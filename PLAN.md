@@ -8,7 +8,8 @@ Stacks is a casino-session ledger for groups of friends. Members log buy-ins and
 
 - **Accounts.** Sign in with Clerk (email, Google, Apple) on web and mobile.
 - **Groups.** A group is one shared ledger with a fixed currency. You can create one, invite people with a link or code, and give members the owner, admin or member role. Members can leave, and admins can remove them.
-- **Sessions.** A session is one trip or sitting: a venue (a casino, or online), a game, a start and end time, and the people who played. A session is either *live* or *closed*. An admin can reopen a closed session, so closing isn't permanent.
+- **Guest players.** Anyone can add a friend who hasn't signed up as a guest, with just a name. Guests play, owe and are owed like anyone else. Each guest gets a claim link; when they sign up through it, their history becomes theirs.
+- **Sessions.** A session is one trip or sitting: a venue (a casino, or online), a game, a start and end time, and the people who played. A session is either _live_ or _closed_. An admin can reopen a closed session, so closing isn't permanent.
 - **Entries.** An entry is a buy-in, a rebuy, a cash-out or an adjustment for one player. Each entry also records whose money paid for it (a buy-in) or who received it (a cash-out). That's how debts appear without anyone typing them in.
 - **Balances and settle up.** Each member gets a net balance. "Settle up" shows the fewest payments that clear every balance, and a payment, once recorded, becomes a settlement entry.
 - **History and stats.** Results over time for you and for the group, broken down by game, venue and member, with session counts and hours played.
@@ -26,12 +27,12 @@ Stacks is a casino-session ledger for groups of friends. Members log buy-ins and
 
 ### How debts arise
 
-| Event | Recorded as | Debt effect |
-| --- | --- | --- |
-| Bea covers Alex's $100 buy-in | `buy_in` 100, player Alex, counterparty Bea | Alex owes Bea $100 |
-| Alex cashes out $300 and Bea holds the cash | `cash_out` 300, player Alex, counterparty Bea | Bea owes Alex $300 |
-| Alex pays Bea back $100 | `settlement` 100, from Alex, to Bea | Alex's debt to Bea goes down by $100 |
-| An entry with no counterparty (or the player themself) | — | Affects results only |
+| Event                                                  | Recorded as                                   | Debt effect                          |
+| ------------------------------------------------------ | --------------------------------------------- | ------------------------------------ |
+| Bea covers Alex's $100 buy-in                          | `buy_in` 100, player Alex, counterparty Bea   | Alex owes Bea $100                   |
+| Alex cashes out $300 and Bea holds the cash            | `cash_out` 300, player Alex, counterparty Bea | Bea owes Alex $300                   |
+| Alex pays Bea back $100                                | `settlement` 100, from Alex, to Bea           | Alex's debt to Bea goes down by $100 |
+| An entry with no counterparty (or the player themself) | —                                             | Affects results only                 |
 
 A player's session result is the sum of their cash-outs and adjustments minus the sum of their buy-ins. That number is separate from debts: you can win at the table and still owe a friend.
 
@@ -41,20 +42,20 @@ This follows T3Code: Effect end to end, typed contracts shared over the wire, an
 
 ```
 apps/
-  api/        Cloudflare Worker: Effect RPC over HTTP, Clerk JWT auth, Postgres
+  api/        Cloudflare Worker: Effect HttpApi, Clerk JWT auth, Postgres
   web/        React 19 + Vite + TanStack Router + Tailwind v4 + Base UI
   mobile/     Expo + React Navigation native-stack + Uniwind + Clerk Expo
 packages/
   contracts/       Effect Schema domain types and the RpcGroup definitions. No runtime logic.
   shared/          Pure logic with subpath exports: money, results, balances, settle-up, time
-  client-runtime/  RPC client, auth token wiring, atoms, optimistic mutations (web + mobile)
+  client-runtime/  Typed API client (AtomHttpApi), auth token wiring, atoms, optimistic mutations (web + mobile)
 docs/
   internals/  Decisions and constraints only (T3Code's doc rules)
 ```
 
 ### Request flow
 
-1. A client calls an RPC defined in `@stacks/contracts`, using `@stacks/client-runtime` and sending a Clerk session token.
+1. A client calls an endpoint of the `StacksApi` defined in `@stacks/contracts` (Effect `HttpApi`, as T3Code's relay does), using `@stacks/client-runtime` and sending a Clerk session token.
 2. In `apps/api`, the handler decodes the input and calls **one service method**. It then maps errors. Transports stay thin.
 3. The service checks group membership and role, then writes in a single transaction. Ledger rows are only ever inserted: an edit voids the old entry and inserts a new one, so the audit trail stays complete.
 4. Reads come back as projections the client can use directly: group summary, session detail, balances. Balances and results are computed with the same `@stacks/shared` functions the client uses, so optimistic UI and the server always agree.
@@ -78,9 +79,12 @@ venues           id, group_id, name, kind (casino|online|home), city, archived_a
 sessions         id, group_id, venue_id, game (slots|blackjack|roulette|craps|baccarat|
                  poker_cash|poker_tourney|other), status (live|closed),
                  started_at, ended_at, notes, created_by, closed_by, reopened_at
-session_players  session_id, user_id, joined_at
+players          id, group_id, display_name, user_id (null for a guest), claim_code,
+                 claimed_at, created_by, created_at
+session_players  session_id, player_id, joined_at
 entries          id, group_id, session_id (null for settlements), kind
-                 (buy_in|cash_out|adjustment|settlement), player_id, counterparty_id,
+                 (buy_in|cash_out|adjustment|settlement), player_id, counterparty_id
+                 (both players.id),
                  amount_minor (bigint, > 0), occurred_at, note,
                  created_by, created_at, voided_at, voided_by, void_reason,
                  replaces_entry_id
@@ -91,7 +95,8 @@ Rules (enforced in the service, with the shape enforced by DB constraints too):
 
 - A session can't close while any player has buy-ins and no cash-out. They can cash out $0 to record a bust.
 - The creator of an entry, its player, or a group admin can void it. Voided entries stay visible in the session history, struck through.
-- A settlement's `player_id` is the payer and its `counterparty_id` is the payee. Both must be members of the group.
+- A settlement's `player_id` is the payer and its `counterparty_id` is the payee. Both must be players in the group.
+- Every ledger reference points at `players`, never at `users`. A member's player row is created when they join, and claiming a guest just sets `user_id` on the guest's row, so no history has to move. Someone who joins and then claims a guest ends up with the guest's row; their empty auto-created row is removed.
 - Someone who leaves a group keeps their history and balances. They can't leave while their balance isn't zero (admins can override this).
 
 ## Shared logic (`packages/shared`)
@@ -141,19 +146,19 @@ These are pure functions with thorough unit tests, and they're the first code wr
 
 ## Delivery phases
 
-| Phase | Deliverable | Done when |
-| --- | --- | --- |
-| 0. Scaffold | Monorepo, catalog, vp config, tsconfig base, CI, AGENTS.md, empty apps that boot | `pnpm dev` runs web, api and Expo. CI is green |
-| 1. Core | `contracts` schemas and `shared` ledger logic | Unit and property tests cover money, results, balances and settle-up |
-| 2. API | DB schema and migrations, Clerk auth, services and RPCs for groups, invites, sessions, entries and settlements, plus a seed script | Integration tests run against a real Postgres. The preview stage deploys |
-| 3. Web | client-runtime and every v1 screen on the web | A full flow works on web: create a group, invite someone, run a session, settle up |
-| 4. Mobile | The same screens on Expo, plus live mode | The same flow works on iOS and Android dev clients. EAS preview build exists |
-| 5. Polish | Stats, limits and reminders, CSV export, empty and error states, `emil-prep-for-prod` pass | Ready for TestFlight and a Play internal track |
-| 6. Next | Realtime with a Durable Object, offline write queue, pooled play, widgets and Live Activity | — |
+| Phase       | Deliverable                                                                                                                        | Done when                                                                          |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 0. Scaffold | Monorepo, catalog, vp config, tsconfig base, CI, AGENTS.md, empty apps that boot                                                   | `pnpm dev` runs web, api and Expo. CI is green                                     |
+| 1. Core     | `contracts` schemas and `shared` ledger logic                                                                                      | Unit and property tests cover money, results, balances and settle-up               |
+| 2. API      | DB schema and migrations, Clerk auth, services and RPCs for groups, invites, sessions, entries and settlements, plus a seed script | Integration tests run against a real Postgres. The preview stage deploys           |
+| 3. Web      | client-runtime and every v1 screen on the web                                                                                      | A full flow works on web: create a group, invite someone, run a session, settle up |
+| 4. Mobile   | The same screens on Expo, plus live mode                                                                                           | The same flow works on iOS and Android dev clients. EAS preview build exists       |
+| 5. Polish   | Stats, limits and reminders, CSV export, empty and error states, `emil-prep-for-prod` pass                                         | Ready for TestFlight and a Play internal track                                     |
+| 6. Next     | Realtime with a Durable Object, offline write queue, pooled play, widgets and Live Activity                                        | —                                                                                  |
 
 ## Risks and open questions
 
 - **App store review.** Apple and Google allow tracking apps that don't involve real-money wagering, but expect a 17+ age rating, and the listing copy must not suggest the app takes bets. Don't link out to casinos or sportsbooks.
 - **Data sensitivity.** Gambling records are personal. Members see only their own groups, and every query is scoped by membership. Add account deletion (the App Store requires it): delete the profile and anonymize the user's ledger rows, so other members' balances still add up.
 - **Disputed entries.** v1 lets the creator, the player or an admin void an entry. If that turns out to be too loose, add a "player must confirm entries made for them" setting.
-- **Questions to settle before phase 2:** Should each group have its own venue list, or should there be a shared catalog? Should poker tournaments track placement and prize separately from cash-out? What should the app do for members who haven't signed up yet ("guest players" whose name is just text)? Guests matter a lot for groups, and they need a `users.claimed_at` flow.
+- **Questions to settle before phase 2:** Should each group have its own venue list, or should there be a shared catalog? Should poker tournaments track placement and prize separately from cash-out?

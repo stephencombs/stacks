@@ -1,0 +1,36 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Hold back versions published in the last day; most bad releases are pulled by then.
+minimumReleaseAge: 1440
+
+onlyBuiltDependencies:
+  - "@tsc-rs/typescript"
+  - esbuild
+  - workerd
+
+# Shared versions. Packages depend on `catalog:` so web, mobile and api never drift.
+catalog:
+  "@effect/atom-react": 4.0.5
+  "@tailwindcss/vite": 4.3.3
+  "@types/node": 24.12.4
+  "@types/react": ~19.3.0
+  "@types/react-dom": ~19.3.0
+  effect: 4.0.5
+  knip: 6.34.0
+  react: 19.3.0
+  react-dom: 19.3.0
+  tailwindcss: 4.3.3
+  typescript: npm:@tsc-rs/typescript@0.8.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  vite-plus: 1.4.0
+
+# `vite` is vite-plus-core and `typescript` is @tsc-rs/typescript; their version numbers sit
+# outside what other packages declare, but both are drop-in replacements.
+peerDependencyRules:
+  allowAny:
+    - typescript
+    - vite
+  allowedVersions:
+    vite: "*"

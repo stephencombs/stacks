@@ -1,0 +1,28 @@
+{
+  "name": "@stacks/monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp run --parallel --filter @stacks/api --filter @stacks/web dev",
+    "dev:api": "vp run --filter @stacks/api dev",
+    "dev:web": "vp run --filter @stacks/web dev",
+    "dev:mobile": "vp run --filter @stacks/mobile dev",
+    "build": "vp run --filter './apps/*' build",
+    "typecheck": "vp run -r --cache typecheck",
+    "lint": "vp lint --report-unused-disable-directives",
+    "fmt": "vp fmt",
+    "fmt:check": "vp fmt --check",
+    "test": "vp run -r test",
+    "knip": "knip"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "knip": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

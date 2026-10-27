@@ -1,0 +1,17 @@
+node_modules/
+.pnpm-store/
+dist/
+*.tsbuildinfo
+*.log
+.DS_Store
+.idea/
+.env*
+!.env.example
+.wrangler/
+.alchemy/
+.tanstack/
+.vitest-*
+__screenshots__/
+apps/mobile/.expo/
+apps/mobile/ios/
+apps/mobile/android/
