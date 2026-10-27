@@ -18,7 +18,8 @@ const GENERATED = [
 export default defineConfig({
   test: {
     environment: "node",
-    exclude: ["**/node_modules/**", "**/dist/**"],
+    // e2e/ runs under Playwright (`pnpm test:e2e`), not vitest.
+    exclude: ["**/node_modules/**", "**/dist/**", "**/dist-web/**", "**/e2e/**"],
     allowOnly: !process.env.CI,
     // Flaky tests are fixed, not retried.
     retry: 0,

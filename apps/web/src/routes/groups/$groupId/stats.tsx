@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 import { Money } from "~/components/Money";
 import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
 import { GroupHeader } from "~/features/GroupHeader";
-import { playerNames } from "~/features/group";
-import { gameNames } from "~/lib/format";
+import { playerNames } from "@stacks/client-runtime/format";
+import { gameNames } from "@stacks/client-runtime/format";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/groups/$groupId/stats")({ component: Stats });

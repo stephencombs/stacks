@@ -1,0 +1,150 @@
+import { expect, test, type Page } from "@playwright/test";
+
+import { createUsers, deleteUsers, signIn } from "./users";
+
+const SCREENSHOTS = process.env.E2E_SCREENSHOT_DIR;
+const shoot = (page: Page, name: string) =>
+  SCREENSHOTS
+    ? page.screenshot({ path: `${SCREENSHOTS}/mobile-${name}.png`, fullPage: true })
+    : Promise.resolve();
+
+// The web stack keeps earlier screens mounted but hidden, so lookups only count visible text.
+test.describe.serial("live mode on a phone", () => {
+  let users: Awaited<ReturnType<typeof createUsers>> = [];
+  test.beforeAll(async () => {
+    users = await createUsers(["Alex", "Bea"]);
+  });
+  test.afterAll(async () => {
+    await deleteUsers(users);
+  });
+
+  test("create, invite, play, close and settle up", async ({ browser }) => {
+    const [alexUser, beaUser] = users;
+    const contextOptions = test.info().project.use;
+    const alex = await (await browser.newContext(contextOptions)).newPage();
+    const bea = await (await browser.newContext(contextOptions)).newPage();
+
+    await signIn(alex, alexUser!.emailAddress);
+    await expect(alex.getByText("Your groups").filter({ visible: true })).toBeVisible();
+    await alex.getByRole("button", { name: "New group" }).filter({ visible: true }).click();
+    await alex.getByLabel("Group name").fill("Vegas crew");
+    await expect(alex.getByLabel("Your name in this group")).toHaveValue("Alex");
+    await alex.getByRole("button", { name: "Create group" }).filter({ visible: true }).click();
+    await expect(
+      alex.getByRole("button", { name: "Start a session" }).filter({ visible: true }),
+    ).toBeVisible();
+    const groupUrl = alex.url();
+
+    await alex.getByRole("button", { name: "People" }).filter({ visible: true }).click();
+    await alex.getByRole("button", { name: "New invite link" }).filter({ visible: true }).click();
+    const inviteLink = (await alex
+      .getByText(/\/join\//)
+      .filter({ visible: true })
+      .textContent())!;
+    await alex.getByRole("button", { name: "Add a guest" }).filter({ visible: true }).click();
+    await alex.getByLabel("Name", { exact: true }).fill("Gus");
+    await alex.getByRole("button", { name: "Add guest" }).filter({ visible: true }).click();
+    await expect(
+      alex.getByRole("button", { name: "Send claim link" }).filter({ visible: true }),
+    ).toBeVisible();
+
+    await signIn(bea, beaUser!.emailAddress);
+    await bea.goto(new URL(inviteLink).pathname);
+    await expect(bea.getByText("Vegas crew").filter({ visible: true })).toBeVisible();
+    await bea.getByRole("button", { name: "Join group" }).filter({ visible: true }).click();
+    await expect(
+      bea.getByRole("button", { name: "Start a session" }).filter({ visible: true }),
+    ).toBeVisible();
+
+    await alex.goto(groupUrl);
+    await alex.getByRole("button", { name: "Start a session" }).filter({ visible: true }).click();
+    await alex.getByRole("button", { name: "Add a venue" }).filter({ visible: true }).click();
+    await alex.getByLabel("Name", { exact: true }).fill(`Wynn test ${Date.now().toString(36)}`);
+    await alex.getByLabel("City").fill("Las Vegas");
+    await alex.getByRole("button", { name: "Add venue" }).filter({ visible: true }).click();
+    await alex.getByRole("radio", { name: "Craps" }).click();
+    await alex.getByRole("checkbox", { name: "Bea" }).click();
+    await alex.getByRole("checkbox", { name: "Gus" }).click();
+    await alex.getByRole("button", { name: "Start session" }).filter({ visible: true }).click();
+    await expect(alex.getByText("Live", { exact: true }).filter({ visible: true })).toBeVisible();
+
+    const record = async (
+      action: "Buy in" | "Cash out",
+      player: string,
+      amount: string,
+      counterparty?: string,
+    ) => {
+      await alex.getByRole("button", { name: `${action} for ${player}` }).click();
+      await alex.getByLabel("Amount").fill(amount);
+      if (counterparty) await alex.getByRole("radio", { name: counterparty }).click();
+      await alex
+        .getByRole("button", { name: action === "Buy in" ? "Record buy in" : "Record cash out" })
+        .filter({ visible: true })
+        .click();
+    };
+
+    await record("Buy in", "Alex", "100");
+    await record("Buy in", "Bea", "200");
+    await record("Buy in", "Alex", "50", "Bea");
+    await record("Buy in", "Gus", "100");
+    // One tap repeats Gus's last buy-in.
+    await alex.getByRole("button", { name: "Rebuy for Gus" }).filter({ visible: true }).click();
+    await expect(
+      alex.getByText("In $200.00 · Out $0.00").filter({ visible: true }).first(),
+    ).toBeVisible();
+
+    await alex.getByRole("button", { name: "Close session" }).filter({ visible: true }).click();
+    await alex
+      .getByRole("button", { name: "Close session" })
+      .filter({ visible: true })
+      .last()
+      .click();
+    await expect(
+      alex
+        .getByText("Everyone who bought in needs a cash-out first.", { exact: false })
+        .filter({ visible: true }),
+    ).toBeVisible();
+    await alex.getByRole("button", { name: "Keep playing" }).filter({ visible: true }).click();
+
+    await record("Cash out", "Alex", "320");
+    await record("Cash out", "Bea", "0");
+    await record("Cash out", "Gus", "220", "Alex");
+    await expect(alex.getByText("+$170.00").filter({ visible: true })).toBeVisible();
+    await shoot(alex, "session-live");
+
+    await alex.getByRole("button", { name: "Close session" }).filter({ visible: true }).click();
+    await alex
+      .getByRole("button", { name: "Close session" })
+      .filter({ visible: true })
+      .last()
+      .click();
+    await expect(alex.getByText("Closed", { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("-$200.00").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("+$20.00").filter({ visible: true })).toBeVisible();
+
+    // Alex owes Bea $50 for the buy-in and Gus $220 for the cash he kept.
+    await alex.goto(groupUrl);
+    await expect(alex.getByText("Owes $270.00").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("Owed $50.00").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("Owed $220.00").filter({ visible: true })).toBeVisible();
+    await shoot(alex, "group");
+
+    await alex.getByRole("button", { name: "Settle up" }).filter({ visible: true }).click();
+    await expect(
+      alex.getByRole("button", { name: "Mark paid" }).filter({ visible: true }),
+    ).toHaveCount(2);
+    await shoot(alex, "settle-up");
+    for (let i = 0; i < 2; i++) {
+      await alex
+        .getByRole("button", { name: "Mark paid" })
+        .filter({ visible: true })
+        .first()
+        .click();
+      await alex.getByRole("button", { name: "Record payment" }).filter({ visible: true }).click();
+    }
+    await expect(alex.getByText("Everyone's square").filter({ visible: true })).toBeVisible();
+
+    await bea.reload();
+    await expect(bea.getByText("Settled up").filter({ visible: true })).toHaveCount(3);
+  });
+});

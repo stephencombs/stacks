@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { Money } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
 import { Skeleton, Surface, Tag } from "~/components/ui/Surface";
-import { formatDay, formatTime, gameNames } from "~/lib/format";
+import { formatDay, formatTime, gameNames } from "@stacks/client-runtime/format";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 const PAGE_SIZE = 30;

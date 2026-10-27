@@ -24,5 +24,7 @@ export default (): ExpoConfig => ({
   userInterfaceStyle: "automatic",
   ios: { bundleIdentifier: id, supportsTablet: true },
   android: { package: id },
+  plugins: ["@clerk/expo", "expo-secure-store", "expo-web-browser"],
+  web: { bundler: "metro", output: "single" },
   extra: { appVariant: variant },
 });

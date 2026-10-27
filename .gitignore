@@ -18,3 +18,4 @@ apps/mobile/android/
 .dev.vars
 test-results/
 playwright-report/
+dist-web/

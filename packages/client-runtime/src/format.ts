@@ -1,4 +1,5 @@
 import * as DateTime from "effect/DateTime";
+import type { GroupDetail, PlayerId } from "@stacks/contracts";
 
 const day = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -38,3 +39,9 @@ export const gameNames = {
   poker_tourney: "Poker tournament",
   other: "Other",
 } as const;
+
+export const playerNames = (detail: GroupDetail) =>
+  new Map<PlayerId, string>(detail.players.map((player) => [player.id, player.displayName]));
+
+/** Admins and the owner manage people, reopen sessions and void anyone's entries. */
+export const isAdmin = (detail: GroupDetail) => detail.role !== "member";

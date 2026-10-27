@@ -7,7 +7,7 @@ import { ButtonLink } from "~/components/ui/Button";
 import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
 import { GroupHeader } from "~/features/GroupHeader";
 import { SessionHistory, SessionList } from "~/features/SessionList";
-import { playerNames } from "~/features/group";
+import { playerNames } from "@stacks/client-runtime/format";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/groups/$groupId/")({ component: GroupHome });

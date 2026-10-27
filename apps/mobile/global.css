@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "uniwind";
 
+@theme {
+  /* Loaded with expo-font in App.tsx under these names. */
+  --font-serif: "Newsreader_500Medium";
+}
+
 /* Keep in step with apps/web/src/index.css. */
 @layer theme {
   :root {

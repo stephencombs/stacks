@@ -17,8 +17,8 @@ import { FormError, Select } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { SectionHeading, Skeleton, Surface, Tag } from "~/components/ui/Surface";
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
-import { isAdmin, playerNames } from "~/features/group";
-import { formatDay, formatDuration, formatTime, gameNames } from "~/lib/format";
+import { isAdmin, playerNames } from "@stacks/client-runtime/format";
+import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/sessions/$sessionId")({ component: SessionPage });

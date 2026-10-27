@@ -18,7 +18,7 @@ import { SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
 import { cn } from "~/components/ui/cn";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
 import { VenuePicker } from "~/features/VenuePicker";
-import { gameNames } from "~/lib/format";
+import { gameNames } from "@stacks/client-runtime/format";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/groups/$groupId/sessions/new")({ component: NewSession });

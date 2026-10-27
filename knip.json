@@ -3,7 +3,13 @@
   "ignoreBinaries": ["eas"],
   "workspaces": {
     "apps/mobile": {
-      "ignoreDependencies": ["@babel/core", "@react-navigation/elements", "expo-updates"]
+      "ignoreDependencies": [
+        "@babel/core",
+        "@react-navigation/elements",
+        "expo-updates",
+        "expo-font",
+        "serve"
+      ]
     }
   }
 }

@@ -13,7 +13,7 @@ import { Menu, MenuItem } from "~/components/ui/Menu";
 import { SectionHeading, Skeleton, Surface, Tag } from "~/components/ui/Surface";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
 import { GroupHeader } from "~/features/GroupHeader";
-import { formatDay } from "~/lib/format";
+import { formatDay } from "@stacks/client-runtime/format";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/groups/$groupId/settings")({ component: People });
