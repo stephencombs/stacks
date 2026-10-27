@@ -19,7 +19,8 @@ Requires Node 22.12+ (CI uses 24), pnpm 10 and Postgres (Docker works).
 ```sh
 pnpm install
 docker compose up -d                              # Postgres with `stacks` and `stacks_test`
-cp apps/api/.dev.vars.example apps/api/.dev.vars  # then add your Clerk keys
+cp apps/api/.dev.vars.example apps/api/.dev.vars  # then add your Clerk secret key
+cp .env.example apps/web/.env.local                # then add your Clerk publishable key
 pnpm --filter @stacks/api db:migrate
 pnpm --filter @stacks/api db:seed -- --owner <your Clerk user ID>
 pnpm dev          # API on :8787 and web on :5173 (Vite proxies /api)
@@ -31,6 +32,10 @@ The seed builds one group with four players, 30 sessions and some settlements. `
 In Clerk, add `name` and `picture` claims to the session token (Sessions → Customize session token: `{"name": "{{user.full_name}}", "picture": "{{user.image_url}}"}`) so the API knows what to call people.
 
 The mobile app needs a dev client build on your simulator or phone the first time: `pnpm --filter @stacks/mobile ios` (or `android`), or an EAS build with `pnpm --filter @stacks/mobile eas:dev`. It finds the API on the machine running Metro; set `EXPO_PUBLIC_API_URL` to point it elsewhere.
+
+## End-to-end test
+
+`pnpm --filter @stacks/web test:e2e` runs the whole loop in a browser against your Clerk development instance: two people make a group, invite each other, play a session, close it and settle up. It creates throwaway Clerk users (`+clerk_test` emails and 555-01XX numbers, which Clerk never messages) and deletes them afterwards. It starts the API and web dev servers itself, and needs Postgres running. Set `E2E_SCREENSHOT_DIR` to save desktop and phone screenshots.
 
 ## Check
 

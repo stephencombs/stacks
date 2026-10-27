@@ -38,7 +38,8 @@ export type Session = typeof Session.Type;
 
 /**
  * - `buy_in`: chips bought by `playerId`. A counterparty paid for them, so the player owes them.
- * - `cash_out`: chips cashed by `playerId`. A counterparty kept the cash, so they owe the player.
+ * - `cash_out`: chips cashed by `playerId`, zero for a bust. A counterparty kept the cash, so they
+ *   owe the player.
  * - `adjustment`: a signed correction to the player's result. Never creates a debt.
  * - `settlement`: `playerId` paid `counterpartyId` back outside the app.
  */
@@ -89,6 +90,10 @@ function entryShapeIssue(entry: {
   }
   if (entry.counterpartyId === entry.playerId) {
     return { path: ["counterpartyId"], issue: "leave empty when it's the player's own money" };
+  }
+  // A player who busted cashes out zero, which is what lets the session close.
+  if (entry.kind === "cash_out") {
+    return entry.amount >= 0 ? undefined : { path: ["amount"], issue: "must not be negative" };
   }
   return entry.amount > 0 ? undefined : { path: ["amount"], issue: "must be positive" };
 }

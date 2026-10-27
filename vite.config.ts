@@ -54,6 +54,7 @@ export default defineConfig({
       ],
       "eslint/no-shadow": "off",
       "eslint/no-await-in-loop": "off",
+      "eslint/no-underscore-dangle": "off",
       "unicorn/consistent-function-scoping": "off",
       "unicorn/no-array-sort": "off",
       "oxc/no-map-spread": "off",

@@ -13,6 +13,7 @@ import {
   ClaimPreview,
   GroupDetail,
   GroupListItem,
+  GroupStats,
   Invite,
   InvitePreview,
   SessionDetail,
@@ -132,6 +133,13 @@ const GroupsGroup = HttpApiGroup.make("groups")
     HttpApiEndpoint.get("get", "/groups/:groupId", {
       params: groupParams,
       success: GroupDetail,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("stats", "/groups/:groupId/stats", {
+      params: groupParams,
+      success: GroupStats,
       error: [Forbidden, NotFound],
     }),
   )

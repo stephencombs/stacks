@@ -45,6 +45,10 @@ describe("Entry", () => {
     expect(accepts({ amount: Number.MAX_SAFE_INTEGER + 1 })).toBe(false);
   });
 
+  it("records a bust as a zero cash-out", () => {
+    expect(accepts({ kind: "cash_out", amount: 0 })).toBe(true);
+  });
+
   it("requires positive amounts except on adjustments, which can't be zero", () => {
     expect(accepts({ kind: "buy_in", amount: 0 })).toBe(false);
     expect(accepts({ kind: "cash_out", amount: -5 })).toBe(false);

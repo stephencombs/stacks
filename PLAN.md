@@ -164,6 +164,8 @@ These are pure functions with thorough unit tests, and they're the first code wr
 | 5. Polish   | Stats, limits and reminders, CSV export, empty and error states, `emil-prep-for-prod` pass                                                                                | Ready for TestFlight and a Play internal track                                     |
 | 6. Next     | Realtime with a Durable Object, offline write queue, pooled play, widgets and Live Activity                                                                               | —                                                                                  |
 
+Phase 3 status: every v1 screen works on the web, and a Playwright test runs the full loop against the real Clerk development instance. Entries refresh after each write rather than updating optimistically; live mode on mobile (phase 4) is where instant updates matter most.
+
 Phase 2 status: the API, schema, auth, catalog import and seed are built and tested against Postgres. Deploying (alchemy, Cloudflare, Hyperdrive and a hosted Postgres) waits for accounts and keys. `user_limits` arrives with limits in phase 5.
 
 ## Risks and open questions

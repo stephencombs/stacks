@@ -1,22 +1,45 @@
 @import "tailwindcss";
+@import "@fontsource-variable/newsreader";
 
+/* Keep in step with apps/mobile/global.css. */
 @theme {
-  --color-surface: oklch(0.97 0.006 95);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Newsreader Variable", ui-serif, Georgia, "Times New Roman", serif;
+
+  --color-canvas: oklch(0.975 0.006 95);
+  --color-surface: oklch(0.993 0.003 95);
+  --color-sunken: oklch(0.948 0.008 95);
   --color-ink: oklch(0.22 0.01 95);
-  --color-muted: oklch(0.52 0.01 95);
-  --color-line: oklch(0.9 0.008 95);
-  --color-win: oklch(0.55 0.13 150);
-  --color-loss: oklch(0.56 0.17 28);
+  --color-muted: oklch(0.5 0.012 95);
+  --color-faint: oklch(0.64 0.01 95);
+  --color-line: oklch(0.22 0.01 95 / 0.1);
+  --color-line-strong: oklch(0.22 0.01 95 / 0.18);
+  --color-accent: oklch(0.24 0.012 95);
+  --color-accent-ink: oklch(0.985 0.004 95);
+  --color-win: oklch(0.52 0.12 150);
+  --color-loss: oklch(0.55 0.17 28);
+  --color-live: oklch(0.6 0.15 65);
+  --color-danger: oklch(0.52 0.18 28);
+  --color-disabled: oklch(0.8 0.006 95);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-surface: oklch(0.18 0.004 95);
+    --color-canvas: oklch(0.17 0.004 95);
+    --color-surface: oklch(0.205 0.005 95);
+    --color-sunken: oklch(0.15 0.004 95);
     --color-ink: oklch(0.94 0.006 95);
-    --color-muted: oklch(0.68 0.008 95);
-    --color-line: oklch(0.3 0.006 95);
-    --color-win: oklch(0.72 0.14 150);
-    --color-loss: oklch(0.7 0.15 28);
+    --color-muted: oklch(0.7 0.008 95);
+    --color-faint: oklch(0.56 0.008 95);
+    --color-line: oklch(0.29 0.005 95);
+    --color-line-strong: oklch(0.36 0.006 95);
+    --color-accent: oklch(0.93 0.008 95);
+    --color-accent-ink: oklch(0.18 0.004 95);
+    --color-win: oklch(0.74 0.12 150);
+    --color-loss: oklch(0.72 0.13 28);
+    --color-live: oklch(0.78 0.12 70);
+    --color-danger: oklch(0.7 0.14 28);
+    --color-disabled: oklch(0.35 0.005 95);
   }
 }
 
@@ -24,8 +47,28 @@
   html {
     color-scheme: light dark;
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
-    @apply bg-surface text-ink;
+    @apply bg-canvas font-sans text-ink;
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }

@@ -7,4 +7,8 @@ const devApiUrl = () => {
   return metroHost ? `http://${metroHost}:8787` : "http://localhost:8787";
 };
 
-export const Stacks = makeStacksClient(process.env.EXPO_PUBLIC_API_URL ?? devApiUrl());
+// Sign-in arrives with the phase 4 screens; until then only public endpoints are called.
+export const Stacks = makeStacksClient({
+  baseUrl: process.env.EXPO_PUBLIC_API_URL ?? devApiUrl(),
+  getToken: async () => null,
+});

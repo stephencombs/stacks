@@ -156,3 +156,64 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
     }),
   );
 });
+
+it.layer(TestApi.layer, { timeout: "30 seconds" })("stats", (it) => {
+  it.effect("adds up closed sessions by player, game and venue", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const group = yield* groupWith(alex);
+      const groupId = group.group.id;
+      const me = group.myPlayerId;
+      const venue = yield* catalogVenue(alex);
+      const play = (game: "craps" | "slots", buyIn: number, cashOut: number | null) =>
+        Effect.gen(function* () {
+          const sessionId = ids.session();
+          yield* alex.sessions.create({
+            params: { groupId },
+            payload: { id: sessionId, venueId: venue.id, game, playerIds: [me], notes: null },
+          });
+          const entry = (kind: "buy_in" | "cash_out", amount: number) =>
+            alex.ledger.addEntry({
+              params: { sessionId },
+              payload: {
+                id: ids.entry(),
+                kind,
+                playerId: me,
+                counterpartyId: null,
+                amount: usd(amount),
+                note: null,
+                replacesEntryId: null,
+              },
+            });
+          yield* entry("buy_in", buyIn);
+          if (cashOut !== null) {
+            yield* entry("cash_out", cashOut);
+            yield* alex.sessions.close({ params: { sessionId }, payload: {} });
+          }
+        });
+      yield* play("craps", 10000, 25000);
+      yield* play("craps", 10000, 0);
+      yield* play("slots", 5000, 6000);
+      yield* play("slots", 99900, null);
+
+      const stats = yield* alex.groups.stats({ params: { groupId } });
+      expect(stats.sessionCount).toBe(3);
+      expect(stats.byPlayer).toEqual([
+        { playerId: me, buyIn: 25000, cashOut: 31000, adjustment: 0, net: 6000 },
+      ]);
+      expect(stats.byGame).toEqual(
+        expect.arrayContaining([
+          { key: "craps", sessionCount: 2, results: [expect.objectContaining({ net: 5000 })] },
+          { key: "slots", sessionCount: 1, results: [expect.objectContaining({ net: 1000 })] },
+        ]),
+      );
+      expect(stats.byVenue).toEqual([
+        {
+          key: expect.objectContaining({ id: venue.id }),
+          sessionCount: 3,
+          results: [expect.objectContaining({ net: 6000 })],
+        },
+      ]);
+    }),
+  );
+});

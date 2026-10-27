@@ -1,3 +1,4 @@
+import "vite-plus/test/config";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
@@ -11,6 +12,8 @@ export default defineConfig({
   resolve: {
     alias: { "~": NodeURL.fileURLToPath(new URL("./src", import.meta.url)) },
   },
+  // e2e/ runs under Playwright (`pnpm test:e2e`), not vitest.
+  test: { exclude: ["e2e/**", "node_modules/**"] },
   server: {
     port: 5173,
     // Dev is single-origin: the browser calls /api and Vite forwards it to the worker.

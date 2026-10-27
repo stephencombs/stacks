@@ -1,10 +1,82 @@
-import { RegistryProvider } from "@effect/atom-react";
-import { Outlet, createRootRoute } from "@tanstack/react-router";
+import { ClerkFailed, SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/react";
+import { Link, Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
 
-export const Route = createRootRoute({
-  component: () => (
-    <RegistryProvider>
-      <Outlet />
-    </RegistryProvider>
-  ),
-});
+import { Button } from "~/components/ui/Button";
+import { FormError } from "~/components/ui/Field";
+import { StacksProvider } from "~/lib/stacks";
+
+export const Route = createRootRoute({ component: Root });
+
+function Root() {
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  if (!isLoaded) return <Loading />;
+  if (!isSignedIn) return <SignedOut />;
+  return (
+    <StacksProvider key={userId}>
+      <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4">
+        <header className="flex h-16 items-center justify-between">
+          <Wordmark />
+          <UserButton />
+        </header>
+        <main className="flex flex-1 flex-col gap-8 pb-16">
+          <Outlet />
+        </main>
+      </div>
+    </StacksProvider>
+  );
+}
+
+function Wordmark() {
+  return (
+    <Link to="/" className="font-serif text-2xl font-medium tracking-tight">
+      Stacks
+    </Link>
+  );
+}
+
+function Loading() {
+  return (
+    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4">
+      <header className="flex h-16 items-center">
+        <Wordmark />
+      </header>
+      <ClerkFailed>
+        <main className="pt-16">
+          <FormError>Couldn't load sign-in. Check your connection and reload the page.</FormError>
+        </main>
+      </ClerkFailed>
+    </div>
+  );
+}
+
+function SignedOut() {
+  const { pathname } = useLocation();
+  const invited = pathname.startsWith("/join/") || pathname.startsWith("/claim/");
+  return (
+    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4">
+      <header className="flex h-16 items-center">
+        <Wordmark />
+      </header>
+      <main className="flex flex-1 flex-col justify-center gap-6 pb-24">
+        <h1 className="max-w-[18ch] font-serif text-5xl leading-[1.05] font-medium">
+          {invited ? "You've been invited to a group." : "Keep the casino trip honest."}
+        </h1>
+        <p className="max-w-[46ch] text-lg text-muted">
+          {invited
+            ? "Sign in or create an account to see who invited you and join their ledger."
+            : "Log buy-ins and cash-outs as you play. Stacks works out everyone's results and who owes whom, so settling up takes one tap."}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <SignUpButton mode="modal">
+            <Button variant="primary" size="lg">
+              Create an account
+            </Button>
+          </SignUpButton>
+          <SignInButton mode="modal">
+            <Button size="lg">Sign in</Button>
+          </SignInButton>
+        </div>
+      </main>
+    </div>
+  );
+}

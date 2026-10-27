@@ -7,10 +7,18 @@
     "./api": {
       "types": "./src/api.ts",
       "import": "./src/api.ts"
+    },
+    "./errors": {
+      "types": "./src/errors.ts",
+      "import": "./src/errors.ts"
+    },
+    "./ids": {
+      "types": "./src/ids.ts",
+      "import": "./src/ids.ts"
     }
   },
   "scripts": {
-    "test": "vp test run --config ../../vite.config.ts --dir . --passWithNoTests",
+    "test": "vp test run --config ../../vite.config.ts --dir .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -18,6 +26,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   }

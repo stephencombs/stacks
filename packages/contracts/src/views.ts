@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { GroupId, InviteId, PlayerId, UserId, VenueId } from "./ids.ts";
-import { Entry, Session } from "./ledger.ts";
+import { Entry, Game, Session } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 
 export const MemberRole = Schema.Literals(["owner", "admin", "member"]);
@@ -125,3 +125,16 @@ export const ClaimPreview = Schema.Struct({
   displayName: Schema.String,
 });
 export type ClaimPreview = typeof ClaimPreview.Type;
+
+const StatsBreakdown = <K extends Schema.Top>(key: K) =>
+  Schema.Struct({ key, sessionCount: Schema.Int, results: Schema.Array(PlayerResult) });
+
+/** All-time results over closed sessions; live sessions aren't settled yet. */
+export const GroupStats = Schema.Struct({
+  sessionCount: Schema.Int,
+  minutesPlayed: Schema.Int,
+  byPlayer: Schema.Array(PlayerResult),
+  byGame: Schema.Array(StatsBreakdown(Game)),
+  byVenue: Schema.Array(StatsBreakdown(Venue)),
+});
+export type GroupStats = typeof GroupStats.Type;

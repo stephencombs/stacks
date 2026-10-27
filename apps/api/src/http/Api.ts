@@ -8,6 +8,7 @@ import * as Guests from "../features/Guests.ts";
 import * as Invites from "../features/Invites.ts";
 import * as Ledger from "../features/Ledger.ts";
 import * as Sessions from "../features/Sessions.ts";
+import * as Stats from "../features/Stats.ts";
 import * as Venues from "../features/Venues.ts";
 
 /** Database failures are server faults, so they surface as 500s instead of typed errors. */
@@ -23,6 +24,7 @@ const groups = HttpApiBuilder.group(StacksApi, "groups", (handlers) =>
     .handle("list", () => serve(Groups.list()))
     .handle("create", ({ payload }) => serve(Groups.create(payload)))
     .handle("get", ({ params }) => serve(Groups.get(params.groupId)))
+    .handle("stats", ({ params }) => serve(Stats.forGroup(params.groupId)))
     .handle("leave", ({ params }) => serve(Groups.leave(params.groupId)))
     .handle("removeMember", ({ params }) =>
       serve(Groups.removeMember(params.groupId, params.userId)),
