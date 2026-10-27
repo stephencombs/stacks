@@ -29,6 +29,9 @@ A change that works on the path you tested and is missing everywhere else is the
 ## Dev
 
 - `pnpm install` installs. `pnpm dev` starts the API (wrangler, port 8787) and web (Vite, port 5173). Dev is single-origin: Vite proxies `/api` to the worker, so never bake an API URL into the web build for dev.
+- The API needs Postgres: `docker compose up -d`, then `pnpm --filter @stacks/api db:migrate` and `db:seed`. An empty database is a bad test; seed it.
+- API tests run against the real `stacks_test` database (`TEST_DATABASE_URL`), not mocks. Each test signs in as fresh users from `users(...)` in `apps/api/src/testing/fixtures.ts`, so tests never see each other's data.
+- Workers can't share a socket between requests, so the Worker opens a database client per request. Service functions read `SqlClient` and `CurrentUser` from context; never capture them when a layer is built.
 - `pnpm dev:mobile` starts Metro for the dev client. The app finds the API on the same host that serves Metro. Set `EXPO_PUBLIC_API_URL` to override it.
 - Stop what you started, by the PID you captured. Never kill by name pattern.
 
@@ -41,7 +44,7 @@ A change that works on the path you tested and is missing everywhere else is the
 
 ## Where code lives
 
-- `apps/api`: Cloudflare Worker serving the Effect `HttpApi` defined in contracts.
+- `apps/api`: Cloudflare Worker serving the Effect `HttpApi` defined in contracts. `src/features` holds one module of service functions per feature, `src/http/Api.ts` the thin handlers, `src/db/migrations` the SQL migrations (append new ones to `migrations/index.ts`).
 - `apps/web`: React 19, Vite (through vite-plus), TanStack Router file routes, Tailwind v4.
 - `apps/mobile`: Expo with a dev client, React Navigation native-stack (static config), Uniwind.
 - `packages/contracts`: Effect Schema types and the `StacksApi` definition. No runtime logic.

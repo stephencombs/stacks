@@ -56,6 +56,7 @@ export default defineConfig({
       "eslint/no-await-in-loop": "off",
       "unicorn/consistent-function-scoping": "off",
       "unicorn/no-array-sort": "off",
+      "oxc/no-map-spread": "off",
       "eslint/no-restricted-imports": [
         "error",
         {

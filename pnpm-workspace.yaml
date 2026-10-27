@@ -13,6 +13,9 @@ onlyBuiltDependencies:
 # Shared versions. Packages depend on `catalog:` so web, mobile and api never drift.
 catalog:
   "@effect/atom-react": 4.0.5
+  "@clerk/backend": 3.25.0
+  "@effect/platform-node": 4.0.5
+  "@effect/sql-pg": 4.0.5
   "@effect/vitest": 4.0.5
   "@tailwindcss/vite": 4.3.3
   "@types/node": 24.12.4

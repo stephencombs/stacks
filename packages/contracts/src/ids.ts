@@ -21,3 +21,6 @@ export type VenueId = typeof VenueId.Type;
 /** Clerk's user ID (`user_…`), not a UUID. */
 export const UserId = Schema.NonEmptyString.pipe(Schema.brand("UserId"));
 export type UserId = typeof UserId.Type;
+
+export const InviteId = Uuid.pipe(Schema.brand("InviteId"));
+export type InviteId = typeof InviteId.Type;

@@ -150,7 +150,7 @@ These are pure functions with thorough unit tests, and they're the first code wr
 - Root scripts: `dev`, `dev:web`, `dev:api`, `typecheck`, `lint`, `fmt`, `test`, and `check:changed`.
 - `AGENTS.md`/`CLAUDE.md` adapted from T3Code's: glossary (group, session, entry, settlement, balance, result), "hit every surface" (web + mobile + API + contracts), taste rules, and test rules (`it.effect` with `TestClock`, no sleeps).
 - GitHub Actions: lint, typecheck and test on every PR, with change detection so only affected packages run. Separate workflows for web previews, the API deploy with per-PR preview stages through alchemy, and EAS preview builds.
-- A local dev database: Postgres in Docker (or a Neon branch), migrations with drizzle-kit, and a seed script that builds a realistic group of 4 people, 30 sessions and some settlements. The venue catalog has its own import script (see phase 2). An empty database is a bad test.
+- A local dev database: Postgres in Docker (or a Neon branch), plain SQL migrations run by Effect's `PgMigrator` (no Drizzle: one schema language, and no release-candidate ORM to pin), and a seed script that builds a realistic group of 4 people, 30 sessions and some settlements. The venue catalog has its own import script (see phase 2). An empty database is a bad test.
 
 ## Delivery phases
 
@@ -163,6 +163,8 @@ These are pure functions with thorough unit tests, and they're the first code wr
 | 4. Mobile   | The same screens on Expo, plus live mode                                                                                                                                  | The same flow works on iOS and Android dev clients. EAS preview build exists       |
 | 5. Polish   | Stats, limits and reminders, CSV export, empty and error states, `emil-prep-for-prod` pass                                                                                | Ready for TestFlight and a Play internal track                                     |
 | 6. Next     | Realtime with a Durable Object, offline write queue, pooled play, widgets and Live Activity                                                                               | —                                                                                  |
+
+Phase 2 status: the API, schema, auth, catalog import and seed are built and tested against Postgres. Deploying (alchemy, Cloudflare, Hyperdrive and a hosted Postgres) waits for accounts and keys. `user_limits` arrives with limits in phase 5.
 
 ## Risks and open questions
 

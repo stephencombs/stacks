@@ -6,15 +6,24 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "build": "wrangler deploy --dry-run --outdir dist",
-    "test": "vp test run --config ../../vite.config.ts --dir . --passWithNoTests",
-    "typecheck": "tsc --noEmit"
+    "test": "node scripts/migrate.ts --test && vp test run --config ../../vite.config.ts --dir .",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node scripts/migrate.ts",
+    "db:seed": "node scripts/seed.ts",
+    "venues:import": "node scripts/import-venues.ts"
   },
   "dependencies": {
+    "@clerk/backend": "catalog:",
+    "@effect/sql-pg": "catalog:",
     "@stacks/contracts": "workspace:*",
+    "@stacks/shared": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261024.1",
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "wrangler": "4.152.0"

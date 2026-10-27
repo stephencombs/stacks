@@ -15,3 +15,4 @@ __screenshots__/
 apps/mobile/.expo/
 apps/mobile/ios/
 apps/mobile/android/
+.dev.vars
