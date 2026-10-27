@@ -14,7 +14,8 @@
     "test": "vp test run --config ../../vite.config.ts --dir . --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "web": "expo start --web",
-    "test:e2e": "expo export --platform web --output-dir dist-web && playwright test"
+    "test:e2e": "expo export --platform web --output-dir dist-web && playwright test",
+    "ios:device": "expo run:ios --device"
   },
   "dependencies": {
     "@clerk/expo": "catalog:",
