@@ -24,6 +24,7 @@ Stacks is a casino-session ledger for groups of friends. Members log buy-ins and
 - Sports betting, DFS, and bets between people.
 - Pooled or staked play, where several people split one buy-in by share. This is the most likely v2 feature, and the entry model below leaves room for it.
 - Multiple currencies inside one group.
+- Poker tournament details. A tournament is logged like any other session: the entry fee is a buy-in and any prize is a cash-out. Finishing place, field size and re-entries can come later.
 - Offline writes. Reads are cached, and writes need a connection. The IDs are generated on the client, so we can add an offline queue later without changing the schema.
 
 ### How debts arise
@@ -169,4 +170,3 @@ These are pure functions with thorough unit tests, and they're the first code wr
 - **Disputed entries.** v1 lets the creator, the player or an admin void an entry. If that turns out to be too loose, add a "player must confirm entries made for them" setting.
 - **Seeding the venue catalog.** Import land-based casinos from OpenStreetMap (`amenity=casino`), and hand-curate a short list of online casinos. OSM data is under the ODbL, which requires credit to OpenStreetMap and makes the catalog itself share-alike if we ever publish it. That's fine for an in-app list, but the app needs an attribution line. Re-running the import updates venues by `source_ref` and never deletes one that sessions use.
 - **Moderation.** User-added venues show up for everyone, so names need a length limit and basic filtering. Reviewing, verifying and merging venues needs a small admin tool; until it exists, a script can do it.
-- **Question to settle before phase 2:** Should poker tournaments track placement and prize separately from cash-out?
