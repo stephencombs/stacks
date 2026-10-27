@@ -45,6 +45,7 @@ A change that works on the path you tested and is missing everywhere else is the
 - `apps/web`: React 19, Vite (through vite-plus), TanStack Router file routes, Tailwind v4.
 - `apps/mobile`: Expo with a dev client, React Navigation native-stack (static config), Uniwind.
 - `packages/contracts`: Effect Schema types and the `StacksApi` definition. No runtime logic.
+- `packages/shared`: pure ledger logic shared by the API and clients: `money`, `results`, `balances`, `settleUp`. Import a subpath; there's no root export.
 - `packages/client-runtime`: client code shared by web and mobile. Import an explicit subpath (`@stacks/client-runtime/api`); there's no root export.
 - Dependency versions live in the `catalog:` in `pnpm-workspace.yaml`. Add a shared dependency there, not as a version in one package.
 

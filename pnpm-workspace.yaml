@@ -13,6 +13,7 @@ onlyBuiltDependencies:
 # Shared versions. Packages depend on `catalog:` so web, mobile and api never drift.
 catalog:
   "@effect/atom-react": 4.0.5
+  "@effect/vitest": 4.0.5
   "@tailwindcss/vite": 4.3.3
   "@types/node": 24.12.4
   "@types/react": ~19.3.0
@@ -34,3 +35,16 @@ peerDependencyRules:
     - vite
   allowedVersions:
     vite: "*"
+
+overrides:
+  # The patch below points @effect/vitest at vite-plus's bundled vitest. A second vitest
+  # instance fails every test file with "Cannot read properties of undefined (reading 'config')".
+  "@effect/vitest>vitest": "-"
+
+packageExtensions:
+  "@effect/vitest@*":
+    dependencies:
+      vite-plus: 1.4.0
+
+patchedDependencies:
+  "@effect/vitest@4.0.5": patches/@effect__vitest@4.0.5.patch

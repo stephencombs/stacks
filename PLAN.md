@@ -34,7 +34,7 @@ Stacks is a casino-session ledger for groups of friends. Members log buy-ins and
 | Bea covers Alex's $100 buy-in                          | `buy_in` 100, player Alex, counterparty Bea   | Alex owes Bea $100                   |
 | Alex cashes out $300 and Bea holds the cash            | `cash_out` 300, player Alex, counterparty Bea | Bea owes Alex $300                   |
 | Alex pays Bea back $100                                | `settlement` 100, from Alex, to Bea           | Alex's debt to Bea goes down by $100 |
-| An entry with no counterparty (or the player themself) | —                                             | Affects results only                 |
+| An entry with no counterparty (the player's own money) | —                                             | Affects results only                 |
 
 A player's session result is the sum of their cash-outs and adjustments minus the sum of their buy-ins. That number is separate from debts: you can win at the table and still owe a friend.
 
@@ -99,6 +99,7 @@ Rules (enforced in the service, with the shape enforced by DB constraints too):
 
 - A session can't close while any player has buy-ins and no cash-out. They can cash out $0 to record a bust.
 - The creator of an entry, its player, or a group admin can void it. Voided entries stay visible in the session history, struck through.
+- Buy-ins and cash-outs are positive. An adjustment is a signed, non-zero correction to one player's result and never has a counterparty. A counterparty is always someone other than the player; the player's own money has no counterparty.
 - A settlement's `player_id` is the payer and its `counterparty_id` is the payee. Both must be players in the group.
 - Every ledger reference points at `players`, never at `users`. A member's player row is created when they join, and claiming a guest just sets `user_id` on the guest's row, so no history has to move. Someone who joins and then claims a guest ends up with the guest's row; their empty auto-created row is removed.
 - Casino and online venues have no `group_id` and belong to the shared catalog. A home venue always has a `group_id`, and only that group can see or pick it.
@@ -113,7 +114,7 @@ These are pure functions with thorough unit tests, and they're the first code wr
 - `money`: parse, format and add amounts in a currency, with no float math anywhere.
 - `results`: each player's result for a session, each member's result over a range, and breakdowns by game and venue.
 - `balances`: net balance per member, built from non-voided entries.
-- `settleUp`: the smallest set of transfers from those balances (greedy: match the largest debtor with the largest creditor). Test it with property tests: every transfer list must zero out every balance.
+- `settleUp`: transfers that clear those balances. Debtors and creditors are paired from largest to smallest, so n players never need more than n − 1 transfers. Finding the true minimum is NP-hard and not worth it for a friend group. Property tests check that every transfer list zeroes every balance.
 
 ## Clients
 

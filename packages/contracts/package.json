@@ -10,13 +10,14 @@
     }
   },
   "scripts": {
-    "test": "vp test run --config ../../vite.config.ts --dir . --passWithNoTests",
+    "test": "vp test run --config ../../vite.config.ts --dir .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   }
