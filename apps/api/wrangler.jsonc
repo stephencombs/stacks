@@ -18,7 +18,8 @@
     "production": {
       "name": "stacks",
       "workers_dev": true,
-      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "REPLACE_WITH_HYPERDRIVE_ID" }],
+      "vars": { "CLERK_AUTHORIZED_PARTIES": "https://stacks.stephen-jcombs.workers.dev" },
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "b31cff468a5645638b063167ded46c50" }],
       "assets": {
         "directory": "../web/dist",
         "not_found_handling": "single-page-application",
