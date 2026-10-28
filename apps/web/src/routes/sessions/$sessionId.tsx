@@ -7,6 +7,7 @@ import {
   type PlayerId,
   type SessionDetail,
 } from "@stacks/contracts";
+import * as DateTime from "effect/DateTime";
 import { ChevronLeft, UserPlus } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
@@ -81,10 +82,14 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
         <p className="text-muted">
           {gameNames[session.game]} · {formatDay(session.startedAt)} ·{" "}
           {formatTime(session.startedAt)}
-          {session.endedAt
+          {/* Imported sessions end when they start: no length was recorded. */}
+          {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
             ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
             : ""}
         </p>
+        {session.notes ? (
+          <p className="max-w-[65ch] text-sm text-pretty whitespace-pre-line">{session.notes}</p>
+        ) : null}
       </div>
 
       <section className="flex flex-col gap-2">
@@ -112,7 +117,9 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-medium">{names.get(playerId)}</span>
                     <span className="text-sm whitespace-nowrap text-muted tabular-nums">
-                      {result ? (
+                      {result && result.buyIn === 0 && result.cashOut === 0 ? (
+                        "Net result only"
+                      ) : result ? (
                         <>
                           In <Money amount={result.buyIn} currency={currency} /> · Out{" "}
                           <Money amount={result.cashOut} currency={currency} />
@@ -123,7 +130,8 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
                     </span>
                   </div>
                   <div className="text-right font-serif text-xl whitespace-nowrap">
-                    {result && cashedOut.has(playerId) ? (
+                    {/* A closed session's results are final, cash-out or not. */}
+                    {result && (!live || cashedOut.has(playerId)) ? (
                       <Money amount={result.net} currency={currency} tone="result" />
                     ) : result ? (
                       <span className="font-sans text-sm text-muted">Playing</span>

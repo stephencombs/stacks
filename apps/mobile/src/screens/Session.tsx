@@ -197,10 +197,12 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
         <Text className="text-base text-muted">
           {gameNames[session.game]} · {formatDay(session.startedAt)} ·{" "}
           {formatTime(session.startedAt)}
-          {session.endedAt
+          {/* Imported sessions end when they start: no length was recorded. */}
+          {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
             ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
             : ""}
         </Text>
+        {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
       </View>
 
       <View className="gap-3">
@@ -230,7 +232,9 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                     {name}
                   </Text>
                   <Text className="text-sm text-muted tabular-nums">
-                    {result ? (
+                    {result && result.buyIn === 0 && result.cashOut === 0 ? (
+                      "Net result only"
+                    ) : result ? (
                       <>
                         In{" "}
                         <Money amount={result.buyIn} currency={currency} className="text-muted" /> ·
@@ -242,7 +246,8 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                     )}
                   </Text>
                 </View>
-                {result && cashedOut.has(playerId) ? (
+                {/* A closed session's results are final, cash-out or not. */}
+                {result && (!live || cashedOut.has(playerId)) ? (
                   <Money
                     amount={result.net}
                     currency={currency}

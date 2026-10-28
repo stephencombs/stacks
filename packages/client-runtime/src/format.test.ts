@@ -6,4 +6,6 @@ it("sums up what the group has played", () => {
   expect(playedSummary(29, 8100)).toBe("The group has played 29 sessions over 135 hours.");
   expect(playedSummary(1, 60)).toBe("The group has played 1 session over 1 hour.");
   expect(playedSummary(2, 95)).toBe("The group has played 2 sessions over 1.6 hours.");
+  // Imported sessions have no recorded length.
+  expect(playedSummary(41, 0)).toBe("The group has played 41 sessions.");
 });
