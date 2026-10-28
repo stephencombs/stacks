@@ -1,6 +1,13 @@
 import { useAuth } from "@clerk/expo";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { GroupId, InviteId, UserId, type GroupDetail, type Player } from "@stacks/contracts";
+import {
+  GroupId,
+  InviteId,
+  UserId,
+  type GroupDetail,
+  type Invite,
+  type Player,
+} from "@stacks/contracts";
 import { formatDay } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { useState } from "react";
@@ -10,7 +17,7 @@ import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { Row, SectionHeading, Skeleton, Surface, Tag } from "../components/ui/Surface";
+import { List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { webUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
@@ -57,14 +64,14 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
       <InviteSection detail={detail} />
       <View className="gap-2">
         <SectionHeading>Members</SectionHeading>
-        <Surface>
+        <List>
           {members.map((player) => (
             <Row
               key={player.id}
               {...(canManage(player)
                 ? {
                     onPress: () => setManaging(player),
-                    accessibilityLabel: `Manage ${player.displayName}`,
+                    accessibilityHint: "Change their role or remove them",
                   }
                 : {})}
             >
@@ -77,7 +84,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
               {player.role ? <Tag>{roleNames[player.role]}</Tag> : null}
             </Row>
           ))}
-        </Surface>
+        </List>
       </View>
       <View className="gap-2">
         <SectionHeading
@@ -98,7 +105,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
             their history becomes theirs.
           </Text>
         ) : (
-          <Surface>
+          <List>
             {guests.map((player) => (
               <Row key={player.id}>
                 <Text className="flex-1 text-base text-ink">{player.displayName}</Text>
@@ -117,7 +124,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
                 ) : null}
               </Row>
             ))}
-          </Surface>
+          </List>
         )}
       </View>
       <View className="gap-2 border-t border-line pt-6">
@@ -136,7 +143,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
 function InviteSection({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("invites", "create"));
-  const revoke = useAction(stacks.Client.mutation("invites", "revoke"));
+  const [revoking, setRevoking] = useState<Invite | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   return (
     <View className="gap-2">
@@ -164,7 +171,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
               Make a link and send it to anyone you want in the group. Links last a week.
             </Text>
           ) : (
-            <Surface>
+            <List>
               {invites.map((invite) => {
                 const url = `${webUrl}/join/${invite.code}`;
                 return (
@@ -191,19 +198,18 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
                         label="Revoke"
                         size="sm"
                         variant="ghost"
-                        onPress={() => void revoke.run({ params: { inviteId: invite.id } })}
+                        onPress={() => setRevoking(invite)}
                       />
                     </View>
                   </Row>
                 );
               })}
-            </Surface>
+            </List>
           )
         }
       </Loaded>
-      {(create.error ?? revoke.error) ? (
-        <FormError>{create.error ?? revoke.error}</FormError>
-      ) : null}
+      {create.error ? <FormError>{create.error}</FormError> : null}
+      {revoking ? <RevokeSheet invite={revoking} onClose={() => setRevoking(null)} /> : null}
     </View>
   );
 }
@@ -222,6 +228,27 @@ function ManageMemberSheet({
   const remove = useAction(stacks.Client.mutation("groups", "removeMember"));
   const params = { groupId: detail.group.id, userId: UserId.make(player.userId!) };
   const done = (ok: unknown) => (ok ? onClose() : undefined);
+  const [confirming, setConfirming] = useState(false);
+  if (confirming) {
+    return (
+      <Sheet
+        open
+        onClose={onClose}
+        title={`Remove ${player.displayName}?`}
+        description="They lose access to the group. Their history stays in the ledger, and you can invite them back."
+      >
+        {remove.error ? <FormError>{remove.error}</FormError> : null}
+        <Button
+          label="Remove"
+          variant="danger"
+          size="lg"
+          pending={remove.pending}
+          onPress={() => void remove.run({ params }).then(done)}
+        />
+        <Button label="Keep them" onPress={() => setConfirming(false)} />
+      </Sheet>
+    );
+  }
   return (
     <Sheet open onClose={onClose} title={player.displayName}>
       {detail.role === "owner" ? (
@@ -235,16 +262,9 @@ function ManageMemberSheet({
           }
         />
       ) : null}
-      <Button
-        label="Remove from group"
-        variant="danger"
-        pending={remove.pending}
-        onPress={() => void remove.run({ params }).then(done)}
-      />
+      <Button label="Remove from group" variant="danger" onPress={() => setConfirming(true)} />
       <Text className="text-sm text-muted">Their history stays in the group's ledger.</Text>
-      {(setRole.error ?? remove.error) ? (
-        <FormError>{setRole.error ?? remove.error}</FormError>
-      ) : null}
+      {setRole.error ? <FormError>{setRole.error}</FormError> : null}
     </Sheet>
   );
 }
@@ -275,6 +295,35 @@ function LeaveSheet({ detail, onClose }: { detail: GroupDetail; onClose: () => v
         onPress={() => void confirm()}
       />
       <Button label="Stay" onPress={onClose} />
+    </Sheet>
+  );
+}
+
+function RevokeSheet({ invite, onClose }: { invite: Invite; onClose: () => void }) {
+  const stacks = useStacks();
+  const revoke = useAction(stacks.Client.mutation("invites", "revoke"));
+  const confirm = async () => {
+    if (await revoke.run({ params: { inviteId: invite.id } })) onClose();
+  };
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title="Revoke this invite link?"
+      description="Anyone who hasn't joined yet will need a new link."
+    >
+      <Text numberOfLines={1} className="font-mono text-sm text-muted">
+        {`${webUrl}/join/${invite.code}`}
+      </Text>
+      {revoke.error ? <FormError>{revoke.error}</FormError> : null}
+      <Button
+        label="Revoke link"
+        variant="danger"
+        size="lg"
+        pending={revoke.pending}
+        onPress={() => void confirm()}
+      />
+      <Button label="Keep it" onPress={onClose} />
     </Sheet>
   );
 }

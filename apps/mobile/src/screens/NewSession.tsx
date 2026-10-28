@@ -9,13 +9,14 @@ import {
 } from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
+import * as DateTime from "effect/DateTime";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Choice, FormError } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
-import { Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
+import { List, Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { VenuePicker } from "../features/VenuePicker";
@@ -42,12 +43,20 @@ const GAMES = (Object.keys(gameNames) as ReadonlyArray<Game>).map((game) => ({
   label: gameNames[game],
 }));
 
+const STARTS = [
+  { value: "0", label: "Now" },
+  { value: "30", label: "30 min ago" },
+  { value: "60", label: "1 hr ago" },
+  { value: "120", label: "2 hr ago" },
+] as const;
+
 function NewSessionForm({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
   const navigation = useNavigation();
   const create = useAction(stacks.Client.mutation("sessions", "create"));
   const [venue, setVenue] = useState<Venue | null>(null);
   const [game, setGame] = useState<Game>("blackjack");
+  const [startedAgo, setStartedAgo] = useState<(typeof STARTS)[number]["value"]>("0");
   const [playerIds, setPlayerIds] = useState<ReadonlySet<PlayerId>>(
     () => new Set([detail.myPlayerId]),
   );
@@ -78,6 +87,13 @@ function NewSessionForm({ detail }: { detail: GroupDetail }) {
         game,
         playerIds: [first, ...rest],
         notes: null,
+        ...(startedAgo === "0"
+          ? {}
+          : {
+              startedAt: DateTime.subtract(DateTime.nowUnsafe(), {
+                minutes: Number(startedAgo),
+              }),
+            }),
       },
     });
     if (session)
@@ -106,7 +122,7 @@ function NewSessionForm({ detail }: { detail: GroupDetail }) {
         >
           Who's playing
         </SectionHeading>
-        <Surface>
+        <List>
           {players.map((player) => {
             const checked = playerIds.has(player.id);
             return (
@@ -131,15 +147,22 @@ function NewSessionForm({ detail }: { detail: GroupDetail }) {
                     {player.id === detail.myPlayerId ? (
                       <Text className="text-muted"> (you)</Text>
                     ) : null}
-                    {player.userId === null ? <Text className="text-faint"> · guest</Text> : null}
+                    {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
                   </Text>
                 </Pressable>
               </Row>
             );
           })}
-        </Surface>
+        </List>
         <Text className="text-sm text-muted">Anyone else can join the session later.</Text>
       </View>
+      <Choice
+        label="Started"
+        options={STARTS}
+        value={startedAgo}
+        onChange={setStartedAgo}
+        columns={2}
+      />
       {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
       <Button
         label="Start session"

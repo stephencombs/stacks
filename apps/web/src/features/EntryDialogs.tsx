@@ -113,7 +113,7 @@ export function EntryDialog({
         draft.replaces
           ? "The original entry is voided and this one takes its place."
           : draft.kind === "cash_out"
-            ? "Record $0 if they busted."
+            ? `Record ${formatMoney(MinorUnits.make(0), currency)} if they busted.`
             : draft.kind === "adjustment"
               ? "For anything the buy-ins and cash-outs missed. Use a minus sign for a loss."
               : undefined

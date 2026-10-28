@@ -22,8 +22,9 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-sm",
-  md: "h-10 px-4 text-sm",
+  // Touch screens get 44px targets; a mouse can use the tighter sizes.
+  sm: "h-8 px-3 text-sm pointer-coarse:h-11",
+  md: "h-10 px-4 text-sm pointer-coarse:h-11",
   lg: "h-12 px-5 text-base",
 };
 

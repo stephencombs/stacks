@@ -86,7 +86,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                 {mine(row.results) ? (
                   <Money amount={mine(row.results)!.net} currency={currency} tone="result" />
                 ) : (
-                  <span className="text-faint">—</span>
+                  <span className="text-muted">—</span>
                 )}
               </td>
             </tr>
@@ -105,7 +105,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                 {mine(row.results) ? (
                   <Money amount={mine(row.results)!.net} currency={currency} tone="result" />
                 ) : (
-                  <span className="text-faint">—</span>
+                  <span className="text-muted">—</span>
                 )}
               </td>
             </tr>

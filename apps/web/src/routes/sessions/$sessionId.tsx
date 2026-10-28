@@ -19,6 +19,7 @@ import { SectionHeading, Skeleton, Surface, Tag } from "~/components/ui/Surface"
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
+import { formatMoney } from "@stacks/shared/money";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/sessions/$sessionId")({ component: SessionPage });
@@ -176,7 +177,9 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
                 group={group}
                 actions={
                   live && entry.voidedAt === null && canVoid(entry) ? (
-                    <Menu label="Entry actions">
+                    <Menu
+                      label={`Actions for ${names.get(entry.playerId)} ${verbs[entry.kind]} ${formatMoney(entry.amount, currency)}`}
+                    >
                       {entry.kind !== "settlement" ? (
                         <MenuItem
                           onClick={() =>
@@ -252,7 +255,7 @@ function EntryRow({
       </span>
       <div
         className={
-          voided ? "flex min-w-0 flex-1 flex-col text-faint" : "flex min-w-0 flex-1 flex-col"
+          voided ? "flex min-w-0 flex-1 flex-col text-muted" : "flex min-w-0 flex-1 flex-col"
         }
       >
         <span className={voided ? "line-through" : undefined}>

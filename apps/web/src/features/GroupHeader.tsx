@@ -34,9 +34,9 @@ export function GroupHeader({
             params={{ groupId: detail.group.id }}
             aria-current={tab.key === current ? "page" : undefined}
             className={cn(
-              "inline-flex h-9 items-center rounded-lg px-3 text-sm whitespace-nowrap transition-colors duration-150",
+              "inline-flex h-9 items-center rounded-lg pointer-coarse:h-11 px-3 text-sm whitespace-nowrap transition-colors duration-150",
               tab.key === current
-                ? "bg-surface font-medium text-ink shadow-[0_0_0_1px_var(--color-line)]"
+                ? "bg-surface text-ink shadow-[0_0_0_1px_var(--color-line)]"
                 : "text-muted hover:text-ink",
             )}
           >

@@ -4,7 +4,7 @@ import { formatDay, formatTime, gameNames } from "@stacks/client-runtime/format"
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { Row, Surface, Tag } from "../components/ui/Surface";
+import { List, Row, Tag } from "../components/ui/Surface";
 
 export function SessionList({
   sessions,
@@ -15,13 +15,13 @@ export function SessionList({
 }) {
   const navigation = useNavigation();
   return (
-    <Surface>
+    <List>
       {sessions.map(({ session, venue, results }) => {
         const mine = results.find((result) => result.playerId === detail.myPlayerId);
         return (
           <Row
             key={session.id}
-            accessibilityLabel={`${venue.name}, ${gameNames[session.game]}, ${formatDay(session.startedAt)}`}
+            accessibilityHint="Opens the session"
             onPress={() => navigation.navigate("Session", { sessionId: session.id })}
           >
             <View className="flex-1 gap-0.5">
@@ -44,11 +44,11 @@ export function SessionList({
                 className="text-base font-medium"
               />
             ) : (
-              <Text className="text-sm text-faint">Sat out</Text>
+              <Text className="text-sm text-muted">Sat out</Text>
             )}
           </Row>
         );
       })}
-    </Surface>
+    </List>
   );
 }

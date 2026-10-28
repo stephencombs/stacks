@@ -119,7 +119,7 @@ export function EntrySheet({
         keyboardType={draft.kind === "adjustment" ? "numbers-and-punctuation" : "decimal-pad"}
         autoFocus
         error={amountError}
-        inputClassName="h-16 font-serif text-3xl tabular-nums"
+        inputClassName="min-h-16 font-serif text-3xl tabular-nums"
         onSubmitEditing={submit}
       />
       {draft.kind === "buy_in" && !draft.replaces ? (

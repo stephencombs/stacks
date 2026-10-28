@@ -26,9 +26,9 @@ export function TextField({
       <TextInput
         accessibilityLabel={label}
         aria-labelledby={id}
-        placeholderTextColor="#8a877e"
+        placeholderTextColorClassName="accent-muted"
         className={cn(
-          "h-12 rounded-xl border bg-surface px-3 text-base text-ink",
+          "min-h-12 rounded-xl border bg-surface px-3 py-2.5 text-base text-ink",
           error ? "border-danger" : "border-line-strong focus:border-ink",
           inputClassName,
         )}
@@ -92,10 +92,7 @@ export function Choice<A extends string>({
               )}
             >
               <Text
-                className={cn(
-                  "text-center text-sm",
-                  selected ? "font-medium text-accent-ink" : "text-ink",
-                )}
+                className={cn("text-center text-sm", selected ? "text-accent-ink" : "text-ink")}
               >
                 {option.label}
               </Text>

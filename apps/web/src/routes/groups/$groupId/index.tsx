@@ -76,7 +76,7 @@ function GroupHomeView({ detail }: { detail: GroupDetail }) {
                 {player.id === detail.myPlayerId ? (
                   <span className="text-muted"> (you)</span>
                 ) : null}
-                {player.userId === null ? <span className="text-faint"> · guest</span> : null}
+                {player.userId === null ? <span className="text-muted"> · guest</span> : null}
               </span>
               <span className="text-sm">
                 <BalanceLabel

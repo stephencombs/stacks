@@ -39,7 +39,7 @@ function SessionRow({ summary, detail }: { summary: SessionSummary; detail: Grou
             className="font-medium"
           />
         ) : (
-          <span className="text-faint">Sat out</span>
+          <span className="text-muted">Sat out</span>
         )}
       </div>
       <ChevronRight className="size-5 shrink-0 text-faint" aria-hidden />

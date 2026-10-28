@@ -6,7 +6,7 @@ import { Text, View } from "react-native";
 import { BalanceLabel } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { Screen } from "../components/ui/Screen";
-import { EmptyState, Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
+import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { SessionList } from "../features/SessionList";
 import { Loaded, useStacks } from "../lib/stacks";
 
@@ -75,7 +75,7 @@ function GroupView({ detail }: { detail: GroupDetail }) {
 
       <View className="gap-2">
         <SectionHeading>Balances</SectionHeading>
-        <Surface>
+        <List>
           {detail.players.map((player) => (
             <Row key={player.id}>
               <Text numberOfLines={1} className="flex-1 text-base text-ink">
@@ -83,7 +83,7 @@ function GroupView({ detail }: { detail: GroupDetail }) {
                 {player.id === detail.myPlayerId ? (
                   <Text className="text-muted"> (you)</Text>
                 ) : null}
-                {player.userId === null ? <Text className="text-faint"> · guest</Text> : null}
+                {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
               </Text>
               <BalanceLabel
                 amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
@@ -91,7 +91,7 @@ function GroupView({ detail }: { detail: GroupDetail }) {
               />
             </Row>
           ))}
-        </Surface>
+        </List>
       </View>
 
       <View className="gap-2">

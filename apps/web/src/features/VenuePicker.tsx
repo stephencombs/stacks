@@ -249,10 +249,8 @@ function AddVenueDialog({
               <label
                 key={option}
                 className={cn(
-                  "flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
-                  kind === option
-                    ? "bg-accent font-medium text-accent-ink shadow-none"
-                    : "hover:bg-sunken",
+                  "flex h-11 cursor-pointer items-center justify-center rounded-lg outline-offset-2 outline-ink has-[:focus-visible]:outline-2 text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
+                  kind === option ? "bg-accent text-accent-ink shadow-none" : "hover:bg-sunken",
                 )}
               >
                 <input

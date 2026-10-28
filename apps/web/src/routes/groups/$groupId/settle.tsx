@@ -10,7 +10,7 @@ import {
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { applyPayments } from "@stacks/shared/balances";
-import { parseMoney } from "@stacks/shared/money";
+import { formatMoney, parseMoney } from "@stacks/shared/money";
 import { settleUp } from "@stacks/shared/settleUp";
 import * as Option from "effect/Option";
 import { ArrowRight } from "lucide-react";
@@ -114,7 +114,7 @@ function SettleUpView({ detail }: { detail: GroupDetail }) {
                 >
                   <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="font-medium">{names.get(transfer.from)}</span>
-                    <ArrowRight className="size-4 text-faint" aria-label="pays" />
+                    <ArrowRight className="size-4 text-muted" role="img" aria-label="pays" />
                     <span className="font-medium">{names.get(transfer.to)}</span>
                   </span>
                   <Money
@@ -157,14 +157,16 @@ function SettleUpView({ detail }: { detail: GroupDetail }) {
                   <span className="w-24 shrink-0 text-sm text-muted">
                     {formatDay(entry.occurredAt)}
                   </span>
-                  <span className={voided ? "flex-1 text-faint line-through" : "flex-1"}>
+                  <span className={voided ? "flex-1 text-muted line-through" : "flex-1"}>
                     {names.get(entry.playerId)} paid{" "}
                     {entry.counterpartyId ? names.get(entry.counterpartyId) : ""}{" "}
                     <Money amount={entry.amount} currency={currency} className="font-medium" />
                     {entry.note ? <span className="text-muted"> · {entry.note}</span> : null}
                   </span>
                   {!voided && (isAdmin(detail) || entry.playerId === detail.myPlayerId) ? (
-                    <Menu label="Payment actions">
+                    <Menu
+                      label={`Actions for ${names.get(entry.playerId)} paid ${entry.counterpartyId ? names.get(entry.counterpartyId) : ""} ${formatMoney(entry.amount, currency)}`}
+                    >
                       <MenuItem tone="danger" onClick={() => setVoiding(entry)}>
                         Void
                       </MenuItem>

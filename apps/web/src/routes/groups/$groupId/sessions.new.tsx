@@ -116,9 +116,9 @@ function NewSessionForm({ detail }: { detail: GroupDetail }) {
             <label
               key={option}
               className={cn(
-                "flex h-11 cursor-pointer items-center justify-center rounded-lg px-2 text-center text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
+                "flex h-11 cursor-pointer items-center justify-center rounded-lg outline-offset-2 outline-ink has-[:focus-visible]:outline-2 px-2 text-center text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
                 game === option
-                  ? "bg-accent font-medium text-accent-ink shadow-none"
+                  ? "bg-accent text-accent-ink shadow-none"
                   : "bg-surface hover:bg-sunken",
               )}
             >
@@ -162,7 +162,7 @@ function NewSessionForm({ detail }: { detail: GroupDetail }) {
                 {player.id === detail.myPlayerId ? (
                   <span className="text-muted"> (you)</span>
                 ) : null}
-                {player.userId === null ? <span className="text-faint"> · guest</span> : null}
+                {player.userId === null ? <span className="text-muted"> · guest</span> : null}
               </span>
             </label>
           ))}

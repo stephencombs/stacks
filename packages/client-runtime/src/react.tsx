@@ -26,12 +26,19 @@ export function useAction<Arg, A, E>(mutation: Atom.AtomResultFn<Arg, A, E>) {
     pending: false,
     error: null,
   });
-  const execute = async (arg: Omit<Arg, "reactivityKeys">) => {
+  /** Like `run`, but hands back the failure sentence too, for callers that show it elsewhere. */
+  const attempt = async (arg: Omit<Arg, "reactivityKeys">) => {
     setState({ pending: true, error: null });
     const exit = await run({ ...arg, reactivityKeys: LEDGER_KEYS } as Arg);
     const error = Exit.isFailure(exit) ? describeError(Cause.squash(exit.cause)) : null;
     setState({ pending: false, error });
-    return Exit.isSuccess(exit) ? exit.value : null;
+    return { value: Exit.isSuccess(exit) ? exit.value : null, error };
   };
-  return { run: execute, ...state, clearError: () => setState((s) => ({ ...s, error: null })) };
+  const execute = async (arg: Omit<Arg, "reactivityKeys">) => (await attempt(arg)).value;
+  return {
+    run: execute,
+    attempt,
+    ...state,
+    clearError: () => setState((s) => ({ ...s, error: null })),
+  };
 }

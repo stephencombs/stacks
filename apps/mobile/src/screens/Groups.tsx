@@ -10,7 +10,7 @@ import { Button } from "../components/ui/Button";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, Row, Skeleton, Surface, Tag } from "../components/ui/Surface";
+import { EmptyState, List, Row, Skeleton, Tag } from "../components/ui/Surface";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
 export function GroupsScreen() {
@@ -21,13 +21,18 @@ export function GroupsScreen() {
 
   return (
     <Screen>
-      <View className="flex-row items-end justify-between gap-4">
+      <View className="gap-3">
         <Text accessibilityRole="header" className="font-serif text-4xl text-ink">
           Your groups
         </Text>
-        <View className="flex-row gap-1">
-          <Button label="Account" variant="ghost" size="sm" onPress={() => setAccount(true)} />
-          <Button label="New group" variant="primary" size="sm" onPress={() => setCreating(true)} />
+        <View className="flex-row gap-2">
+          <Button
+            label="New group"
+            variant="primary"
+            className="flex-1"
+            onPress={() => setCreating(true)}
+          />
+          <Button label="Account" onPress={() => setAccount(true)} />
         </View>
       </View>
       <Loaded query={stacks.groups} skeleton={<Skeleton className="h-40" />}>
@@ -47,11 +52,11 @@ export function GroupsScreen() {
               they sent you to join it.
             </EmptyState>
           ) : (
-            <Surface>
+            <List>
               {groups.map((item) => (
                 <Row
                   key={item.group.id}
-                  accessibilityLabel={item.group.name}
+                  accessibilityHint="Opens the group"
                   onPress={() => navigation.navigate("Group", { groupId: item.group.id })}
                 >
                   <View className="flex-1 gap-1">
@@ -67,10 +72,16 @@ export function GroupsScreen() {
                       subject="you"
                     />
                   </View>
-                  <Text className="text-xl text-faint">›</Text>
+                  <Text
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    className="text-xl text-faint"
+                  >
+                    ›
+                  </Text>
                 </Row>
               ))}
-            </Surface>
+            </List>
           )
         }
       </Loaded>

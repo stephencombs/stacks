@@ -10,7 +10,7 @@ export function Menu({ label, children }: { label: string; children: ReactNode }
     <BaseMenu.Root>
       <BaseMenu.Trigger
         aria-label={label}
-        className="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:bg-sunken hover:text-ink data-[popup-open]:bg-sunken"
+        className="inline-flex size-9 items-center pointer-coarse:size-11 justify-center rounded-lg text-muted transition-colors duration-150 hover:bg-sunken hover:text-ink data-[popup-open]:bg-sunken"
       >
         <Ellipsis className="size-5" aria-hidden />
       </BaseMenu.Trigger>
@@ -38,7 +38,7 @@ export function MenuItem({
     <BaseMenu.Item
       onClick={onClick}
       className={cn(
-        "flex h-9 cursor-default items-center gap-2 rounded-lg px-3 text-sm outline-none select-none data-[highlighted]:bg-sunken",
+        "flex h-9 cursor-default pointer-coarse:h-11 items-center gap-2 rounded-lg px-3 text-sm outline-none select-none data-[highlighted]:bg-sunken",
         tone === "danger" ? "text-danger" : "text-ink",
       )}
     >

@@ -18,7 +18,7 @@
   --color-accent-ink: oklch(0.985 0.004 95);
   --color-win: oklch(0.52 0.12 150);
   --color-loss: oklch(0.55 0.17 28);
-  --color-live: oklch(0.6 0.15 65);
+  --color-live: oklch(0.5 0.13 60);
   --color-danger: oklch(0.52 0.18 28);
   --color-disabled: oklch(0.8 0.006 95);
 }
@@ -46,6 +46,7 @@
 @layer base {
   html {
     color-scheme: light dark;
+    font-synthesis: none;
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
   }
@@ -70,5 +71,6 @@
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

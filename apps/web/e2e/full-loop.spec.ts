@@ -6,9 +6,21 @@ const SCREENSHOTS = process.env.E2E_SCREENSHOT_DIR;
 const shoot = async (page: Page, name: string) => {
   if (!SCREENSHOTS) return;
   await page.screenshot({ path: `${SCREENSHOTS}/${name}-desktop.png`, fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: `${SCREENSHOTS}/${name}-phone.png`, fullPage: true });
-  await page.setViewportSize({ width: 1280, height: 800 });
+  // The same page on a touch screen, so touch-only sizes apply.
+  const phone = await page
+    .context()
+    .browser()!
+    .newContext({
+      storageState: await page.context().storageState(),
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+    });
+  const phonePage = await phone.newPage();
+  await phonePage.goto(page.url());
+  await expect(phonePage.locator("main h1")).toBeVisible();
+  await expect(phonePage.locator(".animate-pulse")).toHaveCount(0);
+  await phonePage.screenshot({ path: `${SCREENSHOTS}/${name}-phone.png`, fullPage: true });
+  await phone.close();
 };
 
 test.describe.serial("a group's first night out", () => {
@@ -49,6 +61,11 @@ test.describe.serial("a group's first night out", () => {
     await bea.getByRole("button", { name: "Join group" }).click();
     await expect(bea.getByRole("link", { name: "Settle up" })).toBeVisible();
 
+    // Revoking the used link asks first.
+    await alex.getByRole("button", { name: "Revoke" }).click();
+    await alex.getByRole("button", { name: "Revoke link" }).click();
+    await expect(alex.getByText("Make a link and send it", { exact: false })).toBeVisible();
+
     // Alex starts a session at a venue he adds to the catalog.
     await alex.getByRole("link", { name: "Sessions" }).click();
     await alex.getByRole("link", { name: "Start a session" }).first().click();
@@ -59,6 +76,7 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByText("Craps", { exact: true }).click();
     await alex.getByRole("checkbox", { name: /Member 1|Bea/ }).check();
     await alex.getByRole("checkbox", { name: /Gus/ }).check();
+    await shoot(alex, "new-session");
     await alex.getByRole("button", { name: "Start session" }).click();
     await expect(alex.getByText("Live", { exact: true })).toBeVisible();
 

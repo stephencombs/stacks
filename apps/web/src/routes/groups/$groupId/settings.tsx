@@ -1,6 +1,13 @@
 import { useAuth } from "@clerk/react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { GroupId, InviteId, UserId, type GroupDetail, type Player } from "@stacks/contracts";
+import {
+  GroupId,
+  InviteId,
+  UserId,
+  type GroupDetail,
+  type Invite,
+  type Player,
+} from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { UserPlus } from "lucide-react";
 import { useState } from "react";
@@ -37,8 +44,8 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
   const { userId } = useAuth();
   const stacks = useStacks();
   const setRole = useAction(stacks.Client.mutation("groups", "setRole"));
-  const remove = useAction(stacks.Client.mutation("groups", "removeMember"));
   const [addingGuest, setAddingGuest] = useState(false);
+  const [removing, setRemoving] = useState<{ player: Player; userId: UserId } | null>(null);
   const [leaving, setLeaving] = useState(false);
   const members = detail.players.filter((player) => player.role !== null);
   const guests = detail.players.filter((player) => player.userId === null);
@@ -67,7 +74,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
           </MenuItem>
         ) : null}
         {canRemove ? (
-          <MenuItem tone="danger" onClick={() => void remove.run({ params })}>
+          <MenuItem tone="danger" onClick={() => setRemoving({ player, userId: target })}>
             Remove from group
           </MenuItem>
         ) : null}
@@ -97,9 +104,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
             </div>
           ))}
         </Surface>
-        {(setRole.error ?? remove.error) ? (
-          <FormError>{setRole.error ?? remove.error}</FormError>
-        ) : null}
+        {setRole.error ? <FormError>{setRole.error}</FormError> : null}
       </section>
 
       <section className="flex flex-col gap-2">
@@ -154,6 +159,9 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
 
       <AddGuestDialog detail={detail} open={addingGuest} onOpenChange={setAddingGuest} />
       <LeaveDialog detail={detail} open={leaving} onOpenChange={setLeaving} />
+      {removing ? (
+        <RemoveMemberDialog detail={detail} {...removing} onClose={() => setRemoving(null)} />
+      ) : null}
     </>
   );
 }
@@ -161,7 +169,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
 function InviteSection({ detail, origin }: { detail: GroupDetail; origin: string }) {
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("invites", "create"));
-  const revoke = useAction(stacks.Client.mutation("invites", "revoke"));
+  const [revoking, setRevoking] = useState<Invite | null>(null);
   return (
     <section className="flex flex-col gap-2">
       <SectionHeading
@@ -201,11 +209,7 @@ function InviteSection({ detail, origin }: { detail: GroupDetail; origin: string
                     </span>
                   </div>
                   <CopyButton text={`${origin}/join/${invite.code}`} />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void revoke.run({ params: { inviteId: invite.id } })}
-                  >
+                  <Button size="sm" variant="ghost" onClick={() => setRevoking(invite)}>
                     Revoke
                   </Button>
                 </div>
@@ -214,8 +218,13 @@ function InviteSection({ detail, origin }: { detail: GroupDetail; origin: string
           )
         }
       </Loaded>
-      {(create.error ?? revoke.error) ? (
-        <FormError>{create.error ?? revoke.error}</FormError>
+      {create.error ? <FormError>{create.error}</FormError> : null}
+      {revoking ? (
+        <RevokeInviteDialog
+          invite={revoking}
+          url={`${origin}/join/${revoking.code}`}
+          onClose={() => setRevoking(null)}
+        />
       ) : null}
     </section>
   );
@@ -249,6 +258,77 @@ function LeaveDialog({
           <Button onClick={() => onOpenChange(false)}>Stay</Button>
           <Button variant="danger" onClick={() => void confirm()} disabled={leave.pending}>
             {leave.pending ? "Leaving…" : "Leave group"}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+function RemoveMemberDialog({
+  detail,
+  player,
+  userId,
+  onClose,
+}: {
+  detail: GroupDetail;
+  player: Player;
+  userId: UserId;
+  onClose: () => void;
+}) {
+  const stacks = useStacks();
+  const remove = useAction(stacks.Client.mutation("groups", "removeMember"));
+  const confirm = async () => {
+    if (await remove.run({ params: { groupId: detail.group.id, userId } })) onClose();
+  };
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => (open ? undefined : onClose())}
+      title={`Remove ${player.displayName}?`}
+      description="They lose access to the group. Their history stays in the ledger, and you can invite them back."
+    >
+      <div className="flex flex-col gap-4">
+        {remove.error ? <FormError>{remove.error}</FormError> : null}
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Keep them</Button>
+          <Button variant="danger" onClick={() => void confirm()} disabled={remove.pending}>
+            {remove.pending ? "Removing…" : "Remove"}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+function RevokeInviteDialog({
+  invite,
+  url,
+  onClose,
+}: {
+  invite: Invite;
+  url: string;
+  onClose: () => void;
+}) {
+  const stacks = useStacks();
+  const revoke = useAction(stacks.Client.mutation("invites", "revoke"));
+  const confirm = async () => {
+    if (await revoke.run({ params: { inviteId: invite.id } })) onClose();
+  };
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => (open ? undefined : onClose())}
+      title="Revoke this invite link?"
+      description="Anyone who hasn't joined yet will need a new link."
+    >
+      <div className="flex flex-col gap-4">
+        <p className="truncate font-mono text-sm text-muted">{url}</p>
+        {revoke.error ? <FormError>{revoke.error}</FormError> : null}
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Keep it</Button>
+          <Button variant="danger" onClick={() => void confirm()} disabled={revoke.pending}>
+            {revoke.pending ? "Revoking…" : "Revoke link"}
           </Button>
         </div>
       </div>

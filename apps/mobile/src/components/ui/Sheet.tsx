@@ -47,7 +47,8 @@ export function Sheet({
               accessibilityRole="button"
               accessibilityLabel="Close"
               onPress={onClose}
-              className="h-9 justify-center"
+              hitSlop={8}
+              className="-mr-2 min-h-11 justify-center px-2"
             >
               <Text className="text-base text-muted">Close</Text>
             </Pressable>

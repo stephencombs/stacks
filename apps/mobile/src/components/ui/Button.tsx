@@ -19,11 +19,12 @@ const labels: Record<Variant, string> = {
   ghost: "text-ink",
   danger: "text-danger",
 };
+// Minimum heights, so larger accessibility text sizes grow the button instead of clipping it.
 const sizes: Record<Size, string> = {
-  sm: "h-9 px-3 rounded-lg",
-  md: "h-11 px-4 rounded-xl",
-  lg: "h-13 px-5 rounded-xl",
-  xl: "h-16 px-5 rounded-2xl",
+  sm: "min-h-11 px-3 py-2 rounded-lg",
+  md: "min-h-11 px-4 py-2.5 rounded-xl",
+  lg: "min-h-13 px-5 py-3 rounded-xl",
+  xl: "min-h-16 px-5 py-4 rounded-2xl",
 };
 const text: Record<Size, string> = {
   sm: "text-sm",

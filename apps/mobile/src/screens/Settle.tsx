@@ -22,7 +22,7 @@ import { Button } from "../components/ui/Button";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
+import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
@@ -98,10 +98,13 @@ function SettleView({ detail }: { detail: GroupDetail }) {
           </EmptyState>
         ) : (
           <>
-            <Surface>
+            <List>
               {transfers.map((transfer) => (
                 <Row key={`${transfer.from}:${transfer.to}`}>
-                  <Text className="flex-1 text-base text-ink">
+                  <Text
+                    accessibilityLabel={`${names.get(transfer.from)} pays ${names.get(transfer.to)}`}
+                    className="flex-1 text-base text-ink"
+                  >
                     {names.get(transfer.from)} → {names.get(transfer.to)}
                   </Text>
                   <Money
@@ -112,7 +115,7 @@ function SettleView({ detail }: { detail: GroupDetail }) {
                   <Button label="Mark paid" size="sm" onPress={() => setPaying(transfer)} />
                 </Row>
               ))}
-            </Surface>
+            </List>
             <Text className="text-sm text-muted">
               Payments that clear every balance. Pay however you like; Stacks only keeps the record.
             </Text>
@@ -126,7 +129,7 @@ function SettleView({ detail }: { detail: GroupDetail }) {
         {detail.settlements.length === 0 && unsaved.length === 0 ? (
           <Text className="text-sm text-muted">Payments you record show up here.</Text>
         ) : (
-          <Surface>
+          <List>
             {unsaved.map((payment) => (
               <Row key={payment.id}>
                 <Text className="w-20 text-sm text-muted">Saving…</Text>
@@ -143,14 +146,14 @@ function SettleView({ detail }: { detail: GroupDetail }) {
                 <Row
                   key={entry.id}
                   {...(canVoid
-                    ? { onPress: () => setVoiding(entry), accessibilityLabel: "Void this payment" }
+                    ? { onPress: () => setVoiding(entry), accessibilityHint: "Void this payment" }
                     : {})}
                 >
                   <Text className="w-20 text-sm text-muted">{formatDay(entry.occurredAt)}</Text>
                   <Text
                     className={cn(
                       "flex-1 text-base",
-                      voided ? "text-faint line-through" : "text-ink",
+                      voided ? "text-muted line-through" : "text-ink",
                     )}
                   >
                     {names.get(entry.playerId)} paid{" "}
@@ -159,12 +162,12 @@ function SettleView({ detail }: { detail: GroupDetail }) {
                   <Money
                     amount={entry.amount}
                     currency={currency}
-                    className={cn("font-medium", voided && "text-faint")}
+                    className={cn("font-medium", voided && "text-muted")}
                   />
                 </Row>
               );
             })}
-          </Surface>
+          </List>
         )}
       </View>
 

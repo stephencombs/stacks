@@ -5,7 +5,7 @@ import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Screen } from "../components/ui/Screen";
-import { EmptyState, Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
+import { EmptyState, List, Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
 import { Loaded, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ groupId: string }>;
@@ -53,7 +53,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       </View>
       <View className="gap-2">
         <SectionHeading>Everyone, all time</SectionHeading>
-        <Surface>
+        <List>
           {stats.byPlayer
             .toSorted((a, b) => b.net - a.net)
             .map((result) => (
@@ -67,11 +67,11 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                 />
               </Row>
             ))}
-        </Surface>
+        </List>
       </View>
       <View className="gap-2">
         <SectionHeading>Your results by game</SectionHeading>
-        <Surface>
+        <List>
           {stats.byGame.map((row) => {
             const result = mine(row.results);
             return (
@@ -88,16 +88,16 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                     className="text-base"
                   />
                 ) : (
-                  <Text className="text-faint">—</Text>
+                  <Text className="text-muted">—</Text>
                 )}
               </Row>
             );
           })}
-        </Surface>
+        </List>
       </View>
       <View className="gap-2">
         <SectionHeading>Your results by venue</SectionHeading>
-        <Surface>
+        <List>
           {stats.byVenue.map((row) => {
             const result = mine(row.results);
             return (
@@ -113,12 +113,12 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                     className="text-base"
                   />
                 ) : (
-                  <Text className="text-faint">—</Text>
+                  <Text className="text-muted">—</Text>
                 )}
               </Row>
             );
           })}
-        </Surface>
+        </List>
       </View>
     </>
   );

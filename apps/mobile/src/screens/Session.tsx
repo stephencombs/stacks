@@ -29,7 +29,8 @@ import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { Row, SectionHeading, Skeleton, Surface, Tag } from "../components/ui/Surface";
+import { List, Row, SectionHeading, Skeleton, Surface, Tag } from "../components/ui/Surface";
+import { useToast } from "../components/ui/Toast";
 import { cn } from "../components/ui/cn";
 import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
@@ -73,8 +74,12 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   const live = session.status === "live";
   const currency = group.group.currency;
   const names = playerNames(group);
+  const toast = useToast();
   const addEntry = useAction(stacks.Client.mutation("ledger", "addEntry"));
+  const voidEntry = useAction(stacks.Client.mutation("ledger", "voidEntry"));
   const [pending, setPending] = useState<ReadonlyArray<PendingEntry>>([]);
+  // Entries undone here count as voided while the void saves.
+  const [undone, setUndone] = useState<ReadonlySet<EntryId>>(new Set());
   const [draft, setDraft] = useState<EntryDraft | null>(null);
   const [selected, setSelected] = useState<Entry | null>(null);
   const [closing, setClosing] = useState(false);
@@ -87,11 +92,15 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   // Until the server confirms them, entries recorded here count as if they were already saved.
   const unsaved = pending.filter((entry) => !detail.entries.some((saved) => saved.id === entry.id));
   const replaced = new Set(unsaved.map((entry) => entry.replacesEntryId).filter(Boolean));
+  const voidedHere = (id: EntryId) => replaced.has(id) || undone.has(id);
   const counted = [
     ...detail.entries.map((entry) =>
-      replaced.has(entry.id) ? { ...entry, voidedAt: entry.occurredAt } : entry,
+      voidedHere(entry.id) ? { ...entry, voidedAt: entry.occurredAt } : entry,
     ),
-    ...unsaved.map((entry) => ({ ...entry, voidedAt: null })),
+    ...unsaved.map((entry) => ({
+      ...entry,
+      voidedAt: voidedHere(entry.id) ? entry.occurredAt : null,
+    })),
   ];
   const results = playerResults(counted);
   const cashedOut = new Set(
@@ -106,26 +115,65 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
         e.counterpartyId === null,
     );
 
-  const record = async (input: EntryInput) => {
+  /** Records an entry at once and saves it in the background; `saved` settles when that's done. */
+  const record = (input: EntryInput) => {
     const entry: PendingEntry = {
       ...input,
       id: EntryId.make(newId()),
       occurredAt: DateTime.nowUnsafe(),
     };
     setPending((all) => [...all, entry]);
-    const saved = await addEntry.run({
-      params: { sessionId: session.id },
-      payload: {
-        id: entry.id,
-        kind: entry.kind,
-        playerId: entry.playerId,
-        counterpartyId: entry.counterpartyId,
-        amount: entry.amount,
-        note: entry.note,
-        replacesEntryId: entry.replacesEntryId,
-      },
+    const saved = addEntry
+      .attempt({
+        params: { sessionId: session.id },
+        payload: {
+          id: entry.id,
+          kind: entry.kind,
+          playerId: entry.playerId,
+          counterpartyId: entry.counterpartyId,
+          amount: entry.amount,
+          note: entry.note,
+          replacesEntryId: entry.replacesEntryId,
+        },
+      })
+      .then(({ error }) => {
+        if (error === null) return true;
+        setPending((all) => all.filter((p) => p.id !== entry.id));
+        toast({ message: error });
+        return false;
+      });
+    return { id: entry.id, saved };
+  };
+
+  const undo = async (id: EntryId, saved: Promise<boolean>) => {
+    setUndone((all) => new Set(all).add(id));
+    if (!(await saved)) return;
+    const { error } = await voidEntry.attempt({
+      params: { entryId: id },
+      payload: { reason: "Undone" },
     });
-    if (!saved) setPending((all) => all.filter((p) => p.id !== entry.id));
+    if (error === null) return;
+    setUndone((all) => {
+      const next = new Set(all);
+      next.delete(id);
+      return next;
+    });
+    toast({ message: error });
+  };
+
+  const rebuy = (playerId: PlayerId, name: string, amount: Entry["amount"]) => {
+    const { id, saved } = record({
+      kind: "buy_in",
+      playerId,
+      counterpartyId: null,
+      amount,
+      note: null,
+      replacesEntryId: null,
+    });
+    toast({
+      message: `${name} rebought for ${formatMoney(amount, currency)}`,
+      action: { label: "Undo", onPress: () => void undo(id, saved) },
+    });
   };
 
   const canVoid = (entry: Entry) =>
@@ -154,7 +202,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
             : ""}
         </Text>
       </View>
-      {addEntry.error ? <FormError>{addEntry.error}</FormError> : null}
 
       <View className="gap-3">
         <SectionHeading
@@ -174,7 +221,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
         {detail.playerIds.map((playerId) => {
           const result = results.get(playerId);
           const name = names.get(playerId) ?? "Player";
-          const rebuy = lastBuyIn(playerId);
+          const lastRebuy = lastBuyIn(playerId);
           return (
             <Surface key={playerId} className="gap-3 p-4">
               <View className="flex-row items-start justify-between gap-3">
@@ -225,30 +272,21 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                     />
                   </View>
                   <View className="flex-row gap-2">
-                    {rebuy ? (
+                    {lastRebuy ? (
                       <Button
-                        label={`Rebuy ${formatMoney(rebuy.amount, currency)}`}
+                        label={`Rebuy ${formatMoney(lastRebuy.amount, currency)}`}
                         accessibilityLabel={`Rebuy for ${name}`}
                         variant="primary"
                         className="flex-1"
                         haptic
-                        onPress={() =>
-                          void record({
-                            kind: "buy_in",
-                            playerId,
-                            counterpartyId: null,
-                            amount: rebuy.amount,
-                            note: null,
-                            replacesEntryId: null,
-                          })
-                        }
+                        onPress={() => rebuy(playerId, name, lastRebuy.amount)}
                       />
                     ) : null}
                     <Button
                       label="Adjust"
                       accessibilityLabel={`Adjust result for ${name}`}
                       variant="ghost"
-                      className={rebuy ? undefined : "flex-1"}
+                      className={lastRebuy ? undefined : "flex-1"}
                       onPress={() => setDraft({ kind: "adjustment", playerId })}
                     />
                   </View>
@@ -266,10 +304,10 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
             Buy-ins and cash-outs show up here as you record them.
           </Text>
         ) : (
-          <Surface>
+          <List>
             {history.map((item) => {
               const { entry, saving } = item;
-              const voided = !item.saving && item.entry.voidedAt !== null;
+              const voided = undone.has(entry.id) || (!item.saving && item.entry.voidedAt !== null);
               const voidReason = item.saving ? null : item.entry.voidReason;
               const counterparty = entry.counterpartyId ? names.get(entry.counterpartyId) : null;
               const actionable = live && !item.saving && !voided && canVoid(item.entry);
@@ -280,14 +318,14 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                   </Text>
                   <View className="flex-1 gap-0.5">
                     <Text
-                      className={cn("text-base", voided ? "text-faint line-through" : "text-ink")}
+                      className={cn("text-base", voided ? "text-muted line-through" : "text-ink")}
                     >
                       {names.get(entry.playerId)} {verbs[entry.kind]}{" "}
                       <Money
                         amount={entry.amount}
                         currency={currency}
                         tone={entry.kind === "adjustment" ? "result" : "plain"}
-                        className={cn("font-medium", voided && "text-faint")}
+                        className={cn("font-medium", voided && "text-muted")}
                       />
                     </Text>
                     {counterparty || entry.note || voided || saving ? (
@@ -314,7 +352,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                   accessibilityRole="button"
                   accessibilityHint="Correct or void this entry"
                   onPress={() => setSelected(item.entry)}
-                  className="flex-row items-center gap-3 border-b border-line px-4 py-3 active:bg-sunken"
+                  className="flex-row items-center gap-3 border-t border-line px-4 py-3 active:bg-sunken"
                 >
                   {content}
                 </Pressable>
@@ -322,7 +360,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                 <Row key={entry.id}>{content}</Row>
               );
             })}
-          </Surface>
+          </List>
         )}
       </View>
 
@@ -332,7 +370,9 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
         <EntrySheet
           detail={group}
           draft={draft}
-          onSubmit={(input) => void record(input)}
+          onSubmit={(input) => {
+            record(input);
+          }}
           onClose={() => setDraft(null)}
         />
       ) : null}
@@ -489,11 +529,11 @@ function AddPlayerSheet({
           Everyone in the group is already in this session.
         </Text>
       ) : (
-        <Surface>
+        <List>
           {available.map((player) => (
             <Row
               key={player.id}
-              accessibilityLabel={`Add ${player.displayName}`}
+              accessibilityHint="Adds them to this session"
               onPress={() =>
                 void add
                   .run({
@@ -506,7 +546,7 @@ function AddPlayerSheet({
               <Text className="text-base text-ink">{player.displayName}</Text>
             </Row>
           ))}
-        </Surface>
+        </List>
       )}
       {add.error ? <FormError>{add.error}</FormError> : null}
     </Sheet>

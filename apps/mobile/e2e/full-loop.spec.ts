@@ -65,6 +65,7 @@ test.describe.serial("live mode on a phone", () => {
     await alex.getByRole("radio", { name: "Craps" }).click();
     await alex.getByRole("checkbox", { name: "Bea" }).click();
     await alex.getByRole("checkbox", { name: "Gus" }).click();
+    await shoot(alex, "new-session");
     await alex.getByRole("button", { name: "Start session" }).filter({ visible: true }).click();
     await expect(alex.getByText("Live", { exact: true }).filter({ visible: true })).toBeVisible();
 
@@ -89,6 +90,27 @@ test.describe.serial("live mode on a phone", () => {
     await record("Buy in", "Gus", "100");
     // One tap repeats Gus's last buy-in.
     await alex.getByRole("button", { name: "Rebuy for Gus" }).filter({ visible: true }).click();
+    await expect(
+      alex.getByText("In $200.00 · Out $0.00").filter({ visible: true }).first(),
+    ).toBeVisible();
+    // A mistaken rebuy can be undone from the toast.
+    await alex.getByRole("button", { name: "Rebuy for Gus" }).filter({ visible: true }).click();
+    const toast = alex.getByText("Gus rebought for $100.00").filter({ visible: true });
+    await expect(toast).toBeVisible();
+    // Let the toast finish fading in before the screenshot.
+    await expect
+      .poll(() =>
+        toast.evaluate((node) => {
+          let opacity = 1;
+          for (let el: Element | null = node; el; el = el.parentElement)
+            opacity *= Number(getComputedStyle(el).opacity);
+          return opacity;
+        }),
+      )
+      .toBe(1);
+    await shoot(alex, "rebuy-toast");
+    await alex.getByRole("button", { name: "Undo" }).filter({ visible: true }).click();
+    await expect(alex.getByText("Voided: Undone").filter({ visible: true })).toBeVisible();
     await expect(
       alex.getByText("In $200.00 · Out $0.00").filter({ visible: true }).first(),
     ).toBeVisible();

@@ -11,23 +11,35 @@ export function Surface({ children, className }: { children: ReactNode; classNam
   );
 }
 
-/** A tappable row inside a Surface. */
+/** A surface of rows. The list clips the first row's divider, so only gaps between rows show one. */
+export function List({ children }: { children: ReactNode }) {
+  return (
+    <Surface>
+      <View className="-mt-px">{children}</View>
+    </Surface>
+  );
+}
+
+/**
+ * One row of a List. A pressable row is read out from its content, so the hint says what pressing
+ * it does rather than replacing what it shows.
+ */
 export function Row({
   children,
   onPress,
-  accessibilityLabel,
+  accessibilityHint,
   className,
 }: {
   children: ReactNode;
   onPress?: () => void;
-  accessibilityLabel?: string;
+  accessibilityHint?: string;
   className?: string;
 }) {
-  const classes = cn("flex-row items-center gap-3 border-b border-line px-4 py-3.5", className);
+  const classes = cn("flex-row items-center gap-3 border-t border-line px-4 py-3.5", className);
   return onPress ? (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       onPress={onPress}
       className={cn(classes, "active:bg-sunken")}
     >

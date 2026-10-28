@@ -37,7 +37,7 @@ export function Tag({
         "inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium",
         tone === "live" && "bg-[color-mix(in_oklch,var(--color-live)_16%,transparent)] text-live",
         tone === "neutral" && "bg-sunken text-muted",
-        tone === "voided" && "bg-sunken text-faint line-through",
+        tone === "voided" && "bg-sunken text-muted line-through",
       )}
     >
       {tone === "live" ? <span className="size-1.5 rounded-full bg-live" aria-hidden /> : null}
