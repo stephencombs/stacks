@@ -105,50 +105,66 @@ const groupStakes = Effect.fn("Views.groupStakes")(function* (groupId: GroupId) 
   `.pipe(Effect.flatMap(decodeRows(StakeRow)));
   const live = stakes.filter((stake) => stake.voidedAt === null);
   if (live.length === 0) return { stakes, outcomes: stakeOutcomes([], [], []) };
-  const sessions = yield* sql`select * from sessions where group_id = ${groupId}`.pipe(
-    Effect.flatMap(decodeRows(SessionRow)),
+  const [sessions, entries] = yield* Effect.all(
+    [
+      sql`select * from sessions where group_id = ${groupId}`.pipe(
+        Effect.flatMap(decodeRows(SessionRow)),
+      ),
+      sql`
+        select * from entries
+        where group_id = ${groupId} and session_id is not null and voided_at is null
+          and player_id in ${sql.in(Array.from(new Set(live.map((stake) => stake.borrowerId))))}
+      `.pipe(Effect.flatMap(decodeRows(EntryRow))),
+    ],
+    { concurrency: "unbounded" },
   );
-  const entries = yield* sql`
-    select * from entries
-    where group_id = ${groupId} and session_id is not null and voided_at is null
-      and player_id in ${sql.in(Array.from(new Set(live.map((stake) => stake.borrowerId))))}
-  `.pipe(Effect.flatMap(decodeRows(EntryRow)));
   return { stakes, outcomes: stakeOutcomes(live, sessions, entries) };
 });
 
 /** Balances from every entry that moved money between two players, and every live stake. */
 export const groupBalances = Effect.fn("Views.groupBalances")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
-  const entries = yield* sql`
-    select * from entries
-    where group_id = ${groupId} and voided_at is null and counterparty_id is not null
-  `.pipe(Effect.flatMap(decodeRows(EntryRow)));
-  const { stakes, outcomes } = yield* groupStakes(groupId);
+  const [entries, { stakes, outcomes }] = yield* Effect.all(
+    [
+      sql`
+        select * from entries
+        where group_id = ${groupId} and voided_at is null and counterparty_id is not null
+      `.pipe(Effect.flatMap(decodeRows(EntryRow))),
+      groupStakes(groupId),
+    ],
+    { concurrency: "unbounded" },
+  );
   return { owed: withStakes(balances(entries), stakes, outcomes), stakes, outcomes };
 });
 
 export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Membership) {
   const sql = yield* SqlClient.SqlClient;
   const { groupId } = member;
-  const [group] = yield* sql`
-    select id, name, currency, created_at from groups where id = ${groupId}
-  `.pipe(Effect.flatMap(decodeRows(GroupRow)));
-  const players = yield* sql`
-    select p.id, p.display_name, p.user_id, m.role, p.claim_code
-    from players p
-    left join memberships m
-      on m.group_id = p.group_id and m.user_id = p.user_id and m.left_at is null
-    where p.group_id = ${groupId}
-    order by p.created_at, p.id
-  `.pipe(Effect.flatMap(decodeRows(PlayerRow)));
-  const { owed, stakes, outcomes } = yield* groupBalances(groupId);
-  const settlements = yield* sql`
-    select * from entries
-    where group_id = ${groupId} and kind = 'settlement'
-    order by occurred_at desc, created_at desc
-    limit 50
-  `.pipe(Effect.flatMap(decodeRows(EntryRow)));
-  const sessions = yield* sessionSummaries(groupId, { limit: 20 });
+  // Independent reads, run together: each is a round trip to the database.
+  const [[group], players, { owed, stakes, outcomes }, settlements, sessions] = yield* Effect.all(
+    [
+      sql`select id, name, currency, created_at from groups where id = ${groupId}`.pipe(
+        Effect.flatMap(decodeRows(GroupRow)),
+      ),
+      sql`
+        select p.id, p.display_name, p.user_id, m.role, p.claim_code
+        from players p
+        left join memberships m
+          on m.group_id = p.group_id and m.user_id = p.user_id and m.left_at is null
+        where p.group_id = ${groupId}
+        order by p.created_at, p.id
+      `.pipe(Effect.flatMap(decodeRows(PlayerRow))),
+      groupBalances(groupId),
+      sql`
+        select * from entries
+        where group_id = ${groupId} and kind = 'settlement'
+        order by occurred_at desc, created_at desc
+        limit 50
+      `.pipe(Effect.flatMap(decodeRows(EntryRow))),
+      sessionSummaries(groupId, { limit: 20 }),
+    ],
+    { concurrency: "unbounded" },
+  );
 
   return {
     group: group!,
