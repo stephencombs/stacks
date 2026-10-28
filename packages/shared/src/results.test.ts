@@ -3,7 +3,7 @@ import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 import { SessionId } from "@stacks/contracts";
 
-import { playerResults, resultsBy, runningNet } from "./results.ts";
+import { playerResults, resultsBy, runningNet, sessionCounts, sessionRuns } from "./results.ts";
 import { ALEX, BEA, RandomLedger, entry, money, toEntries } from "./testing/ledgerArbitrary.ts";
 
 describe("playerResults", () => {
@@ -125,6 +125,63 @@ describe("runningNet", () => {
       for (const [playerId, result] of playerResults(entries)) {
         expect(runningNet(timeline, playerId).at(-1)?.total).toBe(result.net);
       }
+    },
+  );
+});
+
+describe("sessionCounts", () => {
+  it("counts the sessions each player has a result in", () => {
+    const counts = sessionCounts([
+      { results: [{ playerId: ALEX }, { playerId: BEA }] },
+      { results: [{ playerId: ALEX }] },
+      { results: [] },
+    ]);
+    expect(counts).toEqual(
+      new Map([
+        [ALEX, 2],
+        [BEA, 1],
+      ]),
+    );
+  });
+});
+
+describe("sessionRuns", () => {
+  it("finds the longest winning run and the run the latest session is on", () => {
+    expect(sessionRuns([100, 200, -50, 300, 400, 500, -10, -20])).toEqual({
+      sessions: 8,
+      wins: 5,
+      longestWinningRun: 3,
+      current: { length: 2, winning: false },
+    });
+  });
+
+  it("lets an even session break a run", () => {
+    expect(sessionRuns([100, 0, 100, 100])).toMatchObject({
+      longestWinningRun: 2,
+      current: { length: 2, winning: true },
+    });
+    expect(sessionRuns([100, 0]).current).toEqual({ length: 0, winning: false });
+    expect(sessionRuns([])).toEqual({
+      sessions: 0,
+      wins: 0,
+      longestWinningRun: 0,
+      current: { length: 0, winning: false },
+    });
+  });
+
+  it.prop(
+    "keeps every count within the sessions played",
+    [Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: -3, maximum: 3 })))],
+    ([nets]) => {
+      const runs = sessionRuns(nets);
+      expect(runs.sessions).toBe(nets.length);
+      expect(runs.wins).toBe(nets.filter((net) => net > 0).length);
+      expect(runs.longestWinningRun).toBeLessThanOrEqual(runs.wins);
+      expect(runs.current.length).toBeLessThanOrEqual(runs.sessions);
+      if (runs.current.winning)
+        expect(runs.longestWinningRun).toBeGreaterThanOrEqual(runs.current.length);
+      const tail = nets.slice(nets.length - runs.current.length);
+      expect(tail.every((net) => Math.sign(net) === (runs.current.winning ? 1 : -1))).toBe(true);
     },
   );
 });

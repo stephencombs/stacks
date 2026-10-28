@@ -162,7 +162,12 @@ test.describe.serial("a group's first night out", () => {
     await expect(bea.getByText("Settled up")).toHaveCount(3);
     await alex.getByRole("link", { name: "Stats" }).click();
     await expect(alex.getByRole("cell", { name: "Craps" })).toBeVisible();
+    await expect(alex.getByRole("listitem").filter({ hasText: "you" })).toContainText("+$170.00");
     const chart = alex.getByRole("figure");
+    await expect(chart).toContainText("Up in 1 of 1");
+    await alex.getByRole("group", { name: /Your result in each session/ }).hover();
+    await expect(chart).toContainText("+$170.00 overall after it");
+    await alex.getByRole("button", { name: "Running total" }).click();
     await expect(chart).toContainText("After 1 session");
     await expect(chart).toContainText("+$170.00");
 
@@ -175,6 +180,7 @@ test.describe.serial("a group's first night out", () => {
     });
     const phonePage = await phone.newPage();
     await phonePage.goto(alex.url());
+    await phonePage.getByRole("button", { name: "Running total" }).tap();
     const plot = phonePage.getByRole("group", { name: /Your net after each session/ });
     const caption = phonePage.locator("figcaption");
     await expect(caption).toContainText("After 1 session");

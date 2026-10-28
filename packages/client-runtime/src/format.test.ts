@@ -11,7 +11,7 @@ import {
   type StakeView,
 } from "@stacks/contracts";
 
-import { playedSummary, stakeLines } from "./format.ts";
+import { playedSummary, runsLine, stakeLines, winRate } from "./format.ts";
 
 it("sums up what the group has played", () => {
   expect(playedSummary(29, 8100)).toBe("The group has played 29 sessions over 135 hours.");
@@ -19,6 +19,19 @@ it("sums up what the group has played", () => {
   expect(playedSummary(2, 95)).toBe("The group has played 2 sessions over 1.6 hours.");
   // Imported sessions have no recorded length.
   expect(playedSummary(41, 0)).toBe("The group has played 41 sessions.");
+});
+
+it("sums up wins and streaks", () => {
+  const runs = (wins: number, longest: number, length: number, winning: boolean) => ({
+    sessions: 27,
+    wins,
+    longestWinningRun: longest,
+    current: { length, winning },
+  });
+  expect(winRate(runs(16, 7, 1, true))).toEqual({ count: "Up in 16 of 27", percent: "59%" });
+  expect(runsLine(runs(16, 7, 1, true))).toBe("Longest winning run: 7");
+  expect(runsLine(runs(16, 8, 8, true))).toBe("Longest winning run: 8 · Now on 8 wins in a row");
+  expect(runsLine(runs(3, 1, 4, false))).toBe("Longest winning run: 1 · Now on 4 losses in a row");
 });
 
 it("says how a stake stands", () => {

@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { GroupId, type GroupDetail, type GroupStats, type PlayerResult } from "@stacks/contracts";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
 import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
+import { cn } from "~/components/ui/cn";
 import { GroupHeader } from "~/features/GroupHeader";
 import { NetChart } from "~/features/NetChart";
-import { playerNames } from "@stacks/client-runtime/format";
+import { SessionBars } from "~/features/SessionBars";
+import { Standings } from "~/features/Standings";
 import { gameNames, playedSummary } from "@stacks/client-runtime/format";
 import { Loaded, useStacks } from "~/lib/stacks";
 
@@ -30,10 +32,13 @@ function Stats() {
   );
 }
 
-const byNet = (a: PlayerResult, b: PlayerResult) => b.net - a.net;
+const charts = [
+  { key: "each", label: "Each session" },
+  { key: "total", label: "Running total" },
+] as const;
 
 function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }) {
-  const names = playerNames(detail);
+  const [chart, setChart] = useState<(typeof charts)[number]["key"]>("each");
   const currency = detail.group.currency;
   if (stats.sessionCount === 0) {
     return (
@@ -52,27 +57,43 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       </p>
 
       <section className="flex flex-col gap-2">
-        <SectionHeading>Your net over time</SectionHeading>
-        <Surface className="p-5">
-          <NetChart stats={stats} playerId={detail.myPlayerId} currency={currency} />
+        <SectionHeading>Standings</SectionHeading>
+        <Surface>
+          <Standings detail={detail} stats={stats} me={detail.myPlayerId} />
         </Surface>
       </section>
 
       <section className="flex flex-col gap-2">
-        <SectionHeading>Everyone, all time</SectionHeading>
-        <Table head={["Player", "Bought in", "Net"]}>
-          {stats.byPlayer.toSorted(byNet).map((result) => (
-            <tr key={result.playerId}>
-              <td className="px-5 py-3">{names.get(result.playerId)}</td>
-              <td className="px-5 py-3 text-right">
-                <Money amount={result.buyIn} currency={currency} className="text-muted" />
-              </td>
-              <td className="px-5 py-3 text-right font-medium">
-                <Money amount={result.net} currency={currency} tone="result" />
-              </td>
-            </tr>
-          ))}
-        </Table>
+        <SectionHeading>Your sessions</SectionHeading>
+        <Surface className="flex flex-col gap-4 p-5">
+          <div
+            role="group"
+            aria-label="Chart"
+            className="flex gap-1 self-start rounded-xl bg-sunken p-1"
+          >
+            {charts.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={chart === option.key}
+                onClick={() => setChart(option.key)}
+                className={cn(
+                  "inline-flex h-8 items-center rounded-lg px-3 text-sm whitespace-nowrap transition-colors duration-150 pointer-coarse:h-10",
+                  chart === option.key
+                    ? "bg-surface text-ink shadow-[0_0_0_1px_var(--color-line)]"
+                    : "text-muted hover:text-ink",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {chart === "each" ? (
+            <SessionBars stats={stats} playerId={detail.myPlayerId} currency={currency} />
+          ) : (
+            <NetChart stats={stats} playerId={detail.myPlayerId} currency={currency} />
+          )}
+        </Surface>
       </section>
 
       <section className="flex flex-col gap-2">
