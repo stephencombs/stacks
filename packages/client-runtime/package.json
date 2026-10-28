@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@stacks/contracts": "workspace:*",
+    "@stacks/shared": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

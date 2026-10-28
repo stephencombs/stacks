@@ -8,7 +8,7 @@ import {
   MinorUnits,
   NotFound,
   type CreateGroupRequest,
-  type GroupId,
+  GroupId,
   type GroupListItem,
   type SetRoleRequest,
   type UserId,
@@ -51,15 +51,29 @@ export const list = Effect.fn("Groups.list")(function* () {
     where group_id in ${sql.in(rows.map((row) => row.id))}
       and voided_at is null and counterparty_id is not null
   `.pipe(Effect.flatMap(Access.decodeRows(EntryRow)));
-  return rows.map((row): GroupListItem => ({
-    group: { id: row.id, name: row.name, currency: row.currency, createdAt: row.createdAt },
-    role: row.role,
-    myPlayerId: row.playerId,
-    myBalance:
-      balances(entries.filter((entry) => entry.groupId === row.id)).get(row.playerId) ??
-      MinorUnits.make(0),
-    liveSessionCount: row.liveSessionCount,
-  }));
+  // Stakes need each group's session results, so only groups with a live stake pay for them.
+  const staked = new Set(
+    (yield* sql`
+      select distinct group_id from stakes
+      where group_id in ${sql.in(rows.map((row) => row.id))} and voided_at is null
+    `.pipe(Effect.flatMap(Access.decodeRows(Schema.Struct({ groupId: GroupId }))))).map(
+      (row) => row.groupId,
+    ),
+  );
+  return yield* Effect.forEach(rows, (row) =>
+    Effect.gen(function* () {
+      const owed = staked.has(row.id)
+        ? (yield* Views.groupBalances(row.id)).owed
+        : balances(entries.filter((entry) => entry.groupId === row.id));
+      return {
+        group: { id: row.id, name: row.name, currency: row.currency, createdAt: row.createdAt },
+        role: row.role,
+        myPlayerId: row.playerId,
+        myBalance: owed.get(row.playerId) ?? MinorUnits.make(0),
+        liveSessionCount: row.liveSessionCount,
+      } satisfies GroupListItem;
+    }),
+  );
 });
 
 export const create = Effect.fn("Groups.create")(function* (
@@ -101,7 +115,7 @@ export const get = Effect.fn("Groups.get")(function* (groupId: GroupId) {
 });
 
 const balanceOf = Effect.fn("Groups.balanceOf")(function* (member: Access.Membership) {
-  const owed = yield* Views.groupBalances(member.groupId);
+  const { owed } = yield* Views.groupBalances(member.groupId);
   return owed.get(member.playerId) ?? 0;
 });
 

@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import { EntryId, GroupId, PlayerId, SessionId, UserId, VenueId } from "./ids.ts";
+import { EntryId, GroupId, PlayerId, SessionId, StakeId, UserId, VenueId } from "./ids.ts";
 import { MinorUnits } from "./money.ts";
 
 export const Game = Schema.Literals([
@@ -97,3 +97,26 @@ function entryShapeIssue(entry: {
   }
   return entry.amount > 0 ? undefined : { path: ["amount"], issue: "must be positive" };
 }
+
+/**
+ * Money `lenderId` gave `borrowerId` to play with. While it's open, the borrower's results go to
+ * it: the lender gets the stake back plus `lenderShare` percent of the winnings, or what's left
+ * of the stake after losses. Several stakes on one borrower split each result by amount.
+ */
+export const Stake = Schema.Struct({
+  id: StakeId,
+  groupId: GroupId,
+  lenderId: PlayerId,
+  borrowerId: PlayerId,
+  amount: MinorUnits,
+  lenderShare: Schema.Int,
+  startedAt: Schema.DateTimeUtc,
+  endedAt: Schema.NullOr(Schema.DateTimeUtc),
+  note: Schema.NullOr(Schema.String),
+  createdBy: UserId,
+  createdAt: Schema.DateTimeUtc,
+  voidedAt: Schema.NullOr(Schema.DateTimeUtc),
+  voidedBy: Schema.NullOr(UserId),
+  voidReason: Schema.NullOr(Schema.String),
+});
+export type Stake = typeof Stake.Type;

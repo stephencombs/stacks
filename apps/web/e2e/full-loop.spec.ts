@@ -141,6 +141,21 @@ test.describe.serial("a group's first night out", () => {
     }
     await expect(alex.getByText("Everyone's square")).toBeVisible();
 
+    // Alex backs Bea: Settle up asks for the stake back until it's voided.
+    await alex.getByRole("button", { name: "Back a player" }).click();
+    await alex.getByLabel("Who's playing it").selectOption({ label: "Bea" });
+    await alex.getByLabel("Amount").fill("100");
+    await alex.getByRole("button", { name: "Back them" }).click();
+    await expect(alex.getByText("Alex backed Bea $100.00 · 50% of winnings")).toBeVisible();
+    await expect(alex.getByText("Bea is even · owes back $100.00")).toBeVisible();
+    await expect(alex.getByRole("button", { name: "Mark paid" })).toHaveCount(1);
+    await shoot(alex, "backing");
+    await alex.getByRole("button", { name: /^Actions for Alex backed Bea/ }).click();
+    await alex.getByRole("menuitem", { name: "Void" }).click();
+    await alex.getByRole("button", { name: "Void stake" }).click();
+    await expect(alex.getByText("Everyone's square")).toBeVisible();
+    await expect(alex.getByText("Voided")).toBeVisible();
+
     // Bea sees the same ledger.
     await bea.reload();
     await bea.getByRole("link", { name: "Sessions" }).click();

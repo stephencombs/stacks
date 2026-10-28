@@ -8,6 +8,7 @@ import * as Guests from "../features/Guests.ts";
 import * as Invites from "../features/Invites.ts";
 import * as Ledger from "../features/Ledger.ts";
 import * as Sessions from "../features/Sessions.ts";
+import * as Stakes from "../features/Stakes.ts";
 import * as Stats from "../features/Stats.ts";
 import * as Venues from "../features/Venues.ts";
 
@@ -78,6 +79,14 @@ const ledger = HttpApiBuilder.group(StacksApi, "ledger", (handlers) =>
     ),
 );
 
+const stakes = HttpApiBuilder.group(StacksApi, "stakes", (handlers) =>
+  handlers
+    .handle("create", ({ params, payload }) => serve(Stakes.create(params.groupId, payload)))
+    .handle("end", ({ params, payload }) => serve(Stakes.end(params.stakeId, payload)))
+    .handle("reopen", ({ params }) => serve(Stakes.reopen(params.stakeId)))
+    .handle("void", ({ params, payload }) => serve(Stakes.voidStake(params.stakeId, payload))),
+);
+
 export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openapi.json" }).pipe(
-  Layer.provide([health, groups, invites, guests, venues, sessions, ledger]),
+  Layer.provide([health, groups, invites, guests, venues, sessions, ledger, stakes]),
 );

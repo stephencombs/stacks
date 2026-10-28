@@ -6,8 +6,17 @@ import * as OpenApi from "effect/http-api/OpenApi";
 
 import { Authentication } from "./auth.ts";
 import { Conflict, Forbidden, InvalidRequest, NotFound } from "./errors.ts";
-import { EntryId, GroupId, InviteId, PlayerId, SessionId, UserId, VenueId } from "./ids.ts";
-import { Entry, Game } from "./ledger.ts";
+import {
+  EntryId,
+  GroupId,
+  InviteId,
+  PlayerId,
+  SessionId,
+  StakeId,
+  UserId,
+  VenueId,
+} from "./ids.ts";
+import { Entry, Game, Stake } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import {
   ClaimPreview,
@@ -108,6 +117,19 @@ export const RecordSettlementRequest = Schema.Struct({
   occurredAt: Schema.optionalKey(Schema.DateTimeUtc),
   note: Schema.NullOr(Note),
 });
+
+export const CreateStakeRequest = Schema.Struct({
+  id: StakeId,
+  lenderId: PlayerId,
+  borrowerId: PlayerId,
+  amount: MinorUnits.check(Schema.isGreaterThan(0)),
+  /** The lender's cut of the borrower's winnings, in percent. */
+  lenderShare: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+  startedAt: Schema.optionalKey(Schema.DateTimeUtc),
+  note: Schema.NullOr(Note),
+});
+
+export const EndStakeRequest = Schema.Struct({ endedAt: Schema.optionalKey(Schema.DateTimeUtc) });
 
 const groupParams = Schema.Struct({ groupId: GroupId });
 const sessionParams = Schema.Struct({ sessionId: SessionId });
@@ -332,6 +354,42 @@ const LedgerGroup = HttpApiGroup.make("ledger")
   )
   .middleware(Authentication);
 
+const stakeParams = Schema.Struct({ stakeId: StakeId });
+
+const StakesGroup = HttpApiGroup.make("stakes")
+  .add(
+    HttpApiEndpoint.post("create", "/groups/:groupId/stakes", {
+      params: groupParams,
+      payload: CreateStakeRequest,
+      success: Stake,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("end", "/stakes/:stakeId/end", {
+      params: stakeParams,
+      payload: EndStakeRequest,
+      success: Stake,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("reopen", "/stakes/:stakeId/reopen", {
+      params: stakeParams,
+      success: Stake,
+      error: [Forbidden, NotFound, Conflict],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("void", "/stakes/:stakeId/void", {
+      params: stakeParams,
+      payload: VoidEntryRequest,
+      success: Stake,
+      error: [Forbidden, NotFound, Conflict],
+    }),
+  )
+  .middleware(Authentication);
+
 export class StacksApi extends HttpApi.make("stacks")
   .add(HealthGroup)
   .add(GroupsGroup)
@@ -340,4 +398,5 @@ export class StacksApi extends HttpApi.make("stacks")
   .add(VenuesGroup)
   .add(SessionsGroup)
   .add(LedgerGroup)
+  .add(StakesGroup)
   .prefix("/api") {}

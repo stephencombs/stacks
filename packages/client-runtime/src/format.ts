@@ -1,5 +1,12 @@
 import * as DateTime from "effect/DateTime";
-import type { GroupDetail, PlayerId } from "@stacks/contracts";
+import {
+  MinorUnits,
+  type GroupDetail,
+  type PlayerId,
+  type StakeView,
+  type UserId,
+} from "@stacks/contracts";
+import { formatMoney } from "@stacks/shared/money";
 
 const day = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -52,3 +59,38 @@ export const playedSummary = (sessionCount: number, minutesPlayed: number) => {
   const played = `The group has played ${sessionCount} ${sessionCount === 1 ? "session" : "sessions"}`;
   return hours === 0 ? `${played}.` : `${played} over ${hours} ${hours === 1 ? "hour" : "hours"}.`;
 };
+
+/**
+ * Two lines for a stake: who backed whom on what terms, then where it stands, as in
+ * "Nick is up $400.00 · owes back $1,200.00".
+ */
+export const stakeLines = (
+  { stake, result, owed }: StakeView,
+  names: ReadonlyMap<PlayerId, string>,
+  currency: GroupDetail["group"]["currency"],
+) => {
+  const money = (amount: number) => formatMoney(MinorUnits.make(Math.abs(amount)), currency);
+  const borrower = names.get(stake.borrowerId) ?? "Player";
+  const title = `${names.get(stake.lenderId) ?? "Player"} backed ${borrower} ${money(stake.amount)} · ${stake.lenderShare}% of winnings`;
+  if (stake.voidedAt !== null) {
+    return { title, status: `Voided${stake.voidReason ? `: ${stake.voidReason}` : ""}` };
+  }
+  const ended = stake.endedAt !== null;
+  const standing =
+    result === 0
+      ? `${borrower} ${ended ? "broke" : "is"} even`
+      : `${borrower} ${ended ? "was" : "is"} ${result > 0 ? "up" : "down"} ${money(result)}`;
+  const parts = [
+    ended ? `Ended ${formatDay(stake.endedAt!)}` : null,
+    standing,
+    `owes back ${money(owed)}`,
+  ];
+  return { title, status: parts.filter(Boolean).join(" · ") };
+};
+
+/** The backer, the player, whoever added a stake or an admin can end, reopen or void it. */
+export const canChangeStake = (detail: GroupDetail, { stake }: StakeView, userId: UserId | null) =>
+  isAdmin(detail) ||
+  stake.createdBy === userId ||
+  stake.lenderId === detail.myPlayerId ||
+  stake.borrowerId === detail.myPlayerId;

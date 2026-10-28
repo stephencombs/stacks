@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import {
+  MinorUnits,
   NotFound,
   PlayerId,
   type GroupDetail,
@@ -16,8 +17,9 @@ import {
 import { balances } from "@stacks/shared/balances";
 import { resultsBy } from "@stacks/shared/results";
 import { settleUp } from "@stacks/shared/settleUp";
+import { stakeOutcomes, withStakes } from "@stacks/shared/stakes";
 
-import { EntryRow, GroupRow, PlayerRow, SessionRow, VenueRow } from "../db/rows.ts";
+import { EntryRow, GroupRow, PlayerRow, SessionRow, StakeRow, VenueRow } from "../db/rows.ts";
 import { decodeRows, type Membership } from "./Access.ts";
 
 export const venueColumns = (sql: SqlClient.SqlClient) => sql`
@@ -95,14 +97,34 @@ export const sessionDetail = Effect.fn("Views.sessionDetail")(function* (session
   } satisfies SessionDetail;
 });
 
-/** Balances from every non-voided entry that moved money between two players. */
+/** The group's stakes, voided ones included, and where each live one stands. */
+const groupStakes = Effect.fn("Views.groupStakes")(function* (groupId: GroupId) {
+  const sql = yield* SqlClient.SqlClient;
+  const stakes = yield* sql`
+    select * from stakes where group_id = ${groupId} order by started_at, created_at
+  `.pipe(Effect.flatMap(decodeRows(StakeRow)));
+  const live = stakes.filter((stake) => stake.voidedAt === null);
+  if (live.length === 0) return { stakes, outcomes: stakeOutcomes([], [], []) };
+  const sessions = yield* sql`select * from sessions where group_id = ${groupId}`.pipe(
+    Effect.flatMap(decodeRows(SessionRow)),
+  );
+  const entries = yield* sql`
+    select * from entries
+    where group_id = ${groupId} and session_id is not null and voided_at is null
+      and player_id in ${sql.in(Array.from(new Set(live.map((stake) => stake.borrowerId))))}
+  `.pipe(Effect.flatMap(decodeRows(EntryRow)));
+  return { stakes, outcomes: stakeOutcomes(live, sessions, entries) };
+});
+
+/** Balances from every entry that moved money between two players, and every live stake. */
 export const groupBalances = Effect.fn("Views.groupBalances")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   const entries = yield* sql`
     select * from entries
     where group_id = ${groupId} and voided_at is null and counterparty_id is not null
   `.pipe(Effect.flatMap(decodeRows(EntryRow)));
-  return balances(entries);
+  const { stakes, outcomes } = yield* groupStakes(groupId);
+  return { owed: withStakes(balances(entries), stakes, outcomes), stakes, outcomes };
 });
 
 export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Membership) {
@@ -119,7 +141,7 @@ export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Mem
     where p.group_id = ${groupId}
     order by p.created_at, p.id
   `.pipe(Effect.flatMap(decodeRows(PlayerRow)));
-  const owed = yield* groupBalances(groupId);
+  const { owed, stakes, outcomes } = yield* groupBalances(groupId);
   const settlements = yield* sql`
     select * from entries
     where group_id = ${groupId} and kind = 'settlement'
@@ -136,6 +158,11 @@ export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Mem
     balances: Array.from(owed, ([playerId, amount]) => ({ playerId, amount })),
     transfers: settleUp(owed),
     settlements,
+    stakes: stakes.map((stake) => ({
+      stake,
+      result: outcomes.get(stake.id)?.result ?? MinorUnits.make(0),
+      owed: outcomes.get(stake.id)?.owed ?? MinorUnits.make(0),
+    })),
     sessions,
   } satisfies GroupDetail;
 });

@@ -22,6 +22,7 @@ import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
+import { BackingSection } from "~/features/Backing";
 import { VoidEntryDialog } from "~/features/EntryDialogs";
 import { GroupHeader } from "~/features/GroupHeader";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
@@ -134,6 +135,8 @@ function SettleUpView({ detail }: { detail: GroupDetail }) {
           </>
         )}
       </section>
+
+      <BackingSection detail={detail} />
 
       <section className="flex flex-col gap-2">
         <SectionHeading>Payments</SectionHeading>

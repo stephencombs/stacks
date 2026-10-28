@@ -19,6 +19,10 @@
     "./settleUp": {
       "types": "./src/settleUp.ts",
       "import": "./src/settleUp.ts"
+    },
+    "./stakes": {
+      "types": "./src/stakes.ts",
+      "import": "./src/stakes.ts"
     }
   },
   "scripts": {

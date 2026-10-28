@@ -368,6 +368,9 @@ importers:
       '@stacks/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@stacks/shared':
+        specifier: workspace:*
+        version: link:../shared
       effect:
         specifier: 'catalog:'
         version: 4.0.5

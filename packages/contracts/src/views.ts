@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { GroupId, InviteId, PlayerId, SessionId, UserId, VenueId } from "./ids.ts";
-import { Entry, Game, Session } from "./ledger.ts";
+import { Entry, Game, Session, Stake } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 
 export const MemberRole = Schema.Literals(["owner", "admin", "member"]);
@@ -86,6 +86,14 @@ export const GroupListItem = Schema.Struct({
 });
 export type GroupListItem = typeof GroupListItem.Type;
 
+/** A stake and where it stands: the borrower's result so far and what they'd hand back now. */
+export const StakeView = Schema.Struct({
+  stake: Stake,
+  result: MinorUnits,
+  owed: MinorUnits,
+});
+export type StakeView = typeof StakeView.Type;
+
 export const GroupDetail = Schema.Struct({
   group: Group,
   role: MemberRole,
@@ -94,6 +102,7 @@ export const GroupDetail = Schema.Struct({
   balances: Schema.Array(Balance),
   transfers: Schema.Array(Transfer),
   settlements: Schema.Array(Entry),
+  stakes: Schema.Array(StakeView),
   sessions: Schema.Array(SessionSummary),
 });
 export type GroupDetail = typeof GroupDetail.Type;

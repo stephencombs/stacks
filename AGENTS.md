@@ -15,6 +15,7 @@ Fight for the smallest model that makes the correct behavior unsurprising. Don't
 - **result**: a player's win or loss (cash-outs minus buy-ins). A result is separate from a balance.
 - **balance**: what a member is owed (positive) or owes (negative) inside a group.
 - **settlement**: a recorded payment between two members. Stacks never moves money.
+- **stake**: money one player (the backer) gives another to play with. While it's open, the player's results go to it: the backer gets the stake back plus their share of the winnings, or what's left after losses. What the player owes back counts in balances.
 
 ## Hit every surface
 

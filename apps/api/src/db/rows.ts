@@ -11,6 +11,7 @@ import {
   PlayerId,
   SessionId,
   SessionStatus,
+  StakeId,
   CurrencyCode,
   UserId,
   VenueId,
@@ -99,4 +100,21 @@ export const EntryRow = Schema.Struct({
   voidedBy: Schema.NullOr(UserId),
   voidReason: Schema.NullOr(Schema.String),
   replacesEntryId: Schema.NullOr(EntryId),
+});
+
+export const StakeRow = Schema.Struct({
+  id: StakeId,
+  groupId: GroupId,
+  lenderId: PlayerId,
+  borrowerId: PlayerId,
+  amount: Amount,
+  lenderShare: Schema.Int,
+  startedAt: Timestamp,
+  endedAt: Schema.NullOr(Timestamp),
+  note: Schema.NullOr(Schema.String),
+  createdBy: UserId,
+  createdAt: Timestamp,
+  voidedAt: Schema.NullOr(Timestamp),
+  voidedBy: Schema.NullOr(UserId),
+  voidReason: Schema.NullOr(Schema.String),
 });

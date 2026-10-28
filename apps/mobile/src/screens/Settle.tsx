@@ -25,6 +25,7 @@ import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
+import { BackingSection } from "../features/Backing";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ groupId: string }>;
@@ -127,6 +128,8 @@ function SettleView({ detail }: { detail: GroupDetail }) {
         )}
       </View>
       <Button label="Record a payment" onPress={() => setPaying("custom")} />
+
+      <BackingSection detail={detail} />
 
       <View className="gap-2">
         <SectionHeading>Payments</SectionHeading>
