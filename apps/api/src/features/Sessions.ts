@@ -24,10 +24,17 @@ export const create = Effect.fn("Sessions.create")(function* (
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   yield* Access.membership(groupId);
-  const venue = yield* Venues.findVisible(request.venueId, groupId).pipe(
-    Effect.catchTag("NotFound", () => Effect.fail(new Conflict({ reason: "venue_not_available" }))),
+  const [venue] = yield* Effect.all(
+    [
+      Venues.findVisible(request.venueId, groupId).pipe(
+        Effect.catchTag("NotFound", () =>
+          Effect.fail(new Conflict({ reason: "venue_not_available" })),
+        ),
+      ),
+      Access.requirePlayersInGroup(groupId, request.playerIds),
+    ],
+    { concurrency: "unbounded" },
   );
-  yield* Access.requirePlayersInGroup(groupId, request.playerIds);
   const startedAt = request.startedAt ?? (yield* DateTime.now);
 
   const inserted = yield* sql.withTransaction(
@@ -40,12 +47,12 @@ export const create = Effect.fn("Sessions.create")(function* (
         returning id
       `;
       if (rows.length === 0) return false;
-      for (const playerId of new Set(request.playerIds)) {
-        yield* sql`
-          insert into session_players (session_id, group_id, player_id)
-          values (${request.id}, ${groupId}, ${playerId})
-        `;
-      }
+      const players = Array.from(new Set(request.playerIds), (playerId) => ({
+        sessionId: request.id,
+        groupId,
+        playerId,
+      }));
+      if (players.length > 0) yield* sql`insert into session_players ${sql.insert(players)}`;
       return true;
     }),
   );

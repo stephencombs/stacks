@@ -37,13 +37,18 @@ const summaries = Effect.fn("Views.summaries")(function* (
   const sql = yield* SqlClient.SqlClient;
   const sessionIds = sessions.map((session) => session.id);
   const venueIds = Array.from(new Set(sessions.map((session) => session.venueId)));
-  const venues = yield* sql`
-    select ${venueColumns(sql)} from venues v where v.id in ${sql.in(venueIds)}
-  `.pipe(Effect.flatMap(decodeRows(VenueRow)));
-  const entries = yield* sql`
-    select * from entries
-    where session_id in ${sql.in(sessionIds)} and voided_at is null
-  `.pipe(Effect.flatMap(decodeRows(EntryRow)));
+  const [venues, entries] = yield* Effect.all(
+    [
+      sql`
+        select ${venueColumns(sql)} from venues v where v.id in ${sql.in(venueIds)}
+      `.pipe(Effect.flatMap(decodeRows(VenueRow))),
+      sql`
+        select * from entries
+        where session_id in ${sql.in(sessionIds)} and voided_at is null
+      `.pipe(Effect.flatMap(decodeRows(EntryRow))),
+    ],
+    { concurrency: "unbounded" },
+  );
 
   const venueById = new Map<VenueId, (typeof venues)[number]>(venues.map((v) => [v.id, v]));
   const resultsBySession = resultsBy(sessions, entries, (session) => session.id);
@@ -81,13 +86,18 @@ export const loadSession = Effect.fn("Views.loadSession")(function* (sessionId: 
 export const sessionDetail = Effect.fn("Views.sessionDetail")(function* (sessionId: SessionId) {
   const sql = yield* SqlClient.SqlClient;
   const session = yield* loadSession(sessionId);
-  const [summary] = yield* summaries([session]);
-  const playerIds = yield* sql`
-    select player_id from session_players where session_id = ${sessionId} order by joined_at
-  `.pipe(Effect.flatMap(decodeRows(Schema.Struct({ playerId: PlayerId }))));
-  const entries = yield* sql`
-    select * from entries where session_id = ${sessionId} order by occurred_at, created_at
-  `.pipe(Effect.flatMap(decodeRows(EntryRow)));
+  const [[summary], playerIds, entries] = yield* Effect.all(
+    [
+      summaries([session]),
+      sql`
+        select player_id from session_players where session_id = ${sessionId} order by joined_at
+      `.pipe(Effect.flatMap(decodeRows(Schema.Struct({ playerId: PlayerId })))),
+      sql`
+        select * from entries where session_id = ${sessionId} order by occurred_at, created_at
+      `.pipe(Effect.flatMap(decodeRows(EntryRow))),
+    ],
+    { concurrency: "unbounded" },
+  );
   return {
     session,
     venue: summary!.venue,
