@@ -1,27 +1,30 @@
-import type { CurrencyCode, GroupStats, PlayerId } from "@stacks/contracts";
+import type { CurrencyCode, GroupStats } from "@stacks/contracts";
 import { formatDay } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
-import { runningNet } from "@stacks/shared/results";
+import { runningNet, type Subject } from "@stacks/shared/results";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { NetChartPlot } from "./NetChartPlot";
 
-/** A player's running net over the group's closed sessions, oldest on the left. */
+/** A player's or the group's running net over the group's closed sessions, oldest on the left. */
 export function NetChart({
   stats,
-  playerId,
+  subject,
+  whose,
   currency,
 }: {
   stats: GroupStats;
-  playerId: PlayerId;
+  subject: Subject;
+  /** "Your", "Nick's" or "The group's", from `whose` in client-runtime. */
+  whose: string;
   currency: CurrencyCode;
 }) {
-  const points = runningNet(stats.bySession, playerId);
+  const points = runningNet(stats.bySession, subject);
   if (points.length === 0) {
     return (
       <Text className="text-sm text-muted">
-        Your running total shows up here after you play a session.
+        A running total shows up here after a finished session.
       </Text>
     );
   }
@@ -32,7 +35,7 @@ export function NetChart({
   return (
     <View
       accessible
-      accessibilityLabel={`Your net after ${sessions}: ${formatMoney(last.total, currency, { signDisplay: "exceptZero" })}`}
+      accessibilityLabel={`${whose} net after ${sessions}: ${formatMoney(last.total, currency, { signDisplay: "exceptZero" })}`}
       className="gap-4"
     >
       <View className="gap-0.5">

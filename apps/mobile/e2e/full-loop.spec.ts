@@ -174,6 +174,9 @@ test.describe.serial("live mode on a phone", () => {
     await expect(alex.getByText("Up in 1 of 1").filter({ visible: true })).toBeVisible();
     await alex.getByRole("radio", { name: "Running total" }).filter({ visible: true }).click();
     await expect(alex.getByText("After 1 session").filter({ visible: true })).toBeVisible();
+    await alex.getByRole("button", { name: /Bea: / }).filter({ visible: true }).click();
+    await expect(alex.getByText("Bea's sessions").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("-$200.00").filter({ visible: true }).first()).toBeVisible();
     await shoot(alex, "stats");
   });
 });

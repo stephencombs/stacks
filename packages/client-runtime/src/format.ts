@@ -7,7 +7,7 @@ import {
   type UserId,
 } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
-import type { SessionRuns } from "@stacks/shared/results";
+import type { SessionRuns, Subject } from "@stacks/shared/results";
 
 const day = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -107,4 +107,12 @@ export const runsLine = ({ longestWinningRun, current }: SessionRuns) => {
   const longest = `Longest winning run: ${longestWinningRun}`;
   if (current.length < 2) return longest;
   return `${longest} · Now on ${current.length} ${current.winning ? "wins" : "losses"} in a row`;
+};
+
+/** "Your", "Nick's" or "The group's": who a stats heading is about. */
+export const whose = (subject: Subject, me: PlayerId, names: ReadonlyMap<PlayerId, string>) => {
+  if (subject === "group") return "The group's";
+  if (subject === me) return "Your";
+  const name = names.get(subject);
+  return name ? `${name}'s` : "Their";
 };

@@ -9,7 +9,8 @@ import { GroupHeader } from "~/features/GroupHeader";
 import { NetChart } from "~/features/NetChart";
 import { SessionBars } from "~/features/SessionBars";
 import { Standings } from "~/features/Standings";
-import { gameNames, playedSummary } from "@stacks/client-runtime/format";
+import { gameNames, playedSummary, playerNames, whose } from "@stacks/client-runtime/format";
+import { netFor, type Subject } from "@stacks/shared/results";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/groups/$groupId/stats")({ component: Stats });
@@ -38,7 +39,11 @@ const charts = [
 ] as const;
 
 function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }) {
+  const me = detail.myPlayerId;
   const [chart, setChart] = useState<(typeof charts)[number]["key"]>("each");
+  const [subject, setSubject] = useState<Subject>(() =>
+    stats.byPlayer.some((result) => result.playerId === me) ? me : "group",
+  );
   const currency = detail.group.currency;
   if (stats.sessionCount === 0) {
     return (
@@ -47,8 +52,16 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       </EmptyState>
     );
   }
-  const mine = (results: ReadonlyArray<PlayerResult>) =>
-    results.find((result) => result.playerId === detail.myPlayerId);
+  const owner = whose(subject, me, playerNames(detail));
+  const net = (results: ReadonlyArray<PlayerResult>) => {
+    const amount = netFor(results, subject);
+    return amount === undefined ? (
+      <span className="text-muted">—</span>
+    ) : (
+      <Money amount={amount} currency={currency} tone="result" />
+    );
+  };
+  const netColumn = subject === "group" ? "Group net" : `${owner} net`;
 
   return (
     <>
@@ -57,14 +70,24 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       </p>
 
       <section className="flex flex-col gap-2">
-        <SectionHeading>Standings</SectionHeading>
+        <SectionHeading
+          action={<span className="text-xs text-muted">Pick a row to see their stats</span>}
+        >
+          Standings
+        </SectionHeading>
         <Surface>
-          <Standings detail={detail} stats={stats} me={detail.myPlayerId} />
+          <Standings
+            detail={detail}
+            stats={stats}
+            me={me}
+            selected={subject}
+            onSelect={setSubject}
+          />
         </Surface>
       </section>
 
       <section className="flex flex-col gap-2">
-        <SectionHeading>Your sessions</SectionHeading>
+        <SectionHeading>{`${owner} sessions`}</SectionHeading>
         <Surface className="flex flex-col gap-4 p-5">
           <div
             role="group"
@@ -89,46 +112,46 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
             ))}
           </div>
           {chart === "each" ? (
-            <SessionBars stats={stats} playerId={detail.myPlayerId} currency={currency} />
+            <SessionBars
+              key={subject}
+              stats={stats}
+              subject={subject}
+              whose={owner}
+              currency={currency}
+            />
           ) : (
-            <NetChart stats={stats} playerId={detail.myPlayerId} currency={currency} />
+            <NetChart
+              key={subject}
+              stats={stats}
+              subject={subject}
+              whose={owner}
+              currency={currency}
+            />
           )}
         </Surface>
       </section>
 
       <section className="flex flex-col gap-2">
-        <SectionHeading>Your results by game</SectionHeading>
-        <Table head={["Game", "Sessions", "Your net"]}>
+        <SectionHeading>{`${owner} results by game`}</SectionHeading>
+        <Table head={["Game", "Sessions", netColumn]}>
           {stats.byGame.map((row) => (
             <tr key={row.key}>
               <td className="px-5 py-3">{gameNames[row.key]}</td>
               <td className="px-5 py-3 text-right text-muted tabular-nums">{row.sessionCount}</td>
-              <td className="px-5 py-3 text-right font-medium">
-                {mine(row.results) ? (
-                  <Money amount={mine(row.results)!.net} currency={currency} tone="result" />
-                ) : (
-                  <span className="text-muted">—</span>
-                )}
-              </td>
+              <td className="px-5 py-3 text-right font-medium">{net(row.results)}</td>
             </tr>
           ))}
         </Table>
       </section>
 
       <section className="flex flex-col gap-2">
-        <SectionHeading>Your results by venue</SectionHeading>
-        <Table head={["Venue", "Sessions", "Your net"]}>
+        <SectionHeading>{`${owner} results by venue`}</SectionHeading>
+        <Table head={["Venue", "Sessions", netColumn]}>
           {stats.byVenue.map((row) => (
             <tr key={row.key.id}>
               <td className="px-5 py-3">{row.key.name}</td>
               <td className="px-5 py-3 text-right text-muted tabular-nums">{row.sessionCount}</td>
-              <td className="px-5 py-3 text-right font-medium">
-                {mine(row.results) ? (
-                  <Money amount={mine(row.results)!.net} currency={currency} tone="result" />
-                ) : (
-                  <span className="text-muted">—</span>
-                )}
-              </td>
+              <td className="px-5 py-3 text-right font-medium">{net(row.results)}</td>
             </tr>
           ))}
         </Table>

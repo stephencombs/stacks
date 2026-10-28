@@ -1,8 +1,8 @@
-import type { CurrencyCode, GroupStats, PlayerId } from "@stacks/contracts";
+import type { CurrencyCode, GroupStats } from "@stacks/contracts";
 import { barTrack } from "@stacks/client-runtime/chart";
 import { formatDay, runsLine, winRate } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
-import { runningNet, sessionRuns } from "@stacks/shared/results";
+import { runningNet, sessionRuns, type Subject } from "@stacks/shared/results";
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { Money } from "~/components/Money";
@@ -11,21 +11,24 @@ import { cn } from "~/components/ui/cn";
 // How far a finger moves before a touch counts as a scroll rather than a tap.
 const SLOP = 8;
 
-/** A player's result in each closed session, oldest on the left, with streaks underneath. */
+/** A player's or the group's result in each closed session, oldest on the left, with streaks underneath. */
 export function SessionBars({
   stats,
-  playerId,
+  subject,
+  whose,
   currency,
 }: {
   stats: GroupStats;
-  playerId: PlayerId;
+  subject: Subject;
+  /** "Your", "Nick's" or "The group's", from `whose` in client-runtime. */
+  whose: string;
   currency: CurrencyCode;
 }) {
   const [active, setActive] = useState<number | null>(null);
   const touch = useRef<{ x: number; y: number } | null>(null);
-  const points = runningNet(stats.bySession, playerId);
+  const points = runningNet(stats.bySession, subject);
   if (points.length === 0) {
-    return <p className="text-sm text-muted">Each session you play shows up here as a bar.</p>;
+    return <p className="text-sm text-muted">Each finished session shows up here as a bar.</p>;
   }
 
   const runs = sessionRuns(points.map((point) => point.net));
@@ -79,7 +82,7 @@ export function SessionBars({
       <div
         role="group"
         tabIndex={0}
-        aria-label="Your result in each session. Use the arrow keys to step through them."
+        aria-label={`${whose} result in each session. Use the arrow keys to step through them.`}
         onPointerDown={(event) => {
           if (event.pointerType !== "touch") return pick(event);
           touch.current = { x: event.clientX, y: event.clientY };

@@ -3,7 +3,14 @@ import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 import { SessionId } from "@stacks/contracts";
 
-import { playerResults, resultsBy, runningNet, sessionCounts, sessionRuns } from "./results.ts";
+import {
+  netFor,
+  playerResults,
+  resultsBy,
+  runningNet,
+  sessionCounts,
+  sessionRuns,
+} from "./results.ts";
 import { ALEX, BEA, RandomLedger, entry, money, toEntries } from "./testing/ledgerArbitrary.ts";
 
 describe("playerResults", () => {
@@ -103,6 +110,21 @@ describe("runningNet", () => {
     expect(runningNet([session("first", { playerId: BEA, net: 100 })], ALEX)).toEqual([]);
   });
 
+  it("adds everyone together for the group, skipping sessions nobody finished", () => {
+    const points = runningNet(
+      [
+        session("first", { playerId: ALEX, net: 5000 }, { playerId: BEA, net: -2000 }),
+        session("empty"),
+        session("second", { playerId: BEA, net: -4000 }),
+      ],
+      "group",
+    );
+    expect(points.map((point) => [point.session.name, point.net, point.total])).toEqual([
+      ["first", 3000, 3000],
+      ["second", -4000, -1000],
+    ]);
+  });
+
   it.prop(
     "ends at the player's all-time net",
     [RandomLedger, Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 6 }))],
@@ -184,4 +206,19 @@ describe("sessionRuns", () => {
       expect(tail.every((net) => Math.sign(net) === (runs.current.winning ? 1 : -1))).toBe(true);
     },
   );
+});
+
+describe("netFor", () => {
+  const results = [
+    { playerId: ALEX, net: money(2500) },
+    { playerId: BEA, net: money(-1000) },
+  ];
+  it("picks a player's net, or sums everyone's for the group", () => {
+    expect(netFor(results, ALEX)).toBe(2500);
+    expect(netFor(results, "group")).toBe(1500);
+  });
+  it("is undefined when the subject has no result", () => {
+    expect(netFor([results[1]!], ALEX)).toBeUndefined();
+    expect(netFor([], "group")).toBeUndefined();
+  });
 });

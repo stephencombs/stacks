@@ -66,9 +66,22 @@ export const resultsBy = <S extends Pick<Session, "id">, K>(
   return new Map(Array.from(grouped, ([groupKey, group]) => [groupKey, playerResults(group)]));
 };
 
+/** Whose results a view shows: one player, or everyone in the group added together. */
+export type Subject = PlayerId | "group";
+
+/** A subject's net across `results`, or undefined when nobody they cover has a result there. */
+export const netFor = (
+  results: ReadonlyArray<{ readonly playerId: PlayerId; readonly net: MinorUnits }>,
+  subject: Subject,
+): MinorUnits | undefined => {
+  if (subject !== "group") return results.find((r) => r.playerId === subject)?.net;
+  if (results.length === 0) return undefined;
+  return MinorUnits.make(results.reduce((total, r) => total + r.net, 0));
+};
+
 /**
- * A player's result in each session they played, with the running total after it. Pass the
- * sessions oldest first; sessions the player sat out are skipped.
+ * A subject's result in each session they played, with the running total after it. Pass the
+ * sessions oldest first; sessions the subject sat out are skipped.
  */
 export const runningNet = <
   S extends {
@@ -76,15 +89,15 @@ export const runningNet = <
   },
 >(
   sessions: Iterable<S>,
-  playerId: PlayerId,
+  subject: Subject,
 ): ReadonlyArray<{ readonly session: S; readonly net: MinorUnits; readonly total: MinorUnits }> => {
   const points: Array<{ session: S; net: MinorUnits; total: MinorUnits }> = [];
   let total = 0;
   for (const session of sessions) {
-    const result = session.results.find((r) => r.playerId === playerId);
-    if (!result) continue;
-    total += result.net;
-    points.push({ session, net: result.net, total: MinorUnits.make(total) });
+    const net = netFor(session.results, subject);
+    if (net === undefined) continue;
+    total += net;
+    points.push({ session, net, total: MinorUnits.make(total) });
   }
   return points;
 };

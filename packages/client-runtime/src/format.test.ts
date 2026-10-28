@@ -11,7 +11,7 @@ import {
   type StakeView,
 } from "@stacks/contracts";
 
-import { playedSummary, runsLine, stakeLines, winRate } from "./format.ts";
+import { playedSummary, runsLine, stakeLines, whose, winRate } from "./format.ts";
 
 it("sums up what the group has played", () => {
   expect(playedSummary(29, 8100)).toBe("The group has played 29 sessions over 135 hours.");
@@ -32,6 +32,17 @@ it("sums up wins and streaks", () => {
   expect(runsLine(runs(16, 7, 1, true))).toBe("Longest winning run: 7");
   expect(runsLine(runs(16, 8, 8, true))).toBe("Longest winning run: 8 · Now on 8 wins in a row");
   expect(runsLine(runs(3, 1, 4, false))).toBe("Longest winning run: 1 · Now on 4 losses in a row");
+});
+
+it("names whose stats these are", () => {
+  const me = PlayerId.make("0192e7a0-0000-7000-8000-000000000001");
+  const nick = PlayerId.make("0192e7a0-0000-7000-8000-000000000002");
+  const gone = PlayerId.make("0192e7a0-0000-7000-8000-000000000003");
+  const names = new Map([[nick, "Nick"]]);
+  expect(whose(me, me, names)).toBe("Your");
+  expect(whose(nick, me, names)).toBe("Nick's");
+  expect(whose("group", me, names)).toBe("The group's");
+  expect(whose(gone, me, names)).toBe("Their");
 });
 
 it("says how a stake stands", () => {

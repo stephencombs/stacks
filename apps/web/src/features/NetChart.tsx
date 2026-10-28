@@ -1,8 +1,8 @@
-import { MinorUnits, type CurrencyCode, type GroupStats, type PlayerId } from "@stacks/contracts";
+import { MinorUnits, type CurrencyCode, type GroupStats } from "@stacks/contracts";
 import { fromTop, netScale } from "@stacks/client-runtime/chart";
 import { formatDay } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
-import { runningNet } from "@stacks/shared/results";
+import { runningNet, type Subject } from "@stacks/shared/results";
 import { useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { Money } from "~/components/Money";
@@ -13,14 +13,17 @@ const HEIGHT = 200;
 // How far a finger moves before a touch counts as a drag rather than a tap.
 const SLOP = 8;
 
-/** A player's running net over the group's closed sessions, oldest on the left. */
+/** A player's or the group's running net over the group's closed sessions, oldest on the left. */
 export function NetChart({
   stats,
-  playerId,
+  subject,
+  whose,
   currency,
 }: {
   stats: GroupStats;
-  playerId: PlayerId;
+  subject: Subject;
+  /** "Your", "Nick's" or "The group's", from `whose` in client-runtime. */
+  whose: string;
   currency: CurrencyCode;
 }) {
   const [active, setActive] = useState<number | null>(null);
@@ -28,12 +31,10 @@ export function NetChart({
   // Where a finger went down. A vertical swipe scrolls the page and leaves the chart alone; a tap
   // picks a session and a sideways drag scrubs through them.
   const touch = useRef<{ x: number; y: number; scrubbing: boolean } | null>(null);
-  const points = runningNet(stats.bySession, playerId);
+  const points = runningNet(stats.bySession, subject);
   if (points.length === 0) {
     return (
-      <p className="text-sm text-muted">
-        Your running total shows up here after you play a session.
-      </p>
+      <p className="text-sm text-muted">A running total shows up here after a finished session.</p>
     );
   }
 
@@ -102,7 +103,7 @@ export function NetChart({
         <div
           role="group"
           tabIndex={0}
-          aria-label="Your net after each session. Use the arrow keys to step through sessions."
+          aria-label={`${whose} net after each session. Use the arrow keys to step through sessions.`}
           onPointerDown={(event) => {
             if (event.pointerType !== "touch") return pick(event);
             touch.current = { x: event.clientX, y: event.clientY, scrubbing: false };

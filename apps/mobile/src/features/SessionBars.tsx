@@ -1,24 +1,27 @@
-import type { CurrencyCode, GroupStats, PlayerId } from "@stacks/contracts";
+import type { CurrencyCode, GroupStats } from "@stacks/contracts";
 import { formatDay, runsLine, winRate } from "@stacks/client-runtime/format";
-import { runningNet, sessionRuns } from "@stacks/shared/results";
+import { runningNet, sessionRuns, type Subject } from "@stacks/shared/results";
 import { Text, View } from "react-native";
 
 import { SessionBarsPlot } from "./SessionBarsPlot";
 
-/** A player's result in each closed session, oldest on the left, with streaks underneath. */
+/** A player's or the group's result in each closed session, oldest on the left, with streaks underneath. */
 export function SessionBars({
   stats,
-  playerId,
+  subject,
+  whose,
   currency,
 }: {
   stats: GroupStats;
-  playerId: PlayerId;
+  subject: Subject;
+  /** "Your", "Nick's" or "The group's", from `whose` in client-runtime. */
+  whose: string;
   currency: CurrencyCode;
 }) {
-  const points = runningNet(stats.bySession, playerId);
+  const points = runningNet(stats.bySession, subject);
   if (points.length === 0) {
     return (
-      <Text className="text-sm text-muted">Each session you play shows up here as a bar.</Text>
+      <Text className="text-sm text-muted">Each finished session shows up here as a bar.</Text>
     );
   }
   const runs = sessionRuns(points.map((point) => point.net));
@@ -29,7 +32,7 @@ export function SessionBars({
   return (
     <View
       accessible
-      accessibilityLabel={`${rate.count} sessions, ${rate.percent}. ${runsLine(runs)}.`}
+      accessibilityLabel={`${whose} sessions: ${rate.count}, ${rate.percent}. ${runsLine(runs)}.`}
       className="gap-4"
     >
       <View className="gap-0.5">

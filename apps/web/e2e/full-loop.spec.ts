@@ -170,6 +170,13 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("button", { name: "Running total" }).click();
     await expect(chart).toContainText("After 1 session");
     await expect(chart).toContainText("+$170.00");
+    // Anyone's stats, and the group's, are a tap away.
+    await alex.getByRole("button", { name: /Bea/ }).click();
+    await expect(alex.getByRole("heading", { name: "Bea's sessions" })).toBeVisible();
+    await expect(chart).toContainText("-$200.00");
+    await alex.getByRole("button", { name: /Group total/ }).click();
+    await expect(alex.getByRole("heading", { name: "The group's sessions" })).toBeVisible();
+    await expect(chart).toContainText("-$10.00");
 
     // On a phone, scrolling with a finger on the chart leaves it alone; a tap picks a session.
     const phone = await browser.newContext({
