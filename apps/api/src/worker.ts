@@ -24,13 +24,17 @@ const { handler } = HttpRouter.toWebHandler(
   ),
 );
 
+interface Env {
+  readonly HYPERDRIVE: Hyperdrive;
+}
+
 /**
  * A Worker can't reuse a socket opened during another request, so each request gets its own
  * database client. Hyperdrive keeps the real Postgres connections pooled behind it.
  */
-const handleRequest = (request: Request) =>
+const handleRequest = (request: Request, env: Env) =>
   Effect.gen(function* () {
-    const database = yield* Layer.build(Database.layerConfig);
+    const database = yield* Layer.build(Database.layer(env.HYPERDRIVE.connectionString));
     return yield* Effect.promise(() => handler(request, database));
   }).pipe(
     Effect.scoped,
@@ -43,5 +47,5 @@ const handleRequest = (request: Request) =>
   );
 
 export default {
-  fetch: (request) => Effect.runPromise(handleRequest(request)),
-} satisfies ExportedHandler;
+  fetch: (request, env) => Effect.runPromise(handleRequest(request, env)),
+} satisfies ExportedHandler<Env>;

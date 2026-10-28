@@ -5,4 +5,25 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // Locally Hyperdrive is a pass-through to the dev Postgres from docker-compose.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "local",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/stacks",
+    },
+  ],
+  "env": {
+    // `wrangler deploy --env production`: one Worker serves the API and the built web app.
+    "production": {
+      "name": "stacks",
+      "workers_dev": true,
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "REPLACE_WITH_HYPERDRIVE_ID" }],
+      "assets": {
+        "directory": "../web/dist",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"],
+      },
+    },
+  },
 }

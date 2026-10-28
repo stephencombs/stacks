@@ -7,13 +7,14 @@
     "dev:api": "vp run --filter @stacks/api dev",
     "dev:web": "vp run --filter @stacks/web dev",
     "dev:mobile": "vp run --filter @stacks/mobile dev",
-    "build": "vp run --filter './apps/*' build",
+    "build": "vp run --filter @stacks/web build && vp run --filter @stacks/api build && vp run --filter @stacks/mobile build",
     "typecheck": "vp run -r --cache typecheck",
     "lint": "vp lint --report-unused-disable-directives",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
     "test": "vp run -r test",
-    "knip": "knip"
+    "knip": "knip",
+    "deploy": "vp run --filter @stacks/web build && vp run --filter @stacks/api deploy"
   },
   "devDependencies": {
     "@types/node": "catalog:",

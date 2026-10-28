@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --ip 0.0.0.0 --port 8787",
-    "build": "wrangler deploy --dry-run --outdir dist",
+    "build": "wrangler deploy --env production --dry-run --outdir dist",
     "test": "node scripts/migrate.ts --test && vp test run --config ../../vite.config.ts --dir .",
     "typecheck": "tsc --noEmit",
     "db:migrate": "node scripts/migrate.ts",
     "db:seed": "node scripts/seed.ts",
-    "venues:import": "node scripts/import-venues.ts"
+    "venues:import": "node scripts/import-venues.ts",
+    "deploy": "wrangler deploy --env production"
   },
   "dependencies": {
     "@clerk/backend": "catalog:",
