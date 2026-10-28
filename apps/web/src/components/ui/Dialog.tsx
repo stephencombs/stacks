@@ -22,15 +22,16 @@ export function Dialog({
   return (
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>
-        <BaseDialog.Backdrop className="fixed inset-0 bg-black/30 transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+        <BaseDialog.Backdrop className="fixed inset-0 bg-black/30 transition-opacity duration-250 ease-[cubic-bezier(0.32,0.72,0,1)] data-[ending-style]:duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 sm:duration-200 sm:data-[ending-style]:duration-150" />
         <BaseDialog.Popup
           // React bubbles events through portals; a form in here must not submit one around the trigger.
           onSubmit={(event) => event.stopPropagation()}
           className={cn(
             "fixed inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto rounded-t-2xl bg-surface px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl outline-none",
-            "transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] data-[ending-style]:translate-y-4 data-[ending-style]:opacity-0 data-[starting-style]:translate-y-4 data-[starting-style]:opacity-0",
-            "sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:pb-5",
-            "sm:data-[ending-style]:-translate-y-[48%] sm:data-[starting-style]:-translate-y-[48%]",
+            // On phones it's a sheet sliding up from the bottom edge; wider screens fade it in centered.
+            "transition-[translate,opacity] duration-250 ease-[cubic-bezier(0.32,0.72,0,1)] data-[ending-style]:duration-200 data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
+            "sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:pb-5 sm:duration-200 sm:data-[ending-style]:duration-150",
+            "sm:data-[ending-style]:-translate-y-[48%] sm:data-[ending-style]:opacity-0 sm:data-[starting-style]:-translate-y-[48%] sm:data-[starting-style]:opacity-0",
             className,
           )}
         >

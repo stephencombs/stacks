@@ -1,6 +1,6 @@
 import type { StaticScreenProps } from "@react-navigation/native";
 import { GroupId, type GroupDetail, type GroupStats, type PlayerResult } from "@stacks/contracts";
-import { gameNames, playerNames } from "@stacks/client-runtime/format";
+import { gameNames, playedSummary, playerNames } from "@stacks/client-runtime/format";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
@@ -39,19 +39,12 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
   }
   const mine = (results: ReadonlyArray<PlayerResult>) =>
     results.find((r) => r.playerId === detail.myPlayerId);
-  const tile = (label: string, value: string) => (
-    <Surface className="flex-1 gap-1 px-4 py-3">
-      <Text className="text-sm text-muted">{label}</Text>
-      <Text className="font-serif text-3xl text-ink tabular-nums">{value}</Text>
-    </Surface>
-  );
 
   return (
     <>
-      <View className="flex-row gap-3">
-        {tile("Sessions", String(stats.sessionCount))}
-        {tile("Hours played", String(Math.round(stats.minutesPlayed / 6) / 10))}
-      </View>
+      <Text className="text-base text-muted">
+        {playedSummary(stats.sessionCount, stats.minutesPlayed)}
+      </Text>
       <View className="gap-2">
         <SectionHeading>Your net over time</SectionHeading>
         <Surface className="p-4">

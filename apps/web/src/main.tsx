@@ -8,6 +8,13 @@ import { routeTree } from "./routeTree.gen";
 
 const router = createRouter({ routeTree, defaultPreload: "intent" });
 
+// The palette follows the system theme; without this, every button would fade into its new color.
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  const root = document.documentElement;
+  root.dataset.themeSwitching = "";
+  requestAnimationFrame(() => requestAnimationFrame(() => delete root.dataset.themeSwitching));
+});
+
 declare module "@tanstack/react-router" {
   interface Register {
     router: typeof router;

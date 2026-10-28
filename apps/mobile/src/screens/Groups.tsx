@@ -7,6 +7,7 @@ import { Text, View } from "react-native";
 
 import { BalanceLabel } from "../components/Money";
 import { Button } from "../components/ui/Button";
+import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
@@ -72,13 +73,7 @@ export function GroupsScreen() {
                       subject="you"
                     />
                   </View>
-                  <Text
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                    className="text-xl text-faint"
-                  >
-                    ›
-                  </Text>
+                  <Icon name="chevron-right" color="faint" />
                 </Row>
               ))}
             </List>

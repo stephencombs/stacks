@@ -414,7 +414,7 @@ function StatusActions({
   const stacks = useStacks();
   const reopen = useAction(stacks.Client.mutation("sessions", "reopen"));
   if (detail.session.status === "live") {
-    return <Button label="Close session" variant="primary" size="xl" onPress={onClose} />;
+    return <Button label="Close session" size="lg" onPress={onClose} />;
   }
   if (!isAdmin(group)) return null;
   return (

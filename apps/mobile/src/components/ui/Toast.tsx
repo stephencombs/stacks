@@ -18,38 +18,58 @@ export function ToastHost({ children }: { children: ReactNode }) {
   const [current, setCurrent] = useState<(Toast & { readonly id: number }) | null>(null);
   const nextId = useRef(0);
   const [show] = useState(() => (toast: Toast) => setCurrent({ ...toast, id: nextId.current++ }));
+  const [clear] = useState(() => () => setCurrent(null));
 
   useEffect(() => {
-    if (!current) return;
-    AccessibilityInfo.announceForAccessibility(current.message);
-    const hide = setTimeout(() => setCurrent(null), VISIBLE_MS);
-    return () => clearTimeout(hide);
+    if (current) AccessibilityInfo.announceForAccessibility(current.message);
   }, [current]);
 
   return (
     <ToastContext value={show}>
       {children}
-      {current ? (
-        <ToastView key={current.id} toast={current} onDismiss={() => setCurrent(null)} />
-      ) : null}
+      {current ? <ToastView key={current.id} toast={current} onClosed={clear} /> : null}
     </ToastContext>
   );
 }
 
-function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
+function ToastView({ toast, onClosed }: { toast: Toast; onClosed: () => void }) {
   const insets = useSafeAreaInsets();
   const [shown] = useState(() => new Animated.Value(0));
-  const [rise, setRise] = useState(8);
+  // Settled before anything moves; with Reduce Motion on, the toast appears and leaves at once.
+  const reduced = useRef<boolean | null>(null);
+  const closing = useRef(false);
+  const [close] = useState(() => () => {
+    if (closing.current) return;
+    closing.current = true;
+    if (reduced.current) return onClosed();
+    Animated.timing(shown, {
+      toValue: 0,
+      duration: 150,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start(({ finished }) => (finished ? onClosed() : undefined));
+  });
 
   useEffect(() => {
-    void AccessibilityInfo.isReduceMotionEnabled().then((reduced) => setRise(reduced ? 0 : 8));
-    Animated.timing(shown, {
-      toValue: 1,
-      duration: 200,
-      easing: Easing.bezier(0.32, 0.72, 0, 1),
-      useNativeDriver: true,
-    }).start();
-  }, [shown]);
+    let live = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+      if (!live) return;
+      reduced.current = reduce;
+      if (reduce) shown.setValue(1);
+      else
+        Animated.timing(shown, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.bezier(0.32, 0.72, 0, 1),
+          useNativeDriver: true,
+        }).start();
+    });
+    const hide = setTimeout(close, VISIBLE_MS);
+    return () => {
+      live = false;
+      clearTimeout(hide);
+    };
+  }, [shown, close]);
 
   return (
     <View
@@ -61,7 +81,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         style={{
           opacity: shown,
           transform: [
-            { translateY: shown.interpolate({ inputRange: [0, 1], outputRange: [rise, 0] }) },
+            { translateY: shown.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) },
           ],
         }}
       >
@@ -74,8 +94,9 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
             <Pressable
               accessibilityRole="button"
               onPress={() => {
+                if (closing.current) return;
                 toast.action?.onPress();
-                onDismiss();
+                close();
               }}
               className="min-h-11 justify-center rounded-xl px-3 active:opacity-70"
             >

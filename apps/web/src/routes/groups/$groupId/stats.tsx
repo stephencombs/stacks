@@ -7,7 +7,7 @@ import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/S
 import { GroupHeader } from "~/features/GroupHeader";
 import { NetChart } from "~/features/NetChart";
 import { playerNames } from "@stacks/client-runtime/format";
-import { gameNames } from "@stacks/client-runtime/format";
+import { gameNames, playedSummary } from "@stacks/client-runtime/format";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/groups/$groupId/stats")({ component: Stats });
@@ -42,22 +42,14 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       </EmptyState>
     );
   }
-  const hours = Math.round(stats.minutesPlayed / 6) / 10;
   const mine = (results: ReadonlyArray<PlayerResult>) =>
     results.find((result) => result.playerId === detail.myPlayerId);
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
-        <Surface className="flex flex-col gap-1 px-5 py-4">
-          <span className="text-sm text-muted">Sessions</span>
-          <span className="font-serif text-3xl tabular-nums">{stats.sessionCount}</span>
-        </Surface>
-        <Surface className="flex flex-col gap-1 px-5 py-4">
-          <span className="text-sm text-muted">Hours played</span>
-          <span className="font-serif text-3xl tabular-nums">{hours}</span>
-        </Surface>
-      </div>
+      <p className="-mt-4 text-pretty text-muted">
+        {playedSummary(stats.sessionCount, stats.minutesPlayed)}
+      </p>
 
       <section className="flex flex-col gap-2">
         <SectionHeading>Your net over time</SectionHeading>

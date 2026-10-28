@@ -45,3 +45,9 @@ export const playerNames = (detail: GroupDetail) =>
 
 /** Admins and the owner manage people, reopen sessions and void anyone's entries. */
 export const isAdmin = (detail: GroupDetail) => detail.role !== "member";
+
+/** "The group has played 29 sessions over 135 hours." Hours keep one decimal. */
+export const playedSummary = (sessionCount: number, minutesPlayed: number) => {
+  const hours = Math.round(minutesPlayed / 6) / 10;
+  return `The group has played ${sessionCount} ${sessionCount === 1 ? "session" : "sessions"} over ${hours} ${hours === 1 ? "hour" : "hours"}.`;
+};

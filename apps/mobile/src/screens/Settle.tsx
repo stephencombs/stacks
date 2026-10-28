@@ -19,6 +19,7 @@ import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
+import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
@@ -101,12 +102,15 @@ function SettleView({ detail }: { detail: GroupDetail }) {
             <List>
               {transfers.map((transfer) => (
                 <Row key={`${transfer.from}:${transfer.to}`}>
-                  <Text
+                  <View
+                    accessible
                     accessibilityLabel={`${names.get(transfer.from)} pays ${names.get(transfer.to)}`}
-                    className="flex-1 text-base text-ink"
+                    className="flex-1 flex-row flex-wrap items-center gap-x-1.5"
                   >
-                    {names.get(transfer.from)} → {names.get(transfer.to)}
-                  </Text>
+                    <Text className="text-base text-ink">{names.get(transfer.from)}</Text>
+                    <Icon name="arrow-right" color="muted" size={16} />
+                    <Text className="text-base text-ink">{names.get(transfer.to)}</Text>
+                  </View>
                   <Money
                     amount={transfer.amount}
                     currency={currency}

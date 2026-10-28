@@ -65,6 +65,13 @@
   }
 }
 
+/* Set for a couple of frames while the system theme changes, so colors swap at once. */
+[data-theme-switching] *,
+[data-theme-switching] *::before,
+[data-theme-switching] *::after {
+  transition: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

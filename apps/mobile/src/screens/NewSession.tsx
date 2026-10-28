@@ -14,6 +14,7 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
+import { Icon } from "../components/ui/Icon";
 import { Choice, FormError } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { List, Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
@@ -140,7 +141,7 @@ function NewSessionForm({ detail }: { detail: GroupDetail }) {
                       checked ? "border-accent bg-accent" : "border-line-strong",
                     )}
                   >
-                    {checked ? <Text className="text-sm font-bold text-accent-ink">✓</Text> : null}
+                    {checked ? <Icon name="check" color="accent-ink" size={16} /> : null}
                   </View>
                   <Text className="text-base text-ink">
                     {player.displayName}
