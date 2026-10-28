@@ -21,12 +21,14 @@ export const formatMoney = (
   options: {
     readonly locale?: string;
     readonly signDisplay?: "auto" | "always" | "exceptZero";
+    readonly trailingZeroDisplay?: "auto" | "stripIfInteger";
   } = {},
 ): string =>
   new Intl.NumberFormat(options.locale, {
     style: "currency",
     currency,
     signDisplay: options.signDisplay ?? "auto",
+    trailingZeroDisplay: options.trailingZeroDisplay ?? "auto",
   }).format(toDecimalString(amount, minorUnitDigits(currency)));
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");

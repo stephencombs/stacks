@@ -25,6 +25,12 @@ describe("formatMoney", () => {
     expect(formatMoney(money(1234), KWD, { locale: "en-US" })).toBe("KWD\u00a01.234");
   });
 
+  it("drops zero cents on request, for chart axes", () => {
+    const short = { locale: "en-US", trailingZeroDisplay: "stripIfInteger" } as const;
+    expect(formatMoney(money(5000), USD, short)).toBe("$50");
+    expect(formatMoney(money(5050), USD, short)).toBe("$50.50");
+  });
+
   it("shows a plus sign on request", () => {
     expect(formatMoney(money(1000), USD, { locale: "en-US", signDisplay: "always" })).toBe(
       "+$10.00",

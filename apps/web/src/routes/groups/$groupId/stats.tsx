@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Money } from "~/components/Money";
 import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
 import { GroupHeader } from "~/features/GroupHeader";
+import { NetChart } from "~/features/NetChart";
 import { playerNames } from "@stacks/client-runtime/format";
 import { gameNames } from "@stacks/client-runtime/format";
 import { Loaded, useStacks } from "~/lib/stacks";
@@ -57,6 +58,13 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
           <span className="font-serif text-3xl tabular-nums">{hours}</span>
         </Surface>
       </div>
+
+      <section className="flex flex-col gap-2">
+        <SectionHeading>Your net over time</SectionHeading>
+        <Surface className="p-5">
+          <NetChart stats={stats} playerId={detail.myPlayerId} currency={currency} />
+        </Surface>
+      </section>
 
       <section className="flex flex-col gap-2">
         <SectionHeading>Everyone, all time</SectionHeading>

@@ -168,5 +168,10 @@ test.describe.serial("live mode on a phone", () => {
 
     await bea.reload();
     await expect(bea.getByText("Settled up").filter({ visible: true })).toHaveCount(3);
+
+    await alex.goto(groupUrl);
+    await alex.getByRole("button", { name: "Stats" }).filter({ visible: true }).click();
+    await expect(alex.getByText("After 1 session").filter({ visible: true })).toBeVisible();
+    await shoot(alex, "stats");
   });
 });

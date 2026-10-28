@@ -214,6 +214,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stats", (it) => {
           results: [expect.objectContaining({ net: 6000 })],
         },
       ]);
+      // Closed sessions only, oldest first.
+      expect(stats.bySession.map((s) => s.results.map((r) => r.net))).toEqual([
+        [15000],
+        [-10000],
+        [1000],
+      ]);
     }),
   );
 });

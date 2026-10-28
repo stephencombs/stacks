@@ -28,12 +28,14 @@ import * as Venues from "../src/features/Venues.ts";
 
 // Usage: node scripts/seed.ts [--owner user_xxx]
 // Builds one realistic group. Pass your Clerk user ID as --owner to see it when signed in.
-// IDs come from a seeded generator, so running it again changes nothing.
+// IDs come from a generator seeded by the owner, so running it again changes nothing and each
+// owner gets their own group.
 const ownerFlag = process.argv.indexOf("--owner");
 const ownerId = ownerFlag === -1 ? "seed_alex" : process.argv[ownerFlag + 1]!;
 const url = process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/stacks";
 
 let state = 20261027;
+for (const char of ownerId) state = Math.imul(state ^ char.charCodeAt(0), 16777619);
 const random = () => {
   state = (state + 0x6d2b79f5) | 0;
   let t = Math.imul(state ^ (state >>> 15), 1 | state);

@@ -147,6 +147,9 @@ test.describe.serial("a group's first night out", () => {
     await expect(bea.getByText("Settled up")).toHaveCount(3);
     await alex.getByRole("link", { name: "Stats" }).click();
     await expect(alex.getByRole("cell", { name: "Craps" })).toBeVisible();
+    const chart = alex.getByRole("figure");
+    await expect(chart).toContainText("After 1 session");
+    await expect(chart).toContainText("+$170.00");
     await shoot(alex, "stats");
   });
 });

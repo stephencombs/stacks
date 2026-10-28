@@ -65,3 +65,26 @@ export const resultsBy = <S extends Pick<Session, "id">, K>(
 
   return new Map(Array.from(grouped, ([groupKey, group]) => [groupKey, playerResults(group)]));
 };
+
+/**
+ * A player's result in each session they played, with the running total after it. Pass the
+ * sessions oldest first; sessions the player sat out are skipped.
+ */
+export const runningNet = <
+  S extends {
+    readonly results: ReadonlyArray<{ readonly playerId: PlayerId; readonly net: MinorUnits }>;
+  },
+>(
+  sessions: Iterable<S>,
+  playerId: PlayerId,
+): ReadonlyArray<{ readonly session: S; readonly net: MinorUnits; readonly total: MinorUnits }> => {
+  const points: Array<{ session: S; net: MinorUnits; total: MinorUnits }> = [];
+  let total = 0;
+  for (const session of sessions) {
+    const result = session.results.find((r) => r.playerId === playerId);
+    if (!result) continue;
+    total += result.net;
+    points.push({ session, net: result.net, total: MinorUnits.make(total) });
+  }
+  return points;
+};

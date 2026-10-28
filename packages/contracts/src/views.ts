@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import { GroupId, InviteId, PlayerId, UserId, VenueId } from "./ids.ts";
+import { GroupId, InviteId, PlayerId, SessionId, UserId, VenueId } from "./ids.ts";
 import { Entry, Game, Session } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 
@@ -136,5 +136,13 @@ export const GroupStats = Schema.Struct({
   byPlayer: Schema.Array(PlayerResult),
   byGame: Schema.Array(StatsBreakdown(Game)),
   byVenue: Schema.Array(StatsBreakdown(Venue)),
+  /** Each closed session's results, oldest first. */
+  bySession: Schema.Array(
+    Schema.Struct({
+      sessionId: SessionId,
+      startedAt: Schema.DateTimeUtc,
+      results: Schema.Array(PlayerResult),
+    }),
+  ),
 });
 export type GroupStats = typeof GroupStats.Type;

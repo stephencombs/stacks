@@ -6,6 +6,7 @@ import { Text, View } from "react-native";
 import { Money } from "../components/Money";
 import { Screen } from "../components/ui/Screen";
 import { EmptyState, List, Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
+import { NetChart } from "../features/NetChart";
 import { Loaded, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ groupId: string }>;
@@ -50,6 +51,12 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       <View className="flex-row gap-3">
         {tile("Sessions", String(stats.sessionCount))}
         {tile("Hours played", String(Math.round(stats.minutesPlayed / 6) / 10))}
+      </View>
+      <View className="gap-2">
+        <SectionHeading>Your net over time</SectionHeading>
+        <Surface className="p-4">
+          <NetChart stats={stats} playerId={detail.myPlayerId} currency={currency} />
+        </Surface>
       </View>
       <View className="gap-2">
         <SectionHeading>Everyone, all time</SectionHeading>
