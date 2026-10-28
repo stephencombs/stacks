@@ -150,6 +150,37 @@ test.describe.serial("a group's first night out", () => {
     const chart = alex.getByRole("figure");
     await expect(chart).toContainText("After 1 session");
     await expect(chart).toContainText("+$170.00");
+
+    // On a phone, scrolling with a finger on the chart leaves it alone; a tap picks a session.
+    const phone = await browser.newContext({
+      storageState: await alex.context().storageState(),
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const phonePage = await phone.newPage();
+    await phonePage.goto(alex.url());
+    const plot = phonePage.getByRole("group", { name: /Your net after each session/ });
+    const caption = phonePage.locator("figcaption");
+    await expect(caption).toContainText("After 1 session");
+    const box = (await plot.boundingBox())!;
+    const finger = (y: number) => [{ x: box.x + box.width / 2, y }];
+    const cdp = await phone.newCDPSession(phonePage);
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: finger(box.y + 150),
+    });
+    for (let i = 1; i <= 10; i++) {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: finger(box.y + 150 - i * 30),
+      });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(caption).toContainText("After 1 session");
+    await plot.tap();
+    await expect(caption).toContainText("won $170.00");
+    await phone.close();
     await shoot(alex, "stats");
   });
 });

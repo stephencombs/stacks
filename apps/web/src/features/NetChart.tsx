@@ -3,13 +3,15 @@ import { fromTop, netScale } from "@stacks/client-runtime/chart";
 import { formatDay } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
 import { runningNet } from "@stacks/shared/results";
-import { useId, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { Money } from "~/components/Money";
 
 // The SVG stretches to its box; strokes keep their width through `vector-effect`.
 const WIDTH = 600;
 const HEIGHT = 200;
+// How far a finger moves before a touch counts as a drag rather than a tap.
+const SLOP = 8;
 
 /** A player's running net over the group's closed sessions, oldest on the left. */
 export function NetChart({
@@ -23,6 +25,9 @@ export function NetChart({
 }) {
   const [active, setActive] = useState<number | null>(null);
   const gradient = useId();
+  // Where a finger went down. A vertical swipe scrolls the page and leaves the chart alone; a tap
+  // picks a session and a sideways drag scrubs through them.
+  const touch = useRef<{ x: number; y: number; scrubbing: boolean } | null>(null);
   const points = runningNet(stats.bySession, playerId);
   if (points.length === 0) {
     return (
@@ -98,8 +103,31 @@ export function NetChart({
           role="group"
           tabIndex={0}
           aria-label="Your net after each session. Use the arrow keys to step through sessions."
-          onPointerMove={pick}
-          onPointerDown={pick}
+          onPointerDown={(event) => {
+            if (event.pointerType !== "touch") return pick(event);
+            touch.current = { x: event.clientX, y: event.clientY, scrubbing: false };
+          }}
+          onPointerMove={(event) => {
+            if (event.pointerType !== "touch") return pick(event);
+            const start = touch.current;
+            if (!start) return;
+            const dx = Math.abs(event.clientX - start.x);
+            if (!start.scrubbing && (dx < SLOP || dx < Math.abs(event.clientY - start.y))) return;
+            start.scrubbing = true;
+            pick(event);
+          }}
+          onPointerUp={(event) => {
+            const start = touch.current;
+            touch.current = null;
+            const moved = start
+              ? Math.hypot(event.clientX - start.x, event.clientY - start.y)
+              : Infinity;
+            if (event.pointerType === "touch" && moved < SLOP) pick(event);
+          }}
+          // The browser took the gesture over to scroll the page.
+          onPointerCancel={() => {
+            touch.current = null;
+          }}
           onPointerLeave={(event) => (event.pointerType === "mouse" ? setActive(null) : undefined)}
           onKeyDown={step}
           onBlur={() => setActive(null)}
