@@ -26,7 +26,8 @@ export function GroupHeader({
         <h1 className="font-serif text-4xl font-medium">{detail.group.name}</h1>
         {action}
       </div>
-      <nav aria-label="Group" className="-mx-1 flex gap-1 overflow-x-auto">
+      {/* The padding keeps focus rings inside the scroll box, which clips everything past its edge. */}
+      <nav aria-label="Group" className="-m-1 flex gap-1 overflow-x-auto p-1">
         {tabs.map((tab) => (
           <Link
             key={tab.key}
