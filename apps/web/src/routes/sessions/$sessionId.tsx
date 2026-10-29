@@ -76,7 +76,7 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
           {group.trips.find((trip) => trip.id === session.tripId)?.name ?? group.group.name}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-serif text-4xl font-medium">{venue.name}</h1>
+          <h1 className="font-display text-4xl font-medium">{venue.name}</h1>
           {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
         </div>
         <p className="text-muted">
@@ -129,7 +129,7 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
                       )}
                     </span>
                   </div>
-                  <div className="text-right font-serif text-xl whitespace-nowrap">
+                  <div className="text-right text-lg font-bold whitespace-nowrap">
                     {/* A closed session's results are final, cash-out or not. */}
                     {result && (!live || cashedOut.has(playerId)) ? (
                       <Money amount={result.net} currency={currency} tone="result" />

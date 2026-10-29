@@ -28,8 +28,8 @@ export function TextField({
         aria-labelledby={id}
         placeholderTextColorClassName="accent-muted"
         className={cn(
-          "min-h-12 rounded-xl border bg-surface px-3 py-2.5 text-base text-ink",
-          error ? "border-danger" : "border-line-strong focus:border-ink",
+          "min-h-12 rounded-lg border bg-surface px-3 py-2.5 text-base text-ink",
+          error ? "border-danger" : "border-line-strong focus:border-accent-text",
           inputClassName,
         )}
         {...props}
@@ -48,7 +48,7 @@ export function TextField({
 /** A form-level failure, such as the API refusing the request. */
 export function FormError({ children }: { children: ReactNode }) {
   return (
-    <View accessibilityRole="alert" className="rounded-xl bg-sunken px-3 py-2.5">
+    <View accessibilityRole="alert" className="rounded-lg bg-sunken px-3 py-2.5">
       <Text className="text-sm text-danger">{children}</Text>
     </View>
   );
@@ -82,7 +82,7 @@ export function Choice<A extends string>({
               accessibilityState={{ checked: selected }}
               onPress={() => onChange(option.value)}
               className={cn(
-                "min-h-11 items-center justify-center rounded-xl border px-4 py-2.5",
+                "min-h-11 items-center justify-center rounded-lg border px-4 py-2.5",
                 columns === 2 && "basis-[48%] grow",
                 columns === 3 && "basis-[31%] grow",
                 columns === 4 && "basis-[23%] grow",
@@ -92,7 +92,10 @@ export function Choice<A extends string>({
               )}
             >
               <Text
-                className={cn("text-center text-sm", selected ? "text-accent-ink" : "text-ink")}
+                className={cn(
+                  "text-center text-sm",
+                  selected ? "font-semibold text-accent-ink" : "text-ink",
+                )}
               >
                 {option.label}
               </Text>

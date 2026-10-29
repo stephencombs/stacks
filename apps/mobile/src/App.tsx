@@ -1,16 +1,25 @@
 import { ClerkProvider, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
-import { Newsreader_500Medium, useFonts } from "@expo-google-fonts/newsreader";
-import { createStaticNavigation, type StaticParamList } from "@react-navigation/native";
+import { BarlowCondensed_700Bold } from "@expo-google-fonts/barlow-condensed";
+import { JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
+import {
+  DarkTheme,
+  DefaultTheme,
+  createStaticNavigation,
+  type StaticParamList,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as Linking from "expo-linking";
+import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import { Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useCSSVariable, useUniwind } from "uniwind";
 
 import { SignInButton } from "./features/SignInButton";
 import { clerkPublishableKey } from "./lib/config";
 import { StacksProvider } from "./lib/stacks";
+import "./lib/theme";
 import { ClaimScreen, JoinScreen } from "./screens/Invites";
 import { GroupScreen } from "./screens/Group";
 import { GroupsScreen } from "./screens/Groups";
@@ -84,20 +93,50 @@ const linking = { enabled: "auto" as const, prefixes: [Linking.createURL("/")] }
 
 function Root() {
   const { isLoaded, isSignedIn, userId } = useAuth();
+  const theme = useNavigationTheme();
   if (!isLoaded) return <View className="flex-1 bg-canvas" />;
   if (!isSignedIn) return <SignedOut />;
   return (
     <StacksProvider key={userId}>
-      <Navigation linking={linking} />
+      <Navigation linking={linking} theme={theme} />
     </StacksProvider>
   );
+}
+
+/** Headers and screen backgrounds in the palette, so navigation follows the theme too. */
+function useNavigationTheme() {
+  const { theme } = useUniwind();
+  const [canvas, ink, line, accent, loss] = useCSSVariable([
+    "--color-canvas",
+    "--color-ink",
+    "--color-line",
+    "--color-accent-text",
+    "--color-loss",
+  ]).map(String);
+  const base = theme === "light" ? DefaultTheme : DarkTheme;
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      background: canvas!,
+      card: canvas!,
+      text: ink!,
+      border: line!,
+      primary: accent!,
+      notification: loss!,
+    },
+    fonts: {
+      ...base.fonts,
+      bold: { fontFamily: "BarlowCondensed_700Bold", fontWeight: "normal" as const },
+    },
+  };
 }
 
 function SignedOut() {
   return (
     <View className="flex-1 justify-center gap-6 bg-canvas px-6">
-      <Text className="font-serif text-3xl text-ink">Stacks</Text>
-      <Text accessibilityRole="header" className="font-serif text-5xl leading-tight text-ink">
+      <Text className="font-display text-3xl text-ink">Stacks</Text>
+      <Text accessibilityRole="header" className="font-display text-5xl leading-tight text-ink">
         Keep the casino trip honest.
       </Text>
       <Text className="text-lg text-muted">
@@ -113,12 +152,13 @@ function SignedOut() {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts({ Newsreader_500Medium });
+  const [fontsLoaded] = useFonts({ BarlowCondensed_700Bold, JetBrainsMono_500Medium });
+  const { theme } = useUniwind();
   return (
     <SafeAreaProvider>
       <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
         {fontsLoaded ? <Root /> : <View className="flex-1 bg-canvas" />}
-        <StatusBar style="auto" />
+        <StatusBar style={theme === "light" ? "dark" : "light"} />
       </ClerkProvider>
     </SafeAreaProvider>
   );

@@ -31,6 +31,10 @@
     "./trip": {
       "types": "./src/trip.ts",
       "import": "./src/trip.ts"
+    },
+    "./theme": {
+      "types": "./src/theme.ts",
+      "import": "./src/theme.ts"
     }
   },
   "scripts": {

@@ -40,12 +40,7 @@ export function NetChart({
     >
       <View className="gap-0.5">
         <Text className="text-sm text-muted">After {sessions}</Text>
-        <Money
-          amount={last.total}
-          currency={currency}
-          tone="result"
-          className="font-serif text-3xl"
-        />
+        <Money amount={last.total} currency={currency} tone="result" className="text-2xl" />
       </View>
       <NetChartPlot
         points={points.map((point) => ({ id: point.session.sessionId, total: point.total }))}

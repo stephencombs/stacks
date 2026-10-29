@@ -23,7 +23,7 @@ function Claim() {
           <Surface className="flex flex-col gap-5 p-6">
             <div className="flex flex-col gap-1">
               <p className="text-sm text-muted">{preview.groupName}</p>
-              <h1 className="font-serif text-4xl font-medium">Are you {preview.displayName}?</h1>
+              <h1 className="font-display text-4xl font-medium">Are you {preview.displayName}?</h1>
             </div>
             <p className="max-w-[52ch] text-muted">
               {preview.displayName} has been playing in {preview.groupName} as a guest. Claim it to

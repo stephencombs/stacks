@@ -5,7 +5,7 @@ import { cn } from "./cn";
 
 export function Surface({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <View className={cn("overflow-hidden rounded-2xl border border-line bg-surface", className)}>
+    <View className={cn("overflow-hidden rounded-xl border border-line bg-surface", className)}>
       {children}
     </View>
   );
@@ -55,7 +55,7 @@ export function SectionHeading({ children, action }: { children: string; action?
     <View className="min-h-9 flex-row items-center justify-between">
       <Text
         accessibilityRole="header"
-        className="text-xs font-semibold tracking-widest text-muted uppercase"
+        className="text-[11px] font-semibold tracking-[2px] text-muted uppercase"
       >
         {children}
       </Text>
@@ -74,12 +74,17 @@ export function Tag({
   return (
     <View
       className={cn(
-        "h-6 flex-row items-center gap-1.5 self-start rounded-full px-2.5",
+        "h-6 flex-row items-center gap-1.5 self-start rounded-md px-2",
         tone === "live" ? "bg-live/15" : "bg-sunken",
       )}
     >
       {tone === "live" ? <View className="size-1.5 rounded-full bg-live" /> : null}
-      <Text className={cn("text-xs font-medium", tone === "live" ? "text-live" : "text-muted")}>
+      <Text
+        className={cn(
+          "font-mono text-[11px] tracking-wider uppercase",
+          tone === "live" ? "text-live" : "text-muted",
+        )}
+      >
         {children}
       </Text>
     </View>
@@ -96,8 +101,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <View className="gap-3 rounded-2xl border border-dashed border-line-strong px-5 py-6">
-      <Text className="font-serif text-xl text-ink">{title}</Text>
+    <View className="gap-3 rounded-xl border border-dashed border-line-strong px-5 py-6">
+      <Text className="font-display text-2xl text-ink">{title}</Text>
       {children ? <Text className="text-sm text-muted">{children}</Text> : null}
       {action}
     </View>
@@ -105,5 +110,5 @@ export function EmptyState({
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <View accessibilityElementsHidden className={cn("rounded-2xl bg-sunken", className)} />;
+  return <View accessibilityElementsHidden className={cn("rounded-xl bg-sunken", className)} />;
 }

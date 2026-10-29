@@ -1,28 +1,33 @@
 @import "tailwindcss";
-@import "@fontsource-variable/newsreader";
+@import "@fontsource/barlow-condensed/700.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
 
-/* Keep in step with apps/mobile/global.css. */
+/* Keep in step with apps/mobile/global.css. Dark is the default; light is a saved choice
+   (data-theme on <html>, set by index.html before first paint). */
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-serif: "Newsreader Variable", ui-serif, Georgia, "Times New Roman", serif;
+  --font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 
-  --color-canvas: oklch(0.975 0.006 95);
-  --color-surface: oklch(0.993 0.003 95);
-  --color-sunken: oklch(0.948 0.008 95);
-  --color-ink: oklch(0.22 0.01 95);
-  --color-muted: oklch(0.5 0.012 95);
-  --color-faint: oklch(0.64 0.01 95);
-  --color-line: oklch(0.22 0.01 95 / 0.1);
-  --color-line-strong: oklch(0.22 0.01 95 / 0.18);
-  --color-accent: oklch(0.24 0.012 95);
-  --color-accent-ink: oklch(0.985 0.004 95);
-  --color-win: oklch(0.52 0.12 150);
-  --color-loss: oklch(0.55 0.17 28);
-  --color-live: oklch(0.5 0.13 60);
-  --color-danger: oklch(0.52 0.18 28);
-  --color-disabled: oklch(0.8 0.006 95);
+  --color-canvas: oklch(0.15 0.01 260);
+  --color-surface: oklch(0.19 0.01 260);
+  --color-sunken: oklch(0.12 0.01 260);
+  --color-ink: oklch(0.96 0 0);
+  --color-muted: oklch(0.7 0.01 260);
+  --color-faint: oklch(0.54 0.01 260);
+  --color-line: oklch(1 0 0 / 0.09);
+  --color-line-strong: oklch(1 0 0 / 0.16);
+  --color-accent: oklch(0.83 0.16 75);
+  --color-accent-ink: oklch(0.2 0.02 75);
+  --color-accent-text: oklch(0.83 0.16 75);
+  --color-win: oklch(0.8 0.17 150);
+  --color-loss: oklch(0.7 0.19 25);
+  --color-live: oklch(0.7 0.19 25);
+  --color-danger: oklch(0.7 0.19 25);
+  --color-disabled: oklch(0.27 0.01 260);
 
-  /* The trip board is a sportsbook: always dark, whatever the system theme. */
+  /* The trip board is a sportsbook: always dark, whatever the theme. */
   --color-board: oklch(0.15 0.01 260);
   --color-board-panel: oklch(0.19 0.01 260);
   --color-board-deep: oklch(0.11 0.01 260);
@@ -57,29 +62,29 @@
   --color-chip-edge: oklch(0.97 0.01 90);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-canvas: oklch(0.17 0.004 95);
-    --color-surface: oklch(0.205 0.005 95);
-    --color-sunken: oklch(0.15 0.004 95);
-    --color-ink: oklch(0.94 0.006 95);
-    --color-muted: oklch(0.7 0.008 95);
-    --color-faint: oklch(0.56 0.008 95);
-    --color-line: oklch(0.29 0.005 95);
-    --color-line-strong: oklch(0.36 0.006 95);
-    --color-accent: oklch(0.93 0.008 95);
-    --color-accent-ink: oklch(0.18 0.004 95);
-    --color-win: oklch(0.74 0.12 150);
-    --color-loss: oklch(0.72 0.13 28);
-    --color-live: oklch(0.78 0.12 70);
-    --color-danger: oklch(0.7 0.14 28);
-    --color-disabled: oklch(0.35 0.005 95);
-  }
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-canvas: oklch(0.965 0.004 260);
+  --color-surface: oklch(0.995 0.002 260);
+  --color-sunken: oklch(0.935 0.006 260);
+  --color-ink: oklch(0.2 0.015 260);
+  --color-muted: oklch(0.48 0.015 260);
+  --color-faint: oklch(0.62 0.01 260);
+  --color-line: oklch(0.2 0.015 260 / 0.1);
+  --color-line-strong: oklch(0.2 0.015 260 / 0.18);
+  --color-accent: oklch(0.8 0.16 75);
+  --color-accent-ink: oklch(0.2 0.02 75);
+  --color-accent-text: oklch(0.52 0.12 65);
+  --color-win: oklch(0.5 0.13 150);
+  --color-loss: oklch(0.54 0.19 25);
+  --color-live: oklch(0.54 0.19 25);
+  --color-danger: oklch(0.52 0.19 25);
+  --color-disabled: oklch(0.86 0.005 260);
 }
 
 @layer base {
   html {
-    color-scheme: light dark;
+    color-scheme: dark;
     font-synthesis: none;
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
@@ -89,7 +94,7 @@
     min-height: 100dvh;
   }
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--color-accent-text);
     outline-offset: 2px;
   }
   h1,
@@ -106,7 +111,7 @@
   }
 }
 
-/* Set for a couple of frames while the system theme changes, so colors swap at once. */
+/* Set for a couple of frames while the theme changes, so colors swap at once. */
 [data-theme-switching] *,
 [data-theme-switching] *::before,
 [data-theme-switching] *::after {

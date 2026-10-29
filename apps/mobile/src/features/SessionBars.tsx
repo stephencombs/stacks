@@ -37,7 +37,7 @@ export function SessionBars({
     >
       <View className="gap-0.5">
         <Text className="text-sm text-muted">{rate.count}</Text>
-        <Text className="font-serif text-3xl text-ink tabular-nums">
+        <Text className="font-mono text-2xl text-ink">
           {rate.percent}
           <Text className="font-sans text-base text-muted"> winning sessions</Text>
         </Text>

@@ -21,7 +21,7 @@ export function Money({
   return (
     <span
       className={cn(
-        "tabular-nums",
+        "font-mono tabular-nums",
         tone === "result" && amount > 0 && "text-win",
         tone === "result" && amount < 0 && "text-loss",
         tone === "result" && amount === 0 && "text-muted",

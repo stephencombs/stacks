@@ -22,9 +22,9 @@ const labels: Record<Variant, string> = {
 // Minimum heights, so larger accessibility text sizes grow the button instead of clipping it.
 const sizes: Record<Size, string> = {
   sm: "min-h-11 px-3 py-2 rounded-lg",
-  md: "min-h-11 px-4 py-2.5 rounded-xl",
-  lg: "min-h-13 px-5 py-3 rounded-xl",
-  xl: "min-h-16 px-5 py-4 rounded-2xl",
+  md: "min-h-11 px-4 py-2.5 rounded-lg",
+  lg: "min-h-13 px-5 py-3 rounded-lg",
+  xl: "min-h-16 px-5 py-4 rounded-xl",
 };
 const text: Record<Size, string> = {
   sm: "text-sm",
@@ -79,7 +79,7 @@ export function Button({
       )}
     >
       {pending ? <ActivityIndicator size="small" /> : icon}
-      <Text className={cn("font-medium", labels[variant], text[size])} numberOfLines={1}>
+      <Text className={cn("font-semibold", labels[variant], text[size])} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>

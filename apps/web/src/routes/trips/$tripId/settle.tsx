@@ -151,7 +151,7 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
                   <Money
                     amount={transfer.amount}
                     currency={currency}
-                    className="font-serif text-xl"
+                    className="text-lg font-bold"
                   />
                   <Button size="sm" onClick={() => setPaying(transfer)}>
                     Mark paid

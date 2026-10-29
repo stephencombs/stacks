@@ -22,7 +22,7 @@ export function GroupHeader({
   return (
     <div className="flex flex-col gap-4 pt-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-serif text-4xl font-medium">{detail.group.name}</h1>
+        <h1 className="font-display text-4xl font-medium">{detail.group.name}</h1>
         {action}
       </div>
       {/* The padding keeps focus rings inside the scroll box, which clips everything past its edge. */}

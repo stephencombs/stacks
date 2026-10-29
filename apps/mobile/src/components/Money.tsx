@@ -22,7 +22,7 @@ export function Money({
   return (
     <Text
       className={cn(
-        "tabular-nums",
+        "font-mono",
         tone === "plain" && "text-ink",
         tone === "result" && amount > 0 && "text-win",
         tone === "result" && amount < 0 && "text-loss",

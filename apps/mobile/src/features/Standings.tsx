@@ -60,12 +60,7 @@ export function Standings({
                 </Text>
                 <Text className="text-sm text-muted tabular-nums">{summary}</Text>
               </View>
-              <Money
-                amount={result.net}
-                currency={currency}
-                tone="result"
-                className="font-serif text-xl"
-              />
+              <Money amount={result.net} currency={currency} tone="result" className="text-lg" />
             </View>
             <View className="ml-8 h-1.5 overflow-hidden rounded-full bg-line">
               <View
@@ -94,7 +89,7 @@ export function Standings({
             <Text className="text-base font-medium text-ink">Group total</Text>
             <Text className="text-sm text-muted tabular-nums">{sessions(stats.sessionCount)}</Text>
           </View>
-          <Money amount={total} currency={currency} tone="result" className="font-serif text-xl" />
+          <Money amount={total} currency={currency} tone="result" className="text-lg" />
         </View>
       </Choice>
     </List>

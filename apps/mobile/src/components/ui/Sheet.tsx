@@ -38,7 +38,7 @@ export function Sheet({
         >
           <View className="flex-row items-start justify-between gap-4 px-5 pt-5 pb-2">
             <View className="flex-1 gap-1">
-              <Text accessibilityRole="header" className="font-serif text-2xl text-ink">
+              <Text accessibilityRole="header" className="font-display text-3xl text-ink">
                 {title}
               </Text>
               {description ? <Text className="text-sm text-muted">{description}</Text> : null}

@@ -20,7 +20,7 @@ function Groups() {
   return (
     <>
       <div className="flex items-end justify-between gap-4 pt-4">
-        <h1 className="font-serif text-4xl font-medium">Your groups</h1>
+        <h1 className="font-display text-4xl font-medium">Your groups</h1>
         <Button variant="primary" onClick={() => setCreating(true)}>
           <Plus className="size-4" aria-hidden />
           New group
@@ -51,7 +51,7 @@ function Groups() {
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-serif text-xl">{item.group.name}</span>
+                      <span className="truncate font-display text-xl">{item.group.name}</span>
                       {item.liveSessionCount > 0 ? <Tag tone="live">Live</Tag> : null}
                     </div>
                     <span className="text-sm">

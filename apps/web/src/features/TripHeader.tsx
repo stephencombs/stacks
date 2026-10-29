@@ -67,7 +67,7 @@ export function TripHeader({
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="font-serif text-4xl font-medium">{trip.trip.name}</h1>
+          <h1 className="font-display text-4xl font-medium">{trip.trip.name}</h1>
           <p className="flex items-center gap-2 text-muted">
             {tripDates(trip.trip)}
             {ended ? <Tag>Ended</Tag> : <Tag tone="live">Going</Tag>}

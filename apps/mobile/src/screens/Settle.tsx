@@ -139,11 +139,7 @@ function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDetail })
                     <Icon name="arrow-right" color="muted" size={16} />
                     <Text className="text-base text-ink">{names.get(transfer.to)}</Text>
                   </View>
-                  <Money
-                    amount={transfer.amount}
-                    currency={currency}
-                    className="font-serif text-xl"
-                  />
+                  <Money amount={transfer.amount} currency={currency} className="text-lg" />
                   <Button label="Mark paid" size="sm" onPress={() => setPaying(transfer)} />
                 </Row>
               ))}
@@ -261,11 +257,7 @@ function PaymentSheet({
       }
     >
       {transfer ? (
-        <Money
-          amount={transfer.amount}
-          currency={detail.group.currency}
-          className="font-serif text-4xl"
-        />
+        <Money amount={transfer.amount} currency={detail.group.currency} className="text-3xl" />
       ) : (
         <>
           <Choice label="Who paid" options={people} value={from} onChange={setFrom} />

@@ -83,7 +83,7 @@ export function NetChart({
           amount={(shown ?? last).total}
           currency={currency}
           tone="result"
-          className="font-serif text-3xl"
+          className="text-2xl font-bold"
         />
       </figcaption>
 

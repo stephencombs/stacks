@@ -69,10 +69,10 @@ export function SessionBars({
             amount={shown.net}
             currency={currency}
             tone="result"
-            className="font-serif text-3xl"
+            className="text-2xl font-bold"
           />
         ) : (
-          <span className="font-serif text-3xl tabular-nums">
+          <span className="font-mono text-2xl font-bold tabular-nums">
             {rate.percent}
             <span className="font-sans text-base text-muted"> winning sessions</span>
           </span>

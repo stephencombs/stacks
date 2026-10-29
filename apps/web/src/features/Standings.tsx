@@ -63,7 +63,7 @@ export function Standings({
               amount={result.net}
               currency={currency}
               tone="result"
-              className="font-serif text-xl"
+              className="text-lg font-bold"
             />
             <span aria-hidden className="relative col-start-2 col-end-4 h-1.5">
               <span className="absolute inset-0 rounded-full bg-line" />
@@ -94,7 +94,7 @@ export function Standings({
           <span className="font-medium">Group total</span>
           <span className="text-sm text-muted tabular-nums">{sessions(stats.sessionCount)}</span>
         </span>
-        <Money amount={total} currency={currency} tone="result" className="font-serif text-xl" />
+        <Money amount={total} currency={currency} tone="result" className="text-lg font-bold" />
       </Choice>
     </ol>
   );

@@ -104,7 +104,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
         <p className="text-sm text-muted">
           {detail.group.name} · {trip.trip.name}
         </p>
-        <h1 className="font-serif text-4xl font-medium">Start a session</h1>
+        <h1 className="font-display text-4xl font-medium">Start a session</h1>
       </div>
 
       <section className="flex flex-col gap-2">

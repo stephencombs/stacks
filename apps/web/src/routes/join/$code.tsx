@@ -50,7 +50,7 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
         <p className="text-sm text-muted">
           {preview.memberCount} {preview.memberCount === 1 ? "member" : "members"}
         </p>
-        <h1 className="font-serif text-4xl font-medium">{preview.groupName}</h1>
+        <h1 className="font-display text-4xl font-medium">{preview.groupName}</h1>
       </div>
       {preview.alreadyMember ? (
         <>

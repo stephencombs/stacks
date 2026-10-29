@@ -2,6 +2,7 @@ import { useClerk, useUser } from "@clerk/expo";
 import { useNavigation } from "@react-navigation/native";
 import { CurrencyCode, GroupId } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
+import { themeChoices } from "@stacks/client-runtime/theme";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
@@ -13,6 +14,7 @@ import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, Skeleton, Tag } from "../components/ui/Surface";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
+import { setTheme, useTheme } from "../lib/theme";
 
 export function GroupsScreen() {
   const stacks = useStacks();
@@ -23,7 +25,7 @@ export function GroupsScreen() {
   return (
     <Screen>
       <View className="gap-3">
-        <Text accessibilityRole="header" className="font-serif text-4xl text-ink">
+        <Text accessibilityRole="header" className="font-display text-4xl text-ink">
           Your groups
         </Text>
         <View className="flex-row gap-2">
@@ -62,7 +64,7 @@ export function GroupsScreen() {
                 >
                   <View className="flex-1 gap-1">
                     <View className="flex-row items-center gap-2">
-                      <Text numberOfLines={1} className="shrink font-serif text-xl text-ink">
+                      <Text numberOfLines={1} className="shrink font-display text-xl text-ink">
                         {item.group.name}
                       </Text>
                       {item.liveSessionCount > 0 ? <Tag tone="live">Live</Tag> : null}
@@ -159,6 +161,7 @@ function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: () => voi
 function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useUser();
   const { signOut } = useClerk();
+  const theme = useTheme();
   return (
     <Sheet open={open} onClose={onClose} title="Account">
       <View className="gap-1">
@@ -169,6 +172,13 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <Text className="text-sm text-muted">{user.primaryEmailAddress.emailAddress}</Text>
         ) : null}
       </View>
+      <Choice
+        label="Appearance"
+        options={themeChoices}
+        value={theme}
+        onChange={setTheme}
+        columns={3}
+      />
       <Button label="Sign out" variant="danger" onPress={() => void signOut()} />
     </Sheet>
   );

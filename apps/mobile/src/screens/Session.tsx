@@ -252,7 +252,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                     amount={result.net}
                     currency={currency}
                     tone="result"
-                    className="font-serif text-2xl"
+                    className="text-xl"
                   />
                 ) : result ? (
                   <Text className="text-sm text-muted">Playing</Text>

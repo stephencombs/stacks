@@ -129,7 +129,7 @@ export function EntryDialog({
               inputMode="decimal"
               autoComplete="off"
               autoFocus
-              className="font-serif text-2xl tabular-nums"
+              className="font-mono text-2xl tabular-nums"
             />
           )}
         </Field>

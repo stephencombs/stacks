@@ -55,7 +55,7 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
         <Text className="text-sm text-muted">
           {preview.memberCount} {preview.memberCount === 1 ? "member" : "members"}
         </Text>
-        <Text accessibilityRole="header" className="font-serif text-4xl text-ink">
+        <Text accessibilityRole="header" className="font-display text-4xl text-ink">
           {preview.groupName}
         </Text>
       </View>
@@ -109,7 +109,7 @@ export function ClaimScreen({ route }: Props) {
           <Surface className="gap-5 p-5">
             <View className="gap-1">
               <Text className="text-sm text-muted">{preview.groupName}</Text>
-              <Text accessibilityRole="header" className="font-serif text-4xl text-ink">
+              <Text accessibilityRole="header" className="font-display text-4xl text-ink">
                 Are you {preview.displayName}?
               </Text>
             </View>
