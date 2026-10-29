@@ -32,7 +32,7 @@ import { newId } from "@stacks/client-runtime/ids";
 import { formatMoney, parseMoney } from "@stacks/shared/money";
 import { buyInPresets } from "@stacks/shared/table";
 import { playerResults, type PlayerResult } from "@stacks/shared/results";
-import { useAction, useOutbox, usePending, useStacks } from "~/lib/stacks";
+import { useAction, useOutbox, usePending, useStacks, useUnsaved } from "~/lib/stacks";
 
 type EntryInput = {
   readonly kind: EntryDraft["kind"];
@@ -68,19 +68,16 @@ export function SessionView({
   const outbox = useOutbox();
   const stacks = useStacks();
   const voidEntry = useAction(stacks.Client.mutation("ledger", "voidEntry"));
-  // Entries recorded here count as soon as they're recorded, until the server confirms them,
-  // except ones it refused.
-  const unsaved = usePending(session.id).filter(
-    (p) => !detail.entries.some((saved) => saved.id === p.entry.id),
-  );
-  const replaced = new Set(
-    unsaved.flatMap((p) => (p.failed === null ? [p.entry.replacesEntryId] : [])),
-  );
+  // Entries recorded here count as soon as they're recorded, until this page has them back from
+  // the server, except ones it refused.
+  const { pending: unsaved, sent } = useUnsaved(session.id, detail.entries);
+  const recorded = [...sent, ...unsaved.filter((p) => p.failed === null)].map((p) => p.entry);
+  const replaced = new Set(recorded.map((entry) => entry.replacesEntryId));
   const counted = [
     ...detail.entries.map((entry) =>
       replaced.has(entry.id) ? { ...entry, voidedAt: entry.occurredAt } : entry,
     ),
-    ...unsaved.filter((p) => p.failed === null).map((p) => ({ ...p.entry, voidedAt: null })),
+    ...recorded.map((entry) => ({ ...entry, voidedAt: null })),
   ];
   const resultOf = playerResults(counted);
   const cashedOut = new Set(

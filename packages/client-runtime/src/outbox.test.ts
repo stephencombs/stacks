@@ -49,6 +49,17 @@ describe("outbox", () => {
     expect(relaunched.pending()).toEqual([]);
   });
 
+  it("remembers what the server confirmed, so screens count it until they refetch", async () => {
+    const { send } = server();
+    const outbox = makeOutbox(memory(), send);
+    const buyIn = entry(100);
+    await outbox.add(session, buyIn);
+    expect(outbox.pending()).toEqual([]);
+    expect(outbox.sent()).toEqual([{ sessionId: session, entry: buyIn, failed: null }]);
+    // Only for this launch: the server has it now, so nothing needs to survive a restart.
+    expect(makeOutbox(memory(), send).sent()).toEqual([]);
+  });
+
   it("sends in the order things happened and stops at the first network failure", async () => {
     let up = false;
     const sent: Array<number> = [];

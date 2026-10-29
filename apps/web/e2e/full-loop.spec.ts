@@ -38,6 +38,13 @@ test.describe.serial("a group's first night out", () => {
     const alex = await (await browser.newContext()).newPage();
     const bea = await (await browser.newContext()).newPage();
 
+    // Production refetches slower than a local server; entries must keep counting between the
+    // server confirming them and the session coming back with them.
+    await alex.route(/\/api\/sessions\/[^/]+$/, async (route) => {
+      if (route.request().method() === "GET") await new Promise((r) => setTimeout(r, 900));
+      await route.continue();
+    });
+
     // Alex starts a group.
     await signIn(alex, alexUser!.emailAddress);
     await expect(alex.getByRole("heading", { name: "Your groups" })).toBeVisible();

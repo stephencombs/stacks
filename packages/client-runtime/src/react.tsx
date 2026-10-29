@@ -14,7 +14,7 @@ import {
 
 import { LEDGER_KEYS, type Stacks } from "./api.ts";
 import { describeError } from "./errors.ts";
-import { makeOutbox, type Outbox, type OutboxStorage } from "./outbox.ts";
+import { makeOutbox, type Outbox, type OutboxStorage, type Pending } from "./outbox.ts";
 
 /** Each app provides its own client, built with its own way of getting the Clerk token. */
 export const StacksContext = createContext<Stacks | null>(null);
@@ -109,4 +109,24 @@ export const usePending = (sessionId: SessionId) => {
   const outbox = useOutbox();
   const pending = useSyncExternalStore(outbox.subscribe, outbox.pending);
   return pending.filter((p) => p.sessionId === sessionId);
+};
+
+/**
+ * Everything recorded here for a session that the given saved entries don't include yet:
+ * entries still waiting, and ones the server confirmed that haven't come back in a refetch.
+ */
+export const useUnsaved = (
+  sessionId: SessionId,
+  saved: ReadonlyArray<{ readonly id: Pending["entry"]["id"] }>,
+) => {
+  const outbox = useOutbox();
+  const pending = usePending(sessionId);
+  const sent = useSyncExternalStore(outbox.subscribe, outbox.sent);
+  const known = new Set(saved.map((entry) => entry.id));
+  return {
+    /** Waiting to be sent, or refused. */
+    pending: pending.filter((p) => !known.has(p.entry.id)),
+    /** Confirmed, and still to show up in what the screen has. */
+    sent: sent.filter((p) => p.sessionId === sessionId && !known.has(p.entry.id)),
+  };
 };

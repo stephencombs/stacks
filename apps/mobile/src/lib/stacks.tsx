@@ -12,6 +12,7 @@ import {
   useAction,
   useOutbox,
   usePending,
+  useUnsaved,
   useStacks,
 } from "@stacks/client-runtime/react";
 import * as Haptics from "expo-haptics";
@@ -49,7 +50,7 @@ export function StacksProvider({ userId, children }: { userId: string; children:
   );
 }
 
-export { useAction, useOutbox, usePending, useStacks };
+export { useAction, useOutbox, usePending, useStacks, useUnsaved };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 export function Loaded<A, E>({

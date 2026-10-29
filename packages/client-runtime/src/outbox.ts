@@ -22,6 +22,8 @@ export interface OutboxStorage {
   readonly save: (value: string) => void;
 }
 
+const SENT_KEPT = 200;
+
 /** Sends one entry; resolves with the failure, or null once the server has it. */
 export type SendEntry = (pending: Pending) => Promise<{ readonly error: unknown }>;
 
@@ -40,6 +42,9 @@ export const makeOutbox = (storage: OutboxStorage, send: SendEntry) => {
       return [];
     }
   })();
+  // Confirmed entries stay here for the launch: a screen showing the session hasn't refetched
+  // the moment the server answers, and the entry must keep counting in between.
+  let sent: ReadonlyArray<Pending> = [];
   const listeners = new Set<() => void>();
   let flushing: Promise<void> | null = null;
 
@@ -58,8 +63,10 @@ export const makeOutbox = (storage: OutboxStorage, send: SendEntry) => {
       const next = pending.find((p) => p.failed === null);
       if (!next) return;
       const { error } = await send(next);
-      if (error === null) set(pending.filter((p) => p.entry.id !== next.entry.id));
-      else if (isRetryable(error)) return;
+      if (error === null) {
+        sent = [...sent, next].slice(-SENT_KEPT);
+        set(pending.filter((p) => p.entry.id !== next.entry.id));
+      } else if (isRetryable(error)) return;
       else
         set(
           pending.map((p) =>
@@ -77,6 +84,8 @@ export const makeOutbox = (storage: OutboxStorage, send: SendEntry) => {
 
   return {
     pending: () => pending,
+    /** What the server confirmed since launch, oldest first. */
+    sent: () => sent,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => void listeners.delete(listener);

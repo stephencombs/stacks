@@ -42,7 +42,7 @@ import { AddGuestSheet } from "../features/AddGuestSheet";
 import { Chip } from "../features/Chip";
 import { Reveal } from "../features/Reveal";
 import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
-import { Loaded, useAction, useOutbox, usePending, useStacks } from "../lib/stacks";
+import { Loaded, useAction, useOutbox, usePending, useStacks, useUnsaved } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ sessionId: string }>;
 
@@ -82,7 +82,7 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
   const toast = useToast();
   const voidEntry = useAction(stacks.Client.mutation("ledger", "voidEntry"));
   const outbox = useOutbox();
-  const queued = usePending(session.id);
+  const { pending: queued, sent } = useUnsaved(session.id, detail.entries);
   // Entries undone here count as voided while the void saves.
   const [undone, setUndone] = useState<ReadonlySet<EntryId>>(new Set());
   const [draft, setDraft] = useState<EntryDraft | null>(null);
@@ -91,22 +91,27 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
   const [closing, setClosing] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
 
-  // Until the server confirms them, entries recorded here count as if they were already saved,
-  // except ones it refused.
-  const unsaved = queued
-    .filter((p) => !detail.entries.some((saved) => saved.id === p.entry.id))
-    .map((p) => ({ ...p.entry, occurredAt: p.entry.occurredAt!, failed: p.failed }));
-  const replaced = new Set(
-    unsaved.flatMap((entry) => (entry.failed === null ? [entry.replacesEntryId] : [])),
-  );
+  // Entries recorded here count as if they were already saved until this screen has them back
+  // from the server, except ones it refused.
+  const unsaved = queued.map((p) => ({
+    ...p.entry,
+    occurredAt: p.entry.occurredAt!,
+    failed: p.failed,
+  }));
+  const recorded = [
+    ...sent.map((p) => ({ ...p.entry, occurredAt: p.entry.occurredAt! })),
+    ...unsaved.filter((entry) => entry.failed === null),
+  ];
+  const replaced = new Set(recorded.map((entry) => entry.replacesEntryId));
   const voidedHere = (id: EntryId) => replaced.has(id) || undone.has(id);
   const counted = [
     ...detail.entries.map((entry) =>
       voidedHere(entry.id) ? { ...entry, voidedAt: entry.occurredAt } : entry,
     ),
-    ...unsaved
-      .filter((entry) => entry.failed === null)
-      .map((entry) => ({ ...entry, voidedAt: voidedHere(entry.id) ? entry.occurredAt : null })),
+    ...recorded.map((entry) => ({
+      ...entry,
+      voidedAt: voidedHere(entry.id) ? entry.occurredAt : null,
+    })),
   ];
   const results = playerResults(counted);
   const cashedOut = new Set(
