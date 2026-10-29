@@ -72,11 +72,20 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
             onPress={() => navigation.navigate("NewSession", { tripId: trip.trip.id })}
           />
         ) : null}
-        <Button
-          label="Settle up"
-          size="sm"
-          onPress={() => navigation.navigate("Settle", { tripId: trip.trip.id })}
-        />
+        <View className="flex-row gap-2">
+          <Button
+            label="Stats"
+            size="sm"
+            className="flex-1"
+            onPress={() => navigation.navigate("TripStats", { tripId: trip.trip.id })}
+          />
+          <Button
+            label="Settle up"
+            size="sm"
+            className="flex-1"
+            onPress={() => navigation.navigate("Settle", { tripId: trip.trip.id })}
+          />
+        </View>
       </View>
       <TripBoard detail={group} trip={trip} />
       {closed.length > 0 ? (

@@ -29,6 +29,7 @@ import { SessionScreen } from "./screens/Session";
 import { SettleScreen } from "./screens/Settle";
 import { StatsScreen } from "./screens/Stats";
 import { TripScreen } from "./screens/Trip";
+import { TripStatsScreen } from "./screens/TripStats";
 
 const RootStack = createNativeStackNavigator({
   screenOptions: {
@@ -68,6 +69,11 @@ const RootStack = createNativeStackNavigator({
       screen: TripScreen,
       options: { title: "" },
       linking: { path: "trips/:tripId" },
+    },
+    TripStats: {
+      screen: TripStatsScreen,
+      options: { title: "Stats" },
+      linking: { path: "trips/:tripId/stats" },
     },
     Join: {
       screen: JoinScreen,

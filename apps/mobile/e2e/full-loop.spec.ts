@@ -157,6 +157,14 @@ test.describe.serial("live mode on a phone", () => {
     await visible(alex.getByRole("button", { name: "Vegas weekend, live board" })).click();
     await expect(alex.getByText("Biggest hit").filter({ visible: true })).toBeVisible();
     await shoot(alex, "trip-board");
+    await alex
+      .getByRole("button", { name: "Stats", exact: true })
+      .filter({ visible: true })
+      .click();
+    await expect(alex.getByText(/leads by/).filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("Win rate").filter({ visible: true })).toBeVisible();
+    await shoot(alex, "trip-stats");
+    await alex.goBack();
     await alex.getByRole("button", { name: "Settle up" }).filter({ visible: true }).click();
     await expect(alex.getByText("Owes $270.00").filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("Owed $50.00").filter({ visible: true })).toBeVisible();
