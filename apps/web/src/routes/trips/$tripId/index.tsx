@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { Plus } from "lucide-react";
+import { useState } from "react";
 
 import { ButtonLink } from "~/components/ui/Button";
 import { EmptyState, SectionHeading, Skeleton } from "~/components/ui/Surface";
 import { SessionList } from "~/features/SessionList";
-import { TripBoard } from "~/features/TripBoard";
+import { SessionView } from "~/features/SessionView";
 import { TripHeader } from "~/features/TripHeader";
 import { Loaded, useStacks } from "~/lib/stacks";
 
@@ -28,10 +29,20 @@ function TripPage() {
   );
 }
 
+/** Your live table if you're seated at one; otherwise a way to start one and what's been played. */
 function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
+  const stacks = useStacks();
+  const mine = trip.sessions.find(
+    (s) => s.session.status === "live" && s.playerIds.includes(group.myPlayerId),
+  );
+  // The table you just closed stays on screen with its results, until you start the next one.
+  const [kept, setKept] = useState(mine?.session.id ?? null);
+  if (mine && mine.session.id !== kept) setKept(mine.session.id);
+  const shown = trip.sessions.find((s) => s.session.id === kept);
+  const live = trip.sessions.filter((s) => s.session.status === "live" && s !== mine);
   const closed = trip.sessions.filter((s) => s.session.status === "closed").toReversed();
   const startSession =
-    trip.trip.endedAt === null ? (
+    trip.trip.endedAt === null && !mine ? (
       <ButtonLink
         to="/trips/$tripId/sessions/new"
         params={{ tripId: trip.trip.id }}
@@ -44,23 +55,30 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
 
   return (
     <>
-      <TripHeader group={group} trip={trip} current="board" action={startSession} />
-      <TripBoard detail={group} trip={trip} />
-
-      <section className="flex flex-col gap-2">
-        <SectionHeading>Sessions</SectionHeading>
-        {trip.sessions.length === 0 ? (
-          <EmptyState title="No sessions yet" action={startSession}>
-            Start one when you sit down to play.
-          </EmptyState>
-        ) : closed.length > 0 ? (
-          <SessionList sessions={closed} detail={group} />
-        ) : (
-          <p className="text-sm text-muted">
-            Finished sessions show up here. Live ones are on the board.
-          </p>
-        )}
-      </section>
+      <TripHeader group={group} trip={trip} current="table" action={startSession} />
+      {shown ? (
+        <Loaded query={stacks.session(shown.session.id)} skeleton={<Skeleton className="h-96" />}>
+          {(session) => <SessionView session={session} group={group} inTrip />}
+        </Loaded>
+      ) : null}
+      {live.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <SectionHeading>{mine ? "Also live" : "Live now"}</SectionHeading>
+          <SessionList sessions={live} detail={group} />
+        </section>
+      ) : null}
+      {mine ? null : (
+        <section className="flex flex-col gap-2">
+          <SectionHeading>Sessions</SectionHeading>
+          {closed.length > 0 ? (
+            <SessionList sessions={closed} detail={group} />
+          ) : (
+            <EmptyState title="No sessions yet" action={startSession}>
+              Start one when you sit down to play.
+            </EmptyState>
+          )}
+        </section>
+      )}
     </>
   );
 }

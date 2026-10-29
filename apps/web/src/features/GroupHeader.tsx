@@ -1,7 +1,7 @@
 import type { GroupDetail } from "@stacks/contracts";
 import type { ReactNode } from "react";
 
-import { Tab, Tabs } from "~/components/ui/Nav";
+import { BackLink, Tab, Tabs } from "~/components/ui/Nav";
 import { PageTitle } from "~/components/ui/Surface";
 
 const tabs = [
@@ -20,7 +20,8 @@ export function GroupHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-5 pt-4">
+    <div className="flex flex-col gap-4 pt-2">
+      <BackLink to="/groups">Your groups</BackLink>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <PageTitle
           context={`${detail.players.length} ${detail.players.length === 1 ? "player" : "players"} · ${detail.group.currency}`}

@@ -52,7 +52,7 @@ type Props = StaticScreenProps<{ sessionId: string }>;
 export function SessionScreen({ route }: Props) {
   const stacks = useStacks();
   return (
-    <Screen>
+    <Screen table={SessionId.make(route.params.sessionId)}>
       <Loaded
         query={stacks.session(SessionId.make(route.params.sessionId))}
         skeleton={<Skeleton className="h-96" />}
@@ -75,7 +75,7 @@ function KeepAwake() {
   return null;
 }
 
-function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDetail }) {
+export function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDetail }) {
   const stacks = useStacks();
   const { userId } = useAuth();
   const { session, venue } = detail;

@@ -32,7 +32,7 @@ import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay } from "@stacks/client-runtime/format";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
-export const Route = createFileRoute("/trips/$tripId/settle")({ component: SettleUp });
+export const Route = createFileRoute("/trips/$tripId/money")({ component: SettleUp });
 
 function SettleUp() {
   const { tripId } = Route.useParams();
@@ -102,7 +102,7 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
       <TripHeader
         group={detail}
         trip={trip}
-        current="settle"
+        current="money"
         action={<Button onClick={() => setRecording(true)}>Record a payment</Button>}
       />
 

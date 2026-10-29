@@ -23,13 +23,12 @@ import "./lib/theme";
 import { ClaimScreen, JoinScreen } from "./screens/Invites";
 import { GroupScreen } from "./screens/Group";
 import { GroupsScreen } from "./screens/Groups";
+import { HomeScreen } from "./screens/Home";
 import { NewSessionScreen } from "./screens/NewSession";
 import { PeopleScreen } from "./screens/People";
 import { SessionScreen } from "./screens/Session";
-import { SettleScreen } from "./screens/Settle";
 import { StatsScreen } from "./screens/Stats";
 import { TripScreen } from "./screens/Trip";
-import { TripStatsScreen } from "./screens/TripStats";
 
 const RootStack = createNativeStackNavigator({
   screenOptions: {
@@ -38,7 +37,8 @@ const RootStack = createNativeStackNavigator({
     headerBackButtonDisplayMode: "minimal",
   },
   screens: {
-    Groups: { screen: GroupsScreen, options: { title: "Stacks" }, linking: { path: "" } },
+    Home: { screen: HomeScreen, options: { title: "" }, linking: { path: "" } },
+    Groups: { screen: GroupsScreen, options: { title: "Stacks" }, linking: { path: "groups" } },
     Group: { screen: GroupScreen, options: { title: "" }, linking: { path: "groups/:groupId" } },
     NewSession: {
       screen: NewSessionScreen,
@@ -49,11 +49,6 @@ const RootStack = createNativeStackNavigator({
       screen: SessionScreen,
       options: { title: "" },
       linking: { path: "sessions/:sessionId" },
-    },
-    Settle: {
-      screen: SettleScreen,
-      options: { title: "Settle up" },
-      linking: { path: "trips/:tripId/settle" },
     },
     Stats: {
       screen: StatsScreen,
@@ -69,11 +64,6 @@ const RootStack = createNativeStackNavigator({
       screen: TripScreen,
       options: { title: "" },
       linking: { path: "trips/:tripId" },
-    },
-    TripStats: {
-      screen: TripStatsScreen,
-      options: { title: "Stats" },
-      linking: { path: "trips/:tripId/stats" },
     },
     Join: {
       screen: JoinScreen,

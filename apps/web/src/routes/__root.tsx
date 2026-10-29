@@ -6,6 +6,7 @@ import { Moon, Sun } from "lucide-react";
 import { Button } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuChoice } from "~/components/ui/Menu";
+import { LiveBar } from "~/features/LiveBar";
 import { StacksProvider } from "~/lib/stacks";
 import { setTheme, useTheme } from "~/lib/theme";
 
@@ -25,9 +26,10 @@ function Root() {
             <UserButton />
           </div>
         </header>
-        <main className="flex flex-1 flex-col gap-8 pb-16">
+        <main className="flex flex-1 flex-col gap-8 pb-28">
           <Outlet />
         </main>
+        <LiveBar />
       </div>
     </StacksProvider>
   );

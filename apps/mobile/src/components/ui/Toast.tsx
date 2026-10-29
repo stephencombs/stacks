@@ -14,7 +14,8 @@ export const useToast = () => use(ToastContext);
 
 const VISIBLE_MS = 6000;
 
-export function ToastHost({ children }: { children: ReactNode }) {
+/** `above` keeps toasts clear of something pinned to the bottom, such as a tab bar. */
+export function ToastHost({ children, above }: { children: ReactNode; above?: number }) {
   const [current, setCurrent] = useState<(Toast & { readonly id: number }) | null>(null);
   const nextId = useRef(0);
   const [show] = useState(() => (toast: Toast) => setCurrent({ ...toast, id: nextId.current++ }));
@@ -27,12 +28,22 @@ export function ToastHost({ children }: { children: ReactNode }) {
   return (
     <ToastContext value={show}>
       {children}
-      {current ? <ToastView key={current.id} toast={current} onClosed={clear} /> : null}
+      {current ? (
+        <ToastView key={current.id} toast={current} onClosed={clear} above={above} />
+      ) : null}
     </ToastContext>
   );
 }
 
-function ToastView({ toast, onClosed }: { toast: Toast; onClosed: () => void }) {
+function ToastView({
+  toast,
+  onClosed,
+  above,
+}: {
+  toast: Toast;
+  onClosed: () => void;
+  above: number | undefined;
+}) {
   const insets = useSafeAreaInsets();
   const [shown] = useState(() => new Animated.Value(0));
   // Settled before anything moves; with Reduce Motion on, the toast appears and leaves at once.
@@ -74,8 +85,12 @@ function ToastView({ toast, onClosed }: { toast: Toast; onClosed: () => void }) 
   return (
     <View
       pointerEvents="box-none"
-      className="absolute inset-x-0 bottom-0 px-4"
-      style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+      className="absolute inset-x-0 px-4"
+      style={
+        above === undefined
+          ? { bottom: 0, paddingBottom: Math.max(insets.bottom, 12) }
+          : { bottom: above + 8 }
+      }
     >
       <Animated.View
         style={{

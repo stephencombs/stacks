@@ -153,30 +153,26 @@ test.describe.serial("live mode on a phone", () => {
       .filter({ visible: true })
       .last()
       .click();
+    // The closed table stays on screen with everyone's result, under the way to the next one.
+    await expect(visible(alex.getByRole("button", { name: "Start a session" }))).toBeVisible();
     await expect(alex.getByText("Closed", { exact: true }).filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("-$200").filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("+$20").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("-$200").filter({ visible: true }).first()).toBeVisible();
 
-    // The trip's board ranks the night, and its settle-up says who owes whom: Alex owes Bea $50
-    // for the buy-in and Gus $220 for the cash he kept.
-    await alex.goto(groupUrl);
-    await shoot(alex, "group");
-    await visible(alex.getByRole("button", { name: "Vegas weekend, live board" })).click();
+    // The trip's board ranks the night, and Money says who owes whom: Alex owes Bea $50 for the
+    // buy-in and Gus $220 for the cash he kept.
+    const tab = (name: string) => visible(alex.getByRole("tab", { name }));
+    await tab("Board").click();
     await expect(alex.getByText("Biggest hit").filter({ visible: true })).toBeVisible();
     await shoot(alex, "trip-board");
-    await alex
-      .getByRole("button", { name: "Stats", exact: true })
-      .filter({ visible: true })
-      .click();
+    await visible(alex.getByRole("radio", { name: "Race" })).click();
     await expect(alex.getByText(/leads by/).filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("Win rate").filter({ visible: true })).toBeVisible();
     await shoot(alex, "trip-stats");
-    await alex.goBack();
-    await alex.getByRole("button", { name: "Settle up" }).filter({ visible: true }).click();
+    await tab("Money").click();
     await expect(alex.getByText("Owes $270").filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("Owed $50").filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("Owed $220").filter({ visible: true })).toBeVisible();
-    const settleUrl = alex.url();
+    const moneyUrl = `${new URL(alex.url()).pathname.replace(/\/$/, "")}?tab=money`;
     await expect(
       alex.getByRole("button", { name: "Mark paid" }).filter({ visible: true }),
     ).toHaveCount(2);
@@ -191,10 +187,11 @@ test.describe.serial("live mode on a phone", () => {
     }
     await expect(alex.getByText("Everyone's square").filter({ visible: true })).toBeVisible();
 
-    await bea.goto(new URL(settleUrl).pathname);
+    await bea.goto(moneyUrl);
     await expect(bea.getByText("Square", { exact: true }).filter({ visible: true })).toHaveCount(3);
 
     await alex.goto(groupUrl);
+    await shoot(alex, "group");
     await alex.getByRole("button", { name: "Stats" }).filter({ visible: true }).click();
     await expect(
       alex.getByText("Alex · #1 of 3 · 1 session").filter({ visible: true }),
@@ -210,14 +207,14 @@ test.describe.serial("live mode on a phone", () => {
     await alex.goto(groupUrl);
     await visible(alex.getByRole("button", { name: "Vegas weekend, live board" })).click();
     for (const action of ["End trip", "Reopen trip"]) {
-      await visible(alex.getByRole("button", { name: "Actions for Vegas weekend" })).click();
+      await visible(alex.getByRole("button", { name: "Trip options" })).click();
       await visible(alex.getByRole("button", { name: action })).click();
     }
     await alex.goto(groupUrl);
     await visible(alex.getByRole("button", { name: "Start a trip" })).click();
     await visible(alex.getByLabel("Trip name")).fill("Maybe Reno");
     await visible(alex.getByRole("button", { name: "Start trip" })).click();
-    await visible(alex.getByRole("button", { name: "Actions for Maybe Reno" })).click();
+    await visible(alex.getByRole("button", { name: "Trip options" })).click();
     await visible(alex.getByRole("button", { name: "Delete trip" })).click();
     await visible(alex.getByRole("button", { name: "Delete for good" })).click();
     await expect(

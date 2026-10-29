@@ -14,9 +14,9 @@ import { PageTitle, Tag } from "~/components/ui/Surface";
 import { useAction, useStacks } from "~/lib/stacks";
 
 const tabs = [
-  { key: "board", label: "Board", to: "/trips/$tripId" },
-  { key: "stats", label: "Stats", to: "/trips/$tripId/stats" },
-  { key: "settle", label: "Settle up", to: "/trips/$tripId/settle" },
+  { key: "table", label: "Table", to: "/trips/$tripId" },
+  { key: "board", label: "Board", to: "/trips/$tripId/board" },
+  { key: "money", label: "Money", to: "/trips/$tripId/money" },
 ] as const;
 
 /** A trip's name, dates and tabs, with a way back to its group and the trip's own options. */

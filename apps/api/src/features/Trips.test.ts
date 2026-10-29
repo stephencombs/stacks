@@ -76,6 +76,30 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
     }),
   );
 
+  it.effect("say which trip is going and which table you're seated at", () =>
+    Effect.gen(function* () {
+      const { alex, bea } = yield* users("alex", "bea");
+      const group = yield* groupWith(alex, bea);
+      const [before] = yield* alex.groups.list();
+      expect(before).toMatchObject({ currentTripId: group.tripId, mySession: null });
+
+      const sessionId = yield* startSession(alex, group, group.tripId);
+      const [seated] = yield* alex.groups.list();
+      expect(seated?.mySession).toMatchObject({ id: sessionId, tripId: group.tripId });
+      expect(seated?.mySession?.venueName).toBeTruthy();
+      // Bea is in the group but not at the table.
+      const [watching] = yield* bea.groups.list();
+      expect(watching?.mySession).toBeNull();
+      const trip = yield* alex.trips.get({ params: { tripId: group.tripId } });
+      expect(trip.sessions.map((s) => s.playerIds)).toEqual([[group.myPlayerId]]);
+
+      yield* alex.sessions.close({ params: { sessionId }, payload: { endedAt: day(2) } });
+      yield* alex.trips.end({ params: { tripId: group.tripId }, payload: { endedAt: day(3) } });
+      const [after] = yield* alex.groups.list();
+      expect(after).toMatchObject({ currentTripId: null, mySession: null });
+    }),
+  );
+
   it.effect("take no new sessions once ended, until reopened", () =>
     Effect.gen(function* () {
       const { alex } = yield* users("alex");

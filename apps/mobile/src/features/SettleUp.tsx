@@ -1,7 +1,5 @@
-import type { StaticScreenProps } from "@react-navigation/native";
 import {
   EntryId,
-  TripId,
   type Entry,
   type GroupDetail,
   type TripDetail,
@@ -23,33 +21,12 @@ import { BalanceLabel, Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
-import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
+import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
-import { BackingSection } from "../features/Backing";
-import { Chip } from "../features/Chip";
-import { Loaded, useAction, useStacks } from "../lib/stacks";
-
-type Props = StaticScreenProps<{ tripId: string }>;
-
-export function SettleScreen({ route }: Props) {
-  const stacks = useStacks();
-  return (
-    <Screen>
-      <Loaded
-        query={stacks.trip(TripId.make(route.params.tripId))}
-        skeleton={<Skeleton className="h-96" />}
-      >
-        {(trip) => (
-          <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
-            {(detail) => <SettleView detail={detail} trip={trip} />}
-          </Loaded>
-        )}
-      </Loaded>
-    </Screen>
-  );
-}
+import { BackingSection } from "./Backing";
+import { Chip } from "./Chip";
+import { useAction, useStacks } from "../lib/stacks";
 
 type Payment = {
   readonly id: EntryId;
@@ -59,7 +36,7 @@ type Payment = {
   readonly note: string | null;
 };
 
-function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const stacks = useStacks();
   const names = playerNames(detail);
   const currency = detail.group.currency;

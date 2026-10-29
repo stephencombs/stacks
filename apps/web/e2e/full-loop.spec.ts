@@ -129,33 +129,38 @@ test.describe.serial("a group's first night out", () => {
     await record("Cash out", "Gus", "120", "Alex");
     await shoot(alex, "session-live");
 
+    // Away from the table, the live bar keeps it one tap away.
+    await alex
+      .getByRole("navigation", { name: "Trip" })
+      .getByRole("link", { name: "Board" })
+      .click();
+    await alex.getByRole("link", { name: /^Live/ }).click();
+    await expect(alex.getByRole("button", { name: "Close session" })).toBeVisible();
+
     await alex.getByRole("button", { name: "Close session" }).click();
     await alex.getByRole("dialog").getByRole("button", { name: "Close session" }).click();
+    // The closed table stays on screen with everyone's result, next to the way to the next one.
     await expect(alex.getByText("Closed", { exact: true })).toBeVisible();
-    await expect(alex.getByText("+$170")).toBeVisible();
-    await expect(alex.getByText("-$200")).toBeVisible();
-    await expect(alex.getByText("+$20")).toBeVisible();
+    await expect(alex.getByText("+$170").first()).toBeVisible();
+    await expect(alex.getByText("-$200").first()).toBeVisible();
+    await expect(alex.getByRole("link", { name: "Start a session" }).first()).toBeVisible();
 
     // The trip's board ranks the night.
-    await alex.getByRole("link", { name: "Vegas weekend" }).click();
+    const tab = (name: string) =>
+      alex.getByRole("navigation", { name: "Trip" }).getByRole("link", { name });
+    await tab("Board").click();
     const board = alex.getByRole("list").filter({ hasText: "SESS" });
     await expect(board.getByRole("listitem").first()).toContainText("+$170");
     await expect(alex.getByText("Biggest hit")).toBeVisible();
     await shoot(alex, "trip-board");
 
     // Stats race the night and open a stat sheet for whoever's picked.
-    await alex
-      .getByRole("navigation", { name: "Trip" })
-      .getByRole("link", { name: "Stats" })
-      .click();
+    await alex.getByRole("button", { name: "Race" }).click();
     await expect(alex.getByRole("heading", { name: /leads by \$150/ })).toBeVisible();
     await expect(alex.getByText("Win rate")).toBeVisible();
 
     // Alex owes Bea $50 for the buy-in and Gus $120 for the cash he kept.
-    await alex
-      .getByRole("navigation", { name: "Trip" })
-      .getByRole("link", { name: "Settle up" })
-      .click();
+    await tab("Money").click();
     await expect(alex.getByText("Owes $170")).toBeVisible();
     await expect(alex.getByText("Owed $50")).toBeVisible();
     await expect(alex.getByText("Owed $120")).toBeVisible();
@@ -189,6 +194,7 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByText("Ended", { exact: true })).toBeVisible();
     await alex.getByRole("button", { name: "Actions for Vegas weekend" }).click();
     await alex.getByRole("menuitem", { name: "Reopen trip" }).click();
+    await expect(alex.getByText("Going", { exact: true })).toBeVisible();
     await alex.getByRole("link", { name: "Vegas crew" }).click();
     await alex.getByRole("button", { name: "Start a trip" }).click();
     await alex.getByLabel("Trip name").fill("Maybe Reno");
@@ -204,7 +210,7 @@ test.describe.serial("a group's first night out", () => {
     await bea.getByRole("link", { name: /Vegas weekend/ }).click();
     await bea
       .getByRole("navigation", { name: "Trip" })
-      .getByRole("link", { name: "Settle up" })
+      .getByRole("link", { name: "Money" })
       .click();
     await expect(bea.getByText("Square", { exact: true })).toHaveCount(3);
     // All-time stats race every trip; the stat sheet opens on you, and anyone else is a tap away.

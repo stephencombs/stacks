@@ -9,7 +9,7 @@ import {
   type GroupId,
   type PlayerResult,
   type SessionDetail,
-  type SessionId,
+  SessionId,
   type SessionSummary,
   type TripDetail,
   type TripId,
@@ -46,7 +46,7 @@ const summaries = Effect.fn("Views.summaries")(function* (
   const sql = yield* SqlClient.SqlClient;
   const sessionIds = sessions.map((session) => session.id);
   const venueIds = Array.from(new Set(sessions.map((session) => session.venueId)));
-  const [venues, entries] = yield* Effect.all(
+  const [venues, entries, seats] = yield* Effect.all(
     [
       sql`
         select ${venueColumns(sql)} from venues v where v.id in ${sql.in(venueIds)}
@@ -55,6 +55,12 @@ const summaries = Effect.fn("Views.summaries")(function* (
         select * from entries
         where session_id in ${sql.in(sessionIds)} and voided_at is null
       `.pipe(Effect.flatMap(decodeRows(EntryRow))),
+      sql`
+        select session_id, player_id from session_players
+        where session_id in ${sql.in(sessionIds)} order by joined_at
+      `.pipe(
+        Effect.flatMap(decodeRows(Schema.Struct({ sessionId: SessionId, playerId: PlayerId }))),
+      ),
     ],
     { concurrency: "unbounded" },
   );
@@ -64,6 +70,7 @@ const summaries = Effect.fn("Views.summaries")(function* (
   return sessions.map((session): SessionSummary => ({
     session,
     venue: venueById.get(session.venueId)!,
+    playerIds: seats.filter((seat) => seat.sessionId === session.id).map((seat) => seat.playerId),
     results: toResultList(resultsBySession.get(session.id)),
   }));
 });

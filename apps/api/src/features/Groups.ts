@@ -9,6 +9,7 @@ import {
   NotFound,
   type CreateGroupRequest,
   GroupId,
+  SessionId,
   TripId,
   type GroupListItem,
   type SetRoleRequest,
@@ -28,7 +29,12 @@ export const list = Effect.fn("Groups.list")(function* () {
   const rows = yield* sql`
     select g.id, g.name, g.currency, g.created_at, m.group_id, m.role, p.id as player_id,
       (select count(*)::int from sessions s where s.group_id = g.id and s.status = 'live')
-        as live_session_count
+        as live_session_count,
+      (select t.id from trips t where t.group_id = g.id and t.ended_at is null
+        order by t.started_at desc limit 1) as current_trip_id,
+      (select s.id from sessions s join session_players sp on sp.session_id = s.id
+        where s.group_id = g.id and s.status = 'live' and sp.player_id = p.id
+        order by s.started_at desc limit 1) as my_session_id
     from memberships m
     join groups g on g.id = m.group_id
     join players p on p.group_id = m.group_id and p.user_id = m.user_id
@@ -41,11 +47,34 @@ export const list = Effect.fn("Groups.list")(function* () {
           ...GroupRow.fields,
           ...MembershipRow.fields,
           liveSessionCount: Schema.Int,
+          currentTripId: Schema.NullOr(TripId),
+          mySessionId: Schema.NullOr(SessionId),
         }),
       ),
     ),
   );
   if (rows.length === 0) return [];
+
+  const seatedIds = rows.flatMap((row) => (row.mySessionId ? [row.mySessionId] : []));
+  const seated =
+    seatedIds.length === 0
+      ? []
+      : yield* sql`
+          select s.id, s.trip_id, s.started_at, v.name as venue_name
+          from sessions s join venues v on v.id = s.venue_id
+          where s.id in ${sql.in(seatedIds)}
+        `.pipe(
+          Effect.flatMap(
+            Access.decodeRows(
+              Schema.Struct({
+                id: SessionId,
+                tripId: TripId,
+                startedAt: Schema.DateTimeUtcFromDate,
+                venueName: Schema.String,
+              }),
+            ),
+          ),
+        );
 
   const entries = yield* sql`
     select * from entries
@@ -72,6 +101,8 @@ export const list = Effect.fn("Groups.list")(function* () {
         myPlayerId: row.playerId,
         myBalance: owed.get(row.playerId) ?? MinorUnits.make(0),
         liveSessionCount: row.liveSessionCount,
+        currentTripId: row.currentTripId,
+        mySession: seated.find((session) => session.id === row.mySessionId) ?? null,
       } satisfies GroupListItem;
     }),
   );

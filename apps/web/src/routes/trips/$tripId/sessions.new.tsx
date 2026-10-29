@@ -97,7 +97,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
       },
     });
     if (session)
-      void navigate({ to: "/sessions/$sessionId", params: { sessionId: session.session.id } });
+      void navigate({ to: "/trips/$tripId", params: { tripId: session.session.tripId } });
   };
 
   return (

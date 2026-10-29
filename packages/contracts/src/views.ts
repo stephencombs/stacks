@@ -64,6 +64,8 @@ export type Venue = typeof Venue.Type;
 export const SessionSummary = Schema.Struct({
   session: Session,
   venue: Venue,
+  /** Everyone seated at the table, in the order they sat down. */
+  playerIds: Schema.Array(PlayerId),
   results: Schema.Array(PlayerResult),
 });
 export type SessionSummary = typeof SessionSummary.Type;
@@ -83,6 +85,17 @@ export const GroupListItem = Schema.Struct({
   myPlayerId: PlayerId,
   myBalance: MinorUnits,
   liveSessionCount: Schema.Int,
+  /** The trip still going, most recently started first; where the app opens. */
+  currentTripId: Schema.NullOr(TripId),
+  /** The live session you're seated at, if any. */
+  mySession: Schema.NullOr(
+    Schema.Struct({
+      id: SessionId,
+      tripId: TripId,
+      venueName: Schema.String,
+      startedAt: Schema.DateTimeUtc,
+    }),
+  ),
 });
 export type GroupListItem = typeof GroupListItem.Type;
 
