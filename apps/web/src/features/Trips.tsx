@@ -44,14 +44,14 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
               key={trip.id}
               to="/trips/$tripId"
               params={{ tripId: trip.id }}
-              className="flex flex-col gap-3 rounded-2xl bg-board p-4 text-board-ink transition-[scale] duration-150 active:scale-[0.99]"
+              className="flex flex-col gap-4 rounded-2xl border border-board-rule bg-board p-5 text-board-ink transition-[scale,border-color] duration-150 hover:border-board-amber/40 active:scale-[0.99]"
             >
               <span className="flex items-center justify-between gap-3">
-                <span className="flex min-w-0 flex-col">
+                <span className="flex min-w-0 flex-col gap-1.5">
                   <span className="text-[11px] font-semibold tracking-[0.18em] text-board-amber uppercase">
                     Live board · {tripDates(trip)}
                   </span>
-                  <span className="truncate text-2xl font-black tracking-tight uppercase">
+                  <span className="truncate font-display text-4xl leading-none tracking-tight uppercase">
                     {trip.name}
                   </span>
                 </span>
@@ -73,9 +73,11 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
                 key={trip.id}
                 to="/trips/$tripId"
                 params={{ tripId: trip.id }}
-                className="flex min-h-12 items-center justify-between gap-3 px-5 py-3 first:rounded-t-2xl last:rounded-b-2xl hover:bg-sunken/50"
+                className="flex min-h-12 items-center justify-between gap-3 px-5 py-3 first:rounded-t-xl last:rounded-b-xl hover:bg-sunken/50"
               >
-                <span className="truncate">{trip.name}</span>
+                <span className="truncate font-display text-xl tracking-wide uppercase">
+                  {trip.name}
+                </span>
                 <span className="flex shrink-0 items-center gap-1 text-sm text-muted">
                   {tripDates(trip)}
                   <ChevronRight className="size-4" aria-hidden />

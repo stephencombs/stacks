@@ -35,7 +35,8 @@ function Root() {
 
 function Wordmark() {
   return (
-    <Link to="/" className="font-display text-2xl font-medium tracking-tight">
+    <Link to="/" className="flex items-center gap-2 font-display text-2xl tracking-wide uppercase">
+      <span aria-hidden className="size-3 rotate-45 rounded-[3px] bg-accent" />
       Stacks
     </Link>
   );
@@ -75,8 +76,11 @@ function SignedOut() {
         <Wordmark />
         <ThemeMenu />
       </header>
-      <main className="flex flex-1 flex-col justify-center gap-6 pb-24">
-        <h1 className="max-w-[18ch] font-display text-5xl leading-[1.05] font-medium">
+      <main className="flex flex-1 flex-col justify-center gap-5 pb-24">
+        <p className="text-[11px] font-semibold tracking-[0.18em] text-accent-text uppercase">
+          {invited ? "You're on the list" : "For the trip with your friends"}
+        </p>
+        <h1 className="max-w-[14ch] font-display text-6xl leading-[0.9] tracking-tight uppercase sm:text-7xl">
           {invited ? "You've been invited to a group." : "Keep the casino trip honest."}
         </h1>
         <p className="max-w-[46ch] text-lg text-muted">

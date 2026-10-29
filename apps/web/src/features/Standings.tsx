@@ -1,11 +1,13 @@
 import { MinorUnits, type GroupDetail, type GroupStats, type PlayerId } from "@stacks/contracts";
 import { barTrack } from "@stacks/client-runtime/chart";
 import { playerNames } from "@stacks/client-runtime/format";
+import { chipOf } from "@stacks/client-runtime/trip";
 import { sessionCounts, type Subject } from "@stacks/shared/results";
 import type { ReactNode } from "react";
 
 import { Money } from "~/components/Money";
 import { cn } from "~/components/ui/cn";
+import { Chip } from "./Chip";
 
 /**
  * Everyone ranked by all-time net, each with a bar from break-even, and the group's total.
@@ -43,11 +45,18 @@ export function Standings({
             selected={selected === result.playerId}
             onSelect={() => onSelect(result.playerId)}
           >
-            <span className="text-sm text-muted tabular-nums">{index + 1}</span>
+            <span className="font-mono text-base font-bold text-accent-text">{index + 1}</span>
             <span className="flex min-w-0 flex-col">
-              <span className="truncate font-medium">
-                {names.get(result.playerId)}
-                {you ? <span className="font-normal text-muted"> · you</span> : null}
+              <span className="flex min-w-0 items-center gap-2">
+                <Chip
+                  chip={chipOf(detail, result.playerId)}
+                  name={names.get(result.playerId) ?? ""}
+                  size={22}
+                />
+                <span className="truncate font-display text-lg leading-tight tracking-wide uppercase">
+                  {names.get(result.playerId)}
+                </span>
+                {you ? <span className="text-sm text-muted">you</span> : null}
               </span>
               <span className="text-sm text-muted tabular-nums">
                 {sessions(played.get(result.playerId) ?? 0)}
@@ -91,7 +100,9 @@ export function Standings({
       <Choice selected={selected === "group"} onSelect={() => onSelect("group")}>
         <span aria-hidden />
         <span className="flex min-w-0 flex-col">
-          <span className="font-medium">Group total</span>
+          <span className="font-display text-lg leading-tight tracking-wide uppercase">
+            Group total
+          </span>
           <span className="text-sm text-muted tabular-nums">{sessions(stats.sessionCount)}</span>
         </span>
         <Money amount={total} currency={currency} tone="result" className="text-lg font-bold" />
@@ -110,14 +121,14 @@ function Choice({
   children: ReactNode;
 }) {
   return (
-    <li className="first:*:rounded-t-2xl last:*:rounded-b-2xl">
+    <li className="first:*:rounded-t-xl last:*:rounded-b-xl">
       <button
         type="button"
         aria-pressed={selected}
         onClick={onSelect}
         className={cn(
-          "grid w-full grid-cols-[1.5rem_1fr_auto] items-baseline gap-x-3 gap-y-2 px-5 py-3.5 text-left transition-colors duration-150 focus-visible:-outline-offset-2",
-          selected ? "bg-sunken" : "hover:bg-sunken/50",
+          "grid w-full grid-cols-[1.5rem_1fr_auto] items-center gap-x-3 gap-y-2 px-5 py-3.5 text-left transition-colors duration-150 focus-visible:-outline-offset-2",
+          selected ? "bg-sunken shadow-[inset_3px_0_0_var(--color-accent)]" : "hover:bg-sunken/50",
         )}
       >
         {children}

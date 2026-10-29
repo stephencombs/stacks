@@ -1,17 +1,16 @@
 import { useAuth } from "@clerk/react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
 import { tripDates } from "@stacks/client-runtime/trip";
-import { ChevronLeft } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
-import { Tag } from "~/components/ui/Surface";
-import { cn } from "~/components/ui/cn";
+import { BackLink, Tab, Tabs } from "~/components/ui/Nav";
+import { PageTitle, Tag } from "~/components/ui/Surface";
 import { useAction, useStacks } from "~/lib/stacks";
 
 const tabs = [
@@ -42,16 +41,11 @@ export function TripHeader({
     trip.sessions.length === 0 && (isAdmin(group) || trip.trip.createdBy === userId);
 
   return (
-    <div className="flex flex-col gap-4 pt-4">
+    <div className="flex flex-col gap-4 pt-2">
       <div className="flex items-center justify-between gap-3">
-        <Link
-          to="/groups/$groupId"
-          params={{ groupId: group.group.id }}
-          className="-ml-1 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"
-        >
-          <ChevronLeft className="size-4" aria-hidden />
+        <BackLink to="/groups/$groupId" params={{ groupId: group.group.id }}>
           {group.group.name}
-        </Link>
+        </BackLink>
         <Menu label={`Actions for ${trip.trip.name}`}>
           {ended ? (
             <MenuItem onClick={() => void reopen.run({ params })}>Reopen trip</MenuItem>
@@ -66,35 +60,20 @@ export function TripHeader({
         </Menu>
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="font-display text-4xl font-medium">{trip.trip.name}</h1>
-          <p className="flex items-center gap-2 text-muted">
-            {tripDates(trip.trip)}
-            {ended ? <Tag>Ended</Tag> : <Tag tone="live">Going</Tag>}
-          </p>
+        <div className="flex flex-col gap-2">
+          <PageTitle eyebrow={tripDates(trip.trip)}>{trip.trip.name}</PageTitle>
+          <p>{ended ? <Tag>Ended</Tag> : <Tag tone="live">Going</Tag>}</p>
         </div>
         {action}
       </div>
       {(end.error ?? reopen.error) ? <FormError>{end.error ?? reopen.error}</FormError> : null}
-      {/* The padding keeps focus rings inside the scroll box, which clips everything past its edge. */}
-      <nav aria-label="Trip" className="-m-1 flex gap-1 overflow-x-auto p-1">
+      <Tabs label="Trip">
         {tabs.map((tab) => (
-          <Link
-            key={tab.key}
-            to={tab.to}
-            params={params}
-            aria-current={tab.key === current ? "page" : undefined}
-            className={cn(
-              "inline-flex h-9 items-center rounded-lg px-3 text-sm whitespace-nowrap transition-colors duration-150 pointer-coarse:h-11",
-              tab.key === current
-                ? "bg-surface text-ink shadow-[0_0_0_1px_var(--color-line)]"
-                : "text-muted hover:text-ink",
-            )}
-          >
+          <Tab key={tab.key} to={tab.to} params={params} current={tab.key === current}>
             {tab.label}
-          </Link>
+          </Tab>
         ))}
-      </nav>
+      </Tabs>
       {deleting ? (
         <DeleteTripDialog trip={trip} group={group} onClose={() => setDeleting(false)} />
       ) : null}

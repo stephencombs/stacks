@@ -15,6 +15,22 @@ export function Surface({ className, ...props }: ComponentProps<"section">) {
   );
 }
 
+/** A page's title, with an optional amber line above it saying where the page sits. */
+export function PageTitle({ eyebrow, children }: { eyebrow?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      {eyebrow ? (
+        <p className="text-[11px] font-semibold tracking-[0.18em] text-accent-text uppercase">
+          {eyebrow}
+        </p>
+      ) : null}
+      <h1 className="font-display text-[2.75rem] leading-[0.95] tracking-tight uppercase">
+        {children}
+      </h1>
+    </div>
+  );
+}
+
 export function SectionHeading({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex min-h-9 items-center justify-between gap-3">

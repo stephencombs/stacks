@@ -13,11 +13,13 @@ function SessionRow({ summary, detail }: { summary: SessionSummary; detail: Grou
     <Link
       to="/sessions/$sessionId"
       params={{ sessionId: session.id }}
-      className="flex items-center gap-4 px-5 py-3.5 transition-colors duration-150 first:rounded-t-2xl last:rounded-b-2xl hover:bg-sunken"
+      className="flex items-center gap-4 px-5 py-3.5 transition-colors duration-150 first:rounded-t-xl last:rounded-b-xl hover:bg-sunken"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <span className="truncate font-medium">{venue.name}</span>
+          <span className="truncate font-display text-lg tracking-wide uppercase">
+            {venue.name}
+          </span>
           {session.status === "live" ? <Tag tone="live">Live</Tag> : null}
         </div>
         <span className="text-sm text-muted">
@@ -31,7 +33,7 @@ function SessionRow({ summary, detail }: { summary: SessionSummary; detail: Grou
             amount={mine.net}
             currency={detail.group.currency}
             tone="result"
-            className="font-medium"
+            className="font-bold"
           />
         ) : (
           <span className="text-muted">Sat out</span>

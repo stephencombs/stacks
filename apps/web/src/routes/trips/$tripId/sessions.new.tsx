@@ -15,11 +15,13 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "~/components/ui/Button";
 import { FormError, Input } from "~/components/ui/Field";
-import { SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
+import { PageTitle, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
 import { cn } from "~/components/ui/cn";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
+import { Chip } from "~/features/Chip";
 import { VenuePicker } from "~/features/VenuePicker";
 import { gameNames } from "@stacks/client-runtime/format";
+import { chipOf } from "@stacks/client-runtime/trip";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/trips/$tripId/sessions/new")({ component: NewSession });
@@ -100,12 +102,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-8 pt-4">
-      <div className="flex flex-col gap-1">
-        <p className="text-sm text-muted">
-          {detail.group.name} · {trip.trip.name}
-        </p>
-        <h1 className="font-display text-4xl font-medium">Start a session</h1>
-      </div>
+      <PageTitle eyebrow={`${detail.group.name} · ${trip.trip.name}`}>Start a session</PageTitle>
 
       <section className="flex flex-col gap-2">
         <SectionHeading>Where</SectionHeading>
@@ -115,7 +112,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
       </section>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-xs font-semibold tracking-[0.08em] text-muted uppercase">
+        <legend className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
           Game
         </legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -123,9 +120,9 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
             <label
               key={option}
               className={cn(
-                "flex h-11 cursor-pointer items-center justify-center rounded-lg outline-offset-2 outline-ink has-[:focus-visible]:outline-2 px-2 text-center text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
+                "flex h-11 cursor-pointer items-center justify-center rounded-lg outline-offset-2 outline-accent-text has-[:focus-visible]:outline-2 px-2 text-center text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
                 game === option
-                  ? "bg-accent text-accent-ink shadow-none"
+                  ? "bg-accent font-semibold text-accent-ink shadow-none"
                   : "bg-surface hover:bg-sunken",
               )}
             >
@@ -144,7 +141,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
 
       <fieldset className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <legend className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">
+          <legend className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
             Who's playing
           </legend>
           <Button size="sm" variant="ghost" onClick={() => setAddingGuest(true)}>
@@ -164,6 +161,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
                 onChange={() => toggle(player.id)}
                 className="size-5 accent-[var(--color-accent)]"
               />
+              <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
               <span>
                 {player.displayName}
                 {player.id === detail.myPlayerId ? (
@@ -215,7 +213,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
         variant="primary"
         size="lg"
         disabled={create.pending}
-        className="self-start"
+        className="w-full sm:w-auto sm:self-start"
       >
         {create.pending ? "Starting…" : "Start session"}
       </Button>

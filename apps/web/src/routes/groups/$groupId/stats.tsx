@@ -92,7 +92,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
           <div
             role="group"
             aria-label="Chart"
-            className="flex gap-1 self-start rounded-xl bg-sunken p-1"
+            className="flex gap-1 self-start rounded-lg bg-sunken p-1"
           >
             {charts.map((option) => (
               <button
@@ -101,10 +101,8 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                 aria-pressed={chart === option.key}
                 onClick={() => setChart(option.key)}
                 className={cn(
-                  "inline-flex h-8 items-center rounded-lg px-3 text-sm whitespace-nowrap transition-colors duration-150 pointer-coarse:h-10",
-                  chart === option.key
-                    ? "bg-surface text-ink shadow-[0_0_0_1px_var(--color-line)]"
-                    : "text-muted hover:text-ink",
+                  "inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold tracking-[0.12em] whitespace-nowrap uppercase transition-colors duration-150 pointer-coarse:h-10",
+                  chart === option.key ? "bg-accent text-accent-ink" : "text-muted hover:text-ink",
                 )}
               >
                 {option.label}
@@ -137,8 +135,8 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
           {stats.byGame.map((row) => (
             <tr key={row.key}>
               <td className="px-5 py-3">{gameNames[row.key]}</td>
-              <td className="px-5 py-3 text-right text-muted tabular-nums">{row.sessionCount}</td>
-              <td className="px-5 py-3 text-right font-medium">{net(row.results)}</td>
+              <td className="px-5 py-3 text-right font-mono text-muted">{row.sessionCount}</td>
+              <td className="px-5 py-3 text-right font-bold">{net(row.results)}</td>
             </tr>
           ))}
         </Table>
@@ -150,8 +148,8 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
           {stats.byVenue.map((row) => (
             <tr key={row.key.id}>
               <td className="px-5 py-3">{row.key.name}</td>
-              <td className="px-5 py-3 text-right text-muted tabular-nums">{row.sessionCount}</td>
-              <td className="px-5 py-3 text-right font-medium">{net(row.results)}</td>
+              <td className="px-5 py-3 text-right font-mono text-muted">{row.sessionCount}</td>
+              <td className="px-5 py-3 text-right font-bold">{net(row.results)}</td>
             </tr>
           ))}
         </Table>
@@ -165,7 +163,7 @@ function Table({ head, children }: { head: ReadonlyArray<string>; children: Reac
     <Surface className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-line text-left text-xs text-muted">
+          <tr className="border-b border-line text-left text-[11px] tracking-[0.16em] text-muted uppercase">
             {head.map((label, index) => (
               <th
                 key={label}

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { Button } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
-import { Skeleton, Surface } from "~/components/ui/Surface";
+import { PageTitle, Skeleton, Surface } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/claim/$code")({ component: Claim });
@@ -21,10 +21,7 @@ function Claim() {
       <Loaded query={stacks.claimPreview(code)} skeleton={<Skeleton className="h-64" />}>
         {(preview) => (
           <Surface className="flex flex-col gap-5 p-6">
-            <div className="flex flex-col gap-1">
-              <p className="text-sm text-muted">{preview.groupName}</p>
-              <h1 className="font-display text-4xl font-medium">Are you {preview.displayName}?</h1>
-            </div>
+            <PageTitle eyebrow={preview.groupName}>Are you {preview.displayName}?</PageTitle>
             <p className="max-w-[52ch] text-muted">
               {preview.displayName} has been playing in {preview.groupName} as a guest. Claim it to
               join the group and make their sessions, results and balance yours.

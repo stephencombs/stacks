@@ -1,8 +1,8 @@
-import { Link } from "@tanstack/react-router";
 import type { GroupDetail } from "@stacks/contracts";
 import type { ReactNode } from "react";
 
-import { cn } from "~/components/ui/cn";
+import { Tab, Tabs } from "~/components/ui/Nav";
+import { PageTitle } from "~/components/ui/Surface";
 
 const tabs = [
   { key: "home", label: "Trips", to: "/groups/$groupId" },
@@ -20,30 +20,27 @@ export function GroupHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 pt-4">
+    <div className="flex flex-col gap-5 pt-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-display text-4xl font-medium">{detail.group.name}</h1>
+        <PageTitle
+          eyebrow={`${detail.players.length} ${detail.players.length === 1 ? "player" : "players"} · ${detail.group.currency}`}
+        >
+          {detail.group.name}
+        </PageTitle>
         {action}
       </div>
-      {/* The padding keeps focus rings inside the scroll box, which clips everything past its edge. */}
-      <nav aria-label="Group" className="-m-1 flex gap-1 overflow-x-auto p-1">
+      <Tabs label="Group">
         {tabs.map((tab) => (
-          <Link
+          <Tab
             key={tab.key}
             to={tab.to}
             params={{ groupId: detail.group.id }}
-            aria-current={tab.key === current ? "page" : undefined}
-            className={cn(
-              "inline-flex h-9 items-center rounded-lg pointer-coarse:h-11 px-3 text-sm whitespace-nowrap transition-colors duration-150",
-              tab.key === current
-                ? "bg-surface text-ink shadow-[0_0_0_1px_var(--color-line)]"
-                : "text-muted hover:text-ink",
-            )}
+            current={tab.key === current}
           >
             {tab.label}
-          </Link>
+          </Tab>
         ))}
-      </nav>
+      </Tabs>
     </div>
   );
 }

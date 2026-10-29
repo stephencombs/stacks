@@ -9,6 +9,7 @@ import {
   type Player,
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
+import { chipOf } from "@stacks/client-runtime/trip";
 import { UserPlus } from "lucide-react";
 import { useState } from "react";
 
@@ -19,6 +20,7 @@ import { FormError } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { SectionHeading, Skeleton, Surface, Tag } from "~/components/ui/Surface";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
+import { Chip } from "~/features/Chip";
 import { GroupHeader } from "~/features/GroupHeader";
 import { formatDay } from "@stacks/client-runtime/format";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
@@ -93,6 +95,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
         <Surface className="divide-y divide-line">
           {members.map((player) => (
             <div key={player.id} className="flex items-center gap-3 px-5 py-3">
+              <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
               <span className="min-w-0 flex-1 truncate">
                 {player.displayName}
                 {player.id === detail.myPlayerId ? (
@@ -127,6 +130,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
           <Surface className="divide-y divide-line">
             {guests.map((player) => (
               <div key={player.id} className="flex items-center gap-3 px-5 py-3">
+                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
                 <span className="min-w-0 flex-1 truncate">{player.displayName}</span>
                 {player.claimCode ? (
                   <CopyButton

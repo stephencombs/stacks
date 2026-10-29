@@ -158,7 +158,7 @@ export function VenuePicker({
           />
         ) : recent.length > 0 ? (
           <>
-            <p className="px-3 pb-1 text-xs font-semibold tracking-[0.08em] text-muted uppercase">
+            <p className="px-3 pb-1 text-xs font-semibold tracking-[0.16em] text-muted uppercase">
               Recent
             </p>
             {recent.map((venue) => (

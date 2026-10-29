@@ -10,6 +10,7 @@ import {
   type Transfer,
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
+import { chipOf } from "@stacks/client-runtime/trip";
 import { applyPayments } from "@stacks/shared/balances";
 import { formatMoney, parseMoney } from "@stacks/shared/money";
 import { settleUp } from "@stacks/shared/settleUp";
@@ -24,6 +25,7 @@ import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
 import { BackingSection } from "~/features/Backing";
+import { Chip } from "~/features/Chip";
 import { VoidEntryDialog } from "~/features/EntryDialogs";
 import { TripHeader } from "~/features/TripHeader";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
@@ -108,8 +110,9 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
         <SectionHeading>Balances</SectionHeading>
         <Surface className="divide-y divide-line">
           {detail.players.map((player) => (
-            <div key={player.id} className="flex items-center justify-between gap-4 px-5 py-3">
-              <span className="truncate">
+            <div key={player.id} className="flex items-center gap-3 px-5 py-3">
+              <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
+              <span className="min-w-0 flex-1 truncate">
                 {names.get(player.id)}
                 {player.id === detail.myPlayerId ? (
                   <span className="text-muted"> (you)</span>
@@ -144,9 +147,9 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
                   className="flex items-center gap-3 px-5 py-3.5"
                 >
                   <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="font-medium">{names.get(transfer.from)}</span>
-                    <ArrowRight className="size-4 text-muted" role="img" aria-label="pays" />
-                    <span className="font-medium">{names.get(transfer.to)}</span>
+                    <Payer detail={detail} playerId={transfer.from} />
+                    <ArrowRight className="size-4 text-accent-text" role="img" aria-label="pays" />
+                    <Payer detail={detail} playerId={transfer.to} />
                   </span>
                   <Money
                     amount={transfer.amount}
@@ -187,7 +190,7 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
               const voided = entry.voidedAt !== null;
               return (
                 <div key={entry.id} className="flex items-center gap-4 px-5 py-3">
-                  <span className="w-24 shrink-0 text-sm text-muted">
+                  <span className="w-24 shrink-0 font-mono text-xs text-muted">
                     {formatDay(entry.occurredAt)}
                   </span>
                   <span className={voided ? "flex-1 text-muted line-through" : "flex-1"}>
@@ -231,6 +234,16 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
       ) : null}
       <VoidEntryDialog entry={voiding} onClose={() => setVoiding(null)} />
     </>
+  );
+}
+
+function Payer({ detail, playerId }: { detail: GroupDetail; playerId: PlayerId }) {
+  const name = detail.players.find((player) => player.id === playerId)?.displayName ?? "Someone";
+  return (
+    <span className="flex items-center gap-1.5">
+      <Chip chip={chipOf(detail, playerId)} name={name} size={22} />
+      <span className="font-display text-lg leading-tight tracking-wide uppercase">{name}</span>
+    </span>
   );
 }
 

@@ -74,7 +74,7 @@ export function SessionBars({
         ) : (
           <span className="font-mono text-2xl font-bold tabular-nums">
             {rate.percent}
-            <span className="font-sans text-base text-muted"> winning sessions</span>
+            <span className="font-sans text-base font-normal text-muted"> winning sessions</span>
           </span>
         )}
       </figcaption>

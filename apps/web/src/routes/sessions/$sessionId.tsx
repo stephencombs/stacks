@@ -1,14 +1,16 @@
 import { useAuth } from "@clerk/react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
+  MinorUnits,
   SessionId,
+  type CurrencyCode,
   type Entry,
   type GroupDetail,
   type PlayerId,
   type SessionDetail,
 } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
-import { ChevronLeft, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
@@ -16,10 +18,13 @@ import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FormError, Select } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
-import { SectionHeading, Skeleton, Surface, Tag } from "~/components/ui/Surface";
+import { BackLink } from "~/components/ui/Nav";
+import { PageTitle, SectionHeading, Skeleton, Surface, Tag } from "~/components/ui/Surface";
+import { Chip } from "~/features/Chip";
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
+import { chipOf } from "@stacks/client-runtime/trip";
 import { formatMoney } from "@stacks/shared/money";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
@@ -66,27 +71,24 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
 
   return (
     <>
-      <div className="flex flex-col gap-3 pt-4">
-        <Link
-          to="/trips/$tripId"
-          params={{ tripId: session.tripId }}
-          className="-ml-1 inline-flex items-center gap-1 self-start text-sm text-muted hover:text-ink"
-        >
-          <ChevronLeft className="size-4" aria-hidden />
+      <div className="flex flex-col gap-4 pt-2">
+        <BackLink to="/trips/$tripId" params={{ tripId: session.tripId }}>
           {group.trips.find((trip) => trip.id === session.tripId)?.name ?? group.group.name}
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-4xl font-medium">{venue.name}</h1>
-          {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
+        </BackLink>
+        <div className="flex flex-col gap-2">
+          <PageTitle eyebrow={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
+            {venue.name}
+          </PageTitle>
+          <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
+            {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
+            {formatTime(session.startedAt)}
+            {/* Imported sessions end when they start: no length was recorded. */}
+            {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
+              ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
+              : ""}
+          </p>
         </div>
-        <p className="text-muted">
-          {gameNames[session.game]} · {formatDay(session.startedAt)} ·{" "}
-          {formatTime(session.startedAt)}
-          {/* Imported sessions end when they start: no length was recorded. */}
-          {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
-            ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
-            : ""}
-        </p>
+        <TicketStub detail={detail} currency={currency} />
         {session.notes ? (
           <p className="max-w-[65ch] text-sm text-pretty whitespace-pre-line">{session.notes}</p>
         ) : null}
@@ -113,9 +115,12 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
                 key={playerId}
                 className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:gap-4"
               >
-                <div className="flex min-w-0 flex-1 items-center gap-4">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <Chip chip={chipOf(group, playerId)} name={names.get(playerId) ?? ""} size={30} />
                   <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium">{names.get(playerId)}</span>
+                    <span className="truncate font-display text-lg leading-tight tracking-wide uppercase">
+                      {names.get(playerId)}
+                    </span>
                     <span className="text-sm whitespace-nowrap text-muted tabular-nums">
                       {result && result.buyIn === 0 && result.cashOut === 0 ? (
                         "Net result only"
@@ -236,6 +241,42 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
   );
 }
 
+/** The table at a glance, like the stub of a betting ticket: who sat down, what went in and out. */
+function TicketStub({ detail, currency }: { detail: SessionDetail; currency: CurrencyCode }) {
+  const total = (pick: (result: SessionDetail["results"][number]) => number) =>
+    MinorUnits.make(detail.results.reduce((sum, result) => sum + pick(result), 0));
+  const buyIn = total((r) => r.buyIn);
+  const cashOut = total((r) => r.cashOut);
+  const players = { label: "Players", value: <>{detail.playerIds.length}</> };
+  // Imported sessions only have each player's net, so there's no money in or out to show.
+  const cells =
+    buyIn === 0 && cashOut === 0
+      ? [
+          players,
+          {
+            label: "Table net",
+            value: <Money amount={total((r) => r.net)} currency={currency} tone="result" />,
+          },
+        ]
+      : [
+          players,
+          { label: "In", value: <Money amount={buyIn} currency={currency} /> },
+          { label: "Out", value: <Money amount={cashOut} currency={currency} /> },
+        ];
+  return (
+    <dl className="grid auto-cols-fr grid-flow-col divide-x divide-dashed divide-line-strong rounded-xl border border-dashed border-line-strong">
+      {cells.map((cell) => (
+        <div key={cell.label} className="flex min-w-0 flex-col gap-0.5 px-3 py-2.5">
+          <dt className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+            {cell.label}
+          </dt>
+          <dd className="truncate font-mono text-base font-bold">{cell.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 const verbs = {
   buy_in: "bought in",
   cash_out: "cashed out",
@@ -258,7 +299,7 @@ function EntryRow({
   const counterparty = entry.counterpartyId ? names.get(entry.counterpartyId) : null;
   return (
     <div className="flex items-center gap-4 px-5 py-3">
-      <span className="w-16 shrink-0 text-sm text-muted tabular-nums">
+      <span className="w-16 shrink-0 font-mono text-xs text-muted">
         {formatTime(entry.occurredAt)}
       </span>
       <div
@@ -306,7 +347,12 @@ function SessionStatusActions({
   const reopen = useAction(stacks.Client.mutation("sessions", "reopen"));
   if (detail.session.status === "live") {
     return (
-      <Button variant="primary" size="lg" className="self-start" onClick={onClose}>
+      <Button
+        variant="primary"
+        size="lg"
+        className="w-full sm:w-auto sm:self-start"
+        onClick={onClose}
+      >
         Close session
       </Button>
     );

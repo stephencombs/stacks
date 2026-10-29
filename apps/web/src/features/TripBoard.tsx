@@ -69,7 +69,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   );
 
   return (
-    <div className="-mx-4 flex flex-col overflow-hidden bg-board text-board-ink sm:mx-0 sm:rounded-3xl">
+    <div className="-mx-4 flex flex-col overflow-hidden border-y border-board-rule bg-board text-board-ink sm:mx-0 sm:rounded-2xl sm:border">
       {ticker.length > 0 ? (
         <div className="overflow-hidden border-b border-board-rule bg-board-deep py-2">
           <div
@@ -91,7 +91,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
             <p className={cn(label, "text-board-amber")}>
               {trip.trip.endedAt === null ? "On the board" : "Final board"}
             </p>
-            <p className="truncate text-3xl font-black tracking-tight uppercase">
+            <p className="truncate font-display text-4xl leading-none tracking-tight uppercase">
               {tonight ? nightLabel(tonight) : "Before the first hand"}
             </p>
           </div>
@@ -114,7 +114,9 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                 >
                   <span className="size-2 animate-pulse rounded-full bg-board-loss motion-reduce:animate-none" />
                   <span className={cn(label, "text-board-loss")}>Live</span>
-                  <span className="flex-1 truncate font-semibold uppercase">{s.venue.name}</span>
+                  <span className="flex-1 truncate font-display text-lg tracking-wide uppercase">
+                    {s.venue.name}
+                  </span>
                   <span className="font-mono text-xs text-board-muted">
                     {s.results.length || "—"} in
                   </span>
@@ -168,7 +170,9 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                   <Chip chip={chipOf(detail, s.playerId)} name={name(s.playerId)} size={30} />
                   <span className="flex min-w-0 flex-col">
                     <span className="flex items-center gap-2">
-                      <span className="truncate font-bold uppercase">{name(s.playerId)}</span>
+                      <span className="truncate font-display text-lg leading-tight tracking-wide uppercase">
+                        {name(s.playerId)}
+                      </span>
                       {s.hot ? (
                         <span className="rounded-sm bg-board-amber px-1 font-mono text-[10px] font-bold text-board-amber-ink">
                           HOT
@@ -205,7 +209,9 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                       name={name(award.playerId)}
                       size={22}
                     />
-                    <span className="truncate font-bold uppercase">{name(award.playerId)}</span>
+                    <span className="truncate font-display text-lg leading-tight tracking-wide uppercase">
+                      {name(award.playerId)}
+                    </span>
                   </span>
                   <span className="text-xs text-pretty text-board-muted">
                     {awardLine(award, currency)}
