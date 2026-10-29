@@ -240,19 +240,12 @@ function TableTab({
   const [kept, setKept] = useState(mine?.session.id ?? null);
   if (mine && mine.session.id !== kept) setKept(mine.session.id);
   const shown = trip.sessions.find((s) => s.session.id === kept);
-  if (mine)
-    return (
-      <View className="gap-6 px-4">
-        <Loaded query={stacks.session(mine.session.id)} skeleton={<Skeleton className="h-96" />}>
-          {(session) => <SessionView detail={session} group={group} />}
-        </Loaded>
-      </View>
-    );
   const live = trip.sessions.filter((s) => s.session.status === "live");
   const closed = trip.sessions.filter((s) => s.session.status === "closed").toReversed();
+  // One tree either way, so the table you're at stays mounted as it closes and shows its receipt.
   return (
     <View className="gap-6 px-4">
-      {trip.trip.endedAt === null ? (
+      {mine ? null : trip.trip.endedAt === null ? (
         <Button
           label="Start a session"
           variant="primary"
@@ -267,13 +260,13 @@ function TableTab({
           {(session) => <SessionView detail={session} group={group} />}
         </Loaded>
       ) : null}
-      {live.length > 0 ? (
+      {!mine && live.length > 0 ? (
         <View className="gap-2">
           <SectionHeading>Live now</SectionHeading>
           <SessionList sessions={live} detail={group} />
         </View>
       ) : null}
-      {closed.length > 0 ? (
+      {!mine && closed.length > 0 ? (
         <View className="gap-2">
           <SectionHeading>Sessions</SectionHeading>
           <SessionList sessions={closed} detail={group} />

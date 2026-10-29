@@ -31,6 +31,10 @@
     "./stats": {
       "types": "./src/stats.ts",
       "import": "./src/stats.ts"
+    },
+    "./table": {
+      "types": "./src/table.ts",
+      "import": "./src/table.ts"
     }
   },
   "scripts": {

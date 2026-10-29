@@ -3,7 +3,7 @@ import { VenueId, type GroupId, type Venue } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Location from "expo-location";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
@@ -116,6 +116,23 @@ export function VenuePicker({
     setNear({ lat: position.coords.latitude, lng: position.coords.longitude });
     setLocating("idle");
   };
+
+  // Someone who has already let Stacks see where they are gets nearby venues first, unasked.
+  useEffect(() => {
+    if (selected) return;
+    let current = true;
+    void Location.getForegroundPermissionsAsync().then(async (permission) => {
+      if (!permission.granted) return;
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      }).catch(() => null);
+      if (current && position)
+        setNear({ lat: position.coords.latitude, lng: position.coords.longitude });
+    });
+    return () => {
+      current = false;
+    };
+  }, [selected]);
 
   const searching = q !== "" || near !== null;
   return (

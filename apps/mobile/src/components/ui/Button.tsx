@@ -4,17 +4,19 @@ import { ActivityIndicator, Platform, Pressable, Text } from "react-native";
 
 import { cn } from "./cn";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg" | "xl";
 
 const surfaces: Record<Variant, string> = {
   primary: "bg-accent active:opacity-85",
+  tint: "bg-accent/15 active:bg-accent/25",
   secondary: "bg-surface border border-line-strong active:bg-sunken",
   ghost: "active:bg-sunken",
   danger: "bg-surface border border-line-strong active:bg-sunken",
 };
 const labels: Record<Variant, string> = {
   primary: "text-accent-ink",
+  tint: "text-accent-text",
   secondary: "text-ink",
   ghost: "text-ink",
   danger: "text-danger",

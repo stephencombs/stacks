@@ -85,23 +85,26 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("button", { name: "Start session" }).click();
     await expect(alex.getByText("Live", { exact: true })).toBeVisible();
 
+    // Picking a player opens one dialog for anything that happened to them.
     const record = async (
-      action: "Buy in" | "Cash out",
+      kind: "Buy in" | "Cash out",
       player: string,
       amount: string,
       counterparty?: string,
     ) => {
-      await alex.getByRole("button", { name: `${action} for ${player}` }).click();
-      await alex.getByLabel("Amount").fill(amount);
+      await alex.getByRole("button", { name: new RegExp(`^${player}, `) }).click();
+      const dialog = alex.getByRole("dialog");
+      await dialog.getByText(kind, { exact: true }).click();
+      await dialog.getByLabel("Amount").fill(amount);
       if (counterparty) {
-        await alex
-          .getByLabel(action === "Buy in" ? "Whose money" : "Who has the cash")
+        await dialog
+          .getByLabel(kind === "Buy in" ? "Whose money" : "Who has the cash")
           .selectOption({ label: counterparty });
       }
-      await alex
-        .getByRole("button", { name: action === "Buy in" ? "Record buy in" : "Record cash out" })
+      await dialog
+        .getByRole("button", { name: kind === "Buy in" ? "Record buy in" : "Record cash out" })
         .click();
-      await expect(alex.getByRole("dialog")).toBeHidden();
+      await expect(dialog).toBeHidden();
     };
 
     // Bea covers $50 of Alex's chips; Alex holds Gus's winnings.
@@ -116,17 +119,27 @@ test.describe.serial("a group's first night out", () => {
     await expect(sending).toBeVisible();
     await alex.context().setOffline(false);
     await expect(sending).toHaveCount(0);
+    // One press repeats a player's last buy-in, and the same spot undoes it.
+    const gus = alex.getByRole("button", { name: /^Gus, / });
+    await alex.getByRole("button", { name: "Rebuy for Gus", exact: true }).click();
+    await expect(gus).toContainText("In $200");
+    await alex.getByRole("button", { name: "Undo rebuy for Gus" }).click();
+    await expect(alex.getByText("Voided: Undone")).toBeVisible();
+    await expect(gus).toContainText("In $100");
 
     await alex.getByRole("button", { name: "Close session" }).click();
     await alex.getByRole("dialog").getByRole("button", { name: "Close session" }).click();
     await expect(
-      alex.getByText("Everyone who bought in needs a cash-out first.", { exact: false }),
+      alex.getByText("Enter what each of them cashed out, 0 if they busted."),
     ).toBeVisible();
     await alex.getByRole("button", { name: "Keep playing" }).click();
 
     await record("Cash out", "Alex", "320");
-    await record("Cash out", "Bea", "0");
+    // Bea busted: one press, no amount to type.
+    await alex.getByRole("button", { name: /^Bea, / }).click();
+    await alex.getByRole("button", { name: "Bust · $0" }).click();
     await record("Cash out", "Gus", "120", "Alex");
+    await expect(gus).toContainText("+$20");
     await shoot(alex, "session-live");
 
     // Away from the table, the live bar keeps it one tap away.
@@ -137,12 +150,14 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("link", { name: /^Live/ }).click();
     await expect(alex.getByRole("button", { name: "Close session" })).toBeVisible();
 
+    // Moving tables closes this one and opens the next with the same place, game and players.
     await alex.getByRole("button", { name: "Close session" }).click();
-    await alex.getByRole("dialog").getByRole("button", { name: "Close session" }).click();
-    // The closed table stays on screen with everyone's result, next to the way to the next one.
-    await expect(alex.getByText("Closed", { exact: true })).toBeVisible();
+    await alex.getByRole("dialog").getByRole("button", { name: "Close and move tables" }).click();
+    await expect(alex.getByRole("heading", { name: "Start a session" })).toBeVisible();
+    await expect(alex.getByRole("radio", { name: "Craps" })).toBeChecked();
+    await expect(alex.getByRole("checkbox", { name: /Gus/ })).toBeChecked();
+    await alex.goBack();
     await expect(alex.getByText("+$170").first()).toBeVisible();
-    await expect(alex.getByText("-$200").first()).toBeVisible();
     await expect(alex.getByRole("link", { name: "Start a session" }).first()).toBeVisible();
 
     // The trip's board ranks the night.

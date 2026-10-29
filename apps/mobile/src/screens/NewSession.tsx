@@ -6,6 +6,7 @@ import {
   type GroupDetail,
   type TripDetail,
   type PlayerId,
+  type SessionDetail,
   type Venue,
 } from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
@@ -26,7 +27,11 @@ import { VenuePicker } from "../features/VenuePicker";
 import { Chip } from "../features/Chip";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
-type Props = StaticScreenProps<{ tripId: string }>;
+type Props = StaticScreenProps<{
+  tripId: string;
+  /** The session just left when moving tables: the new one starts with its place and players. */
+  from?: string;
+}>;
 
 export function NewSessionScreen({ route }: Props) {
   const stacks = useStacks();
@@ -38,7 +43,18 @@ export function NewSessionScreen({ route }: Props) {
       >
         {(trip) => (
           <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
-            {(detail) => <NewSessionForm detail={detail} trip={trip} />}
+            {(detail) =>
+              route.params.from ? (
+                <Loaded
+                  query={stacks.session(SessionId.make(route.params.from))}
+                  skeleton={<Skeleton className="h-96" />}
+                >
+                  {(from) => <NewSessionForm detail={detail} trip={trip} from={from} />}
+                </Loaded>
+              ) : (
+                <NewSessionForm detail={detail} trip={trip} />
+              )
+            }
           </Loaded>
         )}
       </Loaded>
@@ -58,15 +74,23 @@ const STARTS = [
   { value: "120", label: "2 hr ago" },
 ] as const;
 
-function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+function NewSessionForm({
+  detail,
+  trip,
+  from,
+}: {
+  detail: GroupDetail;
+  trip: TripDetail;
+  from?: SessionDetail;
+}) {
   const stacks = useStacks();
   const navigation = useNavigation();
   const create = useAction(stacks.Client.mutation("sessions", "create"));
-  const [venue, setVenue] = useState<Venue | null>(null);
-  const [game, setGame] = useState<Game>("blackjack");
+  const [venue, setVenue] = useState<Venue | null>(from?.venue ?? null);
+  const [game, setGame] = useState<Game>(from?.session.game ?? "blackjack");
   const [startedAgo, setStartedAgo] = useState<(typeof STARTS)[number]["value"]>("0");
   const [playerIds, setPlayerIds] = useState<ReadonlySet<PlayerId>>(
-    () => new Set([detail.myPlayerId]),
+    () => new Set(from?.playerIds ?? [detail.myPlayerId]),
   );
   const [addingGuest, setAddingGuest] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);

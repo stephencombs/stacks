@@ -9,6 +9,7 @@
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --animate-rack: rack 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
 
   --color-canvas: oklch(0.15 0.01 260);
   --color-surface: oklch(0.19 0.01 260);
@@ -89,6 +90,14 @@
   h2,
   h3 {
     text-wrap: balance;
+  }
+}
+
+/* A result landing flips into place like a chip stack being racked. */
+@keyframes rack {
+  from {
+    opacity: 0;
+    transform: perspective(400px) rotateX(-90deg);
   }
 }
 

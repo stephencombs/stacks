@@ -3,7 +3,7 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "./cn";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const base =
@@ -14,6 +14,7 @@ const base =
 const variants: Record<Variant, string> = {
   primary:
     "bg-accent text-accent-ink shadow-[inset_0_-2px_0_rgb(0_0_0/0.18)] hover:bg-[color-mix(in_oklch,var(--color-accent)_88%,white)]",
+  tint: "bg-accent/15 text-accent-text hover:bg-accent/25",
   secondary:
     "bg-surface text-ink shadow-[inset_0_0_0_1px_var(--color-line-strong)] hover:bg-sunken",
   ghost: "text-ink hover:bg-sunken",

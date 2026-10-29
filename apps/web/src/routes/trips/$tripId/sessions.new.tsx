@@ -6,6 +6,7 @@ import {
   type GroupDetail,
   type TripDetail,
   type PlayerId,
+  type SessionDetail,
   type Venue,
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
@@ -24,10 +25,16 @@ import { gameNames } from "@stacks/client-runtime/format";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
-export const Route = createFileRoute("/trips/$tripId/sessions/new")({ component: NewSession });
+export const Route = createFileRoute("/trips/$tripId/sessions/new")({
+  component: NewSession,
+  // The session just left when moving tables: the new one starts with its place and players.
+  validateSearch: (search): { from?: string } =>
+    typeof search.from === "string" ? { from: search.from } : {},
+});
 
 function NewSession() {
   const { tripId } = Route.useParams();
+  const { from } = Route.useSearch();
   const stacks = useStacks();
   return (
     <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="mt-4 h-96" />}>
@@ -36,7 +43,18 @@ function NewSession() {
           query={stacks.group(trip.trip.groupId)}
           skeleton={<Skeleton className="mt-4 h-96" />}
         >
-          {(detail) => <NewSessionForm detail={detail} trip={trip} />}
+          {(detail) =>
+            from ? (
+              <Loaded
+                query={stacks.session(SessionId.make(from))}
+                skeleton={<Skeleton className="mt-4 h-96" />}
+              >
+                {(session) => <NewSessionForm detail={detail} trip={trip} from={session} />}
+              </Loaded>
+            ) : (
+              <NewSessionForm detail={detail} trip={trip} />
+            )
+          }
         </Loaded>
       )}
     </Loaded>
@@ -49,14 +67,22 @@ const GAMES = Object.keys(gameNames) as ReadonlyArray<Game>;
 const localInputValue = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
-function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+function NewSessionForm({
+  detail,
+  trip,
+  from,
+}: {
+  detail: GroupDetail;
+  trip: TripDetail;
+  from?: SessionDetail;
+}) {
   const stacks = useStacks();
   const navigate = useNavigate();
   const create = useAction(stacks.Client.mutation("sessions", "create"));
-  const [venue, setVenue] = useState<Venue | null>(null);
-  const [game, setGame] = useState<Game>("blackjack");
+  const [venue, setVenue] = useState<Venue | null>(from?.venue ?? null);
+  const [game, setGame] = useState<Game>(from?.session.game ?? "blackjack");
   const [playerIds, setPlayerIds] = useState<ReadonlySet<PlayerId>>(
-    () => new Set([detail.myPlayerId]),
+    () => new Set(from?.playerIds ?? [detail.myPlayerId]),
   );
   // The start-time field opens two hours back, capped at the moment it was opened.
   const [earlier, setEarlier] = useState<{ readonly value: string; readonly max: string } | null>(

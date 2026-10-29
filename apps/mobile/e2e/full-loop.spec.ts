@@ -75,19 +75,26 @@ test.describe.serial("live mode on a phone", () => {
     await alex.getByRole("button", { name: "Start session" }).filter({ visible: true }).click();
     await expect(alex.getByText("Live", { exact: true }).filter({ visible: true })).toBeVisible();
 
+    // Tapping a player opens the keypad; the kind, amount and whose money are all taps.
     const record = async (
-      action: "Buy in" | "Cash out",
+      kind: "Buy in" | "Cash out",
       player: string,
       amount: string,
       counterparty?: string,
     ) => {
-      await alex.getByRole("button", { name: `${action} for ${player}` }).click();
-      await alex.getByLabel("Amount").fill(amount);
-      if (counterparty) await alex.getByRole("radio", { name: counterparty }).click();
-      await alex
-        .getByRole("button", { name: action === "Buy in" ? "Record buy in" : "Record cash out" })
-        .filter({ visible: true })
-        .click();
+      await visible(alex.getByRole("button", { name: new RegExp(`^${player}, `) })).click();
+      await visible(alex.getByRole("radio", { name: kind })).click();
+      for (const key of amount)
+        await visible(alex.getByRole("button", { name: key, exact: true })).click();
+      if (counterparty) {
+        await visible(
+          alex.getByRole("button", { name: /^(Whose money|Who has the cash):/ }),
+        ).click();
+        await visible(alex.getByRole("radio", { name: counterparty })).click();
+      }
+      await visible(
+        alex.getByRole("button", { name: kind === "Buy in" ? "Record buy in" : "Record cash out" }),
+      ).click();
     };
 
     await record("Buy in", "Alex", "100");
@@ -102,27 +109,20 @@ test.describe.serial("live mode on a phone", () => {
     await alex.context().setOffline(false);
     await expect(waiting).toHaveCount(0);
     // One tap repeats Gus's last buy-in.
-    await alex.getByRole("button", { name: "Rebuy for Gus" }).filter({ visible: true }).click();
+    await alex
+      .getByRole("button", { name: "Rebuy for Gus", exact: true })
+      .filter({ visible: true })
+      .click();
     await expect(
       alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),
     ).toBeVisible();
-    // A mistaken rebuy can be undone from the toast.
-    await alex.getByRole("button", { name: "Rebuy for Gus" }).filter({ visible: true }).click();
-    const toast = alex.getByText("Gus rebought for $100").filter({ visible: true });
-    await expect(toast).toBeVisible();
-    // Let the toast finish fading in before the screenshot.
-    await expect
-      .poll(() =>
-        toast.evaluate((node) => {
-          let opacity = 1;
-          for (let el: Element | null = node; el; el = el.parentElement)
-            opacity *= Number(getComputedStyle(el).opacity);
-          return opacity;
-        }),
-      )
-      .toBe(1);
-    await shoot(alex, "rebuy-toast");
-    await alex.getByRole("button", { name: "Undo" }).filter({ visible: true }).click();
+    // A mistaken rebuy is undone from the same spot it was tapped.
+    await alex
+      .getByRole("button", { name: "Rebuy for Gus", exact: true })
+      .filter({ visible: true })
+      .click();
+    await shoot(alex, "rebuy-undo");
+    await visible(alex.getByRole("button", { name: "Undo rebuy for Gus" })).click();
     await expect(alex.getByText("Voided: Undone").filter({ visible: true })).toBeVisible();
     await expect(
       alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),
@@ -136,15 +136,18 @@ test.describe.serial("live mode on a phone", () => {
       .click();
     await expect(
       alex
-        .getByText("Everyone who bought in needs a cash-out first.", { exact: false })
+        .getByText("Enter what each of them cashed out, 0 if they busted.")
         .filter({ visible: true }),
     ).toBeVisible();
     await alex.getByRole("button", { name: "Keep playing" }).filter({ visible: true }).click();
 
     await record("Cash out", "Alex", "320");
-    await record("Cash out", "Bea", "0");
     await record("Cash out", "Gus", "220", "Alex");
+    // Bea busted: one tap, no keypad.
+    await visible(alex.getByRole("button", { name: /^Bea, / })).click();
+    await visible(alex.getByRole("button", { name: "Bust · $0" })).click();
     await expect(alex.getByText("+$170").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("-$200").filter({ visible: true })).toBeVisible();
     await shoot(alex, "session-live");
 
     await alex.getByRole("button", { name: "Close session" }).filter({ visible: true }).click();

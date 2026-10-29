@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/react";
 import {
+  EntryId,
   MinorUnits,
   type CurrencyCode,
   type Entry,
@@ -7,14 +8,18 @@ import {
   type PlayerId,
   type SessionDetail,
 } from "@stacks/contracts";
+import { useNavigate } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
+import * as Option from "effect/Option";
 import { UserPlus } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
-import { FormError, Select } from "~/components/ui/Field";
+import { Field, FormError, Input, Select } from "~/components/ui/Field";
+import { cn } from "~/components/ui/cn";
+import { AddGuestDialog } from "~/features/AddGuestDialog";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { BackLink } from "~/components/ui/Nav";
 import { PageTitle, SectionHeading, Surface, Tag } from "~/components/ui/Surface";
@@ -23,9 +28,20 @@ import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryD
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
 import { chipOf } from "@stacks/client-runtime/trip";
-import { formatMoney } from "@stacks/shared/money";
+import { newId } from "@stacks/client-runtime/ids";
+import { formatMoney, parseMoney } from "@stacks/shared/money";
+import { buyInPresets } from "@stacks/shared/table";
 import { playerResults, type PlayerResult } from "@stacks/shared/results";
 import { useAction, useOutbox, usePending, useStacks } from "~/lib/stacks";
+
+type EntryInput = {
+  readonly kind: EntryDraft["kind"];
+  readonly playerId: PlayerId;
+  readonly counterpartyId: PlayerId | null;
+  readonly amount: MinorUnits;
+  readonly note: string | null;
+  readonly replacesEntryId: EntryId | null;
+};
 
 /**
  * A session: its players, history and what can be done with it. On a trip's Table tab it sits
@@ -50,6 +66,8 @@ export function SessionView({
   const [closing, setClosing] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
   const outbox = useOutbox();
+  const stacks = useStacks();
+  const voidEntry = useAction(stacks.Client.mutation("ledger", "voidEntry"));
   // Entries recorded here count as soon as they're recorded, until the server confirms them,
   // except ones it refused.
   const unsaved = usePending(session.id).filter(
@@ -70,6 +88,55 @@ export function SessionView({
   );
   const canVoid = (entry: Entry) =>
     isAdmin(group) || entry.createdBy === userId || entry.playerId === group.myPlayerId;
+  const lastBuyIn = (playerId: PlayerId) =>
+    counted.findLast(
+      (e) =>
+        e.kind === "buy_in" &&
+        e.playerId === playerId &&
+        e.voidedAt === null &&
+        e.counterpartyId === null,
+    );
+  const record = (input: EntryInput) => {
+    const id = EntryId.make(newId());
+    void outbox.add(session.id, { ...input, id, occurredAt: DateTime.nowUnsafe() });
+    return id;
+  };
+  // A rebuy's button turns into Undo for a few seconds, right where it was pressed.
+  const [rebought, setRebought] = useState<ReadonlyMap<PlayerId, EntryId>>(new Map());
+  const forget = (playerId: PlayerId, id?: EntryId) =>
+    setRebought((all) => {
+      if (id !== undefined && all.get(playerId) !== id) return all;
+      const next = new Map(all);
+      next.delete(playerId);
+      return next;
+    });
+  const rebuy = (playerId: PlayerId, amount: Entry["amount"]) => {
+    const id = record({
+      kind: "buy_in",
+      playerId,
+      counterpartyId: null,
+      amount,
+      note: null,
+      replacesEntryId: null,
+    });
+    setRebought((all) => new Map(all).set(playerId, id));
+    setTimeout(() => forget(playerId, id), UNDO_MS);
+  };
+  const undo = async (id: EntryId) => {
+    // An entry the server never got just leaves the outbox; one it has gets voided.
+    await outbox.flush();
+    if (outbox.pending().some((p) => p.entry.id === id)) return outbox.discard(id);
+    await voidEntry.run({ params: { entryId: id }, payload: { reason: "Undone" } });
+  };
+  // While playing you come first; once closed, the table reads like a receipt, best result first.
+  const seats = detail.playerIds.toSorted((a, b) =>
+    live
+      ? Number(b === group.myPlayerId) - Number(a === group.myPlayerId)
+      : (resultOf.get(b)?.net ?? 0) - (resultOf.get(a)?.net ?? 0),
+  );
+  // Results already in when the page opened just sit there; ones that land here rack up.
+  const [settledAtOpen] = useState(() => (live ? cashedOut : new Set(detail.playerIds)));
+  const [closedAtOpen] = useState(!live);
 
   return (
     <>
@@ -125,68 +192,118 @@ export function SessionView({
           Players
         </SectionHeading>
         <Surface className="divide-y divide-line">
-          {detail.playerIds.map((playerId) => {
+          {seats.map((playerId, rank) => {
             const result = resultOf.get(playerId);
-            return (
-              <div
-                key={playerId}
-                className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:gap-4"
-              >
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <Chip chip={chipOf(group, playerId)} name={names.get(playerId) ?? ""} size={30} />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-display text-lg leading-tight tracking-wide uppercase">
-                      {names.get(playerId)}
-                    </span>
-                    <span className="text-sm whitespace-nowrap text-muted tabular-nums">
-                      {result && result.buyIn === 0 && result.cashOut === 0 ? null : result ? (
-                        <>
-                          In <Money amount={result.buyIn} currency={currency} /> · Out{" "}
-                          <Money amount={result.cashOut} currency={currency} />
-                        </>
-                      ) : (
-                        "No buy-ins yet"
-                      )}
-                    </span>
-                  </div>
-                  <div className="text-right text-lg font-bold whitespace-nowrap">
-                    {/* A closed session's results are final, cash-out or not. */}
-                    {result && (!live || cashedOut.has(playerId)) ? (
-                      <Money amount={result.net} currency={currency} tone="result" />
-                    ) : result ? (
-                      <span className="font-sans text-sm text-muted">Playing</span>
+            const name = names.get(playerId) ?? "Player";
+            const lastRebuy = lastBuyIn(playerId);
+            const undoable = rebought.get(playerId);
+            const out = cashedOut.has(playerId);
+            const bought = result !== undefined && result.buyIn > 0;
+            // A closed session's results are final, cash-out or not.
+            const final = result !== undefined && (!live || out);
+            const status = final
+              ? formatMoney(result.net, currency, { signDisplay: "exceptZero" })
+              : bought
+                ? `in ${formatMoney(result.buyIn, currency)}, playing`
+                : "no buy-in yet";
+            const row = (
+              <>
+                <Chip chip={chipOf(group, playerId)} name={name} size={30} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-display text-lg leading-tight tracking-wide uppercase">
+                    {name}
+                    {playerId === group.myPlayerId ? (
+                      <span className="font-sans text-sm tracking-normal text-muted normal-case">
+                        {" "}
+                        you
+                      </span>
                     ) : null}
-                  </div>
-                </div>
-                {live ? (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      className="flex-1 sm:flex-none"
-                      aria-label={`Buy in for ${names.get(playerId)}`}
-                      onClick={() => setDraft({ kind: "buy_in", playerId })}
-                    >
-                      Buy in
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 sm:flex-none"
-                      aria-label={`Cash out for ${names.get(playerId)}`}
-                      onClick={() => setDraft({ kind: "cash_out", playerId })}
-                    >
-                      Cash out
-                    </Button>
-                    <Menu label={`More for ${names.get(playerId)}`}>
-                      <MenuItem onClick={() => setDraft({ kind: "adjustment", playerId })}>
-                        Adjust result
-                      </MenuItem>
-                    </Menu>
-                  </div>
+                  </span>
+                  <span className="text-sm whitespace-nowrap text-muted tabular-nums">
+                    {result && result.buyIn === 0 && result.cashOut === 0 ? null : result ? (
+                      <>
+                        In <Money amount={result.buyIn} currency={currency} /> · Out{" "}
+                        <Money amount={result.cashOut} currency={currency} />
+                      </>
+                    ) : (
+                      "No buy-ins yet"
+                    )}
+                  </span>
+                </span>
+                {final ? (
+                  <span
+                    key={live ? "live" : "closed"}
+                    className={cn(
+                      "text-right text-lg font-bold whitespace-nowrap",
+                      (live ? !settledAtOpen.has(playerId) : !closedAtOpen) &&
+                        "motion-safe:animate-rack",
+                    )}
+                    style={live ? undefined : { animationDelay: `${rank * 90}ms` }}
+                  >
+                    <Money amount={result.net} currency={currency} tone="result" />
+                  </span>
                 ) : null}
+              </>
+            );
+            return (
+              <div key={playerId} className="flex items-center gap-3 pr-4">
+                {live ? (
+                  <button
+                    type="button"
+                    aria-label={`${name}, ${status}`}
+                    title="Record a buy-in, cash-out or adjustment"
+                    onClick={() =>
+                      setDraft({ kind: bought && !out ? "cash_out" : "buy_in", playerId })
+                    }
+                    className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-5 text-left transition-colors duration-150 hover:bg-sunken"
+                  >
+                    {row}
+                  </button>
+                ) : (
+                  <div className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-5">{row}</div>
+                )}
+                {!live || out ? null : undoable ? (
+                  <Button
+                    size="sm"
+                    className="min-w-20"
+                    aria-label={`Undo rebuy for ${name}`}
+                    onClick={() => {
+                      forget(playerId);
+                      void undo(undoable);
+                    }}
+                  >
+                    Undo
+                  </Button>
+                ) : lastRebuy ? (
+                  <Button
+                    size="sm"
+                    variant="tint"
+                    className="min-w-20 font-mono"
+                    aria-label={`Rebuy for ${name}`}
+                    onClick={() => rebuy(playerId, lastRebuy.amount)}
+                  >
+                    +{formatMoney(lastRebuy.amount, currency)}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="min-w-20"
+                    aria-label={`Buy in for ${name}`}
+                    onClick={() => setDraft({ kind: "buy_in", playerId })}
+                  >
+                    Buy in
+                  </Button>
+                )}
               </div>
             );
           })}
         </Surface>
+        {live ? (
+          <p className="text-sm text-muted">
+            Pick a player to cash them out or record anything else.
+          </p>
+        ) : null}
+        {voidEntry.error ? <FormError>{voidEntry.error}</FormError> : null}
       </section>
 
       <section className="flex flex-col gap-2">
@@ -272,11 +389,21 @@ export function SessionView({
           detail={group}
           sessionId={session.id}
           draft={draft}
+          presets={buyInPresets(counted, draft.playerId)}
           onClose={() => setDraft(null)}
         />
       ) : null}
       <VoidEntryDialog entry={voiding} onClose={() => setVoiding(null)} />
-      <CloseSessionDialog detail={detail} open={closing} onOpenChange={setClosing} />
+      <CloseSessionDialog
+        detail={detail}
+        playing={seats
+          .filter((id) => (resultOf.get(id)?.buyIn ?? 0) > 0 && !cashedOut.has(id))
+          .map((id) => ({ id, name: names.get(id) ?? "Player" }))}
+        currency={currency}
+        record={record}
+        open={closing}
+        onOpenChange={setClosing}
+      />
       <AddPlayerDialog
         detail={detail}
         group={group}
@@ -330,6 +457,8 @@ function TicketStub({
     </dl>
   );
 }
+
+const UNDO_MS = 5000;
 
 const verbs = {
   buy_in: "bought in",
@@ -435,25 +564,60 @@ function SessionStatusActions({
   );
 }
 
+/**
+ * Closes the table, taking the cash-outs of anyone still playing on the way, and can open the
+ * next table with the same people.
+ */
 function CloseSessionDialog({
   detail,
+  playing,
+  currency,
+  record,
   open,
   onOpenChange,
 }: {
   detail: SessionDetail;
+  playing: ReadonlyArray<{ readonly id: PlayerId; readonly name: string }>;
+  currency: CurrencyCode;
+  record: (input: EntryInput) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const stacks = useStacks();
+  const navigate = useNavigate();
   const close = useAction(stacks.Client.mutation("sessions", "close"));
   const outbox = useOutbox();
   const unsent = usePending(detail.session.id).length;
-  const confirm = async () => {
+  const [missing, setMissing] = useState(false);
+  const confirm = async (form: HTMLFormElement, next: boolean) => {
+    const data = new FormData(form);
+    const cashOuts = playing.map((player) => ({
+      player,
+      amount: Option.getOrNull(parseMoney(String(data.get(player.id) ?? ""), currency)),
+    }));
+    if (cashOuts.some(({ amount }) => amount === null || amount < 0)) return setMissing(true);
+    setMissing(false);
+    for (const { player, amount } of cashOuts)
+      record({
+        kind: "cash_out",
+        playerId: player.id,
+        counterpartyId: null,
+        amount: amount!,
+        note: null,
+        replacesEntryId: null,
+      });
     // Closing first would make the server refuse what's still waiting to be sent.
     await outbox.flush();
     if (outbox.pending().some((p) => p.sessionId === detail.session.id)) return;
     const closed = await close.run({ params: { sessionId: detail.session.id }, payload: {} });
-    if (closed) onOpenChange(false);
+    if (!closed) return;
+    onOpenChange(false);
+    if (next)
+      void navigate({
+        to: "/trips/$tripId/sessions/new",
+        params: { tripId: detail.session.tripId },
+        search: { from: detail.session.id },
+      });
   };
   return (
     <Dialog
@@ -462,7 +626,36 @@ function CloseSessionDialog({
       title="Close this session?"
       description="Results lock in and the session stops taking entries. An admin can reopen it."
     >
-      <div className="flex flex-col gap-4">
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const next = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value");
+          void confirm(event.currentTarget, next === "move");
+        }}
+      >
+        {playing.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm">What did everyone still playing leave with?</p>
+            {playing.map((player) => (
+              <Field key={player.id} label={player.name}>
+                {(props) => (
+                  <Input
+                    {...props}
+                    name={player.id}
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="0 if they busted"
+                    className="font-mono"
+                  />
+                )}
+              </Field>
+            ))}
+            {missing ? (
+              <FormError>Enter what each of them cashed out, 0 if they busted.</FormError>
+            ) : null}
+          </div>
+        ) : null}
         {unsent > 0 ? (
           <FormError>
             {unsent === 1 ? "1 entry hasn't" : `${unsent} entries haven't`} reached Stacks yet.
@@ -470,13 +663,21 @@ function CloseSessionDialog({
           </FormError>
         ) : null}
         {close.error ? <FormError>{close.error}</FormError> : null}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button onClick={() => onOpenChange(false)}>Keep playing</Button>
-          <Button variant="primary" onClick={() => void confirm()} disabled={close.pending}>
+          <Button
+            type="submit"
+            value="move"
+            disabled={close.pending}
+            title="Close and start another session with the same players"
+          >
+            Close and move tables
+          </Button>
+          <Button type="submit" variant="primary" disabled={close.pending}>
             {close.pending ? "Closing…" : "Close session"}
           </Button>
         </div>
-      </div>
+      </form>
     </Dialog>
   );
 }
@@ -494,40 +695,53 @@ function AddPlayerDialog({
 }) {
   const stacks = useStacks();
   const add = useAction(stacks.Client.mutation("sessions", "addPlayer"));
+  const [addingGuest, setAddingGuest] = useState(false);
   const seated = new Set(detail.playerIds);
   const available = group.players.filter(
     (player) => !seated.has(player.id) && (player.role !== null || player.userId === null),
   );
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  const seat = async (playerId: PlayerId) => {
+    const done = await add.run({ params: { sessionId: detail.session.id }, payload: { playerId } });
+    if (done) onOpenChange(false);
+  };
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const playerId = String(new FormData(event.currentTarget).get("playerId") ?? "");
     const player = available.find((p) => p.id === playerId);
-    if (!player) return;
-    const done = await add.run({
-      params: { sessionId: detail.session.id },
-      payload: { playerId: player.id },
-    });
-    if (done) onOpenChange(false);
+    if (player) void seat(player.id);
   };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Add a player">
-      {available.length === 0 ? (
-        <p className="text-sm text-muted">Everyone in the group is already in this session.</p>
-      ) : (
-        <form onSubmit={submit} className="flex flex-col gap-4">
-          <Select name="playerId" aria-label="Player">
-            {available.map((player) => (
-              <option key={player.id} value={player.id}>
-                {player.displayName}
-              </option>
-            ))}
-          </Select>
+    <>
+      <Dialog open={open && !addingGuest} onOpenChange={onOpenChange} title="Add a player">
+        <div className="flex flex-col gap-4">
+          {available.length === 0 ? (
+            <p className="text-sm text-muted">Everyone in the group is already in this session.</p>
+          ) : (
+            <form onSubmit={submit} className="flex flex-col gap-4">
+              <Select name="playerId" aria-label="Player">
+                {available.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.displayName}
+                  </option>
+                ))}
+              </Select>
+              <Button type="submit" variant="primary" size="lg" disabled={add.pending}>
+                Add to session
+              </Button>
+            </form>
+          )}
           {add.error ? <FormError>{add.error}</FormError> : null}
-          <Button type="submit" variant="primary" size="lg" disabled={add.pending}>
-            Add to session
+          <Button variant="ghost" onClick={() => setAddingGuest(true)}>
+            Not in the group? Add a guest
           </Button>
-        </form>
-      )}
-    </Dialog>
+        </div>
+      </Dialog>
+      <AddGuestDialog
+        detail={group}
+        open={open && addingGuest}
+        onOpenChange={setAddingGuest}
+        onAdded={(id) => void seat(id)}
+      />
+    </>
   );
 }
