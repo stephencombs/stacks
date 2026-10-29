@@ -73,12 +73,27 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
   const unsaved = pending.filter(
     (payment) => !trip.settlements.some((saved) => saved.id === payment.id),
   );
-  const balanceOf = new Map(trip.balances.map((balance) => [balance.playerId, balance.amount]));
-  const transfers = settleUp(
-    applyPayments(
-      new Map(trip.balances.map((balance) => [balance.playerId, balance.amount])),
-      unsaved,
-    ),
+  const balanceOf = applyPayments(
+    new Map(trip.balances.map((balance) => [balance.playerId, balance.amount])),
+    unsaved,
+  );
+  const transfers = settleUp(balanceOf);
+  const me = detail.myPlayerId;
+  const involvesMe = (transfer: Transfer) => transfer.from === me || transfer.to === me;
+  const mine = transfers.filter(involvesMe);
+  const others = transfers.filter((transfer) => !involvesMe(transfer));
+  const transferRow = (transfer: Transfer) => (
+    <div key={`${transfer.from}:${transfer.to}`} className="flex items-center gap-3 px-5 py-3.5">
+      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+        <Payer detail={detail} playerId={transfer.from} />
+        <ArrowRight className="size-4 text-accent-text" role="img" aria-label="pays" />
+        <Payer detail={detail} playerId={transfer.to} />
+      </span>
+      <Money amount={transfer.amount} currency={currency} className="text-lg font-bold" />
+      <Button size="sm" onClick={() => setPaying(transfer)}>
+        Mark paid
+      </Button>
+    </div>
   );
 
   const record = async (payment: Omit<Payment, "id">) => {
@@ -107,66 +122,61 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
       />
 
       <section className="flex flex-col gap-2">
-        <SectionHeading>Balances</SectionHeading>
+        <SectionHeading>You</SectionHeading>
         <Surface className="divide-y divide-line">
-          {detail.players.map((player) => (
-            <div key={player.id} className="flex items-center gap-3 px-5 py-3">
-              <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-              <span className="min-w-0 flex-1 truncate">
-                {names.get(player.id)}
-                {player.id === detail.myPlayerId ? (
-                  <span className="text-muted"> (you)</span>
-                ) : null}
-                {player.userId === null ? <span className="text-muted"> · guest</span> : null}
-              </span>
-              <span className="text-sm">
-                <BalanceLabel
-                  amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
-                  currency={currency}
-                />
-              </span>
-            </div>
-          ))}
+          <p className="px-5 py-4 font-mono text-2xl font-bold">
+            <BalanceLabel
+              amount={balanceOf.get(me) ?? MinorUnits.make(0)}
+              currency={currency}
+              subject="you"
+            />
+          </p>
+          {mine.map(transferRow)}
         </Surface>
+        {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
       </section>
 
+      {transfers.length === 0 ? (
+        <EmptyState title="Everyone's square">
+          Nobody owes anybody on this trip. Debts show up here when someone covers a buy-in or holds
+          someone else's cash.
+        </EmptyState>
+      ) : others.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <SectionHeading>
+            {mine.length > 0 ? "Everyone else" : "Suggested payments"}
+          </SectionHeading>
+          <Surface className="divide-y divide-line">{others.map(transferRow)}</Surface>
+        </section>
+      ) : null}
+      {transfers.length > 0 ? (
+        <p className="-mt-4 text-sm text-muted">
+          Payments that clear every balance. Pay however you like; Stacks only keeps the record.
+        </p>
+      ) : null}
+
       <section className="flex flex-col gap-2">
-        <SectionHeading>Suggested payments</SectionHeading>
-        {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
-        {transfers.length === 0 ? (
-          <EmptyState title="Everyone's square">
-            Nobody owes anybody on this trip. Debts show up here when someone covers a buy-in or
-            holds someone else's cash.
-          </EmptyState>
-        ) : (
-          <>
-            <Surface className="divide-y divide-line">
-              {transfers.map((transfer) => (
-                <div
-                  key={`${transfer.from}:${transfer.to}`}
-                  className="flex items-center gap-3 px-5 py-3.5"
-                >
-                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-                    <Payer detail={detail} playerId={transfer.from} />
-                    <ArrowRight className="size-4 text-accent-text" role="img" aria-label="pays" />
-                    <Payer detail={detail} playerId={transfer.to} />
-                  </span>
-                  <Money
-                    amount={transfer.amount}
+        <SectionHeading>Balances</SectionHeading>
+        <Surface className="divide-y divide-line">
+          {detail.players
+            .toSorted((a, b) => Number(b.id === me) - Number(a.id === me))
+            .map((player) => (
+              <div key={player.id} className="flex items-center gap-3 px-5 py-3">
+                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
+                <span className="min-w-0 flex-1 truncate">
+                  {names.get(player.id)}
+                  {player.id === me ? <span className="text-muted"> (you)</span> : null}
+                  {player.userId === null ? <span className="text-muted"> · guest</span> : null}
+                </span>
+                <span className="text-sm">
+                  <BalanceLabel
+                    amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
                     currency={currency}
-                    className="text-lg font-bold"
                   />
-                  <Button size="sm" onClick={() => setPaying(transfer)}>
-                    Mark paid
-                  </Button>
-                </div>
-              ))}
-            </Surface>
-            <p className="text-sm text-muted">
-              Payments that clear every balance. Pay however you like; Stacks only keeps the record.
-            </p>
-          </>
-        )}
+                </span>
+              </div>
+            ))}
+        </Surface>
       </section>
 
       <BackingSection detail={detail} trip={trip} />

@@ -9,7 +9,14 @@ import {
   localClock,
   nightLabel,
 } from "@stacks/client-runtime/trip";
-import { tripAwards, tripFeed, tripNights, tripStandings } from "@stacks/shared/trips";
+import {
+  tonightBoard,
+  tripAwards,
+  tripFeed,
+  tripNights,
+  tripStandings,
+} from "@stacks/shared/trips";
+import * as DateTime from "effect/DateTime";
 import { useLayoutEffect, useRef } from "react";
 
 import { cn } from "~/components/ui/cn";
@@ -52,7 +59,6 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const names = playerNames(detail);
   const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
-  const live = trip.sessions.filter((s) => s.session.status === "live");
   const standings = tripStandings(closed, localClock);
   const nights = tripNights(closed, localClock);
   const awards = tripAwards(closed, localClock);
@@ -102,25 +108,6 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
             </span>
           </div>
         </header>
-
-        {live.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {live.map((s) => (
-              <li key={s.session.id}>
-                <Link
-                  to="/sessions/$sessionId"
-                  params={{ sessionId: s.session.id }}
-                  className="flex min-h-11 items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2"
-                >
-                  <span className="size-2 animate-pulse rounded-full bg-loss motion-reduce:animate-none" />
-                  <span className={cn(label, "text-loss")}>Live</span>
-                  <span className="flex-1 truncate font-medium">{s.venue.name}</span>
-                  <span className="font-mono text-xs text-muted">{s.results.length || "—"} in</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : null}
 
         <section className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between">
@@ -245,6 +232,106 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
           </section>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/** Tonight only: who's up from tables that finished, and what's still in play at live ones. */
+export function TonightBoard({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+  const currency = detail.group.currency;
+  const names = playerNames(detail);
+  const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
+  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const live = trip.sessions.filter((s) => s.session.status === "live");
+  const rows = tonightBoard(closed, live, localClock, DateTime.nowUnsafe());
+  const inPlayTotal = rows.reduce((sum, r) => sum + r.inPlay, 0);
+  const row = useReorder();
+
+  return (
+    <div className="flex flex-col gap-7 px-4 pt-6 pb-8 sm:px-6">
+      <header className="flex items-end justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className={cn(label, "text-muted")}>Who's up</p>
+          <p className="font-display text-4xl leading-none tracking-tight uppercase">Tonight</p>
+        </div>
+        {inPlayTotal > 0 ? (
+          <div className="flex shrink-0 flex-col items-end">
+            <span className={cn(label, "text-muted")}>In play</span>
+            <span className="font-mono text-lg text-accent-text tabular-nums">
+              {boardMoney(inPlayTotal, currency, false)}
+            </span>
+          </div>
+        ) : null}
+      </header>
+
+      {live.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {live.map((s) => (
+            <li key={s.session.id}>
+              <Link
+                to="/sessions/$sessionId"
+                params={{ sessionId: s.session.id }}
+                className="flex min-h-11 items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2"
+              >
+                <span className="size-2 animate-pulse rounded-full bg-loss motion-reduce:animate-none" />
+                <span className={cn(label, "text-loss")}>Live</span>
+                <span className="flex-1 truncate font-medium">{s.venue.name}</span>
+                <span className="font-mono text-xs text-muted">{s.playing.length} playing</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
+          Nothing on the board tonight. Results land here as players cash out.
+        </p>
+      ) : (
+        <ol
+          aria-label="Tonight"
+          className="relative overflow-hidden rounded-xl border border-line bg-surface"
+        >
+          {rows.map((r) => (
+            <li
+              key={r.playerId}
+              ref={row(r.playerId)}
+              className={cn(
+                "relative grid grid-cols-[1.5rem_auto_1fr_auto] items-center gap-2.5 border-t border-line bg-surface px-3 py-3 first:border-t-0",
+                r.playerId === detail.myPlayerId && "shadow-[inset_3px_0_0_var(--color-accent)]",
+              )}
+            >
+              <span className="font-mono text-xl font-bold text-accent-text tabular-nums">
+                {r.rank}
+              </span>
+              <Chip chip={chipOf(detail, r.playerId)} name={name(r.playerId)} size={30} />
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate font-display text-lg leading-tight tracking-wide uppercase">
+                  {name(r.playerId)}
+                </span>
+                <span className="font-mono text-xs text-muted">
+                  {r.inPlay > 0 ? (
+                    <span className="text-accent-text">
+                      IN PLAY {boardMoney(r.inPlay, currency, false)}
+                    </span>
+                  ) : null}
+                  {r.inPlay > 0 && r.playerId === detail.myPlayerId ? " · " : ""}
+                  {r.playerId === detail.myPlayerId ? "YOU" : ""}
+                </span>
+              </span>
+              {r.net === null ? (
+                <span className="font-mono text-xl text-faint" aria-label="No result yet">
+                  —
+                </span>
+              ) : (
+                <span className={cn("font-mono text-xl font-bold tabular-nums", tone(r.net))}>
+                  {boardMoney(r.net, currency)}
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }

@@ -9,7 +9,14 @@ import {
   localClock,
   nightLabel,
 } from "@stacks/client-runtime/trip";
-import { tripAwards, tripFeed, tripNights, tripStandings } from "@stacks/shared/trips";
+import {
+  tonightBoard,
+  tripAwards,
+  tripFeed,
+  tripNights,
+  tripStandings,
+} from "@stacks/shared/trips";
+import * as DateTime from "effect/DateTime";
 import { useEffect, useState } from "react";
 import {
   AccessibilityInfo,
@@ -83,12 +90,10 @@ function Ticker({ items }: { items: ReadonlyArray<{ key: string; text: string }>
 
 /** The trip as a casino sportsbook board: ticker, standings, awards and night-by-night. */
 export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
-  const navigation = useNavigation();
   const currency = detail.group.currency;
   const names = playerNames(detail);
   const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
-  const live = trip.sessions.filter((s) => s.session.status === "live");
   const standings = tripStandings(closed, localClock);
   const nights = tripNights(closed, localClock);
   const awards = tripAwards(closed, localClock);
@@ -122,22 +127,6 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
             </Text>
           </View>
         </View>
-
-        {live.map((s) => (
-          <Pressable
-            key={s.session.id}
-            accessibilityRole="button"
-            accessibilityLabel={`Live now at ${s.venue.name}`}
-            onPress={() => navigation.navigate("Session", { sessionId: s.session.id })}
-            className="min-h-11 flex-row items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2 active:opacity-80"
-          >
-            <View className="size-2 rounded-full bg-loss" />
-            <Text className={cn(label, "text-loss")}>Live</Text>
-            <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
-              {s.venue.name}
-            </Text>
-          </Pressable>
-        ))}
 
         <View className="gap-2">
           <View className="flex-row justify-between">
@@ -271,6 +260,105 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
           </View>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+/** Tonight only: who's up from tables that finished, and what's still in play at live ones. */
+export function TonightBoard({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+  const navigation = useNavigation();
+  const currency = detail.group.currency;
+  const names = playerNames(detail);
+  const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
+  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const live = trip.sessions.filter((s) => s.session.status === "live");
+  const rows = tonightBoard(closed, live, localClock, DateTime.nowUnsafe());
+  const inPlayTotal = rows.reduce((sum, r) => sum + r.inPlay, 0);
+
+  return (
+    <View className="gap-7 bg-canvas px-4 pt-5 pb-8">
+      <View className="flex-row items-end justify-between gap-4">
+        <View className="flex-1 gap-1">
+          <Text className={cn(label, "text-muted")}>Who's up</Text>
+          <Text className="font-display text-4xl leading-10 text-ink uppercase">Tonight</Text>
+        </View>
+        {inPlayTotal > 0 ? (
+          <View className="items-end">
+            <Text className={cn(label, "text-muted")}>In play</Text>
+            <Text className="font-mono text-lg text-accent-text">
+              {boardMoney(inPlayTotal, currency, false)}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {live.map((s) => (
+        <Pressable
+          key={s.session.id}
+          accessibilityRole="button"
+          accessibilityLabel={`Live now at ${s.venue.name}`}
+          onPress={() => navigation.navigate("Session", { sessionId: s.session.id })}
+          className="min-h-11 flex-row items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2 active:opacity-80"
+        >
+          <View className="size-2 rounded-full bg-loss" />
+          <Text className={cn(label, "text-loss")}>Live</Text>
+          <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
+            {s.venue.name}
+          </Text>
+          <Text className="font-mono text-xs text-muted">{s.playing.length} playing</Text>
+        </Pressable>
+      ))}
+
+      {rows.length === 0 ? (
+        <Text className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
+          Nothing on the board tonight. Results land here as players cash out.
+        </Text>
+      ) : (
+        <View className="overflow-hidden rounded-xl border border-line bg-surface">
+          {rows.map((r, index) => {
+            const you = r.playerId === detail.myPlayerId;
+            const result = r.net === null ? "no result yet" : boardMoney(r.net, currency);
+            const inPlay = r.inPlay > 0 ? `IN PLAY ${boardMoney(r.inPlay, currency, false)}` : "";
+            return (
+              <View
+                key={r.playerId}
+                accessible
+                accessibilityLabel={`${r.rank}. ${name(r.playerId)}${you ? ", you" : ""}: ${result}${r.inPlay > 0 ? `, ${boardMoney(r.inPlay, currency, false)} in play` : ""}`}
+                className={cn(
+                  "flex-row items-center gap-2.5 px-3 py-3",
+                  index > 0 && "border-t border-line",
+                  you && "border-l-[3px] border-l-accent",
+                )}
+              >
+                <Text className="w-6 font-mono text-xl text-accent-text">{r.rank}</Text>
+                <Chip chip={chipOf(detail, r.playerId)} name={name(r.playerId)} size={30} />
+                <View className="flex-1">
+                  <Text
+                    numberOfLines={1}
+                    className="font-display text-lg leading-6 tracking-wide text-ink uppercase"
+                  >
+                    {name(r.playerId)}
+                  </Text>
+                  {inPlay || you ? (
+                    <Text className="font-mono text-xs text-muted">
+                      <Text className="text-accent-text">{inPlay}</Text>
+                      {inPlay && you ? " · " : ""}
+                      {you ? "YOU" : ""}
+                    </Text>
+                  ) : null}
+                </View>
+                {r.net === null ? (
+                  <Text className="font-mono text-lg text-faint">—</Text>
+                ) : (
+                  <Text className={cn("font-mono text-lg", tone(r.net))}>
+                    {boardMoney(r.net, currency)}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }

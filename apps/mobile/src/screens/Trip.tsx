@@ -2,7 +2,9 @@ import { useAuth } from "@clerk/expo";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
-import { tripDates } from "@stacks/client-runtime/trip";
+import { localClock, tripDates } from "@stacks/client-runtime/trip";
+import { tonightBoard } from "@stacks/shared/trips";
+import * as DateTime from "effect/DateTime";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,7 +19,7 @@ import { cn } from "../components/ui/cn";
 import { LiveBar } from "../features/LiveBar";
 import { TripStats } from "../features/RaceStats";
 import { SessionList } from "../features/SessionList";
-import { TripBoard } from "../features/TripBoard";
+import { TonightBoard, TripBoard } from "../features/TripBoard";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { SessionView } from "./Session";
 import { SettleView } from "../features/SettleUp";
@@ -277,18 +279,31 @@ function TableTab({
 }
 
 const boardViews = [
-  { value: "board", label: "Board" },
+  { value: "tonight", label: "Tonight" },
+  { value: "trip", label: "Trip" },
   { value: "race", label: "Race" },
 ] as const;
 
 function BoardTab({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
-  const [view, setView] = useState<(typeof boardViews)[number]["value"]>("board");
+  // Opens on tonight while there's anything on it.
+  const [view, setView] = useState<(typeof boardViews)[number]["value"]>(() =>
+    tonightBoard(
+      trip.sessions.filter((s) => s.session.status === "closed"),
+      trip.sessions.filter((s) => s.session.status === "live"),
+      localClock,
+      DateTime.nowUnsafe(),
+    ).length > 0
+      ? "tonight"
+      : "trip",
+  );
   return (
     <View className="gap-2">
       <View className="px-4">
-        <Choice label="Show" options={boardViews} value={view} onChange={setView} columns={2} />
+        <Choice label="Show" options={boardViews} value={view} onChange={setView} columns={3} />
       </View>
-      {view === "board" ? (
+      {view === "tonight" ? (
+        <TonightBoard detail={group} trip={trip} />
+      ) : view === "trip" ? (
         <TripBoard detail={group} trip={trip} />
       ) : (
         <TripStats detail={group} trip={trip} />

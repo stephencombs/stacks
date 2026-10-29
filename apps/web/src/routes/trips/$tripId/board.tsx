@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
+import { localClock } from "@stacks/client-runtime/trip";
+import { tonightBoard } from "@stacks/shared/trips";
+import * as DateTime from "effect/DateTime";
 import { useState } from "react";
 
 import { Skeleton } from "~/components/ui/Surface";
 import { cn } from "~/components/ui/cn";
 import { TripStats } from "~/features/RaceStats";
-import { TripBoard } from "~/features/TripBoard";
+import { TonightBoard, TripBoard } from "~/features/TripBoard";
 import { TripHeader } from "~/features/TripHeader";
 import { Loaded, useStacks } from "~/lib/stacks";
 
@@ -34,13 +37,26 @@ function BoardPage() {
 }
 
 const views = [
-  { key: "board", label: "Board" },
+  { key: "tonight", label: "Tonight" },
+  { key: "trip", label: "Trip" },
   { key: "race", label: "Race" },
 ] as const;
 
-/** The trip's standings, awards and nights, or the race for first, session by session. */
+/**
+ * Tonight's board, the whole trip's standings, awards and nights, or the race for first. Opens on
+ * tonight while there's anything on it.
+ */
 function Board({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
-  const [view, setView] = useState<(typeof views)[number]["key"]>("board");
+  const [view, setView] = useState<(typeof views)[number]["key"]>(() =>
+    tonightBoard(
+      trip.sessions.filter((s) => s.session.status === "closed"),
+      trip.sessions.filter((s) => s.session.status === "live"),
+      localClock,
+      DateTime.nowUnsafe(),
+    ).length > 0
+      ? "tonight"
+      : "trip",
+  );
   return (
     <div className="flex flex-col gap-4">
       <div
@@ -63,7 +79,9 @@ function Board({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
           </button>
         ))}
       </div>
-      {view === "board" ? (
+      {view === "tonight" ? (
+        <TonightBoard detail={group} trip={trip} />
+      ) : view === "trip" ? (
         <TripBoard detail={group} trip={trip} />
       ) : (
         <TripStats detail={group} trip={trip} />

@@ -4,7 +4,15 @@ import * as Schema from "effect/Schema";
 import { SessionId, VenueId, type PlayerId } from "@stacks/contracts";
 
 import { ALEX, BEA, CAL, DEE, money } from "./testing/ledgerArbitrary.ts";
-import { tripAwards, tripFeed, tripNights, tripStandings, type TripClock } from "./trips.ts";
+import {
+  inPlay,
+  tonightBoard,
+  tripAwards,
+  tripFeed,
+  tripNights,
+  tripStandings,
+  type TripClock,
+} from "./trips.ts";
 
 // Tests run in UTC. A night runs from 6am to 6am.
 const clock: TripClock = {
@@ -191,6 +199,89 @@ describe("tripFeed", () => {
       [BEA, 900],
       [ALEX, -50],
       [ALEX, 100],
+    ]);
+  });
+});
+
+/** A live table: each player's net and buy-in so far, and who's still playing. */
+const table = (
+  results: ReadonlyArray<[PlayerId, number, number]>,
+  playing: ReadonlyArray<PlayerId>,
+) => ({
+  results: results.map(([playerId, net, buyIn]) => ({
+    playerId,
+    net: money(net),
+    buyIn: money(buyIn),
+  })),
+  playing,
+});
+
+describe("inPlay", () => {
+  it("adds up what each player still at a table has bought in for", () => {
+    const tables = [
+      table(
+        [
+          [ALEX, -300, 300],
+          [BEA, 200, 100],
+        ],
+        [ALEX],
+      ),
+      table([[ALEX, -100, 100]], [ALEX]),
+    ];
+    expect(inPlay(tables)).toEqual(new Map([[ALEX, 400]]));
+  });
+});
+
+describe("tonightBoard", () => {
+  const now = DateTime.makeUnsafe(Date.UTC(2026, 9, 23, 1));
+
+  it("ranks tonight's finished play and leaves earlier nights out", () => {
+    const board = tonightBoard(
+      [
+        session(21, 20, [[ALEX, 5000]]),
+        session(22, 20, [
+          [ALEX, -200],
+          [BEA, 300],
+        ]),
+        session(23, 0, [[CAL, 100]]),
+      ],
+      [],
+      clock,
+      now,
+    );
+    expect(board).toEqual([
+      { playerId: BEA, net: 300, inPlay: 0, rank: 1 },
+      { playerId: CAL, net: 100, inPlay: 0, rank: 2 },
+      { playerId: ALEX, net: -200, inPlay: 0, rank: 3 },
+    ]);
+  });
+
+  it("lists someone whose only play tonight is still going, with no result yet", () => {
+    const board = tonightBoard([], [table([[ALEX, -300, 300]], [ALEX])], clock, now);
+    expect(board).toEqual([{ playerId: ALEX, net: null, inPlay: 300, rank: 1 }]);
+  });
+
+  it("counts a cash-out at a live table, and shows what's still in play beside it", () => {
+    const board = tonightBoard(
+      [session(22, 20, [[ALEX, -200]])],
+      [
+        table(
+          [
+            [ALEX, -300, 300],
+            [BEA, 150, 100],
+            [DEE, -100, 100],
+          ],
+          [ALEX],
+        ),
+      ],
+      clock,
+      now,
+    );
+    // Alex's chips at the live table aren't a loss yet; Bea cashed out and Dee busted.
+    expect(board).toEqual([
+      { playerId: BEA, net: 150, inPlay: 0, rank: 1 },
+      { playerId: DEE, net: -100, inPlay: 0, rank: 2 },
+      { playerId: ALEX, net: -200, inPlay: 300, rank: 3 },
     ]);
   });
 });

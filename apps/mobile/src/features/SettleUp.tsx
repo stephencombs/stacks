@@ -49,12 +49,29 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
   const unsaved = pending.filter(
     (payment) => !trip.settlements.some((saved) => saved.id === payment.id),
   );
-  const balanceOf = new Map(trip.balances.map((balance) => [balance.playerId, balance.amount]));
-  const transfers = settleUp(
-    applyPayments(
-      new Map(trip.balances.map((balance) => [balance.playerId, balance.amount])),
-      unsaved,
-    ),
+  const balanceOf = applyPayments(
+    new Map(trip.balances.map((balance) => [balance.playerId, balance.amount])),
+    unsaved,
+  );
+  const transfers = settleUp(balanceOf);
+  const me = detail.myPlayerId;
+  const involvesMe = (transfer: Transfer) => transfer.from === me || transfer.to === me;
+  const mine = transfers.filter(involvesMe);
+  const others = transfers.filter((transfer) => !involvesMe(transfer));
+  const transferRow = (transfer: Transfer) => (
+    <Row key={`${transfer.from}:${transfer.to}`}>
+      <View
+        accessible
+        accessibilityLabel={`${names.get(transfer.from)} pays ${names.get(transfer.to)}`}
+        className="flex-1 flex-row flex-wrap items-center gap-x-1.5"
+      >
+        <Payer detail={detail} playerId={transfer.from} />
+        <Icon name="arrow-right" color="accent-text" size={16} />
+        <Payer detail={detail} playerId={transfer.to} />
+      </View>
+      <Money amount={transfer.amount} currency={currency} className="text-lg" />
+      <Button label="Mark paid" size="sm" onPress={() => setPaying(transfer)} />
+    </Row>
   );
 
   const record = async (payment: Omit<Payment, "id">) => {
@@ -76,59 +93,60 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
   return (
     <>
       <View className="gap-2">
-        <SectionHeading>Balances</SectionHeading>
+        <SectionHeading>You</SectionHeading>
         <List>
-          {detail.players.map((player) => (
-            <Row key={player.id}>
-              <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-              <Text numberOfLines={1} className="flex-1 text-base text-ink">
-                {player.displayName}
-                {player.id === detail.myPlayerId ? (
-                  <Text className="text-muted"> (you)</Text>
-                ) : null}
-                {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
-              </Text>
-              <BalanceLabel
-                amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
-                currency={currency}
-              />
-            </Row>
-          ))}
+          <Row>
+            <BalanceLabel
+              amount={balanceOf.get(me) ?? MinorUnits.make(0)}
+              currency={currency}
+              subject="you"
+              className="font-mono text-2xl"
+            />
+          </Row>
+          {mine.map(transferRow)}
         </List>
+        {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
       </View>
 
+      {transfers.length === 0 ? (
+        <EmptyState title="Everyone's square">
+          Nobody owes anybody on this trip. Debts show up here when someone covers a buy-in or holds
+          someone else's cash.
+        </EmptyState>
+      ) : others.length > 0 ? (
+        <View className="gap-2">
+          <SectionHeading>
+            {mine.length > 0 ? "Everyone else" : "Suggested payments"}
+          </SectionHeading>
+          <List>{others.map(transferRow)}</List>
+        </View>
+      ) : null}
+      {transfers.length > 0 ? (
+        <Text className="text-sm text-muted">
+          Payments that clear every balance. Pay however you like; Stacks only keeps the record.
+        </Text>
+      ) : null}
+
       <View className="gap-2">
-        <SectionHeading>Suggested payments</SectionHeading>
-        {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
-        {transfers.length === 0 ? (
-          <EmptyState title="Everyone's square">
-            Nobody owes anybody on this trip. Debts show up here when someone covers a buy-in or
-            holds someone else's cash.
-          </EmptyState>
-        ) : (
-          <>
-            <List>
-              {transfers.map((transfer) => (
-                <Row key={`${transfer.from}:${transfer.to}`}>
-                  <View
-                    accessible
-                    accessibilityLabel={`${names.get(transfer.from)} pays ${names.get(transfer.to)}`}
-                    className="flex-1 flex-row flex-wrap items-center gap-x-1.5"
-                  >
-                    <Payer detail={detail} playerId={transfer.from} />
-                    <Icon name="arrow-right" color="accent-text" size={16} />
-                    <Payer detail={detail} playerId={transfer.to} />
-                  </View>
-                  <Money amount={transfer.amount} currency={currency} className="text-lg" />
-                  <Button label="Mark paid" size="sm" onPress={() => setPaying(transfer)} />
-                </Row>
-              ))}
-            </List>
-            <Text className="text-sm text-muted">
-              Payments that clear every balance. Pay however you like; Stacks only keeps the record.
-            </Text>
-          </>
-        )}
+        <SectionHeading>Balances</SectionHeading>
+        <List>
+          {detail.players
+            .toSorted((a, b) => Number(b.id === me) - Number(a.id === me))
+            .map((player) => (
+              <Row key={player.id}>
+                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
+                <Text numberOfLines={1} className="flex-1 text-base text-ink">
+                  {player.displayName}
+                  {player.id === me ? <Text className="text-muted"> (you)</Text> : null}
+                  {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
+                </Text>
+                <BalanceLabel
+                  amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
+                  currency={currency}
+                />
+              </Row>
+            ))}
+        </List>
       </View>
       <Button label="Record a payment" onPress={() => setPaying("custom")} />
 

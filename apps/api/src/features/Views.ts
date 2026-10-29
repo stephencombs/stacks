@@ -67,12 +67,24 @@ const summaries = Effect.fn("Views.summaries")(function* (
 
   const venueById = new Map<VenueId, (typeof venues)[number]>(venues.map((v) => [v.id, v]));
   const resultsBySession = resultsBy(sessions, entries, (session) => session.id);
-  return sessions.map((session): SessionSummary => ({
-    session,
-    venue: venueById.get(session.venueId)!,
-    playerIds: seats.filter((seat) => seat.sessionId === session.id).map((seat) => seat.playerId),
-    results: toResultList(resultsBySession.get(session.id)),
-  }));
+  const cashedOut = new Set(
+    entries.filter((e) => e.kind === "cash_out").map((e) => `${e.sessionId}:${e.playerId}`),
+  );
+  return sessions.map((session): SessionSummary => {
+    const playerIds = seats
+      .filter((seat) => seat.sessionId === session.id)
+      .map((seat) => seat.playerId);
+    return {
+      session,
+      venue: venueById.get(session.venueId)!,
+      playerIds,
+      playing:
+        session.status === "live"
+          ? playerIds.filter((id) => !cashedOut.has(`${session.id}:${id}`))
+          : [],
+      results: toResultList(resultsBySession.get(session.id)),
+    };
+  });
 });
 
 export const loadSession = Effect.fn("Views.loadSession")(function* (sessionId: SessionId) {

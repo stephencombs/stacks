@@ -128,6 +128,13 @@ test.describe.serial("live mode on a phone", () => {
       alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),
     ).toBeVisible();
 
+    // While everyone's at the table, tonight counts their chips as in play, not as losses.
+    const tab = (name: string) => visible(alex.getByRole("tab", { name }));
+    await tab("Board").click();
+    await expect(visible(alex.getByLabel(/Alex, you: no result yet, \$150 in play/))).toBeVisible();
+    await shoot(alex, "tonight-live");
+    await tab("Table").click();
+
     await alex.getByRole("button", { name: "Close session" }).filter({ visible: true }).click();
     await alex
       .getByRole("button", { name: "Close session" })
@@ -163,8 +170,11 @@ test.describe.serial("live mode on a phone", () => {
 
     // The trip's board ranks the night, and Money says who owes whom: Alex owes Bea $50 for the
     // buy-in and Gus $220 for the cash he kept.
-    const tab = (name: string) => visible(alex.getByRole("tab", { name }));
     await tab("Board").click();
+    // The board opens on tonight while anything happened tonight.
+    await expect(visible(alex.getByLabel("1. Alex, you: +$170"))).toBeVisible();
+    await shoot(alex, "tonight");
+    await visible(alex.getByRole("radio", { name: "Trip" })).click();
     await expect(alex.getByText("Biggest hit").filter({ visible: true })).toBeVisible();
     await shoot(alex, "trip-board");
     await visible(alex.getByRole("radio", { name: "Race" })).click();

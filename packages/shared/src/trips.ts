@@ -134,6 +134,63 @@ export const tripStandings = (
   });
 };
 
+/** A live table as the board reads it. */
+export interface LiveTable {
+  readonly results: ReadonlyArray<Pick<PlayerResult, "playerId" | "buyIn" | "net">>;
+  /** Seated and not cashed out. */
+  readonly playing: ReadonlyArray<PlayerId>;
+}
+
+export interface TonightRow {
+  readonly playerId: PlayerId;
+  /**
+   * Won or lost tonight in finished play: closed tables, and cash-outs at live ones. Null for
+   * someone whose only play tonight is still going.
+   */
+  readonly net: number | null;
+  /** What they've bought in for at tables they're still playing. Not a loss until they leave. */
+  readonly inPlay: number;
+  readonly rank: number;
+}
+
+/** What each player still at a live table has bought in for there. */
+export const inPlay = (live: ReadonlyArray<LiveTable>): ReadonlyMap<PlayerId, number> => {
+  const amounts = new Map<PlayerId, number>();
+  for (const table of live)
+    for (const r of table.results)
+      if (table.playing.includes(r.playerId))
+        amounts.set(r.playerId, (amounts.get(r.playerId) ?? 0) + r.buyIn);
+  return amounts;
+};
+
+/** Who's up tonight: tonight's finished play, best first, with what anyone has in play. */
+export const tonightBoard = (
+  closed: ReadonlyArray<TripSession>,
+  live: ReadonlyArray<LiveTable>,
+  clock: TripClock,
+  now: DateTime.Utc,
+): ReadonlyArray<TonightRow> => {
+  const tonight = clock.night(now);
+  const finished = [
+    ...closed
+      .filter((s) => clock.night(s.session.startedAt) === tonight)
+      .toSorted((a, b) => startOf(a) - startOf(b))
+      .flatMap((s) => s.results),
+    ...live.flatMap((table) => table.results.filter((r) => !table.playing.includes(r.playerId))),
+  ];
+  const nets = new Map<PlayerId, number>();
+  for (const r of finished) nets.set(r.playerId, (nets.get(r.playerId) ?? 0) + r.net);
+  const playing = inPlay(live);
+  const players = new Set([...nets.keys(), ...playing.keys()]);
+  return Array.from(players, (playerId) => ({
+    playerId,
+    net: nets.get(playerId) ?? null,
+    inPlay: playing.get(playerId) ?? 0,
+  }))
+    .toSorted((a, b) => (b.net ?? 0) - (a.net ?? 0))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+};
+
 /** Hours into the night: 6pm is 0, 2am is 8. Daytime is -1 and never wins Night Owl. */
 const lateness = (hour: number) => (hour >= 18 ? hour - 18 : hour < 6 ? hour + 6 : -1);
 

@@ -41,7 +41,7 @@ export function LiveBar({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Live at ${seat.venueName} since ${formatTime(seat.startedAt)}`}
+        accessibilityLabel={`Back to your table at ${seat.venueName}, since ${formatTime(seat.startedAt)}`}
         accessibilityHint="Goes back to your table"
         onPress={
           onPress ?? (() => navigation.navigate("Trip", { tripId: seat.tripId, tab: "table" }))

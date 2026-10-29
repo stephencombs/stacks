@@ -49,10 +49,15 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a session from buy-in to set
 
       const early = yield* Effect.flip(alex.sessions.close({ params: { sessionId }, payload: {} }));
       expect(early).toMatchObject({ _tag: "Conflict", reason: "players_not_cashed_out" });
+      // The trip shows who's still at the table, so their chips can count as in play.
+      const midway = yield* bea.trips.get({ params: { tripId: group.tripId } });
+      expect(midway.sessions[0]?.playing).toEqual([beaId]);
 
       yield* add("cash_out", beaId, 12000, alexId);
       const closed = yield* alex.sessions.close({ params: { sessionId }, payload: {} });
       expect(closed.session.status).toBe("closed");
+      const after = yield* bea.trips.get({ params: { tripId: group.tripId } });
+      expect(after.sessions[0]?.playing).toEqual([]);
       expect(closed.results).toEqual(
         expect.arrayContaining([
           { playerId: alexId, buyIn: 15000, cashOut: 32000, adjustment: 0, net: 17000 },

@@ -43,7 +43,8 @@ export function BalanceLabel({
   currency: CurrencyCode;
   subject?: "you" | "third";
 }) {
-  if (amount === 0) return <span className="text-muted">Square</span>;
+  if (amount === 0)
+    return <span className="text-muted">{subject === "you" ? "You're square" : "Square"}</span>;
   const magnitude = MinorUnits.make(Math.abs(amount));
   const verb =
     amount > 0

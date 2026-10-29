@@ -66,6 +66,8 @@ export const SessionSummary = Schema.Struct({
   venue: Venue,
   /** Everyone seated at the table, in the order they sat down. */
   playerIds: Schema.Array(PlayerId),
+  /** Who's still at a live table: seated and not cashed out. Empty once it closes. */
+  playing: Schema.Array(PlayerId),
   results: Schema.Array(PlayerResult),
 });
 export type SessionSummary = typeof SessionSummary.Type;
