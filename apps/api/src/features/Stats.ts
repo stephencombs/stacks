@@ -68,6 +68,8 @@ export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId)
     })),
     bySession: sessions.map((session) => ({
       sessionId: session.id,
+      tripId: session.tripId,
+      venueId: session.venueId,
       startedAt: session.startedAt,
       results: toList(bySession.get(session.id) ?? new Map()),
     })),

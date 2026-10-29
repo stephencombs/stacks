@@ -1,9 +1,10 @@
-import type { GroupDetail, PlayerId, SessionSummary, TripDetail } from "@stacks/contracts";
+import type { GroupDetail, PlayerId, SessionId, TripDetail } from "@stacks/contracts";
 import { barTrack } from "@stacks/client-runtime/chart";
 import { formatDay, playerNames } from "@stacks/client-runtime/format";
 import { boardMoney, chipOf, localClock } from "@stacks/client-runtime/trip";
-import { racePlaces, runningTotals, statSheet } from "@stacks/shared/stats";
+import { racePlaces, runningTotals, statSheet, type StatsSession } from "@stacks/shared/stats";
 import { tripNights } from "@stacks/shared/trips";
+import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import Svg, { Circle, G, Line, Polyline, Text as SvgText } from "react-native-svg";
@@ -18,9 +19,53 @@ const tone = (n: number) =>
 
 type Racer = { playerId: PlayerId; name: string; chip: number; running: ReadonlyArray<number> };
 
-/** A trip's stats: the race for first, session by session, and one player's stat sheet. */
+/** A closed session as the race sees it, oldest first. */
+type RaceSession = StatsSession & {
+  readonly session: { readonly id: SessionId; readonly startedAt: DateTime.Utc };
+};
+/** Where on the axis a stretch of sessions starts, such as a night or a trip. */
+type Mark = { readonly index: number; readonly label: string };
+
+/** A trip's stats, with the trip's nights along the race. */
 export function TripStats({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const nights = tripNights(closed, localClock);
+  const nightOf = new Map(
+    nights.flatMap((night) => night.sessions.map((s) => [s.session.id, night.number])),
+  );
+  return (
+    <RaceStats
+      detail={detail}
+      sessions={closed}
+      marks={nights.map((night) => ({
+        index: closed.indexOf(night.sessions[0]!),
+        label: `D${night.number}`,
+      }))}
+      where={(session) => `Day ${nightOf.get(session.session.id)}`}
+      latest={trip.trip.endedAt === null ? "The race so far" : "How it finished"}
+      empty="Stats fill in when the trip's first session closes."
+    />
+  );
+}
+
+/** The race for first, session by session, and one player's stat sheet. */
+export function RaceStats<S extends RaceSession>({
+  detail,
+  sessions: closed,
+  marks,
+  where,
+  latest,
+  empty,
+}: {
+  detail: GroupDetail;
+  sessions: ReadonlyArray<S>;
+  marks: ReadonlyArray<Mark>;
+  /** Where a session sits, like "Day 3", after "After session 12 of 41". */
+  where: (session: S) => string;
+  /** The heading's lead-in at the latest session. */
+  latest: string;
+  empty: string;
+}) {
   const names = playerNames(detail);
   const players = detail.players
     .map((player) => ({
@@ -37,7 +82,7 @@ export function TripStats({ detail, trip }: { detail: GroupDetail; trip: TripDet
   if (players.length === 0)
     return (
       <Text className="m-4 rounded-xl border border-board-rule bg-board-panel p-4 text-sm text-board-muted">
-        Stats fill in when the trip's first session closes.
+        {empty}
       </Text>
     );
 
@@ -50,7 +95,9 @@ export function TripStats({ detail, trip }: { detail: GroupDetail; trip: TripDet
         currency={detail.group.currency}
         picked={player.playerId}
         onPick={setPicked}
-        ended={trip.trip.endedAt !== null}
+        marks={marks}
+        where={where}
+        latest={latest}
       />
       <Sheet
         key={player.playerId}
@@ -80,20 +127,24 @@ function useLineColors() {
   return (chip: number) => (chip === 4 ? muted! : chips[chip < 4 ? chip - 1 : chip - 2]!);
 }
 
-function Race({
+function Race<S extends RaceSession>({
   sessions,
   players,
   currency,
   picked,
   onPick,
-  ended,
+  marks,
+  where,
+  latest,
 }: {
-  sessions: ReadonlyArray<SessionSummary>;
+  sessions: ReadonlyArray<S>;
   players: ReadonlyArray<Racer>;
   currency: GroupDetail["group"]["currency"];
   picked: PlayerId;
   onPick: (playerId: PlayerId) => void;
-  ended: boolean;
+  marks: ReadonlyArray<Mark>;
+  where: (session: S) => string;
+  latest: string;
 }) {
   const last = sessions.length - 1;
   const [at, setAt] = useState(last);
@@ -119,10 +170,6 @@ function Race({
     .map((p) => ({ ...p, now: p.running[at]! }))
     .toSorted((a, b) => places[at]!.get(a.playerId)! - places[at]!.get(b.playerId)!);
   const [leader, second] = standing;
-  const nights = tripNights(sessions, localClock);
-  const nightOf = new Map(
-    nights.flatMap((night) => night.sessions.map((s) => [s.session.id, night.number])),
-  );
   const session = sessions[at]!;
   const scrub = (locationX: number) =>
     setAt(
@@ -138,12 +185,8 @@ function Race({
     <View className="gap-4">
       <View className="gap-1">
         <Text className={cn(label, "text-board-amber")}>
-          {at === last
-            ? ended
-              ? "How it finished"
-              : "The race so far"
-            : `After session ${at + 1} of ${sessions.length}`}{" "}
-          · Day {nightOf.get(session.session.id)}
+          {at === last ? latest : `After session ${at + 1} of ${sessions.length}`} ·{" "}
+          {where(session)}
         </Text>
         <Text
           accessibilityRole="header"
@@ -165,7 +208,7 @@ function Race({
       <View
         accessible
         accessibilityRole="adjustable"
-        accessibilityLabel="Replay the trip session by session"
+        accessibilityLabel="Replay session by session"
         accessibilityValue={{
           text: `Session ${at + 1} of ${sessions.length}, ${session.venue.name}`,
         }}
@@ -199,16 +242,16 @@ function Race({
                 strokeDasharray="2 4"
               />
             ))}
-            {nights.map((night) => (
+            {marks.map((mark) => (
               <SvgText
-                key={night.key}
-                x={x(sessions.indexOf(night.sessions[0]!))}
+                key={mark.index}
+                x={x(mark.index)}
                 y={height - 8}
                 fill={lineColor(4)}
                 fontSize={10}
                 fontFamily="JetBrainsMono_500Medium"
               >
-                D{night.number}
+                {mark.label}
               </SvgText>
             ))}
             {players.toReversed().map((p) => {
@@ -251,7 +294,7 @@ function Race({
         ) : null}
       </View>
       <Text className="-mt-2 text-center text-xs text-board-muted">
-        Drag across to replay the trip
+        Drag across to replay it session by session
       </Text>
 
       <View className="overflow-hidden rounded-xl border border-board-rule bg-board-panel">
@@ -298,7 +341,7 @@ function Sheet({
   of,
   currency,
 }: {
-  sessions: ReadonlyArray<SessionSummary>;
+  sessions: ReadonlyArray<RaceSession>;
   player: Racer;
   rank: number;
   of: number;

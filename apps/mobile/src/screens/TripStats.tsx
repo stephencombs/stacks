@@ -5,7 +5,7 @@ import { ScrollView } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 import { Skeleton } from "../components/ui/Surface";
-import { TripStats } from "../features/TripStats";
+import { TripStats } from "../features/RaceStats";
 import { Loaded, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ tripId: string }>;

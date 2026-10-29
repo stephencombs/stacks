@@ -54,7 +54,7 @@ A change that works on the path you tested and is missing everywhere else is the
 - `packages/contracts`: Effect Schema types and the `StacksApi` definition. No runtime logic.
 - `packages/shared`: pure ledger logic shared by the API and clients: `money`, `results`, `balances`, `settleUp`. Import a subpath; there's no root export.
 - `packages/client-runtime`: client code shared by web and mobile. Import an explicit subpath (`@stacks/client-runtime/api`); there's no root export.
-- Charts, the T3Code way, with no chart library: shape the data in `packages/shared`, take the axis from `@stacks/client-runtime/chart`, and draw it per platform: SVG on web, Swift Charts through `@expo/ui` on iOS (`*.ios.tsx`), and plain views elsewhere.
+- Charts, the T3Code way, with no chart library: shape the data in `packages/shared`, take scales from `@stacks/client-runtime/chart`, and draw it per platform: SVG on web, `react-native-svg` and plain views on mobile.
 - Dependency versions live in the `catalog:` in `pnpm-workspace.yaml`. Add a shared dependency there, not as a version in one package.
 
 ## Taste

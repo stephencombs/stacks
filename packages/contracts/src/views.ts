@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import { GroupId, InviteId, PlayerId, SessionId, UserId, VenueId } from "./ids.ts";
+import { GroupId, InviteId, PlayerId, SessionId, TripId, UserId, VenueId } from "./ids.ts";
 import { Entry, Game, Session, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 
@@ -157,6 +157,8 @@ export const GroupStats = Schema.Struct({
   bySession: Schema.Array(
     Schema.Struct({
       sessionId: SessionId,
+      tripId: TripId,
+      venueId: VenueId,
       startedAt: Schema.DateTimeUtc,
       results: Schema.Array(PlayerResult),
     }),

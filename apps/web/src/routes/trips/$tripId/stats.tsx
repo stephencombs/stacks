@@ -3,7 +3,7 @@ import { TripId } from "@stacks/contracts";
 
 import { Skeleton } from "~/components/ui/Surface";
 import { TripHeader } from "~/features/TripHeader";
-import { TripStats } from "~/features/TripStats";
+import { TripStats } from "~/features/RaceStats";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/trips/$tripId/stats")({ component: TripStatsPage });

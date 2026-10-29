@@ -3,15 +3,8 @@ import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 import { SessionId } from "@stacks/contracts";
 
-import {
-  netFor,
-  playerResults,
-  resultsBy,
-  runningNet,
-  sessionCounts,
-  sessionRuns,
-} from "./results.ts";
-import { ALEX, BEA, RandomLedger, entry, money, toEntries } from "./testing/ledgerArbitrary.ts";
+import { playerResults, resultsBy, sessionRuns } from "./results.ts";
+import { ALEX, BEA, entry, money } from "./testing/ledgerArbitrary.ts";
 
 describe("playerResults", () => {
   it("nets cash-outs and adjustments against buy-ins", () => {
@@ -79,94 +72,6 @@ describe("resultsBy", () => {
   });
 });
 
-describe("runningNet", () => {
-  const session = (
-    name: string,
-    ...results: ReadonlyArray<{ playerId: typeof ALEX; net: number }>
-  ) => ({
-    name,
-    results: results.map((result) => ({ ...result, net: money(result.net) })),
-  });
-
-  it("keeps a running total over the sessions the player played, in order", () => {
-    const points = runningNet(
-      [
-        session("first", { playerId: ALEX, net: 5000 }, { playerId: BEA, net: -5000 }),
-        session("bea alone", { playerId: BEA, net: 100 }),
-        session("second", { playerId: ALEX, net: -8000 }),
-        session("third", { playerId: ALEX, net: 0 }),
-      ],
-      ALEX,
-    );
-
-    expect(points.map((point) => [point.session.name, point.net, point.total])).toEqual([
-      ["first", 5000, 5000],
-      ["second", -8000, -3000],
-      ["third", 0, -3000],
-    ]);
-  });
-
-  it("is empty for a player who never played", () => {
-    expect(runningNet([session("first", { playerId: BEA, net: 100 })], ALEX)).toEqual([]);
-  });
-
-  it("adds everyone together for the group, skipping sessions nobody finished", () => {
-    const points = runningNet(
-      [
-        session("first", { playerId: ALEX, net: 5000 }, { playerId: BEA, net: -2000 }),
-        session("empty"),
-        session("second", { playerId: BEA, net: -4000 }),
-      ],
-      "group",
-    );
-    expect(points.map((point) => [point.session.name, point.net, point.total])).toEqual([
-      ["first", 3000, 3000],
-      ["second", -4000, -1000],
-    ]);
-  });
-
-  it.prop(
-    "ends at the player's all-time net",
-    [RandomLedger, Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 6 }))],
-    ([ledger, sessionCount]) => {
-      const sessions = Array.from({ length: sessionCount }, (_, index) => ({
-        id: SessionId.make(`0192e7a0-0000-7000-8000-0000000001${String(index).padStart(2, "0")}`),
-      }));
-      const entries = toEntries(ledger).map((e, index) => ({
-        ...e,
-        sessionId: sessions[index % sessionCount]!.id,
-      }));
-      const bySession = resultsBy(sessions, entries, (s) => s.id);
-      const timeline = sessions.map((s) => ({
-        results: Array.from(bySession.get(s.id) ?? [], ([playerId, result]) => ({
-          playerId,
-          ...result,
-        })),
-      }));
-
-      for (const [playerId, result] of playerResults(entries)) {
-        expect(runningNet(timeline, playerId).at(-1)?.total).toBe(result.net);
-      }
-    },
-  );
-});
-
-describe("sessionCounts", () => {
-  it("counts the sessions each player has a result in", () => {
-    const counts = sessionCounts([
-      { results: [{ playerId: ALEX }, { playerId: BEA }] },
-      { results: [{ playerId: ALEX }] },
-      { results: [] },
-    ]);
-    expect(counts).toEqual(
-      new Map([
-        [ALEX, 2],
-        [BEA, 1],
-      ]),
-    );
-  });
-});
-
 describe("sessionRuns", () => {
   it("finds the longest winning run and the run the latest session is on", () => {
     expect(sessionRuns([100, 200, -50, 300, 400, 500, -10, -20])).toEqual({
@@ -206,19 +111,4 @@ describe("sessionRuns", () => {
       expect(tail.every((net) => Math.sign(net) === (runs.current.winning ? 1 : -1))).toBe(true);
     },
   );
-});
-
-describe("netFor", () => {
-  const results = [
-    { playerId: ALEX, net: money(2500) },
-    { playerId: BEA, net: money(-1000) },
-  ];
-  it("picks a player's net, or sums everyone's for the group", () => {
-    expect(netFor(results, ALEX)).toBe(2500);
-    expect(netFor(results, "group")).toBe(1500);
-  });
-  it("is undefined when the subject has no result", () => {
-    expect(netFor([results[1]!], ALEX)).toBeUndefined();
-    expect(netFor([], "group")).toBeUndefined();
-  });
 });

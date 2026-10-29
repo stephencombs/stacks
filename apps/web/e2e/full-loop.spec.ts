@@ -200,25 +200,15 @@ test.describe.serial("a group's first night out", () => {
       .getByRole("link", { name: "Settle up" })
       .click();
     await expect(bea.getByText("Settled up")).toHaveCount(3);
+    // All-time stats race every trip; the stat sheet opens on you, and anyone else is a tap away.
     await alex.getByRole("link", { name: "Stats" }).click();
     await expect(alex.getByRole("cell", { name: "Craps" })).toBeVisible();
-    await expect(alex.getByRole("listitem").filter({ hasText: "you" })).toContainText("+$170.00");
-    const chart = alex.getByRole("figure");
-    await expect(chart).toContainText("Up in 1 of 1");
-    await alex.getByRole("group", { name: /Your result in each session/ }).hover();
-    await expect(chart).toContainText("+$170.00 overall after it");
-    await alex.getByRole("button", { name: "Running total" }).click();
-    await expect(chart).toContainText("After 1 session");
-    await expect(chart).toContainText("+$170.00");
-    // Anyone's stats, and the group's, are a tap away.
+    await expect(alex.getByRole("heading", { name: /leads by \$150/ })).toBeVisible();
+    await expect(alex.getByText("Alex · #1 of 3 · 1 session")).toBeVisible();
     await alex.getByRole("button", { name: /Bea/ }).click();
-    await expect(alex.getByRole("heading", { name: "Bea's sessions" })).toBeVisible();
-    await expect(chart).toContainText("-$200.00");
-    await alex.getByRole("button", { name: /Group total/ }).click();
-    await expect(alex.getByRole("heading", { name: "The group's sessions" })).toBeVisible();
-    await expect(chart).toContainText("-$10.00");
+    await expect(alex.getByText("Bea · #3 of 3 · 1 session")).toBeVisible();
 
-    // On a phone, scrolling with a finger on the chart leaves it alone; a tap picks a session.
+    // On a phone, the standings pick a player with a tap.
     const phone = await browser.newContext({
       storageState: await alex.context().storageState(),
       viewport: { width: 390, height: 844 },
@@ -227,27 +217,8 @@ test.describe.serial("a group's first night out", () => {
     });
     const phonePage = await phone.newPage();
     await phonePage.goto(alex.url());
-    await phonePage.getByRole("button", { name: "Running total" }).tap();
-    const plot = phonePage.getByRole("group", { name: /Your net after each session/ });
-    const caption = phonePage.locator("figcaption");
-    await expect(caption).toContainText("After 1 session");
-    const box = (await plot.boundingBox())!;
-    const finger = (y: number) => [{ x: box.x + box.width / 2, y }];
-    const cdp = await phone.newCDPSession(phonePage);
-    await cdp.send("Input.dispatchTouchEvent", {
-      type: "touchStart",
-      touchPoints: finger(box.y + 150),
-    });
-    for (let i = 1; i <= 10; i++) {
-      await cdp.send("Input.dispatchTouchEvent", {
-        type: "touchMove",
-        touchPoints: finger(box.y + 150 - i * 30),
-      });
-    }
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-    await expect(caption).toContainText("After 1 session");
-    await plot.tap();
-    await expect(caption).toContainText("won $170.00");
+    await phonePage.getByRole("button", { name: /Bea/ }).tap();
+    await expect(phonePage.getByText("Bea · #3 of 3 · 1 session")).toBeVisible();
     await phone.close();
     await shoot(alex, "stats");
   });

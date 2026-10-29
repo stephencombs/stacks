@@ -189,12 +189,14 @@ test.describe.serial("live mode on a phone", () => {
 
     await alex.goto(groupUrl);
     await alex.getByRole("button", { name: "Stats" }).filter({ visible: true }).click();
-    await expect(alex.getByText("Up in 1 of 1").filter({ visible: true })).toBeVisible();
-    await alex.getByRole("radio", { name: "Running total" }).filter({ visible: true }).click();
-    await expect(alex.getByText("After 1 session").filter({ visible: true })).toBeVisible();
+    await expect(
+      alex.getByText("Alex · #1 of 3 · 1 session").filter({ visible: true }),
+    ).toBeVisible();
     await alex.getByRole("button", { name: /Bea: / }).filter({ visible: true }).click();
-    await expect(alex.getByText("Bea's sessions").filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("-$200.00").filter({ visible: true }).first()).toBeVisible();
+    await expect(
+      alex.getByText("Bea · #3 of 3 · 1 session").filter({ visible: true }),
+    ).toBeVisible();
+    await expect(alex.getByText("Craps").filter({ visible: true }).first()).toBeVisible();
     await shoot(alex, "stats");
 
     // The trip ends and reopens; a trip with nothing in it can be deleted.
