@@ -2,12 +2,12 @@ import { useUser } from "@clerk/expo";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import type { InvitePreview } from "@stacks/contracts";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Text } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
-import { Skeleton, Surface } from "../components/ui/Surface";
+import { PageTitle, Skeleton, Surface } from "../components/ui/Surface";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ code: string }>;
@@ -51,14 +51,11 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
 
   return (
     <Surface className="gap-5 p-5">
-      <View className="gap-1">
-        <Text className="text-sm text-muted">
-          {preview.memberCount} {preview.memberCount === 1 ? "member" : "members"}
-        </Text>
-        <Text accessibilityRole="header" className="font-display text-4xl text-ink">
-          {preview.groupName}
-        </Text>
-      </View>
+      <PageTitle
+        eyebrow={`${preview.memberCount} ${preview.memberCount === 1 ? "member" : "members"}`}
+      >
+        {preview.groupName}
+      </PageTitle>
       {preview.alreadyMember ? (
         <>
           <Text className="text-base text-muted">You're already in this group.</Text>
@@ -107,12 +104,7 @@ export function ClaimScreen({ route }: Props) {
       >
         {(preview) => (
           <Surface className="gap-5 p-5">
-            <View className="gap-1">
-              <Text className="text-sm text-muted">{preview.groupName}</Text>
-              <Text accessibilityRole="header" className="font-display text-4xl text-ink">
-                Are you {preview.displayName}?
-              </Text>
-            </View>
+            <PageTitle eyebrow={preview.groupName}>{`Are you ${preview.displayName}?`}</PageTitle>
             <Text className="text-base text-muted">
               {preview.displayName} has been playing in {preview.groupName} as a guest. Claim it to
               join the group and make their sessions, results and balance yours.

@@ -1,8 +1,10 @@
 import { useAuth } from "@clerk/expo";
-import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import type { StaticScreenProps } from "@react-navigation/native";
 import {
   EntryId,
+  MinorUnits,
   SessionId,
+  type CurrencyCode,
   type Entry,
   type GroupDetail,
   type PlayerId,
@@ -17,11 +19,12 @@ import {
   playerNames,
 } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
+import { chipOf } from "@stacks/client-runtime/trip";
 import { formatMoney } from "@stacks/shared/money";
 import { playerResults } from "@stacks/shared/results";
 import * as DateTime from "effect/DateTime";
 import { useKeepAwake } from "expo-keep-awake";
-import { useLayoutEffect, useState } from "react";
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
@@ -29,9 +32,18 @@ import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { List, Row, SectionHeading, Skeleton, Surface, Tag } from "../components/ui/Surface";
+import {
+  List,
+  PageTitle,
+  Row,
+  SectionHeading,
+  Skeleton,
+  Surface,
+  Tag,
+} from "../components/ui/Surface";
 import { useToast } from "../components/ui/Toast";
 import { cn } from "../components/ui/cn";
+import { Chip } from "../features/Chip";
 import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
@@ -68,7 +80,6 @@ function KeepAwake() {
 
 function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDetail }) {
   const stacks = useStacks();
-  const navigation = useNavigation();
   const { userId } = useAuth();
   const { session, venue } = detail;
   const live = session.status === "live";
@@ -84,10 +95,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   const [selected, setSelected] = useState<Entry | null>(null);
   const [closing, setClosing] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
-
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: venue.name });
-  }, [navigation, venue.name]);
 
   // Until the server confirms them, entries recorded here count as if they were already saved.
   const unsaved = pending.filter((entry) => !detail.entries.some((saved) => saved.id === entry.id));
@@ -192,16 +199,25 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   return (
     <>
       {live ? <KeepAwake /> : null}
-      <View className="gap-2">
-        {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
-        <Text className="text-base text-muted">
-          {gameNames[session.game]} · {formatDay(session.startedAt)} ·{" "}
-          {formatTime(session.startedAt)}
-          {/* Imported sessions end when they start: no length was recorded. */}
-          {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
-            ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
-            : ""}
-        </Text>
+      <View className="gap-3">
+        <PageTitle eyebrow={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
+          {venue.name}
+        </PageTitle>
+        <View className="flex-row items-center gap-2">
+          {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
+          <Text className="flex-1 text-sm text-muted">
+            {formatTime(session.startedAt)}
+            {/* Imported sessions end when they start: no length was recorded. */}
+            {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
+              ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
+              : ""}
+          </Text>
+        </View>
+        <TicketStub
+          players={detail.playerIds.length}
+          results={[...results.values()]}
+          currency={currency}
+        />
         {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
       </View>
 
@@ -226,9 +242,13 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
           const lastRebuy = lastBuyIn(playerId);
           return (
             <Surface key={playerId} className="gap-3 p-4">
-              <View className="flex-row items-start justify-between gap-3">
+              <View className="flex-row items-center justify-between gap-3">
+                <Chip chip={chipOf(group, playerId)} name={name} size={32} />
                 <View className="flex-1 gap-0.5">
-                  <Text numberOfLines={1} className="text-lg font-medium text-ink">
+                  <Text
+                    numberOfLines={1}
+                    className="font-display text-xl tracking-wide text-ink uppercase"
+                  >
                     {name}
                   </Text>
                   <Text className="text-sm text-muted tabular-nums">
@@ -318,7 +338,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
               const actionable = live && !item.saving && !voided && canVoid(item.entry);
               const content = (
                 <>
-                  <Text numberOfLines={1} className="w-20 text-sm text-muted tabular-nums">
+                  <Text numberOfLines={1} className="w-20 font-mono text-xs text-muted">
                     {formatTime(entry.occurredAt)}
                   </Text>
                   <View className="flex-1 gap-0.5">
@@ -555,5 +575,61 @@ function AddPlayerSheet({
       )}
       {add.error ? <FormError>{add.error}</FormError> : null}
     </Sheet>
+  );
+}
+
+/** The table at a glance, like the stub of a betting ticket: who sat down, what went in and out. */
+function TicketStub({
+  players,
+  results,
+  currency,
+}: {
+  players: number;
+  results: ReadonlyArray<{ buyIn: number; cashOut: number; net: number }>;
+  currency: CurrencyCode;
+}) {
+  const total = (pick: (result: (typeof results)[number]) => number) =>
+    MinorUnits.make(results.reduce((sum, result) => sum + pick(result), 0));
+  const buyIn = total((r) => r.buyIn);
+  const cashOut = total((r) => r.cashOut);
+  // Imported sessions only have each player's net, so there's no money in or out to show.
+  const cells =
+    buyIn === 0 && cashOut === 0
+      ? [
+          {
+            label: "Players",
+            value: <Text className="font-mono text-base text-ink">{players}</Text>,
+          },
+          {
+            label: "Table net",
+            value: <Money amount={total((r) => r.net)} currency={currency} tone="result" />,
+          },
+        ]
+      : [
+          {
+            label: "Players",
+            value: <Text className="font-mono text-base text-ink">{players}</Text>,
+          },
+          { label: "In", value: <Money amount={buyIn} currency={currency} /> },
+          { label: "Out", value: <Money amount={cashOut} currency={currency} /> },
+        ];
+  return (
+    <View className="flex-row rounded-xl border border-dashed border-line-strong">
+      {cells.map((cell, index) => (
+        <View
+          key={cell.label}
+          accessible
+          className={cn(
+            "flex-1 gap-0.5 px-3 py-2.5",
+            index > 0 && "border-l border-dashed border-line-strong",
+          )}
+        >
+          <Text className="text-[11px] font-semibold tracking-[2px] text-muted uppercase">
+            {cell.label}
+          </Text>
+          {cell.value}
+        </View>
+      ))}
+    </View>
   );
 }

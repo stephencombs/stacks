@@ -15,18 +15,15 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
-  Platform,
   Pressable,
   ScrollView,
   Text,
   View,
-  type TextStyle,
 } from "react-native";
 
 import { cn } from "../components/ui/cn";
 import { Chip } from "./Chip";
 
-const mono: TextStyle = { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }) };
 const label = "text-[11px] font-semibold tracking-[2px] uppercase";
 const tone = (n: number) =>
   n > 0 ? "text-board-win" : n < 0 ? "text-board-loss" : "text-board-muted";
@@ -72,8 +69,8 @@ function Ticker({ items }: { items: ReadonlyArray<{ key: string; text: string }>
             <Text
               key={item.key}
               numberOfLines={1}
-              style={[mono, { flexShrink: 0 }]}
-              className="mr-8 text-xs text-board-amber"
+              style={{ flexShrink: 0 }}
+              className="mr-8 font-mono text-xs text-board-amber"
             >
               {item.text}
             </Text>
@@ -116,14 +113,14 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
             </Text>
             <Text
               numberOfLines={1}
-              className="text-2xl font-black tracking-tight text-board-ink uppercase"
+              className="font-display text-4xl leading-10 text-board-ink uppercase"
             >
               {tonight ? nightLabel(tonight) : "Before the first hand"}
             </Text>
           </View>
           <View className="items-end">
             <Text className={cn(label, "text-board-muted")}>Table</Text>
-            <Text style={mono} className={cn("text-lg", tone(total))}>
+            <Text className={cn("font-mono", "text-lg", tone(total))}>
               {boardMoney(total, currency)}
             </Text>
           </View>
@@ -139,7 +136,10 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
           >
             <View className="size-2 rounded-full bg-board-loss" />
             <Text className={cn(label, "text-board-loss")}>Live</Text>
-            <Text numberOfLines={1} className="flex-1 font-semibold text-board-ink uppercase">
+            <Text
+              numberOfLines={1}
+              className="flex-1 font-display text-lg tracking-wide text-board-ink uppercase"
+            >
               {s.venue.name}
             </Text>
           </Pressable>
@@ -173,12 +173,10 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                       you && "border-l-[3px] border-l-board-amber",
                     )}
                   >
-                    <Text style={mono} className="w-6 text-xl font-bold text-board-amber">
-                      {s.rank}
-                    </Text>
+                    <Text className="font-mono w-6 text-xl text-board-amber">{s.rank}</Text>
                     <Text
-                      style={mono}
                       className={cn(
+                        "font-mono",
                         "w-6 text-xs",
                         s.moved > 0 ? "text-board-win" : "text-board-loss",
                       )}
@@ -190,24 +188,21 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                       <View className="flex-row items-center gap-2">
                         <Text
                           numberOfLines={1}
-                          className="shrink font-bold text-board-ink uppercase"
+                          className="shrink font-display text-lg leading-6 tracking-wide text-board-ink uppercase"
                         >
                           {name(s.playerId)}
                         </Text>
                         {s.hot ? (
-                          <Text
-                            style={mono}
-                            className="rounded-sm bg-board-amber px-1 text-[10px] font-bold text-board-amber-ink"
-                          >
+                          <Text className="rounded-sm bg-board-amber px-1 font-mono text-[10px] text-board-amber-ink">
                             HOT
                           </Text>
                         ) : null}
                       </View>
-                      <Text style={mono} className="text-xs text-board-muted">
+                      <Text className="font-mono text-xs text-board-muted">
                         {s.sessions} SESS{you ? " · YOU" : ""}
                       </Text>
                     </View>
-                    <Text style={mono} className={cn("text-lg font-bold", tone(s.net))}>
+                    <Text className={cn("font-mono", "text-lg", tone(s.net))}>
                       {boardMoney(s.net, currency)}
                     </Text>
                   </View>
@@ -236,7 +231,10 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                       name={name(award.playerId)}
                       size={22}
                     />
-                    <Text numberOfLines={1} className="shrink font-bold text-board-ink uppercase">
+                    <Text
+                      numberOfLines={1}
+                      className="shrink font-display text-lg leading-6 tracking-wide text-board-ink uppercase"
+                    >
                       {name(award.playerId)}
                     </Text>
                   </View>
@@ -261,23 +259,20 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                   index > 0 && "border-t border-board-rule",
                 )}
               >
-                <Text style={mono} className="w-7 text-sm text-board-amber">
-                  D{night.number}
-                </Text>
-                <Text style={mono} className="w-9 text-sm text-board-ink uppercase">
+                <Text className="font-mono w-7 text-sm text-board-amber">D{night.number}</Text>
+                <Text className="font-mono w-9 text-sm text-board-ink uppercase">
                   {nightLabel(night).split(" · ")[1]!.slice(0, 3)}
                 </Text>
-                <Text style={mono} className="w-14 text-sm text-board-muted">
+                <Text className="font-mono w-14 text-sm text-board-muted">
                   {night.sessions.length} sess
                 </Text>
                 <Text
-                  style={mono}
                   numberOfLines={1}
-                  className="flex-1 text-sm text-board-ink uppercase"
+                  className="font-mono flex-1 text-sm text-board-ink uppercase"
                 >
                   {night.winner ? name(night.winner.playerId) : "—"}
                 </Text>
-                <Text style={mono} className={cn("text-sm", tone(night.winner?.net ?? 0))}>
+                <Text className={cn("font-mono", "text-sm", tone(night.winner?.net ?? 0))}>
                   {night.winner ? boardMoney(night.winner.net, currency) : ""}
                 </Text>
               </View>

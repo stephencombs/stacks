@@ -10,6 +10,7 @@ import {
 } from "@stacks/contracts";
 import { formatDay } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
+import { chipOf } from "@stacks/client-runtime/trip";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
@@ -21,6 +22,7 @@ import { List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surfa
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { webUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
+import { Chip } from "../features/Chip";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ groupId: string }>;
@@ -75,6 +77,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
                   }
                 : {})}
             >
+              <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
               <Text numberOfLines={1} className="flex-1 text-base text-ink">
                 {player.displayName}
                 {player.id === detail.myPlayerId ? (
@@ -108,6 +111,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
           <List>
             {guests.map((player) => (
               <Row key={player.id}>
+                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
                 <Text className="flex-1 text-base text-ink">{player.displayName}</Text>
                 {player.claimCode ? (
                   <Button

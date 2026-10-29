@@ -1,6 +1,7 @@
 import { MinorUnits, type GroupDetail, type GroupStats, type PlayerId } from "@stacks/contracts";
 import { barTrack } from "@stacks/client-runtime/chart";
 import { playerNames } from "@stacks/client-runtime/format";
+import { chipOf } from "@stacks/client-runtime/trip";
 import { formatMoney } from "@stacks/shared/money";
 import { sessionCounts, type Subject } from "@stacks/shared/results";
 import type { ReactNode } from "react";
@@ -9,6 +10,7 @@ import { Pressable, Text, View } from "react-native";
 import { Money } from "../components/Money";
 import { List } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
+import { Chip } from "./Chip";
 
 /**
  * Everyone ranked by all-time net, each with a bar from break-even, and the group's total.
@@ -51,18 +53,24 @@ export function Standings({
             selected={selected === result.playerId}
             onSelect={() => onSelect(result.playerId)}
           >
-            <View className="flex-row items-baseline gap-3">
-              <Text className="w-5 text-sm text-muted tabular-nums">{index + 1}</Text>
+            <View className="flex-row items-center gap-3">
+              <Text className="w-5 font-mono text-base text-accent-text">{index + 1}</Text>
+              <Chip chip={chipOf(detail, result.playerId)} name={name} size={26} />
               <View className="flex-1">
-                <Text numberOfLines={1} className="text-base font-medium text-ink">
+                <Text
+                  numberOfLines={1}
+                  className="font-display text-lg leading-6 tracking-wide text-ink uppercase"
+                >
                   {name}
-                  {you ? <Text className="font-normal text-muted"> · you</Text> : null}
+                  {you ? (
+                    <Text className="font-sans text-sm text-muted normal-case"> · you</Text>
+                  ) : null}
                 </Text>
                 <Text className="text-sm text-muted tabular-nums">{summary}</Text>
               </View>
               <Money amount={result.net} currency={currency} tone="result" className="text-lg" />
             </View>
-            <View className="ml-8 h-1.5 overflow-hidden rounded-full bg-line">
+            <View className="ml-[70px] h-1.5 overflow-hidden rounded-full bg-line">
               <View
                 className={cn(
                   "absolute inset-y-0 rounded-full",
@@ -83,10 +91,12 @@ export function Standings({
         selected={selected === "group"}
         onSelect={() => onSelect("group")}
       >
-        <View className="flex-row items-baseline gap-3">
+        <View className="flex-row items-center gap-3">
           <View className="w-5" />
           <View className="flex-1">
-            <Text className="text-base font-medium text-ink">Group total</Text>
+            <Text className="font-display text-lg leading-6 tracking-wide text-ink uppercase">
+              Group total
+            </Text>
             <Text className="text-sm text-muted tabular-nums">{sessions(stats.sessionCount)}</Text>
           </View>
           <Money amount={total} currency={currency} tone="result" className="text-lg" />

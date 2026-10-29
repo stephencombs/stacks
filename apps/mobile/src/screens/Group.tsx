@@ -1,11 +1,10 @@
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { GroupId, type GroupDetail } from "@stacks/contracts";
-import { useLayoutEffect } from "react";
 import { View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Screen } from "../components/ui/Screen";
-import { Skeleton } from "../components/ui/Surface";
+import { PageTitle, Skeleton } from "../components/ui/Surface";
 import { TripsSection } from "../features/Trips";
 import { Loaded, useStacks } from "../lib/stacks";
 
@@ -31,12 +30,13 @@ function GroupView({ detail }: { detail: GroupDetail }) {
   // Trips come newest first, so the first one still going is where tonight's sessions go.
   const going = detail.trips.find((trip) => trip.endedAt === null);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: detail.group.name });
-  }, [navigation, detail.group.name]);
-
   return (
     <>
+      <PageTitle
+        eyebrow={`${detail.players.length} ${detail.players.length === 1 ? "player" : "players"} · ${detail.group.currency}`}
+      >
+        {detail.group.name}
+      </PageTitle>
       {going ? (
         <Button
           label={`Start a session in ${going.name}`}

@@ -50,6 +50,25 @@ export function Row({
   );
 }
 
+/** A screen's title, with an optional amber line above it saying where the screen sits. */
+export function PageTitle({ eyebrow, children }: { eyebrow?: string; children: string }) {
+  return (
+    <View className="gap-1.5">
+      {eyebrow ? (
+        <Text className="text-[11px] font-semibold tracking-[2px] text-accent-text uppercase">
+          {eyebrow}
+        </Text>
+      ) : null}
+      <Text
+        accessibilityRole="header"
+        className="font-display text-5xl leading-[48px] text-ink uppercase"
+      >
+        {children}
+      </Text>
+    </View>
+  );
+}
+
 export function SectionHeading({ children, action }: { children: string; action?: ReactNode }) {
   return (
     <View className="min-h-9 flex-row items-center justify-between">

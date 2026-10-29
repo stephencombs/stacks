@@ -88,10 +88,15 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                   onPress={() => setChart(option.key)}
                   className={cn(
                     "min-h-10 justify-center rounded-lg px-3",
-                    selected ? "border border-line bg-surface" : "active:opacity-70",
+                    selected ? "bg-accent" : "active:opacity-70",
                   )}
                 >
-                  <Text className={cn("text-sm", selected ? "text-ink" : "text-muted")}>
+                  <Text
+                    className={cn(
+                      "text-xs font-semibold tracking-[1.5px] uppercase",
+                      selected ? "text-accent-ink" : "text-muted",
+                    )}
+                  >
                     {option.label}
                   </Text>
                 </Pressable>

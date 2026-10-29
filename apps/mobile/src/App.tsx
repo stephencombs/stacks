@@ -1,7 +1,7 @@
 import { ClerkProvider, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
-import { BarlowCondensed_700Bold } from "@expo-google-fonts/barlow-condensed";
-import { JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
+import { BarlowCondensed_700Bold } from "@expo-google-fonts/barlow-condensed/700Bold";
+import { JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono/500Medium";
 import {
   DarkTheme,
   DefaultTheme,
@@ -135,10 +135,21 @@ function useNavigationTheme() {
 function SignedOut() {
   return (
     <View className="flex-1 justify-center gap-6 bg-canvas px-6">
-      <Text className="font-display text-3xl text-ink">Stacks</Text>
-      <Text accessibilityRole="header" className="font-display text-5xl leading-tight text-ink">
-        Keep the casino trip honest.
-      </Text>
+      <View className="flex-row items-center gap-2">
+        <View className="size-3 rotate-45 rounded-[3px] bg-accent" />
+        <Text className="font-display text-2xl tracking-wide text-ink uppercase">Stacks</Text>
+      </View>
+      <View className="gap-3">
+        <Text className="text-[11px] font-semibold tracking-[2px] text-accent-text uppercase">
+          For the trip with your friends
+        </Text>
+        <Text
+          accessibilityRole="header"
+          className="font-display text-6xl leading-[56px] text-ink uppercase"
+        >
+          Keep the casino trip honest.
+        </Text>
+      </View>
       <Text className="text-lg text-muted">
         Log buy-ins and cash-outs as you play. Stacks works out everyone's results and who owes
         whom, so settling up takes one tap.

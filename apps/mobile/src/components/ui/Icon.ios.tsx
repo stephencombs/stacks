@@ -15,7 +15,7 @@ export function Icon({
   size = 20,
 }: {
   name: IconName;
-  color: "ink" | "muted" | "faint" | "accent-ink";
+  color: "ink" | "muted" | "faint" | "accent-ink" | "accent-text";
   size?: number;
 }) {
   const tint = useCSSVariable(`--color-${color}`);

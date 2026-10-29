@@ -10,6 +10,7 @@ import {
 } from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
+import { chipOf } from "@stacks/client-runtime/trip";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -22,6 +23,7 @@ import { List, Row, SectionHeading, Skeleton, Surface } from "../components/ui/S
 import { cn } from "../components/ui/cn";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { VenuePicker } from "../features/VenuePicker";
+import { Chip } from "../features/Chip";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ tripId: string }>;
@@ -148,6 +150,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
                   >
                     {checked ? <Icon name="check" color="accent-ink" size={16} /> : null}
                   </View>
+                  <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
                   <Text className="text-base text-ink">
                     {player.displayName}
                     {player.id === detail.myPlayerId ? (

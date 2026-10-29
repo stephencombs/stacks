@@ -50,15 +50,15 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
           accessibilityRole="button"
           accessibilityLabel={`${trip.name}, live board`}
           onPress={() => navigation.navigate("Trip", { tripId: trip.id })}
-          className="gap-3 rounded-2xl bg-board p-4 active:opacity-90"
+          className="gap-4 rounded-2xl border border-board-rule bg-board p-5 active:opacity-90"
         >
-          <View className="gap-0.5">
+          <View className="gap-1.5">
             <Text className="text-[11px] font-semibold tracking-[2px] text-board-amber uppercase">
               Live board · {tripDates(trip)}
             </Text>
             <Text
               numberOfLines={1}
-              className="text-2xl font-black tracking-tight text-board-ink uppercase"
+              className="font-display text-4xl leading-10 text-board-ink uppercase"
             >
               {trip.name}
             </Text>
@@ -76,7 +76,10 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
               accessibilityHint="Opens the trip's board"
               onPress={() => navigation.navigate("Trip", { tripId: trip.id })}
             >
-              <Text numberOfLines={1} className="flex-1 text-base text-ink">
+              <Text
+                numberOfLines={1}
+                className="flex-1 font-display text-xl tracking-wide text-ink uppercase"
+              >
                 {trip.name}
               </Text>
               <Text className="text-sm text-muted">{tripDates(trip)}</Text>
@@ -101,9 +104,11 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
     <View className="flex-row flex-wrap gap-x-4 gap-y-2">
       {top.map((s) => (
         <View key={s.playerId} className="flex-row items-center gap-2">
-          <Text className="text-sm text-board-amber">{s.rank}</Text>
+          <Text className="font-mono text-sm text-board-amber">{s.rank}</Text>
           <Chip chip={chipOf(detail, s.playerId)} name={names.get(s.playerId) ?? ""} size={22} />
-          <Text className={`text-sm ${s.net >= 0 ? "text-board-win" : "text-board-loss"}`}>
+          <Text
+            className={`font-mono text-sm ${s.net >= 0 ? "text-board-win" : "text-board-loss"}`}
+          >
             {boardMoney(s.net, detail.group.currency)}
           </Text>
         </View>

@@ -11,6 +11,7 @@ import {
 } from "@stacks/contracts";
 import { formatDay, isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
+import { chipOf } from "@stacks/client-runtime/trip";
 import { applyPayments } from "@stacks/shared/balances";
 import { parseMoney } from "@stacks/shared/money";
 import { settleUp } from "@stacks/shared/settleUp";
@@ -27,6 +28,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { BackingSection } from "../features/Backing";
+import { Chip } from "../features/Chip";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ tripId: string }>;
@@ -101,6 +103,7 @@ function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDetail })
         <List>
           {detail.players.map((player) => (
             <Row key={player.id}>
+              <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
               <Text numberOfLines={1} className="flex-1 text-base text-ink">
                 {player.displayName}
                 {player.id === detail.myPlayerId ? (
@@ -135,9 +138,9 @@ function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDetail })
                     accessibilityLabel={`${names.get(transfer.from)} pays ${names.get(transfer.to)}`}
                     className="flex-1 flex-row flex-wrap items-center gap-x-1.5"
                   >
-                    <Text className="text-base text-ink">{names.get(transfer.from)}</Text>
-                    <Icon name="arrow-right" color="muted" size={16} />
-                    <Text className="text-base text-ink">{names.get(transfer.to)}</Text>
+                    <Payer detail={detail} playerId={transfer.from} />
+                    <Icon name="arrow-right" color="accent-text" size={16} />
+                    <Payer detail={detail} playerId={transfer.to} />
                   </View>
                   <Money amount={transfer.amount} currency={currency} className="text-lg" />
                   <Button label="Mark paid" size="sm" onPress={() => setPaying(transfer)} />
@@ -166,7 +169,7 @@ function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDetail })
                 <Text className="flex-1 text-base text-ink">
                   {names.get(payment.from)} paid {names.get(payment.to)}
                 </Text>
-                <Money amount={payment.amount} currency={currency} className="font-medium" />
+                <Money amount={payment.amount} currency={currency} />
               </Row>
             ))}
             {trip.settlements.map((entry) => {
@@ -192,7 +195,7 @@ function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDetail })
                   <Money
                     amount={entry.amount}
                     currency={currency}
-                    className={cn("font-medium", voided && "text-muted")}
+                    className={cn(voided && "text-muted")}
                   />
                 </Row>
               );
@@ -319,5 +322,15 @@ function VoidPaymentSheet({ entry, onClose }: { entry: Entry; onClose: () => voi
         onPress={() => void confirm()}
       />
     </Sheet>
+  );
+}
+
+function Payer({ detail, playerId }: { detail: GroupDetail; playerId: PlayerId }) {
+  const name = detail.players.find((player) => player.id === playerId)?.displayName ?? "Someone";
+  return (
+    <View className="flex-row items-center gap-1.5">
+      <Chip chip={chipOf(detail, playerId)} name={name} size={22} />
+      <Text className="font-display text-lg tracking-wide text-ink uppercase">{name}</Text>
+    </View>
   );
 }

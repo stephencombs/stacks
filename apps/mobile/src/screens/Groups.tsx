@@ -12,7 +12,7 @@ import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, List, Row, Skeleton, Tag } from "../components/ui/Surface";
+import { EmptyState, List, PageTitle, Row, Skeleton, Tag } from "../components/ui/Surface";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { setTheme, useTheme } from "../lib/theme";
 
@@ -25,9 +25,7 @@ export function GroupsScreen() {
   return (
     <Screen>
       <View className="gap-3">
-        <Text accessibilityRole="header" className="font-display text-4xl text-ink">
-          Your groups
-        </Text>
+        <PageTitle>Your groups</PageTitle>
         <View className="flex-row gap-2">
           <Button
             label="New group"
@@ -64,7 +62,10 @@ export function GroupsScreen() {
                 >
                   <View className="flex-1 gap-1">
                     <View className="flex-row items-center gap-2">
-                      <Text numberOfLines={1} className="shrink font-display text-xl text-ink">
+                      <Text
+                        numberOfLines={1}
+                        className="shrink font-display text-2xl tracking-wide text-ink uppercase"
+                      >
                         {item.group.name}
                       </Text>
                       {item.liveSessionCount > 0 ? <Tag tone="live">Live</Tag> : null}
