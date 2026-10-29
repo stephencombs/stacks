@@ -109,11 +109,13 @@ test.describe.serial("a group's first night out", () => {
     await record("Buy in", "Bea", "200");
     await record("Buy in", "Alex", "50", "Bea");
     // With no connection, a buy-in is kept and sent once the connection is back.
+    const sending = alex.getByText("Saved in this browser, sending");
+    await expect(sending).toHaveCount(0);
     await alex.context().setOffline(true);
     await record("Buy in", "Gus", "100");
-    await expect(alex.getByText("Saved in this browser, sending")).toBeVisible();
+    await expect(sending).toBeVisible();
     await alex.context().setOffline(false);
-    await expect(alex.getByText("Saved in this browser, sending")).toBeHidden();
+    await expect(sending).toHaveCount(0);
 
     await alex.getByRole("button", { name: "Close session" }).click();
     await alex.getByRole("dialog").getByRole("button", { name: "Close session" }).click();

@@ -94,12 +94,13 @@ test.describe.serial("live mode on a phone", () => {
     await record("Buy in", "Bea", "200");
     await record("Buy in", "Alex", "50", "Bea");
     // With no signal, a buy-in is kept on the phone and sent once there's signal again.
+    const waiting = alex.getByText("Saved on this phone, sending").filter({ visible: true });
+    await expect(waiting).toHaveCount(0);
     await alex.context().setOffline(true);
     await record("Buy in", "Gus", "100");
-    const waiting = alex.getByText("Saved on this phone, sending").filter({ visible: true });
     await expect(waiting).toBeVisible();
     await alex.context().setOffline(false);
-    await expect(waiting).toBeHidden();
+    await expect(waiting).toHaveCount(0);
     // One tap repeats Gus's last buy-in.
     await alex.getByRole("button", { name: "Rebuy for Gus" }).filter({ visible: true }).click();
     await expect(
