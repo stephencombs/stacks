@@ -1,13 +1,11 @@
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { GroupId, MinorUnits, type GroupDetail } from "@stacks/contracts";
+import { GroupId, type GroupDetail } from "@stacks/contracts";
 import { useLayoutEffect } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
-import { BalanceLabel } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { Screen } from "../components/ui/Screen";
-import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
-import { SessionList } from "../features/SessionList";
+import { Skeleton } from "../components/ui/Surface";
 import { TripsSection } from "../features/Trips";
 import { Loaded, useStacks } from "../lib/stacks";
 
@@ -30,9 +28,8 @@ export function GroupScreen({ route }: Props) {
 function GroupView({ detail }: { detail: GroupDetail }) {
   const navigation = useNavigation();
   const groupId = detail.group.id;
-  const live = detail.sessions.filter((summary) => summary.session.status === "live");
-  const past = detail.sessions.filter((summary) => summary.session.status === "closed");
-  const balanceOf = new Map(detail.balances.map((balance) => [balance.playerId, balance.amount]));
+  // Trips come newest first, so the first one still going is where tonight's sessions go.
+  const going = detail.trips.find((trip) => trip.endedAt === null);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: detail.group.name });
@@ -40,19 +37,15 @@ function GroupView({ detail }: { detail: GroupDetail }) {
 
   return (
     <>
-      <Button
-        label="Start a session"
-        variant="primary"
-        size="lg"
-        onPress={() => navigation.navigate("NewSession", { groupId })}
-      />
-      <View className="flex-row gap-2">
+      {going ? (
         <Button
-          label="Settle up"
-          size="sm"
-          className="flex-1"
-          onPress={() => navigation.navigate("Settle", { groupId })}
+          label={`Start a session in ${going.name}`}
+          variant="primary"
+          size="lg"
+          onPress={() => navigation.navigate("NewSession", { tripId: going.id })}
         />
+      ) : null}
+      <View className="flex-row gap-2">
         <Button
           label="Stats"
           size="sm"
@@ -67,49 +60,7 @@ function GroupView({ detail }: { detail: GroupDetail }) {
         />
       </View>
 
-      {live.length > 0 ? (
-        <View className="gap-2">
-          <SectionHeading>Playing now</SectionHeading>
-          <SessionList sessions={live} detail={detail} />
-        </View>
-      ) : null}
-
       <TripsSection detail={detail} />
-
-      <View className="gap-2">
-        <SectionHeading>Balances</SectionHeading>
-        <List>
-          {detail.players.map((player) => (
-            <Row key={player.id}>
-              <Text numberOfLines={1} className="flex-1 text-base text-ink">
-                {player.displayName}
-                {player.id === detail.myPlayerId ? (
-                  <Text className="text-muted"> (you)</Text>
-                ) : null}
-                {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
-              </Text>
-              <BalanceLabel
-                amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
-                currency={detail.group.currency}
-              />
-            </Row>
-          ))}
-        </List>
-      </View>
-
-      <View className="gap-2">
-        <SectionHeading>Sessions</SectionHeading>
-        {detail.sessions.length === 0 ? (
-          <EmptyState title="No sessions yet">
-            Start one when you sit down to play. Everyone's buy-ins and cash-outs go in it, and the
-            balances above update as you go.
-          </EmptyState>
-        ) : past.length > 0 ? (
-          <SessionList sessions={past} detail={detail} />
-        ) : (
-          <Text className="text-sm text-muted">Finished sessions show up here.</Text>
-        )}
-      </View>
     </>
   );
 }

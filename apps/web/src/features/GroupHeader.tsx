@@ -5,8 +5,7 @@ import type { ReactNode } from "react";
 import { cn } from "~/components/ui/cn";
 
 const tabs = [
-  { key: "home", label: "Sessions", to: "/groups/$groupId" },
-  { key: "settle", label: "Settle up", to: "/groups/$groupId/settle" },
+  { key: "home", label: "Trips", to: "/groups/$groupId" },
   { key: "stats", label: "Stats", to: "/groups/$groupId/stats" },
   { key: "settings", label: "People", to: "/groups/$groupId/settings" },
 ] as const;

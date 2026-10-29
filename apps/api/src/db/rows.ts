@@ -77,6 +77,7 @@ export const VenueRow = Schema.Struct({
 export const SessionRow = Schema.Struct({
   id: SessionId,
   groupId: GroupId,
+  tripId: TripId,
   venueId: VenueId,
   game: Game,
   status: SessionStatus,
@@ -89,6 +90,7 @@ export const EntryRow = Schema.Struct({
   id: EntryId,
   groupId: GroupId,
   sessionId: Schema.NullOr(SessionId),
+  tripId: Schema.NullOr(TripId),
   kind: EntryKind,
   playerId: PlayerId,
   counterpartyId: Schema.NullOr(PlayerId),
@@ -106,6 +108,7 @@ export const EntryRow = Schema.Struct({
 export const StakeRow = Schema.Struct({
   id: StakeId,
   groupId: GroupId,
+  tripId: TripId,
   lenderId: PlayerId,
   borrowerId: PlayerId,
   amount: Amount,

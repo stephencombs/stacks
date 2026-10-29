@@ -13,7 +13,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a session from buy-in to set
       const venue = yield* catalogVenue(alex);
       const sessionId = ids.session();
       yield* alex.sessions.create({
-        params: { groupId: group.group.id },
+        params: { tripId: group.tripId },
         payload: {
           id: sessionId,
           venueId: venue.id,
@@ -61,7 +61,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a session from buy-in to set
       );
 
       // Alex owes Bea 5,000 for the buy-in and 12,000 for the cash Alex kept.
-      const detail = yield* bea.groups.get({ params: { groupId: group.group.id } });
+      const detail = yield* bea.trips.get({ params: { tripId: group.tripId } });
       expect(detail.balances).toEqual(
         expect.arrayContaining([
           { playerId: alexId, amount: -17000 },
@@ -71,7 +71,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a session from buy-in to set
       expect(detail.transfers).toEqual([{ from: alexId, to: beaId, amount: 17000 }]);
 
       yield* alex.ledger.recordSettlement({
-        params: { groupId: group.group.id },
+        params: { tripId: group.tripId },
         payload: {
           id: ids.entry(),
           fromPlayerId: alexId,
@@ -80,7 +80,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a session from buy-in to set
           note: "Venmo",
         },
       });
-      const settled = yield* bea.groups.get({ params: { groupId: group.group.id } });
+      const settled = yield* bea.trips.get({ params: { tripId: group.tripId } });
       expect(settled.balances).toEqual([]);
       expect(settled.transfers).toEqual([]);
       expect(settled.settlements).toHaveLength(1);
@@ -96,7 +96,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("ledger rules", (it) => {
     const venue = yield* catalogVenue(alex);
     const sessionId = ids.session();
     yield* alex.sessions.create({
-      params: { groupId: group.group.id },
+      params: { tripId: group.tripId },
       payload: {
         id: sessionId,
         venueId: venue.id,
@@ -255,7 +255,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("ledger rules", (it) => {
       expect(
         yield* Effect.flip(
           alex.ledger.recordSettlement({
-            params: { groupId: group.group.id },
+            params: { tripId: group.tripId },
             payload: {
               id: ids.entry(),
               fromPlayerId: alexId,

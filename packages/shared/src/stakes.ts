@@ -5,6 +5,7 @@ import {
   type PlayerId,
   type Session,
   type StakeId,
+  type TripId,
 } from "@stacks/contracts";
 
 import { resultsBy } from "./results.ts";
@@ -12,6 +13,7 @@ import { resultsBy } from "./results.ts";
 /** The parts of a stake the math reads. */
 export interface StakeTerms {
   readonly id: StakeId;
+  readonly tripId: TripId;
   readonly lenderId: PlayerId;
   readonly borrowerId: PlayerId;
   readonly amount: MinorUnits;
@@ -31,9 +33,11 @@ export interface StakeOutcome {
 
 type ResultEntry = Pick<Entry, "kind" | "playerId" | "amount" | "voidedAt" | "sessionId">;
 
-const covers = (stake: StakeTerms, at: DateTime.Utc) =>
-  DateTime.toEpochMillis(stake.startedAt) <= DateTime.toEpochMillis(at) &&
-  (stake.endedAt === null || DateTime.toEpochMillis(at) < DateTime.toEpochMillis(stake.endedAt));
+const covers = (stake: StakeTerms, session: Pick<Session, "tripId" | "startedAt">) =>
+  stake.tripId === session.tripId &&
+  DateTime.toEpochMillis(stake.startedAt) <= DateTime.toEpochMillis(session.startedAt) &&
+  (stake.endedAt === null ||
+    DateTime.toEpochMillis(session.startedAt) < DateTime.toEpochMillis(stake.endedAt));
 
 /** Splits `total` in proportion to `weights`, in whole units; leftovers go to the largest remainders. */
 const allocate = (total: number, weights: ReadonlyArray<number>): ReadonlyArray<number> => {
@@ -54,13 +58,13 @@ const allocate = (total: number, weights: ReadonlyArray<number>): ReadonlyArray<
 
 /**
  * Each live stake's share of its borrower's results and what the borrower owes back. A stake
- * covers every session that starts while it's open; when several stakes cover the same
+ * covers every session in its trip that starts while it's open; when several stakes cover the same
  * session, its result is split by how much each lender put in. Winnings are split at the
  * lender's share; a loss comes out of the stake, and the lender never loses more than it.
  */
 export const stakeOutcomes = (
   stakes: Iterable<StakeTerms>,
-  sessions: Iterable<Pick<Session, "id" | "startedAt">>,
+  sessions: Iterable<Pick<Session, "id" | "tripId" | "startedAt">>,
   entries: Iterable<ResultEntry>,
 ): ReadonlyMap<StakeId, StakeOutcome> => {
   const live = Array.from(stakes).filter((stake) => stake.voidedAt === null);
@@ -72,7 +76,7 @@ export const stakeOutcomes = (
     const sessionResults = bySession.get(session.id);
     if (!sessionResults) continue;
     for (const [playerId, result] of sessionResults) {
-      const open = live.filter((s) => s.borrowerId === playerId && covers(s, session.startedAt));
+      const open = live.filter((s) => s.borrowerId === playerId && covers(s, session));
       if (open.length === 0 || result.net === 0) continue;
       const shares = allocate(
         result.net,

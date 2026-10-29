@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  GroupId,
   SessionId,
+  TripId,
   type Game,
   type GroupDetail,
+  type TripDetail,
   type PlayerId,
   type Venue,
 } from "@stacks/contracts";
@@ -21,17 +22,21 @@ import { VenuePicker } from "~/features/VenuePicker";
 import { gameNames } from "@stacks/client-runtime/format";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
-export const Route = createFileRoute("/groups/$groupId/sessions/new")({ component: NewSession });
+export const Route = createFileRoute("/trips/$tripId/sessions/new")({ component: NewSession });
 
 function NewSession() {
-  const { groupId } = Route.useParams();
+  const { tripId } = Route.useParams();
   const stacks = useStacks();
   return (
-    <Loaded
-      query={stacks.group(GroupId.make(groupId))}
-      skeleton={<Skeleton className="mt-4 h-96" />}
-    >
-      {(detail) => <NewSessionForm detail={detail} />}
+    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="mt-4 h-96" />}>
+      {(trip) => (
+        <Loaded
+          query={stacks.group(trip.trip.groupId)}
+          skeleton={<Skeleton className="mt-4 h-96" />}
+        >
+          {(detail) => <NewSessionForm detail={detail} trip={trip} />}
+        </Loaded>
+      )}
     </Loaded>
   );
 }
@@ -42,7 +47,7 @@ const GAMES = Object.keys(gameNames) as ReadonlyArray<Game>;
 const localInputValue = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
-function NewSessionForm({ detail }: { detail: GroupDetail }) {
+function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const stacks = useStacks();
   const navigate = useNavigate();
   const create = useAction(stacks.Client.mutation("sessions", "create"));
@@ -79,7 +84,7 @@ function NewSessionForm({ detail }: { detail: GroupDetail }) {
     const startedAt =
       earlier && startedAtInput ? DateTime.makeUnsafe(new Date(startedAtInput)) : undefined;
     const session = await create.run({
-      params: { groupId: detail.group.id },
+      params: { tripId: trip.trip.id },
       payload: {
         id: SessionId.make(newId()),
         venueId: venue.id,
@@ -96,7 +101,9 @@ function NewSessionForm({ detail }: { detail: GroupDetail }) {
   return (
     <form onSubmit={submit} className="flex flex-col gap-8 pt-4">
       <div className="flex flex-col gap-1">
-        <p className="text-sm text-muted">{detail.group.name}</p>
+        <p className="text-sm text-muted">
+          {detail.group.name} · {trip.trip.name}
+        </p>
         <h1 className="font-serif text-4xl font-medium">Start a session</h1>
       </div>
 

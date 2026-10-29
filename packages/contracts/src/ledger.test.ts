@@ -7,11 +7,13 @@ import { Entry, Session } from "./ledger.ts";
 const ALEX = "0192e7a0-0000-7000-8000-000000000001";
 const BEA = "0192e7a0-0000-7000-8000-000000000002";
 const SESSION = "0192e7a0-0000-7000-8000-0000000000a1";
+const TRIP = "0192e7a0-0000-7000-8000-0000000000b1";
 
 const encodedEntry = (fields: Record<string, unknown>) => ({
   id: "0192e7a0-0000-7000-8000-0000000000e1",
   groupId: "0192e7a0-0000-7000-8000-0000000000f1",
   sessionId: SESSION,
+  tripId: null,
   kind: "buy_in",
   playerId: ALEX,
   counterpartyId: null,
@@ -37,7 +39,9 @@ describe("Entry", () => {
     expect(accepts({ kind: "buy_in", counterpartyId: BEA })).toBe(true);
     expect(accepts({ kind: "cash_out", amount: 1 })).toBe(true);
     expect(accepts({ kind: "adjustment", amount: -250 })).toBe(true);
-    expect(accepts({ kind: "settlement", sessionId: null, counterpartyId: BEA })).toBe(true);
+    expect(
+      accepts({ kind: "settlement", sessionId: null, tripId: TRIP, counterpartyId: BEA }),
+    ).toBe(true);
   });
 
   it("rejects amounts that aren't whole minor units", () => {
@@ -53,9 +57,15 @@ describe("Entry", () => {
     expect(accepts({ kind: "buy_in", amount: 0 })).toBe(false);
     expect(accepts({ kind: "cash_out", amount: -5 })).toBe(false);
     expect(accepts({ kind: "adjustment", amount: 0 })).toBe(false);
-    expect(accepts({ kind: "settlement", sessionId: null, counterpartyId: BEA, amount: -5 })).toBe(
-      false,
-    );
+    expect(
+      accepts({
+        kind: "settlement",
+        sessionId: null,
+        tripId: TRIP,
+        counterpartyId: BEA,
+        amount: -5,
+      }),
+    ).toBe(false);
   });
 
   it("keeps the player's own money as an empty counterparty", () => {
@@ -72,9 +82,16 @@ describe("Entry", () => {
     expect(accepts({ kind: "settlement", counterpartyId: BEA })).toBe(false);
   });
 
+  it("puts a settlement on a trip, and a table entry on its session's trip instead", () => {
+    expect(accepts({ kind: "settlement", sessionId: null, counterpartyId: BEA })).toBe(false);
+    expect(accepts({ kind: "buy_in", tripId: TRIP })).toBe(false);
+  });
+
   it("requires a settlement to be paid to someone else", () => {
     expect(accepts({ kind: "settlement", sessionId: null })).toBe(false);
-    expect(accepts({ kind: "settlement", sessionId: null, counterpartyId: ALEX })).toBe(false);
+    expect(
+      accepts({ kind: "settlement", sessionId: null, tripId: TRIP, counterpartyId: ALEX }),
+    ).toBe(false);
   });
 });
 
@@ -83,6 +100,7 @@ describe("Session", () => {
   const session = (fields: Record<string, unknown>) => ({
     id: SESSION,
     groupId: "0192e7a0-0000-7000-8000-0000000000f1",
+    tripId: TRIP,
     venueId: "0192e7a0-0000-7000-8000-0000000000d1",
     game: "blackjack",
     status: "live",

@@ -68,12 +68,12 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
     <>
       <div className="flex flex-col gap-3 pt-4">
         <Link
-          to="/groups/$groupId"
-          params={{ groupId: group.group.id }}
+          to="/trips/$tripId"
+          params={{ tripId: session.tripId }}
           className="-ml-1 inline-flex items-center gap-1 self-start text-sm text-muted hover:text-ink"
         >
           <ChevronLeft className="size-4" aria-hidden />
-          {group.group.name}
+          {group.trips.find((trip) => trip.id === session.tripId)?.name ?? group.group.name}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-serif text-4xl font-medium">{venue.name}</h1>

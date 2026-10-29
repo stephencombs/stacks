@@ -1,9 +1,9 @@
 import { expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import { StakeId, type GroupDetail, type PlayerId } from "@stacks/contracts";
+import { StakeId, type PlayerId } from "@stacks/contracts";
 
-import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
+import { catalogVenue, groupWith, ids, usd, users, type TestGroup } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
@@ -13,7 +13,7 @@ const day = (n: number) => DateTime.makeUnsafe(`2026-10-${20 + n}T20:00:00Z`);
 /** A session on `day` where `playerId` wins (or loses) `net`. */
 const play = Effect.fn("test.play")(function* (
   client: Client,
-  group: GroupDetail,
+  group: TestGroup,
   playerId: PlayerId,
   net: number,
   on: number,
@@ -21,7 +21,7 @@ const play = Effect.fn("test.play")(function* (
   const venue = yield* catalogVenue(client);
   const sessionId = ids.session();
   yield* client.sessions.create({
-    params: { groupId: group.group.id },
+    params: { tripId: group.tripId },
     payload: {
       id: sessionId,
       venueId: venue.id,
@@ -45,9 +45,9 @@ const play = Effect.fn("test.play")(function* (
   });
 });
 
-const back = (client: Client, group: GroupDetail, lender: PlayerId, borrower: PlayerId) =>
+const back = (client: Client, group: TestGroup, lender: PlayerId, borrower: PlayerId) =>
   client.stakes.create({
-    params: { groupId: group.group.id },
+    params: { tripId: group.tripId },
     payload: {
       id: StakeId.make(crypto.randomUUID()),
       lenderId: lender,
@@ -68,7 +68,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
       const borrower = group.players.find((p) => p.id !== lender)!.id;
       const stake = yield* back(alex, group, lender, borrower);
 
-      const before = yield* alex.groups.get({ params: { groupId: group.group.id } });
+      const before = yield* alex.trips.get({ params: { tripId: group.tripId } });
       expect(before.balances).toEqual(
         expect.arrayContaining([
           { playerId: lender, amount: 100000 },
@@ -77,7 +77,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
       );
 
       yield* play(alex, group, borrower, 40000, 2);
-      const after = yield* alex.groups.get({ params: { groupId: group.group.id } });
+      const after = yield* alex.trips.get({ params: { tripId: group.tripId } });
       expect(after.stakes).toEqual([
         { stake: expect.objectContaining({ id: stake.id }), result: 40000, owed: 120000 },
       ]);
@@ -90,7 +90,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
         yield* Effect.flip(bea.groups.leave({ params: { groupId: group.group.id } })),
       ).toMatchObject({ _tag: "Conflict", reason: "balance_not_settled" });
       yield* bea.ledger.recordSettlement({
-        params: { groupId: group.group.id },
+        params: { tripId: group.tripId },
         payload: {
           id: ids.entry(),
           fromPlayerId: borrower,
@@ -99,7 +99,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
           note: null,
         },
       });
-      const settled = yield* alex.groups.get({ params: { groupId: group.group.id } });
+      const settled = yield* alex.trips.get({ params: { tripId: group.tripId } });
       expect(settled.balances).toEqual([]);
     }),
   );
@@ -112,8 +112,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
       const borrower = group.players.find((p) => p.id !== lender)!.id;
       const stake = yield* back(alex, group, lender, borrower);
       const owed = () =>
-        alex.groups
-          .get({ params: { groupId: group.group.id } })
+        alex.trips
+          .get({ params: { tripId: group.tripId } })
           .pipe(Effect.map((detail) => detail.stakes[0]!));
 
       yield* play(alex, group, borrower, -30000, 2);
@@ -135,7 +135,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
         payload: { reason: "Wrong amount" },
       });
       expect(voided.voidReason).toBe("Wrong amount");
-      const detail = yield* alex.groups.get({ params: { groupId: group.group.id } });
+      const detail = yield* alex.trips.get({ params: { tripId: group.tripId } });
       expect(detail.balances).toEqual([]);
       expect(detail.stakes).toEqual([
         { stake: expect.objectContaining({ voidReason: "Wrong amount" }), result: 0, owed: 0 },

@@ -31,7 +31,7 @@ test.describe.serial("live mode on a phone", () => {
     await expect(alex.getByLabel("Your name in this group")).toHaveValue("Alex");
     await alex.getByRole("button", { name: "Create group" }).filter({ visible: true }).click();
     await expect(
-      alex.getByRole("button", { name: "Start a session" }).filter({ visible: true }),
+      alex.getByRole("button", { name: "Start a trip" }).filter({ visible: true }),
     ).toBeVisible();
     const groupUrl = alex.url();
 
@@ -53,11 +53,17 @@ test.describe.serial("live mode on a phone", () => {
     await expect(bea.getByText("Vegas crew").filter({ visible: true })).toBeVisible();
     await bea.getByRole("button", { name: "Join group" }).filter({ visible: true }).click();
     await expect(
-      bea.getByRole("button", { name: "Start a session" }).filter({ visible: true }),
+      bea.getByRole("button", { name: "Start a trip" }).filter({ visible: true }),
     ).toBeVisible();
 
+    // Every session is part of a trip, so Alex starts one first.
+    const visible = (locator: ReturnType<typeof alex.getByRole>) =>
+      locator.filter({ visible: true });
     await alex.goto(groupUrl);
-    await alex.getByRole("button", { name: "Start a session" }).filter({ visible: true }).click();
+    await visible(alex.getByRole("button", { name: "Start a trip" })).click();
+    await visible(alex.getByLabel("Trip name")).fill("Vegas weekend");
+    await visible(alex.getByRole("button", { name: "Start trip" })).click();
+    await visible(alex.getByRole("button", { name: "Start a session" })).click();
     await alex.getByRole("button", { name: "Add a venue" }).filter({ visible: true }).click();
     await alex.getByLabel("Name", { exact: true }).fill(`Wynn test ${Date.now().toString(36)}`);
     await alex.getByLabel("City").fill("Las Vegas");
@@ -144,14 +150,18 @@ test.describe.serial("live mode on a phone", () => {
     await expect(alex.getByText("-$200.00").filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("+$20.00").filter({ visible: true })).toBeVisible();
 
-    // Alex owes Bea $50 for the buy-in and Gus $220 for the cash he kept.
+    // The trip's board ranks the night, and its settle-up says who owes whom: Alex owes Bea $50
+    // for the buy-in and Gus $220 for the cash he kept.
     await alex.goto(groupUrl);
+    await shoot(alex, "group");
+    await visible(alex.getByRole("button", { name: "Vegas weekend, live board" })).click();
+    await expect(alex.getByText("Biggest hit").filter({ visible: true })).toBeVisible();
+    await shoot(alex, "trip-board");
+    await alex.getByRole("button", { name: "Settle up" }).filter({ visible: true }).click();
     await expect(alex.getByText("Owes $270.00").filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("Owed $50.00").filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("Owed $220.00").filter({ visible: true })).toBeVisible();
-    await shoot(alex, "group");
-
-    await alex.getByRole("button", { name: "Settle up" }).filter({ visible: true }).click();
+    const settleUrl = alex.url();
     await expect(
       alex.getByRole("button", { name: "Mark paid" }).filter({ visible: true }),
     ).toHaveCount(2);
@@ -166,7 +176,7 @@ test.describe.serial("live mode on a phone", () => {
     }
     await expect(alex.getByText("Everyone's square").filter({ visible: true })).toBeVisible();
 
-    await bea.reload();
+    await bea.goto(new URL(settleUrl).pathname);
     await expect(bea.getByText("Settled up").filter({ visible: true })).toHaveCount(3);
 
     await alex.goto(groupUrl);
@@ -179,23 +189,22 @@ test.describe.serial("live mode on a phone", () => {
     await expect(alex.getByText("-$200.00").filter({ visible: true }).first()).toBeVisible();
     await shoot(alex, "stats");
 
-    // A trip started today picks up tonight's session; it can end, reopen and go away.
-    const visible = (locator: ReturnType<typeof alex.getByRole>) =>
-      locator.filter({ visible: true });
+    // The trip ends and reopens; a trip with nothing in it can be deleted.
     await alex.goto(groupUrl);
-    await visible(alex.getByRole("button", { name: "Start a trip" })).click();
-    await visible(alex.getByLabel("Trip name")).fill("Vegas weekend");
-    await visible(alex.getByRole("button", { name: "Start trip" })).click();
     await visible(alex.getByRole("button", { name: "Vegas weekend, live board" })).click();
-    await expect(alex.getByText("Biggest hit").filter({ visible: true })).toBeVisible();
-    await shoot(alex, "trip-board");
     for (const action of ["End trip", "Reopen trip"]) {
       await visible(alex.getByRole("button", { name: "Actions for Vegas weekend" })).click();
       await visible(alex.getByRole("button", { name: action })).click();
     }
-    await visible(alex.getByRole("button", { name: "Actions for Vegas weekend" })).click();
+    await alex.goto(groupUrl);
+    await visible(alex.getByRole("button", { name: "Start a trip" })).click();
+    await visible(alex.getByLabel("Trip name")).fill("Maybe Reno");
+    await visible(alex.getByRole("button", { name: "Start trip" })).click();
+    await visible(alex.getByRole("button", { name: "Actions for Maybe Reno" })).click();
     await visible(alex.getByRole("button", { name: "Delete trip" })).click();
     await visible(alex.getByRole("button", { name: "Delete for good" })).click();
-    await expect(visible(alex.getByRole("button", { name: "Start a trip" }))).toBeVisible();
+    await expect(
+      visible(alex.getByRole("button", { name: "Vegas weekend, live board" })),
+    ).toBeVisible();
   });
 });

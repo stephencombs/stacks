@@ -46,7 +46,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
       const group = yield* groupWith(alex, bea);
       const beaId = group.players[1]!.id;
       yield* alex.ledger.recordSettlement({
-        params: { groupId: group.group.id },
+        params: { tripId: group.tripId },
         payload: {
           id: ids.entry(),
           fromPlayerId: group.myPlayerId,
@@ -66,7 +66,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
       const group = yield* groupWith(alex, bea);
       const groupId = group.group.id;
       yield* alex.ledger.recordSettlement({
-        params: { groupId },
+        params: { tripId: group.tripId },
         payload: {
           id: ids.entry(),
           fromPlayerId: group.myPlayerId,
@@ -141,7 +141,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
       const venue = yield* catalogVenue(alex);
       const sessionId = ids.session();
       yield* alex.sessions.create({
-        params: { groupId },
+        params: { tripId: group.tripId },
         payload: {
           id: sessionId,
           venueId: venue.id,
@@ -169,7 +169,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stats", (it) => {
         Effect.gen(function* () {
           const sessionId = ids.session();
           yield* alex.sessions.create({
-            params: { groupId },
+            params: { tripId: group.tripId },
             payload: { id: sessionId, venueId: venue.id, game, playerIds: [me], notes: null },
           });
           const entry = (kind: "buy_in" | "cash_out", amount: number) =>

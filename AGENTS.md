@@ -10,12 +10,12 @@ Fight for the smallest model that makes the correct behavior unsurprising. Don't
 - **member**: a user in a group, with the role owner, admin or member.
 - **guest**: a player in a group who hasn't signed up yet. A guest can later claim their history by signing up.
 - **session**: one sitting at a venue, either live or closed.
-- **trip**: a named stretch of time in a group, like a weekend in Vegas. Every session that starts while it's open belongs to it, and it has its own board and awards. A group's trips never overlap.
+- **trip**: a run of play inside a group, like a weekend in Vegas. Every session belongs to one trip, and each trip keeps its own balances, stakes, board and settle-up. An ended trip takes no new sessions but can still be settled.
 - **entry**: one ledger row: a buy-in, cash-out, adjustment or settlement. Entries are never edited; a correction voids the old one and adds a new one.
 - **counterparty**: whose money paid for a buy-in, or who received a cash-out. Debts come from counterparties.
 - **result**: a player's win or loss (cash-outs minus buy-ins). A result is separate from a balance.
-- **balance**: what a member is owed (positive) or owes (negative) inside a group.
-- **settlement**: a recorded payment between two members. Stacks never moves money.
+- **balance**: what a member is owed (positive) or owes (negative) inside a trip.
+- **settlement**: a recorded payment between two members that squares up part of a trip. Stacks never moves money.
 - **stake**: money one player (the backer) gives another to play with. While it's open, the player's results go to it: the backer gets the stake back plus their share of the winnings, or what's left after losses. What the player owes back counts in balances.
 
 ## Hit every surface

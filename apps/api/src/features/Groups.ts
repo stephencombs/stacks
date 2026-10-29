@@ -9,6 +9,7 @@ import {
   NotFound,
   type CreateGroupRequest,
   GroupId,
+  TripId,
   type GroupListItem,
   type SetRoleRequest,
   type UserId,
@@ -114,16 +115,23 @@ export const get = Effect.fn("Groups.get")(function* (groupId: GroupId) {
   return yield* Views.groupDetail(yield* Access.membership(groupId));
 });
 
-const balanceOf = Effect.fn("Groups.balanceOf")(function* (member: Access.Membership) {
-  const { owed } = yield* Views.groupBalances(member.groupId);
-  return owed.get(member.playerId) ?? 0;
+/** Whether the member still owes or is owed anything in any of the group's trips. */
+const unsettled = Effect.fn("Groups.unsettled")(function* (member: Access.Membership) {
+  const sql = yield* SqlClient.SqlClient;
+  const trips = yield* sql`select id from trips where group_id = ${member.groupId}`.pipe(
+    Effect.flatMap(Access.decodeRows(Schema.Struct({ id: TripId }))),
+  );
+  const ledgers = yield* Effect.forEach(trips, (trip) => Views.tripLedger(trip.id), {
+    concurrency: "unbounded",
+  });
+  return ledgers.some(({ owed }) => (owed.get(member.playerId) ?? 0) !== 0);
 });
 
 export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const member = yield* Access.membership(groupId);
-  if ((yield* balanceOf(member)) !== 0) {
+  if (yield* unsettled(member)) {
     return yield* new Conflict({ reason: "balance_not_settled" });
   }
   if (member.role === "owner") {

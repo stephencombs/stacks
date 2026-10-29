@@ -40,7 +40,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
       expect(
         yield* Effect.flip(
           eve.sessions.create({
-            params: { groupId: other.group.id },
+            params: { tripId: other.tripId },
             payload: {
               id: ids.session(),
               venueId: home.id,
@@ -87,7 +87,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
         [second, "2026-02-01T20:00:00Z"],
       ] as const) {
         yield* alex.sessions.create({
-          params: { groupId: group.group.id },
+          params: { tripId: group.tripId },
           payload: {
             id: ids.session(),
             venueId: venue.id,

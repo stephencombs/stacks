@@ -1,4 +1,3 @@
-import type * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
@@ -43,9 +42,6 @@ export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => 
     trip: (tripId: TripId) => StacksClient.query("trips", "get", { params: { tripId }, ...keys }),
     session: (sessionId: SessionId) =>
       StacksClient.query("sessions", "get", { params: { sessionId }, ...keys }),
-    /** Sessions that started before `before`, newest first, 30 at a time. */
-    olderSessions: (groupId: GroupId, before: DateTime.Utc) =>
-      StacksClient.query("sessions", "list", { params: { groupId }, query: { before }, ...keys }),
     invites: (groupId: GroupId) =>
       StacksClient.query("invites", "list", { params: { groupId }, ...keys }),
     invitePreview: (code: string) =>

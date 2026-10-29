@@ -33,7 +33,7 @@ const RootStack = createNativeStackNavigator({
     NewSession: {
       screen: NewSessionScreen,
       options: { title: "Start a session" },
-      linking: { path: "groups/:groupId/sessions/new" },
+      linking: { path: "trips/:tripId/sessions/new" },
     },
     Session: {
       screen: SessionScreen,
@@ -43,7 +43,7 @@ const RootStack = createNativeStackNavigator({
     Settle: {
       screen: SettleScreen,
       options: { title: "Settle up" },
-      linking: { path: "groups/:groupId/settle" },
+      linking: { path: "trips/:tripId/settle" },
     },
     Stats: {
       screen: StatsScreen,

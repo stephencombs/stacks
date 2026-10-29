@@ -9,13 +9,14 @@ import {
   NotFound,
   type CreateStakeRequest,
   type EndStakeRequest,
-  type GroupId,
   type StakeId,
+  type TripId,
   type VoidEntryRequest,
 } from "@stacks/contracts";
 
 import { StakeRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as Trips from "./Trips.ts";
 
 const load = Effect.fn("Stakes.load")(function* (stakeId: StakeId) {
   const sql = yield* SqlClient.SqlClient;
@@ -44,11 +45,12 @@ const loadToChange = Effect.fn("Stakes.loadToChange")(function* (stakeId: StakeI
 });
 
 export const create = Effect.fn("Stakes.create")(function* (
-  groupId: GroupId,
+  tripId: TripId,
   request: typeof CreateStakeRequest.Type,
 ) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
+  const { groupId } = yield* Trips.load(tripId);
   yield* Access.membership(groupId);
   if (request.lenderId === request.borrowerId) {
     return yield* new InvalidRequest({ message: "Pick two different players." });
@@ -56,9 +58,9 @@ export const create = Effect.fn("Stakes.create")(function* (
   yield* Access.requirePlayersInGroup(groupId, [request.lenderId, request.borrowerId]);
   const startedAt = request.startedAt ?? (yield* DateTime.now);
   yield* sql`
-    insert into stakes (id, group_id, lender_id, borrower_id, amount, lender_share, started_at,
-      note, created_by)
-    values (${request.id}, ${groupId}, ${request.lenderId}, ${request.borrowerId},
+    insert into stakes (id, group_id, trip_id, lender_id, borrower_id, amount, lender_share,
+      started_at, note, created_by)
+    values (${request.id}, ${groupId}, ${tripId}, ${request.lenderId}, ${request.borrowerId},
       ${BigInt(request.amount)}, ${request.lenderShare}, ${DateTime.toDateUtc(startedAt)},
       ${request.note}, ${userId})
     on conflict (id) do nothing

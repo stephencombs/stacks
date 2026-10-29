@@ -19,7 +19,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
       expect(guest).toMatchObject({ userId: null, role: null });
 
       yield* alex.ledger.recordSettlement({
-        params: { groupId },
+        params: { tripId: group.tripId },
         payload: {
           id: ids.entry(),
           fromPlayerId: group.myPlayerId,
@@ -36,7 +36,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
       const claimed = yield* gus.guests.claim({ params: { code: guest.claimCode! } });
       expect(claimed.myPlayerId).toBe(guestId);
       expect(claimed.role).toBe("member");
-      expect(claimed.balances).toContainEqual({ playerId: guestId, amount: -4000 });
+      const trip = yield* gus.trips.get({ params: { tripId: group.tripId } });
+      expect(trip.balances).toContainEqual({ playerId: guestId, amount: -4000 });
       expect(
         yield* Effect.flip(gus.guests.previewClaim({ params: { code: guest.claimCode! } })),
       ).toMatchObject({
@@ -70,7 +71,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
       const groupId = group.group.id;
       const venue = yield* catalogVenue(alex);
       yield* alex.sessions.create({
-        params: { groupId },
+        params: { tripId: group.tripId },
         payload: {
           id: ids.session(),
           venueId: venue.id,

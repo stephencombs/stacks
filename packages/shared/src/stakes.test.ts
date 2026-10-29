@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
-import { SessionId, StakeId } from "@stacks/contracts";
+import { SessionId, StakeId, TripId } from "@stacks/contracts";
 
 import { balances } from "./balances.ts";
 import { stakeOutcomes, withStakes } from "./stakes.ts";
@@ -16,8 +16,11 @@ import {
 } from "./testing/ledgerArbitrary.ts";
 
 const at = (hour: number) => DateTime.makeUnsafe(Date.UTC(2026, 9, 22, hour));
-const session = (n: number) => ({
+const VEGAS = TripId.make("0192e7a0-0000-7000-8000-000000000501");
+const RENO = TripId.make("0192e7a0-0000-7000-8000-000000000502");
+const session = (n: number, tripId = VEGAS) => ({
   id: SessionId.make(`0192e7a0-0000-7000-8000-0000000002${String(n).padStart(2, "0")}`),
+  tripId,
   startedAt: at(n),
 });
 const stake = (
@@ -36,6 +39,7 @@ const stake = (
   lenderId: fields.lender,
   borrowerId: fields.borrower,
   amount: money(fields.amount),
+  tripId: VEGAS,
   lenderShare: fields.share ?? 50,
   startedAt: at(fields.from ?? 0),
   endedAt: fields.to === undefined ? null : at(fields.to),
@@ -48,7 +52,7 @@ const won = (n: number, playerId: typeof ALEX, amount: number) => ({
 });
 
 describe("stakeOutcomes", () => {
-  const sessions = [1, 2, 3, 4].map(session);
+  const sessions = [1, 2, 3, 4].map((n) => session(n));
   const nick = BEA;
   const bruce = ALEX;
   const brad = CAL;
@@ -69,6 +73,16 @@ describe("stakeOutcomes", () => {
       result: -150000,
       owed: 0,
     });
+  });
+
+  it("counts only sessions in the stake's own trip", () => {
+    const s = stake(1, { lender: bruce, borrower: nick, amount: 100000 });
+    const out = stakeOutcomes(
+      [s],
+      [session(1), session(2, RENO)],
+      [won(1, nick, 1000), won(2, nick, 99900)],
+    );
+    expect(out.get(s.id)).toEqual({ result: 1000, owed: 100500 });
   });
 
   it("counts only sessions that start while the stake is open", () => {

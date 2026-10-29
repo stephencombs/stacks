@@ -1,5 +1,12 @@
 import { useAuth } from "@clerk/react";
-import { PlayerId, StakeId, UserId, type GroupDetail, type StakeView } from "@stacks/contracts";
+import {
+  PlayerId,
+  StakeId,
+  UserId,
+  type GroupDetail,
+  type StakeView,
+  type TripDetail,
+} from "@stacks/contracts";
 import { canChangeStake, playerNames, stakeLines } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { parseMoney } from "@stacks/shared/money";
@@ -15,7 +22,7 @@ import { SectionHeading, Surface } from "~/components/ui/Surface";
 import { useAction, useStacks } from "~/lib/stacks";
 
 /** Stakes: money one player gave another to play with, and what comes back. */
-export function BackingSection({ detail }: { detail: GroupDetail }) {
+export function BackingSection({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const stacks = useStacks();
   const { userId } = useAuth();
   const names = playerNames(detail);
@@ -37,14 +44,14 @@ export function BackingSection({ detail }: { detail: GroupDetail }) {
       >
         Backing
       </SectionHeading>
-      {detail.stakes.length === 0 ? (
+      {trip.stakes.length === 0 ? (
         <p className="text-sm text-muted">
-          When someone gives another player money to play with, add it here. The backer gets it back
-          plus their share of the winnings, or what's left if it's lost, and Settle up counts it.
+          When someone gives another player money to play with on this trip, add it here. The backer
+          gets it back plus their share of the winnings, or what's left if it's lost.
         </p>
       ) : (
         <Surface className="divide-y divide-line">
-          {detail.stakes.map((view) => {
+          {trip.stakes.map((view) => {
             const { title, status } = stakeLines(view, names, detail.group.currency);
             const { stake } = view;
             const voided = stake.voidedAt !== null;
@@ -81,7 +88,9 @@ export function BackingSection({ detail }: { detail: GroupDetail }) {
         </Surface>
       )}
       {(end.error ?? reopen.error) ? <FormError>{end.error ?? reopen.error}</FormError> : null}
-      {backing ? <BackDialog detail={detail} onClose={() => setBacking(false)} /> : null}
+      {backing ? (
+        <BackDialog detail={detail} trip={trip} onClose={() => setBacking(false)} />
+      ) : null}
       {voiding ? (
         <VoidStakeDialog
           view={voiding}
@@ -93,7 +102,15 @@ export function BackingSection({ detail }: { detail: GroupDetail }) {
   );
 }
 
-function BackDialog({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
+function BackDialog({
+  detail,
+  trip,
+  onClose,
+}: {
+  detail: GroupDetail;
+  trip: TripDetail;
+  onClose: () => void;
+}) {
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("stakes", "create"));
   const currency = detail.group.currency;
@@ -115,7 +132,7 @@ function BackDialog({ detail, onClose }: { detail: GroupDetail; onClose: () => v
     setProblem(null);
     const note = String(form.get("note") ?? "").trim();
     const saved = await create.run({
-      params: { groupId: detail.group.id },
+      params: { tripId: trip.trip.id },
       payload: {
         id: StakeId.make(newId()),
         lenderId,

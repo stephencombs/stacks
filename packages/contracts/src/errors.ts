@@ -57,7 +57,7 @@ export const ConflictReason = Schema.Literals([
   "stake_voided",
   "stake_ended",
   "stake_open",
-  "trip_overlaps",
+  "trip_not_empty",
   "trip_ended",
   "trip_open",
   "last_owner",

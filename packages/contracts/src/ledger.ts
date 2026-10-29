@@ -21,6 +21,7 @@ export type SessionStatus = typeof SessionStatus.Type;
 export const Session = Schema.Struct({
   id: SessionId,
   groupId: GroupId,
+  tripId: TripId,
   venueId: VenueId,
   game: Game,
   status: SessionStatus,
@@ -50,6 +51,8 @@ export const Entry = Schema.Struct({
   id: EntryId,
   groupId: GroupId,
   sessionId: Schema.NullOr(SessionId),
+  /** Set only on a settlement; a session's entries belong to the session's trip. */
+  tripId: Schema.NullOr(TripId),
   kind: EntryKind,
   playerId: PlayerId,
   counterpartyId: Schema.NullOr(PlayerId),
@@ -68,6 +71,7 @@ export type Entry = typeof Entry.Type;
 function entryShapeIssue(entry: {
   readonly kind: EntryKind;
   readonly sessionId: SessionId | null;
+  readonly tripId: TripId | null;
   readonly playerId: PlayerId;
   readonly counterpartyId: PlayerId | null;
   readonly amount: number;
@@ -75,6 +79,7 @@ function entryShapeIssue(entry: {
   if (entry.kind === "settlement") {
     if (entry.sessionId !== null)
       return { path: ["sessionId"], issue: "settlements aren't part of a session" };
+    if (entry.tripId === null) return { path: ["tripId"], issue: "a settlement squares up a trip" };
     if (entry.counterpartyId === null || entry.counterpartyId === entry.playerId) {
       return { path: ["counterpartyId"], issue: "a settlement is paid to another player" };
     }
@@ -82,6 +87,8 @@ function entryShapeIssue(entry: {
   }
   if (entry.sessionId === null)
     return { path: ["sessionId"], issue: "required for session entries" };
+  if (entry.tripId !== null)
+    return { path: ["tripId"], issue: "a session's entries belong to the session's trip" };
   if (entry.kind === "adjustment") {
     if (entry.counterpartyId !== null) {
       return { path: ["counterpartyId"], issue: "adjustments don't involve another player" };
@@ -106,6 +113,8 @@ function entryShapeIssue(entry: {
 export const Stake = Schema.Struct({
   id: StakeId,
   groupId: GroupId,
+  /** A stake covers the borrower's sessions in this trip that start while it's open. */
+  tripId: TripId,
   lenderId: PlayerId,
   borrowerId: PlayerId,
   amount: MinorUnits,
@@ -122,8 +131,8 @@ export const Stake = Schema.Struct({
 export type Stake = typeof Stake.Type;
 
 /**
- * A trip: a named stretch of time in a group, like a weekend in Vegas. Every session that starts
- * while it's open belongs to it. A group's trips never overlap.
+ * A trip: a group's weekend in Vegas, or any run of play. Every session belongs to one, and each
+ * trip keeps its own balances and settles up on its own. An ended trip takes no new sessions.
  */
 export const Trip = Schema.Struct({
   id: TripId,

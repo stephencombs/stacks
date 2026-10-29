@@ -7,6 +7,7 @@ import {
   MinorUnits,
   PlayerId,
   StakeId,
+  TripId,
   UserId,
   type StakeView,
 } from "@stacks/contracts";
@@ -57,6 +58,7 @@ it("says how a stake stands", () => {
     stake: {
       id: StakeId.make("0192e7a0-0000-7000-8000-000000000009"),
       groupId: GroupId.make("0192e7a0-0000-7000-8000-000000000008"),
+      tripId: TripId.make("0192e7a0-0000-7000-8000-000000000007"),
       lenderId: bruce,
       borrowerId: nick,
       amount: MinorUnits.make(100000),

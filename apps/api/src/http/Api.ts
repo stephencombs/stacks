@@ -61,14 +61,14 @@ const venues = HttpApiBuilder.group(StacksApi, "venues", (handlers) =>
 
 const sessions = HttpApiBuilder.group(StacksApi, "sessions", (handlers) =>
   handlers
-    .handle("list", ({ params, query }) => serve(Sessions.list(params.groupId, query)))
-    .handle("create", ({ params, payload }) => serve(Sessions.create(params.groupId, payload)))
+    .handle("create", ({ params, payload }) => serve(Sessions.create(params.tripId, payload)))
     .handle("get", ({ params }) => serve(Sessions.get(params.sessionId)))
     .handle("addPlayer", ({ params, payload }) =>
       serve(Sessions.addPlayer(params.sessionId, payload.playerId)),
     )
     .handle("close", ({ params, payload }) => serve(Sessions.close(params.sessionId, payload)))
-    .handle("reopen", ({ params }) => serve(Sessions.reopen(params.sessionId))),
+    .handle("reopen", ({ params }) => serve(Sessions.reopen(params.sessionId)))
+    .handle("move", ({ params, payload }) => serve(Sessions.move(params.sessionId, payload))),
 );
 
 const ledger = HttpApiBuilder.group(StacksApi, "ledger", (handlers) =>
@@ -76,13 +76,13 @@ const ledger = HttpApiBuilder.group(StacksApi, "ledger", (handlers) =>
     .handle("addEntry", ({ params, payload }) => serve(Ledger.addEntry(params.sessionId, payload)))
     .handle("voidEntry", ({ params, payload }) => serve(Ledger.voidEntry(params.entryId, payload)))
     .handle("recordSettlement", ({ params, payload }) =>
-      serve(Ledger.recordSettlement(params.groupId, payload)),
+      serve(Ledger.recordSettlement(params.tripId, payload)),
     ),
 );
 
 const stakes = HttpApiBuilder.group(StacksApi, "stakes", (handlers) =>
   handlers
-    .handle("create", ({ params, payload }) => serve(Stakes.create(params.groupId, payload)))
+    .handle("create", ({ params, payload }) => serve(Stakes.create(params.tripId, payload)))
     .handle("end", ({ params, payload }) => serve(Stakes.end(params.stakeId, payload)))
     .handle("reopen", ({ params }) => serve(Stakes.reopen(params.stakeId)))
     .handle("void", ({ params, payload }) => serve(Stakes.voidStake(params.stakeId, payload))),

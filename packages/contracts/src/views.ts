@@ -99,20 +99,19 @@ export const GroupDetail = Schema.Struct({
   role: MemberRole,
   myPlayerId: PlayerId,
   players: Schema.Array(Player),
+  /** Newest first. */
+  trips: Schema.Array(Trip),
+});
+export type GroupDetail = typeof GroupDetail.Type;
+
+/** A trip's sessions, oldest first and live ones included, and its own ledger of who owes whom. */
+export const TripDetail = Schema.Struct({
+  trip: Trip,
+  sessions: Schema.Array(SessionSummary),
   balances: Schema.Array(Balance),
   transfers: Schema.Array(Transfer),
   settlements: Schema.Array(Entry),
   stakes: Schema.Array(StakeView),
-  /** Newest first. */
-  trips: Schema.Array(Trip),
-  sessions: Schema.Array(SessionSummary),
-});
-export type GroupDetail = typeof GroupDetail.Type;
-
-/** A trip and every session that started during it, oldest first, live ones included. */
-export const TripDetail = Schema.Struct({
-  trip: Trip,
-  sessions: Schema.Array(SessionSummary),
 });
 export type TripDetail = typeof TripDetail.Type;
 

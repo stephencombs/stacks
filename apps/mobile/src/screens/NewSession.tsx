@@ -1,9 +1,10 @@
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import {
-  GroupId,
+  TripId,
   SessionId,
   type Game,
   type GroupDetail,
+  type TripDetail,
   type PlayerId,
   type Venue,
 } from "@stacks/contracts";
@@ -23,17 +24,21 @@ import { AddGuestSheet } from "../features/AddGuestSheet";
 import { VenuePicker } from "../features/VenuePicker";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
-type Props = StaticScreenProps<{ groupId: string }>;
+type Props = StaticScreenProps<{ tripId: string }>;
 
 export function NewSessionScreen({ route }: Props) {
   const stacks = useStacks();
   return (
     <Screen>
       <Loaded
-        query={stacks.group(GroupId.make(route.params.groupId))}
+        query={stacks.trip(TripId.make(route.params.tripId))}
         skeleton={<Skeleton className="h-96" />}
       >
-        {(detail) => <NewSessionForm detail={detail} />}
+        {(trip) => (
+          <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
+            {(detail) => <NewSessionForm detail={detail} trip={trip} />}
+          </Loaded>
+        )}
       </Loaded>
     </Screen>
   );
@@ -51,7 +56,7 @@ const STARTS = [
   { value: "120", label: "2 hr ago" },
 ] as const;
 
-function NewSessionForm({ detail }: { detail: GroupDetail }) {
+function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const stacks = useStacks();
   const navigation = useNavigation();
   const create = useAction(stacks.Client.mutation("sessions", "create"));
@@ -81,7 +86,7 @@ function NewSessionForm({ detail }: { detail: GroupDetail }) {
     if (!first) return setProblem("Pick at least one player.");
     setProblem(null);
     const session = await create.run({
-      params: { groupId: detail.group.id },
+      params: { tripId: trip.trip.id },
       payload: {
         id: SessionId.make(newId()),
         venueId: venue.id,

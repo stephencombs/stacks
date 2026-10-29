@@ -1,132 +1,172 @@
 import { expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import { TripId, type GroupDetail } from "@stacks/contracts";
+import type { TripId } from "@stacks/contracts";
 
-import { catalogVenue, groupWith, ids, users } from "../testing/fixtures.ts";
+import { catalogVenue, groupWith, ids, usd, users, type TestGroup } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
-const day = (n: number, hour = 20) => DateTime.makeUnsafe(Date.UTC(2026, 9, 20 + n, hour));
-const tripId = () => TripId.make(crypto.randomUUID());
+const day = (n: number) => DateTime.makeUnsafe(Date.UTC(2026, 9, 20 + n, 20));
 
 const startSession = Effect.fn("test.startSession")(function* (
   client: Client,
-  group: GroupDetail,
-  on: DateTime.Utc,
+  group: TestGroup,
+  tripId: TripId,
 ) {
   const venue = yield* catalogVenue(client);
   const id = ids.session();
   yield* client.sessions.create({
-    params: { groupId: group.group.id },
+    params: { tripId },
     payload: {
       id,
       venueId: venue.id,
       game: "blackjack",
       playerIds: [group.myPlayerId],
       notes: null,
-      startedAt: on,
+      startedAt: day(1),
     },
   });
   return id;
 });
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
-  it.effect("holds the sessions that start while it's open", () =>
+  it.effect("hold their own sessions and their own ledger", () =>
     Effect.gen(function* () {
       const { alex, bea } = yield* users("alex", "bea");
       const group = yield* groupWith(alex, bea);
-      const before = yield* startSession(alex, group, day(0));
-      const first = yield* startSession(alex, group, day(1));
-      const second = yield* startSession(alex, group, day(2, 3));
-      const after = yield* startSession(alex, group, day(4));
-
-      const trip = yield* alex.trips.create({
+      const beaId = group.players.find((p) => p.id !== group.myPlayerId)!.id;
+      const reno = yield* alex.trips.create({
         params: { groupId: group.group.id },
-        payload: { id: tripId(), name: "Vegas 2026", startedAt: day(1, 12) },
+        payload: { id: ids.trip(), name: "Reno" },
       });
-      expect(trip).toMatchObject({ name: "Vegas 2026", endedAt: null });
-      yield* bea.trips.end({ params: { tripId: trip.id }, payload: { endedAt: day(3) } });
+      const inVegas = yield* startSession(alex, group, group.tripId);
+      const inReno = yield* startSession(alex, group, reno.id);
+      yield* bea.ledger.recordSettlement({
+        params: { tripId: reno.id },
+        payload: {
+          id: ids.entry(),
+          fromPlayerId: beaId,
+          toPlayerId: group.myPlayerId,
+          amount: usd(500),
+          note: null,
+        },
+      });
 
-      const detail = yield* bea.trips.get({ params: { tripId: trip.id } });
-      expect(detail.sessions.map((s) => s.session.id)).toEqual([first, second]);
-      expect(detail.sessions.map((s) => s.session.id)).not.toContain(before);
-      expect(detail.sessions.map((s) => s.session.id)).not.toContain(after);
+      const vegas = yield* bea.trips.get({ params: { tripId: group.tripId } });
+      expect(vegas.sessions.map((s) => s.session.id)).toEqual([inVegas]);
+      expect(vegas.balances).toEqual([]);
+      const renoDetail = yield* bea.trips.get({ params: { tripId: reno.id } });
+      expect(renoDetail.sessions.map((s) => [s.session.id, s.session.tripId])).toEqual([
+        [inReno, reno.id],
+      ]);
+      expect(renoDetail.settlements).toHaveLength(1);
+      expect(renoDetail.balances).toEqual(
+        expect.arrayContaining([
+          { playerId: beaId, amount: 500 },
+          { playerId: group.myPlayerId, amount: -500 },
+        ]),
+      );
 
-      const listed = yield* alex.groups.get({ params: { groupId: group.group.id } });
-      expect(listed.trips).toEqual([expect.objectContaining({ id: trip.id })]);
+      // Any trip left unsettled keeps you from leaving the group.
+      expect(
+        yield* Effect.flip(alex.groups.leave({ params: { groupId: group.group.id } })),
+      ).toMatchObject({ _tag: "Conflict", reason: "balance_not_settled" });
     }),
   );
 
-  it.effect("keeps a group's trips from overlapping, ends and reopens them", () =>
+  it.effect("take no new sessions once ended, until reopened", () =>
     Effect.gen(function* () {
       const { alex } = yield* users("alex");
       const group = yield* groupWith(alex);
-      const groupId = group.group.id;
-      const create = (startedAt: DateTime.Utc) =>
-        alex.trips.create({
-          params: { groupId },
-          payload: { id: tripId(), name: "Trip", startedAt },
-        });
-
-      const first = yield* create(day(1));
-      expect(yield* Effect.flip(create(day(2)))).toMatchObject({
-        _tag: "Conflict",
-        reason: "trip_overlaps",
+      const played = yield* startSession(alex, group, group.tripId);
+      yield* alex.trips.end({ params: { tripId: group.tripId }, payload: {} });
+      // A retry of a session that already landed still gets it back.
+      const venue = yield* catalogVenue(alex);
+      const retried = yield* alex.sessions.create({
+        params: { tripId: group.tripId },
+        payload: {
+          id: played,
+          venueId: venue.id,
+          game: "blackjack",
+          playerIds: [group.myPlayerId],
+          notes: null,
+        },
       });
-      yield* alex.trips.end({ params: { tripId: first.id }, payload: { endedAt: day(3) } });
+      expect(retried.session.id).toBe(played);
+      expect(yield* Effect.flip(startSession(alex, group, group.tripId))).toMatchObject({
+        _tag: "Conflict",
+        reason: "trip_ended",
+      });
       expect(
-        yield* Effect.flip(alex.trips.end({ params: { tripId: first.id }, payload: {} })),
+        yield* Effect.flip(alex.trips.end({ params: { tripId: group.tripId }, payload: {} })),
       ).toMatchObject({ _tag: "Conflict", reason: "trip_ended" });
+      yield* alex.trips.reopen({ params: { tripId: group.tripId } });
       expect(
-        yield* Effect.flip(
-          alex.trips.end({
-            params: { tripId: (yield* create(day(5))).id },
-            payload: { endedAt: day(4) },
-          }),
-        ),
-      ).toMatchObject({ _tag: "InvalidRequest" });
-
-      // A later trip exists, so the first can't run open-ended again.
-      expect(yield* Effect.flip(alex.trips.reopen({ params: { tripId: first.id } }))).toMatchObject(
-        { _tag: "Conflict", reason: "trip_overlaps" },
-      );
+        yield* Effect.flip(alex.trips.reopen({ params: { tripId: group.tripId } })),
+      ).toMatchObject({ _tag: "Conflict", reason: "trip_open" });
+      yield* startSession(alex, group, group.tripId);
     }),
   );
 
-  it.effect("lets whoever started it or an admin delete it, and keeps its sessions", () =>
+  it.effect("let an admin move a session to another trip in the group", () =>
     Effect.gen(function* () {
       const { alex, bea, eve } = yield* users("alex", "bea", "eve");
       const group = yield* groupWith(alex, bea);
-      const session = yield* startSession(alex, group, day(1));
-      const trip = yield* alex.trips.create({
+      const elsewhere = yield* groupWith(eve);
+      const reno = yield* alex.trips.create({
         params: { groupId: group.group.id },
-        payload: { id: tripId(), name: "Weekend", startedAt: day(0) },
+        payload: { id: ids.trip(), name: "Reno" },
       });
+      const session = yield* startSession(alex, group, group.tripId);
 
-      expect(yield* Effect.flip(eve.trips.get({ params: { tripId: trip.id } }))).toMatchObject({
+      expect(
+        yield* Effect.flip(
+          bea.sessions.move({ params: { sessionId: session }, payload: { tripId: reno.id } }),
+        ),
+      ).toMatchObject({ _tag: "Forbidden", reason: "admins_only" });
+      expect(
+        yield* Effect.flip(
+          alex.sessions.move({
+            params: { sessionId: session },
+            payload: { tripId: elsewhere.tripId },
+          }),
+        ),
+      ).toMatchObject({ _tag: "NotFound", resource: "trip" });
+      const moved = yield* alex.sessions.move({
+        params: { sessionId: session },
+        payload: { tripId: reno.id },
+      });
+      expect(moved.session.tripId).toBe(reno.id);
+    }),
+  );
+
+  it.effect("can be deleted only while empty, by whoever started it or an admin", () =>
+    Effect.gen(function* () {
+      const { alex, bea, eve } = yield* users("alex", "bea", "eve");
+      const group = yield* groupWith(alex, bea);
+      const spare = yield* alex.trips.create({
+        params: { groupId: group.group.id },
+        payload: { id: ids.trip(), name: "Maybe Reno" },
+      });
+      yield* startSession(alex, group, group.tripId);
+
+      expect(yield* Effect.flip(eve.trips.get({ params: { tripId: spare.id } }))).toMatchObject({
         _tag: "Forbidden",
         reason: "not_a_member",
       });
-      const beas = yield* bea.trips.create({
-        params: { groupId: group.group.id },
-        payload: { id: trip.id, name: "Same id", startedAt: day(0) },
-      });
-      expect(beas.name).toBe("Weekend");
-      expect(yield* Effect.flip(bea.trips.delete({ params: { tripId: trip.id } }))).toMatchObject({
+      expect(yield* Effect.flip(bea.trips.delete({ params: { tripId: spare.id } }))).toMatchObject({
         _tag: "Forbidden",
         reason: "not_your_trip",
       });
+      expect(
+        yield* Effect.flip(alex.trips.delete({ params: { tripId: group.tripId } })),
+      ).toMatchObject({ _tag: "Conflict", reason: "trip_not_empty" });
 
-      yield* alex.trips.delete({ params: { tripId: trip.id } });
-      expect(yield* Effect.flip(alex.trips.get({ params: { tripId: trip.id } }))).toMatchObject({
-        _tag: "NotFound",
-        resource: "trip",
-      });
+      yield* alex.trips.delete({ params: { tripId: spare.id } });
       const detail = yield* alex.groups.get({ params: { groupId: group.group.id } });
-      expect(detail.sessions.map((s) => s.session.id)).toContain(session);
-      expect(detail.trips).toEqual([]);
+      expect(detail.trips.map((t) => t.id)).toEqual([group.tripId]);
     }),
   );
 });

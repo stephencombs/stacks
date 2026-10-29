@@ -11,6 +11,7 @@ import {
   MinorUnits,
   PlayerId,
   SessionId,
+  TripId,
   UserId,
   VenueId,
   type Game,
@@ -24,6 +25,7 @@ import * as Guests from "../src/features/Guests.ts";
 import * as Invites from "../src/features/Invites.ts";
 import * as Ledger from "../src/features/Ledger.ts";
 import * as Sessions from "../src/features/Sessions.ts";
+import * as Trips from "../src/features/Trips.ts";
 import * as Venues from "../src/features/Venues.ts";
 
 // Usage: node scripts/seed.ts [--owner user_xxx]
@@ -128,81 +130,93 @@ Effect.gen(function* () {
   const venues = [...catalog, garage];
 
   const now = yield* DateTime.now;
-  const sessionCount = 30;
-  for (let index = 0; index < sessionCount; index++) {
-    const isLive = index === sessionCount - 1;
-    const sessionId = SessionId.make(uuid());
-    const startedAt = isLive
-      ? DateTime.subtract(now, { hours: 2 })
-      : DateTime.subtract(now, {
-          days: (sessionCount - index) * 9 + between(0, 4),
-          hours: between(0, 6),
-        });
-    const seated = players.filter(() => random() < 0.75);
-    const table = seated.length >= 2 ? seated : players.slice(0, 2);
-    yield* Sessions.create(groupId, {
-      id: sessionId,
-      venueId: pick(venues).id,
-      game: pick(games),
-      startedAt,
-      playerIds: [table[0]!, ...table.slice(1)],
-      notes: null,
-    }).pipe(as(owner));
+  // Three trips a few months apart, ten sessions each. The last one is still going, with a live
+  // session at the table.
+  const trips = ["Vegas in March", "Reno", "Vegas in the fall"];
+  const sessionCount = 10;
+  let settlementCount = 0;
+  for (const [t, name] of trips.entries()) {
+    const current = t === trips.length - 1;
+    const tripId = TripId.make(uuid());
+    const tripStart = DateTime.subtract(now, { days: (trips.length - 1 - t) * 90 + 2 });
+    const trip = yield* Trips.create(groupId, { id: tripId, name, startedAt: tripStart }).pipe(
+      as(owner),
+    );
 
-    for (const playerId of table) {
-      const buyIns = Array.from({ length: between(1, 3) }, () => between(3, 25) * 20);
-      for (const [n, amount] of buyIns.entries()) {
-        const coveredBy = random() < 0.2 ? pick(table.filter((id) => id !== playerId)) : null;
+    for (let index = 0; index < sessionCount; index++) {
+      const isLive = current && index === sessionCount - 1;
+      const sessionId = SessionId.make(uuid());
+      const startedAt = isLive
+        ? DateTime.subtract(now, { hours: 2 })
+        : DateTime.add(tripStart, { hours: 10 + index * 4 + between(0, 2) });
+      const seated = players.filter(() => random() < 0.75);
+      const table = seated.length >= 2 ? seated : players.slice(0, 2);
+      yield* Sessions.create(tripId, {
+        id: sessionId,
+        venueId: pick(venues).id,
+        game: pick(games),
+        startedAt,
+        playerIds: [table[0]!, ...table.slice(1)],
+        notes: null,
+      }).pipe(as(owner));
+
+      for (const playerId of table) {
+        const buyIns = Array.from({ length: between(1, 3) }, () => between(3, 25) * 20);
+        for (const [n, amount] of buyIns.entries()) {
+          const coveredBy = random() < 0.2 ? pick(table.filter((id) => id !== playerId)) : null;
+          yield* Ledger.addEntry(sessionId, {
+            id: EntryId.make(uuid()),
+            kind: "buy_in",
+            playerId,
+            counterpartyId: coveredBy ?? null,
+            amount: dollars(amount),
+            occurredAt: DateTime.add(startedAt, { minutes: 5 + n * 40 }),
+            note: null,
+            replacesEntryId: null,
+          }).pipe(as(owner));
+        }
+        if (isLive) continue;
+        const staked = buyIns.reduce((sum, amount) => sum + amount, 0);
+        const keptBy = random() < 0.1 ? pick(table.filter((id) => id !== playerId)) : null;
         yield* Ledger.addEntry(sessionId, {
           id: EntryId.make(uuid()),
-          kind: "buy_in",
+          kind: "cash_out",
           playerId,
-          counterpartyId: coveredBy ?? null,
-          amount: dollars(amount),
-          occurredAt: DateTime.add(startedAt, { minutes: 5 + n * 40 }),
+          counterpartyId: keptBy ?? null,
+          amount: dollars(Math.round((staked * between(0, 220)) / 100 / 5) * 5),
+          occurredAt: DateTime.add(startedAt, { hours: 3 }),
           note: null,
           replacesEntryId: null,
         }).pipe(as(owner));
       }
       if (isLive) continue;
-      const staked = buyIns.reduce((sum, amount) => sum + amount, 0);
-      const keptBy = random() < 0.1 ? pick(table.filter((id) => id !== playerId)) : null;
-      yield* Ledger.addEntry(sessionId, {
-        id: EntryId.make(uuid()),
-        kind: "cash_out",
-        playerId,
-        counterpartyId: keptBy ?? null,
-        amount: dollars(Math.round((staked * between(0, 220)) / 100 / 5) * 5),
-        occurredAt: DateTime.add(startedAt, { hours: 3 }),
-        note: null,
-        replacesEntryId: null,
+      yield* Sessions.close(sessionId, {
+        endedAt: DateTime.add(startedAt, { hours: between(3, 4) }),
       }).pipe(as(owner));
     }
-    if (isLive) continue;
-    yield* Sessions.close(sessionId, {
-      endedAt: DateTime.add(startedAt, { hours: between(3, 6) }),
-    }).pipe(as(owner));
 
-    // Every few sessions somebody pays back the biggest debt.
-    if (index % 6 === 5) {
-      const detail = yield* Groups.get(groupId).pipe(as(owner));
-      const transfer = detail.transfers[0];
-      if (transfer) {
-        yield* Ledger.recordSettlement(groupId, {
-          id: EntryId.make(uuid()),
-          fromPlayerId: transfer.from,
-          toPlayerId: transfer.to,
-          amount: transfer.amount,
-          occurredAt: DateTime.add(startedAt, { days: 2 }),
-          note: "Venmo",
-        }).pipe(as(owner));
-      }
+    if (current) continue;
+    // Past trips end, and somebody pays back the biggest debt afterwards.
+    const ended = DateTime.add(tripStart, { days: 3 });
+    if (trip.endedAt === null) yield* Trips.end(tripId, { endedAt: ended }).pipe(as(owner));
+    const transfer = (yield* Trips.get(tripId).pipe(as(owner))).transfers[0];
+    if (transfer) {
+      settlementCount += 1;
+      yield* Ledger.recordSettlement(tripId, {
+        id: EntryId.make(uuid()),
+        fromPlayerId: transfer.from,
+        toPlayerId: transfer.to,
+        amount: transfer.amount,
+        occurredAt: DateTime.add(ended, { days: 2 }),
+        note: "Venmo",
+      }).pipe(as(owner));
     }
   }
 
   const final = yield* Groups.get(groupId).pipe(as(owner));
   yield* Console.log(
     `Seeded "${group.group.name}" (${groupId}) with ${final.players.length} players, ` +
-      `${sessionCount} sessions and ${final.settlements.length} settlements. Owner: ${ownerId}`,
+      `${trips.length} trips of ${sessionCount} sessions and ${settlementCount} settlements. ` +
+      `Owner: ${ownerId}`,
   );
 }).pipe(Effect.provide(Database.layer(url)), NodeRuntime.runMain);

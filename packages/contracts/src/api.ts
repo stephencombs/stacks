@@ -27,7 +27,6 @@ import {
   Invite,
   InvitePreview,
   SessionDetail,
-  SessionSummary,
   TripDetail,
   Venue,
   VenueKind,
@@ -89,10 +88,6 @@ export const CreateSessionRequest = Schema.Struct({
   notes: Schema.NullOr(Schema.String.check(Schema.isMaxLength(1000))),
 });
 
-export const ListSessionsQuery = Schema.Struct({
-  before: Schema.optionalKey(Schema.DateTimeUtcFromString),
-});
-
 export const CloseSessionRequest = Schema.Struct({
   endedAt: Schema.optionalKey(Schema.DateTimeUtc),
 });
@@ -119,6 +114,8 @@ export const RecordSettlementRequest = Schema.Struct({
   occurredAt: Schema.optionalKey(Schema.DateTimeUtc),
   note: Schema.NullOr(Note),
 });
+
+export const MoveSessionRequest = Schema.Struct({ tripId: TripId });
 
 export const CreateStakeRequest = Schema.Struct({
   id: StakeId,
@@ -289,18 +286,12 @@ const VenuesGroup = HttpApiGroup.make("venues")
   )
   .middleware(Authentication);
 
+const tripParams = Schema.Struct({ tripId: TripId });
+
 const SessionsGroup = HttpApiGroup.make("sessions")
   .add(
-    HttpApiEndpoint.get("list", "/groups/:groupId/sessions", {
-      params: groupParams,
-      query: ListSessionsQuery,
-      success: Schema.Array(SessionSummary),
-      error: [Forbidden, NotFound],
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post("create", "/groups/:groupId/sessions", {
-      params: groupParams,
+    HttpApiEndpoint.post("create", "/trips/:tripId/sessions", {
+      params: tripParams,
       payload: CreateSessionRequest,
       success: SessionDetail,
       error: [Forbidden, NotFound, Conflict],
@@ -336,6 +327,14 @@ const SessionsGroup = HttpApiGroup.make("sessions")
       error: [Forbidden, NotFound, Conflict],
     }),
   )
+  .add(
+    HttpApiEndpoint.post("move", "/sessions/:sessionId/trip", {
+      params: sessionParams,
+      payload: MoveSessionRequest,
+      success: SessionDetail,
+      error: [Forbidden, NotFound, Conflict],
+    }),
+  )
   .middleware(Authentication);
 
 const LedgerGroup = HttpApiGroup.make("ledger")
@@ -356,8 +355,8 @@ const LedgerGroup = HttpApiGroup.make("ledger")
     }),
   )
   .add(
-    HttpApiEndpoint.post("recordSettlement", "/groups/:groupId/settlements", {
-      params: groupParams,
+    HttpApiEndpoint.post("recordSettlement", "/trips/:tripId/settlements", {
+      params: tripParams,
       payload: RecordSettlementRequest,
       success: Entry,
       error: [Forbidden, NotFound, Conflict, InvalidRequest],
@@ -369,8 +368,8 @@ const stakeParams = Schema.Struct({ stakeId: StakeId });
 
 const StakesGroup = HttpApiGroup.make("stakes")
   .add(
-    HttpApiEndpoint.post("create", "/groups/:groupId/stakes", {
-      params: groupParams,
+    HttpApiEndpoint.post("create", "/trips/:tripId/stakes", {
+      params: tripParams,
       payload: CreateStakeRequest,
       success: Stake,
       error: [Forbidden, NotFound, Conflict, InvalidRequest],
@@ -400,8 +399,6 @@ const StakesGroup = HttpApiGroup.make("stakes")
     }),
   )
   .middleware(Authentication);
-
-const tripParams = Schema.Struct({ tripId: TripId });
 
 const TripsGroup = HttpApiGroup.make("trips")
   .add(
@@ -438,7 +435,7 @@ const TripsGroup = HttpApiGroup.make("trips")
     HttpApiEndpoint.post("delete", "/trips/:tripId/delete", {
       params: tripParams,
       success: Trip,
-      error: [Forbidden, NotFound],
+      error: [Forbidden, NotFound, Conflict],
     }),
   )
   .middleware(Authentication);

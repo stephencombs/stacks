@@ -43,10 +43,6 @@ export const tripDates = (trip: Trip) => {
     : `${from} – ${shortDate.format(DateTime.toDateUtc(trip.endedAt))}`;
 };
 
-/** The trip that's going now, if any. */
-export const currentTrip = (detail: GroupDetail) =>
-  detail.trips.find((trip) => trip.endedAt === null) ?? null;
-
 /** Money the way the board shows it: always signed, cents only when there are some. */
 export const boardMoney = (amount: number, currency: CurrencyCode, signed = true) =>
   formatMoney(MinorUnits.make(amount), currency, {

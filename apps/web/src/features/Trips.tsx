@@ -1,14 +1,8 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import {
-  boardMoney,
-  chipOf,
-  currentTrip,
-  localClock,
-  tripDates,
-} from "@stacks/client-runtime/trip";
+import { boardMoney, chipOf, localClock, tripDates } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { ChevronRight, Plane } from "lucide-react";
@@ -17,7 +11,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input } from "~/components/ui/Field";
-import { SectionHeading, Surface } from "~/components/ui/Surface";
+import { EmptyState, SectionHeading, Surface } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 import { Chip } from "./Chip";
 
@@ -25,73 +19,93 @@ import { Chip } from "./Chip";
 const localDay = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
-/** The group's trips: the one going now as a jump onto its board, then past trips. */
+/** The group's trips: the ones going now as a jump onto their boards, then past trips. */
 export function TripsSection({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
-  const [starting, setStarting] = useState(false);
-  const current = currentTrip(detail);
+  const going = detail.trips.filter((trip) => trip.endedAt === null);
   const past = detail.trips.filter((trip) => trip.endedAt !== null);
+
+  if (detail.trips.length === 0) {
+    return (
+      <EmptyState title="No trips yet" action={<StartTripButton detail={detail} />}>
+        Every session is part of a trip, like a weekend in Vegas or this month's home games. Start
+        one, and its sessions get their own leaderboard, awards and settle-up.
+      </EmptyState>
+    );
+  }
+
   return (
-    <section className="flex flex-col gap-2">
-      <SectionHeading
-        action={
-          current ? null : (
-            <Button size="sm" variant="ghost" onClick={() => setStarting(true)}>
-              <Plane className="size-4" aria-hidden />
-              Start a trip
-            </Button>
-          )
-        }
-      >
-        Trips
-      </SectionHeading>
-      {current ? (
-        <Link
-          to="/trips/$tripId"
-          params={{ tripId: current.id }}
-          className="flex flex-col gap-3 rounded-2xl bg-board p-4 text-board-ink transition-[scale] duration-150 active:scale-[0.99]"
-        >
-          <span className="flex items-center justify-between gap-3">
-            <span className="flex min-w-0 flex-col">
-              <span className="text-[11px] font-semibold tracking-[0.18em] text-board-amber uppercase">
-                Live board · {tripDates(current)}
-              </span>
-              <span className="truncate text-2xl font-black tracking-tight uppercase">
-                {current.name}
-              </span>
-            </span>
-            <ChevronRight className="size-5 shrink-0 text-board-muted" aria-hidden />
-          </span>
-          <Loaded query={stacks.trip(current.id)} skeleton={<span className="h-6" />}>
-            {(trip) => <Leaders detail={detail} trip={trip} />}
-          </Loaded>
-        </Link>
-      ) : past.length === 0 ? (
-        <p className="text-sm text-pretty text-muted">
-          Going somewhere? Start a trip and every session until you end it lands on its own
-          leaderboard, with awards for the best and worst of it.
-        </p>
-      ) : null}
-      {past.length > 0 ? (
-        <Surface className="divide-y divide-line">
-          {past.map((trip) => (
+    <>
+      {going.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <SectionHeading>Going now</SectionHeading>
+          {going.map((trip) => (
             <Link
               key={trip.id}
               to="/trips/$tripId"
               params={{ tripId: trip.id }}
-              className="flex min-h-12 items-center justify-between gap-3 px-5 py-3 first:rounded-t-2xl last:rounded-b-2xl hover:bg-sunken/50"
+              className="flex flex-col gap-3 rounded-2xl bg-board p-4 text-board-ink transition-[scale] duration-150 active:scale-[0.99]"
             >
-              <span className="truncate">{trip.name}</span>
-              <span className="flex shrink-0 items-center gap-1 text-sm text-muted">
-                {tripDates(trip)}
-                <ChevronRight className="size-4" aria-hidden />
+              <span className="flex items-center justify-between gap-3">
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-[11px] font-semibold tracking-[0.18em] text-board-amber uppercase">
+                    Live board · {tripDates(trip)}
+                  </span>
+                  <span className="truncate text-2xl font-black tracking-tight uppercase">
+                    {trip.name}
+                  </span>
+                </span>
+                <ChevronRight className="size-5 shrink-0 text-board-muted" aria-hidden />
               </span>
+              <Loaded query={stacks.trip(trip.id)} skeleton={<span className="h-6" />}>
+                {(detailed) => <Leaders detail={detail} trip={detailed} />}
+              </Loaded>
             </Link>
           ))}
-        </Surface>
+        </section>
       ) : null}
+      {past.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <SectionHeading>Past trips</SectionHeading>
+          <Surface className="divide-y divide-line">
+            {past.map((trip) => (
+              <Link
+                key={trip.id}
+                to="/trips/$tripId"
+                params={{ tripId: trip.id }}
+                className="flex min-h-12 items-center justify-between gap-3 px-5 py-3 first:rounded-t-2xl last:rounded-b-2xl hover:bg-sunken/50"
+              >
+                <span className="truncate">{trip.name}</span>
+                <span className="flex shrink-0 items-center gap-1 text-sm text-muted">
+                  {tripDates(trip)}
+                  <ChevronRight className="size-4" aria-hidden />
+                </span>
+              </Link>
+            ))}
+          </Surface>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+/** Opens the dialog that starts a trip, and goes to its board once it's saved. */
+export function StartTripButton({
+  detail,
+  variant = "primary",
+}: {
+  detail: GroupDetail;
+  variant?: "primary" | "secondary";
+}) {
+  const [starting, setStarting] = useState(false);
+  return (
+    <>
+      <Button variant={variant} onClick={() => setStarting(true)}>
+        <Plane className="size-4" aria-hidden />
+        Start a trip
+      </Button>
       {starting ? <StartTripDialog detail={detail} onClose={() => setStarting(false)} /> : null}
-    </section>
+    </>
   );
 }
 
@@ -121,6 +135,7 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
 
 function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
   const stacks = useStacks();
+  const navigate = useNavigate();
   const create = useAction(stacks.Client.mutation("trips", "create"));
   const [problem, setProblem] = useState<string | null>(null);
   const [now] = useState(() => new Date());
@@ -133,13 +148,15 @@ function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: ()
     const day = String(form.get("startedOn") ?? today);
     if (!name) return setProblem("Give the trip a name.");
     setProblem(null);
-    // A trip starts at midnight of its first day, so whatever was played that day counts.
+    // A trip starts at midnight of its first day.
     const startedAt = DateTime.makeUnsafe(new Date(`${day}T00:00`).getTime());
     const saved = await create.run({
       params: { groupId: detail.group.id },
       payload: { id: TripId.make(newId()), name, startedAt },
     });
-    if (saved) onClose();
+    if (!saved) return;
+    onClose();
+    void navigate({ to: "/trips/$tripId", params: { tripId: saved.id } });
   };
 
   return (
@@ -147,7 +164,7 @@ function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: ()
       open
       onOpenChange={(open) => (open ? undefined : onClose())}
       title="Start a trip"
-      description="Every session from the start day until you end the trip goes on its board."
+      description="Sessions you start in it go on its board and settle up on their own."
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <Field label="Trip name">
@@ -161,7 +178,7 @@ function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: ()
             />
           )}
         </Field>
-        <Field label="Started on" hint="Pick an earlier day to include sessions already played.">
+        <Field label="Started on" hint="Shown with the trip, in its dates.">
           {(props) => (
             <Input {...props} type="date" name="startedOn" defaultValue={today} max={today} />
           )}

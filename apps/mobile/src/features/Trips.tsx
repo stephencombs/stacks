@@ -2,13 +2,7 @@ import { useNavigation } from "@react-navigation/native";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import {
-  boardMoney,
-  chipOf,
-  currentTrip,
-  localClock,
-  tripDates,
-} from "@stacks/client-runtime/trip";
+import { boardMoney, chipOf, localClock, tripDates } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
@@ -22,58 +16,58 @@ import { List, Row, SectionHeading } from "../components/ui/Surface";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { Chip } from "./Chip";
 
-/** The group's trips: the one going now as a jump onto its board, then past trips. */
+/** The group's trips: the ones going now as a jump onto their boards, then past trips. */
 export function TripsSection({ detail }: { detail: GroupDetail }) {
   const navigation = useNavigation();
   const stacks = useStacks();
   const [starting, setStarting] = useState(false);
-  const current = currentTrip(detail);
+  const going = detail.trips.filter((trip) => trip.endedAt === null);
   const past = detail.trips.filter((trip) => trip.endedAt !== null);
 
   return (
     <View className="gap-2">
       <SectionHeading
         action={
-          current ? undefined : (
-            <Button
-              label="Start a trip"
-              size="sm"
-              variant="ghost"
-              onPress={() => setStarting(true)}
-            />
-          )
+          <Button
+            label="Start a trip"
+            size="sm"
+            variant="ghost"
+            onPress={() => setStarting(true)}
+          />
         }
       >
         Trips
       </SectionHeading>
-      {current ? (
+      {detail.trips.length === 0 ? (
+        <Text className="text-sm text-muted">
+          Every session is part of a trip, like a weekend in Vegas or this month's home games. Start
+          one, and its sessions get their own leaderboard, awards and settle-up.
+        </Text>
+      ) : null}
+      {going.map((trip) => (
         <Pressable
+          key={trip.id}
           accessibilityRole="button"
-          accessibilityLabel={`${current.name}, live board`}
-          onPress={() => navigation.navigate("Trip", { tripId: current.id })}
+          accessibilityLabel={`${trip.name}, live board`}
+          onPress={() => navigation.navigate("Trip", { tripId: trip.id })}
           className="gap-3 rounded-2xl bg-board p-4 active:opacity-90"
         >
           <View className="gap-0.5">
             <Text className="text-[11px] font-semibold tracking-[2px] text-board-amber uppercase">
-              Live board · {tripDates(current)}
+              Live board · {tripDates(trip)}
             </Text>
             <Text
               numberOfLines={1}
               className="text-2xl font-black tracking-tight text-board-ink uppercase"
             >
-              {current.name}
+              {trip.name}
             </Text>
           </View>
-          <Loaded query={stacks.trip(current.id)} skeleton={<View className="h-6" />}>
-            {(trip) => <Leaders detail={detail} trip={trip} />}
+          <Loaded query={stacks.trip(trip.id)} skeleton={<View className="h-6" />}>
+            {(detailed) => <Leaders detail={detail} trip={detailed} />}
           </Loaded>
         </Pressable>
-      ) : past.length === 0 ? (
-        <Text className="text-sm text-muted">
-          Going somewhere? Start a trip and every session until you end it lands on its own
-          leaderboard, with awards for the best and worst of it.
-        </Text>
-      ) : null}
+      ))}
       {past.length > 0 ? (
         <List>
           {past.map((trip) => (
@@ -126,6 +120,7 @@ const STARTS = [
 ] as const;
 
 function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
+  const navigation = useNavigation();
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("trips", "create"));
   const [now] = useState(() => new Date());
@@ -136,7 +131,7 @@ function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () 
   const submit = async () => {
     if (!name.trim()) return setProblem("Give the trip a name.");
     setProblem(null);
-    // A trip starts at midnight of its first day, so whatever was played that day counts.
+    // A trip starts at midnight of its first day.
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - Number(daysAgo));
     const saved = await create.run({
       params: { groupId: detail.group.id },
@@ -146,7 +141,9 @@ function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () 
         startedAt: DateTime.makeUnsafe(start.getTime()),
       },
     });
-    if (saved) onClose();
+    if (!saved) return;
+    onClose();
+    navigation.navigate("Trip", { tripId: saved.id });
   };
 
   return (
@@ -154,7 +151,7 @@ function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () 
       open
       onClose={onClose}
       title="Start a trip"
-      description="Every session from the start day until you end the trip goes on its board."
+      description="Sessions you start in it go on its board and settle up on their own."
     >
       <TextField
         label="Trip name"

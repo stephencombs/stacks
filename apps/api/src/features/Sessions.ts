@@ -5,25 +5,37 @@ import {
   Conflict,
   CurrentUser,
   InvalidRequest,
+  NotFound,
   type CloseSessionRequest,
   type CreateSessionRequest,
-  type GroupId,
-  type ListSessionsQuery,
+  type MoveSessionRequest,
   type PlayerId,
   type SessionId,
+  type TripId,
 } from "@stacks/contracts";
 
 import * as Access from "./Access.ts";
+import * as Trips from "./Trips.ts";
 import * as Venues from "./Venues.ts";
 import * as Views from "./Views.ts";
 
+/** A new session goes in a trip that's still going. */
 export const create = Effect.fn("Sessions.create")(function* (
-  groupId: GroupId,
+  tripId: TripId,
   request: typeof CreateSessionRequest.Type,
 ) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
+  const trip = yield* Trips.load(tripId);
+  const { groupId } = trip;
   yield* Access.membership(groupId);
+  // A retry of a session that already landed gets it back, even after the trip ended.
+  const [existing] = yield* sql`select group_id from sessions where id = ${request.id}`;
+  if (existing) {
+    if (existing.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
+    return yield* Views.sessionDetail(request.id);
+  }
+  if (trip.endedAt !== null) return yield* new Conflict({ reason: "trip_ended" });
   const [venue] = yield* Effect.all(
     [
       Venues.findVisible(request.venueId, groupId).pipe(
@@ -40,8 +52,9 @@ export const create = Effect.fn("Sessions.create")(function* (
   const inserted = yield* sql.withTransaction(
     Effect.gen(function* () {
       const rows = yield* sql`
-        insert into sessions (id, group_id, venue_id, game, started_at, notes, created_by)
-        values (${request.id}, ${groupId}, ${venue.id}, ${request.game},
+        insert into sessions (id, group_id, trip_id, venue_id, game, started_at, notes,
+          created_by)
+        values (${request.id}, ${groupId}, ${tripId}, ${venue.id}, ${request.game},
           ${DateTime.toDateUtc(startedAt)}, ${request.notes}, ${userId})
         on conflict (id) do nothing
         returning id
@@ -61,17 +74,6 @@ export const create = Effect.fn("Sessions.create")(function* (
     if (existing.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
   }
   return yield* Views.sessionDetail(request.id);
-});
-
-export const list = Effect.fn("Sessions.list")(function* (
-  groupId: GroupId,
-  query: typeof ListSessionsQuery.Type,
-) {
-  yield* Access.membership(groupId);
-  return yield* Views.sessionSummaries(groupId, {
-    limit: 30,
-    ...(query.before ? { before: query.before } : {}),
-  });
 });
 
 /** Loads a session the current user can see, with their membership in its group. */
@@ -146,5 +148,20 @@ export const reopen = Effect.fn("Sessions.reopen")(function* (sessionId: Session
     update sessions set status = 'live', ended_at = null, closed_by = null, reopened_at = now()
     where id = ${sessionId} and status = 'closed'
   `;
+  return yield* Views.sessionDetail(sessionId);
+});
+
+/** An admin can move a session into another trip that's still going, to fix where it was logged. */
+export const move = Effect.fn("Sessions.move")(function* (
+  sessionId: SessionId,
+  request: typeof MoveSessionRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const { session, member } = yield* access(sessionId);
+  yield* Access.requireAdmin(member);
+  const trip = yield* Trips.load(request.tripId);
+  if (trip.groupId !== session.groupId) return yield* new NotFound({ resource: "trip" });
+  if (trip.endedAt !== null) return yield* new Conflict({ reason: "trip_ended" });
+  yield* sql`update sessions set trip_id = ${trip.id} where id = ${sessionId}`;
   return yield* Views.sessionDetail(sessionId);
 });

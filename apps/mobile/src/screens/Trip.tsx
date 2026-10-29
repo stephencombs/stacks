@@ -9,7 +9,8 @@ import { useCSSVariable } from "uniwind";
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
-import { Skeleton } from "../components/ui/Surface";
+import { SectionHeading, Skeleton } from "../components/ui/Surface";
+import { SessionList } from "../features/SessionList";
 import { TripBoard } from "../features/TripBoard";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
@@ -40,6 +41,7 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const navigation = useNavigation();
   const [board, ink] = useCSSVariable(["--color-board", "--color-board-ink"]);
   const [options, setOptions] = useState(false);
+  const closed = trip.sessions.filter((s) => s.session.status === "closed").toReversed();
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -61,7 +63,28 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
           <Text className="text-sm text-board-muted">Trip options</Text>
         </Pressable>
       </View>
+      <View className="gap-2 bg-board px-4 pt-1 pb-3">
+        {trip.trip.endedAt === null ? (
+          <Button
+            label="Start a session"
+            variant="primary"
+            size="lg"
+            onPress={() => navigation.navigate("NewSession", { tripId: trip.trip.id })}
+          />
+        ) : null}
+        <Button
+          label="Settle up"
+          size="sm"
+          onPress={() => navigation.navigate("Settle", { tripId: trip.trip.id })}
+        />
+      </View>
       <TripBoard detail={group} trip={trip} />
+      {closed.length > 0 ? (
+        <View className="gap-2 bg-canvas px-4 pt-6 pb-24">
+          <SectionHeading>Sessions</SectionHeading>
+          <SessionList sessions={closed} detail={group} />
+        </View>
+      ) : null}
       {options ? <TripOptions trip={trip} group={group} onClose={() => setOptions(false)} /> : null}
     </>
   );
@@ -84,7 +107,8 @@ function TripOptions({
   const remove = useAction(stacks.Client.mutation("trips", "delete"));
   const [confirming, setConfirming] = useState(false);
   const params = { tripId: trip.trip.id };
-  const canDelete = isAdmin(group) || trip.trip.createdBy === userId;
+  const canDelete =
+    trip.sessions.length === 0 && (isAdmin(group) || trip.trip.createdBy === userId);
   const error = end.error ?? reopen.error ?? remove.error;
 
   return (
@@ -110,7 +134,7 @@ function TripOptions({
         <View className="gap-2">
           {confirming ? (
             <Text className="text-sm text-muted">
-              The board and awards go away. Its sessions and everyone's balances stay in the group.
+              Nothing has been played in it yet, so nothing else changes.
             </Text>
           ) : null}
           <Button

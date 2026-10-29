@@ -8,7 +8,6 @@ import {
   chipOf,
   localClock,
   nightLabel,
-  tripDates,
 } from "@stacks/client-runtime/trip";
 import { tripAwards, tripFeed, tripNights, tripStandings } from "@stacks/shared/trips";
 import { useLayoutEffect, useRef } from "react";
@@ -90,12 +89,11 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
         <header className="flex items-end justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-1">
             <p className={cn(label, "text-board-amber")}>
-              {tonight ? nightLabel(tonight) : tripDates(trip.trip)}
+              {trip.trip.endedAt === null ? "On the board" : "Final board"}
             </p>
-            <h1 className="truncate text-4xl font-black tracking-tight uppercase">
-              {trip.trip.name}
-            </h1>
-            <p className="text-sm text-board-muted">{tripDates(trip.trip)}</p>
+            <p className="truncate text-3xl font-black tracking-tight uppercase">
+              {tonight ? nightLabel(tonight) : "Before the first hand"}
+            </p>
           </div>
           <div className="flex shrink-0 flex-col items-end">
             <span className={cn(label, "text-board-muted")}>Table</span>
