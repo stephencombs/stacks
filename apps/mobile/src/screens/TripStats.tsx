@@ -1,8 +1,6 @@
-import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import type { StaticScreenProps } from "@react-navigation/native";
 import { TripId } from "@stacks/contracts";
-import { useLayoutEffect } from "react";
 import { ScrollView } from "react-native";
-import { useCSSVariable } from "uniwind";
 
 import { Skeleton } from "../components/ui/Surface";
 import { TripStats } from "../features/RaceStats";
@@ -12,18 +10,9 @@ type Props = StaticScreenProps<{ tripId: string }>;
 
 export function TripStatsScreen({ route }: Props) {
   const stacks = useStacks();
-  const navigation = useNavigation();
-  const [board, ink] = useCSSVariable(["--color-board", "--color-board-ink"]);
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerStyle: { backgroundColor: String(board) },
-      headerTintColor: String(ink),
-    });
-  }, [navigation, board, ink]);
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" className="flex-1 bg-board">
+    <ScrollView contentInsetAdjustmentBehavior="automatic" className="flex-1 bg-canvas">
       <Loaded
         query={stacks.trip(TripId.make(route.params.tripId))}
         skeleton={<Skeleton className="m-4 h-96" />}

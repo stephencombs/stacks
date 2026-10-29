@@ -146,9 +146,6 @@ function SignedOut() {
         <Text className="font-display text-2xl tracking-wide text-ink uppercase">Stacks</Text>
       </View>
       <View className="gap-3">
-        <Text className="text-[11px] font-semibold tracking-[2px] text-accent-text uppercase">
-          For the trip with your friends
-        </Text>
         <Text
           accessibilityRole="header"
           className="font-display text-6xl leading-[56px] text-ink uppercase"
@@ -158,7 +155,7 @@ function SignedOut() {
       </View>
       <Text className="text-lg text-muted">
         Log buy-ins and cash-outs as you play. Stacks works out everyone's results and who owes
-        whom, so settling up takes one tap.
+        whom. You pay each other however you like.
       </Text>
       <View className="gap-3">
         <SignInButton mode="sign-up" label="Create an account" variant="primary" />

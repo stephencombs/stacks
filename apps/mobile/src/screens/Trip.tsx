@@ -4,7 +4,6 @@ import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
 import { useLayoutEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { useCSSVariable } from "uniwind";
 
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
@@ -19,7 +18,7 @@ type Props = StaticScreenProps<{ tripId: string }>;
 export function TripScreen({ route }: Props) {
   const stacks = useStacks();
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" className="flex-1 bg-board">
+    <ScrollView contentInsetAdjustmentBehavior="automatic" className="flex-1 bg-canvas">
       <Loaded
         query={stacks.trip(TripId.make(route.params.tripId))}
         skeleton={<Skeleton className="m-4 h-96" />}
@@ -39,31 +38,28 @@ export function TripScreen({ route }: Props) {
 
 function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const navigation = useNavigation();
-  const [board, ink] = useCSSVariable(["--color-board", "--color-board-ink"]);
   const [options, setOptions] = useState(false);
   const closed = trip.sessions.filter((s) => s.session.status === "closed").toReversed();
 
   useLayoutEffect(() => {
     navigation.setOptions({
       title: trip.trip.name,
-      headerStyle: { backgroundColor: String(board) },
-      headerTintColor: String(ink),
     });
-  }, [navigation, trip.trip.name, board, ink]);
+  }, [navigation, trip.trip.name]);
 
   return (
     <>
-      <View className="flex-row justify-end bg-board px-3">
+      <View className="flex-row justify-end bg-canvas px-3">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Actions for ${trip.trip.name}`}
           onPress={() => setOptions(true)}
           className="min-h-11 justify-center px-2 active:opacity-70"
         >
-          <Text className="text-sm text-board-muted">Trip options</Text>
+          <Text className="text-sm text-muted">Trip options</Text>
         </Pressable>
       </View>
-      <View className="gap-2 bg-board px-4 pt-1 pb-3">
+      <View className="gap-2 bg-canvas px-4 pt-1 pb-3">
         {trip.trip.endedAt === null ? (
           <Button
             label="Start a session"

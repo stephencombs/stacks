@@ -52,7 +52,7 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
   return (
     <Surface className="gap-5 p-5">
       <PageTitle
-        eyebrow={`${preview.memberCount} ${preview.memberCount === 1 ? "member" : "members"}`}
+        context={`${preview.memberCount} ${preview.memberCount === 1 ? "member" : "members"}`}
       >
         {preview.groupName}
       </PageTitle>
@@ -104,7 +104,7 @@ export function ClaimScreen({ route }: Props) {
       >
         {(preview) => (
           <Surface className="gap-5 p-5">
-            <PageTitle eyebrow={preview.groupName}>{`Are you ${preview.displayName}?`}</PageTitle>
+            <PageTitle context={preview.groupName}>{`Are you ${preview.displayName}?`}</PageTitle>
             <Text className="text-base text-muted">
               {preview.displayName} has been playing in {preview.groupName} as a guest. Claim it to
               join the group and make their sessions, results and balance yours.

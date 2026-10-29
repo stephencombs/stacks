@@ -130,9 +130,9 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("button", { name: "Close session" }).click();
     await alex.getByRole("dialog").getByRole("button", { name: "Close session" }).click();
     await expect(alex.getByText("Closed", { exact: true })).toBeVisible();
-    await expect(alex.getByText("+$170.00")).toBeVisible();
-    await expect(alex.getByText("-$200.00")).toBeVisible();
-    await expect(alex.getByText("+$20.00")).toBeVisible();
+    await expect(alex.getByText("+$170")).toBeVisible();
+    await expect(alex.getByText("-$200")).toBeVisible();
+    await expect(alex.getByText("+$20")).toBeVisible();
 
     // The trip's board ranks the night.
     await alex.getByRole("link", { name: "Vegas weekend" }).click();
@@ -154,9 +154,9 @@ test.describe.serial("a group's first night out", () => {
       .getByRole("navigation", { name: "Trip" })
       .getByRole("link", { name: "Settle up" })
       .click();
-    await expect(alex.getByText("Owes $170.00")).toBeVisible();
-    await expect(alex.getByText("Owed $50.00")).toBeVisible();
-    await expect(alex.getByText("Owed $120.00")).toBeVisible();
+    await expect(alex.getByText("Owes $170")).toBeVisible();
+    await expect(alex.getByText("Owed $50")).toBeVisible();
+    await expect(alex.getByText("Owed $120")).toBeVisible();
     await expect(alex.getByRole("button", { name: "Mark paid" })).toHaveCount(2);
     await shoot(alex, "settle-up");
     for (let i = 0; i < 2; i++) {
@@ -171,8 +171,8 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByLabel("Who's playing it").selectOption({ label: "Bea" });
     await alex.getByLabel("Amount").fill("100");
     await alex.getByRole("button", { name: "Back them" }).click();
-    await expect(alex.getByText("Alex backed Bea $100.00 · 50% of winnings")).toBeVisible();
-    await expect(alex.getByText("Bea is even · owes back $100.00")).toBeVisible();
+    await expect(alex.getByText("Alex backed Bea $100 · 50% of winnings")).toBeVisible();
+    await expect(alex.getByText("Bea is even · owes back $100")).toBeVisible();
     await expect(alex.getByRole("button", { name: "Mark paid" })).toHaveCount(1);
     await shoot(alex, "backing");
     await alex.getByRole("button", { name: /^Actions for Alex backed Bea/ }).click();
@@ -204,7 +204,7 @@ test.describe.serial("a group's first night out", () => {
       .getByRole("navigation", { name: "Trip" })
       .getByRole("link", { name: "Settle up" })
       .click();
-    await expect(bea.getByText("Settled up")).toHaveCount(3);
+    await expect(bea.getByText("Square", { exact: true })).toHaveCount(3);
     // All-time stats race every trip; the stat sheet opens on you, and anyone else is a tap away.
     await alex.getByRole("link", { name: "Stats" }).click();
     await expect(alex.getByRole("cell", { name: "Craps" })).toBeVisible();

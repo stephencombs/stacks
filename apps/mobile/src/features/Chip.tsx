@@ -6,10 +6,11 @@ const STRIPES = [0, 60, 120, 180, 240, 300];
 
 /** A player's casino chip: striped edge, solid face, their initial. `chip` is 1 to 8. */
 export function Chip({ chip, name, size = 32 }: { chip: number; name: string; size?: number }) {
-  const [face, ink, edge] = useCSSVariable([
+  const [face, ink, edge, ring] = useCSSVariable([
     `--color-chip-${chip}`,
     `--color-chip-${chip}-ink`,
     "--color-chip-edge",
+    "--color-line-strong",
   ]);
   const r = size / 2;
   return (
@@ -25,7 +26,14 @@ export function Chip({ chip, name, size = 32 }: { chip: number; name: string; si
         viewBox={`0 0 ${size} ${size}`}
         style={{ position: "absolute" }}
       >
-        <Circle cx={r} cy={r} r={r} fill={String(face)} />
+        <Circle
+          cx={r}
+          cy={r}
+          r={r - 0.5}
+          fill={String(face)}
+          stroke={String(ring)}
+          strokeWidth={1}
+        />
         <G>
           {STRIPES.map((angle) => (
             <Rect

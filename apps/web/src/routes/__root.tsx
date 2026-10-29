@@ -77,16 +77,13 @@ function SignedOut() {
         <ThemeMenu />
       </header>
       <main className="flex flex-1 flex-col justify-center gap-5 pb-24">
-        <p className="text-[11px] font-semibold tracking-[0.18em] text-accent-text uppercase">
-          {invited ? "You're on the list" : "For the trip with your friends"}
-        </p>
         <h1 className="max-w-[14ch] font-display text-6xl leading-[0.9] tracking-tight uppercase sm:text-7xl">
           {invited ? "You've been invited to a group." : "Keep the casino trip honest."}
         </h1>
         <p className="max-w-[46ch] text-lg text-muted">
           {invited
             ? "Sign in or create an account to see who invited you and join their ledger."
-            : "Log buy-ins and cash-outs as you play. Stacks works out everyone's results and who owes whom, so settling up takes one tap."}
+            : "Log buy-ins and cash-outs as you play. Stacks works out everyone's results and who owes whom. You pay each other however you like."}
         </p>
         <div className="flex flex-wrap gap-3">
           <SignUpButton mode="modal">

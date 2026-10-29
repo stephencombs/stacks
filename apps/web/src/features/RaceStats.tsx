@@ -10,12 +10,12 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "~/components/ui/cn";
 import { Chip } from "./Chip";
 
-const label = "text-[11px] font-semibold tracking-[0.18em] uppercase";
-const tone = (n: number) =>
-  n > 0 ? "text-board-win" : n < 0 ? "text-board-loss" : "text-board-muted";
+// Board readouts: small mono caps, like the labels on a sportsbook screen.
+const label = "font-mono text-[11px] tracking-[0.08em] uppercase";
+const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 // Chip 4 is near-black, so its line on the board takes the chip's light edge instead.
 const lineColor = (chip: number) =>
-  chip === 4 ? "var(--color-board-muted)" : `var(--color-chip-${chip})`;
+  chip === 4 ? "var(--color-muted)" : `var(--color-chip-${chip})`;
 
 /** A closed session as the race sees it, oldest first. */
 type RaceSession = StatsSession & {
@@ -77,16 +77,11 @@ export function RaceStats<S extends RaceSession>({
   const played = players.some((p) => p.playerId === detail.myPlayerId);
   const [picked, setPicked] = useState(played ? detail.myPlayerId : players[0]?.playerId);
 
-  if (players.length === 0)
-    return (
-      <p className="rounded-xl border border-board-rule bg-board p-5 text-sm text-board-muted">
-        {empty}
-      </p>
-    );
+  if (players.length === 0) return <p className="text-sm text-muted">{empty}</p>;
 
   const player = players.find((p) => p.playerId === picked) ?? players[0]!;
   return (
-    <div className="-mx-4 flex flex-col gap-8 border-y border-board-rule bg-board px-4 pt-6 pb-8 text-board-ink sm:mx-0 sm:rounded-2xl sm:border sm:px-6">
+    <div className="flex flex-col gap-8">
       <Race
         sessions={closed}
         players={players}
@@ -166,7 +161,7 @@ function Race<S extends RaceSession>({
   return (
     <section className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <p className={cn(label, "text-board-amber")}>
+        <p className={cn(label, "text-muted")}>
           {at === last ? latest : `After session ${at + 1} of ${sessions.length}`} ·{" "}
           {where(session)}
         </p>
@@ -178,13 +173,13 @@ function Race<S extends RaceSession>({
           ) : (
             <>
               {leader!.name} leads by{" "}
-              <span className="font-mono text-board-win">
+              <span className="font-mono text-win">
                 {boardMoney(leader!.now - second.now, currency, false)}
               </span>
             </>
           )}
         </h2>
-        <p className="text-sm text-board-muted">
+        <p className="text-sm text-muted">
           Session {at + 1}: {session.venue.name}, {formatDay(session.session.startedAt)}
         </p>
       </header>
@@ -207,7 +202,7 @@ function Race<S extends RaceSession>({
                 x2={width - pad.x}
                 y1={y(place)}
                 y2={y(place)}
-                stroke="var(--color-board-rule)"
+                stroke="var(--color-line)"
                 strokeDasharray="2 4"
               />
             ))}
@@ -216,7 +211,7 @@ function Race<S extends RaceSession>({
                 key={mark.index}
                 x={x(mark.index)}
                 y={height - 8}
-                className="fill-board-muted font-mono text-[10px]"
+                className="fill-muted font-mono text-[10px]"
               >
                 {mark.label}
               </text>
@@ -243,7 +238,7 @@ function Race<S extends RaceSession>({
               x2={x(at)}
               y1={pad.top - 6}
               y2={height - pad.bottom + 6}
-              stroke="var(--color-board-amber)"
+              stroke="var(--color-accent)"
               strokeWidth={1.5}
             />
             {players.map((p) => (
@@ -253,7 +248,7 @@ function Race<S extends RaceSession>({
                 cy={y(places[at]!.get(p.playerId)!)}
                 r={6}
                 fill={lineColor(p.chip)}
-                stroke="var(--color-board)"
+                stroke="var(--color-canvas)"
                 strokeWidth={2}
               />
             ))}
@@ -270,22 +265,22 @@ function Race<S extends RaceSession>({
         onChange={(event) => setAt(Number(event.target.value))}
         aria-label="Replay session by session"
         aria-valuetext={`Session ${at + 1} of ${sessions.length}, ${session.venue.name}`}
-        className="w-full accent-[var(--color-board-amber)]"
+        className="w-full accent-[var(--color-accent)]"
       />
 
-      <ol className="overflow-hidden rounded-xl border border-board-rule bg-board-panel">
+      <ol className="overflow-hidden rounded-xl border border-line bg-surface">
         {standing.map((p, place) => (
-          <li key={p.playerId} className="border-t border-board-rule first:border-t-0">
+          <li key={p.playerId} className="border-t border-line first:border-t-0">
             <button
               type="button"
               aria-pressed={p.playerId === picked}
               onClick={() => onPick(p.playerId)}
               className={cn(
-                "grid w-full grid-cols-[1.5rem_auto_1fr_auto] items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-board-deep/50 focus-visible:-outline-offset-2",
-                p.playerId === picked && "shadow-[inset_3px_0_0_var(--color-board-amber)]",
+                "grid w-full grid-cols-[1.5rem_auto_1fr_auto] items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-sunken/50 focus-visible:-outline-offset-2",
+                p.playerId === picked && "shadow-[inset_3px_0_0_var(--color-accent)]",
               )}
             >
-              <span className="font-mono text-lg font-bold text-board-amber">{place + 1}</span>
+              <span className="font-mono text-lg font-bold text-accent-text">{place + 1}</span>
               <Chip chip={p.chip} name={p.name} size={26} />
               <span className="flex min-w-0 items-center gap-2">
                 <span
@@ -372,7 +367,7 @@ function Sheet({
     <section aria-label={`${player.name}'s stats`} className="flex flex-col gap-4">
       <header className="flex items-end justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
-          <p className={cn(label, "text-board-amber")}>
+          <p className={cn(label, "text-muted")}>
             {player.name} · #{rank} of {of} · {runs.sessions}{" "}
             {runs.sessions === 1 ? "session" : "sessions"}
           </p>
@@ -387,38 +382,38 @@ function Sheet({
         {tiles.map((tile) => (
           <li
             key={tile.title}
-            className="flex min-w-0 flex-col gap-1 rounded-xl border border-board-rule bg-board-panel p-3"
+            className="flex min-w-0 flex-col gap-1 rounded-xl border border-line bg-surface p-3"
           >
-            <span className={cn(label, "text-board-muted")}>{tile.title}</span>
+            <span className={cn(label, "text-muted")}>{tile.title}</span>
             <span
               className={cn(
                 "font-mono text-2xl font-bold",
-                tile.tone === undefined ? "text-board-ink" : tone(tile.tone),
+                tile.tone === undefined ? "text-ink" : tone(tile.tone),
               )}
             >
               {tile.value}
             </span>
-            <span className="truncate text-xs text-board-muted">{tile.line}</span>
+            <span className="truncate text-xs text-muted">{tile.line}</span>
           </li>
         ))}
       </ul>
 
       <div className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between gap-3">
-          <h3 className={cn(label, "text-board-muted")}>Every session</h3>
-          <span aria-live="polite" className="truncate font-mono text-xs text-board-muted">
+          <h3 className="text-[15px] font-semibold">Every session</h3>
+          <span aria-live="polite" className="truncate font-mono text-xs text-muted">
             {focus
               ? `${formatDay(focus.session.session.startedAt)} · ${focus.session.venue.name} · ${money(focus.net)}`
               : "Tap a bar"}
           </span>
         </div>
         <div
-          className="relative flex h-36 gap-[2px] rounded-xl border border-board-rule bg-board-panel p-3"
+          className="relative flex h-36 gap-[2px] rounded-xl border border-line bg-surface p-3"
           onPointerLeave={() => setShown(null)}
         >
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-x-3 h-px bg-board-rule"
+            className="pointer-events-none absolute inset-x-3 h-px bg-line"
             style={{ bottom: `calc(0.75rem + ${track.zero} * (100% - 1.5rem))` }}
           />
           {sheet.played.map((p, i) => (
@@ -434,7 +429,7 @@ function Sheet({
               <span
                 className={cn(
                   "absolute inset-x-0 rounded-[2px] transition-opacity duration-150",
-                  p.net >= 0 ? "bg-board-win" : "bg-board-loss",
+                  p.net >= 0 ? "bg-win" : "bg-loss",
                   shown !== null && shown !== i && "opacity-40",
                 )}
                 style={

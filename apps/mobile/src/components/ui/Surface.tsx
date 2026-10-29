@@ -50,21 +50,17 @@ export function Row({
   );
 }
 
-/** A screen's title, with an optional amber line above it saying where the screen sits. */
-export function PageTitle({ eyebrow, children }: { eyebrow?: string; children: string }) {
+/** The one title on a screen, with an optional line under it saying where the screen sits. */
+export function PageTitle({ context, children }: { context?: string; children: string }) {
   return (
-    <View className="gap-1.5">
-      {eyebrow ? (
-        <Text className="text-[11px] font-semibold tracking-[2px] text-accent-text uppercase">
-          {eyebrow}
-        </Text>
-      ) : null}
+    <View className="gap-1">
       <Text
         accessibilityRole="header"
-        className="font-display text-5xl leading-[48px] text-ink uppercase"
+        className="font-display text-[40px] leading-[40px] text-ink uppercase"
       >
         {children}
       </Text>
+      {context ? <Text className="text-sm text-muted">{context}</Text> : null}
     </View>
   );
 }
@@ -72,10 +68,7 @@ export function PageTitle({ eyebrow, children }: { eyebrow?: string; children: s
 export function SectionHeading({ children, action }: { children: string; action?: ReactNode }) {
   return (
     <View className="min-h-9 flex-row items-center justify-between">
-      <Text
-        accessibilityRole="header"
-        className="text-[11px] font-semibold tracking-[2px] text-muted uppercase"
-      >
+      <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
         {children}
       </Text>
       {action}
@@ -100,7 +93,7 @@ export function Tag({
       {tone === "live" ? <View className="size-1.5 rounded-full bg-live" /> : null}
       <Text
         className={cn(
-          "font-mono text-[11px] tracking-wider uppercase",
+          "font-mono text-[11px] tracking-[1px] uppercase",
           tone === "live" ? "text-live" : "text-muted",
         )}
       >
@@ -120,8 +113,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <View className="gap-3 rounded-xl border border-dashed border-line-strong px-5 py-6">
-      <Text className="font-display text-2xl text-ink">{title}</Text>
+    <View className="gap-2 py-2">
+      <Text className="text-base font-semibold text-ink">{title}</Text>
       {children ? <Text className="text-sm text-muted">{children}</Text> : null}
       {action}
     </View>

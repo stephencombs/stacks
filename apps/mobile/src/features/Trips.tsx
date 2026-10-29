@@ -50,18 +50,13 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
           accessibilityRole="button"
           accessibilityLabel={`${trip.name}, live board`}
           onPress={() => navigation.navigate("Trip", { tripId: trip.id })}
-          className="gap-4 rounded-2xl border border-board-rule bg-board p-5 active:opacity-90"
+          className="gap-4 rounded-2xl border border-line bg-canvas p-5 active:opacity-90"
         >
-          <View className="gap-1.5">
-            <Text className="text-[11px] font-semibold tracking-[2px] text-board-amber uppercase">
-              Live board · {tripDates(trip)}
-            </Text>
-            <Text
-              numberOfLines={1}
-              className="font-display text-4xl leading-10 text-board-ink uppercase"
-            >
+          <View className="gap-1">
+            <Text numberOfLines={1} className="font-display text-4xl leading-10 text-ink uppercase">
               {trip.name}
             </Text>
+            <Text className="text-sm text-muted">Going · {tripDates(trip)}</Text>
           </View>
           <Loaded query={stacks.trip(trip.id)} skeleton={<View className="h-6" />}>
             {(detailed) => <Leaders detail={detail} trip={detailed} />}
@@ -76,10 +71,7 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
               accessibilityHint="Opens the trip's board"
               onPress={() => navigation.navigate("Trip", { tripId: trip.id })}
             >
-              <Text
-                numberOfLines={1}
-                className="flex-1 font-display text-xl tracking-wide text-ink uppercase"
-              >
+              <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
                 {trip.name}
               </Text>
               <Text className="text-sm text-muted">{tripDates(trip)}</Text>
@@ -99,16 +91,14 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
   const top = tripStandings(closed, localClock).slice(0, 3);
   if (top.length === 0)
-    return <Text className="text-sm text-board-muted">The board fills in as sessions close.</Text>;
+    return <Text className="text-sm text-muted">Close a session to put it on the board.</Text>;
   return (
     <View className="flex-row flex-wrap gap-x-4 gap-y-2">
       {top.map((s) => (
         <View key={s.playerId} className="flex-row items-center gap-2">
-          <Text className="font-mono text-sm text-board-amber">{s.rank}</Text>
+          <Text className="font-mono text-sm text-accent-text">{s.rank}</Text>
           <Chip chip={chipOf(detail, s.playerId)} name={names.get(s.playerId) ?? ""} size={22} />
-          <Text
-            className={`font-mono text-sm ${s.net >= 0 ? "text-board-win" : "text-board-loss"}`}
-          >
+          <Text className={`font-mono text-sm ${s.net >= 0 ? "text-win" : "text-loss"}`}>
             {boardMoney(s.net, detail.group.currency)}
           </Text>
         </View>

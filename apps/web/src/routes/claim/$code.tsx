@@ -21,7 +21,7 @@ function Claim() {
       <Loaded query={stacks.claimPreview(code)} skeleton={<Skeleton className="h-64" />}>
         {(preview) => (
           <Surface className="flex flex-col gap-5 p-6">
-            <PageTitle eyebrow={preview.groupName}>Are you {preview.displayName}?</PageTitle>
+            <PageTitle context={preview.groupName}>Are you {preview.displayName}?</PageTitle>
             <p className="max-w-[52ch] text-muted">
               {preview.displayName} has been playing in {preview.groupName} as a guest. Claim it to
               join the group and make their sessions, results and balance yours.

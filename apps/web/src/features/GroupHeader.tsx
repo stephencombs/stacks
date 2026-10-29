@@ -23,7 +23,7 @@ export function GroupHeader({
     <div className="flex flex-col gap-5 pt-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <PageTitle
-          eyebrow={`${detail.players.length} ${detail.players.length === 1 ? "player" : "players"} · ${detail.group.currency}`}
+          context={`${detail.players.length} ${detail.players.length === 1 ? "player" : "players"} · ${detail.group.currency}`}
         >
           {detail.group.name}
         </PageTitle>

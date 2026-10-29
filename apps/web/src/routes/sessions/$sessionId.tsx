@@ -90,7 +90,7 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
           {group.trips.find((trip) => trip.id === session.tripId)?.name ?? group.group.name}
         </BackLink>
         <div className="flex flex-col gap-2">
-          <PageTitle eyebrow={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
+          <PageTitle context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
             {venue.name}
           </PageTitle>
           <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -140,9 +140,7 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
                       {names.get(playerId)}
                     </span>
                     <span className="text-sm whitespace-nowrap text-muted tabular-nums">
-                      {result && result.buyIn === 0 && result.cashOut === 0 ? (
-                        "Net result only"
-                      ) : result ? (
+                      {result && result.buyIn === 0 && result.cashOut === 0 ? null : result ? (
                         <>
                           In <Money amount={result.buyIn} currency={currency} /> · Out{" "}
                           <Money amount={result.cashOut} currency={currency} />
@@ -324,7 +322,7 @@ function TicketStub({
     <dl className="grid auto-cols-fr grid-flow-col divide-x divide-dashed divide-line-strong rounded-xl border border-dashed border-line-strong">
       {cells.map((cell) => (
         <div key={cell.label} className="flex min-w-0 flex-col gap-0.5 px-3 py-2.5">
-          <dt className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+          <dt className="font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
             {cell.label}
           </dt>
           <dd className="truncate font-mono text-base font-bold">{cell.value}</dd>
@@ -365,13 +363,20 @@ function EntryRow({
         }
       >
         <span className={voided ? "line-through" : undefined}>
-          {names.get(entry.playerId)} {verbs[entry.kind]}{" "}
-          <Money
-            amount={entry.amount}
-            currency={group.group.currency}
-            tone={entry.kind === "adjustment" ? "result" : "plain"}
-            className="font-medium"
-          />
+          {names.get(entry.playerId)}{" "}
+          {entry.kind === "cash_out" && entry.amount === 0 ? (
+            "busted"
+          ) : (
+            <>
+              {verbs[entry.kind]}{" "}
+              <Money
+                amount={entry.amount}
+                currency={group.group.currency}
+                tone={entry.kind === "adjustment" ? "result" : "plain"}
+                className="font-medium"
+              />
+            </>
+          )}
         </span>
         {counterparty || entry.note || voided ? (
           <span className="text-sm text-muted">

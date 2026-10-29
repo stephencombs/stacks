@@ -51,9 +51,7 @@ function Groups() {
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-display text-2xl leading-tight tracking-wide uppercase">
-                        {item.group.name}
-                      </span>
+                      <span className="truncate text-lg font-semibold">{item.group.name}</span>
                       {item.liveSessionCount > 0 ? <Tag tone="live">Live</Tag> : null}
                     </div>
                     <span className="text-sm">

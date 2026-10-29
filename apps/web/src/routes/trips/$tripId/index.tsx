@@ -51,8 +51,7 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
         <SectionHeading>Sessions</SectionHeading>
         {trip.sessions.length === 0 ? (
           <EmptyState title="No sessions yet" action={startSession}>
-            Start one when you sit down to play. Everyone's buy-ins and cash-outs go in it, and the
-            board fills in as sessions close.
+            Start one when you sit down to play.
           </EmptyState>
         ) : closed.length > 0 ? (
           <SessionList sessions={closed} detail={group} />

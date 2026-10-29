@@ -16,8 +16,8 @@
   --color-ink: oklch(0.96 0 0);
   --color-muted: oklch(0.7 0.01 260);
   --color-faint: oklch(0.54 0.01 260);
-  --color-line: oklch(1 0 0 / 0.09);
-  --color-line-strong: oklch(1 0 0 / 0.16);
+  --color-line: oklch(0.25 0.01 260);
+  --color-line-strong: oklch(0.32 0.01 260);
   --color-accent: oklch(0.83 0.16 75);
   --color-accent-ink: oklch(0.2 0.02 75);
   --color-accent-text: oklch(0.83 0.16 75);
@@ -26,30 +26,18 @@
   --color-live: oklch(0.7 0.19 25);
   --color-danger: oklch(0.7 0.19 25);
   --color-disabled: oklch(0.27 0.01 260);
-
-  /* The trip board is a sportsbook: always dark, whatever the theme. */
-  --color-board: oklch(0.15 0.01 260);
-  --color-board-panel: oklch(0.19 0.01 260);
-  --color-board-deep: oklch(0.11 0.01 260);
-  --color-board-rule: oklch(1 0 0 / 0.09);
-  --color-board-ink: oklch(0.96 0 0);
-  --color-board-muted: oklch(0.68 0.01 260);
-  --color-board-amber: oklch(0.83 0.16 75);
-  --color-board-amber-ink: oklch(0.2 0.02 75);
-  --color-board-win: oklch(0.8 0.17 150);
-  --color-board-loss: oklch(0.7 0.19 25);
 }
 
 /* Player chips, in joining order: casino chip colors. Chips read these through var(), so they're
    emitted even though no utility class names them. */
 @theme static {
-  --color-chip-1: oklch(0.56 0.2 25);
+  --color-chip-1: oklch(0.5 0.19 10);
   --color-chip-1-ink: oklch(0.98 0 0);
   --color-chip-2: oklch(0.5 0.15 255);
   --color-chip-2-ink: oklch(0.98 0 0);
-  --color-chip-3: oklch(0.55 0.13 152);
+  --color-chip-3: oklch(0.55 0.1 190);
   --color-chip-3-ink: oklch(0.98 0 0);
-  --color-chip-4: oklch(0.24 0.01 260);
+  --color-chip-4: oklch(0.34 0.01 260);
   --color-chip-4-ink: oklch(0.98 0 0);
   --color-chip-5: oklch(0.5 0.17 305);
   --color-chip-5-ink: oklch(0.98 0 0);

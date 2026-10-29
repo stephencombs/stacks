@@ -102,7 +102,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-8 pt-4">
-      <PageTitle eyebrow={`${detail.group.name} · ${trip.trip.name}`}>Start a session</PageTitle>
+      <PageTitle context={`${detail.group.name} · ${trip.trip.name}`}>Start a session</PageTitle>
 
       <section className="flex flex-col gap-2">
         <SectionHeading>Where</SectionHeading>
@@ -112,9 +112,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
       </section>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-          Game
-        </legend>
+        <legend className="mb-2 text-[15px] font-semibold text-ink">Game</legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {GAMES.map((option) => (
             <label
@@ -141,9 +139,7 @@ function NewSessionForm({ detail, trip }: { detail: GroupDetail; trip: TripDetai
 
       <fieldset className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <legend className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-            Who's playing
-          </legend>
+          <legend className="text-[15px] font-semibold text-ink">Who's playing</legend>
           <Button size="sm" variant="ghost" onClick={() => setAddingGuest(true)}>
             <UserPlus className="size-4" aria-hidden />
             Add a guest

@@ -13,9 +13,9 @@ import { useCSSVariable } from "uniwind";
 import { cn } from "../components/ui/cn";
 import { Chip } from "./Chip";
 
-const label = "text-[11px] font-semibold tracking-[2px] uppercase";
-const tone = (n: number) =>
-  n > 0 ? "text-board-win" : n < 0 ? "text-board-loss" : "text-board-muted";
+// Board readouts: small mono caps, like the labels on a sportsbook screen.
+const label = "font-mono text-[11px] tracking-[1px] uppercase";
+const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
 type Racer = { playerId: PlayerId; name: string; chip: number; running: ReadonlyArray<number> };
 
@@ -81,7 +81,7 @@ export function RaceStats<S extends RaceSession>({
 
   if (players.length === 0)
     return (
-      <Text className="m-4 rounded-xl border border-board-rule bg-board-panel p-4 text-sm text-board-muted">
+      <Text className="m-4 rounded-xl border border-line bg-surface p-4 text-sm text-muted">
         {empty}
       </Text>
     );
@@ -114,7 +114,7 @@ export function RaceStats<S extends RaceSession>({
 /** Line colors by chip. Chip 4 is near-black, so its line takes the board's light gray instead. */
 function useLineColors() {
   const colors = useCSSVariable([
-    "--color-board-muted",
+    "--color-muted",
     "--color-chip-1",
     "--color-chip-2",
     "--color-chip-3",
@@ -151,9 +151,9 @@ function Race<S extends RaceSession>({
   const [width, setWidth] = useState(0);
   const lineColor = useLineColors();
   const [rule, amber, board] = useCSSVariable([
-    "--color-board-rule",
-    "--color-board-amber",
-    "--color-board",
+    "--color-line",
+    "--color-accent",
+    "--color-canvas",
   ]).map(String);
 
   // Places, not dollars: one big winner would flatten everyone else's line.
@@ -184,23 +184,23 @@ function Race<S extends RaceSession>({
   return (
     <View className="gap-4">
       <View className="gap-1">
-        <Text className={cn(label, "text-board-amber")}>
+        <Text className={cn(label, "text-muted")}>
           {at === last ? latest : `After session ${at + 1} of ${sessions.length}`} ·{" "}
           {where(session)}
         </Text>
         <Text
           accessibilityRole="header"
-          className="font-display text-4xl leading-10 text-board-ink uppercase"
+          className="font-display text-4xl leading-10 text-ink uppercase"
         >
           {headline}
           {second && leader!.now !== second.now ? (
-            <Text className="font-mono text-3xl text-board-win">
+            <Text className="font-mono text-3xl text-win">
               {" "}
               {boardMoney(leader!.now - second.now, currency, false)}
             </Text>
           ) : null}
         </Text>
-        <Text className="text-sm text-board-muted">
+        <Text className="text-sm text-muted">
           Session {at + 1}: {session.venue.name}, {formatDay(session.session.startedAt)}
         </Text>
       </View>
@@ -293,11 +293,8 @@ function Race<S extends RaceSession>({
           </Svg>
         ) : null}
       </View>
-      <Text className="-mt-2 text-center text-xs text-board-muted">
-        Drag across to replay it session by session
-      </Text>
 
-      <View className="overflow-hidden rounded-xl border border-board-rule bg-board-panel">
+      <View className="overflow-hidden rounded-xl border border-line bg-surface">
         {standing.map((p, place) => (
           <Pressable
             key={p.playerId}
@@ -307,12 +304,12 @@ function Race<S extends RaceSession>({
             accessibilityHint="Shows their stats"
             onPress={() => onPick(p.playerId)}
             className={cn(
-              "min-h-12 flex-row items-center gap-3 px-3 py-2.5 active:bg-board-deep",
-              place > 0 && "border-t border-board-rule",
-              p.playerId === picked && "border-l-[3px] border-l-board-amber",
+              "min-h-12 flex-row items-center gap-3 px-3 py-2.5 active:bg-sunken",
+              place > 0 && "border-t border-line",
+              p.playerId === picked && "border-l-[3px] border-l-accent",
             )}
           >
-            <Text className="w-5 font-mono text-lg text-board-amber">{place + 1}</Text>
+            <Text className="w-5 font-mono text-lg text-accent-text">{place + 1}</Text>
             <Chip chip={p.chip} name={p.name} size={26} />
             <View
               className="h-0.5 w-4 rounded-full"
@@ -320,7 +317,7 @@ function Race<S extends RaceSession>({
             />
             <Text
               numberOfLines={1}
-              className="flex-1 font-display text-lg tracking-wide text-board-ink uppercase"
+              className="flex-1 font-display text-lg tracking-wide text-ink uppercase"
             >
               {p.name}
             </Text>
@@ -398,7 +395,7 @@ function Sheet({
     <View className="gap-4">
       <View className="flex-row items-end justify-between gap-4">
         <View className="flex-1 gap-1">
-          <Text className={cn(label, "text-board-amber")}>
+          <Text className={cn(label, "text-muted")}>
             {player.name} · #{rank} of {of} · {runs.sessions}{" "}
             {runs.sessions === 1 ? "session" : "sessions"}
           </Text>
@@ -418,20 +415,20 @@ function Sheet({
           <View
             key={tile.title}
             accessible
-            className="basis-[48%] grow gap-1 rounded-xl border border-board-rule bg-board-panel p-3"
+            className="basis-[48%] grow gap-1 rounded-xl border border-line bg-surface p-3"
           >
-            <Text className={cn(label, "text-board-muted")}>{tile.title}</Text>
+            <Text className={cn(label, "text-muted")}>{tile.title}</Text>
             <Text
               adjustsFontSizeToFit
               numberOfLines={1}
               className={cn(
                 "font-mono text-2xl",
-                tile.tone === undefined ? "text-board-ink" : tone(tile.tone),
+                tile.tone === undefined ? "text-ink" : tone(tile.tone),
               )}
             >
               {tile.value}
             </Text>
-            <Text numberOfLines={1} className="text-xs text-board-muted">
+            <Text numberOfLines={1} className="text-xs text-muted">
               {tile.line}
             </Text>
           </View>
@@ -440,20 +437,20 @@ function Sheet({
 
       <View className="gap-2">
         <View className="flex-row items-baseline justify-between gap-3">
-          <Text accessibilityRole="header" className={cn(label, "text-board-muted")}>
+          <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
             Every session
           </Text>
           <Text
             accessibilityLiveRegion="polite"
             numberOfLines={1}
-            className="shrink font-mono text-xs text-board-muted"
+            className="shrink font-mono text-xs text-muted"
           >
             {focus
               ? `${formatDay(focus.session.session.startedAt)} · ${focus.session.venue.name} · ${money(focus.net)}`
               : "Tap a bar"}
           </Text>
         </View>
-        <View className="h-36 flex-row gap-[2px] rounded-xl border border-board-rule bg-board-panel p-3">
+        <View className="h-36 flex-row gap-[2px] rounded-xl border border-line bg-surface p-3">
           {sheet.played.map((p, i) => (
             <Pressable
               key={p.session.session.id}
@@ -464,7 +461,7 @@ function Sheet({
               <View
                 className={cn(
                   "absolute inset-x-0 rounded-[2px]",
-                  p.net >= 0 ? "bg-board-win" : "bg-board-loss",
+                  p.net >= 0 ? "bg-win" : "bg-loss",
                   shown !== null && shown !== i && "opacity-40",
                 )}
                 style={{

@@ -67,8 +67,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       <Text className="text-base text-muted">
         {playedSummary(stats.sessionCount, stats.minutesPlayed)}
       </Text>
-      {/* The race is drawn in the board's colors, so it sits on a board panel in either theme. */}
-      <View className="-mx-4 border-y border-board-rule bg-board">
+      <View className="-mx-4">
         <RaceStats
           detail={detail}
           sessions={sessions}

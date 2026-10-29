@@ -26,10 +26,7 @@ export function SessionList({
           >
             <View className="flex-1 gap-0.5">
               <View className="flex-row items-center gap-2">
-                <Text
-                  numberOfLines={1}
-                  className="shrink font-display text-lg tracking-wide text-ink uppercase"
-                >
+                <Text numberOfLines={1} className="shrink text-base font-medium text-ink">
                   {venue.name}
                 </Text>
                 {session.status === "live" ? <Tag tone="live">Live</Tag> : null}
@@ -46,9 +43,7 @@ export function SessionList({
                 tone="result"
                 className="text-base"
               />
-            ) : (
-              <Text className="text-sm text-muted">Sat out</Text>
-            )}
+            ) : null}
           </Row>
         );
       })}

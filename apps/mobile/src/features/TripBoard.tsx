@@ -24,9 +24,9 @@ import {
 import { cn } from "../components/ui/cn";
 import { Chip } from "./Chip";
 
-const label = "text-[11px] font-semibold tracking-[2px] uppercase";
-const tone = (n: number) =>
-  n > 0 ? "text-board-win" : n < 0 ? "text-board-loss" : "text-board-muted";
+// Board readouts: small mono caps, like the labels on a sportsbook screen.
+const label = "font-mono text-[11px] tracking-[1px] uppercase";
+const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
 /** The latest results sliding past, like the LED strip over a sportsbook. Still with Reduce Motion. */
 function Ticker({ items }: { items: ReadonlyArray<{ key: string; text: string }> }) {
@@ -57,7 +57,7 @@ function Ticker({ items }: { items: ReadonlyArray<{ key: string; text: string }>
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      className="overflow-hidden border-b border-board-rule bg-board-deep py-2"
+      className="overflow-hidden border-b border-line bg-sunken py-2"
     >
       {/* A horizontal scroll view lets the strip run wider than the screen; it never scrolls. */}
       <ScrollView horizontal scrollEnabled={false} showsHorizontalScrollIndicator={false}>
@@ -70,7 +70,7 @@ function Ticker({ items }: { items: ReadonlyArray<{ key: string; text: string }>
               key={item.key}
               numberOfLines={1}
               style={{ flexShrink: 0 }}
-              className="mr-8 font-mono text-xs text-board-amber"
+              className="mr-8 font-mono text-xs text-accent-text"
             >
               {item.text}
             </Text>
@@ -103,23 +103,20 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   );
 
   return (
-    <View className="flex-1 bg-board">
+    <View className="flex-1 bg-canvas">
       {ticker.length > 0 ? <Ticker items={ticker} /> : null}
       <View className="gap-7 px-4 pt-5 pb-8">
         <View className="flex-row items-end justify-between gap-4">
           <View className="flex-1 gap-1">
-            <Text className={cn(label, "text-board-amber")}>
+            <Text className={cn(label, "text-muted")}>
               {trip.trip.endedAt === null ? "On the board" : "Final board"}
             </Text>
-            <Text
-              numberOfLines={1}
-              className="font-display text-4xl leading-10 text-board-ink uppercase"
-            >
+            <Text numberOfLines={1} className="font-display text-4xl leading-10 text-ink uppercase">
               {tonight ? nightLabel(tonight) : "Before the first hand"}
             </Text>
           </View>
           <View className="items-end">
-            <Text className={cn(label, "text-board-muted")}>Table</Text>
+            <Text className={cn(label, "text-muted")}>Table</Text>
             <Text className={cn("font-mono", "text-lg", tone(total))}>
               {boardMoney(total, currency)}
             </Text>
@@ -132,14 +129,11 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
             accessibilityRole="button"
             accessibilityLabel={`Live now at ${s.venue.name}`}
             onPress={() => navigation.navigate("Session", { sessionId: s.session.id })}
-            className="min-h-11 flex-row items-center gap-3 rounded-xl border border-board-rule bg-board-panel px-3 py-2 active:opacity-80"
+            className="min-h-11 flex-row items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2 active:opacity-80"
           >
-            <View className="size-2 rounded-full bg-board-loss" />
-            <Text className={cn(label, "text-board-loss")}>Live</Text>
-            <Text
-              numberOfLines={1}
-              className="flex-1 font-display text-lg tracking-wide text-board-ink uppercase"
-            >
+            <View className="size-2 rounded-full bg-loss" />
+            <Text className={cn(label, "text-loss")}>Live</Text>
+            <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
               {s.venue.name}
             </Text>
           </Pressable>
@@ -147,19 +141,19 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 
         <View className="gap-2">
           <View className="flex-row justify-between">
-            <Text accessibilityRole="header" className={cn(label, "text-board-muted")}>
+            <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
               The board
             </Text>
-            <Text className={cn(label, "text-board-muted")}>
+            <Text className={cn(label, "text-muted")}>
               {closed.length} {closed.length === 1 ? "session" : "sessions"}
             </Text>
           </View>
           {standings.length === 0 ? (
-            <Text className="rounded-xl border border-board-rule bg-board-panel p-4 text-sm text-board-muted">
-              The board fills in when the trip's first session closes. Start one and play.
+            <Text className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
+              Close a session to put it on the board.
             </Text>
           ) : (
-            <View className="overflow-hidden rounded-xl border border-board-rule bg-board-panel">
+            <View className="overflow-hidden rounded-xl border border-line bg-surface">
               {standings.map((s, index) => {
                 const you = s.playerId === detail.myPlayerId;
                 return (
@@ -169,16 +163,16 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                     accessibilityLabel={`${s.rank}. ${name(s.playerId)}${you ? ", you" : ""}: ${boardMoney(s.net, currency)} over ${s.sessions} sessions${s.hot ? ", on a heater" : ""}`}
                     className={cn(
                       "flex-row items-center gap-2.5 px-3 py-3",
-                      index > 0 && "border-t border-board-rule",
-                      you && "border-l-[3px] border-l-board-amber",
+                      index > 0 && "border-t border-line",
+                      you && "border-l-[3px] border-l-accent",
                     )}
                   >
-                    <Text className="font-mono w-6 text-xl text-board-amber">{s.rank}</Text>
+                    <Text className="font-mono w-6 text-xl text-accent-text">{s.rank}</Text>
                     <Text
                       className={cn(
                         "font-mono",
                         "w-6 text-xs",
-                        s.moved > 0 ? "text-board-win" : "text-board-loss",
+                        s.moved > 0 ? "text-win" : "text-loss",
                       )}
                     >
                       {s.moved === 0 ? "" : `${s.moved > 0 ? "▲" : "▼"}${Math.abs(s.moved)}`}
@@ -188,17 +182,17 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                       <View className="flex-row items-center gap-2">
                         <Text
                           numberOfLines={1}
-                          className="shrink font-display text-lg leading-6 tracking-wide text-board-ink uppercase"
+                          className="shrink font-display text-lg leading-6 tracking-wide text-ink uppercase"
                         >
                           {name(s.playerId)}
                         </Text>
                         {s.hot ? (
-                          <Text className="rounded-sm bg-board-amber px-1 font-mono text-[10px] text-board-amber-ink">
+                          <Text className="rounded-sm bg-accent px-1 font-mono text-[10px] text-accent-ink">
                             HOT
                           </Text>
                         ) : null}
                       </View>
-                      <Text className="font-mono text-xs text-board-muted">
+                      <Text className="font-mono text-xs text-muted">
                         {s.sessions} SESS{you ? " · YOU" : ""}
                       </Text>
                     </View>
@@ -214,17 +208,17 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 
         {awards.length > 0 ? (
           <View className="gap-2">
-            <Text accessibilityRole="header" className={cn(label, "text-board-muted")}>
-              Props hit
+            <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+              Awards
             </Text>
             <View className="flex-row flex-wrap gap-2">
               {awards.map((award) => (
                 <View
                   key={award.key}
                   accessible
-                  className="basis-[48%] grow gap-2 rounded-xl border border-board-rule bg-board-panel p-3"
+                  className="basis-[48%] grow gap-2 rounded-xl border border-line bg-surface p-3"
                 >
-                  <Text className={cn(label, "text-board-amber")}>{awardTitles[award.key]}</Text>
+                  <Text className={cn(label, "text-muted")}>{awardTitles[award.key]}</Text>
                   <View className="flex-row items-center gap-2">
                     <Chip
                       chip={chipOf(detail, award.playerId)}
@@ -233,12 +227,12 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                     />
                     <Text
                       numberOfLines={1}
-                      className="shrink font-display text-lg leading-6 tracking-wide text-board-ink uppercase"
+                      className="shrink font-display text-lg leading-6 tracking-wide text-ink uppercase"
                     >
                       {name(award.playerId)}
                     </Text>
                   </View>
-                  <Text className="text-xs text-board-muted">{awardLine(award, currency)}</Text>
+                  <Text className="text-xs text-muted">{awardLine(award, currency)}</Text>
                 </View>
               ))}
             </View>
@@ -247,7 +241,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 
         {nights.length > 0 ? (
           <View className="gap-1">
-            <Text accessibilityRole="header" className={cn(label, "text-board-muted")}>
+            <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
               Night by night
             </Text>
             {nights.toReversed().map((night, index) => (
@@ -256,20 +250,17 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                 accessible
                 className={cn(
                   "flex-row items-center gap-3 py-2.5",
-                  index > 0 && "border-t border-board-rule",
+                  index > 0 && "border-t border-line",
                 )}
               >
-                <Text className="font-mono w-7 text-sm text-board-amber">D{night.number}</Text>
-                <Text className="font-mono w-9 text-sm text-board-ink uppercase">
+                <Text className="font-mono w-7 text-sm text-accent-text">D{night.number}</Text>
+                <Text className="font-mono w-9 text-sm text-ink uppercase">
                   {nightLabel(night).split(" · ")[1]!.slice(0, 3)}
                 </Text>
-                <Text className="font-mono w-14 text-sm text-board-muted">
+                <Text className="font-mono w-14 text-sm text-muted">
                   {night.sessions.length} sess
                 </Text>
-                <Text
-                  numberOfLines={1}
-                  className="font-mono flex-1 text-sm text-board-ink uppercase"
-                >
+                <Text numberOfLines={1} className="font-mono flex-1 text-sm text-ink uppercase">
                   {night.winner ? name(night.winner.playerId) : "—"}
                 </Text>
                 <Text className={cn("font-mono", "text-sm", tone(night.winner?.net ?? 0))}>

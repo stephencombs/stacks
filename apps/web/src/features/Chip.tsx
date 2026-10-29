@@ -6,7 +6,7 @@ export function Chip({ chip, name, size = 32 }: { chip: number; name: string; si
   return (
     <span
       aria-hidden
-      className="inline-grid shrink-0 place-items-center rounded-full shadow-[0_1px_2px_oklch(0_0_0/0.3),inset_0_0_0_1px_oklch(0_0_0/0.15)]"
+      className="inline-grid shrink-0 place-items-center rounded-full shadow-[0_0_0_1px_var(--color-line-strong),0_1px_2px_oklch(0_0_0/0.3)]"
       style={
         {
           width: size,

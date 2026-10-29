@@ -33,7 +33,7 @@ function GroupView({ detail }: { detail: GroupDetail }) {
   return (
     <>
       <PageTitle
-        eyebrow={`${detail.players.length} ${detail.players.length === 1 ? "player" : "players"} · ${detail.group.currency}`}
+        context={`${detail.players.length} ${detail.players.length === 1 ? "player" : "players"} · ${detail.group.currency}`}
       >
         {detail.group.name}
       </PageTitle>

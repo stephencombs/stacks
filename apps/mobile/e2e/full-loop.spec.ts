@@ -103,11 +103,11 @@ test.describe.serial("live mode on a phone", () => {
     // One tap repeats Gus's last buy-in.
     await alex.getByRole("button", { name: "Rebuy for Gus" }).filter({ visible: true }).click();
     await expect(
-      alex.getByText("In $200.00 · Out $0.00").filter({ visible: true }).first(),
+      alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),
     ).toBeVisible();
     // A mistaken rebuy can be undone from the toast.
     await alex.getByRole("button", { name: "Rebuy for Gus" }).filter({ visible: true }).click();
-    const toast = alex.getByText("Gus rebought for $100.00").filter({ visible: true });
+    const toast = alex.getByText("Gus rebought for $100").filter({ visible: true });
     await expect(toast).toBeVisible();
     // Let the toast finish fading in before the screenshot.
     await expect
@@ -124,7 +124,7 @@ test.describe.serial("live mode on a phone", () => {
     await alex.getByRole("button", { name: "Undo" }).filter({ visible: true }).click();
     await expect(alex.getByText("Voided: Undone").filter({ visible: true })).toBeVisible();
     await expect(
-      alex.getByText("In $200.00 · Out $0.00").filter({ visible: true }).first(),
+      alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),
     ).toBeVisible();
 
     await alex.getByRole("button", { name: "Close session" }).filter({ visible: true }).click();
@@ -143,7 +143,7 @@ test.describe.serial("live mode on a phone", () => {
     await record("Cash out", "Alex", "320");
     await record("Cash out", "Bea", "0");
     await record("Cash out", "Gus", "220", "Alex");
-    await expect(alex.getByText("+$170.00").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("+$170").filter({ visible: true })).toBeVisible();
     await shoot(alex, "session-live");
 
     await alex.getByRole("button", { name: "Close session" }).filter({ visible: true }).click();
@@ -153,8 +153,8 @@ test.describe.serial("live mode on a phone", () => {
       .last()
       .click();
     await expect(alex.getByText("Closed", { exact: true }).filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("-$200.00").filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("+$20.00").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("-$200").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("+$20").filter({ visible: true })).toBeVisible();
 
     // The trip's board ranks the night, and its settle-up says who owes whom: Alex owes Bea $50
     // for the buy-in and Gus $220 for the cash he kept.
@@ -172,9 +172,9 @@ test.describe.serial("live mode on a phone", () => {
     await shoot(alex, "trip-stats");
     await alex.goBack();
     await alex.getByRole("button", { name: "Settle up" }).filter({ visible: true }).click();
-    await expect(alex.getByText("Owes $270.00").filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("Owed $50.00").filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("Owed $220.00").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("Owes $270").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("Owed $50").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("Owed $220").filter({ visible: true })).toBeVisible();
     const settleUrl = alex.url();
     await expect(
       alex.getByRole("button", { name: "Mark paid" }).filter({ visible: true }),
@@ -191,7 +191,7 @@ test.describe.serial("live mode on a phone", () => {
     await expect(alex.getByText("Everyone's square").filter({ visible: true })).toBeVisible();
 
     await bea.goto(new URL(settleUrl).pathname);
-    await expect(bea.getByText("Settled up").filter({ visible: true })).toHaveCount(3);
+    await expect(bea.getByText("Square", { exact: true }).filter({ visible: true })).toHaveCount(3);
 
     await alex.goto(groupUrl);
     await alex.getByRole("button", { name: "Stats" }).filter({ visible: true }).click();

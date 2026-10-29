@@ -47,7 +47,7 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
   return (
     <Surface className="flex flex-col gap-5 p-6">
       <PageTitle
-        eyebrow={`${preview.memberCount} ${preview.memberCount === 1 ? "member" : "members"}`}
+        context={`${preview.memberCount} ${preview.memberCount === 1 ? "member" : "members"}`}
       >
         {preview.groupName}
       </PageTitle>

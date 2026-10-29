@@ -62,10 +62,7 @@ export function GroupsScreen() {
                 >
                   <View className="flex-1 gap-1">
                     <View className="flex-row items-center gap-2">
-                      <Text
-                        numberOfLines={1}
-                        className="shrink font-display text-2xl tracking-wide text-ink uppercase"
-                      >
+                      <Text numberOfLines={1} className="shrink text-lg font-semibold text-ink">
                         {item.group.name}
                       </Text>
                       {item.liveSessionCount > 0 ? <Tag tone="live">Live</Tag> : null}

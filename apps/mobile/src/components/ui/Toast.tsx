@@ -87,9 +87,9 @@ function ToastView({ toast, onClosed }: { toast: Toast; onClosed: () => void }) 
       >
         <View
           accessibilityLiveRegion="polite"
-          className="min-h-13 flex-row items-center gap-3 rounded-2xl bg-accent py-1.5 pr-1.5 pl-4"
+          className="min-h-13 flex-row items-center gap-3 rounded-xl border border-line-strong bg-surface py-1.5 pr-1.5 pl-4"
         >
-          <Text className="flex-1 text-base text-accent-ink">{toast.message}</Text>
+          <Text className="flex-1 text-base text-ink">{toast.message}</Text>
           {toast.action ? (
             <Pressable
               accessibilityRole="button"
@@ -100,7 +100,7 @@ function ToastView({ toast, onClosed }: { toast: Toast; onClosed: () => void }) 
               }}
               className="min-h-11 justify-center rounded-xl px-3 active:opacity-70"
             >
-              <Text className="text-base font-semibold text-accent-ink">{toast.action.label}</Text>
+              <Text className="text-base font-semibold text-accent-text">{toast.action.label}</Text>
             </Pressable>
           ) : null}
         </View>

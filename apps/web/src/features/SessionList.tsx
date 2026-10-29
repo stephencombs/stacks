@@ -17,9 +17,7 @@ function SessionRow({ summary, detail }: { summary: SessionSummary; detail: Grou
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <span className="truncate font-display text-lg tracking-wide uppercase">
-            {venue.name}
-          </span>
+          <span className="truncate font-medium">{venue.name}</span>
           {session.status === "live" ? <Tag tone="live">Live</Tag> : null}
         </div>
         <span className="text-sm text-muted">
@@ -36,7 +34,7 @@ function SessionRow({ summary, detail }: { summary: SessionSummary; detail: Grou
             className="font-bold"
           />
         ) : (
-          <span className="text-muted">Sat out</span>
+          <span />
         )}
       </div>
       <ChevronRight className="size-5 shrink-0 text-faint" aria-hidden />

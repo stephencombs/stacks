@@ -121,7 +121,7 @@ function Table({ head, children }: { head: ReadonlyArray<string>; children: Reac
     <Surface className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-line text-left text-[11px] tracking-[0.16em] text-muted uppercase">
+          <tr className="border-b border-line text-left text-xs text-muted">
             {head.map((label, index) => (
               <th
                 key={label}

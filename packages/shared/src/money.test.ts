@@ -18,23 +18,21 @@ describe("minorUnitDigits", () => {
 });
 
 describe("formatMoney", () => {
-  it("formats minor units in the currency", () => {
+  it("formats minor units in the currency, with cents only when there are some", () => {
     expect(formatMoney(money(123456), USD, { locale: "en-US" })).toBe("$1,234.56");
-    expect(formatMoney(money(-500), USD, { locale: "en-US" })).toBe("-$5.00");
+    expect(formatMoney(money(-500), USD, { locale: "en-US" })).toBe("-$5");
+    expect(formatMoney(money(5050), USD, { locale: "en-US" })).toBe("$50.50");
     expect(formatMoney(money(1500), JPY, { locale: "en-US" })).toBe("¥1,500");
     expect(formatMoney(money(1234), KWD, { locale: "en-US" })).toBe("KWD\u00a01.234");
   });
 
-  it("drops zero cents on request, for chart axes", () => {
-    const short = { locale: "en-US", trailingZeroDisplay: "stripIfInteger" } as const;
-    expect(formatMoney(money(5000), USD, short)).toBe("$50");
-    expect(formatMoney(money(5050), USD, short)).toBe("$50.50");
+  it("keeps zero cents on request", () => {
+    const full = { locale: "en-US", trailingZeroDisplay: "auto" } as const;
+    expect(formatMoney(money(5000), USD, full)).toBe("$50.00");
   });
 
   it("shows a plus sign on request", () => {
-    expect(formatMoney(money(1000), USD, { locale: "en-US", signDisplay: "always" })).toBe(
-      "+$10.00",
-    );
+    expect(formatMoney(money(1000), USD, { locale: "en-US", signDisplay: "always" })).toBe("+$10");
   });
 
   it("stays exact at the largest safe amount", () => {

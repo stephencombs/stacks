@@ -55,16 +55,16 @@ it("says how a stake stands", () => {
   const usd = CurrencyCode.make("USD");
 
   expect(stakeLines(view({}, 40000, 120000), names, usd)).toEqual({
-    title: "Bruce backed Nick $1,000.00 · 50% of winnings",
-    status: "Nick is up $400.00 · owes back $1,200.00",
+    title: "Bruce backed Nick $1,000 · 50% of winnings",
+    status: "Nick is up $400 · owes back $1,200",
   });
   expect(stakeLines(view({}, 0, 100000), names, usd).status).toBe(
-    "Nick is even · owes back $1,000.00",
+    "Nick is even · owes back $1,000",
   );
   expect(
     stakeLines(view({ voidedAt: at, voidReason: "Wrong amount" }, 0, 0), names, usd).status,
   ).toBe("Voided: Wrong amount");
   expect(stakeLines(view({ endedAt: at }, -40000, 60000), names, usd).status).toMatch(
-    /^Ended .+ · Nick was down \$400\.00 · owes back \$600\.00$/,
+    /^Ended .+ · Nick was down \$400 · owes back \$600$/,
   );
 });

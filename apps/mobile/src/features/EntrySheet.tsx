@@ -156,7 +156,13 @@ export function EntrySheet({
       ) : null}
       <TextField label="Note (optional)" value={note} onChangeText={setNote} maxLength={280} />
       <Button
-        label={draft.replaces ? "Save correction" : `Record ${titles[draft.kind].toLowerCase()}`}
+        label={
+          draft.replaces
+            ? "Save correction"
+            : draft.kind === "adjustment"
+              ? "Save adjustment"
+              : `Record ${titles[draft.kind].toLowerCase()}`
+        }
         variant="primary"
         size="xl"
         haptic

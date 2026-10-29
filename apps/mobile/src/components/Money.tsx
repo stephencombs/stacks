@@ -44,7 +44,7 @@ export function BalanceLabel({
   currency: CurrencyCode;
   subject?: "you" | "third";
 }) {
-  if (amount === 0) return <Text className="text-sm text-muted">Settled up</Text>;
+  if (amount === 0) return <Text className="text-sm text-muted">Square</Text>;
   const verb =
     amount > 0
       ? subject === "you"

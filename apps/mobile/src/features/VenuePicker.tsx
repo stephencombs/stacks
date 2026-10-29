@@ -152,9 +152,7 @@ export function VenuePicker({
           />
         ) : recent.length > 0 ? (
           <>
-            <Text className="px-3 pb-1 text-xs font-semibold tracking-widest text-muted uppercase">
-              Recent
-            </Text>
+            <Text className="px-3 pb-1 text-sm text-muted">Recent</Text>
             {recent.map((venue) => (
               <VenueOption
                 key={venue.id}

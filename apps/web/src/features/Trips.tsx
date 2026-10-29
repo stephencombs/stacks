@@ -44,18 +44,16 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
               key={trip.id}
               to="/trips/$tripId"
               params={{ tripId: trip.id }}
-              className="flex flex-col gap-4 rounded-2xl border border-board-rule bg-board p-5 text-board-ink transition-[scale,border-color] duration-150 hover:border-board-amber/40 active:scale-[0.99]"
+              className="flex flex-col gap-4 rounded-2xl border border-line bg-canvas p-5 text-ink transition-[scale,border-color] duration-150 hover:border-accent/40 active:scale-[0.99]"
             >
               <span className="flex items-center justify-between gap-3">
-                <span className="flex min-w-0 flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold tracking-[0.18em] text-board-amber uppercase">
-                    Live board · {tripDates(trip)}
-                  </span>
+                <span className="flex min-w-0 flex-col gap-1">
                   <span className="truncate font-display text-4xl leading-none tracking-tight uppercase">
                     {trip.name}
                   </span>
+                  <span className="text-sm text-muted">Going · {tripDates(trip)}</span>
                 </span>
-                <ChevronRight className="size-5 shrink-0 text-board-muted" aria-hidden />
+                <ChevronRight className="size-5 shrink-0 text-muted" aria-hidden />
               </span>
               <Loaded query={stacks.trip(trip.id)} skeleton={<span className="h-6" />}>
                 {(detailed) => <Leaders detail={detail} trip={detailed} />}
@@ -75,9 +73,7 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
                 params={{ tripId: trip.id }}
                 className="flex min-h-12 items-center justify-between gap-3 px-5 py-3 first:rounded-t-xl last:rounded-b-xl hover:bg-sunken/50"
               >
-                <span className="truncate font-display text-xl tracking-wide uppercase">
-                  {trip.name}
-                </span>
+                <span className="truncate font-medium">{trip.name}</span>
                 <span className="flex shrink-0 items-center gap-1 text-sm text-muted">
                   {tripDates(trip)}
                   <ChevronRight className="size-4" aria-hidden />
@@ -117,15 +113,15 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
   const top = tripStandings(closed, localClock).slice(0, 3);
   if (top.length === 0)
-    return <span className="text-sm text-board-muted">The board fills in as sessions close.</span>;
+    return <span className="text-sm text-muted">Close a session to put it on the board.</span>;
   return (
     <span className="flex flex-wrap gap-x-4 gap-y-2">
       {top.map((s) => (
         <span key={s.playerId} className="flex items-center gap-2">
-          <span className="font-mono text-sm text-board-amber">{s.rank}</span>
+          <span className="font-mono text-sm text-accent-text">{s.rank}</span>
           <Chip chip={chipOf(detail, s.playerId)} name={names.get(s.playerId) ?? ""} size={22} />
           <span
-            className={`font-mono text-sm tabular-nums ${s.net >= 0 ? "text-board-win" : "text-board-loss"}`}
+            className={`font-mono text-sm tabular-nums ${s.net >= 0 ? "text-win" : "text-loss"}`}
           >
             {boardMoney(s.net, detail.group.currency)}
           </span>

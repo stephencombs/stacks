@@ -28,7 +28,7 @@ export const formatMoney = (
     style: "currency",
     currency,
     signDisplay: options.signDisplay ?? "auto",
-    trailingZeroDisplay: options.trailingZeroDisplay ?? "auto",
+    trailingZeroDisplay: options.trailingZeroDisplay ?? "stripIfInteger",
   }).format(toDecimalString(amount, minorUnitDigits(currency)));
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");

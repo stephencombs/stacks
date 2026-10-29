@@ -181,7 +181,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
     <>
       {live ? <KeepAwake /> : null}
       <View className="gap-3">
-        <PageTitle eyebrow={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
+        <PageTitle context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
           {venue.name}
         </PageTitle>
         <View className="flex-row items-center gap-2">
@@ -233,9 +233,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                     {name}
                   </Text>
                   <Text className="text-sm text-muted tabular-nums">
-                    {result && result.buyIn === 0 && result.cashOut === 0 ? (
-                      "Net result only"
-                    ) : result ? (
+                    {result && result.buyIn === 0 && result.cashOut === 0 ? null : result ? (
                       <>
                         In{" "}
                         <Money amount={result.buyIn} currency={currency} className="text-muted" /> ·
@@ -326,13 +324,20 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                     <Text
                       className={cn("text-base", voided ? "text-muted line-through" : "text-ink")}
                     >
-                      {names.get(entry.playerId)} {verbs[entry.kind]}{" "}
-                      <Money
-                        amount={entry.amount}
-                        currency={currency}
-                        tone={entry.kind === "adjustment" ? "result" : "plain"}
-                        className={cn("font-medium", voided && "text-muted")}
-                      />
+                      {names.get(entry.playerId)}{" "}
+                      {entry.kind === "cash_out" && entry.amount === 0 ? (
+                        "busted"
+                      ) : (
+                        <>
+                          {verbs[entry.kind]}{" "}
+                          <Money
+                            amount={entry.amount}
+                            currency={currency}
+                            tone={entry.kind === "adjustment" ? "result" : "plain"}
+                            className={cn("font-medium", voided && "text-muted")}
+                          />
+                        </>
+                      )}
                     </Text>
                     {counterparty || entry.note || voided || saving ? (
                       <Text className="text-sm text-muted">
@@ -659,7 +664,7 @@ function TicketStub({
             index > 0 && "border-l border-dashed border-line-strong",
           )}
         >
-          <Text className="text-[11px] font-semibold tracking-[2px] text-muted uppercase">
+          <Text className="font-mono text-[11px] tracking-[1px] text-muted uppercase">
             {cell.label}
           </Text>
           {cell.value}

@@ -62,7 +62,7 @@ export function TripHeader({
       </div>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-2">
-          <PageTitle eyebrow={tripDates(trip.trip)}>{trip.trip.name}</PageTitle>
+          <PageTitle context={tripDates(trip.trip)}>{trip.trip.name}</PageTitle>
           <p>{ended ? <Tag>Ended</Tag> : <Tag tone="live">Going</Tag>}</p>
         </div>
         {action}

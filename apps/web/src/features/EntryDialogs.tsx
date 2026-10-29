@@ -178,7 +178,11 @@ export function EntryDialog({
           )}
         </Field>
         <Button type="submit" variant="primary" size="lg">
-          {draft.replaces ? "Save correction" : `Record ${titles[draft.kind].toLowerCase()}`}
+          {draft.replaces
+            ? "Save correction"
+            : draft.kind === "adjustment"
+              ? "Save adjustment"
+              : `Record ${titles[draft.kind].toLowerCase()}`}
         </Button>
       </form>
     </Dialog>
