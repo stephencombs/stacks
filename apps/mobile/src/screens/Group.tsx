@@ -8,6 +8,7 @@ import { Button } from "../components/ui/Button";
 import { Screen } from "../components/ui/Screen";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { SessionList } from "../features/SessionList";
+import { TripsSection } from "../features/Trips";
 import { Loaded, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ groupId: string }>;
@@ -72,6 +73,8 @@ function GroupView({ detail }: { detail: GroupDetail }) {
           <SessionList sessions={live} detail={detail} />
         </View>
       ) : null}
+
+      <TripsSection detail={detail} />
 
       <View className="gap-2">
         <SectionHeading>Balances</SectionHeading>

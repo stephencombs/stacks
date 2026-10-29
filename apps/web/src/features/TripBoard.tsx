@@ -129,7 +129,9 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
         <section className="flex flex-col gap-2">
           <div className={cn("flex items-center justify-between", label, "text-board-muted")}>
             <h2>The board</h2>
-            <span>{closed.length} sessions</span>
+            <span>
+              {closed.length} {closed.length === 1 ? "session" : "sessions"}
+            </span>
           </div>
           {standings.length === 0 ? (
             <p className="rounded-xl border border-board-rule bg-board-panel p-4 text-sm text-board-muted">
