@@ -27,6 +27,10 @@
     "./trips": {
       "types": "./src/trips.ts",
       "import": "./src/trips.ts"
+    },
+    "./stats": {
+      "types": "./src/stats.ts",
+      "import": "./src/stats.ts"
     }
   },
   "scripts": {

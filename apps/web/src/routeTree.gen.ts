@@ -18,6 +18,7 @@ import { Route as GroupsGroupIdSettingsRouteImport } from './routes/groups/$grou
 import { Route as GroupsGroupIdStatsRouteImport } from './routes/groups/$groupId/stats'
 import { Route as TripsTripIdIndexRouteImport } from './routes/trips/$tripId/index'
 import { Route as TripsTripIdSettleRouteImport } from './routes/trips/$tripId/settle'
+import { Route as TripsTripIdStatsRouteImport } from './routes/trips/$tripId/stats'
 import { Route as TripsTripIdSessionsNewRouteImport } from './routes/trips/$tripId/sessions.new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -65,6 +66,11 @@ const TripsTripIdSettleRoute = TripsTripIdSettleRouteImport.update({
   path: '/trips/$tripId/settle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TripsTripIdStatsRoute = TripsTripIdStatsRouteImport.update({
+  id: '/trips/$tripId/stats',
+  path: '/trips/$tripId/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TripsTripIdSessionsNewRoute = TripsTripIdSessionsNewRouteImport.update({
   id: '/trips/$tripId/sessions/new',
   path: '/trips/$tripId/sessions/new',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
   '/trips/$tripId/settle': typeof TripsTripIdSettleRoute
+  '/trips/$tripId/stats': typeof TripsTripIdStatsRoute
   '/groups/$groupId/': typeof GroupsGroupIdIndexRoute
   '/trips/$tripId/': typeof TripsTripIdIndexRoute
   '/trips/$tripId/sessions/new': typeof TripsTripIdSessionsNewRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
   '/trips/$tripId/settle': typeof TripsTripIdSettleRoute
+  '/trips/$tripId/stats': typeof TripsTripIdStatsRoute
   '/groups/$groupId': typeof GroupsGroupIdIndexRoute
   '/trips/$tripId': typeof TripsTripIdIndexRoute
   '/trips/$tripId/sessions/new': typeof TripsTripIdSessionsNewRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
   '/trips/$tripId/settle': typeof TripsTripIdSettleRoute
+  '/trips/$tripId/stats': typeof TripsTripIdStatsRoute
   '/groups/$groupId/': typeof GroupsGroupIdIndexRoute
   '/trips/$tripId/': typeof TripsTripIdIndexRoute
   '/trips/$tripId/sessions/new': typeof TripsTripIdSessionsNewRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/groups/$groupId/settings'
     | '/groups/$groupId/stats'
     | '/trips/$tripId/settle'
+    | '/trips/$tripId/stats'
     | '/groups/$groupId/'
     | '/trips/$tripId/'
     | '/trips/$tripId/sessions/new'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/groups/$groupId/settings'
     | '/groups/$groupId/stats'
     | '/trips/$tripId/settle'
+    | '/trips/$tripId/stats'
     | '/groups/$groupId'
     | '/trips/$tripId'
     | '/trips/$tripId/sessions/new'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/groups/$groupId/settings'
     | '/groups/$groupId/stats'
     | '/trips/$tripId/settle'
+    | '/trips/$tripId/stats'
     | '/groups/$groupId/'
     | '/trips/$tripId/'
     | '/trips/$tripId/sessions/new'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   GroupsGroupIdSettingsRoute: typeof GroupsGroupIdSettingsRoute
   GroupsGroupIdStatsRoute: typeof GroupsGroupIdStatsRoute
   TripsTripIdSettleRoute: typeof TripsTripIdSettleRoute
+  TripsTripIdStatsRoute: typeof TripsTripIdStatsRoute
   GroupsGroupIdIndexRoute: typeof GroupsGroupIdIndexRoute
   TripsTripIdIndexRoute: typeof TripsTripIdIndexRoute
   TripsTripIdSessionsNewRoute: typeof TripsTripIdSessionsNewRoute
@@ -225,6 +238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TripsTripIdSettleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trips/$tripId/stats': {
+      id: '/trips/$tripId/stats'
+      path: '/trips/$tripId/stats'
+      fullPath: '/trips/$tripId/stats'
+      preLoaderRoute: typeof TripsTripIdStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trips/$tripId/sessions/new': {
       id: '/trips/$tripId/sessions/new'
       path: '/trips/$tripId/sessions/new'
@@ -243,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   GroupsGroupIdSettingsRoute: GroupsGroupIdSettingsRoute,
   GroupsGroupIdStatsRoute: GroupsGroupIdStatsRoute,
   TripsTripIdSettleRoute: TripsTripIdSettleRoute,
+  TripsTripIdStatsRoute: TripsTripIdStatsRoute,
   GroupsGroupIdIndexRoute: GroupsGroupIdIndexRoute,
   TripsTripIdIndexRoute: TripsTripIdIndexRoute,
   TripsTripIdSessionsNewRoute: TripsTripIdSessionsNewRoute,

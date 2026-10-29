@@ -136,6 +136,14 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByText("Biggest hit")).toBeVisible();
     await shoot(alex, "trip-board");
 
+    // Stats race the night and open a stat sheet for whoever's picked.
+    await alex
+      .getByRole("navigation", { name: "Trip" })
+      .getByRole("link", { name: "Stats" })
+      .click();
+    await expect(alex.getByRole("heading", { name: /leads by \$150/ })).toBeVisible();
+    await expect(alex.getByText("Win rate")).toBeVisible();
+
     // Alex owes Bea $50 for the buy-in and Gus $120 for the cash he kept.
     await alex
       .getByRole("navigation", { name: "Trip" })

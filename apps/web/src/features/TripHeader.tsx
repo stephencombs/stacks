@@ -15,6 +15,7 @@ import { useAction, useStacks } from "~/lib/stacks";
 
 const tabs = [
   { key: "board", label: "Board", to: "/trips/$tripId" },
+  { key: "stats", label: "Stats", to: "/trips/$tripId/stats" },
   { key: "settle", label: "Settle up", to: "/trips/$tripId/settle" },
 ] as const;
 
