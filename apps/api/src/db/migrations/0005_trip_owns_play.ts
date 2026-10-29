@@ -32,11 +32,11 @@ export default Effect.gen(function* () {
   `;
   // Entries are append-only; this one backfill writes past the guard.
   yield* sql`alter table entries disable trigger entries_append_only`;
+  // People pay up after a trip ends, so a payment squares up the latest trip that began before it.
   yield* sql`
     update entries e set trip_id = (
       select t.id from trips t
       where t.group_id = e.group_id and e.occurred_at >= t.started_at
-        and (t.ended_at is null or e.occurred_at < t.ended_at)
       order by t.started_at desc limit 1
     )
     where e.kind = 'settlement'
