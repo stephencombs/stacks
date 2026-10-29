@@ -16,7 +16,7 @@ function Root() {
   if (!isLoaded) return <Loading />;
   if (!isSignedIn) return <SignedOut />;
   return (
-    <StacksProvider key={userId}>
+    <StacksProvider key={userId} userId={userId}>
       <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4">
         <header className="flex h-16 items-center justify-between">
           <Wordmark />

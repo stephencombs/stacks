@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import { Conflict, Forbidden, InvalidRequest } from "@stacks/contracts";
 
-import { describeError } from "./errors.ts";
+import { describeError, isRetryable } from "./errors.ts";
 
 it("explains API errors in plain words", () => {
   expect(describeError(new Conflict({ reason: "players_not_cashed_out" }))).toBe(
@@ -19,4 +19,10 @@ it("blames the connection for anything else", () => {
   expect(describeError(new Error("fetch failed"))).toBe(
     "Couldn't reach Stacks. Check your connection and try again.",
   );
+});
+
+it("retries what the network could explain, not what the API refused", () => {
+  expect(isRetryable(new Error("fetch failed"))).toBe(true);
+  expect(isRetryable(new Conflict({ reason: "session_closed" }))).toBe(false);
+  expect(isRetryable(new Forbidden({ reason: "not_your_entry" }))).toBe(false);
 });

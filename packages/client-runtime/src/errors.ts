@@ -57,3 +57,10 @@ export const describeError = (error: unknown): string => {
   if (isUnauthorized(error)) return "Your sign-in expired. Sign in again.";
   return "Couldn't reach Stacks. Check your connection and try again.";
 };
+
+/**
+ * Whether trying again later could work. The API's own refusals won't change on a retry; anything
+ * else (no signal, a timeout, an expired sign-in) might.
+ */
+export const isRetryable = (error: unknown) =>
+  !(isConflict(error) || isForbidden(error) || isNotFound(error) || isInvalid(error));

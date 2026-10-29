@@ -45,7 +45,7 @@ import { useToast } from "../components/ui/Toast";
 import { cn } from "../components/ui/cn";
 import { Chip } from "../features/Chip";
 import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
-import { Loaded, useAction, useStacks } from "../lib/stacks";
+import { Loaded, useAction, useOutbox, usePending, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ sessionId: string }>;
 
@@ -70,9 +70,6 @@ export function SessionScreen({ route }: Props) {
   );
 }
 
-/** An entry recorded on this device that the server hasn't confirmed yet. */
-type PendingEntry = EntryInput & { readonly id: EntryId; readonly occurredAt: DateTime.Utc };
-
 function KeepAwake() {
   useKeepAwake();
   return null;
@@ -86,28 +83,33 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   const currency = group.group.currency;
   const names = playerNames(group);
   const toast = useToast();
-  const addEntry = useAction(stacks.Client.mutation("ledger", "addEntry"));
   const voidEntry = useAction(stacks.Client.mutation("ledger", "voidEntry"));
-  const [pending, setPending] = useState<ReadonlyArray<PendingEntry>>([]);
+  const outbox = useOutbox();
+  const queued = usePending(session.id);
   // Entries undone here count as voided while the void saves.
   const [undone, setUndone] = useState<ReadonlySet<EntryId>>(new Set());
   const [draft, setDraft] = useState<EntryDraft | null>(null);
   const [selected, setSelected] = useState<Entry | null>(null);
+  const [refused, setRefused] = useState<{ id: EntryId; reason: string } | null>(null);
   const [closing, setClosing] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
 
-  // Until the server confirms them, entries recorded here count as if they were already saved.
-  const unsaved = pending.filter((entry) => !detail.entries.some((saved) => saved.id === entry.id));
-  const replaced = new Set(unsaved.map((entry) => entry.replacesEntryId).filter(Boolean));
+  // Until the server confirms them, entries recorded here count as if they were already saved,
+  // except ones it refused.
+  const unsaved = queued
+    .filter((p) => !detail.entries.some((saved) => saved.id === p.entry.id))
+    .map((p) => ({ ...p.entry, occurredAt: p.entry.occurredAt!, failed: p.failed }));
+  const replaced = new Set(
+    unsaved.flatMap((entry) => (entry.failed === null ? [entry.replacesEntryId] : [])),
+  );
   const voidedHere = (id: EntryId) => replaced.has(id) || undone.has(id);
   const counted = [
     ...detail.entries.map((entry) =>
       voidedHere(entry.id) ? { ...entry, voidedAt: entry.occurredAt } : entry,
     ),
-    ...unsaved.map((entry) => ({
-      ...entry,
-      voidedAt: voidedHere(entry.id) ? entry.occurredAt : null,
-    })),
+    ...unsaved
+      .filter((entry) => entry.failed === null)
+      .map((entry) => ({ ...entry, voidedAt: voidedHere(entry.id) ? entry.occurredAt : null })),
   ];
   const results = playerResults(counted);
   const cashedOut = new Set(
@@ -122,39 +124,18 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
         e.counterpartyId === null,
     );
 
-  /** Records an entry at once and saves it in the background; `saved` settles when that's done. */
+  /** Records an entry at once; the outbox sends it now, or when there's signal again. */
   const record = (input: EntryInput) => {
-    const entry: PendingEntry = {
-      ...input,
-      id: EntryId.make(newId()),
-      occurredAt: DateTime.nowUnsafe(),
-    };
-    setPending((all) => [...all, entry]);
-    const saved = addEntry
-      .attempt({
-        params: { sessionId: session.id },
-        payload: {
-          id: entry.id,
-          kind: entry.kind,
-          playerId: entry.playerId,
-          counterpartyId: entry.counterpartyId,
-          amount: entry.amount,
-          note: entry.note,
-          replacesEntryId: entry.replacesEntryId,
-        },
-      })
-      .then(({ error }) => {
-        if (error === null) return true;
-        setPending((all) => all.filter((p) => p.id !== entry.id));
-        toast({ message: error });
-        return false;
-      });
-    return { id: entry.id, saved };
+    const id = EntryId.make(newId());
+    void outbox.add(session.id, { ...input, id, occurredAt: DateTime.nowUnsafe() });
+    return id;
   };
 
-  const undo = async (id: EntryId, saved: Promise<boolean>) => {
+  const undo = async (id: EntryId) => {
     setUndone((all) => new Set(all).add(id));
-    if (!(await saved)) return;
+    // An entry the server never got just leaves the outbox; one it has gets voided.
+    await outbox.flush();
+    if (outbox.pending().some((p) => p.entry.id === id)) return outbox.discard(id);
     const { error } = await voidEntry.attempt({
       params: { entryId: id },
       payload: { reason: "Undone" },
@@ -169,7 +150,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   };
 
   const rebuy = (playerId: PlayerId, name: string, amount: Entry["amount"]) => {
-    const { id, saved } = record({
+    const id = record({
       kind: "buy_in",
       playerId,
       counterpartyId: null,
@@ -179,14 +160,14 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
     });
     toast({
       message: `${name} rebought for ${formatMoney(amount, currency)}`,
-      action: { label: "Undo", onPress: () => void undo(id, saved) },
+      action: { label: "Undo", onPress: () => void undo(id) },
     });
   };
 
   const canVoid = (entry: Entry) =>
     isAdmin(group) || entry.createdBy === userId || entry.playerId === group.myPlayerId;
   const history: ReadonlyArray<
-    | { readonly saving: true; readonly entry: PendingEntry }
+    | { readonly saving: true; readonly entry: (typeof unsaved)[number] }
     | { readonly saving: false; readonly entry: Entry }
   > = [
     ...unsaved.map((entry) => ({ saving: true as const, entry })),
@@ -361,7 +342,9 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                             ? `${counterparty} has the cash`
                             : null,
                           entry.note,
-                          saving ? "Saving…" : null,
+                          item.saving
+                            ? (item.entry.failed ?? "Saved on this phone, sending")
+                            : null,
                           voided ? `Voided${voidReason ? `: ${voidReason}` : ""}` : null,
                         ]
                           .filter(Boolean)
@@ -371,6 +354,20 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                   </View>
                 </>
               );
+              if (item.saving && item.entry.failed !== null) {
+                const reason = item.entry.failed;
+                return (
+                  <Pressable
+                    key={entry.id}
+                    accessibilityRole="button"
+                    accessibilityHint="Try saving it again or discard it"
+                    onPress={() => setRefused({ id: entry.id, reason })}
+                    className="flex-row items-center gap-3 border-t border-line bg-danger/10 px-4 py-3 active:bg-sunken"
+                  >
+                    {content}
+                  </Pressable>
+                );
+              }
               return actionable && !item.saving ? (
                 <Pressable
                   key={entry.id}
@@ -411,6 +408,33 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
               setDraft({ kind: selected.kind, playerId: selected.playerId, replaces: selected });
           }}
         />
+      ) : null}
+      {refused ? (
+        <Sheet
+          open
+          onClose={() => setRefused(null)}
+          title="This didn't save"
+          description={refused.reason}
+        >
+          <Button
+            label="Try again"
+            variant="primary"
+            size="lg"
+            onPress={() => {
+              void outbox.retry(refused.id);
+              setRefused(null);
+            }}
+          />
+          <Button
+            label="Discard it"
+            variant="danger"
+            size="lg"
+            onPress={() => {
+              outbox.discard(refused.id);
+              setRefused(null);
+            }}
+          />
+        </Sheet>
       ) : null}
       {closing ? <CloseSheet detail={detail} onClose={() => setClosing(false)} /> : null}
       {addingPlayer ? (
@@ -509,7 +533,12 @@ function EntryActionsSheet({
 function CloseSheet({ detail, onClose }: { detail: SessionDetail; onClose: () => void }) {
   const stacks = useStacks();
   const close = useAction(stacks.Client.mutation("sessions", "close"));
+  const outbox = useOutbox();
+  const unsent = usePending(detail.session.id).length;
   const confirm = async () => {
+    // Closing first would make the server refuse what's still waiting to be sent.
+    await outbox.flush();
+    if (outbox.pending().some((p) => p.sessionId === detail.session.id)) return;
     if (await close.run({ params: { sessionId: detail.session.id }, payload: {} })) onClose();
   };
   return (
@@ -519,6 +548,12 @@ function CloseSheet({ detail, onClose }: { detail: SessionDetail; onClose: () =>
       title="Close this session?"
       description="Results lock in and the session stops taking entries. An admin can reopen it."
     >
+      {unsent > 0 ? (
+        <FormError>
+          {unsent === 1 ? "1 entry hasn't" : `${unsent} entries haven't`} reached Stacks yet. Close
+          once they have, so nothing is left out.
+        </FormError>
+      ) : null}
       {close.error ? <FormError>{close.error}</FormError> : null}
       <Button
         label="Close session"

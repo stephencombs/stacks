@@ -35,6 +35,10 @@
     "./theme": {
       "types": "./src/theme.ts",
       "import": "./src/theme.ts"
+    },
+    "./outbox": {
+      "types": "./src/outbox.ts",
+      "import": "./src/outbox.ts"
     }
   },
   "scripts": {

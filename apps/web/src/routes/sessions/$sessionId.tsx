@@ -26,7 +26,8 @@ import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { formatMoney } from "@stacks/shared/money";
-import { Loaded, useAction, useStacks } from "~/lib/stacks";
+import { playerResults, type PlayerResult } from "@stacks/shared/results";
+import { Loaded, useAction, useOutbox, usePending, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/sessions/$sessionId")({ component: SessionPage });
 
@@ -60,11 +61,24 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
   const [voiding, setVoiding] = useState<Entry | null>(null);
   const [closing, setClosing] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
-  const resultOf = new Map(detail.results.map((result) => [result.playerId, result]));
+  const outbox = useOutbox();
+  // Entries recorded here count as soon as they're recorded, until the server confirms them,
+  // except ones it refused.
+  const unsaved = usePending(session.id).filter(
+    (p) => !detail.entries.some((saved) => saved.id === p.entry.id),
+  );
+  const replaced = new Set(
+    unsaved.flatMap((p) => (p.failed === null ? [p.entry.replacesEntryId] : [])),
+  );
+  const counted = [
+    ...detail.entries.map((entry) =>
+      replaced.has(entry.id) ? { ...entry, voidedAt: entry.occurredAt } : entry,
+    ),
+    ...unsaved.filter((p) => p.failed === null).map((p) => ({ ...p.entry, voidedAt: null })),
+  ];
+  const resultOf = playerResults(counted);
   const cashedOut = new Set(
-    detail.entries
-      .filter((e) => e.kind === "cash_out" && e.voidedAt === null)
-      .map((e) => e.playerId),
+    counted.filter((e) => e.kind === "cash_out" && e.voidedAt === null).map((e) => e.playerId),
   );
   const canVoid = (entry: Entry) =>
     isAdmin(group) || entry.createdBy === userId || entry.playerId === group.myPlayerId;
@@ -88,7 +102,11 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
               : ""}
           </p>
         </div>
-        <TicketStub detail={detail} currency={currency} />
+        <TicketStub
+          players={detail.playerIds.length}
+          results={[...resultOf.values()]}
+          currency={currency}
+        />
         {session.notes ? (
           <p className="max-w-[65ch] text-sm text-pretty whitespace-pre-line">{session.notes}</p>
         ) : null}
@@ -176,12 +194,43 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
 
       <section className="flex flex-col gap-2">
         <SectionHeading>History</SectionHeading>
-        {detail.entries.length === 0 ? (
+        {detail.entries.length === 0 && unsaved.length === 0 ? (
           <p className="text-sm text-muted">
             Buy-ins and cash-outs show up here as you record them.
           </p>
         ) : (
           <Surface className="divide-y divide-line">
+            {unsaved.toReversed().map(({ entry, failed }) => (
+              <div key={entry.id} className="flex items-center gap-4 px-5 py-3">
+                <span className="w-16 shrink-0 font-mono text-xs text-muted">
+                  {entry.occurredAt ? formatTime(entry.occurredAt) : ""}
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span>
+                    {names.get(entry.playerId)} {verbs[entry.kind]}{" "}
+                    <Money
+                      amount={entry.amount}
+                      currency={currency}
+                      tone={entry.kind === "adjustment" ? "result" : "plain"}
+                      className="font-medium"
+                    />
+                  </span>
+                  <span className={failed ? "text-sm text-danger" : "text-sm text-muted"}>
+                    {failed ?? "Saved in this browser, sending"}
+                  </span>
+                </div>
+                {failed ? (
+                  <span className="flex gap-2">
+                    <Button size="sm" onClick={() => void outbox.retry(entry.id)}>
+                      Try again
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => outbox.discard(entry.id)}>
+                      Discard
+                    </Button>
+                  </span>
+                ) : null}
+              </div>
+            ))}
             {detail.entries.toReversed().map((entry) => (
               <EntryRow
                 key={entry.id}
@@ -242,12 +291,20 @@ function SessionView({ session: detail, group }: { session: SessionDetail; group
 }
 
 /** The table at a glance, like the stub of a betting ticket: who sat down, what went in and out. */
-function TicketStub({ detail, currency }: { detail: SessionDetail; currency: CurrencyCode }) {
-  const total = (pick: (result: SessionDetail["results"][number]) => number) =>
-    MinorUnits.make(detail.results.reduce((sum, result) => sum + pick(result), 0));
+function TicketStub({
+  players: seated,
+  results,
+  currency,
+}: {
+  players: number;
+  results: ReadonlyArray<PlayerResult>;
+  currency: CurrencyCode;
+}) {
+  const total = (pick: (result: PlayerResult) => number) =>
+    MinorUnits.make(results.reduce((sum, result) => sum + pick(result), 0));
   const buyIn = total((r) => r.buyIn);
   const cashOut = total((r) => r.cashOut);
-  const players = { label: "Players", value: <>{detail.playerIds.length}</> };
+  const players = { label: "Players", value: <>{seated}</> };
   // Imported sessions only have each player's net, so there's no money in or out to show.
   const cells =
     buyIn === 0 && cashOut === 0
@@ -385,7 +442,12 @@ function CloseSessionDialog({
 }) {
   const stacks = useStacks();
   const close = useAction(stacks.Client.mutation("sessions", "close"));
+  const outbox = useOutbox();
+  const unsent = usePending(detail.session.id).length;
   const confirm = async () => {
+    // Closing first would make the server refuse what's still waiting to be sent.
+    await outbox.flush();
+    if (outbox.pending().some((p) => p.sessionId === detail.session.id)) return;
     const closed = await close.run({ params: { sessionId: detail.session.id }, payload: {} });
     if (closed) onOpenChange(false);
   };
@@ -397,6 +459,12 @@ function CloseSessionDialog({
       description="Results lock in and the session stops taking entries. An admin can reopen it."
     >
       <div className="flex flex-col gap-4">
+        {unsent > 0 ? (
+          <FormError>
+            {unsent === 1 ? "1 entry hasn't" : `${unsent} entries haven't`} reached Stacks yet.
+            Close once they have, so nothing is left out.
+          </FormError>
+        ) : null}
         {close.error ? <FormError>{close.error}</FormError> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={() => onOpenChange(false)}>Keep playing</Button>

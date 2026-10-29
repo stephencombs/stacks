@@ -8,13 +8,14 @@ import {
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
+import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
-import { useAction, useStacks } from "~/lib/stacks";
+import { useAction, useOutbox, useStacks } from "~/lib/stacks";
 
 export type EntryDraft = {
   readonly kind: "buy_in" | "cash_out" | "adjustment";
@@ -51,8 +52,7 @@ export function EntryDialog({
   draft: EntryDraft;
   onClose: () => void;
 }) {
-  const stacks = useStacks();
-  const add = useAction(stacks.Client.mutation("ledger", "addEntry"));
+  const outbox = useOutbox();
   const currency = detail.group.currency;
   const [amount, setAmount] = useState(() =>
     draft.replaces ? amountText(draft.replaces.amount, currency) : "",
@@ -85,19 +85,18 @@ export function EntryDialog({
     setAmountError(null);
     const counterparty = String(form.get("counterparty") ?? "");
     const note = String(form.get("note") ?? "").trim();
-    const saved = await add.run({
-      params: { sessionId },
-      payload: {
-        id: EntryId.make(newId()),
-        kind: draft.kind,
-        playerId: draft.playerId,
-        counterpartyId: counterparty ? PlayerId.make(counterparty) : null,
-        amount: value,
-        note: note || null,
-        replacesEntryId: draft.replaces?.id ?? null,
-      },
+    // Recorded at once; the outbox sends it now, or when the connection is back.
+    void outbox.add(sessionId, {
+      id: EntryId.make(newId()),
+      kind: draft.kind,
+      playerId: draft.playerId,
+      counterpartyId: counterparty ? PlayerId.make(counterparty) : null,
+      amount: value,
+      occurredAt: DateTime.nowUnsafe(),
+      note: note || null,
+      replacesEntryId: draft.replaces?.id ?? null,
     });
-    if (saved) onClose();
+    onClose();
   };
 
   return (
@@ -178,13 +177,8 @@ export function EntryDialog({
             />
           )}
         </Field>
-        {add.error ? <FormError>{add.error}</FormError> : null}
-        <Button type="submit" variant="primary" size="lg" disabled={add.pending}>
-          {add.pending
-            ? "Saving…"
-            : draft.replaces
-              ? "Save correction"
-              : `Record ${titles[draft.kind].toLowerCase()}`}
+        <Button type="submit" variant="primary" size="lg">
+          {draft.replaces ? "Save correction" : `Record ${titles[draft.kind].toLowerCase()}`}
         </Button>
       </form>
     </Dialog>

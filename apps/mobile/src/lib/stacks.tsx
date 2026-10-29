@@ -6,18 +6,28 @@ import type * as Atom from "effect/reactivity/Atom";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { makeStacksClient } from "@stacks/client-runtime/api";
 import { describeError } from "@stacks/client-runtime/errors";
-import { StacksContext, useAction, useStacks } from "@stacks/client-runtime/react";
-import { useState, type ReactNode } from "react";
+import {
+  OutboxProvider,
+  StacksContext,
+  useAction,
+  useOutbox,
+  usePending,
+  useStacks,
+} from "@stacks/client-runtime/react";
+import * as Haptics from "expo-haptics";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Platform } from "react-native";
 
 import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
 import { apiUrl, clerkPublishableKey } from "./config";
+import { outboxStorage, wakeOutbox } from "./outbox";
 
 /**
  * One API client and atom registry per signed-in user. Remounting it with a new `key` on
  * sign-in drops every cached query from the previous user.
  */
-export function StacksProvider({ children }: { children: ReactNode }) {
+export function StacksProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const [stacks] = useState(() =>
     makeStacksClient({
       baseUrl: apiUrl,
@@ -26,14 +36,20 @@ export function StacksProvider({ children }: { children: ReactNode }) {
         null,
     }),
   );
+  const [storage] = useState(() => outboxStorage(userId));
   return (
     <StacksContext value={stacks}>
-      <RegistryProvider>{children}</RegistryProvider>
+      <RegistryProvider>
+        <OutboxProvider storage={storage} wake={wakeOutbox}>
+          <RefusalHaptic />
+          {children}
+        </OutboxProvider>
+      </RegistryProvider>
     </StacksContext>
   );
 }
 
-export { useAction, useStacks };
+export { useAction, useOutbox, usePending, useStacks };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 export function Loaded<A, E>({
@@ -56,4 +72,21 @@ export function Loaded<A, E>({
       }),
     onSuccess: (success) => children(success.value),
   });
+}
+
+/** A buzz the moment the server refuses something logged here, so it's noticed in a pocket. */
+function RefusalHaptic() {
+  const outbox = useOutbox();
+  const refused = useRef(new Set<string>());
+  useEffect(
+    () =>
+      outbox.subscribe(() => {
+        const now = outbox.pending().filter((p) => p.failed !== null);
+        if (now.some((p) => !refused.current.has(p.entry.id)) && Platform.OS !== "web")
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        refused.current = new Set(now.map((p) => p.entry.id));
+      }),
+    [outbox],
+  );
+  return null;
 }

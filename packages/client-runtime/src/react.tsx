@@ -1,11 +1,20 @@
 import { useAtomSet } from "@effect/atom-react";
+import type { SessionId } from "@stacks/contracts";
 import * as Cause from "effect/Cause";
 import * as Exit from "effect/Exit";
 import type * as Atom from "effect/reactivity/Atom";
-import { createContext, use, useState } from "react";
+import {
+  createContext,
+  use,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 import { LEDGER_KEYS, type Stacks } from "./api.ts";
 import { describeError } from "./errors.ts";
+import { makeOutbox, type Outbox, type OutboxStorage } from "./outbox.ts";
 
 /** Each app provides its own client, built with its own way of getting the Clerk token. */
 export const StacksContext = createContext<Stacks | null>(null);
@@ -42,3 +51,62 @@ export function useAction<Arg, A, E>(mutation: Atom.AtomResultFn<Arg, A, E>) {
     clearError: () => setState((s) => ({ ...s, error: null })),
   };
 }
+
+const OutboxContext = createContext<Outbox | null>(null);
+/** How often entries waiting for signal try again while the app is open. */
+const RETRY_MS = 15_000;
+
+/**
+ * Holds entries until the server confirms them, for the whole signed-in app, so leaving a
+ * screen doesn't lose what was logged on it. `wake` lets the platform say "try now", such as
+ * the app returning to the foreground or the browser coming back online.
+ */
+export function OutboxProvider({
+  storage,
+  wake,
+  children,
+}: {
+  storage: OutboxStorage;
+  wake: (flush: () => void) => () => void;
+  children: ReactNode;
+}) {
+  const stacks = useStacks();
+  const add = useAtomSet(stacks.Client.mutation("ledger", "addEntry"), { mode: "promiseExit" });
+  const [outbox] = useState(() =>
+    makeOutbox(storage, async ({ sessionId, entry }) => {
+      const exit = await add({
+        params: { sessionId },
+        payload: entry,
+        reactivityKeys: LEDGER_KEYS,
+      });
+      return { error: Exit.isFailure(exit) ? Cause.squash(exit.cause) : null };
+    }),
+  );
+  const pending = useSyncExternalStore(outbox.subscribe, outbox.pending);
+  const waiting = pending.some((p) => p.failed === null);
+
+  useEffect(() => {
+    void outbox.flush();
+    return wake(() => void outbox.flush());
+  }, [outbox, wake]);
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => void outbox.flush(), RETRY_MS);
+    return () => clearInterval(timer);
+  }, [outbox, waiting]);
+
+  return <OutboxContext value={outbox}>{children}</OutboxContext>;
+}
+
+export const useOutbox = () => {
+  const outbox = use(OutboxContext);
+  if (!outbox) throw new Error("useOutbox needs an OutboxProvider above it");
+  return outbox;
+};
+
+/** Entries for one session the server hasn't confirmed yet, oldest first. */
+export const usePending = (sessionId: SessionId) => {
+  const outbox = useOutbox();
+  const pending = useSyncExternalStore(outbox.subscribe, outbox.pending);
+  return pending.filter((p) => p.sessionId === sessionId);
+};

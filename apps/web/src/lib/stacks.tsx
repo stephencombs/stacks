@@ -6,7 +6,15 @@ import type * as Atom from "effect/reactivity/Atom";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { makeStacksClient } from "@stacks/client-runtime/api";
 import { describeError } from "@stacks/client-runtime/errors";
-import { StacksContext, useAction, useStacks } from "@stacks/client-runtime/react";
+import type { OutboxStorage } from "@stacks/client-runtime/outbox";
+import {
+  OutboxProvider,
+  StacksContext,
+  useAction,
+  useOutbox,
+  usePending,
+  useStacks,
+} from "@stacks/client-runtime/react";
 import { useState, type ReactNode } from "react";
 
 import { FormError } from "~/components/ui/Field";
@@ -16,21 +24,43 @@ import { Skeleton } from "~/components/ui/Surface";
  * One API client and atom registry per signed-in user. Remounting it with a new `key` on
  * sign-in drops every cached query from the previous user.
  */
-export function StacksProvider({ children }: { children: ReactNode }) {
+export function StacksProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const [stacks] = useState(() =>
     makeStacksClient({
       baseUrl: import.meta.env.VITE_API_URL ?? "",
       getToken: () => getToken(),
     }),
   );
+  const [storage] = useState(() => outboxStorage(userId));
   return (
     <StacksContext value={stacks}>
-      <RegistryProvider>{children}</RegistryProvider>
+      <RegistryProvider>
+        <OutboxProvider storage={storage} wake={wakeOutbox}>
+          {children}
+        </OutboxProvider>
+      </RegistryProvider>
     </StacksContext>
   );
 }
 
-export { useAction, useStacks };
+/** Entries waiting for signal, per person signed in on this browser. */
+const outboxStorage = (userId: string): OutboxStorage => ({
+  load: () => localStorage.getItem(`stacks-outbox-${userId}`),
+  save: (value) => localStorage.setItem(`stacks-outbox-${userId}`, value),
+});
+
+/** Retry as soon as the browser is back online or the tab comes back. */
+const wakeOutbox = (flush: () => void) => {
+  const visible = () => (document.visibilityState === "visible" ? flush() : undefined);
+  window.addEventListener("online", flush);
+  document.addEventListener("visibilitychange", visible);
+  return () => {
+    window.removeEventListener("online", flush);
+    document.removeEventListener("visibilitychange", visible);
+  };
+};
+
+export { useAction, useOutbox, usePending, useStacks };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 export function Loaded<A, E>({

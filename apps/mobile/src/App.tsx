@@ -103,7 +103,7 @@ function Root() {
   if (!isLoaded) return <View className="flex-1 bg-canvas" />;
   if (!isSignedIn) return <SignedOut />;
   return (
-    <StacksProvider key={userId}>
+    <StacksProvider key={userId} userId={userId}>
       <Navigation linking={linking} theme={theme} />
     </StacksProvider>
   );
