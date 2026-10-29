@@ -12,6 +12,7 @@ import {
   SessionId,
   SessionStatus,
   StakeId,
+  TripId,
   CurrencyCode,
   UserId,
   VenueId,
@@ -117,4 +118,14 @@ export const StakeRow = Schema.Struct({
   voidedAt: Schema.NullOr(Timestamp),
   voidedBy: Schema.NullOr(UserId),
   voidReason: Schema.NullOr(Schema.String),
+});
+
+export const TripRow = Schema.Struct({
+  id: TripId,
+  groupId: GroupId,
+  name: Schema.String,
+  startedAt: Timestamp,
+  endedAt: Schema.NullOr(Timestamp),
+  createdBy: UserId,
+  createdAt: Timestamp,
 });

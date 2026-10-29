@@ -27,6 +27,10 @@
     "./chart": {
       "types": "./src/chart.ts",
       "import": "./src/chart.ts"
+    },
+    "./trip": {
+      "types": "./src/trip.ts",
+      "import": "./src/trip.ts"
     }
   },
   "scripts": {

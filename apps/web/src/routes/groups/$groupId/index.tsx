@@ -7,6 +7,7 @@ import { ButtonLink } from "~/components/ui/Button";
 import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
 import { GroupHeader } from "~/features/GroupHeader";
 import { SessionHistory, SessionList } from "~/features/SessionList";
+import { TripsSection } from "~/features/Trips";
 import { playerNames } from "@stacks/client-runtime/format";
 import { Loaded, useStacks } from "~/lib/stacks";
 
@@ -51,6 +52,8 @@ function GroupHomeView({ detail }: { detail: GroupDetail }) {
           <SessionList sessions={live} detail={detail} />
         </section>
       ) : null}
+
+      <TripsSection detail={detail} />
 
       <section className="flex flex-col gap-2">
         <SectionHeading

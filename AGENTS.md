@@ -9,7 +9,8 @@ Fight for the smallest model that makes the correct behavior unsurprising. Don't
 - **group**: one shared ledger with a fixed currency, and the members who use it.
 - **member**: a user in a group, with the role owner, admin or member.
 - **guest**: a player in a group who hasn't signed up yet. A guest can later claim their history by signing up.
-- **session**: one trip or sitting at a venue, either live or closed.
+- **session**: one sitting at a venue, either live or closed.
+- **trip**: a named stretch of time in a group, like a weekend in Vegas. Every session that starts while it's open belongs to it, and it has its own board and awards. A group's trips never overlap.
 - **entry**: one ledger row: a buy-in, cash-out, adjustment or settlement. Entries are never edited; a correction voids the old one and adds a new one.
 - **counterparty**: whose money paid for a buy-in, or who received a cash-out. Debts come from counterparties.
 - **result**: a player's win or loss (cash-outs minus buy-ins). A result is separate from a balance.

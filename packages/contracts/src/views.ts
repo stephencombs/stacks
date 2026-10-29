@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { GroupId, InviteId, PlayerId, SessionId, UserId, VenueId } from "./ids.ts";
-import { Entry, Game, Session, Stake } from "./ledger.ts";
+import { Entry, Game, Session, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 
 export const MemberRole = Schema.Literals(["owner", "admin", "member"]);
@@ -103,9 +103,18 @@ export const GroupDetail = Schema.Struct({
   transfers: Schema.Array(Transfer),
   settlements: Schema.Array(Entry),
   stakes: Schema.Array(StakeView),
+  /** Newest first. */
+  trips: Schema.Array(Trip),
   sessions: Schema.Array(SessionSummary),
 });
 export type GroupDetail = typeof GroupDetail.Type;
+
+/** A trip and every session that started during it, oldest first, live ones included. */
+export const TripDetail = Schema.Struct({
+  trip: Trip,
+  sessions: Schema.Array(SessionSummary),
+});
+export type TripDetail = typeof TripDetail.Type;
 
 export const Invite = Schema.Struct({
   id: InviteId,

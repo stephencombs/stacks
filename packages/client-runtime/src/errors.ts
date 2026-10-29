@@ -27,6 +27,9 @@ const conflictMessages: Record<ConflictReason, string> = {
   stake_voided: "That stake was voided.",
   stake_ended: "That stake has already ended. Reopen it first.",
   stake_open: "That stake is still open.",
+  trip_overlaps: "That would overlap another trip. End the current trip first.",
+  trip_ended: "That trip has already ended. Reopen it first.",
+  trip_open: "That trip is still going.",
 };
 
 const forbiddenMessages: Record<Forbidden["reason"], string> = {
@@ -36,6 +39,7 @@ const forbiddenMessages: Record<Forbidden["reason"], string> = {
   not_your_entry: "Only whoever added it, the player or an admin can void that entry.",
   not_your_stake:
     "Only the backer, the player, whoever added it or an admin can change that stake.",
+  not_your_trip: "Only whoever started the trip or an admin can delete it.",
 };
 
 const isConflict = Schema.is(Conflict);

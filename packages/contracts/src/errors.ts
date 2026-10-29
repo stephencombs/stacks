@@ -15,6 +15,7 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()(
       "owner_only",
       "not_your_entry",
       "not_your_stake",
+      "not_your_trip",
     ]),
   },
   { httpApiStatus: 403 },
@@ -32,6 +33,7 @@ export class NotFound extends Schema.TaggedError<NotFound>()(
       "session",
       "entry",
       "stake",
+      "trip",
     ]),
   },
   { httpApiStatus: 404 },
@@ -55,6 +57,9 @@ export const ConflictReason = Schema.Literals([
   "stake_voided",
   "stake_ended",
   "stake_open",
+  "trip_overlaps",
+  "trip_ended",
+  "trip_open",
   "last_owner",
 ]);
 export type ConflictReason = typeof ConflictReason.Type;

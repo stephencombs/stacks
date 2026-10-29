@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import { EntryId, GroupId, PlayerId, SessionId, StakeId, UserId, VenueId } from "./ids.ts";
+import { EntryId, GroupId, PlayerId, SessionId, StakeId, TripId, UserId, VenueId } from "./ids.ts";
 import { MinorUnits } from "./money.ts";
 
 export const Game = Schema.Literals([
@@ -120,3 +120,18 @@ export const Stake = Schema.Struct({
   voidReason: Schema.NullOr(Schema.String),
 });
 export type Stake = typeof Stake.Type;
+
+/**
+ * A trip: a named stretch of time in a group, like a weekend in Vegas. Every session that starts
+ * while it's open belongs to it. A group's trips never overlap.
+ */
+export const Trip = Schema.Struct({
+  id: TripId,
+  groupId: GroupId,
+  name: Schema.String,
+  startedAt: Schema.DateTimeUtc,
+  endedAt: Schema.NullOr(Schema.DateTimeUtc),
+  createdBy: UserId,
+  createdAt: Schema.DateTimeUtc,
+});
+export type Trip = typeof Trip.Type;

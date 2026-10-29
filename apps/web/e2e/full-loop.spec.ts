@@ -33,6 +33,7 @@ test.describe.serial("a group's first night out", () => {
   });
 
   test("create, invite, play, close and settle up", async ({ browser }) => {
+    test.slow();
     const [alexUser, beaUser] = users;
     const alex = await (await browser.newContext()).newPage();
     const bea = await (await browser.newContext()).newPage();
@@ -155,6 +156,30 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("button", { name: "Void stake" }).click();
     await expect(alex.getByText("Everyone's square")).toBeVisible();
     await expect(alex.getByText("Voided")).toBeVisible();
+
+    // Alex starts a trip from this morning, so tonight's session lands on its board.
+    await alex
+      .getByRole("navigation", { name: "Group" })
+      .getByRole("link", { name: "Sessions" })
+      .click();
+    await alex.getByRole("button", { name: "Start a trip" }).click();
+    await alex.getByLabel("Trip name").fill("Vegas weekend");
+    await alex.getByRole("button", { name: "Start trip" }).click();
+    await alex.getByRole("link", { name: /Vegas weekend/ }).click();
+    await expect(alex.getByRole("heading", { name: "Vegas weekend" })).toBeVisible();
+    const board = alex.getByRole("list").filter({ hasText: "SESS" });
+    await expect(board.getByRole("listitem").first()).toContainText("+$170");
+    await expect(alex.getByText("Biggest hit")).toBeVisible();
+    await shoot(alex, "trip-board");
+    await alex.getByRole("button", { name: "Actions for Vegas weekend" }).click();
+    await alex.getByRole("menuitem", { name: "End trip" }).click();
+    await alex.getByRole("button", { name: "Actions for Vegas weekend" }).click();
+    await alex.getByRole("menuitem", { name: "Reopen trip" }).click();
+    await alex.getByRole("button", { name: "Actions for Vegas weekend" }).click();
+    await alex.getByRole("menuitem", { name: "Delete trip" }).click();
+    await alex.getByRole("button", { name: "Delete trip" }).click();
+    await expect(alex.getByRole("button", { name: "Start a trip" })).toBeVisible();
+    await alex.getByRole("link", { name: "Settle up" }).first().click();
 
     // Bea sees the same ledger.
     await bea.reload();

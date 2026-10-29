@@ -23,6 +23,10 @@
     "./stakes": {
       "types": "./src/stakes.ts",
       "import": "./src/stakes.ts"
+    },
+    "./trips": {
+      "types": "./src/trips.ts",
+      "import": "./src/trips.ts"
     }
   },
   "scripts": {

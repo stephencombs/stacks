@@ -9,6 +9,7 @@ import * as Invites from "../features/Invites.ts";
 import * as Ledger from "../features/Ledger.ts";
 import * as Sessions from "../features/Sessions.ts";
 import * as Stakes from "../features/Stakes.ts";
+import * as Trips from "../features/Trips.ts";
 import * as Stats from "../features/Stats.ts";
 import * as Venues from "../features/Venues.ts";
 
@@ -87,6 +88,15 @@ const stakes = HttpApiBuilder.group(StacksApi, "stakes", (handlers) =>
     .handle("void", ({ params, payload }) => serve(Stakes.voidStake(params.stakeId, payload))),
 );
 
+const trips = HttpApiBuilder.group(StacksApi, "trips", (handlers) =>
+  handlers
+    .handle("create", ({ params, payload }) => serve(Trips.create(params.groupId, payload)))
+    .handle("get", ({ params }) => serve(Trips.get(params.tripId)))
+    .handle("end", ({ params, payload }) => serve(Trips.end(params.tripId, payload)))
+    .handle("reopen", ({ params }) => serve(Trips.reopen(params.tripId)))
+    .handle("delete", ({ params }) => serve(Trips.remove(params.tripId))),
+);
+
 export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openapi.json" }).pipe(
-  Layer.provide([health, groups, invites, guests, venues, sessions, ledger, stakes]),
+  Layer.provide([health, groups, invites, guests, venues, sessions, ledger, stakes, trips]),
 );

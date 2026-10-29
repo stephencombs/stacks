@@ -19,7 +19,15 @@ import { resultsBy } from "@stacks/shared/results";
 import { settleUp } from "@stacks/shared/settleUp";
 import { stakeOutcomes, withStakes } from "@stacks/shared/stakes";
 
-import { EntryRow, GroupRow, PlayerRow, SessionRow, StakeRow, VenueRow } from "../db/rows.ts";
+import {
+  EntryRow,
+  GroupRow,
+  PlayerRow,
+  SessionRow,
+  StakeRow,
+  TripRow,
+  VenueRow,
+} from "../db/rows.ts";
 import { decodeRows, type Membership } from "./Access.ts";
 
 export const venueColumns = (sql: SqlClient.SqlClient) => sql`
@@ -70,6 +78,20 @@ export const sessionSummaries = Effect.fn("Views.sessionSummaries")(function* (
       ${options.before ? sql`and started_at < ${DateTime.toDateUtc(options.before)}` : sql``}
     order by started_at desc
     limit ${options.limit}
+  `.pipe(Effect.flatMap(decodeRows(SessionRow)));
+  return yield* summaries(sessions);
+});
+
+/** Every session that started during the trip, oldest first. */
+export const tripSessions = Effect.fn("Views.tripSessions")(function* (
+  trip: Pick<typeof TripRow.Type, "groupId" | "startedAt" | "endedAt">,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const sessions = yield* sql`
+    select * from sessions
+    where group_id = ${trip.groupId} and started_at >= ${DateTime.toDateUtc(trip.startedAt)}
+      ${trip.endedAt ? sql`and started_at < ${DateTime.toDateUtc(trip.endedAt)}` : sql``}
+    order by started_at
   `.pipe(Effect.flatMap(decodeRows(SessionRow)));
   return yield* summaries(sessions);
 });
@@ -151,12 +173,13 @@ export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Mem
   const sql = yield* SqlClient.SqlClient;
   const { groupId } = member;
   // Independent reads, run together: each is a round trip to the database.
-  const [[group], players, { owed, stakes, outcomes }, settlements, sessions] = yield* Effect.all(
-    [
-      sql`select id, name, currency, created_at from groups where id = ${groupId}`.pipe(
-        Effect.flatMap(decodeRows(GroupRow)),
-      ),
-      sql`
+  const [[group], players, { owed, stakes, outcomes }, settlements, sessions, trips] =
+    yield* Effect.all(
+      [
+        sql`select id, name, currency, created_at from groups where id = ${groupId}`.pipe(
+          Effect.flatMap(decodeRows(GroupRow)),
+        ),
+        sql`
         select p.id, p.display_name, p.user_id, m.role, p.claim_code
         from players p
         left join memberships m
@@ -164,17 +187,20 @@ export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Mem
         where p.group_id = ${groupId}
         order by p.created_at, p.id
       `.pipe(Effect.flatMap(decodeRows(PlayerRow))),
-      groupBalances(groupId),
-      sql`
+        groupBalances(groupId),
+        sql`
         select * from entries
         where group_id = ${groupId} and kind = 'settlement'
         order by occurred_at desc, created_at desc
         limit 50
       `.pipe(Effect.flatMap(decodeRows(EntryRow))),
-      sessionSummaries(groupId, { limit: 20 }),
-    ],
-    { concurrency: "unbounded" },
-  );
+        sessionSummaries(groupId, { limit: 20 }),
+        sql`select * from trips where group_id = ${groupId} order by started_at desc`.pipe(
+          Effect.flatMap(decodeRows(TripRow)),
+        ),
+      ],
+      { concurrency: "unbounded" },
+    );
 
   return {
     group: group!,
@@ -189,6 +215,7 @@ export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Mem
       result: outcomes.get(stake.id)?.result ?? MinorUnits.make(0),
       owed: outcomes.get(stake.id)?.owed ?? MinorUnits.make(0),
     })),
+    trips,
     sessions,
   } satisfies GroupDetail;
 });

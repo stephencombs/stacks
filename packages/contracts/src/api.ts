@@ -13,10 +13,11 @@ import {
   PlayerId,
   SessionId,
   StakeId,
+  TripId,
   UserId,
   VenueId,
 } from "./ids.ts";
-import { Entry, Game, Stake } from "./ledger.ts";
+import { Entry, Game, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import {
   ClaimPreview,
@@ -27,6 +28,7 @@ import {
   InvitePreview,
   SessionDetail,
   SessionSummary,
+  TripDetail,
   Venue,
   VenueKind,
 } from "./views.ts";
@@ -130,6 +132,15 @@ export const CreateStakeRequest = Schema.Struct({
 });
 
 export const EndStakeRequest = Schema.Struct({ endedAt: Schema.optionalKey(Schema.DateTimeUtc) });
+
+export const CreateTripRequest = Schema.Struct({
+  id: TripId,
+  name: Name(60),
+  /** Defaults to now. Earlier times pick up sessions already played. */
+  startedAt: Schema.optionalKey(Schema.DateTimeUtc),
+});
+
+export const EndTripRequest = Schema.Struct({ endedAt: Schema.optionalKey(Schema.DateTimeUtc) });
 
 const groupParams = Schema.Struct({ groupId: GroupId });
 const sessionParams = Schema.Struct({ sessionId: SessionId });
@@ -390,6 +401,48 @@ const StakesGroup = HttpApiGroup.make("stakes")
   )
   .middleware(Authentication);
 
+const tripParams = Schema.Struct({ tripId: TripId });
+
+const TripsGroup = HttpApiGroup.make("trips")
+  .add(
+    HttpApiEndpoint.post("create", "/groups/:groupId/trips", {
+      params: groupParams,
+      payload: CreateTripRequest,
+      success: Trip,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("get", "/trips/:tripId", {
+      params: tripParams,
+      success: TripDetail,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("end", "/trips/:tripId/end", {
+      params: tripParams,
+      payload: EndTripRequest,
+      success: Trip,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("reopen", "/trips/:tripId/reopen", {
+      params: tripParams,
+      success: Trip,
+      error: [Forbidden, NotFound, Conflict],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("delete", "/trips/:tripId/delete", {
+      params: tripParams,
+      success: Trip,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .middleware(Authentication);
+
 export class StacksApi extends HttpApi.make("stacks")
   .add(HealthGroup)
   .add(GroupsGroup)
@@ -399,4 +452,5 @@ export class StacksApi extends HttpApi.make("stacks")
   .add(SessionsGroup)
   .add(LedgerGroup)
   .add(StakesGroup)
+  .add(TripsGroup)
   .prefix("/api") {}

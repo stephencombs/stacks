@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClaimCodeRouteImport } from './routes/claim/$code'
 import { Route as JoinCodeRouteImport } from './routes/join/$code'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions/$sessionId'
+import { Route as TripsTripIdRouteImport } from './routes/trips/$tripId'
 import { Route as GroupsGroupIdIndexRouteImport } from './routes/groups/$groupId/index'
 import { Route as GroupsGroupIdSettingsRouteImport } from './routes/groups/$groupId/settings'
 import { Route as GroupsGroupIdSettleRouteImport } from './routes/groups/$groupId/settle'
@@ -37,6 +38,11 @@ const JoinCodeRoute = JoinCodeRouteImport.update({
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   id: '/sessions/$sessionId',
   path: '/sessions/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TripsTripIdRoute = TripsTripIdRouteImport.update({
+  id: '/trips/$tripId',
+  path: '/trips/$tripId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GroupsGroupIdIndexRoute = GroupsGroupIdIndexRouteImport.update({
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/claim/$code': typeof ClaimCodeRoute
   '/join/$code': typeof JoinCodeRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
+  '/trips/$tripId': typeof TripsTripIdRoute
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/groups/$groupId/settle': typeof GroupsGroupIdSettleRoute
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/claim/$code': typeof ClaimCodeRoute
   '/join/$code': typeof JoinCodeRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
+  '/trips/$tripId': typeof TripsTripIdRoute
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/groups/$groupId/settle': typeof GroupsGroupIdSettleRoute
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/claim/$code': typeof ClaimCodeRoute
   '/join/$code': typeof JoinCodeRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
+  '/trips/$tripId': typeof TripsTripIdRoute
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/groups/$groupId/settle': typeof GroupsGroupIdSettleRoute
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/claim/$code'
     | '/join/$code'
     | '/sessions/$sessionId'
+    | '/trips/$tripId'
     | '/groups/$groupId/settings'
     | '/groups/$groupId/settle'
     | '/groups/$groupId/stats'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/claim/$code'
     | '/join/$code'
     | '/sessions/$sessionId'
+    | '/trips/$tripId'
     | '/groups/$groupId/settings'
     | '/groups/$groupId/settle'
     | '/groups/$groupId/stats'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/claim/$code'
     | '/join/$code'
     | '/sessions/$sessionId'
+    | '/trips/$tripId'
     | '/groups/$groupId/settings'
     | '/groups/$groupId/settle'
     | '/groups/$groupId/stats'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   ClaimCodeRoute: typeof ClaimCodeRoute
   JoinCodeRoute: typeof JoinCodeRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
+  TripsTripIdRoute: typeof TripsTripIdRoute
   GroupsGroupIdSettingsRoute: typeof GroupsGroupIdSettingsRoute
   GroupsGroupIdSettleRoute: typeof GroupsGroupIdSettleRoute
   GroupsGroupIdStatsRoute: typeof GroupsGroupIdStatsRoute
@@ -176,6 +189,13 @@ declare module '@tanstack/react-router' {
       path: '/sessions/$sessionId'
       fullPath: '/sessions/$sessionId'
       preLoaderRoute: typeof SessionsSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trips/$tripId': {
+      id: '/trips/$tripId'
+      path: '/trips/$tripId'
+      fullPath: '/trips/$tripId'
+      preLoaderRoute: typeof TripsTripIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/groups/$groupId/': {
@@ -221,6 +241,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClaimCodeRoute: ClaimCodeRoute,
   JoinCodeRoute: JoinCodeRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
+  TripsTripIdRoute: TripsTripIdRoute,
   GroupsGroupIdSettingsRoute: GroupsGroupIdSettingsRoute,
   GroupsGroupIdSettleRoute: GroupsGroupIdSettleRoute,
   GroupsGroupIdStatsRoute: GroupsGroupIdStatsRoute,
