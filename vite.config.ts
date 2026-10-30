@@ -8,6 +8,8 @@ const GENERATED = [
   "*.tsbuildinfo",
   ".wrangler",
   ".alchemy",
+  "packages/client-runtime/src/tableArt.ts",
+  "apps/mobile/src/features/tableImages.ts",
   "**/routeTree.gen.ts",
   "apps/mobile/ios/**",
   "apps/mobile/android/**",

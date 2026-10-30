@@ -32,6 +32,14 @@
       "types": "./src/trip.ts",
       "import": "./src/trip.ts"
     },
+    "./table": {
+      "types": "./src/table.ts",
+      "import": "./src/table.ts"
+    },
+    "./tableArt": {
+      "types": "./src/tableArt.ts",
+      "import": "./src/tableArt.ts"
+    },
     "./theme": {
       "types": "./src/theme.ts",
       "import": "./src/theme.ts"

@@ -7,6 +7,8 @@ import {
   type PlayerResult,
 } from "@stacks/contracts";
 import { gameNames, playedSummary } from "@stacks/client-runtime/format";
+import { seatLabel } from "@stacks/client-runtime/table";
+import { tableSeats } from "@stacks/shared/seats";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
@@ -104,6 +106,22 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
           ))}
         </List>
       </View>
+      {stats.bySeat.length > 0 ? (
+        <View className="gap-2">
+          <SectionHeading>By blackjack seat</SectionHeading>
+          <List>
+            {stats.bySeat.map((row) => (
+              <Row key={row.key}>
+                <Text className="flex-1 text-base text-ink">
+                  {seatLabel(row.key, tableSeats.blackjack ?? 7)}{" "}
+                  <Text className="text-sm text-muted">· {row.sessionCount}</Text>
+                </Text>
+                <Money amount={tableNet(row.results)} currency={currency} tone="result" />
+              </Row>
+            ))}
+          </List>
+        </View>
+      ) : null}
     </>
   );
 }

@@ -7,6 +7,8 @@ import {
   type PlayerResult,
 } from "@stacks/contracts";
 import { gameNames, playedSummary } from "@stacks/client-runtime/format";
+import { seatLabel } from "@stacks/client-runtime/table";
+import { tableSeats } from "@stacks/shared/seats";
 import type { ReactNode } from "react";
 
 import { Money } from "~/components/Money";
@@ -112,6 +114,27 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
           ))}
         </Table>
       </section>
+
+      {stats.bySeat.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <SectionHeading>By blackjack seat</SectionHeading>
+          <Table head={["Seat", "Sessions", "Table net"]}>
+            {stats.bySeat.map((row) => (
+              <tr key={row.key}>
+                <td className="px-3 py-3 sm:px-5">
+                  {seatLabel(row.key, tableSeats.blackjack ?? 7)}
+                </td>
+                <td className="px-3 py-3 sm:px-5 text-right font-mono text-muted">
+                  {row.sessionCount}
+                </td>
+                <td className="px-3 py-3 sm:px-5 text-right font-bold">
+                  <Money amount={tableNet(row.results)} currency={currency} tone="result" />
+                </td>
+              </tr>
+            ))}
+          </Table>
+        </section>
+      ) : null}
     </>
   );
 }

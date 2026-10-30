@@ -19,9 +19,11 @@ import {
   playerNames,
 } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
+import { tableView } from "@stacks/client-runtime/table";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { formatMoney, parseMoney } from "@stacks/shared/money";
 import { playerResults } from "@stacks/shared/results";
+import { seatsNow, tableSeats } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -41,6 +43,7 @@ import { cn } from "../components/ui/cn";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { Chip } from "../features/Chip";
 import { Reveal } from "../features/Reveal";
+import { TableMap } from "../features/TableMap";
 import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
 import { Loaded, useAction, useOutbox, usePending, useStacks, useUnsaved } from "../lib/stacks";
 
@@ -219,6 +222,21 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
         />
         {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
       </View>
+
+      {tableSeats[session.game] ? (
+        <TableMap
+          detail={detail}
+          view={tableView({
+            closed: !live,
+            seats: seatsNow(detail.seatings),
+            results,
+            cashedOut,
+          })}
+          currency={currency}
+          names={names}
+          chipOf={(playerId) => chipOf(group, playerId)}
+        />
+      ) : null}
 
       <View className="gap-3">
         <SectionHeading

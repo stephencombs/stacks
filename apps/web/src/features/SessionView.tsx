@@ -25,11 +25,14 @@ import { BackLink } from "~/components/ui/Nav";
 import { PageTitle, SectionHeading, Surface, Tag } from "~/components/ui/Surface";
 import { Chip } from "~/features/Chip";
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
+import { TableMap } from "~/features/TableMap";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
+import { tableView } from "@stacks/client-runtime/table";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { newId } from "@stacks/client-runtime/ids";
 import { formatMoney, parseMoney } from "@stacks/shared/money";
+import { seatsNow, tableSeats } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import { playerResults, type PlayerResult } from "@stacks/shared/results";
 import { useAction, useOutbox, usePending, useStacks, useUnsaved } from "~/lib/stacks";
@@ -174,6 +177,21 @@ export function SessionView({
           <p className="max-w-[65ch] text-sm text-pretty whitespace-pre-line">{session.notes}</p>
         ) : null}
       </div>
+
+      {tableSeats[session.game] ? (
+        <TableMap
+          detail={detail}
+          view={tableView({
+            closed: !live,
+            seats: seatsNow(detail.seatings),
+            results: resultOf,
+            cashedOut,
+          })}
+          currency={currency}
+          names={names}
+          chipOf={(playerId) => chipOf(group, playerId)}
+        />
+      ) : null}
 
       <section className="flex flex-col gap-2">
         <SectionHeading
