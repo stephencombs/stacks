@@ -9,13 +9,16 @@ import {
   type StaticParamList,
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 
+import { Button } from "./components/ui/Button";
 import { SignInButton } from "./features/SignInButton";
 import { clerkPublishableKey } from "./lib/config";
 import { StacksProvider } from "./lib/stacks";
@@ -90,7 +93,7 @@ const linking = { enabled: "auto" as const, prefixes: [Linking.createURL("/")] }
 function Root() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const theme = useNavigationTheme();
-  if (!isLoaded) return <View className="flex-1 bg-canvas" />;
+  if (!isLoaded) return <Starting />;
   if (!isSignedIn) return <SignedOut />;
   return (
     <StacksProvider key={userId} userId={userId}>
@@ -128,6 +131,29 @@ function useNavigationTheme() {
   };
 }
 
+const STALLED_MS = 10_000;
+
+/** Blank while sign-in starts; if it never does, say so instead of staying blank forever. */
+function Starting() {
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setStalled(true), STALLED_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  if (!stalled) return <View className="flex-1 bg-canvas" />;
+  return (
+    <View className="flex-1 justify-center gap-4 bg-canvas px-6">
+      <Text accessibilityRole="header" className="font-display text-4xl text-ink uppercase">
+        Can't sign in yet
+      </Text>
+      <Text className="text-lg text-muted">
+        Stacks couldn't reach its sign-in service. Check your connection, then try again.
+      </Text>
+      <Button label="Try again" variant="primary" size="lg" onPress={() => void reloadAppAsync()} />
+    </View>
+  );
+}
+
 function SignedOut() {
   return (
     <View className="flex-1 justify-center gap-6 bg-canvas px-6">
@@ -156,12 +182,13 @@ function SignedOut() {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts({ BarlowCondensed_700Bold, JetBrainsMono_500Medium });
+  // Fonts that fail to load fall back to the system's rather than holding the app on a blank screen.
+  const [fontsLoaded, fontsFailed] = useFonts({ BarlowCondensed_700Bold, JetBrainsMono_500Medium });
   const { theme } = useUniwind();
   return (
     <SafeAreaProvider>
       <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
-        {fontsLoaded ? <Root /> : <View className="flex-1 bg-canvas" />}
+        {fontsLoaded || fontsFailed ? <Root /> : <View className="flex-1 bg-canvas" />}
         <StatusBar style={theme === "light" ? "dark" : "light"} />
       </ClerkProvider>
     </SafeAreaProvider>
