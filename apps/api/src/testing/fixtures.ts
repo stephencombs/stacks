@@ -6,6 +6,7 @@ import {
   InviteId,
   MinorUnits,
   PlayerId,
+  SeatingId,
   SessionId,
   TripId,
   VenueId,
@@ -21,6 +22,7 @@ export const ids = {
   entry: () => EntryId.make(crypto.randomUUID()),
   venue: () => VenueId.make(crypto.randomUUID()),
   trip: () => TripId.make(crypto.randomUUID()),
+  seating: () => SeatingId.make(crypto.randomUUID()),
 };
 
 export const usd = (amount: number) => MinorUnits.make(amount);

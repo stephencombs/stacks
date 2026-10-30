@@ -18,6 +18,9 @@ export type EntryId = typeof EntryId.Type;
 export const StakeId = Uuid.pipe(Schema.brand("StakeId"));
 export type StakeId = typeof StakeId.Type;
 
+export const SeatingId = Uuid.pipe(Schema.brand("SeatingId"));
+export type SeatingId = typeof SeatingId.Type;
+
 export const TripId = Uuid.pipe(Schema.brand("TripId"));
 export type TripId = typeof TripId.Type;
 

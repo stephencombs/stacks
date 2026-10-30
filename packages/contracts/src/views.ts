@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { GroupId, InviteId, PlayerId, SessionId, TripId, UserId, VenueId } from "./ids.ts";
-import { Entry, Game, Session, Stake, Trip } from "./ledger.ts";
+import { Entry, Game, Seat, Seating, Session, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 
 export const MemberRole = Schema.Literals(["owner", "admin", "member"]);
@@ -78,6 +78,8 @@ export const SessionDetail = Schema.Struct({
   playerIds: Schema.Array(PlayerId),
   results: Schema.Array(PlayerResult),
   entries: Schema.Array(Entry),
+  /** Every sit, move and stand, oldest first. */
+  seatings: Schema.Array(Seating),
 });
 export type SessionDetail = typeof SessionDetail.Type;
 
@@ -168,6 +170,8 @@ export const GroupStats = Schema.Struct({
   byPlayer: Schema.Array(PlayerResult),
   byGame: Schema.Array(StatsBreakdown(Game)),
   byVenue: Schema.Array(StatsBreakdown(Venue)),
+  /** Results by seat: each player's session counts for the seat they held longest in it. */
+  bySeat: Schema.Array(StatsBreakdown(Seat)),
   /** Each closed session's results, oldest first. */
   bySession: Schema.Array(
     Schema.Struct({

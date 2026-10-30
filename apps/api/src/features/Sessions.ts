@@ -10,10 +10,14 @@ import {
   type CreateSessionRequest,
   type MoveSessionRequest,
   type PlayerId,
+  type SeatRequest,
   type SessionId,
   type TripId,
 } from "@stacks/contracts";
 
+import { seatsNow, tableSeats } from "@stacks/shared/seats";
+
+import { SeatingRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
 import * as Trips from "./Trips.ts";
 import * as Venues from "./Venues.ts";
@@ -101,6 +105,60 @@ export const addPlayer = Effect.fn("Sessions.addPlayer")(function* (
     values (${sessionId}, ${session.groupId}, ${playerId})
     on conflict do nothing
   `;
+  return yield* Views.sessionDetail(sessionId);
+});
+
+/**
+ * Sits a player down, moves them or stands them up. Anyone in the group can, the same as
+ * recording a buy-in. A seat holds one player at a time.
+ */
+export const seat = Effect.fn("Sessions.seat")(function* (
+  sessionId: SessionId,
+  request: typeof SeatRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const { userId } = yield* CurrentUser;
+  const { session } = yield* access(sessionId);
+  // A retry of a seating that already landed is the same write.
+  const [existing] = yield* sql`select session_id from seatings where id = ${request.id}`;
+  if (existing) {
+    if (existing.sessionId !== sessionId) return yield* new Conflict({ reason: "id_taken" });
+    return yield* Views.sessionDetail(sessionId);
+  }
+  if (session.status === "closed") return yield* new Conflict({ reason: "session_closed" });
+  const seats = tableSeats[session.game];
+  if (seats === undefined) {
+    return yield* new InvalidRequest({ message: "This game isn't played from seats." });
+  }
+  if (request.seat !== null && request.seat > seats) {
+    return yield* new InvalidRequest({ message: `This table has ${seats} seats.` });
+  }
+  const [atTable] = yield* sql`
+    select 1 from session_players
+    where session_id = ${sessionId} and player_id = ${request.playerId}
+  `;
+  if (!atTable) return yield* new Conflict({ reason: "player_not_in_session" });
+  const occurredAt = request.occurredAt ?? (yield* DateTime.now);
+
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      // Two phones seating people at once queue here, so a seat can't end up with two players.
+      yield* sql`select 1 from sessions where id = ${sessionId} for update`;
+      const seatings = yield* sql`
+        select id, session_id, player_id, seat, occurred_at from seatings
+        where session_id = ${sessionId} order by occurred_at, created_at
+      `.pipe(Effect.flatMap(Access.decodeRows(SeatingRow)));
+      const now = seatsNow(seatings);
+      if (request.seat === (now.get(request.playerId) ?? null)) return;
+      const taken = [...now].some(([p, s]) => s === request.seat && p !== request.playerId);
+      if (taken) return yield* new Conflict({ reason: "seat_taken" });
+      yield* sql`
+        insert into seatings (id, session_id, group_id, player_id, seat, occurred_at, created_by)
+        values (${request.id}, ${sessionId}, ${session.groupId}, ${request.playerId},
+          ${request.seat}, ${DateTime.toDateUtc(occurredAt)}, ${userId})
+      `;
+    }),
+  );
   return yield* Views.sessionDetail(sessionId);
 });
 

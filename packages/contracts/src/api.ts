@@ -11,13 +11,14 @@ import {
   GroupId,
   InviteId,
   PlayerId,
+  SeatingId,
   SessionId,
   StakeId,
   TripId,
   UserId,
   VenueId,
 } from "./ids.ts";
-import { Entry, Game, Stake, Trip } from "./ledger.ts";
+import { Entry, Game, Seat, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import {
   ClaimPreview,
@@ -116,6 +117,14 @@ export const RecordSettlementRequest = Schema.Struct({
 });
 
 export const MoveSessionRequest = Schema.Struct({ tripId: TripId });
+
+export const SeatRequest = Schema.Struct({
+  id: SeatingId,
+  playerId: PlayerId,
+  /** Null stands the player up. */
+  seat: Schema.NullOr(Seat),
+  occurredAt: Schema.optionalKey(Schema.DateTimeUtc),
+});
 
 export const CreateStakeRequest = Schema.Struct({
   id: StakeId,
@@ -310,6 +319,14 @@ const SessionsGroup = HttpApiGroup.make("sessions")
       payload: Schema.Struct({ playerId: PlayerId }),
       success: SessionDetail,
       error: [Forbidden, NotFound, Conflict],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("seat", "/sessions/:sessionId/seatings", {
+      params: sessionParams,
+      payload: SeatRequest,
+      success: SessionDetail,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
     }),
   )
   .add(

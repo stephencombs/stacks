@@ -1,6 +1,16 @@
 import * as Schema from "effect/Schema";
 
-import { EntryId, GroupId, PlayerId, SessionId, StakeId, TripId, UserId, VenueId } from "./ids.ts";
+import {
+  EntryId,
+  GroupId,
+  PlayerId,
+  SeatingId,
+  SessionId,
+  StakeId,
+  TripId,
+  UserId,
+  VenueId,
+} from "./ids.ts";
 import { MinorUnits } from "./money.ts";
 
 export const Game = Schema.Literals([
@@ -36,6 +46,22 @@ export const Session = Schema.Struct({
   ),
 );
 export type Session = typeof Session.Type;
+
+/** A spot at the table, numbered from the dealer's left: seat 1 is first base at blackjack. */
+export const Seat = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 14 }));
+
+/**
+ * A player sitting down at `seat`, or standing up when it's null. Rows are never edited: moving
+ * is a new row, so a session's latest row for each player is where they sit now.
+ */
+export const Seating = Schema.Struct({
+  id: SeatingId,
+  sessionId: SessionId,
+  playerId: PlayerId,
+  seat: Schema.NullOr(Seat),
+  occurredAt: Schema.DateTimeUtc,
+});
+export type Seating = typeof Seating.Type;
 
 /**
  * - `buy_in`: chips bought by `playerId`. A counterparty paid for them, so the player owes them.

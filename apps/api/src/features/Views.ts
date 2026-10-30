@@ -24,6 +24,7 @@ import {
   EntryRow,
   GroupRow,
   PlayerRow,
+  SeatingRow,
   SessionRow,
   StakeRow,
   TripRow,
@@ -99,7 +100,7 @@ export const loadSession = Effect.fn("Views.loadSession")(function* (sessionId: 
 export const sessionDetail = Effect.fn("Views.sessionDetail")(function* (sessionId: SessionId) {
   const sql = yield* SqlClient.SqlClient;
   const session = yield* loadSession(sessionId);
-  const [[summary], playerIds, entries] = yield* Effect.all(
+  const [[summary], playerIds, entries, seatings] = yield* Effect.all(
     [
       summaries([session]),
       sql`
@@ -108,6 +109,10 @@ export const sessionDetail = Effect.fn("Views.sessionDetail")(function* (session
       sql`
         select * from entries where session_id = ${sessionId} order by occurred_at, created_at
       `.pipe(Effect.flatMap(decodeRows(EntryRow))),
+      sql`
+        select id, session_id, player_id, seat, occurred_at from seatings
+        where session_id = ${sessionId} order by occurred_at, created_at
+      `.pipe(Effect.flatMap(decodeRows(SeatingRow))),
     ],
     { concurrency: "unbounded" },
   );
@@ -117,6 +122,7 @@ export const sessionDetail = Effect.fn("Views.sessionDetail")(function* (session
     playerIds: playerIds.map((row) => row.playerId),
     results: summary!.results,
     entries,
+    seatings,
   } satisfies SessionDetail;
 });
 

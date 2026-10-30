@@ -17,6 +17,7 @@ const conflictMessages: Record<ConflictReason, string> = {
     "You already have history in this group, so this guest can't be merged into you.",
   player_not_in_group: "That player isn't in this group.",
   player_not_in_session: "That player isn't in this session.",
+  seat_taken: "Someone's already in that seat.",
   venue_not_available: "That venue isn't available to this group.",
   session_closed: "This session is closed. An admin can reopen it.",
   session_open: "This session is still live.",

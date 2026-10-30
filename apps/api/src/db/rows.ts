@@ -9,6 +9,8 @@ import {
   MemberRole,
   MinorUnits,
   PlayerId,
+  Seat,
+  SeatingId,
   SessionId,
   SessionStatus,
   StakeId,
@@ -84,6 +86,14 @@ export const SessionRow = Schema.Struct({
   startedAt: Timestamp,
   endedAt: Schema.NullOr(Timestamp),
   notes: Schema.NullOr(Schema.String),
+});
+
+export const SeatingRow = Schema.Struct({
+  id: SeatingId,
+  sessionId: SessionId,
+  playerId: PlayerId,
+  seat: Schema.NullOr(Seat),
+  occurredAt: Timestamp,
 });
 
 export const EntryRow = Schema.Struct({

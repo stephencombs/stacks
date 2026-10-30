@@ -35,6 +35,10 @@
     "./table": {
       "types": "./src/table.ts",
       "import": "./src/table.ts"
+    },
+    "./seats": {
+      "types": "./src/seats.ts",
+      "import": "./src/seats.ts"
     }
   },
   "scripts": {
