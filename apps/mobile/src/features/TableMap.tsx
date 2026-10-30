@@ -220,7 +220,7 @@ function ResultTag({
       >
         <Text
           className={
-            bust || out.net !== 0 ? "font-mono text-xs text-black" : "font-mono text-xs text-ink"
+            bust || out.net !== 0 ? "font-mono text-xs text-canvas" : "font-mono text-xs text-ink"
           }
         >
           {bust ? "Bust" : formatMoney(out.net, currency, { signDisplay: "exceptZero" })}

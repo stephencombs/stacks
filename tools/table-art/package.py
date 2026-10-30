@@ -2,8 +2,10 @@
 
 python3 package.py [render dir, default here]   (after scene.py has written out/ and chips/)
 """
-import io, json, os, sys
-from PIL import Image
+import json, os, sys
+
+import numpy as np
+from PIL import Image, ImageFilter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -13,6 +15,8 @@ META = os.path.join(ROOT, "packages", "client-runtime", "src", "tableArt.ts")
 PHONE = os.path.join(ROOT, "apps", "mobile", "src", "features", "tableImages.ts")
 WIDTH = 1170  # A 390-point phone at 3x.
 CHIP_WIDTH = 220
+SHADOW = 0.5  # How much of the floor shadow to keep.
+FADE = 0.05  # How far in from each edge the frame fades out, as a fraction of its size.
 
 meta = json.load(open(os.path.join(SRC, "out", "meta.json")))
 chips = json.load(open(os.path.join(SRC, "chips", "chips.json")))
@@ -24,6 +28,22 @@ for name in os.listdir(ART):
 
 def save(image, name, quality):
     image.save(os.path.join(ART, name), "WEBP", quality=quality, method=6)
+
+
+def settle(image):
+    """Fits a frame onto any page, light or dark: the floor shadow is lightened (the table's own
+    edges are left alone), and everything fades out toward the frame's edges, so no shadow ends
+    in a hard line where the frame was cropped."""
+    alpha = np.asarray(image.getchannel("A"), dtype=np.float32)
+    table = image.getchannel("A").point(lambda v: 255 if v >= 250 else 0).filter(ImageFilter.MaxFilter(5))
+    shadow = np.asarray(table, dtype=np.float32) == 0
+    alpha = np.where(shadow, alpha * SHADOW, alpha)
+    h, w = alpha.shape
+    ramp = lambda n, edge: np.clip(np.minimum(np.arange(n), np.arange(n)[::-1]) / (n * edge), 0, 1)
+    alpha *= np.outer(ramp(h, FADE), ramp(w, FADE))
+    out = image.copy()
+    out.putalpha(Image.fromarray(alpha.round().astype(np.uint8)))
+    return out
 
 
 def solid(alpha, threshold):
@@ -46,7 +66,7 @@ fy = lambda v: round((v * H - y0) / ch, 4)
 frames = []
 for i in range(count):
     anchors = meta["anchors"][str(i)]
-    save(tables[i].crop((x0, y0, x1, y1)).resize(size, Image.LANCZOS), f"frame-{i:02d}.webp", 84)
+    save(settle(tables[i].crop((x0, y0, x1, y1)).resize(size, Image.LANCZOS)), f"frame-{i:02d}.webp", 84)
     # The rail layer only ships for angles where it covers a seat or a stack.
     alpha = rails[i].split()[3]
     covers = any(

@@ -458,9 +458,9 @@ export function TableMap({
                       className={
                         "absolute top-[92%] left-1/2 -translate-x-1/2 rounded-md px-2 py-0.5 font-mono text-xs font-semibold whitespace-nowrap shadow-[0_2px_8px_rgb(0_0_0/0.35)] " +
                         (s.out.cashOut === 0 || s.out.net < 0
-                          ? "bg-loss text-black"
+                          ? "bg-loss text-canvas"
                           : s.out.net > 0
-                            ? "bg-win text-black"
+                            ? "bg-win text-canvas"
                             : "bg-surface text-ink")
                       }
                     >
