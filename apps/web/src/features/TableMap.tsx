@@ -35,9 +35,9 @@ const urls = import.meta.glob<string>("../../../../packages/client-runtime/table
 const url = (name: string) => urls[`../../../../packages/client-runtime/table-art/${name}.webp`]!;
 
 interface Images {
-  readonly frames: ReadonlyArray<HTMLImageElement>;
-  readonly rails: ReadonlyArray<HTMLImageElement | null>;
-  readonly chips: Readonly<Record<number, ReadonlyArray<HTMLImageElement>>>;
+  readonly frames: Array<HTMLImageElement | null>;
+  readonly rails: Array<HTMLImageElement | null>;
+  readonly chips: Record<number, ReadonlyArray<HTMLImageElement>>;
 }
 
 const load = async (src: string) => {
@@ -46,25 +46,55 @@ const load = async (src: string) => {
   await img.decode();
   return img;
 };
+const pad = (i: number) => String(i).padStart(2, "0");
 
-// Everything is decoded before the table shows, so nothing is ever drawn half-loaded.
-let images: Promise<Images> | null = null;
-const loadImages = () =>
-  (images ??= Promise.all([
-    Promise.all(art.frames.map((_, i) => load(url(`frame-${String(i).padStart(2, "0")}`)))),
-    Promise.all(
-      art.frames.map((f, i) => (f.rail ? load(url(`rail-${String(i).padStart(2, "0")}`)) : null)),
-    ),
-    Promise.all(
-      art.chipLevels.map((level) =>
-        Promise.all([1, 2, 3, 4, 5, 6, 7, 8].map((n) => load(url(`chip-${level}-${n}`)))),
-      ),
-    ),
-  ]).then(([frames, rails, chips]) => ({
-    frames,
-    rails,
-    chips: Object.fromEntries(art.chipLevels.map((level, i) => [level, chips[i]!])),
-  })));
+// The table shows as soon as the chips and the frame it opens on are decoded; the other angles
+// follow in the background, nearest first, and a move draws the nearest one already in.
+const images: Images = {
+  frames: art.frames.map(() => null),
+  rails: art.frames.map(() => null),
+  chips: {},
+};
+let chipsReady: Promise<void> | null = null;
+const framesLoading = new Map<number, Promise<void>>();
+const loadFrame = (i: number) => {
+  const loading =
+    framesLoading.get(i) ??
+    Promise.all([
+      load(url(`frame-${pad(i)}`)).then((img) => void (images.frames[i] = img)),
+      art.frames[i]!.rail
+        ? load(url(`rail-${pad(i)}`)).then((img) => void (images.rails[i] = img))
+        : null,
+    ]).then(() => undefined);
+  framesLoading.set(i, loading);
+  return loading;
+};
+const loadImages = async (first: number) => {
+  chipsReady ??= Promise.all(
+    art.chipLevels.map(async (level) => {
+      images.chips[level] = await Promise.all(
+        [1, 2, 3, 4, 5, 6, 7, 8].map((n) => load(url(`chip-${level}-${n}`))),
+      );
+    }),
+  ).then(() => undefined);
+  await Promise.all([chipsReady, loadFrame(first)]);
+  const rest = art.frames
+    .map((_, i) => i)
+    .toSorted((a, b) => Math.abs(a - first) - Math.abs(b - first));
+  void (async () => {
+    for (const i of rest) await loadFrame(i);
+  })();
+  return images;
+};
+
+/** The loaded frame nearest `i`, for a move that gets ahead of the download. */
+const nearest = (list: Images["frames"], i: number) => {
+  for (let d = 0; d < list.length; d++) {
+    const image = list[i - d] ?? list[i + d];
+    if (image) return image;
+  }
+  return null;
+};
 
 /** A chip canvas is this many chip diameters square, with the chip's contact point at its middle. */
 const BOX = 1.6;
@@ -152,7 +182,7 @@ export function TableMap({
 
   useEffect(() => {
     let cancelled = false;
-    void loadImages().then((imgs) => !cancelled && setLoaded(imgs));
+    void loadImages(camera.current.f).then((imgs) => !cancelled && setLoaded(imgs));
     return () => {
       cancelled = true;
     };
@@ -182,8 +212,9 @@ export function TableMap({
     ] as const) {
       const canvas = root.querySelector<HTMLCanvasElement>(selector)!;
       const ctx = canvas.getContext("2d")!;
-      const a = list[i] ?? null;
-      const b = t > 0.001 ? (list[i + 1] ?? null) : null;
+      // The table always draws something; a rail still downloading just waits.
+      const a = list[i] ?? (list === loaded.frames ? nearest(list, Math.round(cam.f)) : null);
+      const b = t > 0.001 && list[i] ? (list[i + 1] ?? null) : null;
       // The rail layer is empty at the high angles, where it never covers a chip.
       if (canvas.dataset.drawn === "none" && !a && !b) continue;
       canvas.dataset.drawn = a || b ? "some" : "none";
