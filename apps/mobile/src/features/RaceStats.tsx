@@ -6,7 +6,7 @@ import { racePlaces, runningTotals, statSheet, type StatsSession } from "@stacks
 import { tripNights } from "@stacks/shared/trips";
 import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { PanResponder, Pressable, Text, View } from "react-native";
 import Svg, { Circle, G, Line, Polyline, Text as SvgText } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 
@@ -147,7 +147,10 @@ function Race<S extends RaceSession>({
   latest: string;
 }) {
   const last = sessions.length - 1;
-  const [at, setAt] = useState(last);
+  // Unpinned, the race follows the latest session, including ones that arrive while it's open.
+  const [pinned, setPinned] = useState<number | null>(null);
+  const at = pinned === null ? last : Math.min(pinned, last);
+  const setAt = (next: number) => setPinned(next >= last ? null : next);
   const [width, setWidth] = useState(0);
   const lineColor = useLineColors();
   const [rule, amber, board] = useCSSVariable([
@@ -175,6 +178,13 @@ function Race<S extends RaceSession>({
     setAt(
       Math.max(0, Math.min(last, Math.round(((locationX - pad.x) / (width - 2 * pad.x)) * last))),
     );
+  // Only a sideways drag scrubs; an up-or-down swipe that starts on the chart scrolls the page.
+  const drag = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) =>
+      Math.abs(gesture.dx) > 6 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+    onPanResponderGrant: (event) => scrub(event.nativeEvent.locationX),
+    onPanResponderMove: (event) => scrub(event.nativeEvent.locationX),
+  });
   const headline = !second
     ? `${leader!.name} leads`
     : leader!.now === second.now
@@ -214,19 +224,15 @@ function Race<S extends RaceSession>({
         }}
         accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
         onAccessibilityAction={(event) =>
-          setAt((current) =>
+          setAt(
             Math.max(
               0,
-              Math.min(last, current + (event.nativeEvent.actionName === "increment" ? 1 : -1)),
+              Math.min(last, at + (event.nativeEvent.actionName === "increment" ? 1 : -1)),
             ),
           )
         }
         onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
-        onResponderTerminationRequest={() => false}
-        onResponderGrant={(event) => scrub(event.nativeEvent.locationX)}
-        onResponderMove={(event) => scrub(event.nativeEvent.locationX)}
+        {...drag.panHandlers}
         style={{ height }}
       >
         {width > 0 ? (

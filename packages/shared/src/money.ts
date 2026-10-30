@@ -23,13 +23,20 @@ export const formatMoney = (
     readonly signDisplay?: "auto" | "always" | "exceptZero";
     readonly trailingZeroDisplay?: "auto" | "stripIfInteger";
   } = {},
-): string =>
-  new Intl.NumberFormat(options.locale, {
+): string => {
+  const digits = minorUnitDigits(currency);
+  // Whole amounts drop their zero cents by asking for no fraction digits, which every engine
+  // honours; Hermes on iOS ignores trailingZeroDisplay.
+  const whole =
+    (options.trailingZeroDisplay ?? "stripIfInteger") === "stripIfInteger" &&
+    amount % 10 ** digits === 0;
+  return new Intl.NumberFormat(options.locale, {
     style: "currency",
     currency,
     signDisplay: options.signDisplay ?? "auto",
-    trailingZeroDisplay: options.trailingZeroDisplay ?? "stripIfInteger",
-  }).format(toDecimalString(amount, minorUnitDigits(currency)));
+    ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+  }).format(toDecimalString(amount, digits));
+};
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
 

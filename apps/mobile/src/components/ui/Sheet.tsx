@@ -31,36 +31,39 @@ export function Sheet({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView edges={["bottom"]} className="flex-1 bg-surface">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          className="flex-1"
-        >
-          <View className="flex-row items-start justify-between gap-4 px-5 pt-5 pb-2">
-            <View className="flex-1 gap-1">
-              <Text accessibilityRole="header" className="font-display text-3xl text-ink">
-                {title}
-              </Text>
-              {description ? <Text className="text-sm text-muted">{description}</Text> : null}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              onPress={onClose}
-              hitSlop={8}
-              className="-mr-2 min-h-11 justify-center px-2"
-            >
-              <Text className="text-base text-muted">Close</Text>
-            </Pressable>
-          </View>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerClassName="gap-4 px-5 pt-3 pb-8"
+      {/* SafeAreaView takes no className, so the sheet's color sits on a plain View. */}
+      <View className="flex-1 bg-surface">
+        <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            className="flex-1"
           >
-            {children}
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+            <View className="flex-row items-start justify-between gap-4 px-5 pt-5 pb-2">
+              <View className="flex-1 gap-1">
+                <Text accessibilityRole="header" className="font-display text-3xl text-ink">
+                  {title}
+                </Text>
+                {description ? <Text className="text-sm text-muted">{description}</Text> : null}
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                onPress={onClose}
+                hitSlop={8}
+                className="-mr-2 min-h-11 justify-center px-2"
+              >
+                <Text className="text-base text-muted">Close</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerClassName="gap-4 px-5 pt-3 pb-8"
+            >
+              {children}
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </View>
     </Modal>
   );
 }

@@ -26,6 +26,23 @@ describe("formatMoney", () => {
     expect(formatMoney(money(1234), KWD, { locale: "en-US" })).toBe("KWD\u00a01.234");
   });
 
+  it("drops zero cents where Intl ignores trailingZeroDisplay, as Hermes on iOS does", () => {
+    const NumberFormat = Intl.NumberFormat;
+    class WithoutTrailingZeroDisplay extends NumberFormat {
+      constructor(locale?: string | Array<string>, options: Intl.NumberFormatOptions = {}) {
+        const { trailingZeroDisplay: _ignored, ...rest } = options;
+        super(locale, rest);
+      }
+    }
+    Intl.NumberFormat = WithoutTrailingZeroDisplay as typeof Intl.NumberFormat;
+    try {
+      expect(formatMoney(money(10000), USD, { locale: "en-US" })).toBe("$100");
+      expect(formatMoney(money(5050), USD, { locale: "en-US" })).toBe("$50.50");
+    } finally {
+      Intl.NumberFormat = NumberFormat;
+    }
+  });
+
   it("keeps zero cents on request", () => {
     const full = { locale: "en-US", trailingZeroDisplay: "auto" } as const;
     expect(formatMoney(money(5000), USD, full)).toBe("$50.00");

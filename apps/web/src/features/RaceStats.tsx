@@ -126,7 +126,10 @@ function Race<S extends RaceSession>({
   latest: string;
 }) {
   const last = sessions.length - 1;
-  const [at, setAt] = useState(last);
+  // Unpinned, the race follows the latest session, including ones that arrive while it's open.
+  const [pinned, setPinned] = useState<number | null>(null);
+  const at = pinned === null ? last : Math.min(pinned, last);
+  const setAt = (next: number) => setPinned(next >= last ? null : next);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
