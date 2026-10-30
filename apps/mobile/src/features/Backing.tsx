@@ -142,6 +142,15 @@ function BackSheet({
       onClose={onClose}
       title="Back a player"
       description="From now until it's ended, the player's results go to the stake."
+      footer={
+        <Button
+          label="Back them"
+          variant="primary"
+          size="lg"
+          pending={create.pending}
+          onPress={() => void submit()}
+        />
+      }
     >
       <Choice
         label="Who's putting up the money"
@@ -166,13 +175,6 @@ function BackSheet({
       />
       <TextField label="Note (optional)" value={note} onChangeText={setNote} maxLength={280} />
       {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
-      <Button
-        label="Back them"
-        variant="primary"
-        size="lg"
-        pending={create.pending}
-        onPress={() => void submit()}
-      />
     </Sheet>
   );
 }
@@ -196,7 +198,22 @@ function StakeSheet({
   const error = end.error ?? reopen.error ?? voidStake.error;
 
   return (
-    <Sheet open onClose={onClose} title={title}>
+    <Sheet
+      open
+      onClose={onClose}
+      title={title}
+      footer={
+        <Button
+          label="Void stake"
+          variant="danger"
+          size="lg"
+          pending={voidStake.pending}
+          onPress={() =>
+            void voidStake.run({ params, payload: { reason: reason.trim() || null } }).then(done)
+          }
+        />
+      }
+    >
       {view.stake.endedAt === null ? (
         <Button
           label="End now"
@@ -222,15 +239,6 @@ function StakeSheet({
         maxLength={280}
       />
       {error ? <FormError>{error}</FormError> : null}
-      <Button
-        label="Void stake"
-        variant="danger"
-        size="lg"
-        pending={voidStake.pending}
-        onPress={() =>
-          void voidStake.run({ params, payload: { reason: reason.trim() || null } }).then(done)
-        }
-      />
     </Sheet>
   );
 }

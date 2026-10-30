@@ -1,7 +1,13 @@
-import { ArrowRight, Check, ChevronRight } from "lucide-react-native";
+import { ArrowRight, Check, ChevronRight, Delete, X } from "lucide-react-native";
 import { useCSSVariable } from "uniwind";
 
-const icons = { "chevron-right": ChevronRight, check: Check, "arrow-right": ArrowRight };
+const icons = {
+  "chevron-right": ChevronRight,
+  check: Check,
+  "arrow-right": ArrowRight,
+  close: X,
+  delete: Delete,
+};
 
 export type IconName = keyof typeof icons;
 

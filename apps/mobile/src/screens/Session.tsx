@@ -473,26 +473,29 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
           onClose={() => setRefused(null)}
           title="This didn't save"
           description={refused.reason}
-        >
-          <Button
-            label="Try again"
-            variant="primary"
-            size="lg"
-            onPress={() => {
-              void outbox.retry(refused.id);
-              setRefused(null);
-            }}
-          />
-          <Button
-            label="Discard it"
-            variant="danger"
-            size="lg"
-            onPress={() => {
-              outbox.discard(refused.id);
-              setRefused(null);
-            }}
-          />
-        </Sheet>
+          footer={
+            <>
+              <Button
+                label="Try again"
+                variant="primary"
+                size="lg"
+                onPress={() => {
+                  void outbox.retry(refused.id);
+                  setRefused(null);
+                }}
+              />
+              <Button
+                label="Discard it"
+                variant="danger"
+                size="lg"
+                onPress={() => {
+                  outbox.discard(refused.id);
+                  setRefused(null);
+                }}
+              />
+            </>
+          }
+        />
       ) : null}
       {closing ? (
         <CloseSheet
@@ -583,6 +586,15 @@ function EntryActionsSheet({
       onClose={onClose}
       title="Fix this entry"
       description="Voided entries stay in the history, crossed out, and stop counting."
+      footer={
+        <Button
+          label="Void entry"
+          variant="danger"
+          size="lg"
+          pending={voidEntry.pending}
+          onPress={() => void confirmVoid()}
+        />
+      }
     >
       {entry.kind !== "settlement" ? (
         <Button label="Correct the amount or who paid" size="lg" onPress={onCorrect} />
@@ -594,13 +606,6 @@ function EntryActionsSheet({
         maxLength={280}
       />
       {voidEntry.error ? <FormError>{voidEntry.error}</FormError> : null}
-      <Button
-        label="Void entry"
-        variant="danger"
-        size="lg"
-        pending={voidEntry.pending}
-        onPress={() => void confirmVoid()}
-      />
     </Sheet>
   );
 }
@@ -661,6 +666,25 @@ function CloseSheet({
       onClose={onClose}
       title="Close this session?"
       description="Results lock in and the session stops taking entries. An admin can reopen it."
+      footer={
+        <>
+          <Button
+            label="Close session"
+            variant="primary"
+            size="lg"
+            pending={close.pending}
+            onPress={() => void confirm(false)}
+          />
+          <Button
+            label="Close and move tables"
+            accessibilityLabel="Close and start another session with the same players"
+            size="lg"
+            disabled={close.pending}
+            onPress={() => void confirm(true)}
+          />
+          <Button label="Keep playing" variant="ghost" onPress={onClose} />
+        </>
+      }
     >
       {playing.length > 0 ? (
         <View className="gap-3">
@@ -688,21 +712,6 @@ function CloseSheet({
         </FormError>
       ) : null}
       {close.error ? <FormError>{close.error}</FormError> : null}
-      <Button
-        label="Close session"
-        variant="primary"
-        size="lg"
-        pending={close.pending}
-        onPress={() => void confirm(false)}
-      />
-      <Button
-        label="Close and move tables"
-        accessibilityLabel="Close and start another session with the same players"
-        size="lg"
-        disabled={close.pending}
-        onPress={() => void confirm(true)}
-      />
-      <Button label="Keep playing" variant="ghost" onPress={onClose} />
     </Sheet>
   );
 }

@@ -21,7 +21,6 @@ import { Icon } from "../components/ui/Icon";
 import { Choice, FormError } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { List, Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
-import { cn } from "../components/ui/cn";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { VenuePicker } from "../features/VenuePicker";
 import { Chip } from "../features/Chip";
@@ -176,22 +175,15 @@ function NewSessionForm({
                   onPress={() => toggle(player.id)}
                   className="flex-1 flex-row items-center gap-3"
                 >
-                  <View
-                    className={cn(
-                      "size-6 items-center justify-center rounded-md border",
-                      checked ? "border-accent bg-accent" : "border-line-strong",
-                    )}
-                  >
-                    {checked ? <Icon name="check" color="accent-ink" size={16} /> : null}
-                  </View>
-                  <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-                  <Text className="text-base text-ink">
+                  <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
+                  <Text className="flex-1 text-[17px] text-ink">
                     {player.displayName}
                     {player.id === detail.myPlayerId ? (
                       <Text className="text-muted"> (you)</Text>
                     ) : null}
                     {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
                   </Text>
+                  {checked ? <Icon name="check" color="accent-text" size={18} /> : null}
                 </Pressable>
               </Row>
             );

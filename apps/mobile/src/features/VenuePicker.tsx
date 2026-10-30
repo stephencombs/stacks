@@ -247,6 +247,15 @@ function AddVenueSheet({
       onClose={onClose}
       title="Add a venue"
       description="Casinos you add are shared with everyone on Stacks. Home games stay private to this group."
+      footer={
+        <Button
+          label="Add venue"
+          variant="primary"
+          size="lg"
+          pending={create.pending}
+          onPress={() => void submit()}
+        />
+      }
     >
       <Choice
         label="Kind"
@@ -270,13 +279,6 @@ function AddVenueSheet({
         <TextField label="City" value={city} onChangeText={setCity} maxLength={80} />
       ) : null}
       {create.error ? <FormError>{create.error}</FormError> : null}
-      <Button
-        label="Add venue"
-        variant="primary"
-        size="lg"
-        pending={create.pending}
-        onPress={() => void submit()}
-      />
     </Sheet>
   );
 }

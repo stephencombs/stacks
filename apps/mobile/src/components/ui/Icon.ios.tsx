@@ -7,6 +7,8 @@ const symbols: Record<IconName, SFSymbol> = {
   "chevron-right": "chevron.right",
   check: "checkmark",
   "arrow-right": "arrow.right",
+  close: "xmark",
+  delete: "delete.left",
 };
 
 export function Icon({

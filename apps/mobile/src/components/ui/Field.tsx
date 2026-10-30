@@ -1,8 +1,23 @@
 import { useId, type ReactNode } from "react";
-import { Pressable, Text, TextInput, View, type TextInputProps } from "react-native";
+import * as Haptics from "expo-haptics";
+import { Platform, Pressable, Text, TextInput, View, type TextInputProps } from "react-native";
 
+import { Icon } from "./Icon";
 import { cn } from "./cn";
 
+/** A caption over a group of rows, in the iOS grouped-list style. */
+function FieldLabel({ id, children }: { id?: string; children: ReactNode }) {
+  return (
+    <Text nativeID={id} className="px-1 text-[13px] font-medium text-muted">
+      {children}
+    </Text>
+  );
+}
+
+/**
+ * A text field as iOS lays them out: a caption above a borderless field on a card, with any
+ * error or hint underneath.
+ */
 export function TextField({
   label,
   hint,
@@ -20,26 +35,24 @@ export function TextField({
   const id = useId();
   return (
     <View className={cn("gap-1.5", className)}>
-      <Text nativeID={id} className="text-sm font-medium text-ink">
-        {label}
-      </Text>
+      <FieldLabel id={id}>{label}</FieldLabel>
       <TextInput
         accessibilityLabel={label}
         aria-labelledby={id}
-        placeholderTextColorClassName="accent-muted"
+        placeholderTextColorClassName="accent-faint"
         className={cn(
-          "min-h-12 rounded-lg border bg-surface px-3 py-2.5 text-base text-ink",
-          error ? "border-danger" : "border-line-strong focus:border-accent-text",
+          "min-h-12 rounded-xl bg-surface px-4 py-3 text-[17px] text-ink",
+          error && "border border-danger",
           inputClassName,
         )}
         {...props}
       />
       {error ? (
-        <Text accessibilityLiveRegion="polite" className="text-sm text-danger">
+        <Text accessibilityLiveRegion="polite" className="px-1 text-[13px] text-danger">
           {error}
         </Text>
       ) : hint ? (
-        <Text className="text-sm text-muted">{hint}</Text>
+        <Text className="px-1 text-[13px] text-muted">{hint}</Text>
       ) : null}
     </View>
   );
@@ -54,25 +67,69 @@ export function FormError({ children }: { children: ReactNode }) {
   );
 }
 
-/** One of a few options, as a row or grid of chips. */
+/**
+ * One of a few options. Up to four read as an iOS segmented control; more read as a list of
+ * rows with a checkmark, like a picker in Settings.
+ */
 export function Choice<A extends string>({
   label,
   options,
   value,
   onChange,
-  columns,
+  labelHidden = false,
 }: {
   label: string;
   options: ReadonlyArray<{ readonly value: A; readonly label: string }>;
   value: A;
   onChange: (value: A) => void;
+  /** Read out but not shown, where the options speak for themselves. */
+  labelHidden?: boolean;
+  /** No longer used: the control picks its own layout. */
   columns?: 2 | 3 | 4;
 }) {
+  const pick = (next: A) => {
+    if (next !== value && Platform.OS !== "web") void Haptics.selectionAsync();
+    onChange(next);
+  };
+  if (options.length <= 4)
+    return (
+      <View className="gap-1.5" accessibilityRole="radiogroup" accessibilityLabel={label}>
+        {labelHidden ? null : <FieldLabel>{label}</FieldLabel>}
+        <View className="flex-row rounded-[10px] bg-fill p-0.5">
+          {options.map((option) => {
+            const selected = option.value === value;
+            return (
+              <Pressable
+                key={option.value}
+                accessibilityRole="radio"
+                accessibilityLabel={option.label}
+                accessibilityState={{ checked: selected }}
+                onPress={() => pick(option.value)}
+                className={cn(
+                  "min-h-9 flex-1 items-center justify-center rounded-lg px-2",
+                  selected && "bg-raised shadow-sm",
+                )}
+              >
+                <Text
+                  numberOfLines={1}
+                  className={cn(
+                    "text-[13px]",
+                    selected ? "font-semibold text-ink" : "font-medium text-ink",
+                  )}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    );
   return (
-    <View className="gap-2" accessibilityRole="radiogroup" accessibilityLabel={label}>
-      <Text className="text-sm font-medium text-ink">{label}</Text>
-      <View className="flex-row flex-wrap gap-2">
-        {options.map((option) => {
+    <View className="gap-1.5" accessibilityRole="radiogroup" accessibilityLabel={label}>
+      <FieldLabel>{label}</FieldLabel>
+      <View className="overflow-hidden rounded-xl bg-surface">
+        {options.map((option, index) => {
           const selected = option.value === value;
           return (
             <Pressable
@@ -80,25 +137,18 @@ export function Choice<A extends string>({
               accessibilityRole="radio"
               accessibilityLabel={option.label}
               accessibilityState={{ checked: selected }}
-              onPress={() => onChange(option.value)}
-              className={cn(
-                "min-h-11 items-center justify-center rounded-lg border px-4 py-2.5",
-                columns === 2 && "basis-[48%] grow",
-                columns === 3 && "basis-[31%] grow",
-                columns === 4 && "basis-[23%] grow",
-                selected
-                  ? "border-accent bg-accent"
-                  : "border-line-strong bg-surface active:bg-sunken",
-              )}
+              onPress={() => pick(option.value)}
+              className="min-h-12 flex-row items-center pl-4 active:bg-sunken"
             >
-              <Text
+              <View
                 className={cn(
-                  "text-center text-sm",
-                  selected ? "font-semibold text-accent-ink" : "text-ink",
+                  "min-h-12 flex-1 flex-row items-center justify-between pr-4",
+                  index > 0 && "border-t border-line",
                 )}
               >
-                {option.label}
-              </Text>
+                <Text className="text-[17px] text-ink">{option.label}</Text>
+                {selected ? <Icon name="check" color="accent-text" size={18} /> : null}
+              </View>
             </Pressable>
           );
         })}

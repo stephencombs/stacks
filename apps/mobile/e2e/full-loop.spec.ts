@@ -108,6 +108,8 @@ test.describe.serial("live mode on a phone", () => {
         ).click();
         await visible(alex.getByRole("radio", { name: counterparty })).click();
       }
+      if (kind === "Buy in" && amount === "100" && player === "Alex")
+        await shoot(alex, "entry-sheet");
       await visible(
         alex.getByRole("button", { name: kind === "Buy in" ? "Record buy in" : "Record cash out" }),
       ).click();

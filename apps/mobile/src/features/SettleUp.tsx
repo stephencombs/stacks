@@ -253,6 +253,7 @@ function PaymentSheet({
           ? `${names.get(transfer.from)} paid ${names.get(transfer.to)}.`
           : "For money that changed hands outside a session."
       }
+      footer={<Button label="Record payment" variant="primary" size="lg" haptic onPress={submit} />}
     >
       {transfer ? (
         <Money amount={transfer.amount} currency={detail.group.currency} className="text-3xl" />
@@ -277,7 +278,6 @@ function PaymentSheet({
         maxLength={280}
       />
       {problem ? <FormError>{problem}</FormError> : null}
-      <Button label="Record payment" variant="primary" size="lg" haptic onPress={submit} />
     </Sheet>
   );
 }
@@ -301,6 +301,15 @@ function VoidPaymentSheet({ entry, onClose }: { entry: Entry; onClose: () => voi
       onClose={onClose}
       title="Void this payment?"
       description="It stays in the history, crossed out, and stops counting."
+      footer={
+        <Button
+          label="Void payment"
+          variant="danger"
+          size="lg"
+          pending={voidEntry.pending}
+          onPress={() => void confirm()}
+        />
+      }
     >
       <TextField
         label="Reason (optional)"
@@ -309,13 +318,6 @@ function VoidPaymentSheet({ entry, onClose }: { entry: Entry; onClose: () => voi
         maxLength={280}
       />
       {voidEntry.error ? <FormError>{voidEntry.error}</FormError> : null}
-      <Button
-        label="Void payment"
-        variant="danger"
-        size="lg"
-        pending={voidEntry.pending}
-        onPress={() => void confirm()}
-      />
     </Sheet>
   );
 }

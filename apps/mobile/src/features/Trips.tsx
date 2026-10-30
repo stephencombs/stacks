@@ -147,6 +147,15 @@ function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () 
       onClose={onClose}
       title="Start a trip"
       description="Sessions you start in it go on its board and settle up on their own."
+      footer={
+        <Button
+          label="Start trip"
+          variant="primary"
+          size="lg"
+          pending={create.pending}
+          onPress={() => void submit()}
+        />
+      }
     >
       <TextField
         label="Trip name"
@@ -157,13 +166,6 @@ function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () 
       />
       <Choice label="Started" options={STARTS} value={daysAgo} onChange={setDaysAgo} columns={2} />
       {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
-      <Button
-        label="Start trip"
-        variant="primary"
-        size="lg"
-        pending={create.pending}
-        onPress={() => void submit()}
-      />
     </Sheet>
   );
 }

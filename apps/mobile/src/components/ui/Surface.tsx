@@ -4,11 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { cn } from "./cn";
 
 export function Surface({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <View className={cn("overflow-hidden rounded-xl border border-line bg-surface", className)}>
-      {children}
-    </View>
-  );
+  return <View className={cn("overflow-hidden rounded-xl bg-surface", className)}>{children}</View>;
 }
 
 /** A surface of rows. The list clips the first row's divider, so only gaps between rows show one. */

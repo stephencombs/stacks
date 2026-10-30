@@ -10,19 +10,27 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-/** A form or confirmation that slides up over the current screen. */
+import { Icon } from "./Icon";
+
+/**
+ * A form or confirmation that slides up over the current screen, laid out like an iOS sheet: a
+ * grabber, a centred title with a close button, and the main action pinned to the bottom.
+ */
 export function Sheet({
   open,
   onClose,
   title,
   description,
+  footer,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   description?: string;
-  children: ReactNode;
+  /** The sheet's main action, kept above the keyboard and the home indicator. */
+  footer?: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <Modal
@@ -32,35 +40,46 @@ export function Sheet({
       onRequestClose={onClose}
     >
       {/* SafeAreaView takes no className, so the sheet's color sits on a plain View. */}
-      <View className="flex-1 bg-surface">
+      <View className="flex-1 bg-canvas">
         <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             className="flex-1"
           >
-            <View className="flex-row items-start justify-between gap-4 px-5 pt-5 pb-2">
-              <View className="flex-1 gap-1">
-                <Text accessibilityRole="header" className="font-display text-3xl text-ink">
-                  {title}
-                </Text>
-                {description ? <Text className="text-sm text-muted">{description}</Text> : null}
-              </View>
+            <View className="items-center pt-2">
+              <View className="h-[5px] w-9 rounded-full bg-line-strong" />
+            </View>
+            <View className="min-h-14 flex-row items-center px-4">
+              <View className="w-11" />
+              <Text
+                accessibilityRole="header"
+                numberOfLines={1}
+                className="flex-1 text-center text-[17px] font-semibold text-ink"
+              >
+                {title}
+              </Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Close"
                 onPress={onClose}
                 hitSlop={8}
-                className="-mr-2 min-h-11 justify-center px-2"
+                className="size-11 items-center justify-center"
               >
-                <Text className="text-base text-muted">Close</Text>
+                <View className="size-8 items-center justify-center rounded-full bg-fill">
+                  <Icon name="close" color="muted" size={14} />
+                </View>
               </Pressable>
             </View>
             <ScrollView
               keyboardShouldPersistTaps="handled"
-              contentContainerClassName="gap-4 px-5 pt-3 pb-8"
+              contentContainerClassName="gap-5 px-4 pt-2 pb-8"
             >
+              {description ? (
+                <Text className="px-1 text-center text-[15px] text-muted">{description}</Text>
+              ) : null}
               {children}
             </ScrollView>
+            {footer ? <View className="gap-2 px-4 pt-2 pb-3">{footer}</View> : null}
           </KeyboardAvoidingView>
         </SafeAreaView>
       </View>

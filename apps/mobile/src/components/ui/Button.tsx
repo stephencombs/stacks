@@ -10,9 +10,9 @@ type Size = "sm" | "md" | "lg" | "xl";
 const surfaces: Record<Variant, string> = {
   primary: "bg-accent active:opacity-85",
   tint: "bg-accent/15 active:bg-accent/25",
-  secondary: "bg-surface border border-line-strong active:bg-sunken",
-  ghost: "active:bg-sunken",
-  danger: "bg-surface border border-line-strong active:bg-sunken",
+  secondary: "bg-fill active:opacity-70",
+  ghost: "active:bg-fill",
+  danger: "bg-fill active:opacity-70",
 };
 const labels: Record<Variant, string> = {
   primary: "text-accent-ink",
@@ -23,16 +23,16 @@ const labels: Record<Variant, string> = {
 };
 // Minimum heights, so larger accessibility text sizes grow the button instead of clipping it.
 const sizes: Record<Size, string> = {
-  sm: "min-h-11 px-3 py-2 rounded-lg",
-  md: "min-h-11 px-4 py-2.5 rounded-lg",
-  lg: "min-h-13 px-5 py-3 rounded-lg",
-  xl: "min-h-16 px-5 py-4 rounded-xl",
+  sm: "min-h-11 px-4 py-2 rounded-full",
+  md: "min-h-11 px-5 py-2.5 rounded-full",
+  lg: "min-h-13 px-6 py-3 rounded-full",
+  xl: "min-h-14 px-6 py-4 rounded-full",
 };
 const text: Record<Size, string> = {
-  sm: "text-sm",
-  md: "text-base",
-  lg: "text-base",
-  xl: "text-lg",
+  sm: "text-[15px]",
+  md: "text-[15px]",
+  lg: "text-[17px]",
+  xl: "text-[17px]",
 };
 
 export function Button({

@@ -240,16 +240,20 @@ function ManageMemberSheet({
         onClose={onClose}
         title={`Remove ${player.displayName}?`}
         description="They lose access to the group. Their history stays in the ledger, and you can invite them back."
+        footer={
+          <>
+            <Button
+              label="Remove"
+              variant="danger"
+              size="lg"
+              pending={remove.pending}
+              onPress={() => void remove.run({ params }).then(done)}
+            />
+            <Button label="Keep them" onPress={() => setConfirming(false)} />
+          </>
+        }
       >
         {remove.error ? <FormError>{remove.error}</FormError> : null}
-        <Button
-          label="Remove"
-          variant="danger"
-          size="lg"
-          pending={remove.pending}
-          onPress={() => void remove.run({ params }).then(done)}
-        />
-        <Button label="Keep them" onPress={() => setConfirming(false)} />
       </Sheet>
     );
   }
@@ -289,16 +293,20 @@ function LeaveSheet({ detail, onClose }: { detail: GroupDetail; onClose: () => v
       onClose={onClose}
       title={`Leave ${detail.group.name}?`}
       description="Your history stays in the group's ledger. Someone can invite you back."
+      footer={
+        <>
+          <Button
+            label="Leave group"
+            variant="danger"
+            size="lg"
+            pending={leave.pending}
+            onPress={() => void confirm()}
+          />
+          <Button label="Stay" onPress={onClose} />
+        </>
+      }
     >
       {leave.error ? <FormError>{leave.error}</FormError> : null}
-      <Button
-        label="Leave group"
-        variant="danger"
-        size="lg"
-        pending={leave.pending}
-        onPress={() => void confirm()}
-      />
-      <Button label="Stay" onPress={onClose} />
     </Sheet>
   );
 }
@@ -315,19 +323,23 @@ function RevokeSheet({ invite, onClose }: { invite: Invite; onClose: () => void 
       onClose={onClose}
       title="Revoke this invite link?"
       description="Anyone who hasn't joined yet will need a new link."
+      footer={
+        <>
+          <Button
+            label="Revoke link"
+            variant="danger"
+            size="lg"
+            pending={revoke.pending}
+            onPress={() => void confirm()}
+          />
+          <Button label="Keep it" onPress={onClose} />
+        </>
+      }
     >
       <Text numberOfLines={1} className="font-mono text-sm text-muted">
         {`${webUrl}/join/${invite.code}`}
       </Text>
       {revoke.error ? <FormError>{revoke.error}</FormError> : null}
-      <Button
-        label="Revoke link"
-        variant="danger"
-        size="lg"
-        pending={revoke.pending}
-        onPress={() => void confirm()}
-      />
-      <Button label="Keep it" onPress={onClose} />
     </Sheet>
   );
 }

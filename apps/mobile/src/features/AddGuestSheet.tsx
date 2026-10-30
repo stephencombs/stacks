@@ -45,6 +45,15 @@ export function AddGuestSheet({
       onClose={onClose}
       title="Add a guest"
       description="For a friend who isn't on Stacks yet. They can claim their history when they sign up."
+      footer={
+        <Button
+          label="Add guest"
+          variant="primary"
+          size="lg"
+          pending={add.pending}
+          onPress={() => void submit()}
+        />
+      }
     >
       <TextField
         label="Name"
@@ -55,13 +64,6 @@ export function AddGuestSheet({
         error={nameError}
       />
       {add.error ? <FormError>{add.error}</FormError> : null}
-      <Button
-        label="Add guest"
-        variant="primary"
-        size="lg"
-        pending={add.pending}
-        onPress={() => void submit()}
-      />
     </Sheet>
   );
 }

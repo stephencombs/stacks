@@ -2,10 +2,12 @@ import { MinorUnits, PlayerId, type Entry, type GroupDetail } from "@stacks/cont
 import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
 import * as Option from "effect/Option";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Choice, TextField } from "../components/ui/Field";
+import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { cn } from "../components/ui/cn";
 
@@ -114,6 +116,10 @@ export function EntrySheet({
   const bottomLeft = kind === "adjustment" ? "sign" : cents ? decimal : null;
   const whoseLabel = kind === "buy_in" ? "Whose money" : "Who has the cash";
   const whose = others.find((other) => other.id === counterparty)?.displayName;
+  const tap = (key: string) => {
+    if (Platform.OS !== "web") void Haptics.selectionAsync();
+    press(key);
+  };
 
   return (
     <Sheet
@@ -125,15 +131,36 @@ export function EntrySheet({
       description={
         draft.replaces ? "The original entry is voided and this one takes its place." : undefined
       }
+      footer={
+        <Button
+          label={
+            draft.replaces
+              ? "Save correction"
+              : kind === "adjustment"
+                ? "Save adjustment"
+                : `Record ${titles[kind].toLowerCase()}`
+          }
+          variant="primary"
+          size="xl"
+          haptic
+          onPress={() => submit()}
+        />
+      }
     >
       {draft.replaces ? null : (
-        <Choice label="What happened" options={kinds} value={kind} onChange={setKind} columns={3} />
+        <Choice label="What happened" labelHidden options={kinds} value={kind} onChange={setKind} />
       )}
-      <View accessible accessibilityLabel="Amount" accessibilityValue={{ text: amount || "none" }}>
+      <View
+        accessible
+        accessibilityLabel="Amount"
+        accessibilityValue={{ text: amount || "none" }}
+        className="items-center gap-2 py-3"
+      >
         <Text
           adjustsFontSizeToFit
           numberOfLines={1}
-          className={cn("font-mono text-5xl", amount ? "text-ink" : "text-faint")}
+          style={{ lineHeight: 72 }}
+          className={cn("font-mono text-[60px]", amount ? "text-ink" : "text-faint")}
         >
           {value === null
             ? amount || formatMoney(MinorUnits.make(0), currency)
@@ -142,36 +169,36 @@ export function EntrySheet({
               })}
         </Text>
         {amountError ? (
-          <Text accessibilityLiveRegion="polite" className="text-sm text-danger">
+          <Text accessibilityLiveRegion="polite" className="text-center text-[13px] text-danger">
             {amountError}
           </Text>
         ) : null}
       </View>
-      {kind === "buy_in" && presets.length > 0 ? (
-        <View className="flex-row gap-2">
-          {presets.map((preset) => (
+      {(kind === "buy_in" && presets.length > 0) || (kind === "cash_out" && !draft.replaces) ? (
+        <View className="flex-row justify-center gap-2">
+          {kind === "buy_in" ? (
+            presets.map((preset) => (
+              <Button
+                key={preset}
+                label={formatMoney(MinorUnits.make(preset), currency)}
+                size="sm"
+                onPress={() => setAmount(amountText(MinorUnits.make(preset), currency))}
+              />
+            ))
+          ) : (
             <Button
-              key={preset}
-              label={formatMoney(MinorUnits.make(preset), currency)}
+              label={`Bust · ${formatMoney(MinorUnits.make(0), currency)}`}
               size="sm"
-              className="flex-1"
-              onPress={() => setAmount(amountText(MinorUnits.make(preset), currency))}
+              haptic
+              onPress={() => submit(MinorUnits.make(0))}
             />
-          ))}
+          )}
         </View>
       ) : null}
-      {kind === "cash_out" && !draft.replaces ? (
-        <Button
-          label={`Bust · ${formatMoney(MinorUnits.make(0), currency)}`}
-          size="sm"
-          haptic
-          onPress={() => submit(MinorUnits.make(0))}
-        />
-      ) : null}
-      <View className="flex-row flex-wrap gap-2">
+      <View className="flex-row flex-wrap">
         {[...keys, bottomLeft, "0", "back"].map((key) =>
           key === null ? (
-            <View key="gap" className="h-16 basis-[31%] grow" />
+            <View key="gap" className="h-16 basis-1/3" />
           ) : (
             <Pressable
               key={key}
@@ -179,78 +206,74 @@ export function EntrySheet({
               accessibilityLabel={
                 key === "back" ? "Delete" : key === "sign" ? "Plus or minus" : key
               }
-              onPress={() => press(key)}
-              className="h-16 basis-[31%] grow items-center justify-center rounded-xl bg-surface active:bg-sunken"
+              onPress={() => tap(key)}
+              className="h-16 basis-1/3 items-center justify-center rounded-full active:bg-fill"
             >
-              <Text className="font-mono text-2xl text-ink">
-                {key === "back" ? "⌫" : key === "sign" ? "±" : key}
-              </Text>
+              {key === "back" ? (
+                <Icon name="delete" color="ink" size={24} />
+              ) : (
+                <Text className="text-[28px] font-medium text-ink">
+                  {key === "sign" ? "±" : key}
+                </Text>
+              )}
             </Pressable>
           ),
         )}
       </View>
-      {kind !== "adjustment" && others.length > 0 ? (
-        choosingWhose ? (
-          <Choice
-            label={whoseLabel}
-            options={[
-              {
-                value: "",
-                label:
-                  kind === "buy_in" ? `${player?.displayName}'s own` : `${player?.displayName}`,
-              },
-              ...others.map((other) => ({ value: other.id, label: other.displayName })),
-            ]}
-            value={counterparty}
-            onChange={(next) => {
-              setCounterparty(next);
-              setChoosingWhose(false);
-            }}
-          />
-        ) : (
+      {kind !== "adjustment" && others.length > 0 && choosingWhose ? (
+        <Choice
+          label={whoseLabel}
+          options={[
+            {
+              value: "",
+              label: kind === "buy_in" ? `${player?.displayName}'s own` : `${player?.displayName}`,
+            },
+            ...others.map((other) => ({ value: other.id, label: other.displayName })),
+          ]}
+          value={counterparty}
+          onChange={(next) => {
+            setCounterparty(next);
+            setChoosingWhose(false);
+          }}
+        />
+      ) : null}
+      {noting ? (
+        <TextField label="Note" value={note} onChangeText={setNote} maxLength={280} />
+      ) : null}
+      <View className="overflow-hidden rounded-xl bg-surface">
+        {kind !== "adjustment" && others.length > 0 && !choosingWhose ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${whoseLabel}: ${whose ?? "their own"}. Change`}
             onPress={() => setChoosingWhose(true)}
-            className="min-h-11 flex-row items-center justify-between"
+            className="min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken"
           >
-            <Text className="text-sm text-muted">
-              {kind === "buy_in"
-                ? whose
-                  ? `${whose}'s money · they'll be owed this`
-                  : "Their own money"
-                : whose
-                  ? `${whose} has the cash · they'll owe this`
-                  : "They have the cash"}
+            <Text className="text-[17px] text-ink">{whoseLabel}</Text>
+            <Text numberOfLines={1} className="flex-1 text-right text-[17px] text-muted">
+              {whose ?? (kind === "buy_in" ? "Their own" : "They do")}
             </Text>
-            <Text className="text-sm font-semibold text-accent-text">Change</Text>
+            <Icon name="chevron-right" color="faint" size={16} />
           </Pressable>
-        )
-      ) : null}
-      {noting ? (
-        <TextField label="Note" value={note} onChangeText={setNote} maxLength={280} />
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setNoting(true)}
-          className="min-h-11 justify-center"
-        >
-          <Text className="text-sm font-semibold text-accent-text">Add a note</Text>
-        </Pressable>
-      )}
-      <Button
-        label={
-          draft.replaces
-            ? "Save correction"
-            : kind === "adjustment"
-              ? "Save adjustment"
-              : `Record ${titles[kind].toLowerCase()}`
-        }
-        variant="primary"
-        size="xl"
-        haptic
-        onPress={() => submit()}
-      />
+        ) : null}
+        {noting ? null : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add a note"
+            onPress={() => setNoting(true)}
+            className={cn(
+              "min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken",
+              kind !== "adjustment" &&
+                others.length > 0 &&
+                !choosingWhose &&
+                "border-t border-line",
+            )}
+          >
+            <Text className="flex-1 text-[17px] text-ink">Note</Text>
+            <Text className="text-[17px] text-muted">Add</Text>
+            <Icon name="chevron-right" color="faint" size={16} />
+          </Pressable>
+        )}
+      </View>
     </Sheet>
   );
 }

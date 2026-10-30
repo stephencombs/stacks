@@ -122,6 +122,15 @@ function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: () => voi
       onClose={onClose}
       title="New group"
       description="Everyone in a group shares one ledger in one currency."
+      footer={
+        <Button
+          label="Create group"
+          variant="primary"
+          size="lg"
+          pending={create.pending}
+          onPress={() => void submit()}
+        />
+      }
     >
       <TextField
         label="Group name"
@@ -145,13 +154,6 @@ function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: () => voi
         columns={4}
       />
       {create.error ? <FormError>{create.error}</FormError> : null}
-      <Button
-        label="Create group"
-        variant="primary"
-        size="lg"
-        pending={create.pending}
-        onPress={() => void submit()}
-      />
     </Sheet>
   );
 }
@@ -161,7 +163,12 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
   const { signOut } = useClerk();
   const theme = useTheme();
   return (
-    <Sheet open={open} onClose={onClose} title="Account">
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Account"
+      footer={<Button label="Sign out" variant="danger" onPress={() => void signOut()} />}
+    >
       <View className="gap-1">
         <Text className="text-base text-ink">
           {user?.fullName ?? user?.primaryEmailAddress?.emailAddress}
@@ -177,7 +184,6 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
         onChange={setTheme}
         columns={3}
       />
-      <Button label="Sign out" variant="danger" onPress={() => void signOut()} />
     </Sheet>
   );
 }
