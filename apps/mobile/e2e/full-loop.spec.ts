@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 import { createUsers, deleteUsers, signIn } from "./users";
 
@@ -7,6 +7,22 @@ const shoot = (page: Page, name: string) =>
   SCREENSHOTS
     ? page.screenshot({ path: `${SCREENSHOTS}/mobile-${name}.png`, fullPage: true })
     : Promise.resolve();
+
+/**
+ * Takes away what Chromium has and Hermes on iOS doesn't, so code the phone can't run fails here
+ * too. The app's own polyfills then put back what it relies on.
+ */
+const hermesLike = (context: BrowserContext) => {
+  void context.addInitScript(() => {
+    const remove = (owner: object, key: PropertyKey) => Reflect.deleteProperty(owner, key);
+    remove(Intl.NumberFormat.prototype, "formatToParts");
+    remove(Array.prototype, "toSorted");
+    remove(Array, "fromAsync");
+    remove(globalThis, "structuredClone");
+    remove(globalThis, "Iterator");
+  });
+  return context;
+};
 
 // The web stack keeps earlier screens mounted but hidden, so lookups only count visible text.
 test.describe.serial("live mode on a phone", () => {
@@ -21,8 +37,8 @@ test.describe.serial("live mode on a phone", () => {
   test("create, invite, play, close and settle up", async ({ browser }) => {
     const [alexUser, beaUser] = users;
     const contextOptions = test.info().project.use;
-    const alex = await (await browser.newContext(contextOptions)).newPage();
-    const bea = await (await browser.newContext(contextOptions)).newPage();
+    const alex = await hermesLike(await browser.newContext(contextOptions)).newPage();
+    const bea = await hermesLike(await browser.newContext(contextOptions)).newPage();
 
     await signIn(alex, alexUser!.emailAddress);
     await expect(alex.getByText("Your groups").filter({ visible: true })).toBeVisible();

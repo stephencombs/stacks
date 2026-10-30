@@ -7,7 +7,7 @@ import {
   type SessionId,
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
-import { formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
+import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useState, type FormEvent } from "react";
@@ -32,9 +32,7 @@ const kinds = ["buy_in", "cash_out", "adjustment"] as const;
 const amountText = (amount: MinorUnits, currency: GroupDetail["group"]["currency"]) => {
   const digits = minorUnitDigits(currency);
   const magnitude = String(Math.abs(amount)).padStart(digits + 1, "0");
-  const decimal =
-    new Intl.NumberFormat().formatToParts(1.5).find((part) => part.type === "decimal")?.value ??
-    ".";
+  const decimal = decimalSeparator();
   const text =
     digits === 0
       ? magnitude

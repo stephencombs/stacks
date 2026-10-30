@@ -1,5 +1,5 @@
 import { MinorUnits, PlayerId, type Entry, type GroupDetail } from "@stacks/contracts";
-import { formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
+import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
 import * as Option from "effect/Option";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -42,8 +42,7 @@ const amountText = (amount: MinorUnits, currency: GroupDetail["group"]["currency
       : `${magnitude.slice(0, -digits)}${decimal}${magnitude.slice(-digits)}`;
   return amount < 0 ? `-${text}` : text;
 };
-const decimal =
-  new Intl.NumberFormat().formatToParts(1.5).find((part) => part.type === "decimal")?.value ?? ".";
+const decimal = decimalSeparator();
 
 /**
  * Collects one entry with a keypad big enough to hit at a table, offering the likely amounts

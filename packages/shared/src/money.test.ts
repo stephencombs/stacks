@@ -3,7 +3,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { CurrencyCode } from "@stacks/contracts";
 
-import { formatMoney, minorUnitDigits, parseMoney } from "./money.ts";
+import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "./money.ts";
 import { money } from "./testing/ledgerArbitrary.ts";
 
 const USD = CurrencyCode.make("USD");
@@ -61,6 +61,20 @@ describe("parseMoney", () => {
       expect(parseMoney(input, USD, { locale: "en-US" })).toEqual(Option.none());
     },
   );
+
+  it("works where Intl can't split a number into parts, as in Hermes on iOS", () => {
+    const formatToParts = Intl.NumberFormat.prototype.formatToParts;
+    // @ts-expect-error Hermes on Apple platforms doesn't define it.
+    delete Intl.NumberFormat.prototype.formatToParts;
+    try {
+      expect(parseMoney("1,234.50", USD, { locale: "en-US" })).toEqual(Option.some(123450));
+      expect(parseMoney("1.234,50 €", EUR, { locale: "de-DE" })).toEqual(Option.some(123450));
+      expect(parseMoney("1 234,50", EUR, { locale: "fr-FR" })).toEqual(Option.some(123450));
+      expect(decimalSeparator("de-DE")).toBe(",");
+    } finally {
+      Intl.NumberFormat.prototype.formatToParts = formatToParts;
+    }
+  });
 
   it("follows the locale's separators", () => {
     expect(parseMoney("1.234,50 €", EUR, { locale: "de-DE" })).toEqual(Option.some(123450));
