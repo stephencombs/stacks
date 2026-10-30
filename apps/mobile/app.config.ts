@@ -24,7 +24,18 @@ export default (): ExpoConfig => ({
   userInterfaceStyle: "automatic",
   ios: { bundleIdentifier: id, supportsTablet: true },
   android: { package: id },
-  plugins: ["@clerk/expo", "expo-secure-store", "expo-web-browser"],
+  plugins: [
+    "@clerk/expo",
+    "expo-secure-store",
+    "expo-web-browser",
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission:
+          "Stacks uses your location to list the casinos near you first.",
+      },
+    ],
+  ],
   web: { bundler: "metro", output: "single" },
-  extra: { appVariant: variant },
+  extra: { appVariant: variant, eas: { projectId: "e15fb4de-bc0f-49f9-b03d-ed701d1c895c" } },
 });

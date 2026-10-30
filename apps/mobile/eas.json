@@ -28,6 +28,12 @@
       "distribution": "internal",
       "channel": "preview"
     },
+    "preview-simulator": {
+      "extends": "preview",
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "env": {
         "APP_VARIANT": "production"
