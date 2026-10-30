@@ -273,12 +273,68 @@ function StackChip({
 }
 
 /**
+ * The table and, while it's live, the size it's played at. A size picked here shows at once,
+ * the server catching up behind it; a size the server refuses snaps back with the reason.
+ */
+export function TableMap(props: {
+  detail: SessionDetail;
+  seats: number;
+  view: TableView;
+  currency: CurrencyCode;
+  names: ReadonlyMap<PlayerId, string>;
+  chipOf: (playerId: PlayerId) => number;
+}) {
+  const { detail, seats, view } = props;
+  const stacks = useStacks();
+  const resize = useAction(stacks.Client.mutation("sessions", "setTable"));
+  const sizes = tableSizes[detail.session.game]?.sizes ?? [];
+  const [chosen, setChosen] = useState<number | null>(null);
+  const [blocked, setBlocked] = useState<string | null>(null);
+  const [saved, setSaved] = useState(seats);
+  if (saved !== seats) {
+    setSaved(seats);
+    setChosen(null);
+  }
+  const size = chosen ?? seats;
+  const pickSize = async (next: number) => {
+    setBlocked(null);
+    resize.clearError();
+    const inTheWay = view.seats.filter((s) => s.seat > next).map((s) => s.seat);
+    if (inTheWay.length > 0)
+      return setBlocked(`Move whoever's in seat ${Math.max(...inTheWay)} first.`);
+    setChosen(next);
+    const { error } = await resize.attempt({
+      params: { sessionId: detail.session.id },
+      payload: { seats: next },
+    });
+    if (error !== null) setChosen(null);
+  };
+  return (
+    <View>
+      {/* Each size is its own table; a new one starts fresh, with its art already bundled. */}
+      <TableScene key={size} {...props} seats={size} />
+      {detail.session.status === "live" && sizes.length > 1 ? (
+        <View className="mt-3 gap-2">
+          <Choice
+            label="Table size"
+            options={sizes.map((option) => ({ value: String(option), label: `${option} seats` }))}
+            value={String(size)}
+            onChange={(option) => void pickSize(Number(option))}
+          />
+          {(blocked ?? resize.error) ? <FormError>{blocked ?? resize.error}</FormError> : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
  * The table, rendered in 3D ahead of time, with each seated player's chip on their seat and
  * their chips in play stacked in the betting circle. The camera follows the session: arriving at
  * an empty table, a player's-eye view while it's live, pushing in when someone leaves, and
  * overhead with everyone's result once it closes.
  */
-export function TableMap({
+function TableScene({
   detail,
   seats,
   view,
@@ -287,7 +343,6 @@ export function TableMap({
   chipOf,
 }: {
   detail: SessionDetail;
-  /** The parent remounts the map when this changes, so the new table starts fresh. */
   seats: number;
   view: TableView;
   currency: CurrencyCode;
@@ -298,9 +353,6 @@ export function TableMap({
   const seatNumbers = art.frames[0]!.seats.map((_, i) => i + 1);
   const seatName = (n: number) => seatLabel(n, seatNumbers.length);
   const rails = Object.keys(railImages[seats]!).map(Number);
-  const stacks = useStacks();
-  const resize = useAction(stacks.Client.mutation("sessions", "setTable"));
-  const sizes = tableSizes[detail.session.game]?.sizes ?? [];
   const [width, setWidth] = useState(0);
   const [shown, setShown] = useState(view);
   // What was on the table when it first drew just sits there; anything after arrives with a drop.
@@ -690,22 +742,6 @@ export function TableMap({
           </Animated.View>
         </View>
       )}
-      {live && sizes.length > 1 ? (
-        <View className="mt-3 gap-2 px-4">
-          <Choice
-            label="Table size"
-            options={sizes.map((size) => ({ value: String(size), label: `${size} seats` }))}
-            value={String(seats)}
-            onChange={(size) =>
-              void resize.run({
-                params: { sessionId: detail.session.id },
-                payload: { seats: Number(size) },
-              })
-            }
-          />
-          {resize.error ? <FormError>{resize.error}</FormError> : null}
-        </View>
-      ) : null}
       <SeatSheet
         detail={detail}
         seatNumbers={seatNumbers}

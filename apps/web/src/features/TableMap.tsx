@@ -183,10 +183,19 @@ export function TableMap({
   const [width, setWidth] = useState(0);
   const [shown, setShown] = useState(view);
   const [picked, setPicked] = useState<number | null>(null);
+  // A size picked here shows at once; the server catches up behind it, or it snaps back.
+  const [chosen, setChosen] = useState<number | null>(null);
+  const [blocked, setBlocked] = useState<string | null>(null);
+  const [saved, setSaved] = useState(seats);
+  if (saved !== seats) {
+    setSaved(seats);
+    setChosen(null);
+  }
+  const size = chosen ?? seats;
   const outer = useRef<HTMLDivElement>(null);
   const map = useRef<HTMLDivElement>(null);
   // A new table size keeps the old table on screen until its frames are in.
-  const art = blackjackArt[loaded?.seats ?? seats]!;
+  const art = blackjackArt[loaded?.seats ?? size]!;
   const seatNumbers = art.frames[0]!.seats.map((_, i) => i + 1);
   const seatName = (n: number) => seatLabel(n, seatNumbers.length);
   const camera = useRef<Camera>(restShot(art, view));
@@ -198,13 +207,32 @@ export function TableMap({
 
   useEffect(() => {
     let cancelled = false;
-    void loadImages(seats, Math.round(camera.current.f)).then(
-      (imgs) => !cancelled && setLoaded(imgs),
-    );
+    const at = Math.round(camera.current.f);
+    void loadImages(size, at).then((imgs) => {
+      if (cancelled) return;
+      setLoaded(imgs);
+      // The other sizes' frame for this angle comes down too, so switching size is instant.
+      for (const other of tableSizes[detail.session.game]?.sizes ?? [])
+        if (other !== size) void loadFrame(other, at);
+    });
     return () => {
       cancelled = true;
     };
-  }, [seats]);
+  }, [size, detail.session.game]);
+
+  const pickSize = async (next: number) => {
+    setBlocked(null);
+    resize.clearError();
+    const inTheWay = shown.seats.filter((s) => s.seat > next).map((s) => s.seat);
+    if (inTheWay.length > 0)
+      return setBlocked(`Move whoever's in seat ${Math.max(...inTheWay)} first.`);
+    setChosen(next);
+    const { error } = await resize.attempt({
+      params: { sessionId: detail.session.id },
+      payload: { seats: next },
+    });
+    if (error !== null) setChosen(null);
+  };
 
   useEffect(() => {
     const el = outer.current;
@@ -538,29 +566,23 @@ export function TableMap({
       {live && sizes.length > 1 ? (
         <div className="mt-3 flex flex-wrap items-center gap-3 px-4 sm:px-0">
           <div role="group" aria-label="Table size" className="flex gap-1 rounded-lg bg-sunken p-1">
-            {sizes.map((size) => (
+            {sizes.map((option) => (
               <button
-                key={size}
+                key={option}
                 type="button"
-                aria-pressed={seats === size}
-                disabled={resize.pending}
-                onClick={() =>
-                  void resize.run({
-                    params: { sessionId: detail.session.id },
-                    payload: { seats: size },
-                  })
-                }
+                aria-pressed={size === option}
+                onClick={() => void pickSize(option)}
                 className={
-                  seats === size
+                  size === option
                     ? "inline-flex h-8 items-center rounded-md bg-surface px-3 text-sm font-medium text-ink shadow-sm pointer-coarse:h-10"
                     : "inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-muted transition-colors duration-150 hover:text-ink pointer-coarse:h-10"
                 }
               >
-                {size} seats
+                {option} seats
               </button>
             ))}
           </div>
-          {resize.error ? <FormError>{resize.error}</FormError> : null}
+          {(blocked ?? resize.error) ? <FormError>{blocked ?? resize.error}</FormError> : null}
         </div>
       ) : null}
       <SeatDialog

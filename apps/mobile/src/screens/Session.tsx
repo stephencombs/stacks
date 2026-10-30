@@ -225,7 +225,6 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
 
       {seatCount(session) ? (
         <TableMap
-          key={seatCount(session)}
           detail={detail}
           seats={seatCount(session)!}
           view={tableView({

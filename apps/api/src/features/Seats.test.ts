@@ -33,7 +33,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("seats at a table", (it) => {
 
   it.effect("sits, moves and stands players, one to a seat", () =>
     Effect.gen(function* () {
-      const { bea, alexId, beaId, sit } = yield* table("blackjack");
+      const { bea, alexId, beaId, sessionId, sit } = yield* table("blackjack");
+      yield* bea.sessions.setTable({ params: { sessionId }, payload: { seats: 7 } });
       yield* sit(bea, alexId, 7);
       yield* sit(bea, beaId, 4);
       const taken = yield* Effect.flip(sit(bea, beaId, 7));
@@ -65,7 +66,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("seats at a table", (it) => {
       const { bea, alexId, sessionId, sit } = yield* table("blackjack");
       const setTable = (seats: number) =>
         bea.sessions.setTable({ params: { sessionId }, payload: { seats } });
-      expect((yield* sit(bea, alexId, 6)).session.tableSeats).toBeNull();
+      // A new table is the usual 5 seats until someone picks another size.
+      const small = yield* Effect.flip(sit(bea, alexId, 6));
+      expect(small).toMatchObject({ _tag: "InvalidRequest", message: "This table has 5 seats." });
+      yield* setTable(7);
+      expect((yield* sit(bea, alexId, 6)).session.tableSeats).toBe(7);
 
       const odd = yield* Effect.flip(setTable(4));
       expect(odd).toMatchObject({ _tag: "InvalidRequest" });

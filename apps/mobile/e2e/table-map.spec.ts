@@ -63,8 +63,10 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
     await expect(visible(page.getByText("Live", { exact: true }))).toBeVisible();
 
     const seat = (name: RegExp) => visible(page.getByRole("button", { name }));
-    await expect(seat(/^Seat 7, third base, empty$/)).toBeVisible();
+    await expect(seat(/^Seat 5, third base, empty$/)).toBeVisible();
     await shoot(page, "table-empty");
+    await page.getByRole("radio", { name: "7 seats" }).click();
+    await expect(seat(/^Seat 7, third base, empty$/)).toBeVisible({ timeout: 300 });
 
     const sit = async (seatName: RegExp, player: string) => {
       await seat(seatName).click();

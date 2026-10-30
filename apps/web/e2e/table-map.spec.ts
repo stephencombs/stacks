@@ -49,17 +49,24 @@ test.describe.serial("seats at a blackjack table", () => {
     await page.getByRole("button", { name: "Start session" }).click();
     await expect(page.getByText("Live", { exact: true })).toBeVisible();
 
-    // An empty table: every seat is open.
+    // An empty table, five seats unless someone picks another size: every seat is open.
     const seat = (name: RegExp) => page.getByRole("button", { name });
-    await expect(seat(/^Seat 7, third base, empty$/)).toBeVisible();
+    await expect(seat(/^Seat 5, third base, empty$/)).toBeVisible();
     await shoot(page, "table-empty");
 
     // The table comes in 5, 6 or 7 seats; the last is always third base.
     const size = page.getByRole("group", { name: "Table size" });
+    // The other sizes are preloaded, so the table itself swaps at once too.
     await size.getByRole("button", { name: "6 seats" }).click();
-    await expect(seat(/^Seat 6, third base, empty$/)).toBeVisible();
+    await expect(seat(/^Seat 6, third base, empty$/)).toBeVisible({ timeout: 300 });
     await expect(seat(/^Seat 7/)).toHaveCount(0);
+    // The pick shows at once, before the server answers.
     await size.getByRole("button", { name: "7 seats" }).click();
+    await expect(size.getByRole("button", { name: "7 seats" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+      { timeout: 200 },
+    );
     await expect(seat(/^Seat 7, third base, empty$/)).toBeVisible();
 
     const sit = async (seatName: RegExp, player: string) => {
