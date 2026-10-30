@@ -23,7 +23,7 @@ import { tableView } from "@stacks/client-runtime/table";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { formatMoney, parseMoney } from "@stacks/shared/money";
 import { playerResults } from "@stacks/shared/results";
-import { seatsNow, tableSeats } from "@stacks/shared/seats";
+import { seatCount, seatsNow } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -223,9 +223,11 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
         {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
       </View>
 
-      {tableSeats[session.game] ? (
+      {seatCount(session) ? (
         <TableMap
+          key={seatCount(session)}
           detail={detail}
+          seats={seatCount(session)!}
           view={tableView({
             closed: !live,
             seats: seatsNow(detail.seatings),

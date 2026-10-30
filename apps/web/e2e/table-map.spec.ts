@@ -54,6 +54,14 @@ test.describe.serial("seats at a blackjack table", () => {
     await expect(seat(/^Seat 7, third base, empty$/)).toBeVisible();
     await shoot(page, "table-empty");
 
+    // The table comes in 5, 6 or 7 seats; the last is always third base.
+    const size = page.getByRole("group", { name: "Table size" });
+    await size.getByRole("button", { name: "6 seats" }).click();
+    await expect(seat(/^Seat 6, third base, empty$/)).toBeVisible();
+    await expect(seat(/^Seat 7/)).toHaveCount(0);
+    await size.getByRole("button", { name: "7 seats" }).click();
+    await expect(seat(/^Seat 7, third base, empty$/)).toBeVisible();
+
     const sit = async (seatName: RegExp, player: string) => {
       await seat(seatName).click();
       await page
@@ -66,6 +74,10 @@ test.describe.serial("seats at a blackjack table", () => {
     await sit(/^Seat 4, empty$/, "Gus");
     await expect(seat(/^Seat 7, third base, Alex$/)).toBeVisible();
     await expect(seat(/^Seat 4, Gus$/)).toBeVisible();
+
+    // A table can't shrink out from under someone.
+    await size.getByRole("button", { name: "5 seats" }).click();
+    await expect(page.getByText("Move whoever's in seat 7 first.")).toBeVisible();
 
     // Gus moves down a seat; the old one opens up.
     await seat(/^Seat 4, Gus$/).click();

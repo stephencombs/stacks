@@ -11,11 +11,12 @@ import {
   type MoveSessionRequest,
   type PlayerId,
   type SeatRequest,
+  type TableRequest,
   type SessionId,
   type TripId,
 } from "@stacks/contracts";
 
-import { seatsNow, tableSeats } from "@stacks/shared/seats";
+import { seatCount, seatsNow, tableSizes } from "@stacks/shared/seats";
 
 import { SeatingRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
@@ -126,8 +127,8 @@ export const seat = Effect.fn("Sessions.seat")(function* (
     return yield* Views.sessionDetail(sessionId);
   }
   if (session.status === "closed") return yield* new Conflict({ reason: "session_closed" });
-  const seats = tableSeats[session.game];
-  if (seats === undefined) {
+  const seats = seatCount(session);
+  if (seats === null) {
     return yield* new InvalidRequest({ message: "This game isn't played from seats." });
   }
   if (request.seat !== null && request.seat > seats) {
@@ -157,6 +158,41 @@ export const seat = Effect.fn("Sessions.seat")(function* (
         values (${request.id}, ${sessionId}, ${session.groupId}, ${request.playerId},
           ${request.seat}, ${DateTime.toDateUtc(occurredAt)}, ${userId})
       `;
+    }),
+  );
+  return yield* Views.sessionDetail(sessionId);
+});
+
+/** Sets how many seats the table has. Seats that would disappear have to be empty first. */
+export const setTable = Effect.fn("Sessions.setTable")(function* (
+  sessionId: SessionId,
+  request: typeof TableRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const { session } = yield* access(sessionId);
+  if (session.status === "closed") return yield* new Conflict({ reason: "session_closed" });
+  const table = tableSizes[session.game];
+  if (!table) return yield* new InvalidRequest({ message: "This game isn't played from seats." });
+  if (!table.sizes.includes(request.seats)) {
+    return yield* new InvalidRequest({
+      message: `These tables come with ${table.sizes.join(", ")} seats.`,
+    });
+  }
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      // Seating and resizing queue on the same lock, so nobody sits down in a seat being removed.
+      yield* sql`select 1 from sessions where id = ${sessionId} for update`;
+      const seatings = yield* sql`
+        select id, session_id, player_id, seat, occurred_at from seatings
+        where session_id = ${sessionId} order by occurred_at, created_at
+      `.pipe(Effect.flatMap(Access.decodeRows(SeatingRow)));
+      const beyond = [...seatsNow(seatings).values()].filter((s) => s > request.seats);
+      if (beyond.length > 0) {
+        return yield* new InvalidRequest({
+          message: `Move whoever's in seat ${Math.max(...beyond)} first.`,
+        });
+      }
+      yield* sql`update sessions set table_seats = ${request.seats} where id = ${sessionId}`;
     }),
   );
   return yield* Views.sessionDetail(sessionId);

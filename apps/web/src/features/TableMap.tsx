@@ -2,6 +2,7 @@ import { SeatingId, type CurrencyCode, type PlayerId, type SessionDetail } from 
 import { newId } from "@stacks/client-runtime/ids";
 import {
   anchorsAt,
+  busted,
   chipAngles,
   chipEdge,
   makeDirector,
@@ -13,10 +14,12 @@ import {
   type Camera,
   type Ease,
   type Motion,
+  type TableArt,
   type TableView,
 } from "@stacks/client-runtime/table";
-import { blackjackArt as art } from "@stacks/client-runtime/tableArt";
+import { blackjackArt } from "@stacks/client-runtime/tableArt";
 import { formatMoney } from "@stacks/shared/money";
+import { tableSizes } from "@stacks/shared/seats";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
@@ -35,6 +38,7 @@ const urls = import.meta.glob<string>("../../../../packages/client-runtime/table
 const url = (name: string) => urls[`../../../../packages/client-runtime/table-art/${name}.webp`]!;
 
 interface Images {
+  readonly seats: number;
   readonly frames: Array<HTMLImageElement | null>;
   readonly rails: Array<HTMLImageElement | null>;
   readonly chips: Record<number, ReadonlyArray<HTMLImageElement>>;
@@ -48,43 +52,54 @@ const load = async (src: string) => {
 };
 const pad = (i: number) => String(i).padStart(2, "0");
 
-// The table shows as soon as the chips and the frame it opens on are decoded; the other angles
-// follow in the background, nearest first, and a move draws the nearest one already in.
-const images: Images = {
-  frames: art.frames.map(() => null),
-  rails: art.frames.map(() => null),
-  chips: {},
-};
+// A table shows as soon as the chips and the frame it opens on are decoded; the other angles
+// follow in the background, nearest first, and a move draws the nearest one already in. Each
+// table size has its own frames; the chips are shared.
+const chips: Images["chips"] = {};
 let chipsReady: Promise<void> | null = null;
-const framesLoading = new Map<number, Promise<void>>();
-const loadFrame = (i: number) => {
-  const loading =
-    framesLoading.get(i) ??
+const tables = new Map<number, { images: Images; loading: Map<number, Promise<void>> }>();
+const tableOf = (seats: number) => {
+  let table = tables.get(seats);
+  if (!table) {
+    const frames = blackjackArt[seats]!.frames;
+    table = {
+      images: { seats, frames: frames.map(() => null), rails: frames.map(() => null), chips },
+      loading: new Map(),
+    };
+    tables.set(seats, table);
+  }
+  return table;
+};
+const loadFrame = (seats: number, i: number) => {
+  const { images, loading } = tableOf(seats);
+  const done =
+    loading.get(i) ??
     Promise.all([
-      load(url(`frame-${pad(i)}`)).then((img) => void (images.frames[i] = img)),
-      art.frames[i]!.rail
-        ? load(url(`rail-${pad(i)}`)).then((img) => void (images.rails[i] = img))
+      load(url(`frame-${seats}-${pad(i)}`)).then((img) => void (images.frames[i] = img)),
+      blackjackArt[seats]!.frames[i]!.rail
+        ? load(url(`rail-${seats}-${pad(i)}`)).then((img) => void (images.rails[i] = img))
         : null,
     ]).then(() => undefined);
-  framesLoading.set(i, loading);
-  return loading;
+  loading.set(i, done);
+  return done;
 };
-const loadImages = async (first: number) => {
+const loadImages = async (seats: number, first: number) => {
+  const art = blackjackArt[seats]!;
   chipsReady ??= Promise.all(
     art.chipLevels.map(async (level) => {
-      images.chips[level] = await Promise.all(
+      chips[level] = await Promise.all(
         [1, 2, 3, 4, 5, 6, 7, 8].map((n) => load(url(`chip-${level}-${n}`))),
       );
     }),
   ).then(() => undefined);
-  await Promise.all([chipsReady, loadFrame(first)]);
+  await Promise.all([chipsReady, loadFrame(seats, first)]);
   const rest = art.frames
     .map((_, i) => i)
     .toSorted((a, b) => Math.abs(a - first) - Math.abs(b - first));
   void (async () => {
-    for (const i of rest) await loadFrame(i);
+    for (const i of rest) await loadFrame(seats, i);
   })();
-  return images;
+  return tableOf(seats).images;
 };
 
 /** The loaded frame nearest `i`, for a move that gets ahead of the download. */
@@ -98,10 +113,7 @@ const nearest = (list: Images["frames"], i: number) => {
 
 /** A chip canvas is this many chip diameters square, with the chip's contact point at its middle. */
 const BOX = 1.6;
-const SEAT_NUMBERS = art.frames[0]!.seats.map((_, i) => i + 1);
-const SEATS = SEAT_NUMBERS.length;
 const STACK_SLOTS = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
-const seatName = (n: number) => seatLabel(n, SEATS);
 
 const eases: Record<Ease, (t: number) => number> = {
   inOut: (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2),
@@ -124,12 +136,7 @@ const spring = (bounce: number, steps = 40) => {
 };
 
 /** Draws a chip seen from `degrees`, cross-fading the two nearest rendered angles on its contact point. */
-function drawChip(
-  canvas: HTMLCanvasElement,
-  chips: Images["chips"],
-  chip: number,
-  degrees: number,
-) {
+function drawChip(art: TableArt, canvas: HTMLCanvasElement, chip: number, degrees: number) {
   const key = `${chip}:${degrees.toFixed(1)}`;
   if (canvas.dataset.key === key) return;
   canvas.dataset.key = key;
@@ -159,12 +166,14 @@ function drawChip(
  */
 export function TableMap({
   detail,
+  seats,
   view,
   currency,
   names,
   chipOf,
 }: {
   detail: SessionDetail;
+  seats: number;
   view: TableView;
   currency: CurrencyCode;
   names: ReadonlyMap<PlayerId, string>;
@@ -176,17 +185,26 @@ export function TableMap({
   const [picked, setPicked] = useState<number | null>(null);
   const outer = useRef<HTMLDivElement>(null);
   const map = useRef<HTMLDivElement>(null);
+  // A new table size keeps the old table on screen until its frames are in.
+  const art = blackjackArt[loaded?.seats ?? seats]!;
+  const seatNumbers = art.frames[0]!.seats.map((_, i) => i + 1);
+  const seatName = (n: number) => seatLabel(n, seatNumbers.length);
   const camera = useRef<Camera>(restShot(art, view));
   const director = useRef<ReturnType<typeof makeDirector> | null>(null);
   const live = detail.session.status === "live";
+  const stacks = useStacks();
+  const resize = useAction(stacks.Client.mutation("sessions", "setTable"));
+  const sizes = tableSizes[detail.session.game]?.sizes ?? [];
 
   useEffect(() => {
     let cancelled = false;
-    void loadImages(camera.current.f).then((imgs) => !cancelled && setLoaded(imgs));
+    void loadImages(seats, Math.round(camera.current.f)).then(
+      (imgs) => !cancelled && setLoaded(imgs),
+    );
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [seats]);
 
   useEffect(() => {
     const el = outer.current;
@@ -236,7 +254,7 @@ export function TableMap({
       el.style.transform = `translate3d(${a.x * width - size / 2}px, ${a.y * height - size / 2}px, 0)`;
       const chip = el.querySelector<HTMLCanvasElement>("canvas");
       if (!chip) continue;
-      drawChip(chip, loaded.chips, Number(chip.dataset.chip), a.e);
+      drawChip(art, chip, Number(chip.dataset.chip), a.e);
       el.querySelector<HTMLElement>("[data-initial]")!.style.transform =
         `translate(-50%, -50%) translateY(${-chipEdge(a.e) * size}px) scaleY(${Math.sin((a.e * Math.PI) / 180).toFixed(3)})`;
     }
@@ -248,7 +266,7 @@ export function TableMap({
       for (const [k, chip] of [...el.querySelectorAll<HTMLCanvasElement>("canvas")].entries()) {
         chip.style.width = chip.style.height = `${size * BOX}px`;
         chip.style.transform = `translate3d(${(-size * BOX) / 2}px, ${(-size * BOX) / 2 - k * edge}px, 0)`;
-        drawChip(chip, loaded.chips, Number(chip.dataset.chip), a.be);
+        drawChip(art, chip, Number(chip.dataset.chip), a.be);
       }
     }
   };
@@ -386,7 +404,7 @@ export function TableMap({
       director.current?.stop();
       director.current = null;
     };
-  }, [loaded, currency, width, height]);
+  }, [loaded, art, currency, width, height]);
 
   useEffect(() => {
     void director.current?.update(view);
@@ -412,7 +430,7 @@ export function TableMap({
               height={Math.round(height * dpr)}
               className="block size-full"
               role="img"
-              aria-label={`Blackjack table, ${shown.seats.length} of ${SEATS} seats taken`}
+              aria-label={`Blackjack table, ${shown.seats.length} of ${seatNumbers.length} seats taken`}
             />
             {shown.seats.map((s) => {
               const { chip, count } = stackOf(s.inPlay, currency);
@@ -434,13 +452,13 @@ export function TableMap({
                 </div>
               );
             })}
-            {SEAT_NUMBERS.map((n) => {
+            {seatNumbers.map((n) => {
               const s = bySeat.get(n);
               const name = s ? (names.get(s.playerId) ?? "Player") : null;
               const label = s
                 ? `${seatName(n)}, ${name}${
                     s.out
-                      ? `, ${s.out.cashOut === 0 ? "busted" : formatMoney(s.out.net, currency, { signDisplay: "exceptZero" })}`
+                      ? `, ${busted(s.out) ? "busted" : formatMoney(s.out.net, currency, { signDisplay: "exceptZero" })}`
                       : s.inPlay > 0
                         ? `, ${formatMoney(s.inPlay, currency)} in play`
                         : ""
@@ -488,14 +506,14 @@ export function TableMap({
                       data-result
                       className={
                         "absolute top-[92%] left-1/2 -translate-x-1/2 rounded-md px-2 py-0.5 font-mono text-xs font-semibold whitespace-nowrap shadow-[0_2px_8px_rgb(0_0_0/0.35)] " +
-                        (s.out.cashOut === 0 || s.out.net < 0
+                        (busted(s.out) || s.out.net < 0
                           ? "bg-loss text-canvas"
                           : s.out.net > 0
                             ? "bg-win text-canvas"
                             : "bg-surface text-ink")
                       }
                     >
-                      {s.out.cashOut === 0
+                      {busted(s.out)
                         ? "Bust"
                         : formatMoney(s.out.net, currency, { signDisplay: "exceptZero" })}
                     </span>
@@ -517,8 +535,37 @@ export function TableMap({
           </div>
         </div>
       )}
+      {live && sizes.length > 1 ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3 px-4 sm:px-0">
+          <div role="group" aria-label="Table size" className="flex gap-1 rounded-lg bg-sunken p-1">
+            {sizes.map((size) => (
+              <button
+                key={size}
+                type="button"
+                aria-pressed={seats === size}
+                disabled={resize.pending}
+                onClick={() =>
+                  void resize.run({
+                    params: { sessionId: detail.session.id },
+                    payload: { seats: size },
+                  })
+                }
+                className={
+                  seats === size
+                    ? "inline-flex h-8 items-center rounded-md bg-surface px-3 text-sm font-medium text-ink shadow-sm pointer-coarse:h-10"
+                    : "inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-muted transition-colors duration-150 hover:text-ink pointer-coarse:h-10"
+                }
+              >
+                {size} seats
+              </button>
+            ))}
+          </div>
+          {resize.error ? <FormError>{resize.error}</FormError> : null}
+        </div>
+      ) : null}
       <SeatDialog
         detail={detail}
+        seatNumbers={seatNumbers}
         seat={picked}
         sitting={pickedSeat}
         view={shown}
@@ -533,6 +580,7 @@ export function TableMap({
 /** Seat someone in an empty seat, or move or stand up whoever's in it. */
 function SeatDialog({
   detail,
+  seatNumbers,
   seat,
   sitting,
   view,
@@ -541,6 +589,7 @@ function SeatDialog({
   onClose,
 }: {
   detail: SessionDetail;
+  seatNumbers: ReadonlyArray<number>;
   seat: number | null;
   sitting: TableView["seats"][number] | null;
   view: TableView;
@@ -551,7 +600,8 @@ function SeatDialog({
   const stacks = useStacks();
   const sit = useAction(stacks.Client.mutation("sessions", "seat"));
   const seatOf = new Map(view.seats.map((s) => [s.playerId, s.seat]));
-  const free = SEAT_NUMBERS.filter((n) => !view.seats.some((s) => s.seat === n));
+  const seatName = (n: number) => seatLabel(n, seatNumbers.length);
+  const free = seatNumbers.filter((n) => !view.seats.some((s) => s.seat === n));
   const save = async (playerId: PlayerId, to: number | null) => {
     const done = await sit.run({
       params: { sessionId: detail.session.id },

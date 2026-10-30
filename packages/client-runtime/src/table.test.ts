@@ -19,7 +19,9 @@ import {
   type TableEvent,
   type TableView,
 } from "./table.ts";
-import { blackjackArt as art } from "./tableArt.ts";
+import { blackjackArt } from "./tableArt.ts";
+
+const art = blackjackArt[7]!;
 
 const usd = CurrencyCode.make("USD");
 const jpy = CurrencyCode.make("JPY");
@@ -96,6 +98,14 @@ describe("tableEvents", () => {
         e.kind === "cashOut" ? `${e.seat.seat}:${e.big}` : e.kind,
       ),
     ).toEqual(["7:true", "bust", "5:false"]);
+  });
+
+  it("doesn't call a result recorded without a cash-out a bust", () => {
+    const events = tableEvents(
+      table([seat(BRUCE, 3)]),
+      table([seat(BRUCE, 3, 0, { net: 79000, cashOut: 0, buyIn: 0 })]),
+    );
+    expect(events.map((e) => e.kind)).toEqual(["cashOut"]);
   });
 
   it("settles everyone in one close shot", () => {

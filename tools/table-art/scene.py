@@ -1,6 +1,6 @@
 """Builds the blackjack table in Blender and renders it with Cycles.
 
-blender -b -P scene.py -- table <out> <frames: all|i,j,k> <samples>
+blender -b -P scene.py -- table <out> <seats> <frames: all|i,j,k> <samples>
 blender -b -P scene.py -- chips <out> <samples>
 
 Run texgen.py first for the textures, and package.py after to put the art in the apps.
@@ -21,6 +21,10 @@ os.makedirs(OUT, exist_ok=True)
 FRAMES, HIGH, LOW = 31, 80, 24
 ELEVATIONS = [HIGH - (HIGH - LOW) * i / (FRAMES - 1) for i in range(FRAMES)]
 CHIP_LEVELS = list(range(24, 85, 6))
+# The table size being rendered: one set of frames per size, the chips shared.
+SEATS = int(args[2]) if MODE == "table" else 7
+lo, hi = L["arc"]
+ANGLES = [lo + (hi - lo) * i / (SEATS - 1) for i in range(SEATS)]
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -112,8 +116,8 @@ def arc_curve(name, radius, z, bevel, scale_z, mat, a0=0.0, a1=math.pi):
 
 def felt_mat(nt, bsdf):
     uv = nt.nodes.new("ShaderNodeTexCoord")
-    col = tex_node(nt, "felt.png")
-    ink = tex_node(nt, "ink.png", "Non-Color")
+    col = tex_node(nt, f"felt-{SEATS}.png")
+    ink = tex_node(nt, f"ink-{SEATS}.png", "Non-Color")
     link(nt, uv.outputs["UV"], col.inputs["Vector"])
     link(nt, uv.outputs["UV"], ink.inputs["Vector"])
     link(nt, col.outputs["Color"], bsdf.inputs["Base Color"])
@@ -366,7 +370,7 @@ def rail_mask_output():
 
 # ---- Modes ----------------------------------------------------------------------------------------------
 if MODE == "table":
-    which, samples = args[2], int(args[3])
+    which, samples = args[3], int(args[4])
     build_table()
     floor()
     lights()
@@ -381,7 +385,7 @@ if MODE == "table":
         k = (HIGH - el) / (HIGH - LOW)
         cam = camera(el, 4.45 - 0.15 * k)
         anchors = []
-        for a in L["angles"]:
+        for a in ANGLES:
             a = math.radians(a)
             out = {}
             for key, ring, radius in (("", L["seatRing"], L["markerR"]), ("b", L["spotRing"], L["stackR"])):

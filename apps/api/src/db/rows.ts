@@ -86,6 +86,7 @@ export const SessionRow = Schema.Struct({
   startedAt: Timestamp,
   endedAt: Schema.NullOr(Timestamp),
   notes: Schema.NullOr(Schema.String),
+  tableSeats: Schema.NullOr(Seat),
 });
 
 export const SeatingRow = Schema.Struct({

@@ -118,6 +118,8 @@ export const RecordSettlementRequest = Schema.Struct({
 
 export const MoveSessionRequest = Schema.Struct({ tripId: TripId });
 
+export const TableRequest = Schema.Struct({ seats: Seat });
+
 export const SeatRequest = Schema.Struct({
   id: SeatingId,
   playerId: PlayerId,
@@ -325,6 +327,14 @@ const SessionsGroup = HttpApiGroup.make("sessions")
     HttpApiEndpoint.post("seat", "/sessions/:sessionId/seatings", {
       params: sessionParams,
       payload: SeatRequest,
+      success: SessionDetail,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("setTable", "/sessions/:sessionId/table", {
+      params: sessionParams,
+      payload: TableRequest,
       success: SessionDetail,
       error: [Forbidden, NotFound, Conflict, InvalidRequest],
     }),

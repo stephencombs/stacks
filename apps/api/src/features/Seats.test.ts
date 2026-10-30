@@ -60,6 +60,28 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("seats at a table", (it) => {
     }),
   );
 
+  it.effect("sizes the table, keeping everyone in a seat that still exists", () =>
+    Effect.gen(function* () {
+      const { bea, alexId, sessionId, sit } = yield* table("blackjack");
+      const setTable = (seats: number) =>
+        bea.sessions.setTable({ params: { sessionId }, payload: { seats } });
+      expect((yield* sit(bea, alexId, 6)).session.tableSeats).toBeNull();
+
+      const odd = yield* Effect.flip(setTable(4));
+      expect(odd).toMatchObject({ _tag: "InvalidRequest" });
+      const tooSmall = yield* Effect.flip(setTable(5));
+      expect(tooSmall).toMatchObject({
+        _tag: "InvalidRequest",
+        message: "Move whoever's in seat 6 first.",
+      });
+
+      yield* sit(bea, alexId, 2);
+      expect((yield* setTable(5)).session.tableSeats).toBe(5);
+      const gone = yield* Effect.flip(sit(bea, alexId, 6));
+      expect(gone).toMatchObject({ _tag: "InvalidRequest", message: "This table has 5 seats." });
+    }),
+  );
+
   it.effect("treats a retry as the same seating", () =>
     Effect.gen(function* () {
       const { alex, alexId, sit } = yield* table("blackjack");

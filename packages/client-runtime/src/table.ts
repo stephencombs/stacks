@@ -89,8 +89,11 @@ export const chipAngles = (art: TableArt, degrees: number) => {
 /** One chip's thickness on screen, in chip diameters: the edge of a chip 0.2 diameters thick. */
 export const chipEdge = (degrees: number) => 0.1 * Math.cos((degrees * Math.PI) / 180);
 
-/** How a seat is read out: numbered from the dealer's left, with blackjack's names for the ends. */
-export const seatLabel = (seat: number, seats: number) =>
+/**
+ * How a seat is read out: numbered from the dealer's left, with blackjack's names for the ends.
+ * Without the table's size, only first base is named: tables of different sizes end differently.
+ */
+export const seatLabel = (seat: number, seats?: number) =>
   seat === 1 ? "Seat 1, first base" : seat === seats ? `Seat ${seat}, third base` : `Seat ${seat}`;
 
 // ---- Chips in play --------------------------------------------------------------------------------
@@ -159,6 +162,12 @@ export const tableView = (input: {
   }).toSorted((a, b) => a.seat - b.seat),
 });
 
+/**
+ * Bought in and left with nothing. A result recorded only as an adjustment, like an imported
+ * night, has no cash-out either but isn't a bust.
+ */
+export const busted = (out: NonNullable<SeatView["out"]>) => out.buyIn > 0 && out.cashOut === 0;
+
 /** A cash-out of three times what went in gets the big-hit shot. */
 const BIG_HIT = 3;
 
@@ -211,7 +220,7 @@ export const tableEvents = (prev: TableView, next: TableView): ReadonlyArray<Tab
     for (const [playerId, now] of after) {
       const was = before.get(playerId);
       if (!now.out || was?.out) continue;
-      if (now.out.cashOut === 0) events.push({ kind: "bust", seat: now });
+      if (busted(now.out)) events.push({ kind: "bust", seat: now });
       else
         events.push({
           kind: "cashOut",

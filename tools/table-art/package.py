@@ -1,6 +1,6 @@
 """Puts the rendered table into the apps: WebP images, their metadata, and the phone's image list.
 
-python3 package.py [render dir, default here]   (after scene.py has written out/ and chips/)
+python3 package.py [render dir, default here]   (after scene.py has written out-<seats>/ and chips/)
 """
 import json, os, sys
 
@@ -18,9 +18,12 @@ CHIP_WIDTH = 220
 SHADOW = 0.5  # How much of the floor shadow to keep.
 FADE = 0.05  # How far in from each edge the frame fades out, as a fraction of its size.
 
-meta = json.load(open(os.path.join(SRC, "out", "meta.json")))
+LAYOUT = json.load(open(os.path.join(HERE, "layout.json")))
+SIZES = LAYOUT["seatCounts"]
+metas = {n: json.load(open(os.path.join(SRC, f"out-{n}", "meta.json"))) for n in SIZES}
 chips = json.load(open(os.path.join(SRC, "chips", "chips.json")))
-count = len(meta["elevations"])
+elevations = metas[SIZES[0]]["elevations"]
+count = len(elevations)
 os.makedirs(ART, exist_ok=True)
 for name in os.listdir(ART):
     os.remove(os.path.join(ART, name))
@@ -50,12 +53,14 @@ def solid(alpha, threshold):
     return alpha.point(lambda v: 255 if v > threshold else 0).getbbox()
 
 
-tables = [Image.open(os.path.join(SRC, "out", f"table-{i:02d}.png")).convert("RGBA") for i in range(count)]
-rails = [Image.open(os.path.join(SRC, "out", f"rail-{i:04d}.png")).convert("RGBA") for i in range(count)]
-W, H = tables[0].size
-# One crop for every frame, so the table holds still as the camera moves. The shadow catcher's
-# faint edges don't count.
-boxes = [solid(t.split()[3], 40) for t in tables]
+def frames_of(n):
+    return [Image.open(os.path.join(SRC, f"out-{n}", f"table-{i:02d}.png")).convert("RGBA") for i in range(count)]
+
+
+# One crop for every size and frame, so the table holds still as the camera moves and doesn't
+# shift when its size changes. The shadow catcher's faint edges don't count.
+W, H = Image.open(os.path.join(SRC, f"out-{SIZES[0]}", "table-00.png")).size
+boxes = [solid(t.split()[3], 40) for n in SIZES for t in frames_of(n)]
 pad = 12
 x0, y0 = max(0, min(b[0] for b in boxes) - pad), max(0, min(b[1] for b in boxes) - pad)
 x1, y1 = min(W, max(b[2] for b in boxes) + pad), min(H, max(b[3] for b in boxes) + pad)
@@ -63,28 +68,32 @@ cw, ch = x1 - x0, y1 - y0
 size = (WIDTH, round(ch * WIDTH / cw))
 fx = lambda v: round((v * W - x0) / cw, 4)
 fy = lambda v: round((v * H - y0) / ch, 4)
-frames = []
-for i in range(count):
-    anchors = meta["anchors"][str(i)]
-    save(settle(tables[i].crop((x0, y0, x1, y1)).resize(size, Image.LANCZOS)), f"frame-{i:02d}.webp", 84)
-    # The rail layer only ships for angles where it covers a seat or a stack.
-    alpha = rails[i].split()[3]
-    covers = any(
-        alpha.crop((round(a[x] * W - a[r] * W * 1.3), round(a[y] * H - a[r] * W * 1.3),
-                    round(a[x] * W + a[r] * W * 1.3), round(a[y] * H + a[r] * W * 0.6))).getextrema()[1] > 24
-        for a in anchors
-        for x, y, r in (("x", "y", "r"), ("bx", "by", "br"))
-    )
-    if covers:
-        save(rails[i].crop((x0, y0, x1, y1)).resize(size, Image.LANCZOS), f"rail-{i:02d}.webp", 80)
-    frames.append({
-        "rail": covers,
-        "seats": [
-            {"x": fx(a["x"]), "y": fy(a["y"]), "r": round(a["r"] * W / cw, 4), "e": round(a["e"], 1),
-             "bx": fx(a["bx"]), "by": fy(a["by"]), "br": round(a["br"] * W / cw, 4), "be": round(a["be"], 1)}
+frames = {}
+for n in SIZES:
+    tables = frames_of(n)
+    frames[n] = []
+    for i in range(count):
+        anchors = metas[n]["anchors"][str(i)]
+        save(settle(tables[i].crop((x0, y0, x1, y1)).resize(size, Image.LANCZOS)), f"frame-{n}-{i:02d}.webp", 84)
+        # The rail layer only ships for angles where it covers a seat or a stack.
+        rail = Image.open(os.path.join(SRC, f"out-{n}", f"rail-{i:04d}.png")).convert("RGBA")
+        alpha = rail.split()[3]
+        covers = any(
+            alpha.crop((round(a[x] * W - a[r] * W * 1.3), round(a[y] * H - a[r] * W * 1.3),
+                        round(a[x] * W + a[r] * W * 1.3), round(a[y] * H + a[r] * W * 0.6))).getextrema()[1] > 24
             for a in anchors
-        ],
-    })
+            for x, y, r in (("x", "y", "r"), ("bx", "by", "br"))
+        )
+        if covers:
+            save(rail.crop((x0, y0, x1, y1)).resize(size, Image.LANCZOS), f"rail-{n}-{i:02d}.webp", 80)
+        frames[n].append({
+            "rail": covers,
+            "seats": [
+                {"x": fx(a["x"]), "y": fy(a["y"]), "r": round(a["r"] * W / cw, 4), "e": round(a["e"], 1),
+                 "bx": fx(a["bx"]), "by": fy(a["by"]), "br": round(a["br"] * W / cw, 4), "be": round(a["be"], 1)}
+                for a in anchors
+            ],
+        })
 
 sprites = {}
 for level in chips["levels"]:
@@ -103,36 +112,41 @@ for level in chips["levels"]:
         "aspect": round(bh / bw, 4),
     }
 
-art = {
-    "aspect": round(cw / ch, 4),
-    "elevations": [round(e, 3) for e in meta["elevations"]],
-    "chipLevels": chips["levels"],
-    "frames": frames,
-    "chips": {str(k): v for k, v in sprites.items()},
-}
+common = {"aspect": round(cw / ch, 4), "elevations": [round(e, 3) for e in elevations], "chipLevels": chips["levels"]}
 with open(META, "w") as f:
     f.write("// Generated by tools/table-art/package.py from the Blender render. Don't edit by hand.\n")
     f.write('import type { TableArt } from "./table.ts";\n\n')
-    f.write(f"export const blackjackArt: TableArt = {json.dumps(art)};\n")
+    f.write(f"const chips: TableArt[\"chips\"] = {json.dumps({str(k): v for k, v in sprites.items()})};\n\n")
+    f.write("/** The blackjack table by how many seats it has. */\n")
+    f.write("export const blackjackArt: Readonly<Record<number, TableArt>> = {\n")
+    for n in SIZES:
+        f.write(f"  {n}: {{ ...{json.dumps(common)}, frames: {json.dumps(frames[n])}, chips }},\n")
+    f.write("};\n")
 
 # Metro only bundles images it can see in a literal require(), so the phone gets a list.
 rel = os.path.relpath(ART, os.path.dirname(PHONE))
 with open(PHONE, "w") as f:
     f.write("// Generated by tools/table-art/package.py. Don't edit by hand.\n")
     f.write("// The phone uses every other camera angle, which halves the images it keeps in memory.\n")
-    f.write("export const frameImages: Record<number, number> = {\n")
-    for i in range(0, count, 2):
-        f.write(f'  {i}: require("{rel}/frame-{i:02d}.webp"),\n')
-    f.write("};\n\nexport const railImages: Record<number, number> = {\n")
-    for i in range(0, count, 2):
-        if frames[i]["rail"]:
-            f.write(f'  {i}: require("{rel}/rail-{i:02d}.webp"),\n')
+    f.write("export const frameImages: Record<number, Record<number, number>> = {\n")
+    for n in SIZES:
+        f.write(f"  {n}: {{\n")
+        for i in range(0, count, 2):
+            f.write(f'    {i}: require("{rel}/frame-{n}-{i:02d}.webp"),\n')
+        f.write("  },\n")
+    f.write("};\n\nexport const railImages: Record<number, Record<number, number>> = {\n")
+    for n in SIZES:
+        f.write(f"  {n}: {{\n")
+        for i in range(0, count, 2):
+            if frames[n][i]["rail"]:
+                f.write(f'    {i}: require("{rel}/rail-{n}-{i:02d}.webp"),\n')
+        f.write("  },\n")
     f.write("};\n\nexport const chipImages: Record<number, ReadonlyArray<number>> = {\n")
     for level in chips["levels"]:
         f.write(f"  {level}: [\n")
-        for n in range(1, 9):
-            f.write(f'    require("{rel}/chip-{level}-{n}.webp"),\n')
+        for k in range(1, 9):
+            f.write(f'    require("{rel}/chip-{level}-{k}.webp"),\n')
         f.write("  ],\n")
     f.write("};\n")
-total = sum(os.path.getsize(os.path.join(ART, n)) for n in os.listdir(ART))
-print(f"{len(os.listdir(ART))} images, {total // 1024} KB; rail frames {[i for i, f in enumerate(frames) if f['rail']]}")
+total = sum(os.path.getsize(os.path.join(ART, name)) for name in os.listdir(ART))
+print(f"{len(os.listdir(ART))} images, {total // 1024} KB; rail frames {[(n, [i for i, f in enumerate(frames[n]) if f['rail']]) for n in SIZES]}")

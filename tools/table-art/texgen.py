@@ -53,32 +53,40 @@ def arc_text(img, text, r, font_path, size, color, spacing=0.0):
         angle -= w / rr
 
 
-ink = Image.new("RGBA", (FW, FH), (0, 0, 0, 0))
-d = ImageDraw.Draw(ink)
-GOLD = (232, 206, 146, 255)
-SOFT = (232, 206, 146, 165)
-m = L["markings"]
-arc_text(ink, "BLACKJACK PAYS 3 TO 2", m["pays"], SERIF, 0.044, GOLD, 0.012)
-arc_text(ink, "Dealer must draw to 16 and stand on all 17s", m["rule"], SERIF_I, 0.022, SOFT, 0.004)
-for rr in m["band"]:
-    cx, cy = at(0, 0)
-    R = rr * px
-    d.arc((cx - R, cy - R, cx + R, cy + R), 18, 162, fill=SOFT, width=round(0.0045 * px))
-arc_text(ink, "INSURANCE PAYS 2 TO 1", sum(m["band"]) / 2, SERIF, 0.025, GOLD, 0.02)
-num_font = ImageFont.truetype(SERIF, round(0.032 * px))
-for i, a in enumerate(L["angles"]):
-    a = math.radians(a)
-    x, y = L["spotRing"] * math.cos(a), -L["spotRing"] * math.sin(a)
-    X, Y = at(x, y)
-    for R, w, c in ((L["spotOuter"], 0.007, GOLD), (L["spotInner"], 0.003, SOFT)):
-        d.ellipse((X - R * px, Y - R * px, X + R * px, Y + R * px), outline=c, width=round(w * px))
-    nr = L["spotRing"] - L["spotOuter"] - 0.05
-    d.text(at(nr * math.cos(a), -nr * math.sin(a)), str(i + 1), font=num_font, fill=SOFT, anchor="mm")
-ink = ink.filter(ImageFilter.GaussianBlur(0.8))
-felt = Image.new("RGBA", (FW, FH), tuple(L["felt"]) + (255,))
-felt.alpha_composite(ink)
-felt.convert("RGB").save(os.path.join(OUT, "felt.png"))
-ink.split()[3].save(os.path.join(OUT, "ink.png"))
+def angles(seats):
+    """Where a table's spots sit around the arc, in degrees: spread evenly, seat 1 on the right."""
+    lo, hi = L["arc"]
+    return [lo + (hi - lo) * i / (seats - 1) for i in range(seats)]
+
+
+# One felt per table size, its spots spread across the same arc.
+for seats in L["seatCounts"]:
+    ink = Image.new("RGBA", (FW, FH), (0, 0, 0, 0))
+    d = ImageDraw.Draw(ink)
+    GOLD = (232, 206, 146, 255)
+    SOFT = (232, 206, 146, 165)
+    m = L["markings"]
+    arc_text(ink, "BLACKJACK PAYS 3 TO 2", m["pays"], SERIF, 0.044, GOLD, 0.012)
+    arc_text(ink, "Dealer must draw to 16 and stand on all 17s", m["rule"], SERIF_I, 0.022, SOFT, 0.004)
+    for rr in m["band"]:
+        cx, cy = at(0, 0)
+        R = rr * px
+        d.arc((cx - R, cy - R, cx + R, cy + R), 18, 162, fill=SOFT, width=round(0.0045 * px))
+    arc_text(ink, "INSURANCE PAYS 2 TO 1", sum(m["band"]) / 2, SERIF, 0.025, GOLD, 0.02)
+    num_font = ImageFont.truetype(SERIF, round(0.032 * px))
+    for i, a in enumerate(angles(seats)):
+        a = math.radians(a)
+        x, y = L["spotRing"] * math.cos(a), -L["spotRing"] * math.sin(a)
+        X, Y = at(x, y)
+        for R, w, c in ((L["spotOuter"], 0.007, GOLD), (L["spotInner"], 0.003, SOFT)):
+            d.ellipse((X - R * px, Y - R * px, X + R * px, Y + R * px), outline=c, width=round(w * px))
+        nr = L["spotRing"] - L["spotOuter"] - 0.05
+        d.text(at(nr * math.cos(a), -nr * math.sin(a)), str(i + 1), font=num_font, fill=SOFT, anchor="mm")
+    ink = ink.filter(ImageFilter.GaussianBlur(0.8))
+    felt = Image.new("RGBA", (FW, FH), tuple(L["felt"]) + (255,))
+    felt.alpha_composite(ink)
+    felt.convert("RGB").save(os.path.join(OUT, f"felt-{seats}.png"))
+    ink.split()[3].save(os.path.join(OUT, f"ink-{seats}.png"))
 
 
 # ---- Chips --------------------------------------------------------------------------------------------

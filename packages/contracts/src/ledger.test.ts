@@ -107,6 +107,7 @@ describe("Session", () => {
     startedAt: "2026-10-27T20:00:00.000Z",
     endedAt: null,
     notes: null,
+    tableSeats: null,
     ...fields,
   });
 

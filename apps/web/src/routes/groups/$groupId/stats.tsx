@@ -8,7 +8,6 @@ import {
 } from "@stacks/contracts";
 import { gameNames, playedSummary } from "@stacks/client-runtime/format";
 import { seatLabel } from "@stacks/client-runtime/table";
-import { tableSeats } from "@stacks/shared/seats";
 import type { ReactNode } from "react";
 
 import { Money } from "~/components/Money";
@@ -121,9 +120,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
           <Table head={["Seat", "Sessions", "Table net"]}>
             {stats.bySeat.map((row) => (
               <tr key={row.key}>
-                <td className="px-3 py-3 sm:px-5">
-                  {seatLabel(row.key, tableSeats.blackjack ?? 7)}
-                </td>
+                <td className="px-3 py-3 sm:px-5">{seatLabel(row.key)}</td>
                 <td className="px-3 py-3 sm:px-5 text-right font-mono text-muted">
                   {row.sessionCount}
                 </td>

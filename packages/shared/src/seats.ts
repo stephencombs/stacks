@@ -3,8 +3,14 @@ import * as DateTime from "effect/DateTime";
 
 import { playerResults, type PlayerResult } from "./results.ts";
 
-/** The games played from numbered seats, and how many seats their tables have. */
-export const tableSeats: Partial<Record<Game, number>> = { blackjack: 7 };
+/** The games played from numbered seats: the table sizes they come in, and the usual one. */
+export const tableSizes: Partial<
+  Record<Game, { readonly sizes: ReadonlyArray<number>; readonly usual: number }>
+> = { blackjack: { sizes: [5, 6, 7], usual: 7 } };
+
+/** How many seats a session's table has, or null for a game that isn't played from seats. */
+export const seatCount = (session: Pick<Session, "game" | "tableSeats">) =>
+  tableSizes[session.game] ? (session.tableSeats ?? tableSizes[session.game]!.usual) : null;
 
 type Sat = Pick<Seating, "playerId" | "seat" | "occurredAt">;
 

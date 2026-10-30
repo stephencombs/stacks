@@ -32,7 +32,7 @@ import { tableView } from "@stacks/client-runtime/table";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { newId } from "@stacks/client-runtime/ids";
 import { formatMoney, parseMoney } from "@stacks/shared/money";
-import { seatsNow, tableSeats } from "@stacks/shared/seats";
+import { seatCount, seatsNow } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import { playerResults, type PlayerResult } from "@stacks/shared/results";
 import { useAction, useOutbox, usePending, useStacks, useUnsaved } from "~/lib/stacks";
@@ -178,9 +178,10 @@ export function SessionView({
         ) : null}
       </div>
 
-      {tableSeats[session.game] ? (
+      {seatCount(session) ? (
         <TableMap
           detail={detail}
+          seats={seatCount(session)!}
           view={tableView({
             closed: !live,
             seats: seatsNow(detail.seatings),

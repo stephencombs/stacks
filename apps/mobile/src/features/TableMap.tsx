@@ -1,6 +1,7 @@
 import { SeatingId, type CurrencyCode, type PlayerId, type SessionDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import {
+  busted,
   chipEdge,
   makeDirector,
   mixCamera,
@@ -12,10 +13,12 @@ import {
   type Ease,
   type Motion,
   type SeatView,
+  type TableArt,
   type TableView,
 } from "@stacks/client-runtime/table";
-import { blackjackArt as art } from "@stacks/client-runtime/tableArt";
+import { blackjackArt } from "@stacks/client-runtime/tableArt";
 import { formatMoney } from "@stacks/shared/money";
+import { tableSizes } from "@stacks/shared/seats";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -28,7 +31,7 @@ import {
 } from "react-native";
 
 import { Button } from "../components/ui/Button";
-import { FormError } from "../components/ui/Field";
+import { Choice, FormError } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row } from "../components/ui/Surface";
 import { useAction, useStacks } from "../lib/stacks";
@@ -36,14 +39,12 @@ import { Chip } from "./Chip";
 import { chipImages, frameImages, railImages } from "./tableImages";
 
 // The phone keeps every other rendered angle; the camera blends between them.
-const FRAMES = Object.keys(frameImages).map(Number);
-const RAILS = Object.keys(railImages).map(Number);
+// Every table size shares the camera path and the chips.
+const SHARED = Object.values(blackjackArt)[0]!;
+const FRAMES = Object.keys(Object.values(frameImages)[0]!).map(Number);
 const REF = 18;
-const SEAT_NUMBERS = art.frames[0]!.seats.map((_, i) => i + 1);
-const SEATS = SEAT_NUMBERS.length;
 const STACK_SLOTS = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
-const LEVELS = art.chipLevels.toSorted((a, b) => b - a);
-const seatName = (n: number) => seatLabel(n, SEATS);
+const LEVELS = SHARED.chipLevels.toSorted((a, b) => b - a);
 
 const eases: Record<Ease, (t: number) => number> = {
   inOut: Easing.inOut(Easing.cubic),
@@ -78,7 +79,7 @@ function ChipArt({
     }),
   );
   return LEVELS.map((level, i) => {
-    const sprite = art.chips[level]!;
+    const sprite = SHARED.chips[level]!;
     const w = size * sprite.k;
     const h = w * sprite.aspect;
     return (
@@ -127,6 +128,7 @@ function useEntrance(enter: boolean, height: number, delay = 0) {
 }
 
 function SeatPiece({
+  art,
   f,
   n,
   base,
@@ -135,6 +137,7 @@ function SeatPiece({
   out,
   enter,
 }: {
+  art: TableArt;
   f: Animated.Value;
   n: number;
   base: number;
@@ -194,7 +197,7 @@ function ResultTag({
       useNativeDriver: true,
     }).start();
   }, [flip]);
-  const bust = out.cashOut === 0;
+  const bust = busted(out);
   return (
     <Animated.View
       pointerEvents="none"
@@ -231,6 +234,7 @@ function ResultTag({
 }
 
 function StackChip({
+  art,
   f,
   n,
   k,
@@ -238,6 +242,7 @@ function StackChip({
   chip,
   enter,
 }: {
+  art: TableArt;
   f: Animated.Value;
   n: number;
   k: number;
@@ -275,17 +280,27 @@ function StackChip({
  */
 export function TableMap({
   detail,
+  seats,
   view,
   currency,
   names,
   chipOf,
 }: {
   detail: SessionDetail;
+  /** The parent remounts the map when this changes, so the new table starts fresh. */
+  seats: number;
   view: TableView;
   currency: CurrencyCode;
   names: ReadonlyMap<PlayerId, string>;
   chipOf: (playerId: PlayerId) => number;
 }) {
+  const art = blackjackArt[seats]!;
+  const seatNumbers = art.frames[0]!.seats.map((_, i) => i + 1);
+  const seatName = (n: number) => seatLabel(n, seatNumbers.length);
+  const rails = Object.keys(railImages[seats]!).map(Number);
+  const stacks = useStacks();
+  const resize = useAction(stacks.Client.mutation("sessions", "setTable"));
+  const sizes = tableSizes[detail.session.game]?.sizes ?? [];
   const [width, setWidth] = useState(0);
   const [shown, setShown] = useState(view);
   // What was on the table when it first drew just sits there; anything after arrives with a drop.
@@ -311,7 +326,7 @@ export function TableMap({
     };
   });
   const [exits] = useState(() =>
-    SEAT_NUMBERS.map(() => ({
+    seatNumbers.map(() => ({
       piece: new Animated.Value(0),
       stack: new Animated.ValueXY(),
       fade: new Animated.Value(1),
@@ -427,7 +442,7 @@ export function TableMap({
       director.current?.stop();
       director.current = null;
     };
-  }, [width, height, currency, camera, exits]);
+  }, [art, width, height, currency, camera, exits]);
 
   useEffect(() => {
     void director.current?.update(view);
@@ -525,13 +540,13 @@ export function TableMap({
         <View
           style={{ height, overflow: "hidden" }}
           accessibilityRole="image"
-          accessibilityLabel={`Blackjack table, ${shown.seats.length} of ${SEATS} seats taken`}
+          accessibilityLabel={`Blackjack table, ${shown.seats.length} of ${seatNumbers.length} seats taken`}
         >
           <Animated.View style={[{ position: "absolute", width, height }, world]}>
             {FRAMES.map((frame, i) => (
               <Animated.Image
                 key={frame}
-                source={frameImages[frame]!}
+                source={frameImages[seats]![frame]!}
                 style={{ position: "absolute", width, height, opacity: layer(i) }}
               />
             ))}
@@ -558,6 +573,7 @@ export function TableMap({
                 >
                   {STACK_SLOTS.slice(0, count).map((slot, k) => (
                     <StackChip
+                      art={art}
                       key={slot}
                       f={camera.f}
                       n={s.seat}
@@ -570,14 +586,14 @@ export function TableMap({
                 </Animated.View>
               );
             })}
-            {SEAT_NUMBERS.map((n) => {
+            {seatNumbers.map((n) => {
               const s = bySeat.get(n);
               const base = art.frames[REF]!.seats[n - 1]!.r * 2 * width;
               const name = s ? (names.get(s.playerId) ?? "Player") : null;
               const label = s
                 ? `${seatName(n)}, ${name}${
                     s.out
-                      ? `, ${s.out.cashOut === 0 ? "busted" : formatMoney(s.out.net, currency, { signDisplay: "exceptZero" })}`
+                      ? `, ${busted(s.out) ? "busted" : formatMoney(s.out.net, currency, { signDisplay: "exceptZero" })}`
                       : s.inPlay > 0
                         ? `, ${formatMoney(s.inPlay, currency)} in play`
                         : ""
@@ -622,6 +638,7 @@ export function TableMap({
                         }}
                       >
                         <SeatPiece
+                          art={art}
                           f={camera.f}
                           n={n}
                           base={base}
@@ -639,11 +656,11 @@ export function TableMap({
                 </Animated.View>
               );
             })}
-            {RAILS.map((frame) => (
+            {rails.map((frame) => (
               <Animated.Image
                 key={frame}
                 pointerEvents="none"
-                source={railImages[frame]!}
+                source={railImages[seats]![frame]!}
                 style={{ position: "absolute", width, height, opacity: rail(frame) }}
               />
             ))}
@@ -673,8 +690,25 @@ export function TableMap({
           </Animated.View>
         </View>
       )}
+      {live && sizes.length > 1 ? (
+        <View className="mt-3 gap-2 px-4">
+          <Choice
+            label="Table size"
+            options={sizes.map((size) => ({ value: String(size), label: `${size} seats` }))}
+            value={String(seats)}
+            onChange={(size) =>
+              void resize.run({
+                params: { sessionId: detail.session.id },
+                payload: { seats: Number(size) },
+              })
+            }
+          />
+          {resize.error ? <FormError>{resize.error}</FormError> : null}
+        </View>
+      ) : null}
       <SeatSheet
         detail={detail}
+        seatNumbers={seatNumbers}
         seat={picked}
         view={shown}
         names={names}
@@ -688,6 +722,7 @@ export function TableMap({
 /** Seat someone in an empty seat, or move or stand up whoever's in it. */
 function SeatSheet({
   detail,
+  seatNumbers,
   seat,
   view,
   names,
@@ -695,6 +730,7 @@ function SeatSheet({
   onClose,
 }: {
   detail: SessionDetail;
+  seatNumbers: ReadonlyArray<number>;
   seat: number | null;
   view: TableView;
   names: ReadonlyMap<PlayerId, string>;
@@ -705,7 +741,8 @@ function SeatSheet({
   const sit = useAction(stacks.Client.mutation("sessions", "seat"));
   const sitting = seat === null ? null : (view.seats.find((s) => s.seat === seat) ?? null);
   const seatOf = new Map(view.seats.map((s) => [s.playerId, s.seat]));
-  const free = SEAT_NUMBERS.filter((n) => !view.seats.some((s) => s.seat === n));
+  const seatName = (n: number) => seatLabel(n, seatNumbers.length);
+  const free = seatNumbers.filter((n) => !view.seats.some((s) => s.seat === n));
   const name = (playerId: PlayerId) => names.get(playerId) ?? "Player";
   const save = async (playerId: PlayerId, to: number | null) => {
     const done = await sit.run({
