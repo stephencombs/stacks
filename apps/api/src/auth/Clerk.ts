@@ -13,6 +13,15 @@ const stringClaim = (claims: Record<string, unknown>, key: string) => {
 };
 
 /**
+ * Whether a token's `azp` claim names a site we serve. Browser tokens name the page's origin;
+ * tokens from the native app have no origin and no `azp`, and Clerk's own check refuses those.
+ */
+export const fromAuthorizedParty = (
+  azp: string | undefined,
+  authorizedParties: ReadonlyArray<string>,
+) => authorizedParties.length === 0 || azp === undefined || authorizedParties.includes(azp);
+
+/**
  * Verifies Clerk session tokens. With `CLERK_JWT_KEY` set, verification is networkless;
  * otherwise Clerk's JWKS is fetched with the secret key. Names come from the `name` and
  * `picture` claims, which the Clerk session token template has to add.
@@ -35,9 +44,14 @@ export const layer = Layer.effect(
               onSome: (key) => ({ secretKey: Redacted.value(key) }),
             }),
             ...Option.match(jwtKey, { onNone: () => ({}), onSome: (key) => ({ jwtKey: key }) }),
-            ...(authorizedParties.length > 0 ? { authorizedParties: [...authorizedParties] } : {}),
           }),
-        ).pipe(Effect.mapError(() => new Unauthorized()));
+        ).pipe(
+          Effect.filterOrFail(
+            (claims) => fromAuthorizedParty(claims.azp, authorizedParties),
+            () => new Unauthorized(),
+          ),
+          Effect.mapError(() => new Unauthorized()),
+        );
 
         const userId = yield* UserId.makeEffect(claims.sub).pipe(
           Effect.mapError(() => new Unauthorized()),
