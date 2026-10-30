@@ -201,7 +201,9 @@ test.describe.serial("live mode on a phone", () => {
     await expect(alex.getByText("Owes $270").filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("Owed $50").filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("Owed $220").filter({ visible: true })).toBeVisible();
-    const moneyUrl = `${new URL(alex.url()).pathname.replace(/\/$/, "")}?tab=money`;
+    // Each tab has its own address, so a link opens straight on Money.
+    const moneyUrl = new URL(alex.url()).pathname;
+    expect(moneyUrl).toMatch(/\/money$/);
     await expect(
       alex.getByRole("button", { name: "Mark paid" }).filter({ visible: true }),
     ).toHaveCount(2);

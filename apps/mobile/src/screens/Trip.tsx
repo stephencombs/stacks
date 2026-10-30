@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/expo";
-import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import { TabActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
 import { localClock, tripDates } from "@stacks/client-runtime/trip";
@@ -7,7 +7,6 @@ import { tonightBoard } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "../components/ui/Button";
 import { Choice, FormError } from "../components/ui/Field";
@@ -15,7 +14,6 @@ import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { List, PageTitle, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { ToastHost } from "../components/ui/Toast";
-import { cn } from "../components/ui/cn";
 import { LiveBar } from "../features/LiveBar";
 import { TripStats } from "../features/RaceStats";
 import { SessionList } from "../features/SessionList";
@@ -23,16 +21,17 @@ import { TonightBoard, TripBoard } from "../features/TripBoard";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { SessionView } from "./Session";
 import { SettleView } from "../features/SettleUp";
+import { TripTabs } from "../features/TripTabs";
+import { tripTabs, type TripTab } from "../features/tripTabs";
 
-type Tab = "table" | "board" | "money";
-type Props = StaticScreenProps<{ tripId: string; tab?: Tab }>;
+type Props = StaticScreenProps<{ tripId: string; tab?: TripTab }>;
 
 export function TripScreen({ route }: Props) {
   return <TripHome tripId={TripId.make(route.params.tripId)} tab={route.params.tab} />;
 }
 
 /** A trip as three views of the same thing: your table, the board, and the money. */
-export function TripHome({ tripId, tab }: { tripId: TripId; tab?: Tab | undefined }) {
+export function TripHome({ tripId, tab }: { tripId: TripId; tab?: TripTab | undefined }) {
   const stacks = useStacks();
   return (
     <Loaded query={stacks.trip(tripId)} skeleton={<Skeleton className="m-4 h-96" />}>
@@ -41,41 +40,37 @@ export function TripHome({ tripId, tab }: { tripId: TripId; tab?: Tab | undefine
           query={stacks.group(trip.trip.groupId)}
           skeleton={<Skeleton className="m-4 h-96" />}
         >
-          {(group) => <TripTabs trip={trip} group={group} asked={tab} />}
+          {(group) => (
+            // A link that asks for a tab (the live bar asks for the table) opens on it.
+            <TripTabs
+              key={tab ?? "default"}
+              initial={tab ?? (trip.trip.endedAt === null ? "table" : "board")}
+              render={(shown, barHeight) => (
+                <TripTabScreen trip={trip} group={group} tab={shown} barHeight={barHeight} />
+              )}
+            />
+          )}
         </Loaded>
       )}
     </Loaded>
   );
 }
 
-const tabs = [
-  { key: "table", label: "Table" },
-  { key: "board", label: "Board" },
-  { key: "money", label: "Money" },
-] as const;
-
-function TripTabs({
+function TripTabScreen({
   trip,
   group,
-  asked,
+  tab,
+  barHeight,
 }: {
   trip: TripDetail;
   group: GroupDetail;
-  asked: Tab | undefined;
+  tab: TripTab;
+  barHeight: number;
 }) {
-  const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<Tab>(asked ?? (trip.trip.endedAt === null ? "table" : "board"));
-  // Coming back with a tab in the link (the live bar asks for the table) switches to it.
-  const [lastAsked, setLastAsked] = useState(asked);
-  if (asked !== lastAsked) {
-    setLastAsked(asked);
-    if (asked) setTab(asked);
-  }
+  const navigation = useNavigation();
   const mine = trip.sessions.find(
     (s) => s.session.status === "live" && s.playerIds.includes(group.myPlayerId),
   );
-  const barHeight = 56 + Math.max(insets.bottom, 8);
-
   return (
     <View className="flex-1 bg-canvas">
       <ToastHost above={barHeight}>
@@ -83,8 +78,7 @@ function TripTabs({
           contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
           className="flex-1"
-          contentContainerClassName="gap-6 pt-4"
-          contentContainerStyle={{ paddingBottom: barHeight + 96 }}
+          contentContainerClassName="gap-6 pt-4 pb-24"
         >
           <TripTitle trip={trip} group={group} />
           {tab === "table" ? (
@@ -99,38 +93,11 @@ function TripTabs({
         </ScrollView>
       </ToastHost>
       {tab !== "table" && mine ? (
-        <LiveBar bottom={barHeight} onPress={() => setTab("table")} />
+        <LiveBar
+          bottom={barHeight}
+          onPress={() => navigation.dispatch(TabActions.jumpTo(tripTabs.table.route))}
+        />
       ) : null}
-      <View
-        accessibilityRole="tablist"
-        className="absolute inset-x-0 bottom-0 flex-row border-t border-line bg-canvas"
-        style={{ paddingBottom: Math.max(insets.bottom, 8) }}
-      >
-        {tabs.map((option) => {
-          const current = option.key === tab;
-          return (
-            <Pressable
-              key={option.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: current }}
-              onPress={() => setTab(option.key)}
-              className="h-14 flex-1 items-center justify-center gap-1 active:bg-sunken"
-            >
-              <View
-                className={cn("h-0.5 w-6 rounded-full", current ? "bg-ink" : "bg-transparent")}
-              />
-              <Text
-                className={cn(
-                  "text-[15px]",
-                  current ? "font-semibold text-ink" : "font-medium text-muted",
-                )}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
     </View>
   );
 }

@@ -33,6 +33,9 @@ import { SessionScreen } from "./screens/Session";
 import { StatsScreen } from "./screens/Stats";
 import { TripScreen } from "./screens/Trip";
 
+// The trip's tabs are a navigator inside Home and Trip; these give them their own addresses.
+const tripTabPaths = { Table: "", Board: "board", Money: "money" };
+
 const RootStack = createNativeStackNavigator({
   screenOptions: {
     headerTransparent: false,
@@ -40,7 +43,11 @@ const RootStack = createNativeStackNavigator({
     headerBackButtonDisplayMode: "minimal",
   },
   screens: {
-    Home: { screen: HomeScreen, options: { title: "" }, linking: { path: "" } },
+    Home: {
+      screen: HomeScreen,
+      options: { title: "" },
+      linking: { path: "", screens: tripTabPaths },
+    },
     Groups: { screen: GroupsScreen, options: { title: "Stacks" }, linking: { path: "groups" } },
     Group: { screen: GroupScreen, options: { title: "" }, linking: { path: "groups/:groupId" } },
     NewSession: {
@@ -66,7 +73,7 @@ const RootStack = createNativeStackNavigator({
     Trip: {
       screen: TripScreen,
       options: { title: "" },
-      linking: { path: "trips/:tripId" },
+      linking: { path: "trips/:tripId", screens: tripTabPaths },
     },
     Join: {
       screen: JoinScreen,
