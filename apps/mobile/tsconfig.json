@@ -1,0 +1,11 @@
+{
+  "extends": "expo/tsconfig.base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", "uniwind-types.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}

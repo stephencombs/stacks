@@ -1,0 +1,33 @@
+{
+  "name": "@stacks/client-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api": {
+      "types": "./src/api.ts",
+      "import": "./src/api.ts"
+    },
+    "./errors": {
+      "types": "./src/errors.ts",
+      "import": "./src/errors.ts"
+    },
+    "./ids": {
+      "types": "./src/ids.ts",
+      "import": "./src/ids.ts"
+    }
+  },
+  "scripts": {
+    "test": "vp test run --config ../../vite.config.ts --dir .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stacks/contracts": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
