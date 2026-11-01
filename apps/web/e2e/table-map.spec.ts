@@ -82,6 +82,27 @@ test.describe.serial("seats at a blackjack table", () => {
     await expect(seat(/^Seat 7, third base, Alex$/)).toBeVisible();
     await expect(seat(/^Seat 4, Gus$/)).toBeVisible();
 
+    // Quick picks: the answer to the first can't undo the second while it's on its way.
+    await size.getByRole("button", { name: "6 seats" }).click();
+    await size.getByRole("button", { name: "7 seats" }).click();
+    const picks = await page.evaluate(
+      () =>
+        new Promise<string[]>((resolve) => {
+          const seen: string[] = [];
+          const t0 = performance.now();
+          const tick = () => {
+            seen.push(
+              document.querySelector('[aria-label="Table size"] [aria-pressed="true"]')
+                ?.textContent ?? "",
+            );
+            if (performance.now() - t0 < 2000) setTimeout(tick, 20);
+            else resolve(seen);
+          };
+          tick();
+        }),
+    );
+    expect(new Set(picks)).toEqual(new Set(["7 seats"]));
+
     // A table can't shrink out from under someone.
     await size.getByRole("button", { name: "5 seats" }).click();
     await expect(page.getByText("Move whoever's in seat 7 first.")).toBeVisible();

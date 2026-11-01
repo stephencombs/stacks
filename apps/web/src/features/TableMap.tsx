@@ -237,11 +237,9 @@ export function TableMap({
   // A size picked here shows at once; the server catches up behind it, or it snaps back.
   const [chosen, setChosen] = useState<number | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
-  const [saved, setSaved] = useState(seats);
-  if (saved !== seats) {
-    setSaved(seats);
-    setChosen(null);
-  }
+  // A pick stays until the server has the same size: an answer to an earlier pick that lands
+  // after a newer one must not undo it.
+  if (chosen !== null && chosen === seats) setChosen(null);
   const size = chosen ?? seats;
   const outer = useRef<HTMLDivElement>(null);
   const map = useRef<HTMLDivElement>(null);
@@ -278,7 +276,7 @@ export function TableMap({
       params: { sessionId: detail.session.id },
       payload: { seats: next },
     });
-    if (error !== null) setChosen(null);
+    if (error !== null) setChosen((current) => (current === next ? null : current));
   };
 
   useEffect(() => {
