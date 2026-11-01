@@ -103,8 +103,14 @@ for level in chips["levels"]:
     bs = [solid(im.split()[3], 4) for im in images]
     box = (min(b[0] for b in bs), min(b[1] for b in bs), max(b[2] for b in bs), max(b[3] for b in bs))
     bw, bh = box[2] - box[0], box[3] - box[1]
-    for n, im in enumerate(images, 1):
-        save(im.crop(box).resize((CHIP_WIDTH, round(CHIP_WIDTH * bh / bw)), Image.LANCZOS), f"chip-{level}-{n}.webp", 88)
+    cells = [im.crop(box).resize((CHIP_WIDTH, round(CHIP_WIDTH * bh / bw)), Image.LANCZOS) for im in images]
+    for n, cell in enumerate(cells, 1):
+        save(cell, f"chip-{level}-{n}.webp", 88)
+    # The web takes all eight colors at an angle in one request: a sheet of them side by side.
+    sheet = Image.new("RGBA", (CHIP_WIDTH * len(cells), cells[0].height), (0, 0, 0, 0))
+    for n, cell in enumerate(cells):
+        sheet.alpha_composite(cell, (n * CHIP_WIDTH, 0))
+    save(sheet, f"chips-{level}.webp", 88)
     sprites[level] = {
         "ox": round((c["base"][0] * S - box[0]) / bw, 4),
         "oy": round((c["base"][1] * S - box[1]) / bh, 4),

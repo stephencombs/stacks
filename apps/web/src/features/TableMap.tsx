@@ -2,6 +2,7 @@ import { SeatingId, type CurrencyCode, type PlayerId, type SessionDetail } from 
 import { newId } from "@stacks/client-runtime/ids";
 import {
   anchorsAt,
+  frameAt,
   busted,
   chipAngles,
   chipEdge,
@@ -30,18 +31,21 @@ import { Skeleton } from "~/components/ui/Surface";
 import { Chip } from "~/features/Chip";
 import { useAction, useStacks } from "~/lib/stacks";
 
-const urls = import.meta.glob<string>("../../../../packages/client-runtime/table-art/*.webp", {
-  eager: true,
-  query: "?url",
-  import: "default",
-});
+// The web takes chips by the sheet; the single chips are for the phone.
+const urls = import.meta.glob<string>(
+  ["../../../../packages/client-runtime/table-art/*.webp", "!**/chip-*.webp"],
+  {
+    eager: true,
+    query: "?url",
+    import: "default",
+  },
+);
 const url = (name: string) => urls[`../../../../packages/client-runtime/table-art/${name}.webp`]!;
 
 interface Images {
   readonly seats: number;
   readonly frames: Array<HTMLImageElement | null>;
   readonly rails: Array<HTMLImageElement | null>;
-  readonly chips: Record<number, ReadonlyArray<HTMLImageElement>>;
 }
 
 const load = async (src: string) => {
@@ -52,18 +56,27 @@ const load = async (src: string) => {
 };
 const pad = (i: number) => String(i).padStart(2, "0");
 
-// A table shows as soon as the chips and the frame it opens on are decoded; the other angles
-// follow in the background, nearest first, and a move draws the nearest one already in. Each
-// table size has its own frames; the chips are shared.
-const chips: Images["chips"] = {};
-let chipsReady: Promise<void> | null = null;
+// A table shows as soon as the frame it opens on and the chip angles its seats need are decoded.
+// Everything else follows in one background queue, most useful first, which a new table size
+// replaces rather than joins: on a phone's connection, extra downloads only slow the one that
+// matters.
+/** One sheet per chip angle: the eight chip colors side by side. */
+const chipSheets: Record<number, HTMLImageElement> = {};
+const chipsLoading = new Map<number, Promise<void>>();
+const loadChips = (level: number) => {
+  const done =
+    chipsLoading.get(level) ??
+    load(url(`chips-${level}`)).then((img) => void (chipSheets[level] = img));
+  chipsLoading.set(level, done);
+  return done;
+};
 const tables = new Map<number, { images: Images; loading: Map<number, Promise<void>> }>();
 const tableOf = (seats: number) => {
   let table = tables.get(seats);
   if (!table) {
     const frames = blackjackArt[seats]!.frames;
     table = {
-      images: { seats, frames: frames.map(() => null), rails: frames.map(() => null), chips },
+      images: { seats, frames: frames.map(() => null), rails: frames.map(() => null) },
       loading: new Map(),
     };
     tables.set(seats, table);
@@ -83,21 +96,38 @@ const loadFrame = (seats: number, i: number) => {
   loading.set(i, done);
   return done;
 };
-const loadImages = async (seats: number, first: number) => {
+/** The chip angles the seats at frame `i` are drawn from. */
+const levelsAt = (art: TableArt, i: number) => {
+  const levels = new Set<number>();
+  for (const seat of art.frames[i]!.seats)
+    for (const e of [seat.e, seat.be]) {
+      const { low, high } = chipAngles(art, e);
+      levels.add(low).add(high);
+    }
+  return levels;
+};
+let queue = 0;
+const loadImages = async (seats: number, first: number, others: ReadonlyArray<number>) => {
   const art = blackjackArt[seats]!;
-  chipsReady ??= Promise.all(
-    art.chipLevels.map(async (level) => {
-      chips[level] = await Promise.all(
-        [1, 2, 3, 4, 5, 6, 7, 8].map((n) => load(url(`chip-${level}-${n}`))),
-      );
-    }),
-  ).then(() => undefined);
-  await Promise.all([chipsReady, loadFrame(seats, first)]);
-  const rest = art.frames
-    .map((_, i) => i)
-    .toSorted((a, b) => Math.abs(a - first) - Math.abs(b - first));
+  const run = ++queue;
+  await Promise.all([loadFrame(seats, first), ...[...levelsAt(art, first)].map(loadChips)]);
+  const near = (a: number, b: number) => Math.abs(a - first) - Math.abs(b - first);
+  const rest = [
+    // The other sizes' table at this angle, so switching size never waits.
+    ...others.filter((n) => n !== seats).map((n) => () => loadFrame(n, first)),
+    ...art.chipLevels
+      .toSorted((a, b) => near(frameAt(art, a), frameAt(art, b)))
+      .map((l) => () => loadChips(l)),
+    ...art.frames
+      .map((_, i) => i)
+      .toSorted(near)
+      .map((i) => () => loadFrame(seats, i)),
+  ];
   void (async () => {
-    for (const i of rest) await loadFrame(seats, i);
+    for (const next of rest) {
+      if (run !== queue) return;
+      await next();
+    }
   })();
   return tableOf(seats).images;
 };
@@ -137,19 +167,40 @@ const spring = (bounce: number, steps = 40) => {
 
 /** Draws a chip seen from `degrees`, cross-fading the two nearest rendered angles on its contact point. */
 function drawChip(art: TableArt, canvas: HTMLCanvasElement, chip: number, degrees: number) {
-  const key = `${chip}:${degrees.toFixed(1)}`;
+  // A chip angle arriving later redraws the chip with it.
+  const key = `${chip}:${degrees.toFixed(1)}:${Object.keys(chipSheets).length}`;
   if (canvas.dataset.key === key) return;
   canvas.dataset.key = key;
   const { low, high, t } = chipAngles(art, degrees);
   const ctx = canvas.getContext("2d")!;
   const W = canvas.width;
   const D = W / BOX;
-  const draw = (level: number, alpha: number) => {
+  const draw = (wanted: number, alpha: number) => {
+    // An angle still downloading borrows the nearest one already in.
+    const level = art.chipLevels
+      .filter((l) => chipSheets[l])
+      .reduce<number | null>(
+        (best, l) => (best === null || Math.abs(l - wanted) < Math.abs(best - wanted) ? l : best),
+        null,
+      );
+    if (level === null) return;
     const sprite = art.chips[level]!;
+    const sheet = chipSheets[level]!;
+    const cell = sheet.width / 8;
     const sw = D * sprite.k;
     const sh = sw * sprite.aspect;
     ctx.globalAlpha = alpha;
-    ctx.drawImage(chips[level]![chip - 1]!, W / 2 - sprite.ox * sw, W / 2 - sprite.oy * sh, sw, sh);
+    ctx.drawImage(
+      sheet,
+      (chip - 1) * cell,
+      0,
+      cell,
+      sheet.height,
+      W / 2 - sprite.ox * sw,
+      W / 2 - sprite.oy * sh,
+      sw,
+      sh,
+    );
   };
   ctx.clearRect(0, 0, W, W);
   // The nearer angle stays opaque underneath, so the chip never turns see-through mid-fade.
@@ -208,13 +259,9 @@ export function TableMap({
   useEffect(() => {
     let cancelled = false;
     const at = Math.round(camera.current.f);
-    void loadImages(size, at).then((imgs) => {
-      if (cancelled) return;
-      setLoaded(imgs);
-      // The other sizes' frame for this angle comes down too, so switching size is instant.
-      for (const other of tableSizes[detail.session.game]?.sizes ?? [])
-        if (other !== size) void loadFrame(other, at);
-    });
+    void loadImages(size, at, tableSizes[detail.session.game]?.sizes ?? []).then(
+      (imgs) => !cancelled && setLoaded(imgs),
+    );
     return () => {
       cancelled = true;
     };
