@@ -11,6 +11,7 @@ import {
   type PlayerId,
   type SeatRequest,
   type TableRequest,
+  type HighLimitRequest,
   type SessionId,
   type TripId,
 } from "@stacks/contracts";
@@ -57,9 +58,10 @@ export const create = Effect.fn("Sessions.create")(function* (
     Effect.gen(function* () {
       const rows = yield* sql`
         insert into sessions (id, group_id, trip_id, venue_id, game, started_at, notes,
-          created_by)
+          high_limit, created_by)
         values (${request.id}, ${groupId}, ${tripId}, ${venue.id}, ${request.game},
-          ${DateTime.toDateUtc(startedAt)}, ${request.notes}, ${userId})
+          ${DateTime.toDateUtc(startedAt)}, ${request.notes}, ${request.highLimit ?? false},
+          ${userId})
         on conflict (id) do nothing
         returning id
       `;
@@ -194,6 +196,20 @@ export const setTable = Effect.fn("Sessions.setTable")(function* (
       yield* sql`update sessions set table_seats = ${request.seats} where id = ${sessionId}`;
     }),
   );
+  return yield* Views.sessionDetail(sessionId);
+});
+
+/**
+ * Marks whether the session was at a high-limit table. It's a label, not part of the ledger, so
+ * anyone in the group can fix it, even after the session closes.
+ */
+export const setHighLimit = Effect.fn("Sessions.setHighLimit")(function* (
+  sessionId: SessionId,
+  request: typeof HighLimitRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  yield* access(sessionId);
+  yield* sql`update sessions set high_limit = ${request.highLimit} where id = ${sessionId}`;
   return yield* Views.sessionDetail(sessionId);
 });
 

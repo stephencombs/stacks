@@ -17,7 +17,7 @@ import { ToastHost } from "../components/ui/Toast";
 import { LiveBar } from "../features/LiveBar";
 import { TripStats } from "../features/RaceStats";
 import { SessionList } from "../features/SessionList";
-import { TonightBoard, TripBoard } from "../features/TripBoard";
+import { DaysBoard, TonightBoard, TripBoard } from "../features/TripBoard";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { SessionView } from "./Session";
 import { SettleView } from "../features/SettleUp";
@@ -248,6 +248,7 @@ function TableTab({
 const boardViews = [
   { value: "tonight", label: "Tonight" },
   { value: "trip", label: "Trip" },
+  { value: "days", label: "Days" },
   { value: "race", label: "Race" },
 ] as const;
 
@@ -266,12 +267,14 @@ function BoardTab({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   return (
     <View className="gap-2">
       <View className="px-4">
-        <Choice label="Show" options={boardViews} value={view} onChange={setView} columns={3} />
+        <Choice label="Show" options={boardViews} value={view} onChange={setView} />
       </View>
       {view === "tonight" ? (
         <TonightBoard detail={group} trip={trip} />
       ) : view === "trip" ? (
         <TripBoard detail={group} trip={trip} />
+      ) : view === "days" ? (
+        <DaysBoard detail={group} trip={trip} />
       ) : (
         <TripStats detail={group} trip={trip} />
       )}

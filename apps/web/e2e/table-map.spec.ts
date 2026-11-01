@@ -48,6 +48,10 @@ test.describe.serial("seats at a blackjack table", () => {
     await page.getByRole("checkbox", { name: /Gus/ }).check();
     await page.getByRole("button", { name: "Start session" }).click();
     await expect(page.getByText("Live", { exact: true })).toBeVisible();
+    // Anyone can mark the table high limit.
+    const highLimit = page.getByRole("button", { name: "High limit" });
+    await highLimit.click();
+    await expect(highLimit).toHaveAttribute("aria-pressed", "true");
 
     // An empty table, five seats unless someone picks another size: every seat is open.
     const seat = (name: RegExp) => page.getByRole("button", { name });

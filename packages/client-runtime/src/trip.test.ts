@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import { CurrencyCode, SessionId, VenueId } from "@stacks/contracts";
 
-import { awardLine, boardMoney, localClock } from "./trip.ts";
+import { awardLine, boardMoney, localClock, recordLine, streakLine } from "./trip.ts";
 
 const usd = CurrencyCode.make("USD");
 const local = (day: number, hour: number) =>
@@ -37,4 +37,13 @@ it("says what earned each award", () => {
     "8 winning sessions in a row",
   );
   expect(awardLine({ ...award, key: "night_owl", value: 2 }, usd)).toMatch(/^Sat down at 2:00/);
+});
+
+it("puts runs and records into words", () => {
+  expect(streakLine({ length: 1, winning: true })).toBeNull();
+  expect(streakLine({ length: 8, winning: true })).toBe("8 wins in a row");
+  expect(streakLine({ length: 2, winning: false })).toBe("2 losses in a row");
+  expect(recordLine(4, 3, 0)).toBe("4W · 3L");
+  expect(recordLine(8, 2, 1)).toBe("8W · 2L · 1 even");
+  expect(recordLine(0, 0, 2)).toBe("2 even");
 });

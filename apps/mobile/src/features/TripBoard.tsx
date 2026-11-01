@@ -8,13 +8,17 @@ import {
   chipOf,
   localClock,
   nightLabel,
+  recordLine,
+  streakLine,
 } from "@stacks/client-runtime/trip";
 import {
   tonightBoard,
   tripAwards,
+  tripDays,
   tripFeed,
   tripNights,
   tripStandings,
+  tripStats,
 } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useEffect, useState } from "react";
@@ -183,6 +187,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                       </View>
                       <Text className="font-mono text-xs text-muted">
                         {s.sessions} SESS{you ? " · YOU" : ""}
+                        {streakLine(s.streak) ? ` · ${streakLine(s.streak)!.toUpperCase()}` : ""}
                       </Text>
                     </View>
                     <Text className={cn("font-mono", "text-lg", tone(s.net))}>
@@ -194,6 +199,8 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
             </View>
           )}
         </View>
+
+        {closed.length > 0 ? <TripNumbers detail={detail} trip={trip} /> : null}
 
         {awards.length > 0 ? (
           <View className="gap-2">
@@ -359,6 +366,209 @@ export function TonightBoard({ detail, trip }: { detail: GroupDetail; trip: Trip
           })}
         </View>
       )}
+    </View>
+  );
+}
+
+/** How the group ran as a team, and the trip's numbers: totals, extremes, drawdown, high limit. */
+function TripNumbers({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+  const currency = detail.group.currency;
+  const names = playerNames(detail);
+  const stats = tripStats(trip.sessions.filter((s) => s.session.status === "closed"));
+  const money = (n: number) => boardMoney(Math.round(n), currency);
+  const { current, longestWin, longestLoss } = stats.team;
+  const tables = (n: number) => `${n} ${n === 1 ? "table" : "tables"}`;
+  const tiles: ReadonlyArray<{ label: string; value: string; tone: number; note?: string }> = [
+    {
+      label: "Gross wins",
+      value: boardMoney(stats.grossWins, currency, false),
+      tone: 1,
+      note: "Every winning result",
+    },
+    {
+      label: "Gross losses",
+      value: money(stats.grossLosses),
+      tone: -1,
+      note: "Every losing result",
+    },
+    { label: "Average table", value: money(stats.average), tone: stats.average },
+    {
+      label: "Largest drawdown",
+      value: money(stats.drawdown),
+      tone: stats.drawdown,
+      note: "Biggest drop from a high",
+    },
+    ...(stats.best
+      ? [
+          {
+            label: "Best result",
+            value: money(stats.best.net),
+            tone: stats.best.net,
+            note: names.get(stats.best.playerId) ?? "",
+          },
+        ]
+      : []),
+    ...(stats.worst
+      ? [
+          {
+            label: "Worst result",
+            value: money(stats.worst.net),
+            tone: stats.worst.net,
+            note: names.get(stats.worst.playerId) ?? "",
+          },
+        ]
+      : []),
+    ...(stats.highLimit.sessions > 0
+      ? [
+          {
+            label: "High limit",
+            value: money(stats.highLimit.net),
+            tone: stats.highLimit.net,
+            note: tables(stats.highLimit.sessions),
+          },
+          {
+            label: "Other tables",
+            value: money(stats.otherTables.net),
+            tone: stats.otherTables.net,
+            note: tables(stats.otherTables.sessions),
+          },
+        ]
+      : []),
+  ];
+  return (
+    <>
+      <View className="gap-2">
+        <View className="flex-row items-baseline justify-between">
+          <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+            As a team
+          </Text>
+          <Text className={cn(label, "text-muted")}>
+            {`${stats.record.wins}W · ${stats.record.losses}L · ${stats.record.mixed} mixed`}
+          </Text>
+        </View>
+        <View accessible className="gap-3 rounded-xl border border-line bg-surface p-4">
+          <Text
+            className={cn(
+              "font-display text-2xl leading-7 tracking-wide uppercase",
+              current ? (current.result === "win" ? "text-win" : "text-loss") : "text-muted",
+            )}
+          >
+            {current
+              ? `${current.length} ${current.result === "win" ? (current.length === 1 ? "win" : "wins") : current.length === 1 ? "loss" : "losses"} in a row`
+              : "No run going"}
+          </Text>
+          <View className="flex-row gap-3">
+            {[
+              ["Best run", String(longestWin)],
+              ["Worst run", String(longestLoss)],
+              ["Team wins", `${Math.round(stats.winRate * 100)}%`],
+            ].map(([title, value]) => (
+              <View key={title} className="flex-1 gap-0.5">
+                <Text className={cn(label, "text-muted")}>{title}</Text>
+                <Text className="font-mono text-base text-ink">{value}</Text>
+              </View>
+            ))}
+          </View>
+          <Text className="text-xs text-muted">
+            A team win is a table where everyone who played won; a team loss, where everyone lost.
+            Anything else is mixed and ends a run.
+          </Text>
+        </View>
+      </View>
+
+      <View className="gap-2">
+        <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+          The numbers
+        </Text>
+        <View className="flex-row flex-wrap gap-2">
+          {tiles.map((tile) => (
+            <View
+              key={tile.label}
+              accessible
+              className="basis-[48%] grow gap-1 rounded-xl border border-line bg-surface p-3"
+            >
+              <Text className={cn(label, "text-muted")}>{tile.label}</Text>
+              <Text className={cn("font-mono text-lg", tone(tile.tone))}>{tile.value}</Text>
+              {tile.note ? (
+                <Text numberOfLines={1} className="text-xs text-muted">
+                  {tile.note}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      </View>
+    </>
+  );
+}
+
+/** The trip night by night: every player's net, with their record, or that they sat it out. */
+export function DaysBoard({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+  const currency = detail.group.currency;
+  const names = playerNames(detail);
+  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const players = [...new Set(closed.flatMap((s) => s.results.map((r) => r.playerId)))];
+  const days = tripDays(closed, localClock, players);
+  const nights = tripNights(closed, localClock);
+  if (days.length === 0)
+    return (
+      <Text className="mx-4 rounded-xl border border-line bg-surface p-4 text-sm text-muted">
+        Close a session to start the first night.
+      </Text>
+    );
+  return (
+    <View className="gap-4 px-4 pb-8">
+      {days.toReversed().map((day) => (
+        <View key={day.key} className="gap-2">
+          <View className="flex-row items-baseline justify-between">
+            <Text
+              accessibilityRole="header"
+              className="font-display text-xl tracking-wide text-ink uppercase"
+            >
+              {nightLabel(nights.find((n) => n.key === day.key)!)}
+            </Text>
+            <Text className={cn(label, "text-muted")}>
+              {day.sessions} {day.sessions === 1 ? "table" : "tables"}
+            </Text>
+          </View>
+          <View className="rounded-xl border border-line bg-surface">
+            {day.rows.map((row, index) => (
+              <View
+                key={row.playerId}
+                accessible
+                className={cn(
+                  "flex-row items-center gap-3 px-3 py-3",
+                  index > 0 && "border-t border-line",
+                )}
+              >
+                <Chip
+                  chip={chipOf(detail, row.playerId)}
+                  name={names.get(row.playerId) ?? "?"}
+                  size={26}
+                />
+                <View className="flex-1">
+                  <Text numberOfLines={1} className="text-base text-ink">
+                    {names.get(row.playerId) ?? "Someone"}
+                  </Text>
+                  <Text className="font-mono text-xs text-muted">
+                    {row.net === null
+                      ? "No results recorded"
+                      : recordLine(row.wins, row.losses, row.even)}
+                  </Text>
+                </View>
+                <Text
+                  className={cn(
+                    "font-mono text-lg",
+                    row.net === null ? "text-muted" : tone(row.net),
+                  )}
+                >
+                  {row.net === null ? "—" : boardMoney(row.net, currency)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
     </View>
   );
 }

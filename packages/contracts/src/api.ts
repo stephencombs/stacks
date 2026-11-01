@@ -87,6 +87,7 @@ export const CreateSessionRequest = Schema.Struct({
   startedAt: Schema.optionalKey(Schema.DateTimeUtc),
   playerIds: Schema.NonEmptyArray(PlayerId),
   notes: Schema.NullOr(Schema.String.check(Schema.isMaxLength(1000))),
+  highLimit: Schema.optionalKey(Schema.Boolean),
 });
 
 export const CloseSessionRequest = Schema.Struct({
@@ -126,6 +127,8 @@ export const RecordSettlementRequest = Schema.Struct({
 export const MoveSessionRequest = Schema.Struct({ tripId: TripId });
 
 export const TableRequest = Schema.Struct({ seats: Seat });
+
+export const HighLimitRequest = Schema.Struct({ highLimit: Schema.Boolean });
 
 export const SeatRequest = Schema.Struct({
   id: SeatingId,
@@ -344,6 +347,14 @@ const SessionsGroup = HttpApiGroup.make("sessions")
       payload: TableRequest,
       success: SessionDetail,
       error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("setHighLimit", "/sessions/:sessionId/high-limit", {
+      params: sessionParams,
+      payload: HighLimitRequest,
+      success: SessionDetail,
+      error: [Forbidden, NotFound],
     }),
   )
   .add(

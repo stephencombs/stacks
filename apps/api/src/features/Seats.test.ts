@@ -87,6 +87,22 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("seats at a table", (it) => {
     }),
   );
 
+  it.effect("labels a high-limit table, even once it's closed", () =>
+    Effect.gen(function* () {
+      const { alex, cal, sessionId } = yield* table("blackjack");
+      yield* alex.sessions.close({ params: { sessionId }, payload: {} });
+      const marked = yield* alex.sessions.setHighLimit({
+        params: { sessionId },
+        payload: { highLimit: true },
+      });
+      expect(marked.session.highLimit).toBe(true);
+      const stranger = yield* Effect.flip(
+        cal.sessions.setHighLimit({ params: { sessionId }, payload: { highLimit: false } }),
+      );
+      expect(stranger).toMatchObject({ _tag: "Forbidden" });
+    }),
+  );
+
   it.effect("treats a retry as the same seating", () =>
     Effect.gen(function* () {
       const { alex, alexId, sit } = yield* table("blackjack");

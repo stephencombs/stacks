@@ -81,6 +81,7 @@ function NewSessionForm({
   const create = useAction(stacks.Client.mutation("sessions", "create"));
   const [venue, setVenue] = useState<Venue | null>(from?.venue ?? null);
   const [game, setGame] = useState<Game>(from?.session.game ?? "blackjack");
+  const [highLimit, setHighLimit] = useState(from?.session.highLimit ?? false);
   const [playerIds, setPlayerIds] = useState<ReadonlySet<PlayerId>>(
     () => new Set(from?.playerIds ?? [detail.myPlayerId]),
   );
@@ -119,6 +120,7 @@ function NewSessionForm({
         game,
         playerIds: [first, ...rest],
         notes: null,
+        highLimit,
         ...(startedAt ? { startedAt } : {}),
       },
     });
@@ -161,6 +163,15 @@ function NewSessionForm({
             </label>
           ))}
         </div>
+        <label className="mt-2 flex cursor-pointer items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={highLimit}
+            onChange={(event) => setHighLimit(event.target.checked)}
+            className="size-5 accent-[var(--color-accent)]"
+          />
+          High-limit table
+        </label>
       </fieldset>
 
       <fieldset className="flex flex-col gap-2">

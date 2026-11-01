@@ -14,7 +14,7 @@ import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Switch, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
@@ -87,6 +87,7 @@ function NewSessionForm({
   const create = useAction(stacks.Client.mutation("sessions", "create"));
   const [venue, setVenue] = useState<Venue | null>(from?.venue ?? null);
   const [game, setGame] = useState<Game>(from?.session.game ?? "blackjack");
+  const [highLimit, setHighLimit] = useState(from?.session.highLimit ?? false);
   const [startedAgo, setStartedAgo] = useState<(typeof STARTS)[number]["value"]>("0");
   const [playerIds, setPlayerIds] = useState<ReadonlySet<PlayerId>>(
     () => new Set(from?.playerIds ?? [detail.myPlayerId]),
@@ -118,6 +119,7 @@ function NewSessionForm({
         game,
         playerIds: [first, ...rest],
         notes: null,
+        highLimit,
         ...(startedAgo === "0"
           ? {}
           : {
@@ -150,6 +152,14 @@ function NewSessionForm({
         </Surface>
       </View>
       <Choice label="Game" options={GAMES} value={game} onChange={setGame} columns={2} />
+      <View className="flex-row items-center justify-between rounded-xl bg-surface px-4 py-3">
+        <Text className="text-base text-ink">High-limit table</Text>
+        <Switch
+          accessibilityLabel="High-limit table"
+          value={highLimit}
+          onValueChange={setHighLimit}
+        />
+      </View>
       <View className="gap-2">
         <SectionHeading
           action={

@@ -108,6 +108,7 @@ describe("Session", () => {
     endedAt: null,
     notes: null,
     tableSeats: null,
+    highLimit: false,
     ...fields,
   });
 

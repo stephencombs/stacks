@@ -5,7 +5,12 @@ import { sessionRuns } from "./results.ts";
 
 /** The parts of a closed session the trip board reads. */
 export interface TripSession {
-  readonly session: { readonly id: SessionId; readonly startedAt: DateTime.Utc };
+  readonly session: {
+    readonly id: SessionId;
+    readonly startedAt: DateTime.Utc;
+    /** Played at a high-limit table. */
+    readonly highLimit?: boolean;
+  };
   readonly venue: { readonly id: VenueId };
   readonly results: ReadonlyArray<Pick<PlayerResult, "playerId" | "buyIn" | "net">>;
 }
@@ -28,6 +33,8 @@ export interface TripStanding {
   readonly moved: number;
   /** Three or more winning sessions in a row, up to now. */
   readonly hot: boolean;
+  /** Their latest run of wins or losses; an even session ends it. */
+  readonly streak: { readonly length: number; readonly winning: boolean };
 }
 
 export interface TripNight<S> {
@@ -130,6 +137,7 @@ export const tripStandings = (
       rank,
       moved: was === undefined ? 0 : was - rank,
       hot: runs.current.winning && runs.current.length >= 3,
+      streak: runs.current,
     };
   });
 };
@@ -267,3 +275,149 @@ export const tripFeed = <S extends TripSession>(sessions: ReadonlyArray<S>, limi
         .map((r) => ({ session, playerId: r.playerId, net: r.net })),
     )
     .slice(0, limit);
+
+/**
+ * How a table went for the group: a win when everyone who played it won, a loss when everyone
+ * lost, mixed otherwise (an even result included). Players who sat out don't count.
+ */
+export type TeamResult = "win" | "loss" | "mixed";
+
+export const teamResult = (s: TripSession): TeamResult =>
+  s.results.length > 0 && s.results.every((r) => r.net > 0)
+    ? "win"
+    : s.results.length > 0 && s.results.every((r) => r.net < 0)
+      ? "loss"
+      : "mixed";
+
+export interface TripStats {
+  readonly sessions: number;
+  readonly net: number;
+  /** Every winning player result added up, and every losing one. */
+  readonly grossWins: number;
+  readonly grossLosses: number;
+  readonly record: { readonly wins: number; readonly losses: number; readonly mixed: number };
+  /** The share of tables everyone won, mixed tables included in the count. */
+  readonly winRate: number;
+  /** The group's net per table. */
+  readonly average: number;
+  /** The best and worst single player result at one table. */
+  readonly best: { readonly playerId: PlayerId; readonly net: number } | null;
+  readonly worst: { readonly playerId: PlayerId; readonly net: number } | null;
+  /** The biggest fall in the group's running total from a high it had reached; 0 or less. */
+  readonly drawdown: number;
+  readonly team: {
+    /** The run the group is on now; mixed tables end a run. */
+    readonly current: { readonly result: "win" | "loss"; readonly length: number } | null;
+    readonly longestWin: number;
+    readonly longestLoss: number;
+  };
+  readonly highLimit: { readonly net: number; readonly sessions: number };
+  readonly otherTables: { readonly net: number; readonly sessions: number };
+}
+
+/** The numbers behind a trip: totals, extremes, how the group ran, and high-limit play. */
+export const tripStats = (sessions: ReadonlyArray<TripSession>): TripStats => {
+  const ordered = sessions.toSorted((a, b) => startOf(a) - startOf(b));
+  let grossWins = 0;
+  let grossLosses = 0;
+  let best: TripStats["best"] = null;
+  let worst: TripStats["worst"] = null;
+  let running = 0;
+  let peak = 0;
+  let drawdown = 0;
+  const record = { wins: 0, losses: 0, mixed: 0 };
+  let current = null as TripStats["team"]["current"];
+  let longestWin = 0;
+  let longestLoss = 0;
+  const high = { net: 0, sessions: 0 };
+  const other = { net: 0, sessions: 0 };
+  for (const s of ordered) {
+    let net = 0;
+    for (const r of s.results) {
+      net += r.net;
+      if (r.net > 0) grossWins += r.net;
+      else grossLosses += r.net;
+      if (!best || r.net > best.net) best = { playerId: r.playerId, net: r.net };
+      if (!worst || r.net < worst.net) worst = { playerId: r.playerId, net: r.net };
+    }
+    running += net;
+    peak = Math.max(peak, running);
+    drawdown = Math.min(drawdown, running - peak);
+    const side = s.session.highLimit ? high : other;
+    side.net += net;
+    side.sessions += 1;
+    const result = teamResult(s);
+    if (result === "mixed") {
+      record.mixed += 1;
+      current = null;
+      continue;
+    }
+    if (result === "win") record.wins += 1;
+    else record.losses += 1;
+    current =
+      current?.result === result ? { result, length: current.length + 1 } : { result, length: 1 };
+    if (result === "win") longestWin = Math.max(longestWin, current.length);
+    else longestLoss = Math.max(longestLoss, current.length);
+  }
+  return {
+    sessions: ordered.length,
+    net: running,
+    grossWins,
+    grossLosses,
+    record,
+    winRate: ordered.length === 0 ? 0 : record.wins / ordered.length,
+    average: ordered.length === 0 ? 0 : running / ordered.length,
+    best,
+    worst,
+    drawdown,
+    team: { current, longestWin, longestLoss },
+    highLimit: high,
+    otherTables: other,
+  };
+};
+
+export interface TripDay {
+  readonly key: string;
+  /** 1 for the trip's first night. */
+  readonly number: number;
+  readonly sessions: number;
+  /** Everyone on the trip, best night first; null for someone who didn't play that night. */
+  readonly rows: ReadonlyArray<{
+    readonly playerId: PlayerId;
+    readonly net: number | null;
+    readonly wins: number;
+    readonly losses: number;
+    readonly even: number;
+  }>;
+}
+
+/**
+ * The trip night by night, for every player. Someone who sat a night out shows as no result,
+ * never as breaking even.
+ */
+export const tripDays = (
+  sessions: ReadonlyArray<TripSession>,
+  clock: TripClock,
+  players: ReadonlyArray<PlayerId>,
+): ReadonlyArray<TripDay> =>
+  tripNights(sessions, clock).map((night) => {
+    const rows = players.map((playerId) => {
+      const mine = night.sessions.flatMap((s) => s.results.filter((r) => r.playerId === playerId));
+      return {
+        playerId,
+        net: mine.length === 0 ? null : mine.reduce((sum, r) => sum + r.net, 0),
+        wins: mine.filter((r) => r.net > 0).length,
+        losses: mine.filter((r) => r.net < 0).length,
+        even: mine.filter((r) => r.net === 0).length,
+      };
+    });
+    return {
+      key: night.key,
+      number: night.number,
+      sessions: night.sessions.length,
+      rows: rows.toSorted(
+        (a, b) =>
+          (a.net === null ? 1 : 0) - (b.net === null ? 1 : 0) || (b.net ?? 0) - (a.net ?? 0),
+      ),
+    };
+  });

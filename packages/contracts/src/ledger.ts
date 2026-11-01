@@ -43,6 +43,8 @@ export const Session = Schema.Struct({
   notes: Schema.NullOr(Schema.String),
   /** How many seats the table has, for games played from seats; null is the game's usual table. */
   tableSeats: Schema.NullOr(Seat),
+  /** Played at a high-limit table. */
+  highLimit: Schema.Boolean,
 }).check(
   Schema.makeFilter((session) =>
     (session.status === "closed") === (session.endedAt !== null)

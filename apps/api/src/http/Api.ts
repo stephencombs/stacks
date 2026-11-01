@@ -67,6 +67,9 @@ const sessions = HttpApiBuilder.group(StacksApi, "sessions", (handlers) =>
       serve(Sessions.addPlayer(params.sessionId, payload.playerId)),
     )
     .handle("seat", ({ params, payload }) => serve(Sessions.seat(params.sessionId, payload)))
+    .handle("setHighLimit", ({ params, payload }) =>
+      serve(Sessions.setHighLimit(params.sessionId, payload)),
+    )
     .handle("setTable", ({ params, payload }) =>
       serve(Sessions.setTable(params.sessionId, payload)),
     )

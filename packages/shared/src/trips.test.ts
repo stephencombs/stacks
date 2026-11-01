@@ -10,7 +10,10 @@ import {
   tripAwards,
   tripFeed,
   tripNights,
+  tripDays,
   tripStandings,
+  tripStats,
+  teamResult,
   type TripClock,
 } from "./trips.ts";
 
@@ -77,9 +80,33 @@ describe("tripStandings", () => {
       clock,
     );
     expect(standings).toEqual([
-      { playerId: BEA, net: 1700, sessions: 2, rank: 1, moved: 1, hot: false },
-      { playerId: ALEX, net: 1000, sessions: 1, rank: 2, moved: -1, hot: false },
-      { playerId: CAL, net: 200, sessions: 2, rank: 3, moved: 0, hot: false },
+      {
+        playerId: BEA,
+        net: 1700,
+        sessions: 2,
+        rank: 1,
+        moved: 1,
+        hot: false,
+        streak: { length: 2, winning: true },
+      },
+      {
+        playerId: ALEX,
+        net: 1000,
+        sessions: 1,
+        rank: 2,
+        moved: -1,
+        hot: false,
+        streak: { length: 1, winning: true },
+      },
+      {
+        playerId: CAL,
+        net: 200,
+        sessions: 2,
+        rank: 3,
+        moved: 0,
+        hot: false,
+        streak: { length: 1, winning: true },
+      },
     ]);
   });
 
@@ -89,6 +116,7 @@ describe("tripStandings", () => {
       clock,
     );
     expect(alex?.hot).toBe(true);
+    expect(alex?.streak).toEqual({ length: 3, winning: true });
   });
 
   it.prop(
@@ -282,6 +310,153 @@ describe("tonightBoard", () => {
       { playerId: BEA, net: 150, inPlay: 0, rank: 1 },
       { playerId: DEE, net: -100, inPlay: 0, rank: 2 },
       { playerId: ALEX, net: -200, inPlay: 300, rank: 3 },
+    ]);
+  });
+});
+
+describe("teamResult", () => {
+  it("is a win only when everyone who played won, and a loss only when everyone lost", () => {
+    expect(
+      teamResult(
+        session(21, 20, [
+          [ALEX, 500],
+          [BEA, 10],
+        ]),
+      ),
+    ).toBe("win");
+    expect(
+      teamResult(
+        session(21, 20, [
+          [ALEX, -500],
+          [BEA, -10],
+        ]),
+      ),
+    ).toBe("loss");
+    expect(
+      teamResult(
+        session(21, 20, [
+          [ALEX, 500],
+          [BEA, -10],
+        ]),
+      ),
+    ).toBe("mixed");
+    expect(
+      teamResult(
+        session(21, 20, [
+          [ALEX, 500],
+          [BEA, 0],
+        ]),
+      ),
+    ).toBe("mixed");
+  });
+});
+
+describe("tripStats", () => {
+  const trip = [
+    {
+      ...session(21, 20, [
+        [ALEX, 500],
+        [BEA, 100],
+      ]),
+      session: { ...session(21, 20, []).session, highLimit: true },
+    },
+    session(21, 22, [
+      [ALEX, 300],
+      [BEA, 200],
+    ]),
+    session(22, 20, [
+      [ALEX, -900],
+      [BEA, -100],
+    ]),
+    session(22, 22, [
+      [ALEX, 400],
+      [CAL, -50],
+    ]),
+    session(23, 20, [
+      [BEA, -300],
+      [CAL, -20],
+    ]),
+  ];
+
+  it("adds up wins, losses, the record and the extremes", () => {
+    const stats = tripStats(trip);
+    expect(stats.sessions).toBe(5);
+    expect(stats.net).toBe(130);
+    expect(stats.grossWins).toBe(1500);
+    expect(stats.grossLosses).toBe(-1370);
+    expect(stats.record).toEqual({ wins: 2, losses: 2, mixed: 1 });
+    expect(stats.winRate).toBe(0.4);
+    expect(stats.average).toBe(26);
+    expect(stats.best).toEqual({ playerId: ALEX, net: 500 });
+    expect(stats.worst).toEqual({ playerId: ALEX, net: -900 });
+  });
+
+  it("measures the biggest fall from a high", () => {
+    // Running totals: 600, 1100, 100, 450, 130. The high of 1100 fell to 100.
+    expect(tripStats(trip).drawdown).toBe(-1000);
+  });
+
+  it("tracks the group's runs, which a mixed table ends", () => {
+    expect(tripStats(trip).team).toEqual({
+      current: { result: "loss", length: 1 },
+      longestWin: 2,
+      longestLoss: 1,
+    });
+  });
+
+  it("splits high-limit play from the other tables", () => {
+    const stats = tripStats(trip);
+    expect(stats.highLimit).toEqual({ net: 600, sessions: 1 });
+    expect(stats.otherTables).toEqual({ net: -470, sessions: 4 });
+  });
+
+  it("is all zeros before anyone plays", () => {
+    const stats = tripStats([]);
+    expect([stats.net, stats.drawdown, stats.winRate, stats.average]).toEqual([0, 0, 0, 0]);
+    expect(stats.best).toBeNull();
+  });
+
+  const Nets = Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: -5000, maximum: 5000 })));
+
+  it.prop("never reports a drawdown deeper than the swings that made it", [Nets], ([nets]) => {
+    const stats = tripStats(nets.map((n, i) => session(21, i, [[ALEX, n]])));
+    const fall = nets.filter((n) => n < 0).reduce((sum, n) => sum + n, 0);
+    expect(stats.drawdown).toBeLessThanOrEqual(0);
+    expect(stats.drawdown).toBeGreaterThanOrEqual(fall);
+    expect(stats.grossWins + stats.grossLosses).toBe(stats.net);
+  });
+});
+
+describe("tripDays", () => {
+  it("shows each player's night, and no result for anyone who sat it out", () => {
+    const days = tripDays(
+      [
+        session(21, 20, [
+          [ALEX, 500],
+          [BEA, -100],
+        ]),
+        session(21, 23, [
+          [ALEX, -200],
+          [BEA, 0],
+        ]),
+        session(22, 20, [[BEA, 50]]),
+      ],
+      clock,
+      [ALEX, BEA, CAL],
+    );
+    expect(days.map((d) => [d.number, d.sessions])).toEqual([
+      [1, 2],
+      [2, 1],
+    ]);
+    expect(days[0]!.rows).toEqual([
+      { playerId: ALEX, net: 300, wins: 1, losses: 1, even: 0 },
+      { playerId: BEA, net: -100, wins: 0, losses: 1, even: 1 },
+      { playerId: CAL, net: null, wins: 0, losses: 0, even: 0 },
+    ]);
+    expect(days[1]!.rows.map((r) => [r.playerId, r.net])).toEqual([
+      [BEA, 50],
+      [ALEX, null],
+      [CAL, null],
     ]);
   });
 });

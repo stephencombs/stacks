@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Skeleton } from "~/components/ui/Surface";
 import { cn } from "~/components/ui/cn";
 import { TripStats } from "~/features/RaceStats";
-import { TonightBoard, TripBoard } from "~/features/TripBoard";
+import { DaysBoard, TonightBoard, TripBoard } from "~/features/TripBoard";
 import { TripHeader } from "~/features/TripHeader";
 import { Loaded, useStacks } from "~/lib/stacks";
 
@@ -39,11 +39,13 @@ function BoardPage() {
 const views = [
   { key: "tonight", label: "Tonight" },
   { key: "trip", label: "Trip" },
+  { key: "days", label: "Days" },
   { key: "race", label: "Race" },
 ] as const;
 
 /**
- * Tonight's board, the whole trip's standings, awards and nights, or the race for first. Opens on
+ * Tonight's board, the whole trip's standings, numbers and awards, its nights one by one, or the
+ * race for first. Opens on
  * tonight while there's anything on it.
  */
 function Board({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
@@ -83,6 +85,8 @@ function Board({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
         <TonightBoard detail={group} trip={trip} />
       ) : view === "trip" ? (
         <TripBoard detail={group} trip={trip} />
+      ) : view === "days" ? (
+        <DaysBoard detail={group} trip={trip} />
       ) : (
         <TripStats detail={group} trip={trip} />
       )}

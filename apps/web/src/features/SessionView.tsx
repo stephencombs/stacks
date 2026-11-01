@@ -161,6 +161,7 @@ export function SessionView({
           )}
           <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
             {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
+            <HighLimitToggle detail={detail} />
             {formatTime(session.startedAt)}
             {/* Imported sessions end when they start: no length was recorded. */}
             {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
@@ -583,6 +584,32 @@ function SessionStatusActions({
  * Closes the table, taking the cash-outs of anyone still playing on the way, and can open the
  * next table with the same people.
  */
+/** Marks the table high limit or not; anyone in the group can, even after it closes. */
+function HighLimitToggle({ detail }: { detail: SessionDetail }) {
+  const stacks = useStacks();
+  const set = useAction(stacks.Client.mutation("sessions", "setHighLimit"));
+  const on = detail.session.highLimit;
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      disabled={set.pending}
+      title={on ? "Played at a high-limit table" : "Mark as a high-limit table"}
+      onClick={() =>
+        void set.run({ params: { sessionId: detail.session.id }, payload: { highLimit: !on } })
+      }
+      className={cn(
+        "inline-flex h-6 items-center rounded-md px-2 font-mono text-[11px] font-medium tracking-[0.08em] uppercase transition-colors duration-150",
+        on
+          ? "bg-[color-mix(in_oklch,var(--color-accent)_18%,transparent)] text-accent-text"
+          : "text-muted shadow-[inset_0_0_0_1px_var(--color-line-strong)] hover:text-ink",
+      )}
+    >
+      High limit
+    </button>
+  );
+}
+
 function CloseSessionDialog({
   detail,
   playing,

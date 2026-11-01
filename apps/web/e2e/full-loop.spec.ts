@@ -187,7 +187,14 @@ test.describe.serial("a group's first night out", () => {
     const board = alex.getByRole("list").filter({ hasText: "SESS" });
     await expect(board.getByRole("listitem").first()).toContainText("+$170");
     await expect(alex.getByText("Biggest hit")).toBeVisible();
+    // The trip's numbers: one table where some won and some lost, so no team run yet.
+    await expect(alex.getByText("No run going")).toBeVisible();
+    await expect(alex.getByText("Largest drawdown")).toBeVisible();
     await shoot(alex, "trip-board");
+    // Night by night, everyone's result, and nobody's missing night counted as even.
+    await alex.getByRole("button", { name: "Days", exact: true }).click();
+    await expect(alex.getByText("1W", { exact: true }).first()).toBeVisible();
+    await shoot(alex, "trip-days");
 
     // Stats race the night and open a stat sheet for whoever's picked.
     await alex.getByRole("button", { name: "Race" }).click();

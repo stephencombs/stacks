@@ -8,13 +8,17 @@ import {
   chipOf,
   localClock,
   nightLabel,
+  recordLine,
+  streakLine,
 } from "@stacks/client-runtime/trip";
 import {
   tonightBoard,
   tripAwards,
+  tripDays,
   tripFeed,
   tripNights,
   tripStandings,
+  tripStats,
 } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useLayoutEffect, useRef } from "react";
@@ -165,6 +169,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                     <span className="font-mono text-xs text-muted">
                       {s.sessions} SESS
                       {s.playerId === detail.myPlayerId ? " · YOU" : ""}
+                      {streakLine(s.streak) ? ` · ${streakLine(s.streak)!.toUpperCase()}` : ""}
                     </span>
                   </span>
                   <span className={cn("font-mono text-xl font-bold tabular-nums", tone(s.net))}>
@@ -175,6 +180,8 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
             </ol>
           )}
         </section>
+
+        {closed.length > 0 ? <TripNumbers detail={detail} trip={trip} /> : null}
 
         {awards.length > 0 ? (
           <section className="flex flex-col gap-2">
@@ -332,6 +339,191 @@ export function TonightBoard({ detail, trip }: { detail: GroupDetail; trip: Trip
           ))}
         </ol>
       )}
+    </div>
+  );
+}
+
+/** How the group ran as a team, and the trip's numbers: totals, extremes, drawdown, high limit. */
+function TripNumbers({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+  const currency = detail.group.currency;
+  const names = playerNames(detail);
+  const stats = tripStats(trip.sessions.filter((s) => s.session.status === "closed"));
+  const money = (n: number) => boardMoney(Math.round(n), currency);
+  const { current, longestWin, longestLoss } = stats.team;
+  const tiles: ReadonlyArray<{ label: string; value: string; tone: number; note?: string }> = [
+    {
+      label: "Gross wins",
+      value: boardMoney(stats.grossWins, currency, false),
+      tone: 1,
+      note: "Every winning result",
+    },
+    {
+      label: "Gross losses",
+      value: money(stats.grossLosses),
+      tone: -1,
+      note: "Every losing result",
+    },
+    { label: "Average table", value: money(stats.average), tone: stats.average },
+    {
+      label: "Largest drawdown",
+      value: money(stats.drawdown),
+      tone: stats.drawdown,
+      note: "Biggest drop from a high",
+    },
+    ...(stats.best
+      ? [
+          {
+            label: "Best result",
+            value: money(stats.best.net),
+            tone: stats.best.net,
+            note: names.get(stats.best.playerId) ?? "",
+          },
+        ]
+      : []),
+    ...(stats.worst
+      ? [
+          {
+            label: "Worst result",
+            value: money(stats.worst.net),
+            tone: stats.worst.net,
+            note: names.get(stats.worst.playerId) ?? "",
+          },
+        ]
+      : []),
+    ...(stats.highLimit.sessions > 0
+      ? [
+          {
+            label: "High limit",
+            value: money(stats.highLimit.net),
+            tone: stats.highLimit.net,
+            note: `${stats.highLimit.sessions} ${stats.highLimit.sessions === 1 ? "table" : "tables"}`,
+          },
+          {
+            label: "Other tables",
+            value: money(stats.otherTables.net),
+            tone: stats.otherTables.net,
+            note: `${stats.otherTables.sessions} ${stats.otherTables.sessions === 1 ? "table" : "tables"}`,
+          },
+        ]
+      : []),
+  ];
+  return (
+    <>
+      <section className="flex flex-col gap-2">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-[15px] font-semibold">As a team</h2>
+          <span className={cn(label, "text-muted")}>
+            {`${stats.record.wins}W · ${stats.record.losses}L · ${stats.record.mixed} mixed`}
+          </span>
+        </div>
+        <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
+          <p
+            className={cn(
+              "font-display text-2xl leading-none tracking-wide uppercase",
+              current ? (current.result === "win" ? "text-win" : "text-loss") : "text-muted",
+            )}
+          >
+            {current
+              ? `${current.length} ${current.result === "win" ? (current.length === 1 ? "win" : "wins") : current.length === 1 ? "loss" : "losses"} in a row`
+              : "No run going"}
+          </p>
+          <dl className="grid grid-cols-3 gap-3 text-sm">
+            <div>
+              <dt className={cn(label, "text-muted")}>Best run</dt>
+              <dd className="font-mono tabular-nums">{longestWin}</dd>
+            </div>
+            <div>
+              <dt className={cn(label, "text-muted")}>Worst run</dt>
+              <dd className="font-mono tabular-nums">{longestLoss}</dd>
+            </div>
+            <div>
+              <dt className={cn(label, "text-muted")}>Team wins</dt>
+              <dd className="font-mono tabular-nums">{Math.round(stats.winRate * 100)}%</dd>
+            </div>
+          </dl>
+          <p className="text-xs text-pretty text-muted">
+            A team win is a table where everyone who played won; a team loss, where everyone lost.
+            Anything else is mixed and ends a run.
+          </p>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-[15px] font-semibold">The numbers</h2>
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {tiles.map((tile) => (
+            <div
+              key={tile.label}
+              className="flex flex-col gap-1 rounded-xl border border-line bg-surface p-3"
+            >
+              <dt className={cn(label, "text-muted")}>{tile.label}</dt>
+              <dd className={cn("font-mono text-lg font-bold tabular-nums", tone(tile.tone))}>
+                {tile.value}
+              </dd>
+              {tile.note ? <dd className="truncate text-xs text-muted">{tile.note}</dd> : null}
+            </div>
+          ))}
+        </dl>
+      </section>
+    </>
+  );
+}
+
+/** The trip night by night: every player's net, with their record, or that they sat it out. */
+export function DaysBoard({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+  const currency = detail.group.currency;
+  const names = playerNames(detail);
+  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const players = [...new Set(closed.flatMap((s) => s.results.map((r) => r.playerId)))];
+  const days = tripDays(closed, localClock, players);
+  const nights = tripNights(closed, localClock);
+  if (days.length === 0)
+    return (
+      <p className="mx-4 rounded-xl border border-line bg-surface p-4 text-sm text-muted sm:mx-6">
+        Close a session to start the first night.
+      </p>
+    );
+  return (
+    <div className="flex flex-col gap-4 px-4 pb-8 sm:px-6">
+      {days.toReversed().map((day) => (
+        <section key={day.key} className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-display text-xl tracking-wide uppercase">
+              {nightLabel(nights.find((n) => n.key === day.key)!)}
+            </h2>
+            <span className={cn(label, "text-muted")}>
+              {day.sessions} {day.sessions === 1 ? "table" : "tables"}
+            </span>
+          </div>
+          <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+            {day.rows.map((row) => (
+              <li key={row.playerId} className="flex items-center gap-3 px-3 py-3">
+                <Chip
+                  chip={chipOf(detail, row.playerId)}
+                  name={names.get(row.playerId) ?? "?"}
+                  size={26}
+                />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate">{names.get(row.playerId) ?? "Someone"}</span>
+                  <span className="font-mono text-xs text-muted">
+                    {row.net === null
+                      ? "No results recorded"
+                      : recordLine(row.wins, row.losses, row.even)}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    "font-mono text-lg font-bold tabular-nums",
+                    row.net === null ? "text-muted" : tone(row.net),
+                  )}
+                >
+                  {row.net === null ? "—" : boardMoney(row.net, currency)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

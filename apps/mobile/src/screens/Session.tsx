@@ -207,6 +207,7 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
         </PageTitle>
         <View className="flex-row items-center gap-2">
           {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
+          <HighLimitToggle detail={detail} />
           <Text className="flex-1 text-sm text-muted">
             {formatTime(session.startedAt)}
             {/* Imported sessions end when they start: no length was recorded. */}
@@ -632,6 +633,38 @@ function EntryActionsSheet({
  * Closes the table, taking the cash-outs of anyone still playing on the way, and can open the
  * next table with the same people.
  */
+/** Marks the table high limit or not; anyone in the group can, even after it closes. */
+function HighLimitToggle({ detail }: { detail: SessionDetail }) {
+  const stacks = useStacks();
+  const set = useAction(stacks.Client.mutation("sessions", "setHighLimit"));
+  const on = detail.session.highLimit;
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel="High-limit table"
+      accessibilityState={{ checked: on, disabled: set.pending }}
+      disabled={set.pending}
+      hitSlop={8}
+      onPress={() =>
+        void set.run({ params: { sessionId: detail.session.id }, payload: { highLimit: !on } })
+      }
+      className={cn(
+        "h-6 justify-center rounded-md px-2",
+        on ? "bg-accent/20" : "border border-line-strong",
+      )}
+    >
+      <Text
+        className={cn(
+          "font-mono text-[11px] tracking-[1px] uppercase",
+          on ? "text-accent-text" : "text-muted",
+        )}
+      >
+        High limit
+      </Text>
+    </Pressable>
+  );
+}
+
 function CloseSheet({
   detail,
   playing,

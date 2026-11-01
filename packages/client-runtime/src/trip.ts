@@ -89,3 +89,13 @@ export const chipOf = (detail: GroupDetail, playerId: PlayerId) => {
   const index = detail.players.findIndex((player) => player.id === playerId);
   return ((index === -1 ? 0 : index) % 8) + 1;
 };
+
+/** A run of results in words, once it's at least two long: "3 wins in a row". */
+export const streakLine = (streak: { readonly length: number; readonly winning: boolean }) =>
+  streak.length < 2 ? null : `${streak.length} ${streak.winning ? "wins" : "losses"} in a row`;
+
+/** A night's or a trip's record: "4W · 3L · 1 even", leaving out what's zero. */
+export const recordLine = (wins: number, losses: number, even: number) =>
+  [wins ? `${wins}W` : null, losses ? `${losses}L` : null, even ? `${even} even` : null]
+    .filter((part) => part !== null)
+    .join(" · ");
