@@ -421,3 +421,39 @@ export const tripDays = (
       ),
     };
   });
+
+export interface RouteStop<V> {
+  readonly venue: V;
+  /** 1 for the first casino visited. */
+  readonly number: number;
+  readonly visits: number;
+  /** The group's net there. */
+  readonly net: number;
+}
+
+/**
+ * Where the trip went: each casino once, numbered in the order it was first visited, and the path
+ * between them in the order the sessions were played, a casino repeated only after leaving it.
+ */
+export const tripRoute = <S extends TripSession & { readonly venue: { readonly id: VenueId } }>(
+  sessions: ReadonlyArray<S>,
+) => {
+  const stops = new Map<
+    VenueId,
+    { venue: S["venue"]; number: number; visits: number; net: number }
+  >();
+  const path: Array<S["venue"]> = [];
+  for (const s of sessions.toSorted((a, b) => startOf(a) - startOf(b))) {
+    const stop = stops.get(s.venue.id) ?? {
+      venue: s.venue,
+      number: stops.size + 1,
+      visits: 0,
+      net: 0,
+    };
+    stop.visits += 1;
+    stop.net += s.results.reduce((sum, r) => sum + r.net, 0);
+    stops.set(s.venue.id, stop);
+    if (path.at(-1)?.id !== s.venue.id) path.push(s.venue);
+  }
+  return { stops: [...stops.values()] as ReadonlyArray<RouteStop<S["venue"]>>, path };
+};

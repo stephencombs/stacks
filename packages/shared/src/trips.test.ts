@@ -11,6 +11,7 @@ import {
   tripFeed,
   tripNights,
   tripDays,
+  tripRoute,
   tripStandings,
   tripStats,
   teamResult,
@@ -457,6 +458,29 @@ describe("tripDays", () => {
       [BEA, 50],
       [ALEX, null],
       [CAL, null],
+    ]);
+  });
+});
+
+describe("tripRoute", () => {
+  it("numbers each casino by first visit and keeps the path in playing order", () => {
+    const route = tripRoute([
+      session(21, 20, [[ALEX, 500]], 1),
+      session(21, 22, [[ALEX, -100]], 1),
+      session(22, 20, [[BEA, 300]], 2),
+      session(22, 23, [[BEA, -50]], 1),
+      session(23, 1, [[CAL, 40]], 3),
+    ]);
+    expect(route.stops.map((s) => [s.venue.id, s.number, s.visits, s.net])).toEqual([
+      [venue(1).id, 1, 3, 350],
+      [venue(2).id, 2, 1, 300],
+      [venue(3).id, 3, 1, 40],
+    ]);
+    expect(route.path.map((v) => v.id)).toEqual([
+      venue(1).id,
+      venue(2).id,
+      venue(1).id,
+      venue(3).id,
     ]);
   });
 });

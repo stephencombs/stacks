@@ -23,7 +23,11 @@ export default (): ExpoConfig => ({
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   ios: { bundleIdentifier: id, supportsTablet: true },
-  android: { package: id },
+  android: {
+    package: id,
+    // Google's map on Android needs a key in the build; without one the route shows as a list.
+    config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_API_KEY } },
+  },
   plugins: [
     "@clerk/expo",
     "expo-secure-store",

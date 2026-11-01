@@ -6,7 +6,7 @@ import { localClock, tripDates } from "@stacks/client-runtime/trip";
 import { tonightBoard } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Choice, FormError } from "../components/ui/Field";
@@ -18,6 +18,7 @@ import { LiveBar } from "../features/LiveBar";
 import { TripStats } from "../features/RaceStats";
 import { SessionList } from "../features/SessionList";
 import { DaysBoard, TonightBoard, TripBoard } from "../features/TripBoard";
+import { TripRoute } from "../features/TripRoute";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { SessionView } from "./Session";
 import { SettleView } from "../features/SettleUp";
@@ -250,6 +251,8 @@ const boardViews = [
   { value: "trip", label: "Trip" },
   { value: "days", label: "Days" },
   { value: "race", label: "Race" },
+  // The route draws on the phone's own maps, which the web build doesn't have.
+  ...(Platform.OS === "web" ? [] : [{ value: "route", label: "Route" } as const]),
 ] as const;
 
 function BoardTab({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
@@ -275,6 +278,8 @@ function BoardTab({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
         <TripBoard detail={group} trip={trip} />
       ) : view === "days" ? (
         <DaysBoard detail={group} trip={trip} />
+      ) : view === "route" ? (
+        <TripRoute detail={group} trip={trip} />
       ) : (
         <TripStats detail={group} trip={trip} />
       )}
