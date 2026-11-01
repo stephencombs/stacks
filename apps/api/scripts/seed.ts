@@ -190,7 +190,7 @@ Effect.gen(function* () {
         }).pipe(as(owner));
       }
       if (isLive) continue;
-      yield* Sessions.close(sessionId, {
+      yield* Ledger.close(sessionId, {
         endedAt: DateTime.add(startedAt, { hours: between(3, 4) }),
       }).pipe(as(owner));
     }

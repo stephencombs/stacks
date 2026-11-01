@@ -523,7 +523,6 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
             .filter((id) => (results.get(id)?.buyIn ?? 0) > 0 && !cashedOut.has(id))
             .map((id) => ({ id, name: names.get(id) ?? "Player" }))}
           currency={currency}
-          record={record}
           onClose={() => setClosing(false)}
         />
       ) : null}
@@ -637,13 +636,11 @@ function CloseSheet({
   detail,
   playing,
   currency,
-  record,
   onClose,
 }: {
   detail: SessionDetail;
   playing: ReadonlyArray<{ readonly id: PlayerId; readonly name: string }>;
   currency: CurrencyCode;
-  record: (input: EntryInput) => void;
   onClose: () => void;
 }) {
   const stacks = useStacks();
@@ -660,20 +657,21 @@ function CloseSheet({
     }));
     if (cashOuts.some(({ amount }) => amount === null || amount < 0)) return setMissing(true);
     setMissing(false);
-    for (const { player, amount } of cashOuts)
-      record({
-        kind: "cash_out",
-        playerId: player.id,
-        counterpartyId: null,
-        amount: amount!,
-        note: null,
-        replacesEntryId: null,
-      });
-    setChips(new Map());
-    // Closing first would make the server refuse what's still waiting to be sent.
+    // Anything still waiting to be sent goes first, so the close counts it.
     await outbox.flush();
     if (outbox.pending().some((p) => p.sessionId === detail.session.id)) return;
-    if (!(await close.run({ params: { sessionId: detail.session.id }, payload: {} }))) return;
+    // The last cash-outs travel with the close: one request for the whole table.
+    const closed = await close.run({
+      params: { sessionId: detail.session.id },
+      payload: {
+        cashOuts: cashOuts.map(({ player, amount }) => ({
+          id: EntryId.make(newId()),
+          playerId: player.id,
+          amount: amount!,
+        })),
+      },
+    });
+    if (!closed) return;
     succeed();
     onClose();
     if (next)

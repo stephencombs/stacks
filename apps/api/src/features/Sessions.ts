@@ -6,7 +6,6 @@ import {
   CurrentUser,
   InvalidRequest,
   NotFound,
-  type CloseSessionRequest,
   type CreateSessionRequest,
   type MoveSessionRequest,
   type PlayerId,
@@ -195,42 +194,6 @@ export const setTable = Effect.fn("Sessions.setTable")(function* (
       yield* sql`update sessions set table_seats = ${request.seats} where id = ${sessionId}`;
     }),
   );
-  return yield* Views.sessionDetail(sessionId);
-});
-
-/** Closing locks the ledger for the session, so everyone who bought in must have cashed out. */
-export const close = Effect.fn("Sessions.close")(function* (
-  sessionId: SessionId,
-  request: typeof CloseSessionRequest.Type,
-) {
-  const sql = yield* SqlClient.SqlClient;
-  const { userId } = yield* CurrentUser;
-  const { session } = yield* access(sessionId);
-  if (session.status === "closed") return yield* Views.sessionDetail(sessionId);
-
-  const stillPlaying = yield* sql`
-    select sp.player_id from session_players sp
-    where sp.session_id = ${sessionId}
-      and exists (
-        select 1 from entries e where e.session_id = sp.session_id and e.player_id = sp.player_id
-          and e.kind = 'buy_in' and e.voided_at is null
-      )
-      and not exists (
-        select 1 from entries e where e.session_id = sp.session_id and e.player_id = sp.player_id
-          and e.kind = 'cash_out' and e.voided_at is null
-      )
-  `;
-  if (stillPlaying.length > 0) return yield* new Conflict({ reason: "players_not_cashed_out" });
-
-  const endedAt = request.endedAt ?? (yield* DateTime.now);
-  if (DateTime.isLessThan(endedAt, session.startedAt)) {
-    return yield* new InvalidRequest({ message: "A session can't end before it starts." });
-  }
-  yield* sql`
-    update sessions set status = 'closed', ended_at = ${DateTime.toDateUtc(endedAt)},
-      closed_by = ${userId}
-    where id = ${sessionId} and status = 'live'
-  `;
   return yield* Views.sessionDetail(sessionId);
 });
 

@@ -134,12 +134,19 @@ test.describe.serial("seats at a blackjack table", () => {
     await page.getByRole("button", { name: /^Gus, / }).click();
     await page.getByRole("button", { name: "Bust · $0" }).click();
     await expect(seat(/^Seat 5, Gus, busted$/)).toBeVisible();
-    await record("Cash out", "Alex", "1100");
-    await expect(seat(/^Seat 7, third base, Alex, \+\$800$/)).toBeVisible();
-
+    // Alex is still playing when the table closes: the close takes his cash-out with it, in one
+    // request rather than one per player.
+    const writes: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST" && request.url().includes("/api/sessions/"))
+        writes.push(new URL(request.url()).pathname.split("/").at(-1)!);
+    });
     await page.getByRole("button", { name: "Close session" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Close session" }).click();
+    const closing = page.getByRole("dialog");
+    await closing.getByLabel("Alex").fill("1100");
+    await closing.getByRole("button", { name: "Close session" }).click();
     await expect(page.getByText("Closed", { exact: true })).toBeVisible();
+    expect(writes).toEqual(["close"]);
     // Seats freeze once the session is closed.
     await expect(seat(/^Seat 7, third base, Alex, \+\$800$/)).toBeDisabled();
     await shoot(page, "table-closed");

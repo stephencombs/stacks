@@ -91,6 +91,13 @@ export const CreateSessionRequest = Schema.Struct({
 
 export const CloseSessionRequest = Schema.Struct({
   endedAt: Schema.optionalKey(Schema.DateTimeUtc),
+  /**
+   * What everyone still playing left with, recorded in the same write as the close, so a table
+   * closes in one request. Zero is a bust.
+   */
+  cashOuts: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ id: EntryId, playerId: PlayerId, amount: MinorUnits })),
+  ),
 });
 
 export const AddEntryRequest = Schema.Struct({

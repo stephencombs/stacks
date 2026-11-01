@@ -70,7 +70,7 @@ const sessions = HttpApiBuilder.group(StacksApi, "sessions", (handlers) =>
     .handle("setTable", ({ params, payload }) =>
       serve(Sessions.setTable(params.sessionId, payload)),
     )
-    .handle("close", ({ params, payload }) => serve(Sessions.close(params.sessionId, payload)))
+    .handle("close", ({ params, payload }) => serve(Ledger.close(params.sessionId, payload)))
     .handle("reopen", ({ params }) => serve(Sessions.reopen(params.sessionId)))
     .handle("move", ({ params, payload }) => serve(Sessions.move(params.sessionId, payload))),
 );
