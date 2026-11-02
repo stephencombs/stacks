@@ -15,7 +15,7 @@ import { UserPlus } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
-import { Button } from "~/components/ui/Button";
+import { Button, ButtonLink } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { cn } from "~/components/ui/cn";
@@ -37,7 +37,14 @@ import { formatMoney, parseMoney } from "@stacks/shared/money";
 import { seatCount, seatsNow } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import { playerResults, type PlayerResult } from "@stacks/shared/results";
-import { useAction, useOutbox, usePending, useStacks, useUnsaved } from "~/lib/stacks";
+import {
+  useAction,
+  useOutbox,
+  usePending,
+  useRememberTrip,
+  useStacks,
+  useUnsaved,
+} from "~/lib/stacks";
 
 type EntryInput = {
   readonly kind: EntryDraft["kind"];
@@ -48,21 +55,18 @@ type EntryInput = {
   readonly replacesEntryId: EntryId | null;
 };
 
-/**
- * A session: its players, history and what can be done with it. On a trip's Table tab it sits
- * under the trip's own header, so the venue heads a section instead of the page.
- */
 export function SessionView({
   session: detail,
   group,
-  inTrip = false,
 }: {
   session: SessionDetail;
   group: GroupDetail;
-  inTrip?: boolean;
 }) {
   const { session, venue } = detail;
   const { userId } = useAuth();
+  useRememberTrip(session.tripId);
+  const trip = group.trips.find((t) => t.id === session.tripId);
+  const tripEnded = trip ? trip.endedAt !== null : false;
   const names = playerNames(group);
   const currency = group.group.currency;
   const live = session.status === "live";
@@ -82,7 +86,10 @@ export function SessionView({
     ...detail.entries.map((entry) =>
       replaced.has(entry.id) ? { ...entry, voidedAt: entry.occurredAt } : entry,
     ),
-    ...recorded.map((entry) => ({ ...entry, voidedAt: null })),
+    ...recorded.map((entry) => ({
+      ...entry,
+      voidedAt: replaced.has(entry.id) ? (entry.occurredAt ?? session.startedAt) : null,
+    })),
   ];
   const resultOf = playerResults(counted);
   const cashedOut = new Set(
@@ -144,10 +151,20 @@ export function SessionView({
     results.reduce((sum, result) => sum + pick(result), 0);
   const buyIn = total((r) => r.buyIn);
   const cashOut = total((r) => r.cashOut);
+  const mySeated = detail.playerIds.includes(group.myPlayerId);
+  const focusPlayerId =
+    mySeated && !cashedOut.has(group.myPlayerId)
+      ? group.myPlayerId
+      : (seats.find((id) => !cashedOut.has(id)) ?? seats[0]);
+  const focusBought = focusPlayerId !== undefined && (resultOf.get(focusPlayerId)?.buyIn ?? 0) > 0;
+  const focusOut = focusPlayerId !== undefined && cashedOut.has(focusPlayerId);
+  const focusIsMe = focusPlayerId === group.myPlayerId;
+  const focusName = focusPlayerId ? (names.get(focusPlayerId) ?? "Player") : "Player";
   // Imported sessions end when they start: no length was recorded.
   const timed = session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt);
   const facts = (
     <>
+      {trip ? `${trip.name} · ` : ""}
       {gameNames[session.game]} · {formatDay(session.startedAt)} · {formatTime(session.startedAt)}
       {timed
         ? ` to ${formatTime(session.endedAt!)} (${formatDuration(session.startedAt, session.endedAt!)})`
@@ -172,32 +189,39 @@ export function SessionView({
 
   return (
     <>
-      {inTrip ? (
-        <div className="flex flex-col gap-1">
-          <div className="flex min-h-9 items-center gap-3">
-            <h2 className="min-w-0 truncate text-xl font-semibold">{venue.name}</h2>
-            <Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Closed"}</Tag>
-            <div className="-mr-3 ml-auto">
-              <HighLimitToggle detail={detail} />
-            </div>
-          </div>
-          <Note>{facts}</Note>
-          {notes}
+      <PageHeader
+        back={
+          <BackLink to="/trips/$tripId" params={{ tripId: session.tripId }}>
+            {trip?.name ?? group.group.name}
+          </BackLink>
+        }
+        options={<HighLimitToggle detail={detail} />}
+        title={venue.name}
+        tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Closed"}</Tag>}
+        context={facts}
+        tabs={notes}
+      />
+
+      {live && focusPlayerId ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => setDraft({ kind: "buy_in", playerId: focusPlayerId })}
+          >
+            {focusIsMe ? (focusBought && !focusOut ? "Rebuy" : "Buy in") : `Buy in · ${focusName}`}
+          </Button>
+          {focusBought && !focusOut ? (
+            <Button
+              variant="tint"
+              size="lg"
+              onClick={() => setDraft({ kind: "cash_out", playerId: focusPlayerId })}
+            >
+              {focusIsMe ? "Cash out" : `Cash out · ${focusName}`}
+            </Button>
+          ) : null}
         </div>
-      ) : (
-        <PageHeader
-          back={
-            <BackLink to="/trips/$tripId" params={{ tripId: session.tripId }}>
-              {group.trips.find((trip) => trip.id === session.tripId)?.name ?? group.group.name}
-            </BackLink>
-          }
-          options={<HighLimitToggle detail={detail} />}
-          title={venue.name}
-          tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Closed"}</Tag>}
-          context={facts}
-          tabs={notes}
-        />
-      )}
+      ) : null}
 
       {seatCount(session) ? (
         <TableMap
@@ -319,6 +343,7 @@ export function SessionView({
                 ) : (
                   <Button
                     size="sm"
+                    variant="tint"
                     className="min-w-20"
                     aria-label={`Buy in for ${name}`}
                     onClick={() => setDraft({ kind: "buy_in", playerId })}
@@ -333,11 +358,29 @@ export function SessionView({
         {live ? (
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pt-1">
             <Note>Pick a player to cash them out or record anything else.</Note>
-            <Button variant="primary" onClick={() => setClosing(true)}>
-              Close session
-            </Button>
+            <Button onClick={() => setClosing(true)}>Close session</Button>
           </div>
-        ) : null}
+        ) : (
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            {!tripEnded ? (
+              <ButtonLink
+                to="/trips/$tripId/sessions/new"
+                params={{ tripId: session.tripId }}
+                search={{ from: session.id }}
+                variant="primary"
+              >
+                Start another session
+              </ButtonLink>
+            ) : null}
+            <ButtonLink
+              to="/trips/$tripId/results"
+              params={{ tripId: session.tripId }}
+              variant={tripEnded ? "primary" : "secondary"}
+            >
+              See results
+            </ButtonLink>
+          </div>
+        )}
         {voidEntry.error ? <FormError>{voidEntry.error}</FormError> : null}
       </Section>
 

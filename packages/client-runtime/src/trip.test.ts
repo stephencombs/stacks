@@ -1,8 +1,25 @@
 import { expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
-import { CurrencyCode, SessionId, VenueId } from "@stacks/contracts";
+import {
+  CurrencyCode,
+  GroupId,
+  MinorUnits,
+  SessionId,
+  TripId,
+  UserId,
+  VenueId,
+} from "@stacks/contracts";
 
-import { awardLine, boardMoney, localClock, recordLine, streakLine } from "./trip.ts";
+import {
+  awardLine,
+  boardMoney,
+  localClock,
+  makeLastTripStore,
+  recordLine,
+  resolveEntry,
+  streakLine,
+  unsettledAmount,
+} from "./trip.ts";
 
 const usd = CurrencyCode.make("USD");
 const local = (day: number, hour: number) =>
@@ -46,4 +63,125 @@ it("puts runs and records into words", () => {
   expect(recordLine(4, 3, 0)).toBe("4W · 3L");
   expect(recordLine(8, 2, 1)).toBe("8W · 2L · 1 even");
   expect(recordLine(0, 0, 2)).toBe("2 even");
+});
+
+it("resolves app entry from the last-viewed trip and going trips across groups", () => {
+  const user = UserId.make("user_1");
+  const makeGroup = (id: string, name: string) => ({
+    id: GroupId.make(id),
+    name,
+    currency: usd,
+    createdAt: local(1, 12),
+  });
+  const makeTrip = (
+    id: string,
+    groupId: GroupId,
+    name: string,
+    startedDay: number,
+    ended: boolean,
+  ) => ({
+    id: TripId.make(id),
+    groupId,
+    name,
+    startedAt: local(startedDay, 12),
+    createdAt: local(startedDay, 12),
+    endedAt: ended ? local(startedDay + 2, 12) : null,
+    createdBy: user,
+  });
+
+  const vegasGroup = makeGroup("0192e7a0-0000-7000-8000-000000000010", "Vegas crew");
+  const homeGroup = makeGroup("0192e7a0-0000-7000-8000-000000000011", "Home game");
+  const pastTrip = makeTrip(
+    "0192e7a0-0000-7000-8000-000000000020",
+    vegasGroup.id,
+    "Spring",
+    10,
+    true,
+  );
+  const vegasTrip = makeTrip(
+    "0192e7a0-0000-7000-8000-000000000021",
+    vegasGroup.id,
+    "Fall Vegas",
+    20,
+    false,
+  );
+  const homeTrip = makeTrip(
+    "0192e7a0-0000-7000-8000-000000000022",
+    homeGroup.id,
+    "October",
+    22,
+    false,
+  );
+  const missingTripId = TripId.make("0192e7a0-0000-7000-8000-000000000099");
+
+  expect(resolveEntry([], null)).toEqual({ kind: "groups" });
+  expect(resolveEntry([{ group: vegasGroup, trips: [pastTrip] }], null)).toEqual({
+    kind: "groups",
+  });
+
+  expect(resolveEntry([{ group: vegasGroup, trips: [vegasTrip, pastTrip] }], null)).toEqual({
+    kind: "trip",
+    tripId: vegasTrip.id,
+  });
+
+  const multiple = [
+    { group: vegasGroup, trips: [vegasTrip, pastTrip] },
+    { group: homeGroup, trips: [homeTrip] },
+  ];
+  expect(resolveEntry(multiple, null)).toEqual({
+    kind: "choose",
+    trips: [
+      { group: homeGroup, trip: homeTrip },
+      { group: vegasGroup, trip: vegasTrip },
+    ],
+  });
+
+  expect(resolveEntry(multiple, pastTrip.id)).toEqual({
+    kind: "trip",
+    tripId: pastTrip.id,
+  });
+
+  expect(resolveEntry(multiple, missingTripId)).toEqual({
+    kind: "choose",
+    trips: [
+      { group: homeGroup, trip: homeTrip },
+      { group: vegasGroup, trip: vegasTrip },
+    ],
+  });
+});
+
+it("persists and notifies on last-viewed trip changes", () => {
+  let saved: string | null = "0192e7a0-0000-7000-8000-000000000021";
+  let notifications = 0;
+  const store = makeLastTripStore({
+    load: () => saved,
+    save: (next) => {
+      saved = next;
+    },
+  });
+  const unsubscribe = store.subscribe(() => {
+    notifications += 1;
+  });
+
+  const first = TripId.make("0192e7a0-0000-7000-8000-000000000021");
+  const second = TripId.make("0192e7a0-0000-7000-8000-000000000022");
+  expect(store.get()).toBe(first);
+  store.set(first);
+  expect(notifications).toBe(0);
+  store.set(second);
+  expect(store.get()).toBe(second);
+  expect(saved).toBe(second);
+  expect(notifications).toBe(1);
+  store.set(null);
+  expect(store.get()).toBeNull();
+  expect(saved).toBeNull();
+  expect(notifications).toBe(2);
+  unsubscribe();
+  store.set(first);
+  expect(notifications).toBe(2);
+
+  expect(
+    unsettledAmount({ unsettled: [{ tripId: second, amount: MinorUnits.make(4500) }] }, second),
+  ).toBe(4500);
+  expect(unsettledAmount({ unsettled: [] }, second)).toBeNull();
 });

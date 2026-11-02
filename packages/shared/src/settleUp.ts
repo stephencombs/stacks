@@ -44,3 +44,6 @@ export const settleUp = (balances: ReadonlyMap<PlayerId, MinorUnits>): ReadonlyA
   }
   return transfers;
 };
+
+export const leftToSettle = (transfers: ReadonlyArray<Transfer>): MinorUnits =>
+  MinorUnits.make(transfers.reduce((sum, transfer) => sum + transfer.amount, 0));

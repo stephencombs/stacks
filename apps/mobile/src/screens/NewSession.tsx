@@ -130,17 +130,7 @@ function NewSessionForm({
       },
     });
     if (!session) return;
-    // Back to the trip it was started from, whose Table tab now shows it; else open the trip.
-    const previous = navigation.getState()?.routes.at(-2);
-    const fromTrip =
-      previous?.name === "Home" ||
-      (previous?.name === "Trip" &&
-        (previous.params as { tripId?: string } | undefined)?.tripId === session.session.tripId);
-    if (fromTrip) navigation.goBack();
-    else
-      navigation.dispatch(
-        StackActions.replace("Trip", { tripId: session.session.tripId, tab: "table" }),
-      );
+    navigation.dispatch(StackActions.replace("Session", { sessionId: session.session.id }));
   };
 
   return (

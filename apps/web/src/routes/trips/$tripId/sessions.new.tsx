@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
+  InviteId,
   SessionId,
   TripId,
   type Game,
@@ -11,9 +12,10 @@ import {
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import * as DateTime from "effect/DateTime";
-import { UserPlus } from "lucide-react";
+import { Link2, UserPlus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
+import { CopyButton } from "~/components/CopyButton";
 import { Button } from "~/components/ui/Button";
 import { Checkbox } from "~/components/ui/Checkbox";
 import { FormError, Input, RadioCards } from "~/components/ui/Field";
@@ -26,7 +28,7 @@ import { PlayerName } from "~/features/Player";
 import { VenuePicker } from "~/features/VenuePicker";
 import { gameNames } from "@stacks/client-runtime/format";
 import { chipOf } from "@stacks/client-runtime/trip";
-import { Loaded, useAction, useStacks } from "~/lib/stacks";
+import { Loaded, useAction, useRememberTrip, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/trips/$tripId/sessions/new")({
   component: NewSession,
@@ -78,6 +80,7 @@ function NewSessionForm({
 }) {
   const stacks = useStacks();
   const navigate = useNavigate();
+  useRememberTrip(trip.trip.id);
   const create = useAction(stacks.Client.mutation("sessions", "create"));
   const [venue, setVenue] = useState<Venue | null>(from?.venue ?? null);
   const [game, setGame] = useState<Game>(from?.session.game ?? "blackjack");
@@ -90,6 +93,7 @@ function NewSessionForm({
     null,
   );
   const [addingGuest, setAddingGuest] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const players = detail.players.filter((player) => player.role !== null || player.userId === null);
 
@@ -125,7 +129,7 @@ function NewSessionForm({
       },
     });
     if (session)
-      void navigate({ to: "/trips/$tripId", params: { tripId: session.session.tripId } });
+      void navigate({ to: "/sessions/$sessionId", params: { sessionId: session.session.id } });
   };
 
   return (
@@ -137,6 +141,7 @@ function NewSessionForm({
           </BackLink>
         }
         title="Start a session"
+        context={`${detail.group.name} · ${trip.trip.name}`}
       />
 
       <Section title="Where">
@@ -160,12 +165,19 @@ function NewSessionForm({
       <Section
         title="Who's playing"
         action={
-          <Button size="sm" variant="ghost" onClick={() => setAddingGuest(true)}>
-            <UserPlus className="size-4" aria-hidden />
-            Add a guest
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="ghost" onClick={() => setInviting((open) => !open)}>
+              <Link2 className="size-4" aria-hidden />
+              Invite link
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setAddingGuest(true)}>
+              <UserPlus className="size-4" aria-hidden />
+              Add a guest
+            </Button>
+          </div>
         }
       >
+        {inviting ? <InlineInvite detail={detail} /> : null}
         <List>
           {players.map((player) => (
             <label key={player.id} className="block cursor-pointer hover:bg-sunken">
@@ -239,5 +251,47 @@ function NewSessionForm({
         onAdded={(id) => setPlayerIds((current) => new Set([...current, id]))}
       />
     </form>
+  );
+}
+
+function InlineInvite({ detail }: { detail: GroupDetail }) {
+  const stacks = useStacks();
+  const create = useAction(stacks.Client.mutation("invites", "create"));
+  const origin = window.location.origin;
+  return (
+    <div className="flex flex-col gap-2 rounded-xl bg-sunken p-3">
+      <Loaded query={stacks.invites(detail.group.id)} skeleton={<Skeleton className="h-10" />}>
+        {(invites) => {
+          const active = invites[0];
+          return active ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-sm text-muted">
+                {`${origin}/join/${active.code}`}
+              </span>
+              <CopyButton text={`${origin}/join/${active.code}`} />
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm text-muted">
+                Send a link so friends can join {detail.group.name}.
+              </span>
+              <Button
+                size="sm"
+                pending={create.pending}
+                onClick={() =>
+                  void create.run({
+                    params: { groupId: detail.group.id },
+                    payload: { id: InviteId.make(newId()), maxUses: null },
+                  })
+                }
+              >
+                New invite link
+              </Button>
+            </div>
+          );
+        }}
+      </Loaded>
+      {create.error ? <FormError>{create.error}</FormError> : null}
+    </div>
   );
 }

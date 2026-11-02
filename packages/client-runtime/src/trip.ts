@@ -1,8 +1,10 @@
 import * as DateTime from "effect/DateTime";
 import {
   MinorUnits,
+  TripId,
   type CurrencyCode,
   type GroupDetail,
+  type GroupListItem,
   type PlayerId,
   type Trip,
 } from "@stacks/contracts";
@@ -99,3 +101,56 @@ export const recordLine = (wins: number, losses: number, even: number) =>
   [wins ? `${wins}W` : null, losses ? `${losses}L` : null, even ? `${even} even` : null]
     .filter((part) => part !== null)
     .join(" · ");
+
+export type LastTripStorage = {
+  readonly load: () => string | null;
+  readonly save: (tripId: string | null) => void;
+};
+
+export const makeLastTripStore = (storage: LastTripStorage) => {
+  const listeners = new Set<() => void>();
+  const initial = storage.load();
+  let current = initial ? TripId.make(initial) : null;
+  return {
+    get: () => current,
+    set: (next: TripId | null) => {
+      if (next === current) return;
+      current = next;
+      storage.save(next);
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+};
+
+export const resolveEntry = (
+  groups: ReadonlyArray<Pick<GroupListItem, "group" | "trips">>,
+  lastTripId: TripId | null,
+) => {
+  if (lastTripId !== null) {
+    const exists = groups.some((item) => item.trips.some((trip) => trip.id === lastTripId));
+    if (exists) return { kind: "trip" as const, tripId: lastTripId };
+  }
+  const going = groups
+    .flatMap((item) =>
+      item.trips
+        .filter((trip) => trip.endedAt === null)
+        .map((trip) => ({ group: item.group, trip })),
+    )
+    .toSorted(
+      (a, b) => DateTime.toEpochMillis(b.trip.startedAt) - DateTime.toEpochMillis(a.trip.startedAt),
+    );
+  if (going.length === 1) return { kind: "trip" as const, tripId: going[0]!.trip.id };
+  if (going.length > 1) return { kind: "choose" as const, trips: going };
+  return { kind: "groups" as const };
+};
+
+export const unsettledAmount = (
+  detail: Pick<GroupDetail, "unsettled">,
+  tripId: TripId,
+): MinorUnits | null => detail.unsettled.find((item) => item.tripId === tripId)?.amount ?? null;

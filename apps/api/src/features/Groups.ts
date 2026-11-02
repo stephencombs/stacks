@@ -17,7 +17,7 @@ import {
 } from "@stacks/contracts";
 import { balances } from "@stacks/shared/balances";
 
-import { EntryRow, GroupRow, MembershipRow } from "../db/rows.ts";
+import { EntryRow, GroupRow, MembershipRow, TripRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
 import * as Views from "./Views.ts";
 
@@ -55,41 +55,45 @@ export const list = Effect.fn("Groups.list")(function* () {
   );
   if (rows.length === 0) return [];
 
+  const groupIds = rows.map((row) => row.id);
   const seatedIds = rows.flatMap((row) => (row.mySessionId ? [row.mySessionId] : []));
-  const seated =
-    seatedIds.length === 0
-      ? []
-      : yield* sql`
-          select s.id, s.trip_id, s.started_at, v.name as venue_name
-          from sessions s join venues v on v.id = s.venue_id
-          where s.id in ${sql.in(seatedIds)}
-        `.pipe(
-          Effect.flatMap(
-            Access.decodeRows(
-              Schema.Struct({
-                id: SessionId,
-                tripId: TripId,
-                startedAt: Schema.DateTimeUtcFromDate,
-                venueName: Schema.String,
-              }),
+  const [seated, groupTrips, entries, stakedRows] = yield* Effect.all(
+    [
+      seatedIds.length === 0
+        ? Effect.succeed([])
+        : sql`
+            select s.id, s.trip_id, s.started_at, v.name as venue_name
+            from sessions s join venues v on v.id = s.venue_id
+            where s.id in ${sql.in(seatedIds)}
+          `.pipe(
+            Effect.flatMap(
+              Access.decodeRows(
+                Schema.Struct({
+                  id: SessionId,
+                  tripId: TripId,
+                  startedAt: Schema.DateTimeUtcFromDate,
+                  venueName: Schema.String,
+                }),
+              ),
             ),
           ),
-        );
-
-  const entries = yield* sql`
-    select * from entries
-    where group_id in ${sql.in(rows.map((row) => row.id))}
-      and voided_at is null and counterparty_id is not null
-  `.pipe(Effect.flatMap(Access.decodeRows(EntryRow)));
-  // Stakes need each group's session results, so only groups with a live stake pay for them.
-  const staked = new Set(
-    (yield* sql`
-      select distinct group_id from stakes
-      where group_id in ${sql.in(rows.map((row) => row.id))} and voided_at is null
-    `.pipe(Effect.flatMap(Access.decodeRows(Schema.Struct({ groupId: GroupId }))))).map(
-      (row) => row.groupId,
-    ),
+      sql`
+        select * from trips where group_id in ${sql.in(groupIds)} order by started_at desc
+      `.pipe(Effect.flatMap(Access.decodeRows(TripRow))),
+      sql`
+        select * from entries
+        where group_id in ${sql.in(groupIds)}
+          and voided_at is null and counterparty_id is not null
+      `.pipe(Effect.flatMap(Access.decodeRows(EntryRow))),
+      // Stakes need each group's session results, so only groups with a live stake pay for them.
+      sql`
+        select distinct group_id from stakes
+        where group_id in ${sql.in(groupIds)} and voided_at is null
+      `.pipe(Effect.flatMap(Access.decodeRows(Schema.Struct({ groupId: GroupId })))),
+    ],
+    { concurrency: "unbounded" },
   );
+  const staked = new Set(stakedRows.map((row) => row.groupId));
   return yield* Effect.forEach(rows, (row) =>
     Effect.gen(function* () {
       const owed = staked.has(row.id)
@@ -102,6 +106,7 @@ export const list = Effect.fn("Groups.list")(function* () {
         myBalance: owed.get(row.playerId) ?? MinorUnits.make(0),
         liveSessionCount: row.liveSessionCount,
         currentTripId: row.currentTripId,
+        trips: groupTrips.filter((trip) => trip.groupId === row.id),
         mySession: seated.find((session) => session.id === row.mySessionId) ?? null,
       } satisfies GroupListItem;
     }),

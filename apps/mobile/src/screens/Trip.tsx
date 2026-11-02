@@ -1,10 +1,10 @@
 import { useAuth } from "@clerk/expo";
-import { TabActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import { useAtomValue } from "@effect/atom-react";
+import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
-import { localClock, tripDates } from "@stacks/client-runtime/trip";
-import { tonightBoard } from "@stacks/shared/trips";
-import * as DateTime from "effect/DateTime";
+import { tripDates } from "@stacks/client-runtime/trip";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useState } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -19,11 +19,10 @@ import { TripStats } from "../features/RaceStats";
 import { SessionList } from "../features/SessionList";
 import { DaysBoard, TonightBoard, TripBoard } from "../features/TripBoard";
 import { TripRoute } from "../features/TripRoute";
-import { Loaded, useAction, useStacks } from "../lib/stacks";
-import { SessionView } from "./Session";
+import { Loaded, useAction, useLastTrip, useRememberTrip, useStacks } from "../lib/stacks";
 import { SettleView } from "../features/SettleUp";
 import { TripTabs } from "../features/TripTabs";
-import { tripTabs, type TripTab } from "../features/tripTabConfig";
+import type { TripTab } from "../features/tripTabConfig";
 
 type Props = StaticScreenProps<{ tripId: string; tab?: TripTab }>;
 
@@ -31,9 +30,9 @@ export function TripScreen({ route }: Props) {
   return <TripHome tripId={TripId.make(route.params.tripId)} tab={route.params.tab} />;
 }
 
-/** A trip as three views of the same thing: your table, the board, and the money. */
 export function TripHome({ tripId, tab }: { tripId: TripId; tab?: TripTab | undefined }) {
   const stacks = useStacks();
+  useRememberTrip(tripId);
   return (
     <Loaded query={stacks.trip(tripId)} skeleton={<Skeleton className="m-4 h-96" />}>
       {(trip) => (
@@ -42,10 +41,9 @@ export function TripHome({ tripId, tab }: { tripId: TripId; tab?: TripTab | unde
           skeleton={<Skeleton className="m-4 h-96" />}
         >
           {(group) => (
-            // A link that asks for a tab (the live bar asks for the table) opens on it.
             <TripTabs
               key={tab ?? "default"}
-              initial={tab ?? (trip.trip.endedAt === null ? "table" : "board")}
+              initial={tab ?? "table"}
               render={(shown, barHeight) => (
                 <TripTabScreen trip={trip} group={group} tab={shown} barHeight={barHeight} />
               )}
@@ -68,7 +66,6 @@ function TripTabScreen({
   tab: TripTab;
   barHeight: number;
 }) {
-  const navigation = useNavigation();
   const mine = trip.sessions.find(
     (s) => s.session.status === "live" && s.playerIds.includes(group.myPlayerId),
   );
@@ -93,12 +90,7 @@ function TripTabScreen({
           )}
         </ScrollView>
       </ToastHost>
-      {tab !== "table" && mine ? (
-        <LiveBar
-          bottom={barHeight}
-          onPress={() => navigation.dispatch(TabActions.jumpTo(tripTabs.table.route))}
-        />
-      ) : null}
+      <LiveBar bottom={barHeight} />
     </View>
   );
 }
@@ -145,6 +137,10 @@ function Switcher({
   onClose: () => void;
 }) {
   const navigation = useNavigation();
+  const stacks = useStacks();
+  const otherGroups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []).filter(
+    (item) => item.group.id !== group.group.id,
+  );
   const go = (to: () => void) => {
     onClose();
     to();
@@ -172,6 +168,28 @@ function Switcher({
           </Row>
         ))}
       </List>
+      {otherGroups.length > 0 ? (
+        <List>
+          {otherGroups.map((item) => {
+            const going = item.trips.find((other) => other.endedAt === null);
+            return (
+              <Row
+                key={item.group.id}
+                onPress={() =>
+                  go(() =>
+                    going
+                      ? navigation.navigate("Trip", { tripId: going.id })
+                      : navigation.navigate("Group", { groupId: item.group.id }),
+                  )
+                }
+              >
+                <Text className="flex-1 text-base text-ink">{item.group.name}</Text>
+                {going ? <Text className="text-sm text-muted">{going.name}</Text> : null}
+              </Row>
+            );
+          })}
+        </List>
+      ) : null}
       <List>
         <Row onPress={() => go(() => navigation.navigate("Stats", { groupId }))}>
           <Text className="flex-1 text-base text-ink">All-time stats</Text>
@@ -204,41 +222,36 @@ function TableTab({
   group: GroupDetail;
   mine: TripDetail["sessions"][number] | undefined;
 }) {
-  const stacks = useStacks();
   const navigation = useNavigation();
-  // The table you just closed stays on screen with its results, until you start the next one.
-  const [kept, setKept] = useState(mine?.session.id ?? null);
-  if (mine && mine.session.id !== kept) setKept(mine.session.id);
-  const shown = trip.sessions.find((s) => s.session.id === kept);
-  const live = trip.sessions.filter((s) => s.session.status === "live");
+  const live = trip.sessions.filter((s) => s.session.status === "live" && s !== mine);
   const closed = trip.sessions.filter((s) => s.session.status === "closed").toReversed();
-  // One tree either way, so the table you're at stays mounted as it closes and shows its receipt.
   return (
     <View className="gap-6 px-4">
-      {mine ? null : trip.trip.endedAt === null ? (
+      {trip.trip.endedAt === null ? (
         <Button
           label="Start a session"
-          variant="primary"
+          variant={mine ? "secondary" : "primary"}
           size="lg"
           onPress={() => navigation.navigate("NewSession", { tripId: trip.trip.id })}
         />
       ) : (
         <Text className="text-base text-muted">This trip has ended. Reopen it to play more.</Text>
       )}
-      {shown ? (
-        <Loaded query={stacks.session(shown.session.id)} skeleton={<Skeleton className="h-96" />}>
-          {(session) => <SessionView detail={session} group={group} />}
-        </Loaded>
-      ) : null}
-      {!mine && live.length > 0 ? (
+      {mine ? (
         <View className="gap-2">
-          <SectionHeading>Live now</SectionHeading>
+          <SectionHeading>Your live session</SectionHeading>
+          <SessionList sessions={[mine]} detail={group} />
+        </View>
+      ) : null}
+      {live.length > 0 ? (
+        <View className="gap-2">
+          <SectionHeading>{mine ? "Other live sessions" : "Live sessions"}</SectionHeading>
           <SessionList sessions={live} detail={group} />
         </View>
       ) : null}
-      {!mine && closed.length > 0 ? (
+      {closed.length > 0 ? (
         <View className="gap-2">
-          <SectionHeading>Sessions</SectionHeading>
+          <SectionHeading>Past sessions</SectionHeading>
           <SessionList sessions={closed} detail={group} />
         </View>
       ) : null}
@@ -247,8 +260,8 @@ function TableTab({
 }
 
 const boardViews = [
+  { value: "trip", label: "Standings" },
   { value: "tonight", label: "Tonight" },
-  { value: "trip", label: "Trip" },
   { value: "days", label: "Days" },
   { value: "race", label: "Race" },
   // The route draws on the phone's own maps, which the web build doesn't have.
@@ -256,17 +269,7 @@ const boardViews = [
 ] as const;
 
 function BoardTab({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
-  // Opens on tonight while there's anything on it.
-  const [view, setView] = useState<(typeof boardViews)[number]["value"]>(() =>
-    tonightBoard(
-      trip.sessions.filter((s) => s.session.status === "closed"),
-      trip.sessions.filter((s) => s.session.status === "live"),
-      localClock,
-      DateTime.nowUnsafe(),
-    ).length > 0
-      ? "tonight"
-      : "trip",
-  );
+  const [view, setView] = useState<(typeof boardViews)[number]["value"]>("trip");
   return (
     <View className="gap-2">
       <View className="px-4">
@@ -302,6 +305,7 @@ function TripOptions({
   const end = useAction(stacks.Client.mutation("trips", "end"));
   const reopen = useAction(stacks.Client.mutation("trips", "reopen"));
   const remove = useAction(stacks.Client.mutation("trips", "delete"));
+  const { lastTripId, setLastTripId } = useLastTrip();
   const [confirming, setConfirming] = useState(false);
   const params = { tripId: trip.trip.id };
   const canDelete =
@@ -316,7 +320,12 @@ function TripOptions({
           size="lg"
           pending={end.pending}
           onPress={() =>
-            void end.run({ params, payload: {} }).then((ok) => (ok ? onClose() : undefined))
+            void end.run({ params, payload: {} }).then((ok) => {
+              if (ok) {
+                onClose();
+                navigation.navigate("Trip", { tripId: trip.trip.id, tab: "money" });
+              }
+            })
           }
         />
       ) : (
@@ -343,6 +352,7 @@ function TripOptions({
               if (!confirming) return setConfirming(true);
               void remove.run({ params }).then((ok) => {
                 if (!ok) return;
+                if (lastTripId === trip.trip.id) setLastTripId(null);
                 onClose();
                 navigation.goBack();
               });

@@ -2,7 +2,13 @@ import { useNavigation } from "@react-navigation/native";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import { boardMoney, chipOf, localClock, tripDates } from "@stacks/client-runtime/trip";
+import {
+  boardMoney,
+  chipOf,
+  localClock,
+  tripDates,
+  unsettledAmount,
+} from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
@@ -31,7 +37,7 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
           <Button
             label="Start a trip"
             size="sm"
-            variant="ghost"
+            variant={detail.trips.length === 0 ? "primary" : "ghost"}
             onPress={() => setStarting(true)}
           />
         }
@@ -66,13 +72,20 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
           {past.map((trip) => (
             <Row
               key={trip.id}
-              accessibilityHint="Opens the trip's board"
-              onPress={() => navigation.navigate("Trip", { tripId: trip.id })}
+              accessibilityHint="Opens the trip"
+              onPress={() =>
+                navigation.navigate("Trip", {
+                  tripId: trip.id,
+                  ...(unsettledAmount(detail, trip.id) ? { tab: "money" as const } : {}),
+                })
+              }
             >
               <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
                 {trip.name}
               </Text>
-              <Text className="text-sm text-muted">{tripDates(trip)}</Text>
+              <Text className="text-sm text-muted">
+                {unsettledAmount(detail, trip.id) ? "Needs settling" : tripDates(trip)}
+              </Text>
               <Icon name="chevron-right" color="faint" size={18} />
             </Row>
           ))}
@@ -138,7 +151,8 @@ function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () 
     });
     if (!saved) return;
     onClose();
-    navigation.navigate("Trip", { tripId: saved.id });
+    if (detail.trips.length === 0) navigation.navigate("NewSession", { tripId: saved.id });
+    else navigation.navigate("Trip", { tripId: saved.id });
   };
 
   return (

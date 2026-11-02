@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import type { MinorUnits, PlayerId } from "@stacks/contracts";
 
 import { balances } from "./balances.ts";
-import { settleUp } from "./settleUp.ts";
+import { leftToSettle, settleUp } from "./settleUp.ts";
 import { ALEX, BEA, CAL, DEE, RandomLedger, money, toEntries } from "./testing/ledgerArbitrary.ts";
 
 describe("settleUp", () => {
@@ -20,10 +20,12 @@ describe("settleUp", () => {
       { from: ALEX, to: DEE, amount: 1000 },
       { from: BEA, to: DEE, amount: 3000 },
     ]);
+    expect(leftToSettle(transfers)).toBe(10000);
   });
 
   it("needs no transfers when everyone is square", () => {
     expect(settleUp(new Map())).toEqual([]);
+    expect(leftToSettle([])).toBe(0);
   });
 
   it("refuses balances that don't add up", () => {
@@ -50,6 +52,10 @@ describe("settleUp", () => {
     }
     expect(Array.from(remaining.values()).every((amount) => amount === 0)).toBe(true);
     expect(transfers.length).toBeLessThanOrEqual(Math.max(owed.size - 1, 0));
+    const totalCredited = Array.from(owed.values())
+      .filter((amount) => amount > 0)
+      .reduce((sum, amount) => sum + amount, 0);
+    expect(leftToSettle(transfers)).toBe(totalCredited);
   });
 
   it.prop("doesn't depend on the order balances arrive in", [RandomLedger], ([ledger]) => {

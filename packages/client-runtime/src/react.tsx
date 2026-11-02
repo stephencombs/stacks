@@ -1,5 +1,5 @@
 import { useAtomSet } from "@effect/atom-react";
-import type { SessionId } from "@stacks/contracts";
+import type { SessionId, TripId } from "@stacks/contracts";
 import * as Cause from "effect/Cause";
 import * as Exit from "effect/Exit";
 import type * as Atom from "effect/reactivity/Atom";
@@ -15,6 +15,7 @@ import {
 import { LEDGER_KEYS, type Stacks } from "./api.ts";
 import { describeError } from "./errors.ts";
 import { makeOutbox, type Outbox, type OutboxStorage, type Pending } from "./outbox.ts";
+import { makeLastTripStore, type LastTripStorage } from "./trip.ts";
 
 /** Each app provides its own client, built with its own way of getting the Clerk token. */
 export const StacksContext = createContext<Stacks | null>(null);
@@ -129,4 +130,33 @@ export const useUnsaved = (
     /** Confirmed, and still to show up in what the screen has. */
     sent: sent.filter((p) => p.sessionId === sessionId && !known.has(p.entry.id)),
   };
+};
+
+type LastTripStore = ReturnType<typeof makeLastTripStore>;
+
+const LastTripContext = createContext<LastTripStore | null>(null);
+
+export function LastTripProvider({
+  storage,
+  children,
+}: {
+  storage: LastTripStorage;
+  children: ReactNode;
+}) {
+  const [store] = useState(() => makeLastTripStore(storage));
+  return <LastTripContext value={store}>{children}</LastTripContext>;
+}
+
+export const useLastTrip = () => {
+  const store = use(LastTripContext);
+  if (!store) throw new Error("useLastTrip needs a LastTripProvider above it");
+  const lastTripId = useSyncExternalStore(store.subscribe, store.get);
+  return { lastTripId, setLastTripId: store.set };
+};
+
+export const useRememberTrip = (tripId: TripId) => {
+  const store = use(LastTripContext);
+  useEffect(() => {
+    store?.set(tripId);
+  }, [store, tripId]);
 };

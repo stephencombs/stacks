@@ -3,7 +3,7 @@ import type { SFSymbol } from "expo-symbols";
 export type TripTab = "table" | "board" | "money";
 
 export const tripTabs = {
-  table: { route: "Table", label: "Table", symbol: "suit.club.fill" },
-  board: { route: "Board", label: "Board", symbol: "list.number" },
-  money: { route: "Money", label: "Money", symbol: "dollarsign.circle" },
+  table: { route: "Sessions", label: "Sessions", symbol: "suit.club.fill" },
+  board: { route: "Results", label: "Results", symbol: "list.number" },
+  money: { route: "SettleUp", label: "Settle up", symbol: "dollarsign.circle" },
 } as const satisfies Record<TripTab, { route: string; label: string; symbol: SFSymbol }>;

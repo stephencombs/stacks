@@ -16,8 +16,8 @@ export const Group = Schema.Struct({
 export type Group = typeof Group.Type;
 
 /**
- * Everyone who can appear in the ledger. A guest has no `userId` and carries the code that lets
- * them claim it; a member who left keeps their history and has no `role`.
+ * Everyone who can appear in the ledger. A guest carries the `claimCode` that lets them claim it;
+ * a former member keeps their history with no `role` and no `claimCode`.
  */
 export const Player = Schema.Struct({
   id: PlayerId,
@@ -91,6 +91,8 @@ export const GroupListItem = Schema.Struct({
   liveSessionCount: Schema.Int,
   /** The trip still going, most recently started first; where the app opens. */
   currentTripId: Schema.NullOr(TripId),
+  /** Newest first. */
+  trips: Schema.Array(Trip),
   /** The live session you're seated at, if any. */
   mySession: Schema.NullOr(
     Schema.Struct({
@@ -118,6 +120,7 @@ export const GroupDetail = Schema.Struct({
   players: Schema.Array(Player),
   /** Newest first. */
   trips: Schema.Array(Trip),
+  unsettled: Schema.Array(Schema.Struct({ tripId: TripId, amount: MinorUnits })),
 });
 export type GroupDetail = typeof GroupDetail.Type;
 
