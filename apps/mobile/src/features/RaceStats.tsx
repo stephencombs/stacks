@@ -13,8 +13,7 @@ import { useCSSVariable } from "uniwind";
 import { cn } from "../components/ui/cn";
 import { Chip } from "./Chip";
 
-// Board readouts: small mono caps, like the labels on a sportsbook screen.
-const label = "font-mono text-[11px] tracking-[1px] uppercase";
+const label = "text-sm";
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
 type Racer = { playerId: PlayerId; name: string; chip: number; running: ReadonlyArray<number> };
@@ -198,10 +197,7 @@ function Race<S extends RaceSession>({
           {at === last ? latest : `After session ${at + 1} of ${sessions.length}`} ·{" "}
           {where(session)}
         </Text>
-        <Text
-          accessibilityRole="header"
-          className="font-display text-4xl leading-10 text-ink uppercase"
-        >
+        <Text accessibilityRole="header" className="text-xl font-semibold text-ink">
           {headline}
           {second && leader!.now !== second.now ? (
             <Text className="font-mono text-3xl text-win">
@@ -321,10 +317,7 @@ function Race<S extends RaceSession>({
               className="h-0.5 w-4 rounded-full"
               style={{ backgroundColor: lineColor(p.chip) }}
             />
-            <Text
-              numberOfLines={1}
-              className="flex-1 font-display text-lg tracking-wide text-ink uppercase"
-            >
+            <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
               {p.name}
             </Text>
             <Text className={cn("font-mono text-lg", tone(p.now))}>
@@ -443,7 +436,7 @@ function Sheet({
 
       <View className="gap-2">
         <View className="flex-row items-baseline justify-between gap-3">
-          <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+          <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
             Every session
           </Text>
           <Text

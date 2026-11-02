@@ -22,8 +22,10 @@ import { cn } from "~/components/ui/cn";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { BackLink } from "~/components/ui/Nav";
-import { PageTitle, SectionHeading, Surface, Tag } from "~/components/ui/Surface";
+import { Note, PageHeader, Section } from "~/components/ui/Page";
+import { List, Row, RowText, Tag } from "~/components/ui/Surface";
 import { Chip } from "~/features/Chip";
+import { PlayerName } from "~/features/Player";
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
 import { TableMap } from "~/features/TableMap";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
@@ -48,7 +50,7 @@ type EntryInput = {
 
 /**
  * A session: its players, history and what can be done with it. On a trip's Table tab it sits
- * under the trip's own header, so it skips the way back and shows the venue as a section.
+ * under the trip's own header, so the venue heads a section instead of the page.
  */
 export function SessionView({
   session: detail,
@@ -137,47 +139,65 @@ export function SessionView({
   // Results already in when the page opened just sit there; ones that land here rack up.
   const [settledAtOpen] = useState(() => (live ? cashedOut : new Set(detail.playerIds)));
   const [closedAtOpen] = useState(!live);
+  const results = [...resultOf.values()];
+  const total = (pick: (result: PlayerResult) => number) =>
+    results.reduce((sum, result) => sum + pick(result), 0);
+  const buyIn = total((r) => r.buyIn);
+  const cashOut = total((r) => r.cashOut);
+  // Imported sessions end when they start: no length was recorded.
+  const timed = session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt);
+  const facts = (
+    <>
+      {gameNames[session.game]} · {formatDay(session.startedAt)} · {formatTime(session.startedAt)}
+      {timed
+        ? ` to ${formatTime(session.endedAt!)} (${formatDuration(session.startedAt, session.endedAt!)})`
+        : ""}
+      <br />
+      {/* Imported sessions only have each player's net, so there's no money in or out to show. */}
+      {buyIn === 0 && cashOut === 0 ? (
+        <>
+          Table net <Money amount={total((r) => r.net)} currency={currency} tone="result" />
+        </>
+      ) : (
+        <>
+          In <Money amount={buyIn} currency={currency} /> · Out{" "}
+          <Money amount={cashOut} currency={currency} />
+        </>
+      )}
+    </>
+  );
+  const notes = session.notes ? (
+    <p className="max-w-[65ch] text-sm text-pretty whitespace-pre-line">{session.notes}</p>
+  ) : null;
 
   return (
     <>
-      <div className={inTrip ? "flex flex-col gap-4" : "flex flex-col gap-4 pt-2"}>
-        {inTrip ? null : (
-          <BackLink to="/trips/$tripId" params={{ tripId: session.tripId }}>
-            {group.trips.find((trip) => trip.id === session.tripId)?.name ?? group.group.name}
-          </BackLink>
-        )}
-        <div className="flex flex-col gap-2">
-          {inTrip ? (
-            <div className="flex flex-col gap-1">
-              <h2 className="font-display text-3xl leading-none uppercase">{venue.name}</h2>
-              <p className="text-sm text-muted">
-                {gameNames[session.game]} · {formatDay(session.startedAt)}
-              </p>
+      {inTrip ? (
+        <div className="flex flex-col gap-1">
+          <div className="flex min-h-9 items-center gap-3">
+            <h2 className="min-w-0 truncate text-xl font-semibold">{venue.name}</h2>
+            <Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Closed"}</Tag>
+            <div className="-mr-3 ml-auto">
+              <HighLimitToggle detail={detail} />
             </div>
-          ) : (
-            <PageTitle context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
-              {venue.name}
-            </PageTitle>
-          )}
-          <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
-            {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
-            <HighLimitToggle detail={detail} />
-            {formatTime(session.startedAt)}
-            {/* Imported sessions end when they start: no length was recorded. */}
-            {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
-              ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
-              : ""}
-          </p>
+          </div>
+          <Note>{facts}</Note>
+          {notes}
         </div>
-        <TicketStub
-          players={detail.playerIds.length}
-          results={[...resultOf.values()]}
-          currency={currency}
+      ) : (
+        <PageHeader
+          back={
+            <BackLink to="/trips/$tripId" params={{ tripId: session.tripId }}>
+              {group.trips.find((trip) => trip.id === session.tripId)?.name ?? group.group.name}
+            </BackLink>
+          }
+          options={<HighLimitToggle detail={detail} />}
+          title={venue.name}
+          tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Closed"}</Tag>}
+          context={facts}
+          tabs={notes}
         />
-        {session.notes ? (
-          <p className="max-w-[65ch] text-sm text-pretty whitespace-pre-line">{session.notes}</p>
-        ) : null}
-      </div>
+      )}
 
       {seatCount(session) ? (
         <TableMap
@@ -195,20 +215,18 @@ export function SessionView({
         />
       ) : null}
 
-      <section className="flex flex-col gap-2">
-        <SectionHeading
-          action={
-            live ? (
-              <Button size="sm" variant="ghost" onClick={() => setAddingPlayer(true)}>
-                <UserPlus className="size-4" aria-hidden />
-                Add player
-              </Button>
-            ) : null
-          }
-        >
-          Players
-        </SectionHeading>
-        <Surface className="divide-y divide-line">
+      <Section
+        title="Players"
+        action={
+          live ? (
+            <Button size="sm" variant="ghost" onClick={() => setAddingPlayer(true)}>
+              <UserPlus className="size-4" aria-hidden />
+              Add player
+            </Button>
+          ) : null
+        }
+      >
+        <List>
           {seats.map((playerId, rank) => {
             const result = resultOf.get(playerId);
             const name = names.get(playerId) ?? "Player";
@@ -225,33 +243,30 @@ export function SessionView({
                 : "no buy-in yet";
             const row = (
               <>
-                <Chip chip={chipOf(group, playerId)} name={name} size={30} />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-display text-lg leading-tight tracking-wide uppercase">
-                    {name}
-                    {playerId === group.myPlayerId ? (
-                      <span className="font-sans text-sm tracking-normal text-muted normal-case">
-                        {" "}
-                        you
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="text-sm whitespace-nowrap text-muted tabular-nums">
-                    {result && result.buyIn === 0 && result.cashOut === 0 ? null : result ? (
-                      <>
-                        In <Money amount={result.buyIn} currency={currency} /> · Out{" "}
-                        <Money amount={result.cashOut} currency={currency} />
-                      </>
-                    ) : (
+                <Chip chip={chipOf(group, playerId)} name={name} size={28} />
+                <RowText
+                  title={<PlayerName name={name} you={playerId === group.myPlayerId} />}
+                  meta={
+                    !result ? (
                       "No buy-ins yet"
-                    )}
-                  </span>
-                </span>
+                    ) : result.buyIn === 0 && result.cashOut === 0 ? null : (
+                      <>
+                        In <Money amount={result.buyIn} currency={currency} />
+                        {final ? (
+                          <>
+                            {" "}
+                            · Out <Money amount={result.cashOut} currency={currency} />
+                          </>
+                        ) : null}
+                      </>
+                    )
+                  }
+                />
                 {final ? (
                   <span
                     key={live ? "live" : "closed"}
                     className={cn(
-                      "text-right text-lg font-bold whitespace-nowrap",
+                      "text-right font-semibold whitespace-nowrap",
                       (live ? !settledAtOpen.has(playerId) : !closedAtOpen) &&
                         "motion-safe:animate-rack",
                     )}
@@ -263,7 +278,7 @@ export function SessionView({
               </>
             );
             return (
-              <div key={playerId} className="flex items-center gap-3 pr-4">
+              <div key={playerId} className="flex min-h-14 items-center gap-3 pr-4">
                 {live ? (
                   <button
                     type="button"
@@ -272,12 +287,12 @@ export function SessionView({
                     onClick={() =>
                       setDraft({ kind: bought && !out ? "cash_out" : "buy_in", playerId })
                     }
-                    className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-5 text-left transition-colors duration-150 hover:bg-sunken"
+                    className="flex min-w-0 flex-1 items-center gap-3 self-stretch py-3 pl-4 text-left transition-colors duration-150 hover:bg-sunken focus-visible:-outline-offset-2"
                   >
                     {row}
                   </button>
                 ) : (
-                  <div className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-5">{row}</div>
+                  <div className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">{row}</div>
                 )}
                 {!live || out ? null : undoable ? (
                   <Button
@@ -295,7 +310,7 @@ export function SessionView({
                   <Button
                     size="sm"
                     variant="tint"
-                    className="min-w-20 font-mono"
+                    className="min-w-20 tabular-nums"
                     aria-label={`Rebuy for ${name}`}
                     onClick={() => rebuy(playerId, lastRebuy.amount)}
                   >
@@ -314,42 +329,44 @@ export function SessionView({
               </div>
             );
           })}
-        </Surface>
+        </List>
         {live ? (
-          <p className="text-sm text-muted">
-            Pick a player to cash them out or record anything else.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 pt-1">
+            <Note>Pick a player to cash them out or record anything else.</Note>
+            <Button variant="primary" onClick={() => setClosing(true)}>
+              Close session
+            </Button>
+          </div>
         ) : null}
         {voidEntry.error ? <FormError>{voidEntry.error}</FormError> : null}
-      </section>
+      </Section>
 
-      <section className="flex flex-col gap-2">
-        <SectionHeading>History</SectionHeading>
+      <Section title="History">
         {detail.entries.length === 0 && unsaved.length === 0 ? (
-          <p className="text-sm text-muted">
-            Buy-ins and cash-outs show up here as you record them.
-          </p>
+          <Note>Buy-ins and cash-outs show up here as you record them.</Note>
         ) : (
-          <Surface className="divide-y divide-line">
+          <List>
             {unsaved.toReversed().map(({ entry, failed }) => (
-              <div key={entry.id} className="flex items-center gap-4 px-5 py-3">
-                <span className="w-16 shrink-0 font-mono text-xs text-muted">
-                  {entry.occurredAt ? formatTime(entry.occurredAt) : ""}
-                </span>
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span>
-                    {names.get(entry.playerId)} {verbs[entry.kind]}{" "}
-                    <Money
-                      amount={entry.amount}
-                      currency={currency}
-                      tone={entry.kind === "adjustment" ? "result" : "plain"}
-                      className="font-medium"
-                    />
-                  </span>
-                  <span className={failed ? "text-sm text-danger" : "text-sm text-muted"}>
-                    {failed ?? "Saved in this browser, sending"}
-                  </span>
-                </div>
+              <Row key={entry.id}>
+                <RowText
+                  title={
+                    <>
+                      {names.get(entry.playerId)} {verbs[entry.kind]}{" "}
+                      <Money
+                        amount={entry.amount}
+                        currency={currency}
+                        tone={entry.kind === "adjustment" ? "result" : "plain"}
+                      />
+                    </>
+                  }
+                  meta={
+                    failed ? (
+                      <span className="text-danger">{failed}</span>
+                    ) : (
+                      "Saved in this browser, sending"
+                    )
+                  }
+                />
                 {failed ? (
                   <span className="flex gap-2">
                     <Button size="sm" onClick={() => void outbox.retry(entry.id)}>
@@ -360,7 +377,7 @@ export function SessionView({
                     </Button>
                   </span>
                 ) : null}
-              </div>
+              </Row>
             ))}
             {detail.entries.toReversed().map((entry) => (
               <EntryRow
@@ -394,11 +411,11 @@ export function SessionView({
                 }
               />
             ))}
-          </Surface>
+          </List>
         )}
-      </section>
+      </Section>
 
-      <SessionStatusActions detail={detail} group={group} onClose={() => setClosing(true)} />
+      {live ? null : <ReopenSession detail={detail} group={group} />}
 
       {draft ? (
         <EntryDialog
@@ -430,50 +447,6 @@ export function SessionView({
   );
 }
 
-/** The table at a glance, like the stub of a betting ticket: who sat down, what went in and out. */
-function TicketStub({
-  players: seated,
-  results,
-  currency,
-}: {
-  players: number;
-  results: ReadonlyArray<PlayerResult>;
-  currency: CurrencyCode;
-}) {
-  const total = (pick: (result: PlayerResult) => number) =>
-    MinorUnits.make(results.reduce((sum, result) => sum + pick(result), 0));
-  const buyIn = total((r) => r.buyIn);
-  const cashOut = total((r) => r.cashOut);
-  const players = { label: "Players", value: <>{seated}</> };
-  // Imported sessions only have each player's net, so there's no money in or out to show.
-  const cells =
-    buyIn === 0 && cashOut === 0
-      ? [
-          players,
-          {
-            label: "Table net",
-            value: <Money amount={total((r) => r.net)} currency={currency} tone="result" />,
-          },
-        ]
-      : [
-          players,
-          { label: "In", value: <Money amount={buyIn} currency={currency} /> },
-          { label: "Out", value: <Money amount={cashOut} currency={currency} /> },
-        ];
-  return (
-    <dl className="grid auto-cols-fr grid-flow-col divide-x divide-dashed divide-line-strong rounded-xl border border-dashed border-line-strong">
-      {cells.map((cell) => (
-        <div key={cell.label} className="flex min-w-0 flex-col gap-0.5 px-3 py-2.5">
-          <dt className="font-mono text-[11px] tracking-[0.08em] text-muted uppercase">
-            {cell.label}
-          </dt>
-          <dd className="truncate font-mono text-base font-bold">{cell.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 const UNDO_MS = 5000;
 
 const verbs = {
@@ -497,72 +470,45 @@ function EntryRow({
   const voided = entry.voidedAt !== null;
   const counterparty = entry.counterpartyId ? names.get(entry.counterpartyId) : null;
   return (
-    <div className="flex items-center gap-4 px-5 py-3">
-      <span className="w-16 shrink-0 font-mono text-xs text-muted">
-        {formatTime(entry.occurredAt)}
-      </span>
-      <div
-        className={
-          voided ? "flex min-w-0 flex-1 flex-col text-muted" : "flex min-w-0 flex-1 flex-col"
+    <Row>
+      <RowText
+        struck={voided}
+        title={
+          <>
+            {names.get(entry.playerId)}{" "}
+            {entry.kind === "cash_out" && entry.amount === 0 ? (
+              "busted"
+            ) : (
+              <>
+                {verbs[entry.kind]}{" "}
+                <Money
+                  amount={entry.amount}
+                  currency={group.group.currency}
+                  tone={entry.kind === "adjustment" ? "result" : "plain"}
+                />
+              </>
+            )}
+          </>
         }
-      >
-        <span className={voided ? "line-through" : undefined}>
-          {names.get(entry.playerId)}{" "}
-          {entry.kind === "cash_out" && entry.amount === 0 ? (
-            "busted"
-          ) : (
-            <>
-              {verbs[entry.kind]}{" "}
-              <Money
-                amount={entry.amount}
-                currency={group.group.currency}
-                tone={entry.kind === "adjustment" ? "result" : "plain"}
-                className="font-medium"
-              />
-            </>
-          )}
-        </span>
-        {counterparty || entry.note || voided ? (
-          <span className="text-sm text-muted">
-            {[
-              counterparty && entry.kind === "buy_in" ? `${counterparty} paid` : null,
-              counterparty && entry.kind === "cash_out" ? `${counterparty} has the cash` : null,
-              entry.note,
-              voided ? `Voided${entry.voidReason ? `: ${entry.voidReason}` : ""}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-        ) : null}
-      </div>
+        meta={[
+          formatTime(entry.occurredAt),
+          counterparty && entry.kind === "buy_in" ? `${counterparty} paid` : null,
+          counterparty && entry.kind === "cash_out" ? `${counterparty} has the cash` : null,
+          entry.note,
+          voided ? `Voided${entry.voidReason ? `: ${entry.voidReason}` : ""}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      />
       {actions}
-    </div>
+    </Row>
   );
 }
 
-function SessionStatusActions({
-  detail,
-  group,
-  onClose,
-}: {
-  detail: SessionDetail;
-  group: GroupDetail;
-  onClose: () => void;
-}) {
+/** A closed session's way back: an admin can reopen it to fix a mistake. */
+function ReopenSession({ detail, group }: { detail: SessionDetail; group: GroupDetail }) {
   const stacks = useStacks();
   const reopen = useAction(stacks.Client.mutation("sessions", "reopen"));
-  if (detail.session.status === "live") {
-    return (
-      <Button
-        variant="primary"
-        size="lg"
-        className="w-full sm:w-auto sm:self-start"
-        onClick={onClose}
-      >
-        Close session
-      </Button>
-    );
-  }
   if (!isAdmin(group)) return null;
   return (
     <div className="flex flex-col items-start gap-2">
@@ -572,11 +518,30 @@ function SessionStatusActions({
       >
         {reopen.pending ? "Reopening…" : "Reopen session"}
       </Button>
-      <p className="text-sm text-muted">
-        Reopen to fix a mistake. Closed sessions can't be edited.
-      </p>
+      <Note>Reopen to fix a mistake. Closed sessions can't be edited.</Note>
       {reopen.error ? <FormError>{reopen.error}</FormError> : null}
     </div>
+  );
+}
+
+/** Marks the table high limit or not; anyone in the group can, even after it closes. */
+function HighLimitToggle({ detail }: { detail: SessionDetail }) {
+  const stacks = useStacks();
+  const set = useAction(stacks.Client.mutation("sessions", "setHighLimit"));
+  const on = detail.session.highLimit;
+  return (
+    <Button
+      size="sm"
+      variant={on ? "tint" : "ghost"}
+      aria-pressed={on}
+      disabled={set.pending}
+      title={on ? "Played at a high-limit table" : "Mark as a high-limit table"}
+      onClick={() =>
+        void set.run({ params: { sessionId: detail.session.id }, payload: { highLimit: !on } })
+      }
+    >
+      High limit
+    </Button>
   );
 }
 
@@ -584,32 +549,6 @@ function SessionStatusActions({
  * Closes the table, taking the cash-outs of anyone still playing on the way, and can open the
  * next table with the same people.
  */
-/** Marks the table high limit or not; anyone in the group can, even after it closes. */
-function HighLimitToggle({ detail }: { detail: SessionDetail }) {
-  const stacks = useStacks();
-  const set = useAction(stacks.Client.mutation("sessions", "setHighLimit"));
-  const on = detail.session.highLimit;
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      disabled={set.pending}
-      title={on ? "Played at a high-limit table" : "Mark as a high-limit table"}
-      onClick={() =>
-        void set.run({ params: { sessionId: detail.session.id }, payload: { highLimit: !on } })
-      }
-      className={cn(
-        "inline-flex h-6 items-center rounded-md px-2 font-mono text-[11px] font-medium tracking-[0.08em] uppercase transition-colors duration-150",
-        on
-          ? "bg-[color-mix(in_oklch,var(--color-accent)_18%,transparent)] text-accent-text"
-          : "text-muted shadow-[inset_0_0_0_1px_var(--color-line-strong)] hover:text-ink",
-      )}
-    >
-      High limit
-    </button>
-  );
-}
-
 function CloseSessionDialog({
   detail,
   playing,
@@ -687,7 +626,7 @@ function CloseSessionDialog({
                     inputMode="decimal"
                     autoComplete="off"
                     placeholder="0 if they busted"
-                    className="font-mono"
+                    className="tabular-nums"
                   />
                 )}
               </Field>

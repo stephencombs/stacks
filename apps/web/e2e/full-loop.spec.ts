@@ -54,9 +54,11 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByLabel("Your name in this group")).toHaveValue("Alex");
     await alex.getByRole("button", { name: "Create group" }).click();
     await expect(alex.getByRole("heading", { name: "Vegas crew" })).toBeVisible();
+    await expect(alex).toHaveTitle("Trips · Vegas crew · Stacks");
 
     // Alex invites Bea and adds Gus as a guest.
     await alex.getByRole("link", { name: "People" }).click();
+    await expect(alex).toHaveTitle("People · Vegas crew · Stacks");
     await alex.getByRole("button", { name: "New invite link" }).click();
     const inviteLink = (await alex.getByText(/\/join\//).textContent())!;
     await alex.getByRole("button", { name: "Add a guest" }).click();
@@ -82,6 +84,16 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("button", { name: "Start trip" }).click();
     await expect(alex.getByRole("heading", { name: "Vegas weekend" })).toBeVisible();
     await alex.getByRole("link", { name: "Start a session" }).first().click();
+    await alex.route(/\/api\/venues\?/, (route) =>
+      route.fulfill({ status: 503, body: "Unavailable" }),
+    );
+    await alex.getByLabel("Search venues").fill("Unavailable venue");
+    await expect(alex.getByRole("button", { name: "Retry venue search" })).toBeVisible();
+    await expect(alex.getByText(/No venues match/)).toHaveCount(0);
+    await alex.unroute(/\/api\/venues\?/);
+    await alex.getByRole("button", { name: "Retry venue search" }).click();
+    await expect(alex.getByText(/No venues match/)).toBeVisible();
+    await alex.getByLabel("Search venues").fill("");
     await alex.getByRole("button", { name: "Add a venue" }).click();
     await alex.getByLabel("Name", { exact: true }).fill(`Bellagio test ${Date.now().toString(36)}`);
     await alex.getByLabel("City").fill("Las Vegas");
@@ -103,7 +115,13 @@ test.describe.serial("a group's first night out", () => {
       await alex.getByRole("button", { name: new RegExp(`^${player}, `) }).click();
       const dialog = alex.getByRole("dialog");
       await dialog.getByText(kind, { exact: true }).click();
+      await dialog.getByLabel("Amount").fill("invalid");
+      await dialog
+        .getByRole("button", { name: kind === "Buy in" ? "Record buy in" : "Record cash out" })
+        .click();
+      await expect(dialog.getByLabel("Amount")).toHaveAttribute("aria-invalid", "true");
       await dialog.getByLabel("Amount").fill(amount);
+      await expect(dialog.getByLabel("Amount")).not.toHaveAttribute("aria-invalid", "true");
       if (counterparty) {
         await dialog
           .getByLabel(kind === "Buy in" ? "Whose money" : "Who has the cash")
@@ -138,7 +156,7 @@ test.describe.serial("a group's first night out", () => {
     const trip = alex.getByRole("navigation", { name: "Trip" });
     await trip.getByRole("link", { name: "Board" }).click();
     await expect(alex.getByText("$450", { exact: true })).toBeVisible();
-    await expect(alex.getByText("IN PLAY $150")).toBeVisible();
+    await expect(alex.getByRole("list", { name: "Tonight" })).toContainText("In play $150");
     await shoot(alex, "tonight-live");
     await trip.getByRole("link", { name: "Table" }).click();
 
@@ -184,11 +202,11 @@ test.describe.serial("a group's first night out", () => {
     await expect(tonight.getByRole("listitem").first()).toContainText("+$170");
     await shoot(alex, "tonight");
     await alex.getByRole("button", { name: "Trip", exact: true }).click();
-    const board = alex.getByRole("list").filter({ hasText: "SESS" });
+    const board = alex.getByRole("list", { name: "Standings" });
     await expect(board.getByRole("listitem").first()).toContainText("+$170");
     await expect(alex.getByText("Biggest hit")).toBeVisible();
     // The trip's numbers: one table where some won and some lost, so no team run yet.
-    await expect(alex.getByText("No run going")).toBeVisible();
+    await expect(alex.getByText("0W · 0L · 1 mixed")).toBeVisible();
     await expect(alex.getByText("Largest drawdown")).toBeVisible();
     await shoot(alex, "trip-board");
     // Night by night, everyone's result, and nobody's missing night counted as even.
@@ -237,7 +255,7 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByText("Ended", { exact: true })).toBeVisible();
     await alex.getByRole("button", { name: "Actions for Vegas weekend" }).click();
     await alex.getByRole("menuitem", { name: "Reopen trip" }).click();
-    await expect(alex.getByText("Going", { exact: true })).toBeVisible();
+    await expect(alex.getByText("Ended", { exact: true })).toHaveCount(0);
     await alex.getByRole("link", { name: "Vegas crew" }).click();
     await alex.getByRole("button", { name: "Start a trip" }).click();
     await alex.getByLabel("Trip name").fill("Maybe Reno");

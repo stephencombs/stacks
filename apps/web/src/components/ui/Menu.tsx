@@ -20,7 +20,7 @@ export function Menu({
     <BaseMenu.Root>
       <BaseMenu.Trigger
         aria-label={label}
-        className="inline-flex size-9 items-center pointer-coarse:size-11 justify-center rounded-lg text-muted transition-colors duration-150 hover:bg-sunken hover:text-ink data-[popup-open]:bg-sunken"
+        className="inline-flex size-10 items-center pointer-coarse:size-11 justify-center rounded-lg text-muted transition-colors duration-150 hover:bg-sunken hover:text-ink data-[popup-open]:bg-sunken"
       >
         {icon}
       </BaseMenu.Trigger>

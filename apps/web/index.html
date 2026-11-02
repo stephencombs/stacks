@@ -2,9 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <meta name="theme-color" content="#0e1116" />
+    <meta
+      name="description"
+      content="Log buy-ins and cash-outs as you play. Stacks works out everyone's results and who owes whom. You pay each other however you like."
+    />
     <title>Stacks</title>
+    <link
+      rel="preload"
+      href="/node_modules/@fontsource/barlow-condensed/files/barlow-condensed-latin-700-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <!-- Applies the saved theme before first paint, so a light-mode reload never flashes dark.
          Keep in step with src/lib/theme.ts. -->
     <script>
@@ -13,8 +27,10 @@
         if (
           choice === "light" ||
           (choice === "system" && matchMedia("(prefers-color-scheme: light)").matches)
-        )
+        ) {
           document.documentElement.dataset.theme = "light";
+          document.querySelector('meta[name="theme-color"]').content = "#f1f3f6";
+        }
       } catch {}
     </script>
   </head>

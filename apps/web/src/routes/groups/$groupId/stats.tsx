@@ -2,16 +2,17 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   GroupId,
   MinorUnits,
+  type CurrencyCode,
   type GroupDetail,
   type GroupStats,
   type PlayerResult,
 } from "@stacks/contracts";
 import { gameNames, playedSummary } from "@stacks/client-runtime/format";
 import { seatLabel } from "@stacks/client-runtime/table";
-import type { ReactNode } from "react";
 
 import { Money } from "~/components/Money";
-import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
+import { EmptyState, Note, Section } from "~/components/ui/Page";
+import { Skeleton, Surface } from "~/components/ui/Surface";
 import { GroupHeader } from "~/features/GroupHeader";
 import { RaceStats } from "~/features/RaceStats";
 import { Loaded, useStacks } from "~/lib/stacks";
@@ -23,7 +24,7 @@ function Stats() {
   const stacks = useStacks();
   const id = GroupId.make(groupId);
   return (
-    <Loaded query={stacks.group(id)} skeleton={<Skeleton className="mt-4 h-96" />}>
+    <Loaded query={stacks.group(id)} skeleton={<Skeleton className="h-96" />}>
       {(detail) => (
         <>
           <GroupHeader detail={detail} current="stats" />
@@ -67,97 +68,79 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
 
   return (
     <>
-      <p className="-mt-2 text-pretty text-muted">
-        {playedSummary(stats.sessionCount, stats.minutesPlayed)}
-      </p>
-
       <RaceStats
         detail={detail}
         sessions={sessions}
         marks={marks}
         where={(session) => trips.get(session.tripId) ?? ""}
-        latest="All-time"
         empty="Stats count closed sessions, so close one to see how everyone's doing."
       />
-
-      <section className="flex flex-col gap-2">
-        <SectionHeading>By game</SectionHeading>
-        <Table head={["Game", "Sessions", "Table net"]}>
-          {byNet(stats.byGame).map((row) => (
-            <tr key={row.key}>
-              <td className="px-3 py-3 sm:px-5">{gameNames[row.key]}</td>
-              <td className="px-3 py-3 sm:px-5 text-right font-mono text-muted">
-                {row.sessionCount}
-              </td>
-              <td className="px-3 py-3 sm:px-5 text-right font-bold">
-                <Money amount={tableNet(row.results)} currency={currency} tone="result" />
-              </td>
-            </tr>
-          ))}
-        </Table>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <SectionHeading>By casino</SectionHeading>
-        <Table head={["Casino", "Sessions", "Table net"]}>
-          {byNet(stats.byVenue).map((row) => (
-            <tr key={row.key.id}>
-              <td className="px-3 py-3 sm:px-5">{row.key.name}</td>
-              <td className="px-3 py-3 sm:px-5 text-right font-mono text-muted">
-                {row.sessionCount}
-              </td>
-              <td className="px-3 py-3 sm:px-5 text-right font-bold">
-                <Money amount={tableNet(row.results)} currency={currency} tone="result" />
-              </td>
-            </tr>
-          ))}
-        </Table>
-      </section>
-
+      <Breakdown
+        title="By game"
+        rows={byNet(stats.byGame).map((row) => ({
+          ...row,
+          id: row.key,
+          label: gameNames[row.key],
+        }))}
+        currency={currency}
+      />
+      <Breakdown
+        title="By casino"
+        rows={byNet(stats.byVenue).map((row) => ({ ...row, id: row.key.id, label: row.key.name }))}
+        currency={currency}
+      />
       {stats.bySeat.length > 0 ? (
-        <section className="flex flex-col gap-2">
-          <SectionHeading>By blackjack seat</SectionHeading>
-          <Table head={["Seat", "Sessions", "Table net"]}>
-            {stats.bySeat.map((row) => (
-              <tr key={row.key}>
-                <td className="px-3 py-3 sm:px-5">{seatLabel(row.key)}</td>
-                <td className="px-3 py-3 sm:px-5 text-right font-mono text-muted">
-                  {row.sessionCount}
-                </td>
-                <td className="px-3 py-3 sm:px-5 text-right font-bold">
-                  <Money amount={tableNet(row.results)} currency={currency} tone="result" />
-                </td>
-              </tr>
-            ))}
-          </Table>
-        </section>
+        <Breakdown
+          title="By blackjack seat"
+          rows={stats.bySeat.map((row) => ({ ...row, id: row.key, label: seatLabel(row.key) }))}
+          currency={currency}
+        />
       ) : null}
+      <Note>{playedSummary(stats.sessionCount, stats.minutesPlayed)}</Note>
     </>
   );
 }
 
-function Table({ head, children }: { head: ReadonlyArray<string>; children: ReactNode }) {
+function Breakdown({
+  title,
+  rows,
+  currency,
+}: {
+  title: string;
+  rows: ReadonlyArray<{
+    readonly id: string | number;
+    readonly label: string;
+    readonly sessionCount: number;
+    readonly results: ReadonlyArray<PlayerResult>;
+  }>;
+  currency: CurrencyCode;
+}) {
   return (
-    <Surface className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-line text-left text-xs text-muted">
-            {head.map((label, index) => (
-              <th
-                key={label}
-                className={
-                  index === 0
-                    ? "px-3 py-2.5 font-medium sm:px-5"
-                    : "px-3 py-2.5 text-right font-medium sm:px-5"
-                }
-              >
-                {label}
+    <Section title={title}>
+      <Surface className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-line text-sm text-muted">
+              <th className="px-4 py-2.5 text-left font-normal">
+                <span className="sr-only">{title}</span>
               </th>
+              <th className="px-4 py-2.5 text-right font-normal">Sessions</th>
+              <th className="px-4 py-2.5 text-right font-normal">Table net</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td className="px-4 py-3 font-medium">{row.label}</td>
+                <td className="px-4 py-3 text-right text-muted tabular-nums">{row.sessionCount}</td>
+                <td className="px-4 py-3 text-right font-semibold">
+                  <Money amount={tableNet(row.results)} currency={currency} tone="result" />
+                </td>
+              </tr>
             ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">{children}</tbody>
-      </table>
-    </Surface>
+          </tbody>
+        </table>
+      </Surface>
+    </Section>
   );
 }

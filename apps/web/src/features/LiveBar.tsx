@@ -4,6 +4,7 @@ import { formatTime } from "@stacks/client-runtime/format";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { ChevronRight } from "lucide-react";
 
+import { Tag } from "~/components/ui/Surface";
 import { useStacks } from "~/lib/stacks";
 
 /**
@@ -19,20 +20,16 @@ export function LiveBar() {
   const onIt = [`/trips/${seat.tripId}`, `/trips/${seat.tripId}/`, `/sessions/${seat.id}`];
   if (onIt.includes(pathname)) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <Link
         to="/trips/$tripId"
         params={{ tripId: seat.tripId }}
         aria-label={`Back to your table at ${seat.venueName}`}
-        className="pointer-events-auto mx-auto flex min-h-13 w-full max-w-2xl items-center gap-3 rounded-xl bg-surface px-4 py-3 shadow-[0_0_0_1px_var(--color-line-strong),0_8px_24px_-8px_rgb(0_0_0/0.4)] hover:bg-sunken"
+        className="pointer-events-auto mx-auto flex min-h-14 w-full max-w-[40rem] items-center gap-3 rounded-xl bg-surface px-4 py-3 shadow-[0_0_0_1px_var(--color-line-strong),0_8px_24px_-8px_rgb(0_0_0/0.4)] hover:bg-sunken"
       >
-        <span
-          aria-hidden
-          className="size-2 animate-pulse rounded-full bg-live motion-reduce:animate-none"
-        />
-        <span className="font-mono text-[11px] tracking-[0.08em] text-live uppercase">Live</span>
+        <Tag tone="live">Live</Tag>
         <span className="min-w-0 flex-1 truncate font-medium">{seat.venueName}</span>
-        <span className="font-mono text-xs text-muted">since {formatTime(seat.startedAt)}</span>
+        <span className="text-sm text-muted tabular-nums">since {formatTime(seat.startedAt)}</span>
         <ChevronRight className="size-4 text-muted" aria-hidden />
       </Link>
     </div>

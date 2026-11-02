@@ -17,10 +17,13 @@ import { useState, type FormEvent } from "react";
 import { Button } from "~/components/ui/Button";
 import { Checkbox } from "~/components/ui/Checkbox";
 import { FormError, Input } from "~/components/ui/Field";
-import { PageTitle, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
+import { BackLink } from "~/components/ui/Nav";
+import { Note, PageHeader, Section } from "~/components/ui/Page";
+import { List, Row, RowText, Skeleton } from "~/components/ui/Surface";
 import { cn } from "~/components/ui/cn";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
 import { Chip } from "~/features/Chip";
+import { PlayerName } from "~/features/Player";
 import { VenuePicker } from "~/features/VenuePicker";
 import { gameNames } from "@stacks/client-runtime/format";
 import { chipOf } from "@stacks/client-runtime/trip";
@@ -38,17 +41,14 @@ function NewSession() {
   const { from } = Route.useSearch();
   const stacks = useStacks();
   return (
-    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="mt-4 h-96" />}>
+    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="h-96" />}>
       {(trip) => (
-        <Loaded
-          query={stacks.group(trip.trip.groupId)}
-          skeleton={<Skeleton className="mt-4 h-96" />}
-        >
+        <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
           {(detail) =>
             from ? (
               <Loaded
                 query={stacks.session(SessionId.make(from))}
-                skeleton={<Skeleton className="mt-4 h-96" />}
+                skeleton={<Skeleton className="h-96" />}
               >
                 {(session) => <NewSessionForm detail={detail} trip={trip} from={session} />}
               </Loaded>
@@ -130,27 +130,30 @@ function NewSessionForm({
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-8 pt-4">
-      <PageTitle context={`${detail.group.name} · ${trip.trip.name}`}>Start a session</PageTitle>
+    <form onSubmit={submit} className="flex flex-col gap-8">
+      <PageHeader
+        back={
+          <BackLink to="/trips/$tripId" params={{ tripId: trip.trip.id }}>
+            {trip.trip.name}
+          </BackLink>
+        }
+        title="Start a session"
+      />
 
-      <section className="flex flex-col gap-2">
-        <SectionHeading>Where</SectionHeading>
-        <Surface className="p-4">
-          <VenuePicker groupId={detail.group.id} selected={venue} onSelect={setVenue} />
-        </Surface>
-      </section>
+      <Section title="Where">
+        <VenuePicker groupId={detail.group.id} selected={venue} onSelect={setVenue} />
+      </Section>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-[15px] font-semibold text-ink">Game</legend>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <Section title="Game">
+        <div role="radiogroup" aria-label="Game" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {GAMES.map((option) => (
             <label
               key={option}
               className={cn(
-                "flex h-11 cursor-pointer items-center justify-center rounded-lg outline-offset-2 outline-accent-text has-[:focus-visible]:outline-2 px-2 text-center text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
+                "flex h-11 cursor-pointer items-center justify-center rounded-lg px-2 text-center text-sm font-medium outline-offset-2 outline-ink transition-colors duration-150 has-[:focus-visible]:outline-2",
                 game === option
-                  ? "bg-accent font-semibold text-accent-ink shadow-none"
-                  : "bg-surface hover:bg-sunken",
+                  ? "bg-accent/15 text-accent-text"
+                  : "shadow-[inset_0_0_0_1px_var(--color-line-strong)] hover:bg-sunken",
               )}
             >
               <input
@@ -164,43 +167,45 @@ function NewSessionForm({
             </label>
           ))}
         </div>
-        <label className="mt-2 flex cursor-pointer items-center gap-3 text-sm">
+        <label className="mt-1 flex min-h-11 cursor-pointer items-center gap-3 text-sm">
           <Checkbox checked={highLimit} onCheckedChange={setHighLimit} />
           High-limit table
         </label>
-      </fieldset>
+      </Section>
 
-      <fieldset className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <legend className="text-[15px] font-semibold text-ink">Who's playing</legend>
+      <Section
+        title="Who's playing"
+        action={
           <Button size="sm" variant="ghost" onClick={() => setAddingGuest(true)}>
             <UserPlus className="size-4" aria-hidden />
             Add a guest
           </Button>
-        </div>
-        <Surface className="divide-y divide-line">
+        }
+      >
+        <List>
           {players.map((player) => (
-            <label
-              key={player.id}
-              className="flex cursor-pointer items-center gap-3 px-5 py-3 hover:bg-sunken"
-            >
-              <Checkbox
-                checked={playerIds.has(player.id)}
-                onCheckedChange={() => toggle(player.id)}
-              />
-              <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-              <span>
-                {player.displayName}
-                {player.id === detail.myPlayerId ? (
-                  <span className="text-muted"> (you)</span>
-                ) : null}
-                {player.userId === null ? <span className="text-muted"> · guest</span> : null}
-              </span>
+            <label key={player.id} className="block cursor-pointer hover:bg-sunken">
+              <Row as="span">
+                <Checkbox
+                  checked={playerIds.has(player.id)}
+                  onCheckedChange={() => toggle(player.id)}
+                />
+                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
+                <RowText
+                  title={
+                    <PlayerName
+                      name={player.displayName}
+                      you={player.id === detail.myPlayerId}
+                      guest={player.userId === null}
+                    />
+                  }
+                />
+              </Row>
             </label>
           ))}
-        </Surface>
-        <p className="text-sm text-muted">Anyone else can join the session later.</p>
-      </fieldset>
+        </List>
+        <Note>Anyone else can join the session later.</Note>
+      </Section>
 
       <div className="flex flex-col gap-3">
         <label className="flex items-center gap-3 text-sm">

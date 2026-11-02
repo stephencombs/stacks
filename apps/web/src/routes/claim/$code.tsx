@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { Button } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
-import { PageTitle, Skeleton, Surface } from "~/components/ui/Surface";
+import { PageHeader } from "~/components/ui/Page";
+import { Skeleton } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/claim/$code")({ component: Claim });
@@ -17,11 +18,11 @@ function Claim() {
     if (claimed) void navigate({ to: "/groups/$groupId", params: { groupId: claimed.group.id } });
   };
   return (
-    <div className="pt-4">
-      <Loaded query={stacks.claimPreview(code)} skeleton={<Skeleton className="h-64" />}>
-        {(preview) => (
-          <Surface className="flex flex-col gap-5 p-6">
-            <PageTitle context={preview.groupName}>Are you {preview.displayName}?</PageTitle>
+    <Loaded query={stacks.claimPreview(code)} skeleton={<Skeleton className="h-64" />}>
+      {(preview) => (
+        <>
+          <PageHeader title={`Are you ${preview.displayName}?`} context={preview.groupName} />
+          <div className="flex flex-col items-start gap-4">
             <p className="max-w-[52ch] text-muted">
               {preview.displayName} has been playing in {preview.groupName} as a guest. Claim it to
               join the group and make their sessions, results and balance yours.
@@ -32,13 +33,12 @@ function Claim() {
               size="lg"
               onClick={() => void confirm()}
               disabled={claim.pending}
-              className="self-start"
             >
               {claim.pending ? "Claiming…" : `Yes, I'm ${preview.displayName}`}
             </Button>
-          </Surface>
-        )}
-      </Loaded>
-    </div>
+          </div>
+        </>
+      )}
+    </Loaded>
   );
 }

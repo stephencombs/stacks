@@ -4,7 +4,8 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { ButtonLink } from "~/components/ui/Button";
-import { EmptyState, SectionHeading, Skeleton } from "~/components/ui/Surface";
+import { EmptyState, Section } from "~/components/ui/Page";
+import { Skeleton } from "~/components/ui/Surface";
 import { SessionList } from "~/features/SessionList";
 import { SessionView } from "~/features/SessionView";
 import { TripHeader } from "~/features/TripHeader";
@@ -16,12 +17,9 @@ function TripPage() {
   const { tripId } = Route.useParams();
   const stacks = useStacks();
   return (
-    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="mt-4 h-96" />}>
+    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="h-96" />}>
       {(trip) => (
-        <Loaded
-          query={stacks.group(trip.trip.groupId)}
-          skeleton={<Skeleton className="mt-4 h-96" />}
-        >
+        <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
           {(group) => <TripView trip={trip} group={group} />}
         </Loaded>
       )}
@@ -62,22 +60,20 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
         </Loaded>
       ) : null}
       {live.length > 0 ? (
-        <section className="flex flex-col gap-2">
-          <SectionHeading>{mine ? "Also live" : "Live now"}</SectionHeading>
+        <Section title={mine ? "Also live" : "Live now"}>
           <SessionList sessions={live} detail={group} />
-        </section>
+        </Section>
       ) : null}
-      {mine ? null : (
-        <section className="flex flex-col gap-2">
-          <SectionHeading>Sessions</SectionHeading>
-          {closed.length > 0 ? (
-            <SessionList sessions={closed} detail={group} />
-          ) : (
-            <EmptyState title="No sessions yet" action={startSession}>
-              Start one when you sit down to play.
-            </EmptyState>
-          )}
-        </section>
+      {mine ? null : closed.length > 0 ? (
+        <Section title="Sessions">
+          <SessionList sessions={closed} detail={group} />
+        </Section>
+      ) : live.length > 0 ? null : (
+        <EmptyState title="No sessions yet">
+          {trip.trip.endedAt === null
+            ? "Start one when you sit down to play."
+            : "This trip ended before anyone played."}
+        </EmptyState>
       )}
     </>
   );

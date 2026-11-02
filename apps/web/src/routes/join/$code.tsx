@@ -5,7 +5,8 @@ import { useState, type FormEvent } from "react";
 
 import { Button, ButtonLink } from "~/components/ui/Button";
 import { Field, FormError, Input } from "~/components/ui/Field";
-import { PageTitle, Skeleton, Surface } from "~/components/ui/Surface";
+import { PageHeader } from "~/components/ui/Page";
+import { Skeleton } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/join/$code")({ component: Join });
@@ -14,11 +15,9 @@ function Join() {
   const { code } = Route.useParams();
   const stacks = useStacks();
   return (
-    <div className="pt-4">
-      <Loaded query={stacks.invitePreview(code)} skeleton={<Skeleton className="h-64" />}>
-        {(preview) => <JoinView code={code} preview={preview} />}
-      </Loaded>
-    </div>
+    <Loaded query={stacks.invitePreview(code)} skeleton={<Skeleton className="h-64" />}>
+      {(preview) => <JoinView code={code} preview={preview} />}
+    </Loaded>
   );
 }
 
@@ -45,30 +44,24 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
   };
 
   return (
-    <Surface className="flex flex-col gap-5 p-6">
-      <PageTitle
+    <>
+      <PageHeader
+        title={preview.groupName}
         context={`${preview.memberCount} ${preview.memberCount === 1 ? "member" : "members"}`}
-      >
-        {preview.groupName}
-      </PageTitle>
+      />
       {preview.alreadyMember ? (
-        <>
+        <div className="flex flex-col items-start gap-4">
           <p className="text-muted">You're already in this group.</p>
-          <ButtonLink
-            to="/groups/$groupId"
-            params={{ groupId: preview.groupId }}
-            variant="primary"
-            className="self-start"
-          >
+          <ButtonLink to="/groups/$groupId" params={{ groupId: preview.groupId }} variant="primary">
             Open group
           </ButtonLink>
-        </>
+        </div>
       ) : preview.status !== "open" ? (
         <p className="text-muted">
           {closedReasons[preview.status]} Ask whoever sent it for a new link.
         </p>
       ) : (
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        <form onSubmit={submit} className="flex max-w-sm flex-col gap-4">
           <Field label="Your name in this group" error={nameError}>
             {(props) => (
               <Input
@@ -92,6 +85,6 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
           </Button>
         </form>
       )}
-    </Surface>
+    </>
   );
 }

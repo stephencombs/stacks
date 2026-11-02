@@ -13,7 +13,7 @@ export function Money({
   tone = "plain",
   className,
 }: {
-  amount: MinorUnits;
+  amount: number;
   currency: CurrencyCode;
   tone?: "plain" | "result";
   className?: string;
@@ -21,14 +21,16 @@ export function Money({
   return (
     <span
       className={cn(
-        "font-mono tabular-nums",
+        "tabular-nums",
         tone === "result" && amount > 0 && "text-win",
         tone === "result" && amount < 0 && "text-loss",
         tone === "result" && amount === 0 && "text-muted",
         className,
       )}
     >
-      {formatMoney(amount, currency, { signDisplay: tone === "result" ? "exceptZero" : "auto" })}
+      {formatMoney(MinorUnits.make(amount), currency, {
+        signDisplay: tone === "result" ? "exceptZero" : "auto",
+      })}
     </span>
   );
 }

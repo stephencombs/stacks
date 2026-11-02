@@ -2,6 +2,7 @@ import { ClerkFailed, SignInButton, SignUpButton, UserButton, useAuth } from "@c
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { Link, Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Button } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
@@ -18,26 +19,48 @@ function Root() {
   if (!isSignedIn) return <SignedOut />;
   return (
     <StacksProvider key={userId} userId={userId}>
-      <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4">
-        <header className="flex h-16 items-center justify-between">
-          <Wordmark />
+      <Frame
+        tools={
           <div className="flex items-center gap-3">
             <ThemeMenu />
             <UserButton />
           </div>
-        </header>
-        <main className="flex flex-1 flex-col gap-8 pb-28">
+        }
+      >
+        <a
+          href="#main-content"
+          className="sr-only rounded-lg bg-surface px-4 py-3 focus:not-sr-only focus:fixed focus:top-2 focus:z-10"
+        >
+          Skip to content
+        </a>
+        <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col gap-8 pt-2 pb-28">
           <Outlet />
         </main>
         <LiveBar />
-      </div>
+      </Frame>
     </StacksProvider>
+  );
+}
+
+/** The column every page sits in, under the wordmark. */
+function Frame({ tools, children }: { tools?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col pt-[env(safe-area-inset-top)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
+      <div className="flex h-16 shrink-0 items-center justify-between">
+        <Wordmark />
+        {tools}
+      </div>
+      {children}
+    </div>
   );
 }
 
 function Wordmark() {
   return (
-    <Link to="/" className="flex items-center gap-2 font-display text-2xl tracking-wide uppercase">
+    <Link
+      to="/"
+      className="flex min-h-11 items-center gap-2 font-display text-2xl tracking-wide uppercase"
+    >
       <span aria-hidden className="size-3 rotate-45 rounded-[3px] bg-accent" />
       Stacks
     </Link>
@@ -56,16 +79,13 @@ function ThemeMenu() {
 
 function Loading() {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4">
-      <header className="flex h-16 items-center">
-        <Wordmark />
-      </header>
+    <Frame>
       <ClerkFailed>
         <main className="pt-16">
           <FormError>Couldn't load sign-in. Check your connection and reload the page.</FormError>
         </main>
       </ClerkFailed>
-    </div>
+    </Frame>
   );
 }
 
@@ -73,13 +93,9 @@ function SignedOut() {
   const { pathname } = useLocation();
   const invited = pathname.startsWith("/join/") || pathname.startsWith("/claim/");
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4">
-      <header className="flex h-16 items-center justify-between">
-        <Wordmark />
-        <ThemeMenu />
-      </header>
+    <Frame tools={<ThemeMenu />}>
       <main className="flex flex-1 flex-col justify-center gap-5 pb-24">
-        <h1 className="max-w-[14ch] font-display text-6xl leading-[0.9] tracking-tight uppercase sm:text-7xl">
+        <h1 className="max-w-[14ch] font-display text-6xl leading-[0.9] tracking-[-0.01em] uppercase sm:text-7xl">
           {invited ? "You've been invited to a group." : "Keep the casino trip honest."}
         </h1>
         <p className="max-w-[46ch] text-lg text-muted">
@@ -98,6 +114,6 @@ function SignedOut() {
           </SignInButton>
         </div>
       </main>
-    </div>
+    </Frame>
   );
 }

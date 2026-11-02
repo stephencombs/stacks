@@ -8,7 +8,7 @@ import { cn } from "./cn";
 export function BackLink({ children, ...props }: LinkProps & { children: ReactNode }) {
   return (
     <Link
-      className="-ml-1 inline-flex min-h-9 items-center gap-1 self-start text-sm text-muted hover:text-ink"
+      className="-ml-1 inline-flex min-h-10 items-center gap-1 self-start text-sm text-muted hover:text-ink pointer-coarse:min-h-11"
       {...props}
     >
       <ChevronLeft className="size-4" aria-hidden />
@@ -35,7 +35,7 @@ export function Tab({
     <Link
       aria-current={current ? "page" : undefined}
       className={cn(
-        "relative inline-flex h-11 items-center text-[15px] font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-offset-[-2px]",
+        "relative inline-flex h-11 min-w-10 items-center justify-center text-[15px] font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-offset-[-2px] pointer-coarse:min-w-11",
         "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full",
         current ? "text-ink after:bg-ink" : "text-muted hover:text-ink",
       )}

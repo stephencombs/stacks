@@ -27,6 +27,7 @@ import { flushSync } from "react-dom";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
+import { Segmented } from "~/components/ui/Segmented";
 import { Skeleton } from "~/components/ui/Surface";
 import { Chip } from "~/features/Chip";
 import { useAction, useStacks } from "~/lib/stacks";
@@ -66,7 +67,12 @@ const chipsLoading = new Map<number, Promise<void>>();
 const loadChips = (level: number) => {
   const done =
     chipsLoading.get(level) ??
-    load(url(`chips-${level}`)).then((img) => void (chipSheets[level] = img));
+    load(url(`chips-${level}`))
+      .then((img) => void (chipSheets[level] = img))
+      .catch((error: unknown) => {
+        chipsLoading.delete(level);
+        throw error;
+      });
   chipsLoading.set(level, done);
   return done;
 };
@@ -92,7 +98,12 @@ const loadFrame = (seats: number, i: number) => {
       blackjackArt[seats]!.frames[i]!.rail
         ? load(url(`rail-${seats}-${pad(i)}`)).then((img) => void (images.rails[i] = img))
         : null,
-    ]).then(() => undefined);
+    ])
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        loading.delete(i);
+        throw error;
+      });
   loading.set(i, done);
   return done;
 };
@@ -126,7 +137,11 @@ const loadImages = async (seats: number, first: number, others: ReadonlyArray<nu
   void (async () => {
     for (const next of rest) {
       if (run !== queue) return;
-      await next();
+      try {
+        await next();
+      } catch {
+        return;
+      }
     }
   })();
   return tableOf(seats).images;
@@ -237,6 +252,8 @@ export function TableMap({
   // A size picked here shows at once; the server catches up behind it, or it snaps back.
   const [chosen, setChosen] = useState<number | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
+  const [failedAttempt, setFailedAttempt] = useState<number | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   // A pick stays until the server has the same size: an answer to an earlier pick that lands
   // after a newer one must not undo it.
   if (chosen !== null && chosen === seats) setChosen(null);
@@ -258,12 +275,17 @@ export function TableMap({
     let cancelled = false;
     const at = Math.round(camera.current.f);
     void loadImages(size, at, tableSizes[detail.session.game]?.sizes ?? []).then(
-      (imgs) => !cancelled && setLoaded(imgs),
+      (imgs) => {
+        if (cancelled) return;
+        setLoaded(imgs);
+        setFailedAttempt(null);
+      },
+      () => !cancelled && setFailedAttempt(loadAttempt),
     );
     return () => {
       cancelled = true;
     };
-  }, [size, detail.session.game]);
+  }, [size, detail.session.game, loadAttempt]);
 
   const pickSize = async (next: number) => {
     setBlocked(null);
@@ -324,6 +346,7 @@ export function TableMap({
       const a = anchors[Number(el.dataset.seat) - 1]!;
       const size = a.r * 2 * width;
       el.style.width = el.style.height = `${size}px`;
+      el.style.setProperty("--seat-hit-size", `${44 / cam.z}px`);
       el.style.transform = `translate3d(${a.x * width - size / 2}px, ${a.y * height - size / 2}px, 0)`;
       const chip = el.querySelector<HTMLCanvasElement>("canvas");
       if (!chip) continue;
@@ -488,6 +511,18 @@ export function TableMap({
 
   return (
     <div ref={outer} className="-mx-4 sm:mx-0">
+      {failedAttempt === loadAttempt ? (
+        <div className="flex flex-col gap-3 p-4">
+          <FormError>Couldn't load the table artwork.</FormError>
+          <Button
+            onClick={() => {
+              setLoadAttempt((attempt) => attempt + 1);
+            }}
+          >
+            Retry table artwork
+          </Button>
+        </div>
+      ) : null}
       {!loaded || width === 0 ? (
         <Skeleton className="aspect-[1.8] w-full rounded-none sm:rounded-2xl" />
       ) : (
@@ -546,7 +581,7 @@ export function TableMap({
                   aria-label={label}
                   disabled={!live}
                   onClick={() => setPicked(n)}
-                  className="group absolute top-0 left-0 grid place-items-center rounded-full will-change-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default"
+                  className="group absolute top-0 left-0 grid place-items-center rounded-full will-change-transform after:absolute after:top-1/2 after:left-1/2 after:size-[var(--seat-hit-size)] after:min-h-full after:min-w-full after:-translate-1/2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-default"
                 >
                   {s ? (
                     <span
@@ -578,7 +613,7 @@ export function TableMap({
                     <span
                       data-result
                       className={
-                        "absolute top-[92%] left-1/2 -translate-x-1/2 rounded-md px-2 py-0.5 font-mono text-xs font-semibold whitespace-nowrap shadow-[0_2px_8px_rgb(0_0_0/0.35)] " +
+                        "absolute top-[92%] left-1/2 -translate-x-1/2 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums whitespace-nowrap shadow-[0_2px_8px_rgb(0_0_0/0.35)] " +
                         (busted(s.out) || s.out.net < 0
                           ? "bg-loss text-canvas"
                           : s.out.net > 0
@@ -609,24 +644,13 @@ export function TableMap({
         </div>
       )}
       {live && sizes.length > 1 ? (
-        <div className="mt-3 flex flex-wrap items-center gap-3 px-4 sm:px-0">
-          <div role="group" aria-label="Table size" className="flex gap-1 rounded-lg bg-sunken p-1">
-            {sizes.map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={size === option}
-                onClick={() => void pickSize(option)}
-                className={
-                  size === option
-                    ? "inline-flex h-8 items-center rounded-md bg-surface px-3 text-sm font-medium text-ink shadow-sm pointer-coarse:h-10"
-                    : "inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-muted transition-colors duration-150 hover:text-ink pointer-coarse:h-10"
-                }
-              >
-                {option} seats
-              </button>
-            ))}
-          </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Segmented
+            label="Table size"
+            options={sizes.map((option) => ({ value: option, label: `${option} seats` }))}
+            value={size}
+            onChange={(next) => void pickSize(next)}
+          />
           {(blocked ?? resize.error) ? <FormError>{blocked ?? resize.error}</FormError> : null}
         </div>
       ) : null}

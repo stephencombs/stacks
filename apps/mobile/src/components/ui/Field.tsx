@@ -38,6 +38,7 @@ export function TextField({
       <FieldLabel id={id}>{label}</FieldLabel>
       <TextInput
         accessibilityLabel={label}
+        accessibilityHint={error ?? hint}
         aria-labelledby={id}
         placeholderTextColorClassName="accent-faint"
         className={cn(

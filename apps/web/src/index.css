@@ -1,14 +1,11 @@
 @import "tailwindcss";
-@import "@fontsource/barlow-condensed/700.css";
-@import "@fontsource/jetbrains-mono/500.css";
-@import "@fontsource/jetbrains-mono/700.css";
+@import "@fontsource/barlow-condensed/latin-700.css";
 
 /* Keep in step with apps/mobile/global.css. Dark is the default; light is a saved choice
    (data-theme on <html>, set by index.html before first paint). */
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   --animate-rack: rack 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
 
   --color-canvas: oklch(0.15 0.01 260);
@@ -87,7 +84,7 @@
     min-height: 100dvh;
   }
   :focus-visible {
-    outline: 2px solid var(--color-accent-text);
+    outline: 2px solid var(--color-ink);
     outline-offset: 2px;
   }
   h1,
@@ -105,13 +102,6 @@
   }
 }
 
-/* The trip board's ticker: two copies of the feed, slid by one copy's width, loop seamlessly. */
-@keyframes ticker {
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 /* Set for a couple of frames while the theme changes, so colors swap at once. */
 [data-theme-switching] *,
 [data-theme-switching] *::before,
@@ -120,11 +110,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+  button,
+  a,
+  [role="menu"] {
+    scale: 1 !important;
   }
 }

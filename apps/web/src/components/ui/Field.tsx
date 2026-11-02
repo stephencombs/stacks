@@ -6,7 +6,7 @@ import { cn } from "./cn";
 const control =
   "w-full rounded-lg bg-surface px-3 text-base text-ink shadow-[inset_0_0_0_1px_var(--color-line-strong)] " +
   "transition-shadow duration-150 placeholder:text-muted hover:shadow-[inset_0_0_0_1px_var(--color-faint)] " +
-  "focus:shadow-[inset_0_0_0_2px_var(--color-accent-text)] focus:outline-none aria-invalid:shadow-[inset_0_0_0_2px_var(--color-danger)] " +
+  "focus:shadow-[inset_0_0_0_2px_var(--color-ink)] focus:outline-none aria-invalid:shadow-[inset_0_0_0_2px_var(--color-danger)] " +
   "disabled:bg-sunken disabled:text-muted";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {

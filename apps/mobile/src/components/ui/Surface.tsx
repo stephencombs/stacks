@@ -64,7 +64,7 @@ export function PageTitle({ context, children }: { context?: string; children: s
 export function SectionHeading({ children, action }: { children: string; action?: ReactNode }) {
   return (
     <View className="min-h-9 flex-row items-center justify-between">
-      <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+      <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
         {children}
       </Text>
       {action}
@@ -87,12 +87,7 @@ export function Tag({
       )}
     >
       {tone === "live" ? <View className="size-1.5 rounded-full bg-live" /> : null}
-      <Text
-        className={cn(
-          "font-mono text-[11px] tracking-[1px] uppercase",
-          tone === "live" ? "text-live" : "text-muted",
-        )}
-      >
+      <Text className={cn("text-xs font-medium", tone === "live" ? "text-live" : "text-muted")}>
         {children}
       </Text>
     </View>

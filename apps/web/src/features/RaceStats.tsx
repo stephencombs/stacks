@@ -7,12 +7,12 @@ import { tripNights } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { Money } from "~/components/Money";
+import { Note } from "~/components/ui/Page";
+import { List, Row, RowText, Surface } from "~/components/ui/Surface";
 import { cn } from "~/components/ui/cn";
 import { Chip } from "./Chip";
 
-// Board readouts: small mono caps, like the labels on a sportsbook screen.
-const label = "font-mono text-[11px] tracking-[0.08em] uppercase";
-const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 // Chip 4 is near-black, so its line on the board takes the chip's light edge instead.
 const lineColor = (chip: number) =>
   chip === 4 ? "var(--color-muted)" : `var(--color-chip-${chip})`;
@@ -40,7 +40,6 @@ export function TripStats({ detail, trip }: { detail: GroupDetail; trip: TripDet
         label: `D${night.number}`,
       }))}
       where={(session) => `Day ${nightOf.get(session.session.id)}`}
-      latest={trip.trip.endedAt === null ? "The race so far" : "How it finished"}
       empty="Stats fill in when the trip's first session closes."
     />
   );
@@ -52,7 +51,6 @@ export function RaceStats<S extends RaceSession>({
   sessions: closed,
   marks,
   where,
-  latest,
   empty,
 }: {
   detail: GroupDetail;
@@ -60,8 +58,6 @@ export function RaceStats<S extends RaceSession>({
   marks: ReadonlyArray<Mark>;
   /** Where a session sits, like "Day 3", after "After session 12 of 41". */
   where: (session: S) => string;
-  /** The heading's lead-in at the latest session. */
-  latest: string;
   empty: string;
 }) {
   const names = playerNames(detail);
@@ -77,11 +73,11 @@ export function RaceStats<S extends RaceSession>({
   const played = players.some((p) => p.playerId === detail.myPlayerId);
   const [picked, setPicked] = useState(played ? detail.myPlayerId : players[0]?.playerId);
 
-  if (players.length === 0) return <p className="text-sm text-muted">{empty}</p>;
+  if (players.length === 0) return <Note>{empty}</Note>;
 
   const player = players.find((p) => p.playerId === picked) ?? players[0]!;
   return (
-    <div className="flex flex-col gap-8">
+    <>
       <Race
         sessions={closed}
         players={players}
@@ -90,7 +86,6 @@ export function RaceStats<S extends RaceSession>({
         onPick={setPicked}
         marks={marks}
         where={where}
-        latest={latest}
       />
       <Sheet
         key={player.playerId}
@@ -100,7 +95,7 @@ export function RaceStats<S extends RaceSession>({
         of={players.length}
         currency={detail.group.currency}
       />
-    </div>
+    </>
   );
 }
 
@@ -114,7 +109,6 @@ function Race<S extends RaceSession>({
   onPick,
   marks,
   where,
-  latest,
 }: {
   sessions: ReadonlyArray<S>;
   players: ReadonlyArray<Line>;
@@ -123,7 +117,6 @@ function Race<S extends RaceSession>({
   onPick: (playerId: PlayerId) => void;
   marks: ReadonlyArray<Mark>;
   where: (session: S) => string;
-  latest: string;
 }) {
   const last = sessions.length - 1;
   // Unpinned, the race follows the latest session, including ones that arrive while it's open.
@@ -162,13 +155,9 @@ function Race<S extends RaceSession>({
   };
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-3">
       <header className="flex flex-col gap-1">
-        <p className={cn(label, "text-muted")}>
-          {at === last ? latest : `After session ${at + 1} of ${sessions.length}`} ·{" "}
-          {where(session)}
-        </p>
-        <h2 className="font-display text-4xl leading-none tracking-tight uppercase">
+        <h2 className="text-lg font-semibold">
           {!second ? (
             `${leader!.name} leads`
           ) : leader!.now === second.now ? (
@@ -176,15 +165,16 @@ function Race<S extends RaceSession>({
           ) : (
             <>
               {leader!.name} leads by{" "}
-              <span className="font-mono text-win">
+              <span className="text-win tabular-nums">
                 {boardMoney(leader!.now - second.now, currency, false)}
               </span>
             </>
           )}
         </h2>
-        <p className="text-sm text-muted">
-          Session {at + 1}: {session.venue.name}, {formatDay(session.session.startedAt)}
-        </p>
+        <Note>
+          After session {at + 1} of {sessions.length} · {where(session)} · {session.venue.name},{" "}
+          {formatDay(session.session.startedAt)}
+        </Note>
       </header>
 
       <div
@@ -214,7 +204,7 @@ function Race<S extends RaceSession>({
                 key={mark.index}
                 x={x(mark.index)}
                 y={height - 8}
-                className="fill-muted font-mono text-[10px]"
+                className="fill-muted text-xs"
               >
                 {mark.label}
               </text>
@@ -268,40 +258,38 @@ function Race<S extends RaceSession>({
         onChange={(event) => setAt(Number(event.target.value))}
         aria-label="Replay session by session"
         aria-valuetext={`Session ${at + 1} of ${sessions.length}, ${session.venue.name}`}
-        className="w-full accent-[var(--color-accent)]"
+        className="min-h-11 w-full accent-[var(--color-muted)]"
       />
 
-      <ol className="overflow-hidden rounded-xl border border-line bg-surface">
+      <List as="ol">
         {standing.map((p, place) => (
-          <li key={p.playerId} className="border-t border-line first:border-t-0">
+          <li key={p.playerId}>
             <button
               type="button"
               aria-pressed={p.playerId === picked}
               onClick={() => onPick(p.playerId)}
               className={cn(
-                "grid w-full grid-cols-[1.5rem_auto_1fr_auto] items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-sunken/50 focus-visible:-outline-offset-2",
+                "block w-full text-left transition-colors duration-150 hover:bg-sunken focus-visible:-outline-offset-2",
                 p.playerId === picked && "shadow-[inset_3px_0_0_var(--color-accent)]",
               )}
             >
-              <span className="font-mono text-lg font-bold text-accent-text">{place + 1}</span>
-              <Chip chip={p.chip} name={p.name} size={26} />
-              <span className="flex min-w-0 items-center gap-2">
+              <Row as="span">
+                <span className="w-4 shrink-0 text-center font-medium text-muted tabular-nums">
+                  {place + 1}
+                </span>
+                <Chip chip={p.chip} name={p.name} size={28} />
                 <span
                   aria-hidden
                   className="h-0.5 w-4 shrink-0 rounded-full"
                   style={{ background: lineColor(p.chip) }}
                 />
-                <span className="truncate font-display text-lg leading-tight tracking-wide uppercase">
-                  {p.name}
-                </span>
-              </span>
-              <span className={cn("font-mono text-lg font-bold", tone(p.now))}>
-                {boardMoney(p.now, currency)}
-              </span>
+                <RowText title={p.name} />
+                <Money amount={p.now} currency={currency} tone="result" className="font-semibold" />
+              </Row>
             </button>
           </li>
         ))}
-      </ol>
+      </List>
     </section>
   );
 }
@@ -324,132 +312,133 @@ function Sheet({
   const track = barTrack(sheet.played.map((p) => p.net));
   const money = (n: number, signed = true) => boardMoney(n, currency, signed);
   const { runs } = sheet;
-  const tiles = [
+  const figure = (n: number, plain = false) => (
+    <Money
+      amount={Math.round(n)}
+      currency={currency}
+      tone={plain ? "plain" : "result"}
+      className="font-semibold"
+    />
+  );
+  const none = <span className="text-faint">—</span>;
+  const rows = [
     {
       title: "Win rate",
-      value: `${Math.round((runs.wins / runs.sessions) * 100)}%`,
-      line: `Up in ${runs.wins} of ${runs.sessions}`,
+      meta: `Up in ${runs.wins} of ${runs.sessions}`,
+      value: (
+        <span className="font-semibold tabular-nums">
+          {Math.round((runs.wins / runs.sessions) * 100)}%
+        </span>
+      ),
     },
     {
       title: "Biggest hit",
-      value: sheet.best ? money(sheet.best.net) : "—",
-      line: sheet.best?.session.venue.name ?? "No winning session yet",
-      tone: sheet.best?.net,
+      meta: sheet.best?.session.venue.name ?? "No winning session yet",
+      value: sheet.best ? figure(sheet.best.net) : none,
     },
     {
       title: "Worst beat",
-      value: sheet.worst ? money(sheet.worst.net) : "—",
-      line: sheet.worst?.session.venue.name ?? "Never finished down",
-      tone: sheet.worst?.net,
+      meta: sheet.worst?.session.venue.name ?? "Never finished down",
+      value: sheet.worst ? figure(sheet.worst.net) : none,
     },
     {
       title: "Longest heater",
-      value: String(runs.longestWinningRun),
-      line:
+      meta:
         runs.current.winning && runs.current.length > 1
           ? `On ${runs.current.length} straight now`
           : "Wins in a row",
+      value: <span className="font-semibold tabular-nums">{runs.longestWinningRun}</span>,
     },
     {
       title: "Best casino",
-      value: sheet.bestVenue ? money(sheet.bestVenue.net) : "—",
-      line: sheet.bestVenue
-        ? `${sheet.bestVenue.name} · ${sheet.bestVenue.sessions} sess`
+      meta: sheet.bestVenue
+        ? `${sheet.bestVenue.name} · ${sheet.bestVenue.sessions} ${sheet.bestVenue.sessions === 1 ? "session" : "sessions"}`
         : "Still looking",
-      tone: sheet.bestVenue?.net,
+      value: sheet.bestVenue ? figure(sheet.bestVenue.net) : none,
     },
     {
-      title: "Avg buy-in",
-      value: sheet.averageBuyIn === null ? "—" : money(sheet.averageBuyIn, false),
-      line: `${sheet.venues} ${sheet.venues === 1 ? "casino" : "casinos"} played`,
+      title: "Average buy-in",
+      meta: `${sheet.venues} ${sheet.venues === 1 ? "casino" : "casinos"} played`,
+      value: sheet.averageBuyIn === null ? none : figure(sheet.averageBuyIn, true),
     },
   ];
   const focus = shown === null ? null : sheet.played[shown]!;
 
   return (
-    <section aria-label={`${player.name}'s stats`} className="flex flex-col gap-4">
-      <header className="flex items-end justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className={cn(label, "text-muted")}>
+    <section aria-label={`${player.name}'s stats`} className="flex flex-col gap-3">
+      <header className="flex items-center gap-3">
+        <Chip chip={player.chip} name={player.name} size={40} />
+        <div className="flex min-w-0 flex-col">
+          <Note>
             {player.name} · #{rank} of {of} · {runs.sessions}{" "}
             {runs.sessions === 1 ? "session" : "sessions"}
-          </p>
-          <p className={cn("font-mono text-5xl font-bold tracking-tight", tone(sheet.total))}>
-            {money(sheet.total)}
-          </p>
+          </Note>
+          <Money
+            amount={sheet.total}
+            currency={currency}
+            tone="result"
+            className="text-2xl font-semibold"
+          />
         </div>
-        <Chip chip={player.chip} name={player.name} size={56} />
       </header>
 
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {tiles.map((tile) => (
-          <li
-            key={tile.title}
-            className="flex min-w-0 flex-col gap-1 rounded-xl border border-line bg-surface p-3"
-          >
-            <span className={cn(label, "text-muted")}>{tile.title}</span>
-            <span
-              className={cn(
-                "font-mono text-2xl font-bold",
-                tile.tone === undefined ? "text-ink" : tone(tile.tone),
-              )}
-            >
-              {tile.value}
-            </span>
-            <span className="truncate text-xs text-muted">{tile.line}</span>
-          </li>
+      <List>
+        {rows.map((row) => (
+          <Row key={row.title}>
+            <RowText title={row.title} meta={row.meta} />
+            {row.value}
+          </Row>
         ))}
-      </ul>
+      </List>
 
       <div className="flex flex-col gap-2">
-        <div className="flex items-baseline justify-between gap-3">
-          <h3 className="text-[15px] font-semibold">Every session</h3>
-          <span aria-live="polite" className="truncate font-mono text-xs text-muted">
+        <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <h3 className="font-semibold">Every session</h3>
+          <span aria-live="polite" className="text-sm text-muted tabular-nums wrap-anywhere">
             {focus
               ? `${formatDay(focus.session.session.startedAt)} · ${focus.session.venue.name} · ${money(focus.net)}`
               : "Tap a bar"}
           </span>
         </div>
-        <div
-          className="relative flex h-36 gap-[2px] rounded-xl border border-line bg-surface p-3"
-          onPointerLeave={() => setShown(null)}
-        >
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-x-3 h-px bg-line"
-            style={{ bottom: `calc(0.75rem + ${track.zero} * (100% - 1.5rem))` }}
-          />
-          {sheet.played.map((p, i) => (
-            <button
-              key={p.session.session.id}
-              type="button"
-              aria-label={`${formatDay(p.session.session.startedAt)}, ${p.session.venue.name}: ${money(p.net)}`}
-              onPointerEnter={() => setShown(i)}
-              onFocus={() => setShown(i)}
-              onClick={() => setShown(i)}
-              className="relative min-w-0 flex-1 focus-visible:outline-offset-0"
-            >
-              <span
-                className={cn(
-                  "absolute inset-x-0 rounded-[2px] transition-opacity duration-150",
-                  p.net >= 0 ? "bg-win" : "bg-loss",
-                  shown !== null && shown !== i && "opacity-40",
-                )}
-                style={
-                  p.net >= 0
-                    ? {
-                        bottom: `${track.zero * 100}%`,
-                        height: `max(2px, ${track.extent(p.net) * 100}%)`,
-                      }
-                    : {
-                        top: `${(1 - track.zero) * 100}%`,
-                        height: `max(2px, ${track.extent(p.net) * 100}%)`,
-                      }
-                }
-              />
-            </button>
-          ))}
-        </div>
+        <Surface className="overflow-x-auto" onPointerLeave={() => setShown(null)}>
+          <div className="relative flex h-36 w-max min-w-full justify-center gap-1 p-3">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-3 h-px bg-line"
+              style={{ bottom: `calc(0.75rem + ${track.zero} * (100% - 1.5rem))` }}
+            />
+            {sheet.played.map((p, i) => (
+              <button
+                key={p.session.session.id}
+                type="button"
+                aria-label={`${formatDay(p.session.session.startedAt)}, ${p.session.venue.name}: ${money(p.net)}`}
+                onPointerEnter={() => setShown(i)}
+                onFocus={() => setShown(i)}
+                onClick={() => setShown(i)}
+                className="relative w-10 min-w-10 flex-1 focus-visible:outline-offset-0 pointer-coarse:w-11 pointer-coarse:min-w-11"
+              >
+                <span
+                  className={cn(
+                    "absolute inset-x-1 rounded-[2px] transition-opacity duration-150",
+                    p.net >= 0 ? "bg-win" : "bg-loss",
+                    shown !== null && shown !== i && "opacity-40",
+                  )}
+                  style={
+                    p.net >= 0
+                      ? {
+                          bottom: `${track.zero * 100}%`,
+                          height: `max(2px, ${track.extent(p.net) * 100}%)`,
+                        }
+                      : {
+                          top: `${(1 - track.zero) * 100}%`,
+                          height: `max(2px, ${track.extent(p.net) * 100}%)`,
+                        }
+                  }
+                />
+              </button>
+            ))}
+          </div>
+        </Surface>
       </div>
     </section>
   );

@@ -10,7 +10,8 @@ import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { BackLink, Tab, Tabs } from "~/components/ui/Nav";
-import { PageTitle, Tag } from "~/components/ui/Surface";
+import { PageHeader } from "~/components/ui/Page";
+import { Tag } from "~/components/ui/Surface";
 import { useAction, useStacks } from "~/lib/stacks";
 
 const tabs = [
@@ -42,43 +43,51 @@ export function TripHeader({
     trip.sessions.length === 0 && (isAdmin(group) || trip.trip.createdBy === userId);
 
   return (
-    <div className="flex flex-col gap-4 pt-2">
-      <div className="flex items-center justify-between gap-3">
-        <BackLink to="/groups/$groupId" params={{ groupId: group.group.id }}>
-          {group.group.name}
-        </BackLink>
-        <Menu label={`Actions for ${trip.trip.name}`}>
-          {ended ? (
-            <MenuItem onClick={() => void reopen.run({ params })}>Reopen trip</MenuItem>
-          ) : (
-            <MenuItem onClick={() => void end.run({ params, payload: {} })}>End trip</MenuItem>
-          )}
-          {canDelete ? (
-            <MenuItem tone="danger" onClick={() => setDeleting(true)}>
-              Delete trip
-            </MenuItem>
-          ) : null}
-        </Menu>
-      </div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <PageTitle context={tripDates(trip.trip)}>{trip.trip.name}</PageTitle>
-          <p>{ended ? <Tag>Ended</Tag> : <Tag tone="live">Going</Tag>}</p>
-        </div>
-        {action}
-      </div>
-      {(end.error ?? reopen.error) ? <FormError>{end.error ?? reopen.error}</FormError> : null}
-      <Tabs label="Trip">
-        {tabs.map((tab) => (
-          <Tab key={tab.key} to={tab.to} params={params} current={tab.key === current}>
-            {tab.label}
-          </Tab>
-        ))}
-      </Tabs>
+    <>
+      <PageHeader
+        back={
+          <BackLink to="/groups/$groupId" params={{ groupId: group.group.id }}>
+            {group.group.name}
+          </BackLink>
+        }
+        options={
+          <Menu label={`Actions for ${trip.trip.name}`}>
+            {ended ? (
+              <MenuItem onClick={() => void reopen.run({ params })}>Reopen trip</MenuItem>
+            ) : (
+              <MenuItem onClick={() => void end.run({ params, payload: {} })}>End trip</MenuItem>
+            )}
+            {canDelete ? (
+              <MenuItem tone="danger" onClick={() => setDeleting(true)}>
+                Delete trip
+              </MenuItem>
+            ) : null}
+          </Menu>
+        }
+        title={trip.trip.name}
+        documentTitle={`${tabs.find((tab) => tab.key === current)!.label} · ${trip.trip.name}`}
+        tag={ended ? <Tag>Ended</Tag> : null}
+        context={tripDates(trip.trip)}
+        action={action}
+        tabs={
+          <>
+            {(end.error ?? reopen.error) ? (
+              <FormError>{end.error ?? reopen.error}</FormError>
+            ) : null}
+            <Tabs label="Trip">
+              {tabs.map((tab) => (
+                <Tab key={tab.key} to={tab.to} params={params} current={tab.key === current}>
+                  {tab.label}
+                </Tab>
+              ))}
+            </Tabs>
+          </>
+        }
+      />
       {deleting ? (
         <DeleteTripDialog trip={trip} group={group} onClose={() => setDeleting(false)} />
       ) : null}
-    </div>
+    </>
   );
 }
 
