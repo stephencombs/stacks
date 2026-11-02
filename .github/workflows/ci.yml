@@ -16,7 +16,7 @@ concurrency:
 jobs:
   check:
     name: Lint, typecheck, test
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     services:
       postgres:
@@ -34,7 +34,7 @@ jobs:
     env:
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/stacks_test
     steps:
-      - uses: actions/checkout@v6
+      - uses: useblacksmith/checkout@v1
       - uses: voidzero-dev/setup-vp@v1
         with:
           node-version-file: .node-version
@@ -48,10 +48,10 @@ jobs:
 
   build:
     name: Build web and api
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: useblacksmith/checkout@v1
       - uses: voidzero-dev/setup-vp@v1
         with:
           node-version-file: .node-version
@@ -63,10 +63,10 @@ jobs:
 
   mobile-bundle:
     name: Bundle mobile (iOS + Android JS)
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: useblacksmith/checkout@v1
       - uses: voidzero-dev/setup-vp@v1
         with:
           node-version-file: .node-version
