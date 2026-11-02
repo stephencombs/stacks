@@ -2,6 +2,7 @@ import * as DateTime from "effect/DateTime";
 import {
   MinorUnits,
   type GroupDetail,
+  type Player,
   type PlayerId,
   type StakeView,
   type UserId,
@@ -49,6 +50,19 @@ export const gameNames = {
 
 export const playerNames = (detail: GroupDetail) =>
   new Map<PlayerId, string>(detail.players.map((player) => [player.id, player.displayName]));
+
+export const isGuest = (player: Player) => player.claimCode !== null;
+
+export const isFormerMember = (player: Player) => player.role === null && player.claimCode === null;
+
+export const csvFilename = (groupName: string) => {
+  const slug = groupName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `${slug || "stacks"}-ledger.csv`;
+};
 
 /** Admins and the owner manage people, reopen sessions and void anyone's entries. */
 export const isAdmin = (detail: GroupDetail) => detail.role !== "member";

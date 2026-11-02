@@ -8,7 +8,7 @@ import {
   type Invite,
   type Player,
 } from "@stacks/contracts";
-import { formatDay } from "@stacks/client-runtime/format";
+import { csvFilename, formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { useState } from "react";
@@ -21,7 +21,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { webUrl } from "../lib/config";
-import { shareLink } from "../lib/share";
+import { shareCsv, shareLink } from "../lib/share";
 import { Chip } from "../features/Chip";
 import {
   GuestPaymentHandlesAction,
@@ -55,7 +55,8 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
   const [shared, setShared] = useState<string | null>(null);
   const { userId } = useAuth();
   const members = detail.players.filter((player) => player.role !== null);
-  const guests = detail.players.filter((player) => player.userId === null);
+  const guests = detail.players.filter(isGuest);
+  const former = detail.players.filter(isFormerMember);
   const canManage = (player: Player) =>
     player.userId !== null &&
     player.userId !== userId &&
@@ -160,6 +161,16 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
           </List>
         )}
       </View>
+      {former.length > 0 ? (
+        <View className="gap-2">
+          <SectionHeading>Former members</SectionHeading>
+          <Text className="text-sm text-muted">
+            {former.map((player) => player.displayName).join(", ")}. Their history stays in the
+            ledger.
+          </Text>
+        </View>
+      ) : null}
+      <ExportSection detail={detail} />
       <View className="gap-2 border-t border-line pt-6">
         <Button label="Leave group" variant="danger" onPress={() => setLeaving(true)} />
         <Text className="text-sm text-muted">You can only leave once you're settled up.</Text>
@@ -170,6 +181,26 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
       ) : null}
       {leaving ? <LeaveSheet detail={detail} onClose={() => setLeaving(false)} /> : null}
     </>
+  );
+}
+
+function ExportSection({ detail }: { detail: GroupDetail }) {
+  const stacks = useStacks();
+  const exportCsv = useAction(stacks.Client.mutation("groups", "exportCsv"));
+  const exportLedger = async () => {
+    const csv = await exportCsv.run({ params: { groupId: detail.group.id } });
+    if (csv == null) return;
+    await shareCsv(csvFilename(detail.group.name), csv);
+  };
+  return (
+    <View className="gap-2">
+      <SectionHeading>Ledger</SectionHeading>
+      <Button label="Export CSV" pending={exportCsv.pending} onPress={() => void exportLedger()} />
+      <Text className="text-sm text-muted">
+        Every buy-in, cash-out, adjustment, settlement and void in this group.
+      </Text>
+      {exportCsv.error ? <FormError>{exportCsv.error}</FormError> : null}
+    </View>
   );
 }
 

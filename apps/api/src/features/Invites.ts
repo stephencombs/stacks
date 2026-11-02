@@ -8,6 +8,7 @@ import {
   Forbidden,
   GroupId,
   NotFound,
+  TripId,
   type AcceptInviteRequest,
   type CreateInviteRequest,
   type InviteId,
@@ -103,7 +104,9 @@ export const preview = Effect.fn("Invites.preview")(function* (code: string) {
       exists (
         select 1 from memberships m
         where m.group_id = g.id and m.user_id = ${userId} and m.left_at is null
-      ) as already_member
+      ) as already_member,
+      (select t.id from trips t where t.group_id = g.id and t.ended_at is null
+        order by t.started_at desc limit 1) as current_trip_id
     from groups g where g.id = ${invite.groupId}
   `.pipe(
     Effect.flatMap(
@@ -112,6 +115,7 @@ export const preview = Effect.fn("Invites.preview")(function* (code: string) {
           name: Schema.String,
           memberCount: Schema.Int,
           alreadyMember: Schema.Boolean,
+          currentTripId: Schema.NullOr(TripId),
         }),
       ),
     ),
@@ -122,6 +126,7 @@ export const preview = Effect.fn("Invites.preview")(function* (code: string) {
     memberCount: group!.memberCount,
     status: inviteStatus(invite, yield* DateTime.now),
     alreadyMember: group!.alreadyMember,
+    currentTripId: group!.alreadyMember ? group!.currentTripId : null,
   } satisfies InvitePreview;
 });
 

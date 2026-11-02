@@ -3,7 +3,13 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { CurrencyCode } from "@stacks/contracts";
 
-import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "./money.ts";
+import {
+  decimalSeparator,
+  formatDecimal,
+  formatMoney,
+  minorUnitDigits,
+  parseMoney,
+} from "./money.ts";
 import { money } from "./testing/ledgerArbitrary.ts";
 
 const USD = CurrencyCode.make("USD");
@@ -14,6 +20,18 @@ const KWD = CurrencyCode.make("KWD");
 describe("minorUnitDigits", () => {
   it("follows the currency", () => {
     expect([USD, JPY, KWD].map(minorUnitDigits)).toEqual([2, 0, 3]);
+  });
+});
+
+describe("formatDecimal", () => {
+  it("formats minor units as plain decimal strings without floats", () => {
+    expect(formatDecimal(money(0), USD)).toBe("0.00");
+    expect(formatDecimal(money(5), USD)).toBe("0.05");
+    expect(formatDecimal(money(10000), USD)).toBe("100.00");
+    expect(formatDecimal(money(-1525), USD)).toBe("-15.25");
+    expect(formatDecimal(money(1500), JPY)).toBe("1500");
+    expect(formatDecimal(money(-50), KWD)).toBe("-0.050");
+    expect(formatDecimal(money(Number.MAX_SAFE_INTEGER), USD)).toBe("90071992547409.91");
   });
 });
 

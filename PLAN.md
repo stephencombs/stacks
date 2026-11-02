@@ -17,6 +17,7 @@ Stacks is a casino-session ledger for groups of friends. Members log buy-ins and
 - **Live session mode on mobile.** A screen you can use one-handed at the table: big buttons for "Rebuy $X" and "Cash out", haptic feedback, and the screen stays awake.
 - **Responsible-play basics.** Optional personal loss limits and session-length reminders. Stats always show losses plainly, not just wins.
 - **Export.** CSV export for each group.
+- **Data ownership.** Never cap history or put access to a member's own data behind a paywall.
 
 ### Not in v1 (on purpose)
 

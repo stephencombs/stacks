@@ -15,6 +15,9 @@ const toDecimalString = (amount: MinorUnits, digits: number) => {
   return `${sign}${decimal}` as Intl.StringNumericLiteral;
 };
 
+export const formatDecimal = (amount: MinorUnits, currency: CurrencyCode): string =>
+  toDecimalString(amount, minorUnitDigits(currency));
+
 export const formatMoney = (
   amount: MinorUnits,
   currency: CurrencyCode,

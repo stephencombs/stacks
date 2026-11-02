@@ -15,7 +15,11 @@ function Claim() {
   const claim = useAction(stacks.Client.mutation("guests", "claim"));
   const confirm = async () => {
     const claimed = await claim.run({ params: { code } });
-    if (claimed) void navigate({ to: "/groups/$groupId", params: { groupId: claimed.group.id } });
+    if (claimed) {
+      const trip = claimed.trips.find((item) => item.endedAt === null);
+      if (trip) void navigate({ to: "/trips/$tripId", params: { tripId: trip.id } });
+      else void navigate({ to: "/groups/$groupId", params: { groupId: claimed.group.id } });
+    }
   };
   return (
     <Loaded query={stacks.claimPreview(code)} skeleton={<Skeleton className="h-64" />}>

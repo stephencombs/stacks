@@ -10,7 +10,7 @@ import {
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
-import { UserPlus } from "lucide-react";
+import { Download, UserPlus } from "lucide-react";
 import { useState } from "react";
 
 import { CopyButton } from "~/components/CopyButton";
@@ -29,7 +29,7 @@ import {
   playerHandlesMeta,
 } from "~/features/PaymentHandles";
 import { PlayerName } from "~/features/Player";
-import { formatDay } from "@stacks/client-runtime/format";
+import { csvFilename, formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/format";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/groups/$groupId/settings")({ component: People });
@@ -54,8 +54,8 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
   const [removing, setRemoving] = useState<{ player: Player; userId: UserId } | null>(null);
   const [leaving, setLeaving] = useState(false);
   const members = detail.players.filter((player) => player.role !== null);
-  const guests = detail.players.filter((player) => player.userId === null);
-  const former = detail.players.filter((player) => player.userId !== null && player.role === null);
+  const guests = detail.players.filter(isGuest);
+  const former = detail.players.filter(isFormerMember);
   const origin = window.location.origin;
 
   const memberActions = (player: Player) => {
@@ -161,6 +161,8 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
         </Section>
       ) : null}
 
+      <ExportSection detail={detail} />
+
       <div className="flex flex-col items-start gap-2">
         <Button variant="danger" onClick={() => setLeaving(true)}>
           Leave group
@@ -174,6 +176,33 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
         <RemoveMemberDialog detail={detail} {...removing} onClose={() => setRemoving(null)} />
       ) : null}
     </>
+  );
+}
+
+function ExportSection({ detail }: { detail: GroupDetail }) {
+  const stacks = useStacks();
+  const exportCsv = useAction(stacks.Client.mutation("groups", "exportCsv"));
+  const download = async () => {
+    const csv = await exportCsv.run({ params: { groupId: detail.group.id } });
+    if (csv == null) return;
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = csvFilename(detail.group.name);
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <Section title="Ledger">
+      <div className="flex flex-col items-start gap-2">
+        <Button onClick={() => void download()} pending={exportCsv.pending}>
+          <Download className="size-4" aria-hidden />
+          Export CSV
+        </Button>
+        <Note>Every buy-in, cash-out, adjustment, settlement and void in this group.</Note>
+        {exportCsv.error ? <FormError>{exportCsv.error}</FormError> : null}
+      </div>
+    </Section>
   );
 }
 

@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { StacksApi } from "@stacks/contracts";
 
+import * as Export from "../features/Export.ts";
 import * as Groups from "../features/Groups.ts";
 import * as Guests from "../features/Guests.ts";
 import * as Invites from "../features/Invites.ts";
@@ -27,6 +28,7 @@ const groups = HttpApiBuilder.group(StacksApi, "groups", (handlers) =>
     .handle("create", ({ payload }) => serve(Groups.create(payload)))
     .handle("get", ({ params }) => serve(Groups.get(params.groupId)))
     .handle("stats", ({ params }) => serve(Stats.forGroup(params.groupId)))
+    .handle("exportCsv", ({ params }) => serve(Export.forGroup(params.groupId)))
     .handle("leave", ({ params }) => serve(Groups.leave(params.groupId)))
     .handle("removeMember", ({ params }) =>
       serve(Groups.removeMember(params.groupId, params.userId)),

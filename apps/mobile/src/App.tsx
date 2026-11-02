@@ -13,7 +13,7 @@ import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -95,11 +95,26 @@ declare global {
 }
 
 const Navigation = createStaticNavigation(RootStack);
-const linking = { enabled: "auto" as const, prefixes: [Linking.createURL("/")] };
-
 function Root() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const theme = useNavigationTheme();
+  const pendingLink = useRef<string | null>(null);
+  useEffect(() => {
+    if (isSignedIn) return;
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      if (/\/(join|claim)\//.test(url)) pendingLink.current = url;
+    });
+    return () => subscription.remove();
+  }, [isSignedIn]);
+  const linking = {
+    enabled: "auto" as const,
+    prefixes: [Linking.createURL("/")],
+    getInitialURL: async () => {
+      const url = pendingLink.current ?? (await Linking.getInitialURL());
+      pendingLink.current = null;
+      return url;
+    },
+  };
   if (!isLoaded) return <Starting />;
   if (!isSignedIn) return <SignedOut />;
   return (

@@ -8,6 +8,7 @@ import {
   PlayerId,
   SeatingId,
   SessionId,
+  StakeId,
   TripId,
   VenueId,
 } from "@stacks/contracts";
@@ -23,6 +24,7 @@ export const ids = {
   venue: () => VenueId.make(crypto.randomUUID()),
   trip: () => TripId.make(crypto.randomUUID()),
   seating: () => SeatingId.make(crypto.randomUUID()),
+  stake: () => StakeId.make(crypto.randomUUID()),
 };
 
 export const usd = (amount: number) => MinorUnits.make(amount);

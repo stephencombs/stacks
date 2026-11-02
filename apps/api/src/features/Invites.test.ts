@@ -20,6 +20,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("invites", (it) => {
         memberCount: 1,
         status: "open",
         alreadyMember: false,
+        currentTripId: null,
       });
       const joined = yield* bea.invites.accept({
         params: { code: invite.code.toLowerCase() },
@@ -27,6 +28,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("invites", (it) => {
       });
       expect(joined.role).toBe("member");
       expect(joined.players.map((player) => player.displayName)).toEqual(["Owner", "Bea"]);
+      expect(yield* bea.invites.preview({ params: { code: invite.code } })).toMatchObject({
+        alreadyMember: true,
+        currentTripId: group.tripId,
+      });
     }),
   );
 

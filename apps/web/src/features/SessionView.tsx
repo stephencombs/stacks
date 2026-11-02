@@ -511,6 +511,9 @@ function EntryRow({
   actions: ReactNode;
 }) {
   const voided = entry.voidedAt !== null;
+  const voidedBy = entry.voidedBy
+    ? (group.players.find((player) => player.userId === entry.voidedBy)?.displayName ?? null)
+    : null;
   const counterparty = entry.counterpartyId ? names.get(entry.counterpartyId) : null;
   return (
     <Row>
@@ -538,11 +541,14 @@ function EntryRow({
           counterparty && entry.kind === "buy_in" ? `${counterparty} paid` : null,
           counterparty && entry.kind === "cash_out" ? `${counterparty} has the cash` : null,
           entry.note,
-          voided ? `Voided${entry.voidReason ? `: ${entry.voidReason}` : ""}` : null,
+          voided
+            ? `${voidedBy ? `Voided by ${voidedBy}` : "Voided"}${entry.voidReason ? `: ${entry.voidReason}` : ""}`
+            : null,
         ]
           .filter(Boolean)
           .join(" · ")}
       />
+      {entry.replacesEntryId ? <Tag>Corrected</Tag> : null}
       {actions}
     </Row>
   );

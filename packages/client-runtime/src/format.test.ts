@@ -12,7 +12,7 @@ import {
   type StakeView,
 } from "@stacks/contracts";
 
-import { playedSummary, stakeLines } from "./format.ts";
+import { csvFilename, isFormerMember, isGuest, playedSummary, stakeLines } from "./format.ts";
 
 it("sums up what the group has played", () => {
   expect(playedSummary(29, 8100)).toBe("The group has played 29 sessions over 135 hours.");
@@ -20,6 +20,33 @@ it("sums up what the group has played", () => {
   expect(playedSummary(2, 95)).toBe("The group has played 2 sessions over 1.6 hours.");
   // Imported sessions have no recorded length.
   expect(playedSummary(41, 0)).toBe("The group has played 41 sessions.");
+});
+
+it("tells guests from former members", () => {
+  const handles = { venmo: null, cashApp: null, paypal: null };
+  const guest = {
+    ...handles,
+    id: PlayerId.make("0192e7a0-0000-7000-8000-000000000011"),
+    displayName: "Cam",
+    userId: null,
+    role: null,
+    claimCode: "CLAIM123",
+  };
+  const former = {
+    ...handles,
+    id: PlayerId.make("0192e7a0-0000-7000-8000-000000000012"),
+    displayName: "Kim",
+    userId: UserId.make("user_kim"),
+    role: null,
+    claimCode: null,
+  };
+  expect([isGuest(guest), isFormerMember(guest)]).toEqual([true, false]);
+  expect([isGuest(former), isFormerMember(former)]).toEqual([false, true]);
+});
+
+it("builds a clean CSV filename", () => {
+  expect(csvFilename("Vegas Crew!")).toBe("vegas-crew-ledger.csv");
+  expect(csvFilename("   ")).toBe("stacks-ledger.csv");
 });
 
 it("says how a stake stands", () => {

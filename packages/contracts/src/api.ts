@@ -3,6 +3,7 @@ import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as HttpApi from "effect/http-api/HttpApi";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
 import * as OpenApi from "effect/http-api/OpenApi";
 
 import { Authentication } from "./auth.ts";
@@ -188,6 +189,9 @@ export const EndTripRequest = Schema.Struct({ endedAt: Schema.optionalKey(Schema
 const groupParams = Schema.Struct({ groupId: GroupId });
 const sessionParams = Schema.Struct({ sessionId: SessionId });
 const Ok = Schema.Struct({ ok: Schema.Literal(true) });
+const CsvText = Schema.String.pipe(
+  HttpApiSchema.asText({ contentType: "text/csv; charset=utf-8" }),
+);
 
 const HealthGroup = HttpApiGroup.make("health").add(
   HttpApiEndpoint.get("health", "/health", { success: HealthResponse }).annotate(
@@ -216,6 +220,13 @@ const GroupsGroup = HttpApiGroup.make("groups")
     HttpApiEndpoint.get("stats", "/groups/:groupId/stats", {
       params: groupParams,
       success: GroupStats,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("exportCsv", "/groups/:groupId/export.csv", {
+      params: groupParams,
+      success: CsvText,
       error: [Forbidden, NotFound],
     }),
   )
