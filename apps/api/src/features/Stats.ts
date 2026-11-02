@@ -3,25 +3,36 @@ import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import type { GroupId, GroupStats, PlayerId, PlayerResult } from "@stacks/contracts";
 import { playerResults, resultsBy } from "@stacks/shared/results";
+import { resultsBySeat } from "@stacks/shared/seats";
 
-import { EntryRow, SessionRow, VenueRow } from "../db/rows.ts";
+import { EntryRow, SeatingRow, SessionRow, VenueRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
 import { venueColumns } from "./Views.ts";
 
 const toList = (results: ReadonlyMap<PlayerId, Omit<PlayerResult, "playerId">>) =>
   Array.from(results, ([playerId, result]) => ({ playerId, ...result }));
 
-/** All-time results over the group's closed sessions, split by player, game and venue. */
+/**
+ * All-time results over the group's closed sessions, split by player, game, venue, seat and
+ * session.
+ */
 export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   yield* Access.membership(groupId);
   const sessions = yield* sql`
     select * from sessions where group_id = ${groupId} and status = 'closed'
+    order by started_at, created_at
   `.pipe(Effect.flatMap(Access.decodeRows(SessionRow)));
   const entries = yield* sql`
     select e.* from entries e join sessions s on s.id = e.session_id
     where e.group_id = ${groupId} and s.status = 'closed' and e.voided_at is null
   `.pipe(Effect.flatMap(Access.decodeRows(EntryRow)));
+  const seatings = yield* sql`
+    select st.id, st.session_id, st.player_id, st.seat, st.occurred_at
+    from seatings st join sessions s on s.id = st.session_id
+    where st.group_id = ${groupId} and s.status = 'closed'
+    order by st.occurred_at, st.created_at
+  `.pipe(Effect.flatMap(Access.decodeRows(SeatingRow)));
   const venues =
     sessions.length === 0
       ? []
@@ -46,6 +57,8 @@ export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId)
     0,
   );
 
+  const bySession = resultsBy(sessions, entries, (s) => s.id);
+
   return {
     sessionCount: sessions.length,
     minutesPlayed,
@@ -62,6 +75,18 @@ export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId)
       key: venue,
       sessionCount: venueCounts.get(venue.id) ?? 0,
       results: toList(resultsBy(sessions, entries, (s) => s.venueId).get(venue.id) ?? new Map()),
+    })),
+    bySeat: Array.from(resultsBySeat(sessions, seatings, entries), ([seat, row]) => ({
+      key: seat,
+      sessionCount: row.sessions,
+      results: toList(row.results),
+    })).toSorted((a, b) => a.key - b.key),
+    bySession: sessions.map((session) => ({
+      sessionId: session.id,
+      tripId: session.tripId,
+      venueId: session.venueId,
+      startedAt: session.startedAt,
+      results: toList(bySession.get(session.id) ?? new Map()),
     })),
   } satisfies GroupStats;
 });

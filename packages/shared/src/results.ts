@@ -65,3 +65,32 @@ export const resultsBy = <S extends Pick<Session, "id">, K>(
 
   return new Map(Array.from(grouped, ([groupKey, group]) => [groupKey, playerResults(group)]));
 };
+
+export interface SessionRuns {
+  readonly sessions: number;
+  /** Sessions that finished up. */
+  readonly wins: number;
+  readonly longestWinningRun: number;
+  /** The run of wins or losses the latest session belongs to; an even session ends any run. */
+  readonly current: { readonly length: number; readonly winning: boolean };
+}
+
+/** Wins and streaks over one player's session results, oldest first. */
+export const sessionRuns = (nets: Iterable<number>): SessionRuns => {
+  let sessions = 0;
+  let wins = 0;
+  let longestWinningRun = 0;
+  let winning = 0;
+  let length = 0;
+  let sign = 0;
+  for (const net of nets) {
+    sessions += 1;
+    if (net > 0) wins += 1;
+    winning = net > 0 ? winning + 1 : 0;
+    longestWinningRun = Math.max(longestWinningRun, winning);
+    const next = Math.sign(net);
+    length = next === 0 ? 0 : next === sign ? length + 1 : 1;
+    sign = next;
+  }
+  return { sessions, wins, longestWinningRun, current: { length, winning: sign > 0 } };
+};

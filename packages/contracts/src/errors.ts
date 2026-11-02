@@ -9,7 +9,14 @@ export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
 export class Forbidden extends Schema.TaggedError<Forbidden>()(
   "Forbidden",
   {
-    reason: Schema.Literals(["not_a_member", "admins_only", "owner_only", "not_your_entry"]),
+    reason: Schema.Literals([
+      "not_a_member",
+      "admins_only",
+      "owner_only",
+      "not_your_entry",
+      "not_your_stake",
+      "not_your_trip",
+    ]),
   },
   { httpApiStatus: 403 },
 ) {}
@@ -17,7 +24,17 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()(
 export class NotFound extends Schema.TaggedError<NotFound>()(
   "NotFound",
   {
-    resource: Schema.Literals(["group", "player", "invite", "claim", "venue", "session", "entry"]),
+    resource: Schema.Literals([
+      "group",
+      "player",
+      "invite",
+      "claim",
+      "venue",
+      "session",
+      "entry",
+      "stake",
+      "trip",
+    ]),
   },
   { httpApiStatus: 404 },
 ) {}
@@ -31,12 +48,19 @@ export const ConflictReason = Schema.Literals([
   "claim_has_history",
   "player_not_in_group",
   "player_not_in_session",
+  "seat_taken",
   "venue_not_available",
   "session_closed",
   "session_open",
   "players_not_cashed_out",
   "entry_voided",
   "balance_not_settled",
+  "stake_voided",
+  "stake_ended",
+  "stake_open",
+  "trip_not_empty",
+  "trip_ended",
+  "trip_open",
   "last_owner",
 ]);
 export type ConflictReason = typeof ConflictReason.Type;

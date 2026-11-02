@@ -6,7 +6,9 @@ import {
   InviteId,
   MinorUnits,
   PlayerId,
+  SeatingId,
   SessionId,
+  TripId,
   VenueId,
 } from "@stacks/contracts";
 
@@ -19,6 +21,8 @@ export const ids = {
   session: () => SessionId.make(crypto.randomUUID()),
   entry: () => EntryId.make(crypto.randomUUID()),
   venue: () => VenueId.make(crypto.randomUUID()),
+  trip: () => TripId.make(crypto.randomUUID()),
+  seating: () => SeatingId.make(crypto.randomUUID()),
 };
 
 export const usd = (amount: number) => MinorUnits.make(amount);
@@ -38,7 +42,10 @@ export const users = <const Names extends ReadonlyArray<string>>(...names: Names
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
-/** A group owned by `owner`, with every other client joined through an invite. */
+/**
+ * A group owned by `owner`, with every other client joined through an invite, and an open trip to
+ * play in: `tripId`.
+ */
 export const groupWith = Effect.fn("fixtures.groupWith")(function* (
   owner: Client,
   ...others: ReadonlyArray<Client>
@@ -62,8 +69,14 @@ export const groupWith = Effect.fn("fixtures.groupWith")(function* (
       payload: { displayName: `Member ${index + 1}` },
     });
   }
-  return yield* owner.groups.get({ params: { groupId } });
+  const trip = yield* owner.trips.create({
+    params: { groupId },
+    payload: { id: ids.trip(), name: "Vegas" },
+  });
+  return { ...(yield* owner.groups.get({ params: { groupId } })), tripId: trip.id };
 });
+
+export type TestGroup = Effect.Success<ReturnType<typeof groupWith>>;
 
 export const catalogVenue = Effect.fn("fixtures.catalogVenue")(function* (client: Client) {
   return yield* client.venues.create({

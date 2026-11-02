@@ -1,6 +1,16 @@
 import * as Schema from "effect/Schema";
 
-import { EntryId, GroupId, PlayerId, SessionId, UserId, VenueId } from "./ids.ts";
+import {
+  EntryId,
+  GroupId,
+  PlayerId,
+  SeatingId,
+  SessionId,
+  StakeId,
+  TripId,
+  UserId,
+  VenueId,
+} from "./ids.ts";
 import { MinorUnits } from "./money.ts";
 
 export const Game = Schema.Literals([
@@ -15,18 +25,26 @@ export const Game = Schema.Literals([
 ]);
 export type Game = typeof Game.Type;
 
+/** A spot at the table, numbered from the dealer's left: seat 1 is first base at blackjack. */
+export const Seat = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 14 }));
+
 export const SessionStatus = Schema.Literals(["live", "closed"]);
 export type SessionStatus = typeof SessionStatus.Type;
 
 export const Session = Schema.Struct({
   id: SessionId,
   groupId: GroupId,
+  tripId: TripId,
   venueId: VenueId,
   game: Game,
   status: SessionStatus,
   startedAt: Schema.DateTimeUtc,
   endedAt: Schema.NullOr(Schema.DateTimeUtc),
   notes: Schema.NullOr(Schema.String),
+  /** How many seats the table has, for games played from seats; null is the game's usual table. */
+  tableSeats: Schema.NullOr(Seat),
+  /** Played at a high-limit table. */
+  highLimit: Schema.Boolean,
 }).check(
   Schema.makeFilter((session) =>
     (session.status === "closed") === (session.endedAt !== null)
@@ -35,6 +53,19 @@ export const Session = Schema.Struct({
   ),
 );
 export type Session = typeof Session.Type;
+
+/**
+ * A player sitting down at `seat`, or standing up when it's null. Rows are never edited: moving
+ * is a new row, so a session's latest row for each player is where they sit now.
+ */
+export const Seating = Schema.Struct({
+  id: SeatingId,
+  sessionId: SessionId,
+  playerId: PlayerId,
+  seat: Schema.NullOr(Seat),
+  occurredAt: Schema.DateTimeUtc,
+});
+export type Seating = typeof Seating.Type;
 
 /**
  * - `buy_in`: chips bought by `playerId`. A counterparty paid for them, so the player owes them.
@@ -50,6 +81,8 @@ export const Entry = Schema.Struct({
   id: EntryId,
   groupId: GroupId,
   sessionId: Schema.NullOr(SessionId),
+  /** Set only on a settlement; a session's entries belong to the session's trip. */
+  tripId: Schema.NullOr(TripId),
   kind: EntryKind,
   playerId: PlayerId,
   counterpartyId: Schema.NullOr(PlayerId),
@@ -68,6 +101,7 @@ export type Entry = typeof Entry.Type;
 function entryShapeIssue(entry: {
   readonly kind: EntryKind;
   readonly sessionId: SessionId | null;
+  readonly tripId: TripId | null;
   readonly playerId: PlayerId;
   readonly counterpartyId: PlayerId | null;
   readonly amount: number;
@@ -75,6 +109,7 @@ function entryShapeIssue(entry: {
   if (entry.kind === "settlement") {
     if (entry.sessionId !== null)
       return { path: ["sessionId"], issue: "settlements aren't part of a session" };
+    if (entry.tripId === null) return { path: ["tripId"], issue: "a settlement squares up a trip" };
     if (entry.counterpartyId === null || entry.counterpartyId === entry.playerId) {
       return { path: ["counterpartyId"], issue: "a settlement is paid to another player" };
     }
@@ -82,6 +117,8 @@ function entryShapeIssue(entry: {
   }
   if (entry.sessionId === null)
     return { path: ["sessionId"], issue: "required for session entries" };
+  if (entry.tripId !== null)
+    return { path: ["tripId"], issue: "a session's entries belong to the session's trip" };
   if (entry.kind === "adjustment") {
     if (entry.counterpartyId !== null) {
       return { path: ["counterpartyId"], issue: "adjustments don't involve another player" };
@@ -97,3 +134,43 @@ function entryShapeIssue(entry: {
   }
   return entry.amount > 0 ? undefined : { path: ["amount"], issue: "must be positive" };
 }
+
+/**
+ * Money `lenderId` gave `borrowerId` to play with. While it's open, the borrower's results go to
+ * it: the lender gets the stake back plus `lenderShare` percent of the winnings, or what's left
+ * of the stake after losses. Several stakes on one borrower split each result by amount.
+ */
+export const Stake = Schema.Struct({
+  id: StakeId,
+  groupId: GroupId,
+  /** A stake covers the borrower's sessions in this trip that start while it's open. */
+  tripId: TripId,
+  lenderId: PlayerId,
+  borrowerId: PlayerId,
+  amount: MinorUnits,
+  lenderShare: Schema.Int,
+  startedAt: Schema.DateTimeUtc,
+  endedAt: Schema.NullOr(Schema.DateTimeUtc),
+  note: Schema.NullOr(Schema.String),
+  createdBy: UserId,
+  createdAt: Schema.DateTimeUtc,
+  voidedAt: Schema.NullOr(Schema.DateTimeUtc),
+  voidedBy: Schema.NullOr(UserId),
+  voidReason: Schema.NullOr(Schema.String),
+});
+export type Stake = typeof Stake.Type;
+
+/**
+ * A trip: a group's weekend in Vegas, or any run of play. Every session belongs to one, and each
+ * trip keeps its own balances and settles up on its own. An ended trip takes no new sessions.
+ */
+export const Trip = Schema.Struct({
+  id: TripId,
+  groupId: GroupId,
+  name: Schema.String,
+  startedAt: Schema.DateTimeUtc,
+  endedAt: Schema.NullOr(Schema.DateTimeUtc),
+  createdBy: UserId,
+  createdAt: Schema.DateTimeUtc,
+});
+export type Trip = typeof Trip.Type;

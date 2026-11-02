@@ -31,3 +31,27 @@ export const balances = (entries: Iterable<BalanceEntry>): ReadonlyMap<PlayerId,
   }
   return result;
 };
+
+/**
+ * Balances after payments the server hasn't confirmed yet, so a screen can stop suggesting a
+ * payment the moment it's recorded. Each payment moves `amount` of debt from `from` to `to`.
+ */
+export const applyPayments = (
+  current: ReadonlyMap<PlayerId, MinorUnits>,
+  payments: Iterable<{
+    readonly from: PlayerId;
+    readonly to: PlayerId;
+    readonly amount: MinorUnits;
+  }>,
+): ReadonlyMap<PlayerId, MinorUnits> => {
+  const totals = new Map<PlayerId, number>(current);
+  for (const { from, to, amount } of payments) {
+    totals.set(from, (totals.get(from) ?? 0) + amount);
+    totals.set(to, (totals.get(to) ?? 0) - amount);
+  }
+  const result = new Map<PlayerId, MinorUnits>();
+  for (const [playerId, total] of totals) {
+    if (total !== 0) result.set(playerId, MinorUnits.make(total));
+  }
+  return result;
+};

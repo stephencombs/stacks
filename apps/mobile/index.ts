@@ -1,3 +1,4 @@
+import "./src/polyfills";
 import "./global.css";
 import { registerRootComponent } from "expo";
 

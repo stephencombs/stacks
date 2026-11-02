@@ -3,17 +3,18 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "./cn";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const base =
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-medium whitespace-nowrap select-none " +
-  "transition-[background-color,color,transform,box-shadow] duration-150 active:scale-[0.98] " +
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap select-none " +
+  "transition-[background-color,color,scale,box-shadow] duration-150 active:scale-[0.98] " +
   "disabled:pointer-events-none disabled:bg-disabled disabled:text-muted disabled:shadow-none";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-accent text-accent-ink shadow-sm hover:bg-[color-mix(in_oklch,var(--color-accent)_88%,var(--color-canvas))]",
+    "bg-accent text-accent-ink shadow-[inset_0_-2px_0_rgb(0_0_0/0.18)] hover:bg-[color-mix(in_oklch,var(--color-accent)_88%,white)]",
+  tint: "bg-accent/15 text-accent-text hover:bg-accent/25",
   secondary:
     "bg-surface text-ink shadow-[inset_0_0_0_1px_var(--color-line-strong)] hover:bg-sunken",
   ghost: "text-ink hover:bg-sunken",
@@ -22,8 +23,9 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-sm",
-  md: "h-10 px-4 text-sm",
+  // Touch screens get 44px targets; a mouse can use the tighter sizes.
+  sm: "h-8 px-3 text-sm pointer-coarse:h-11",
+  md: "h-10 px-4 text-sm pointer-coarse:h-11",
   lg: "h-12 px-5 text-base",
 };
 

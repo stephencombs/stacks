@@ -21,7 +21,7 @@ export function Money({
   return (
     <span
       className={cn(
-        "tabular-nums",
+        "font-mono tabular-nums",
         tone === "result" && amount > 0 && "text-win",
         tone === "result" && amount < 0 && "text-loss",
         tone === "result" && amount === 0 && "text-muted",
@@ -33,7 +33,7 @@ export function Money({
   );
 }
 
-/** "Owed $40", "Owes $40" or "Settled up", for a balance. */
+/** "Owed $40", "Owes $40" or "Square", for a balance. */
 export function BalanceLabel({
   amount,
   currency,
@@ -43,7 +43,8 @@ export function BalanceLabel({
   currency: CurrencyCode;
   subject?: "you" | "third";
 }) {
-  if (amount === 0) return <span className="text-muted">Settled up</span>;
+  if (amount === 0)
+    return <span className="text-muted">{subject === "you" ? "You're square" : "Square"}</span>;
   const magnitude = MinorUnits.make(Math.abs(amount));
   const verb =
     amount > 0

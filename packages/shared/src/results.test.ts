@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
+import * as Schema from "effect/Schema";
 import { SessionId } from "@stacks/contracts";
 
-import { playerResults, resultsBy } from "./results.ts";
+import { playerResults, resultsBy, sessionRuns } from "./results.ts";
 import { ALEX, BEA, entry, money } from "./testing/ledgerArbitrary.ts";
 
 describe("playerResults", () => {
@@ -69,4 +70,45 @@ describe("resultsBy", () => {
     expect(byGame.get("blackjack")?.get(ALEX)?.net).toBe(15000);
     expect(byGame.get("craps")?.get(ALEX)?.net).toBe(-5000);
   });
+});
+
+describe("sessionRuns", () => {
+  it("finds the longest winning run and the run the latest session is on", () => {
+    expect(sessionRuns([100, 200, -50, 300, 400, 500, -10, -20])).toEqual({
+      sessions: 8,
+      wins: 5,
+      longestWinningRun: 3,
+      current: { length: 2, winning: false },
+    });
+  });
+
+  it("lets an even session break a run", () => {
+    expect(sessionRuns([100, 0, 100, 100])).toMatchObject({
+      longestWinningRun: 2,
+      current: { length: 2, winning: true },
+    });
+    expect(sessionRuns([100, 0]).current).toEqual({ length: 0, winning: false });
+    expect(sessionRuns([])).toEqual({
+      sessions: 0,
+      wins: 0,
+      longestWinningRun: 0,
+      current: { length: 0, winning: false },
+    });
+  });
+
+  it.prop(
+    "keeps every count within the sessions played",
+    [Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: -3, maximum: 3 })))],
+    ([nets]) => {
+      const runs = sessionRuns(nets);
+      expect(runs.sessions).toBe(nets.length);
+      expect(runs.wins).toBe(nets.filter((net) => net > 0).length);
+      expect(runs.longestWinningRun).toBeLessThanOrEqual(runs.wins);
+      expect(runs.current.length).toBeLessThanOrEqual(runs.sessions);
+      if (runs.current.winning)
+        expect(runs.longestWinningRun).toBeGreaterThanOrEqual(runs.current.length);
+      const tail = nets.slice(nets.length - runs.current.length);
+      expect(tail.every((net) => Math.sign(net) === (runs.current.winning ? 1 : -1))).toBe(true);
+    },
+  );
 });

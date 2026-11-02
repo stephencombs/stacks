@@ -1,7 +1,5 @@
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/stacks
-
 # From the Clerk dashboard. CLERK_JWT_KEY (the PEM public key) makes verification networkless.
 CLERK_SECRET_KEY=
 # CLERK_JWT_KEY=
-# Comma-separated origins allowed to send tokens, e.g. http://localhost:5173
-# CLERK_AUTHORIZED_PARTIES=
+# Comma-separated origins allowed to send tokens: the web app and the mobile web build.
+# CLERK_AUTHORIZED_PARTIES=http://localhost:5173,http://localhost:8081

@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
-import { GroupId, InviteId, PlayerId, UserId, VenueId } from "./ids.ts";
-import { Entry, Game, Session } from "./ledger.ts";
+import { GroupId, InviteId, PlayerId, SessionId, TripId, UserId, VenueId } from "./ids.ts";
+import { Entry, Game, Seat, Seating, Session, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 
 export const MemberRole = Schema.Literals(["owner", "admin", "member"]);
@@ -64,6 +64,10 @@ export type Venue = typeof Venue.Type;
 export const SessionSummary = Schema.Struct({
   session: Session,
   venue: Venue,
+  /** Everyone seated at the table, in the order they sat down. */
+  playerIds: Schema.Array(PlayerId),
+  /** Who's still at a live table: seated and not cashed out. Empty once it closes. */
+  playing: Schema.Array(PlayerId),
   results: Schema.Array(PlayerResult),
 });
 export type SessionSummary = typeof SessionSummary.Type;
@@ -74,6 +78,8 @@ export const SessionDetail = Schema.Struct({
   playerIds: Schema.Array(PlayerId),
   results: Schema.Array(PlayerResult),
   entries: Schema.Array(Entry),
+  /** Every sit, move and stand, oldest first. */
+  seatings: Schema.Array(Seating),
 });
 export type SessionDetail = typeof SessionDetail.Type;
 
@@ -83,20 +89,48 @@ export const GroupListItem = Schema.Struct({
   myPlayerId: PlayerId,
   myBalance: MinorUnits,
   liveSessionCount: Schema.Int,
+  /** The trip still going, most recently started first; where the app opens. */
+  currentTripId: Schema.NullOr(TripId),
+  /** The live session you're seated at, if any. */
+  mySession: Schema.NullOr(
+    Schema.Struct({
+      id: SessionId,
+      tripId: TripId,
+      venueName: Schema.String,
+      startedAt: Schema.DateTimeUtc,
+    }),
+  ),
 });
 export type GroupListItem = typeof GroupListItem.Type;
+
+/** A stake and where it stands: the borrower's result so far and what they'd hand back now. */
+export const StakeView = Schema.Struct({
+  stake: Stake,
+  result: MinorUnits,
+  owed: MinorUnits,
+});
+export type StakeView = typeof StakeView.Type;
 
 export const GroupDetail = Schema.Struct({
   group: Group,
   role: MemberRole,
   myPlayerId: PlayerId,
   players: Schema.Array(Player),
+  /** Newest first. */
+  trips: Schema.Array(Trip),
+});
+export type GroupDetail = typeof GroupDetail.Type;
+
+/** A trip's sessions, oldest first and live ones included, and its own ledger of who owes whom. */
+export const TripDetail = Schema.Struct({
+  trip: Trip,
+  sessions: Schema.Array(SessionSummary),
   balances: Schema.Array(Balance),
   transfers: Schema.Array(Transfer),
   settlements: Schema.Array(Entry),
-  sessions: Schema.Array(SessionSummary),
+  stakes: Schema.Array(StakeView),
 });
-export type GroupDetail = typeof GroupDetail.Type;
+export type TripDetail = typeof TripDetail.Type;
 
 export const Invite = Schema.Struct({
   id: InviteId,
@@ -136,5 +170,17 @@ export const GroupStats = Schema.Struct({
   byPlayer: Schema.Array(PlayerResult),
   byGame: Schema.Array(StatsBreakdown(Game)),
   byVenue: Schema.Array(StatsBreakdown(Venue)),
+  /** Results by seat: each player's session counts for the seat they held longest in it. */
+  bySeat: Schema.Array(StatsBreakdown(Seat)),
+  /** Each closed session's results, oldest first. */
+  bySession: Schema.Array(
+    Schema.Struct({
+      sessionId: SessionId,
+      tripId: TripId,
+      venueId: VenueId,
+      startedAt: Schema.DateTimeUtc,
+      results: Schema.Array(PlayerResult),
+    }),
+  ),
 });
 export type GroupStats = typeof GroupStats.Type;

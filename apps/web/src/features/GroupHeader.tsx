@@ -1,12 +1,11 @@
-import { Link } from "@tanstack/react-router";
 import type { GroupDetail } from "@stacks/contracts";
 import type { ReactNode } from "react";
 
-import { cn } from "~/components/ui/cn";
+import { BackLink, Tab, Tabs } from "~/components/ui/Nav";
+import { PageTitle } from "~/components/ui/Surface";
 
 const tabs = [
-  { key: "home", label: "Sessions", to: "/groups/$groupId" },
-  { key: "settle", label: "Settle up", to: "/groups/$groupId/settle" },
+  { key: "home", label: "Trips", to: "/groups/$groupId" },
   { key: "stats", label: "Stats", to: "/groups/$groupId/stats" },
   { key: "settings", label: "People", to: "/groups/$groupId/settings" },
 ] as const;
@@ -21,29 +20,28 @@ export function GroupHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 pt-4">
+    <div className="flex flex-col gap-4 pt-2">
+      <BackLink to="/groups">Your groups</BackLink>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-serif text-4xl font-medium">{detail.group.name}</h1>
+        <PageTitle
+          context={`${detail.players.length} ${detail.players.length === 1 ? "player" : "players"} · ${detail.group.currency}`}
+        >
+          {detail.group.name}
+        </PageTitle>
         {action}
       </div>
-      <nav aria-label="Group" className="-mx-1 flex gap-1 overflow-x-auto">
+      <Tabs label="Group">
         {tabs.map((tab) => (
-          <Link
+          <Tab
             key={tab.key}
             to={tab.to}
             params={{ groupId: detail.group.id }}
-            aria-current={tab.key === current ? "page" : undefined}
-            className={cn(
-              "inline-flex h-9 items-center rounded-lg px-3 text-sm whitespace-nowrap transition-colors duration-150",
-              tab.key === current
-                ? "bg-surface font-medium text-ink shadow-[0_0_0_1px_var(--color-line)]"
-                : "text-muted hover:text-ink",
-            )}
+            current={tab.key === current}
           >
             {tab.label}
-          </Link>
+          </Tab>
         ))}
-      </nav>
+      </Tabs>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { CurrencyCode } from "@stacks/contracts";
 
-import { formatMoney, minorUnitDigits, parseMoney } from "./money.ts";
+import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "./money.ts";
 import { money } from "./testing/ledgerArbitrary.ts";
 
 const USD = CurrencyCode.make("USD");
@@ -18,17 +18,38 @@ describe("minorUnitDigits", () => {
 });
 
 describe("formatMoney", () => {
-  it("formats minor units in the currency", () => {
+  it("formats minor units in the currency, with cents only when there are some", () => {
     expect(formatMoney(money(123456), USD, { locale: "en-US" })).toBe("$1,234.56");
-    expect(formatMoney(money(-500), USD, { locale: "en-US" })).toBe("-$5.00");
+    expect(formatMoney(money(-500), USD, { locale: "en-US" })).toBe("-$5");
+    expect(formatMoney(money(5050), USD, { locale: "en-US" })).toBe("$50.50");
     expect(formatMoney(money(1500), JPY, { locale: "en-US" })).toBe("¥1,500");
     expect(formatMoney(money(1234), KWD, { locale: "en-US" })).toBe("KWD\u00a01.234");
   });
 
+  it("drops zero cents where Intl ignores trailingZeroDisplay, as Hermes on iOS does", () => {
+    const NumberFormat = Intl.NumberFormat;
+    class WithoutTrailingZeroDisplay extends NumberFormat {
+      constructor(locale?: string | Array<string>, options: Intl.NumberFormatOptions = {}) {
+        const { trailingZeroDisplay: _ignored, ...rest } = options;
+        super(locale, rest);
+      }
+    }
+    Intl.NumberFormat = WithoutTrailingZeroDisplay as typeof Intl.NumberFormat;
+    try {
+      expect(formatMoney(money(10000), USD, { locale: "en-US" })).toBe("$100");
+      expect(formatMoney(money(5050), USD, { locale: "en-US" })).toBe("$50.50");
+    } finally {
+      Intl.NumberFormat = NumberFormat;
+    }
+  });
+
+  it("keeps zero cents on request", () => {
+    const full = { locale: "en-US", trailingZeroDisplay: "auto" } as const;
+    expect(formatMoney(money(5000), USD, full)).toBe("$50.00");
+  });
+
   it("shows a plus sign on request", () => {
-    expect(formatMoney(money(1000), USD, { locale: "en-US", signDisplay: "always" })).toBe(
-      "+$10.00",
-    );
+    expect(formatMoney(money(1000), USD, { locale: "en-US", signDisplay: "always" })).toBe("+$10");
   });
 
   it("stays exact at the largest safe amount", () => {
@@ -57,6 +78,20 @@ describe("parseMoney", () => {
       expect(parseMoney(input, USD, { locale: "en-US" })).toEqual(Option.none());
     },
   );
+
+  it("works where Intl can't split a number into parts, as in Hermes on iOS", () => {
+    const formatToParts = Intl.NumberFormat.prototype.formatToParts;
+    // @ts-expect-error Hermes on Apple platforms doesn't define it.
+    delete Intl.NumberFormat.prototype.formatToParts;
+    try {
+      expect(parseMoney("1,234.50", USD, { locale: "en-US" })).toEqual(Option.some(123450));
+      expect(parseMoney("1.234,50 €", EUR, { locale: "de-DE" })).toEqual(Option.some(123450));
+      expect(parseMoney("1 234,50", EUR, { locale: "fr-FR" })).toEqual(Option.some(123450));
+      expect(decimalSeparator("de-DE")).toBe(",");
+    } finally {
+      Intl.NumberFormat.prototype.formatToParts = formatToParts;
+    }
+  });
 
   it("follows the locale's separators", () => {
     expect(parseMoney("1.234,50 €", EUR, { locale: "de-DE" })).toEqual(Option.some(123450));

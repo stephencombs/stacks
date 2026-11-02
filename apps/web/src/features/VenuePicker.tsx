@@ -158,9 +158,7 @@ export function VenuePicker({
           />
         ) : recent.length > 0 ? (
           <>
-            <p className="px-3 pb-1 text-xs font-semibold tracking-[0.08em] text-muted uppercase">
-              Recent
-            </p>
+            <p className="px-3 pb-1 text-sm text-muted">Recent</p>
             {recent.map((venue) => (
               <VenueOption
                 key={venue.id}
@@ -249,10 +247,8 @@ function AddVenueDialog({
               <label
                 key={option}
                 className={cn(
-                  "flex h-11 cursor-pointer items-center justify-center rounded-lg text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
-                  kind === option
-                    ? "bg-accent font-medium text-accent-ink shadow-none"
-                    : "hover:bg-sunken",
+                  "flex h-11 cursor-pointer items-center justify-center rounded-lg outline-offset-2 outline-ink has-[:focus-visible]:outline-2 text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
+                  kind === option ? "bg-accent text-accent-ink shadow-none" : "hover:bg-sunken",
                 )}
               >
                 <input

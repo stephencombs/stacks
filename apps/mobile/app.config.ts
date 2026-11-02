@@ -23,6 +23,23 @@ export default (): ExpoConfig => ({
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   ios: { bundleIdentifier: id, supportsTablet: true },
-  android: { package: id },
-  extra: { appVariant: variant },
+  android: {
+    package: id,
+    // Google's map on Android needs a key in the build; without one the route shows as a list.
+    config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_API_KEY } },
+  },
+  plugins: [
+    "@clerk/expo",
+    "expo-secure-store",
+    "expo-web-browser",
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission:
+          "Stacks uses your location to list the casinos near you first.",
+      },
+    ],
+  ],
+  web: { bundler: "metro", output: "single" },
+  extra: { appVariant: variant, eas: { projectId: "e15fb4de-bc0f-49f9-b03d-ed701d1c895c" } },
 });

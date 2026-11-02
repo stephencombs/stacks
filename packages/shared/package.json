@@ -19,6 +19,26 @@
     "./settleUp": {
       "types": "./src/settleUp.ts",
       "import": "./src/settleUp.ts"
+    },
+    "./stakes": {
+      "types": "./src/stakes.ts",
+      "import": "./src/stakes.ts"
+    },
+    "./trips": {
+      "types": "./src/trips.ts",
+      "import": "./src/trips.ts"
+    },
+    "./stats": {
+      "types": "./src/stats.ts",
+      "import": "./src/stats.ts"
+    },
+    "./table": {
+      "types": "./src/table.ts",
+      "import": "./src/table.ts"
+    },
+    "./seats": {
+      "types": "./src/seats.ts",
+      "import": "./src/seats.ts"
     }
   },
   "scripts": {

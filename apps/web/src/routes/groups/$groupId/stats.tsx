@@ -1,12 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GroupId, type GroupDetail, type GroupStats, type PlayerResult } from "@stacks/contracts";
+import {
+  GroupId,
+  MinorUnits,
+  type GroupDetail,
+  type GroupStats,
+  type PlayerResult,
+} from "@stacks/contracts";
+import { gameNames, playedSummary } from "@stacks/client-runtime/format";
+import { seatLabel } from "@stacks/client-runtime/table";
 import type { ReactNode } from "react";
 
 import { Money } from "~/components/Money";
 import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
 import { GroupHeader } from "~/features/GroupHeader";
-import { playerNames } from "~/features/group";
-import { gameNames } from "~/lib/format";
+import { RaceStats } from "~/features/RaceStats";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/groups/$groupId/stats")({ component: Stats });
@@ -29,11 +36,11 @@ function Stats() {
   );
 }
 
-const byNet = (a: PlayerResult, b: PlayerResult) => b.net - a.net;
+const tableNet = (results: ReadonlyArray<PlayerResult>) =>
+  MinorUnits.make(results.reduce((sum, result) => sum + result.net, 0));
 
+/** All-time: the race across every trip, a stat sheet, and the group's results by game and casino. */
 function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }) {
-  const names = playerNames(detail);
-  const currency = detail.group.currency;
   if (stats.sessionCount === 0) {
     return (
       <EmptyState title="No finished sessions yet">
@@ -41,53 +48,49 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       </EmptyState>
     );
   }
-  const hours = Math.round(stats.minutesPlayed / 6) / 10;
-  const mine = (results: ReadonlyArray<PlayerResult>) =>
-    results.find((result) => result.playerId === detail.myPlayerId);
+  const venues = new Map(stats.byVenue.map((row) => [row.key.id, row.key]));
+  const trips = new Map(detail.trips.map((trip) => [trip.id, trip.name]));
+  const sessions = stats.bySession.map((row) => ({
+    session: { id: row.sessionId, startedAt: row.startedAt },
+    tripId: row.tripId,
+    venue: venues.get(row.venueId)!,
+    results: row.results,
+  }));
+  const marks = sessions.flatMap((session, index) =>
+    index === 0 || sessions[index - 1]!.tripId !== session.tripId
+      ? [{ index, label: trips.get(session.tripId) ?? "" }]
+      : [],
+  );
+  const currency = detail.group.currency;
+  const byNet = <R extends { results: ReadonlyArray<PlayerResult> }>(rows: ReadonlyArray<R>) =>
+    rows.toSorted((a, b) => tableNet(b.results) - tableNet(a.results));
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
-        <Surface className="flex flex-col gap-1 px-5 py-4">
-          <span className="text-sm text-muted">Sessions</span>
-          <span className="font-serif text-3xl tabular-nums">{stats.sessionCount}</span>
-        </Surface>
-        <Surface className="flex flex-col gap-1 px-5 py-4">
-          <span className="text-sm text-muted">Hours played</span>
-          <span className="font-serif text-3xl tabular-nums">{hours}</span>
-        </Surface>
-      </div>
+      <p className="-mt-2 text-pretty text-muted">
+        {playedSummary(stats.sessionCount, stats.minutesPlayed)}
+      </p>
+
+      <RaceStats
+        detail={detail}
+        sessions={sessions}
+        marks={marks}
+        where={(session) => trips.get(session.tripId) ?? ""}
+        latest="All-time"
+        empty="Stats count closed sessions, so close one to see how everyone's doing."
+      />
 
       <section className="flex flex-col gap-2">
-        <SectionHeading>Everyone, all time</SectionHeading>
-        <Table head={["Player", "Bought in", "Net"]}>
-          {stats.byPlayer.toSorted(byNet).map((result) => (
-            <tr key={result.playerId}>
-              <td className="px-5 py-3">{names.get(result.playerId)}</td>
-              <td className="px-5 py-3 text-right">
-                <Money amount={result.buyIn} currency={currency} className="text-muted" />
-              </td>
-              <td className="px-5 py-3 text-right font-medium">
-                <Money amount={result.net} currency={currency} tone="result" />
-              </td>
-            </tr>
-          ))}
-        </Table>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <SectionHeading>Your results by game</SectionHeading>
-        <Table head={["Game", "Sessions", "Your net"]}>
-          {stats.byGame.map((row) => (
+        <SectionHeading>By game</SectionHeading>
+        <Table head={["Game", "Sessions", "Table net"]}>
+          {byNet(stats.byGame).map((row) => (
             <tr key={row.key}>
-              <td className="px-5 py-3">{gameNames[row.key]}</td>
-              <td className="px-5 py-3 text-right text-muted tabular-nums">{row.sessionCount}</td>
-              <td className="px-5 py-3 text-right font-medium">
-                {mine(row.results) ? (
-                  <Money amount={mine(row.results)!.net} currency={currency} tone="result" />
-                ) : (
-                  <span className="text-faint">—</span>
-                )}
+              <td className="px-3 py-3 sm:px-5">{gameNames[row.key]}</td>
+              <td className="px-3 py-3 sm:px-5 text-right font-mono text-muted">
+                {row.sessionCount}
+              </td>
+              <td className="px-3 py-3 sm:px-5 text-right font-bold">
+                <Money amount={tableNet(row.results)} currency={currency} tone="result" />
               </td>
             </tr>
           ))}
@@ -95,23 +98,40 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       </section>
 
       <section className="flex flex-col gap-2">
-        <SectionHeading>Your results by venue</SectionHeading>
-        <Table head={["Venue", "Sessions", "Your net"]}>
-          {stats.byVenue.map((row) => (
+        <SectionHeading>By casino</SectionHeading>
+        <Table head={["Casino", "Sessions", "Table net"]}>
+          {byNet(stats.byVenue).map((row) => (
             <tr key={row.key.id}>
-              <td className="px-5 py-3">{row.key.name}</td>
-              <td className="px-5 py-3 text-right text-muted tabular-nums">{row.sessionCount}</td>
-              <td className="px-5 py-3 text-right font-medium">
-                {mine(row.results) ? (
-                  <Money amount={mine(row.results)!.net} currency={currency} tone="result" />
-                ) : (
-                  <span className="text-faint">—</span>
-                )}
+              <td className="px-3 py-3 sm:px-5">{row.key.name}</td>
+              <td className="px-3 py-3 sm:px-5 text-right font-mono text-muted">
+                {row.sessionCount}
+              </td>
+              <td className="px-3 py-3 sm:px-5 text-right font-bold">
+                <Money amount={tableNet(row.results)} currency={currency} tone="result" />
               </td>
             </tr>
           ))}
         </Table>
       </section>
+
+      {stats.bySeat.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <SectionHeading>By blackjack seat</SectionHeading>
+          <Table head={["Seat", "Sessions", "Table net"]}>
+            {stats.bySeat.map((row) => (
+              <tr key={row.key}>
+                <td className="px-3 py-3 sm:px-5">{seatLabel(row.key)}</td>
+                <td className="px-3 py-3 sm:px-5 text-right font-mono text-muted">
+                  {row.sessionCount}
+                </td>
+                <td className="px-3 py-3 sm:px-5 text-right font-bold">
+                  <Money amount={tableNet(row.results)} currency={currency} tone="result" />
+                </td>
+              </tr>
+            ))}
+          </Table>
+        </section>
+      ) : null}
     </>
   );
 }
@@ -126,7 +146,9 @@ function Table({ head, children }: { head: ReadonlyArray<string>; children: Reac
               <th
                 key={label}
                 className={
-                  index === 0 ? "px-5 py-2.5 font-medium" : "px-5 py-2.5 text-right font-medium"
+                  index === 0
+                    ? "px-3 py-2.5 font-medium sm:px-5"
+                    : "px-3 py-2.5 text-right font-medium sm:px-5"
                 }
               >
                 {label}

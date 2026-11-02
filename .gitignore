@@ -7,6 +7,7 @@ dist/
 .idea/
 .env*
 !.env.example
+!.env.production
 .wrangler/
 .alchemy/
 .tanstack/
@@ -18,3 +19,7 @@ apps/mobile/android/
 .dev.vars
 test-results/
 playwright-report/
+dist-web/
+
+# Claude Code personal settings
+.claude/settings.local.json

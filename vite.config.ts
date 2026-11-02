@@ -8,17 +8,22 @@ const GENERATED = [
   "*.tsbuildinfo",
   ".wrangler",
   ".alchemy",
+  "packages/client-runtime/src/tableArt.ts",
+  "apps/mobile/src/features/tableImages.ts",
   "**/routeTree.gen.ts",
   "apps/mobile/ios/**",
   "apps/mobile/android/**",
   "apps/mobile/.expo/**",
   "apps/mobile/uniwind-types.d.ts",
+  // ReUI's agent skill, replaced as a whole when it updates.
+  ".claude/skills/reui/**",
 ];
 
 export default defineConfig({
   test: {
     environment: "node",
-    exclude: ["**/node_modules/**", "**/dist/**"],
+    // e2e/ runs under Playwright (`pnpm test:e2e`), not vitest.
+    exclude: ["**/node_modules/**", "**/dist/**", "**/dist-web/**", "**/e2e/**"],
     allowOnly: !process.env.CI,
     // Flaky tests are fixed, not retried.
     retry: 0,

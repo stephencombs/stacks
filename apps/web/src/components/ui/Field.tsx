@@ -1,12 +1,12 @@
-import { CircleAlert } from "lucide-react";
+import { ChevronDown, CircleAlert } from "lucide-react";
 import { useId, type ComponentProps, type ReactElement, type ReactNode } from "react";
 
 import { cn } from "./cn";
 
 const control =
   "w-full rounded-lg bg-surface px-3 text-base text-ink shadow-[inset_0_0_0_1px_var(--color-line-strong)] " +
-  "transition-shadow duration-150 placeholder:text-faint hover:shadow-[inset_0_0_0_1px_var(--color-faint)] " +
-  "focus:shadow-[inset_0_0_0_2px_var(--color-ink)] focus:outline-none aria-invalid:shadow-[inset_0_0_0_2px_var(--color-danger)] " +
+  "transition-shadow duration-150 placeholder:text-muted hover:shadow-[inset_0_0_0_1px_var(--color-faint)] " +
+  "focus:shadow-[inset_0_0_0_2px_var(--color-accent-text)] focus:outline-none aria-invalid:shadow-[inset_0_0_0_2px_var(--color-danger)] " +
   "disabled:bg-sunken disabled:text-muted";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
@@ -14,7 +14,15 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
 }
 
 export function Select({ className, ...props }: ComponentProps<"select">) {
-  return <select className={cn(control, "h-11 appearance-none pr-8", className)} {...props} />;
+  return (
+    <div className={cn("relative", className)}>
+      <select className={cn(control, "h-11 appearance-none pr-9")} {...props} />
+      <ChevronDown
+        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted"
+        aria-hidden
+      />
+    </div>
+  );
 }
 
 /**

@@ -9,8 +9,12 @@ import {
   MemberRole,
   MinorUnits,
   PlayerId,
+  Seat,
+  SeatingId,
   SessionId,
   SessionStatus,
+  StakeId,
+  TripId,
   CurrencyCode,
   UserId,
   VenueId,
@@ -75,18 +79,30 @@ export const VenueRow = Schema.Struct({
 export const SessionRow = Schema.Struct({
   id: SessionId,
   groupId: GroupId,
+  tripId: TripId,
   venueId: VenueId,
   game: Game,
   status: SessionStatus,
   startedAt: Timestamp,
   endedAt: Schema.NullOr(Timestamp),
   notes: Schema.NullOr(Schema.String),
+  tableSeats: Schema.NullOr(Seat),
+  highLimit: Schema.Boolean,
+});
+
+export const SeatingRow = Schema.Struct({
+  id: SeatingId,
+  sessionId: SessionId,
+  playerId: PlayerId,
+  seat: Schema.NullOr(Seat),
+  occurredAt: Timestamp,
 });
 
 export const EntryRow = Schema.Struct({
   id: EntryId,
   groupId: GroupId,
   sessionId: Schema.NullOr(SessionId),
+  tripId: Schema.NullOr(TripId),
   kind: EntryKind,
   playerId: PlayerId,
   counterpartyId: Schema.NullOr(PlayerId),
@@ -99,4 +115,32 @@ export const EntryRow = Schema.Struct({
   voidedBy: Schema.NullOr(UserId),
   voidReason: Schema.NullOr(Schema.String),
   replacesEntryId: Schema.NullOr(EntryId),
+});
+
+export const StakeRow = Schema.Struct({
+  id: StakeId,
+  groupId: GroupId,
+  tripId: TripId,
+  lenderId: PlayerId,
+  borrowerId: PlayerId,
+  amount: Amount,
+  lenderShare: Schema.Int,
+  startedAt: Timestamp,
+  endedAt: Schema.NullOr(Timestamp),
+  note: Schema.NullOr(Schema.String),
+  createdBy: UserId,
+  createdAt: Timestamp,
+  voidedAt: Schema.NullOr(Timestamp),
+  voidedBy: Schema.NullOr(UserId),
+  voidReason: Schema.NullOr(Schema.String),
+});
+
+export const TripRow = Schema.Struct({
+  id: TripId,
+  groupId: GroupId,
+  name: Schema.String,
+  startedAt: Timestamp,
+  endedAt: Schema.NullOr(Timestamp),
+  createdBy: UserId,
+  createdAt: Timestamp,
 });

@@ -1,42 +1,92 @@
 @import "tailwindcss";
 @import "uniwind";
 
-/* Keep in step with apps/web/src/index.css. */
+@theme {
+  /* Loaded with expo-font in App.tsx under these names. Native fonts come one weight to a family. */
+  --font-display: "BarlowCondensed_700Bold";
+  --font-mono: "JetBrainsMono_500Medium";
+}
+
+/* Keep in step with apps/web/src/index.css. Dark is the default; see lib/theme.ts. */
 @layer theme {
   :root {
     @variant light {
-      --color-canvas: oklch(0.975 0.006 95);
-      --color-surface: oklch(0.993 0.003 95);
-      --color-sunken: oklch(0.948 0.008 95);
-      --color-ink: oklch(0.22 0.01 95);
-      --color-muted: oklch(0.5 0.012 95);
-      --color-faint: oklch(0.64 0.01 95);
-      --color-line: oklch(0.22 0.01 95 / 0.1);
-      --color-line-strong: oklch(0.22 0.01 95 / 0.18);
-      --color-accent: oklch(0.24 0.012 95);
-      --color-accent-ink: oklch(0.985 0.004 95);
-      --color-win: oklch(0.52 0.12 150);
-      --color-loss: oklch(0.55 0.17 28);
-      --color-live: oklch(0.6 0.15 65);
-      --color-danger: oklch(0.52 0.18 28);
-      --color-disabled: oklch(0.8 0.006 95);
+      --color-canvas: oklch(0.965 0.004 260);
+      --color-surface: oklch(0.995 0.002 260);
+      --color-sunken: oklch(0.935 0.006 260);
+      --color-fill: oklch(0.91 0.006 260);
+      --color-raised: oklch(1 0 0);
+      --color-ink: oklch(0.2 0.015 260);
+      --color-muted: oklch(0.48 0.015 260);
+      --color-faint: oklch(0.62 0.01 260);
+      --color-line: oklch(0.2 0.015 260 / 0.1);
+      --color-line-strong: oklch(0.2 0.015 260 / 0.18);
+      --color-accent: oklch(0.8 0.16 75);
+      --color-accent-ink: oklch(0.2 0.02 75);
+      --color-accent-text: oklch(0.52 0.12 65);
+      --color-win: oklch(0.5 0.13 150);
+      --color-loss: oklch(0.54 0.19 25);
+      --color-live: oklch(0.54 0.19 25);
+      --color-danger: oklch(0.52 0.19 25);
+      --color-disabled: oklch(0.86 0.005 260);
+
+      /* Player chips, in joining order: casino chip colors. */
+      --color-chip-1: oklch(0.5 0.19 10);
+      --color-chip-1-ink: oklch(0.98 0 0);
+      --color-chip-2: oklch(0.5 0.15 255);
+      --color-chip-2-ink: oklch(0.98 0 0);
+      --color-chip-3: oklch(0.55 0.1 190);
+      --color-chip-3-ink: oklch(0.98 0 0);
+      --color-chip-4: oklch(0.34 0.01 260);
+      --color-chip-4-ink: oklch(0.98 0 0);
+      --color-chip-5: oklch(0.5 0.17 305);
+      --color-chip-5-ink: oklch(0.98 0 0);
+      --color-chip-6: oklch(0.7 0.16 58);
+      --color-chip-6-ink: oklch(0.2 0.02 58);
+      --color-chip-7: oklch(0.68 0.15 350);
+      --color-chip-7-ink: oklch(0.2 0.02 350);
+      --color-chip-8: oklch(0.85 0.14 95);
+      --color-chip-8-ink: oklch(0.25 0.03 95);
+      --color-chip-edge: oklch(0.97 0.01 90);
     }
     @variant dark {
-      --color-canvas: oklch(0.17 0.004 95);
-      --color-surface: oklch(0.205 0.005 95);
-      --color-sunken: oklch(0.15 0.004 95);
-      --color-ink: oklch(0.94 0.006 95);
-      --color-muted: oklch(0.7 0.008 95);
-      --color-faint: oklch(0.56 0.008 95);
-      --color-line: oklch(0.29 0.005 95);
-      --color-line-strong: oklch(0.36 0.006 95);
-      --color-accent: oklch(0.93 0.008 95);
-      --color-accent-ink: oklch(0.18 0.004 95);
-      --color-win: oklch(0.74 0.12 150);
-      --color-loss: oklch(0.72 0.13 28);
-      --color-live: oklch(0.78 0.12 70);
-      --color-danger: oklch(0.7 0.14 28);
-      --color-disabled: oklch(0.35 0.005 95);
+      --color-canvas: oklch(0.15 0.01 260);
+      --color-surface: oklch(0.19 0.01 260);
+      --color-sunken: oklch(0.12 0.01 260);
+      --color-fill: oklch(0.27 0.01 260);
+      --color-raised: oklch(0.4 0.01 260);
+      --color-ink: oklch(0.96 0 0);
+      --color-muted: oklch(0.7 0.01 260);
+      --color-faint: oklch(0.54 0.01 260);
+      --color-line: oklch(0.25 0.01 260);
+      --color-line-strong: oklch(0.32 0.01 260);
+      --color-accent: oklch(0.83 0.16 75);
+      --color-accent-ink: oklch(0.2 0.02 75);
+      --color-accent-text: oklch(0.83 0.16 75);
+      --color-win: oklch(0.8 0.17 150);
+      --color-loss: oklch(0.7 0.19 25);
+      --color-live: oklch(0.7 0.19 25);
+      --color-danger: oklch(0.7 0.19 25);
+      --color-disabled: oklch(0.27 0.01 260);
+
+      /* Player chips, in joining order: casino chip colors. */
+      --color-chip-1: oklch(0.5 0.19 10);
+      --color-chip-1-ink: oklch(0.98 0 0);
+      --color-chip-2: oklch(0.5 0.15 255);
+      --color-chip-2-ink: oklch(0.98 0 0);
+      --color-chip-3: oklch(0.55 0.1 190);
+      --color-chip-3-ink: oklch(0.98 0 0);
+      --color-chip-4: oklch(0.34 0.01 260);
+      --color-chip-4-ink: oklch(0.98 0 0);
+      --color-chip-5: oklch(0.5 0.17 305);
+      --color-chip-5-ink: oklch(0.98 0 0);
+      --color-chip-6: oklch(0.7 0.16 58);
+      --color-chip-6-ink: oklch(0.2 0.02 58);
+      --color-chip-7: oklch(0.68 0.15 350);
+      --color-chip-7-ink: oklch(0.2 0.02 350);
+      --color-chip-8: oklch(0.85 0.14 95);
+      --color-chip-8-ink: oklch(0.25 0.03 95);
+      --color-chip-edge: oklch(0.97 0.01 90);
     }
   }
 }

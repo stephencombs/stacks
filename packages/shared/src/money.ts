@@ -21,23 +21,36 @@ export const formatMoney = (
   options: {
     readonly locale?: string;
     readonly signDisplay?: "auto" | "always" | "exceptZero";
+    readonly trailingZeroDisplay?: "auto" | "stripIfInteger";
   } = {},
-): string =>
-  new Intl.NumberFormat(options.locale, {
+): string => {
+  const digits = minorUnitDigits(currency);
+  // Whole amounts drop their zero cents by asking for no fraction digits, which every engine
+  // honours; Hermes on iOS ignores trailingZeroDisplay.
+  const whole =
+    (options.trailingZeroDisplay ?? "stripIfInteger") === "stripIfInteger" &&
+    amount % 10 ** digits === 0;
+  return new Intl.NumberFormat(options.locale, {
     style: "currency",
     currency,
     signDisplay: options.signDisplay ?? "auto",
-  }).format(toDecimalString(amount, minorUnitDigits(currency)));
+    ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+  }).format(toDecimalString(amount, digits));
+};
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
 
+// Read off a formatted number rather than formatToParts, which Hermes on iOS doesn't have.
 const separators = (locale: string | undefined) => {
-  const parts = new Intl.NumberFormat(locale).formatToParts(1234567.5);
-  const decimal = parts.find((part) => part.type === "decimal")?.value ?? ".";
-  const group = parts.find((part) => part.type === "group")?.value ?? ",";
+  const marks = new Intl.NumberFormat(locale).format(1234567.5).replace(/\d/g, "");
+  const decimal = marks.at(-1) ?? ".";
+  const group = marks.length > 1 ? marks[0]! : ",";
   // People type a plain space where the locale uses a no-break space; any whitespace is dropped.
   return { decimal, group: /\s/.test(group) ? null : group };
 };
+
+/** The locale's decimal mark, as someone types it on a keypad. */
+export const decimalSeparator = (locale?: string) => separators(locale).decimal;
 
 /**
  * Parses what a person types into an amount field: "1,234.50", "$20", "-15" or, in de-DE,

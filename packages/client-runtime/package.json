@@ -15,6 +15,38 @@
     "./ids": {
       "types": "./src/ids.ts",
       "import": "./src/ids.ts"
+    },
+    "./react": {
+      "types": "./src/react.tsx",
+      "import": "./src/react.tsx"
+    },
+    "./format": {
+      "types": "./src/format.ts",
+      "import": "./src/format.ts"
+    },
+    "./chart": {
+      "types": "./src/chart.ts",
+      "import": "./src/chart.ts"
+    },
+    "./trip": {
+      "types": "./src/trip.ts",
+      "import": "./src/trip.ts"
+    },
+    "./table": {
+      "types": "./src/table.ts",
+      "import": "./src/table.ts"
+    },
+    "./tableArt": {
+      "types": "./src/tableArt.ts",
+      "import": "./src/tableArt.ts"
+    },
+    "./theme": {
+      "types": "./src/theme.ts",
+      "import": "./src/theme.ts"
+    },
+    "./outbox": {
+      "types": "./src/outbox.ts",
+      "import": "./src/outbox.ts"
     }
   },
   "scripts": {
@@ -23,11 +55,19 @@
   },
   "dependencies": {
     "@stacks/contracts": "workspace:*",
+    "@stacks/shared": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@effect/atom-react": "catalog:",
     "@effect/vitest": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "@effect/atom-react": "catalog:",
+    "react": "catalog:"
   }
 }

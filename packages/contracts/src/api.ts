@@ -6,8 +6,19 @@ import * as OpenApi from "effect/http-api/OpenApi";
 
 import { Authentication } from "./auth.ts";
 import { Conflict, Forbidden, InvalidRequest, NotFound } from "./errors.ts";
-import { EntryId, GroupId, InviteId, PlayerId, SessionId, UserId, VenueId } from "./ids.ts";
-import { Entry, Game } from "./ledger.ts";
+import {
+  EntryId,
+  GroupId,
+  InviteId,
+  PlayerId,
+  SeatingId,
+  SessionId,
+  StakeId,
+  TripId,
+  UserId,
+  VenueId,
+} from "./ids.ts";
+import { Entry, Game, Seat, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import {
   ClaimPreview,
@@ -17,7 +28,7 @@ import {
   Invite,
   InvitePreview,
   SessionDetail,
-  SessionSummary,
+  TripDetail,
   Venue,
   VenueKind,
 } from "./views.ts";
@@ -76,14 +87,18 @@ export const CreateSessionRequest = Schema.Struct({
   startedAt: Schema.optionalKey(Schema.DateTimeUtc),
   playerIds: Schema.NonEmptyArray(PlayerId),
   notes: Schema.NullOr(Schema.String.check(Schema.isMaxLength(1000))),
-});
-
-export const ListSessionsQuery = Schema.Struct({
-  before: Schema.optionalKey(Schema.DateTimeUtcFromString),
+  highLimit: Schema.optionalKey(Schema.Boolean),
 });
 
 export const CloseSessionRequest = Schema.Struct({
   endedAt: Schema.optionalKey(Schema.DateTimeUtc),
+  /**
+   * What everyone still playing left with, recorded in the same write as the close, so a table
+   * closes in one request. Zero is a bust.
+   */
+  cashOuts: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ id: EntryId, playerId: PlayerId, amount: MinorUnits })),
+  ),
 });
 
 export const AddEntryRequest = Schema.Struct({
@@ -108,6 +123,42 @@ export const RecordSettlementRequest = Schema.Struct({
   occurredAt: Schema.optionalKey(Schema.DateTimeUtc),
   note: Schema.NullOr(Note),
 });
+
+export const MoveSessionRequest = Schema.Struct({ tripId: TripId });
+
+export const TableRequest = Schema.Struct({ seats: Seat });
+
+export const HighLimitRequest = Schema.Struct({ highLimit: Schema.Boolean });
+
+export const SeatRequest = Schema.Struct({
+  id: SeatingId,
+  playerId: PlayerId,
+  /** Null stands the player up. */
+  seat: Schema.NullOr(Seat),
+  occurredAt: Schema.optionalKey(Schema.DateTimeUtc),
+});
+
+export const CreateStakeRequest = Schema.Struct({
+  id: StakeId,
+  lenderId: PlayerId,
+  borrowerId: PlayerId,
+  amount: MinorUnits.check(Schema.isGreaterThan(0)),
+  /** The lender's cut of the borrower's winnings, in percent. */
+  lenderShare: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+  startedAt: Schema.optionalKey(Schema.DateTimeUtc),
+  note: Schema.NullOr(Note),
+});
+
+export const EndStakeRequest = Schema.Struct({ endedAt: Schema.optionalKey(Schema.DateTimeUtc) });
+
+export const CreateTripRequest = Schema.Struct({
+  id: TripId,
+  name: Name(60),
+  /** Defaults to now. Earlier times pick up sessions already played. */
+  startedAt: Schema.optionalKey(Schema.DateTimeUtc),
+});
+
+export const EndTripRequest = Schema.Struct({ endedAt: Schema.optionalKey(Schema.DateTimeUtc) });
 
 const groupParams = Schema.Struct({ groupId: GroupId });
 const sessionParams = Schema.Struct({ sessionId: SessionId });
@@ -256,18 +307,12 @@ const VenuesGroup = HttpApiGroup.make("venues")
   )
   .middleware(Authentication);
 
+const tripParams = Schema.Struct({ tripId: TripId });
+
 const SessionsGroup = HttpApiGroup.make("sessions")
   .add(
-    HttpApiEndpoint.get("list", "/groups/:groupId/sessions", {
-      params: groupParams,
-      query: ListSessionsQuery,
-      success: Schema.Array(SessionSummary),
-      error: [Forbidden, NotFound],
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post("create", "/groups/:groupId/sessions", {
-      params: groupParams,
+    HttpApiEndpoint.post("create", "/trips/:tripId/sessions", {
+      params: tripParams,
       payload: CreateSessionRequest,
       success: SessionDetail,
       error: [Forbidden, NotFound, Conflict],
@@ -289,6 +334,30 @@ const SessionsGroup = HttpApiGroup.make("sessions")
     }),
   )
   .add(
+    HttpApiEndpoint.post("seat", "/sessions/:sessionId/seatings", {
+      params: sessionParams,
+      payload: SeatRequest,
+      success: SessionDetail,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("setTable", "/sessions/:sessionId/table", {
+      params: sessionParams,
+      payload: TableRequest,
+      success: SessionDetail,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("setHighLimit", "/sessions/:sessionId/high-limit", {
+      params: sessionParams,
+      payload: HighLimitRequest,
+      success: SessionDetail,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
     HttpApiEndpoint.post("close", "/sessions/:sessionId/close", {
       params: sessionParams,
       payload: CloseSessionRequest,
@@ -299,6 +368,14 @@ const SessionsGroup = HttpApiGroup.make("sessions")
   .add(
     HttpApiEndpoint.post("reopen", "/sessions/:sessionId/reopen", {
       params: sessionParams,
+      success: SessionDetail,
+      error: [Forbidden, NotFound, Conflict],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("move", "/sessions/:sessionId/trip", {
+      params: sessionParams,
+      payload: MoveSessionRequest,
       success: SessionDetail,
       error: [Forbidden, NotFound, Conflict],
     }),
@@ -323,11 +400,87 @@ const LedgerGroup = HttpApiGroup.make("ledger")
     }),
   )
   .add(
-    HttpApiEndpoint.post("recordSettlement", "/groups/:groupId/settlements", {
-      params: groupParams,
+    HttpApiEndpoint.post("recordSettlement", "/trips/:tripId/settlements", {
+      params: tripParams,
       payload: RecordSettlementRequest,
       success: Entry,
       error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .middleware(Authentication);
+
+const stakeParams = Schema.Struct({ stakeId: StakeId });
+
+const StakesGroup = HttpApiGroup.make("stakes")
+  .add(
+    HttpApiEndpoint.post("create", "/trips/:tripId/stakes", {
+      params: tripParams,
+      payload: CreateStakeRequest,
+      success: Stake,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("end", "/stakes/:stakeId/end", {
+      params: stakeParams,
+      payload: EndStakeRequest,
+      success: Stake,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("reopen", "/stakes/:stakeId/reopen", {
+      params: stakeParams,
+      success: Stake,
+      error: [Forbidden, NotFound, Conflict],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("void", "/stakes/:stakeId/void", {
+      params: stakeParams,
+      payload: VoidEntryRequest,
+      success: Stake,
+      error: [Forbidden, NotFound, Conflict],
+    }),
+  )
+  .middleware(Authentication);
+
+const TripsGroup = HttpApiGroup.make("trips")
+  .add(
+    HttpApiEndpoint.post("create", "/groups/:groupId/trips", {
+      params: groupParams,
+      payload: CreateTripRequest,
+      success: Trip,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("get", "/trips/:tripId", {
+      params: tripParams,
+      success: TripDetail,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("end", "/trips/:tripId/end", {
+      params: tripParams,
+      payload: EndTripRequest,
+      success: Trip,
+      error: [Forbidden, NotFound, Conflict, InvalidRequest],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("reopen", "/trips/:tripId/reopen", {
+      params: tripParams,
+      success: Trip,
+      error: [Forbidden, NotFound, Conflict],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("delete", "/trips/:tripId/delete", {
+      params: tripParams,
+      success: Trip,
+      error: [Forbidden, NotFound, Conflict],
     }),
   )
   .middleware(Authentication);
@@ -340,4 +493,6 @@ export class StacksApi extends HttpApi.make("stacks")
   .add(VenuesGroup)
   .add(SessionsGroup)
   .add(LedgerGroup)
+  .add(StakesGroup)
+  .add(TripsGroup)
   .prefix("/api") {}

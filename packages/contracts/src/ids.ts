@@ -15,6 +15,15 @@ export type SessionId = typeof SessionId.Type;
 export const EntryId = Uuid.pipe(Schema.brand("EntryId"));
 export type EntryId = typeof EntryId.Type;
 
+export const StakeId = Uuid.pipe(Schema.brand("StakeId"));
+export type StakeId = typeof StakeId.Type;
+
+export const SeatingId = Uuid.pipe(Schema.brand("SeatingId"));
+export type SeatingId = typeof SeatingId.Type;
+
+export const TripId = Uuid.pipe(Schema.brand("TripId"));
+export type TripId = typeof TripId.Type;
+
 export const VenueId = Uuid.pipe(Schema.brand("VenueId"));
 export type VenueId = typeof VenueId.Type;
 

@@ -5,47 +5,73 @@ import {
   Conflict,
   CurrentUser,
   InvalidRequest,
-  type CloseSessionRequest,
+  NotFound,
   type CreateSessionRequest,
-  type GroupId,
-  type ListSessionsQuery,
+  type MoveSessionRequest,
   type PlayerId,
+  type SeatRequest,
+  type TableRequest,
+  type HighLimitRequest,
   type SessionId,
+  type TripId,
 } from "@stacks/contracts";
 
+import { seatCount, seatsNow, tableSizes } from "@stacks/shared/seats";
+
+import { SeatingRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as Trips from "./Trips.ts";
 import * as Venues from "./Venues.ts";
 import * as Views from "./Views.ts";
 
+/** A new session goes in a trip that's still going. */
 export const create = Effect.fn("Sessions.create")(function* (
-  groupId: GroupId,
+  tripId: TripId,
   request: typeof CreateSessionRequest.Type,
 ) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
+  const trip = yield* Trips.load(tripId);
+  const { groupId } = trip;
   yield* Access.membership(groupId);
-  const venue = yield* Venues.findVisible(request.venueId, groupId).pipe(
-    Effect.catchTag("NotFound", () => Effect.fail(new Conflict({ reason: "venue_not_available" }))),
+  // A retry of a session that already landed gets it back, even after the trip ended.
+  const [existing] = yield* sql`select group_id from sessions where id = ${request.id}`;
+  if (existing) {
+    if (existing.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
+    return yield* Views.sessionDetail(request.id);
+  }
+  if (trip.endedAt !== null) return yield* new Conflict({ reason: "trip_ended" });
+  const [venue] = yield* Effect.all(
+    [
+      Venues.findVisible(request.venueId, groupId).pipe(
+        Effect.catchTag("NotFound", () =>
+          Effect.fail(new Conflict({ reason: "venue_not_available" })),
+        ),
+      ),
+      Access.requirePlayersInGroup(groupId, request.playerIds),
+    ],
+    { concurrency: "unbounded" },
   );
-  yield* Access.requirePlayersInGroup(groupId, request.playerIds);
   const startedAt = request.startedAt ?? (yield* DateTime.now);
 
   const inserted = yield* sql.withTransaction(
     Effect.gen(function* () {
       const rows = yield* sql`
-        insert into sessions (id, group_id, venue_id, game, started_at, notes, created_by)
-        values (${request.id}, ${groupId}, ${venue.id}, ${request.game},
-          ${DateTime.toDateUtc(startedAt)}, ${request.notes}, ${userId})
+        insert into sessions (id, group_id, trip_id, venue_id, game, started_at, notes,
+          high_limit, created_by)
+        values (${request.id}, ${groupId}, ${tripId}, ${venue.id}, ${request.game},
+          ${DateTime.toDateUtc(startedAt)}, ${request.notes}, ${request.highLimit ?? false},
+          ${userId})
         on conflict (id) do nothing
         returning id
       `;
       if (rows.length === 0) return false;
-      for (const playerId of new Set(request.playerIds)) {
-        yield* sql`
-          insert into session_players (session_id, group_id, player_id)
-          values (${request.id}, ${groupId}, ${playerId})
-        `;
-      }
+      const players = Array.from(new Set(request.playerIds), (playerId) => ({
+        sessionId: request.id,
+        groupId,
+        playerId,
+      }));
+      if (players.length > 0) yield* sql`insert into session_players ${sql.insert(players)}`;
       return true;
     }),
   );
@@ -54,17 +80,6 @@ export const create = Effect.fn("Sessions.create")(function* (
     if (existing.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
   }
   return yield* Views.sessionDetail(request.id);
-});
-
-export const list = Effect.fn("Sessions.list")(function* (
-  groupId: GroupId,
-  query: typeof ListSessionsQuery.Type,
-) {
-  yield* Access.membership(groupId);
-  return yield* Views.sessionSummaries(groupId, {
-    limit: 30,
-    ...(query.before ? { before: query.before } : {}),
-  });
 });
 
 /** Loads a session the current user can see, with their membership in its group. */
@@ -95,39 +110,106 @@ export const addPlayer = Effect.fn("Sessions.addPlayer")(function* (
   return yield* Views.sessionDetail(sessionId);
 });
 
-/** Closing locks the ledger for the session, so everyone who bought in must have cashed out. */
-export const close = Effect.fn("Sessions.close")(function* (
+/**
+ * Sits a player down, moves them or stands them up. Anyone in the group can, the same as
+ * recording a buy-in. A seat holds one player at a time.
+ */
+export const seat = Effect.fn("Sessions.seat")(function* (
   sessionId: SessionId,
-  request: typeof CloseSessionRequest.Type,
+  request: typeof SeatRequest.Type,
 ) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const { session } = yield* access(sessionId);
-  if (session.status === "closed") return yield* Views.sessionDetail(sessionId);
-
-  const stillPlaying = yield* sql`
-    select sp.player_id from session_players sp
-    where sp.session_id = ${sessionId}
-      and exists (
-        select 1 from entries e where e.session_id = sp.session_id and e.player_id = sp.player_id
-          and e.kind = 'buy_in' and e.voided_at is null
-      )
-      and not exists (
-        select 1 from entries e where e.session_id = sp.session_id and e.player_id = sp.player_id
-          and e.kind = 'cash_out' and e.voided_at is null
-      )
-  `;
-  if (stillPlaying.length > 0) return yield* new Conflict({ reason: "players_not_cashed_out" });
-
-  const endedAt = request.endedAt ?? (yield* DateTime.now);
-  if (DateTime.isLessThan(endedAt, session.startedAt)) {
-    return yield* new InvalidRequest({ message: "A session can't end before it starts." });
+  // A retry of a seating that already landed is the same write.
+  const [existing] = yield* sql`select session_id from seatings where id = ${request.id}`;
+  if (existing) {
+    if (existing.sessionId !== sessionId) return yield* new Conflict({ reason: "id_taken" });
+    return yield* Views.sessionDetail(sessionId);
   }
-  yield* sql`
-    update sessions set status = 'closed', ended_at = ${DateTime.toDateUtc(endedAt)},
-      closed_by = ${userId}
-    where id = ${sessionId} and status = 'live'
+  if (session.status === "closed") return yield* new Conflict({ reason: "session_closed" });
+  const seats = seatCount(session);
+  if (seats === null) {
+    return yield* new InvalidRequest({ message: "This game isn't played from seats." });
+  }
+  if (request.seat !== null && request.seat > seats) {
+    return yield* new InvalidRequest({ message: `This table has ${seats} seats.` });
+  }
+  const [atTable] = yield* sql`
+    select 1 from session_players
+    where session_id = ${sessionId} and player_id = ${request.playerId}
   `;
+  if (!atTable) return yield* new Conflict({ reason: "player_not_in_session" });
+  const occurredAt = request.occurredAt ?? (yield* DateTime.now);
+
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      // Two phones seating people at once queue here, so a seat can't end up with two players.
+      yield* sql`select 1 from sessions where id = ${sessionId} for update`;
+      const seatings = yield* sql`
+        select id, session_id, player_id, seat, occurred_at from seatings
+        where session_id = ${sessionId} order by occurred_at, created_at
+      `.pipe(Effect.flatMap(Access.decodeRows(SeatingRow)));
+      const now = seatsNow(seatings);
+      if (request.seat === (now.get(request.playerId) ?? null)) return;
+      const taken = [...now].some(([p, s]) => s === request.seat && p !== request.playerId);
+      if (taken) return yield* new Conflict({ reason: "seat_taken" });
+      yield* sql`
+        insert into seatings (id, session_id, group_id, player_id, seat, occurred_at, created_by)
+        values (${request.id}, ${sessionId}, ${session.groupId}, ${request.playerId},
+          ${request.seat}, ${DateTime.toDateUtc(occurredAt)}, ${userId})
+      `;
+    }),
+  );
+  return yield* Views.sessionDetail(sessionId);
+});
+
+/** Sets how many seats the table has. Seats that would disappear have to be empty first. */
+export const setTable = Effect.fn("Sessions.setTable")(function* (
+  sessionId: SessionId,
+  request: typeof TableRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const { session } = yield* access(sessionId);
+  if (session.status === "closed") return yield* new Conflict({ reason: "session_closed" });
+  const table = tableSizes[session.game];
+  if (!table) return yield* new InvalidRequest({ message: "This game isn't played from seats." });
+  if (!table.sizes.includes(request.seats)) {
+    return yield* new InvalidRequest({
+      message: `These tables come with ${table.sizes.join(", ")} seats.`,
+    });
+  }
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      // Seating and resizing queue on the same lock, so nobody sits down in a seat being removed.
+      yield* sql`select 1 from sessions where id = ${sessionId} for update`;
+      const seatings = yield* sql`
+        select id, session_id, player_id, seat, occurred_at from seatings
+        where session_id = ${sessionId} order by occurred_at, created_at
+      `.pipe(Effect.flatMap(Access.decodeRows(SeatingRow)));
+      const beyond = [...seatsNow(seatings).values()].filter((s) => s > request.seats);
+      if (beyond.length > 0) {
+        return yield* new InvalidRequest({
+          message: `Move whoever's in seat ${Math.max(...beyond)} first.`,
+        });
+      }
+      yield* sql`update sessions set table_seats = ${request.seats} where id = ${sessionId}`;
+    }),
+  );
+  return yield* Views.sessionDetail(sessionId);
+});
+
+/**
+ * Marks whether the session was at a high-limit table. It's a label, not part of the ledger, so
+ * anyone in the group can fix it, even after the session closes.
+ */
+export const setHighLimit = Effect.fn("Sessions.setHighLimit")(function* (
+  sessionId: SessionId,
+  request: typeof HighLimitRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  yield* access(sessionId);
+  yield* sql`update sessions set high_limit = ${request.highLimit} where id = ${sessionId}`;
   return yield* Views.sessionDetail(sessionId);
 });
 
@@ -139,5 +221,20 @@ export const reopen = Effect.fn("Sessions.reopen")(function* (sessionId: Session
     update sessions set status = 'live', ended_at = null, closed_by = null, reopened_at = now()
     where id = ${sessionId} and status = 'closed'
   `;
+  return yield* Views.sessionDetail(sessionId);
+});
+
+/** An admin can move a session into another trip that's still going, to fix where it was logged. */
+export const move = Effect.fn("Sessions.move")(function* (
+  sessionId: SessionId,
+  request: typeof MoveSessionRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const { session, member } = yield* access(sessionId);
+  yield* Access.requireAdmin(member);
+  const trip = yield* Trips.load(request.tripId);
+  if (trip.groupId !== session.groupId) return yield* new NotFound({ resource: "trip" });
+  if (trip.endedAt !== null) return yield* new Conflict({ reason: "trip_ended" });
+  yield* sql`update sessions set trip_id = ${trip.id} where id = ${sessionId}`;
   return yield* Views.sessionDetail(sessionId);
 });

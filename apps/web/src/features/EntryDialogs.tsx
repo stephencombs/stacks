@@ -7,14 +7,16 @@ import {
   type SessionId,
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
-import { formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
+import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
+import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "~/components/ui/Button";
+import { cn } from "~/components/ui/cn";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
-import { useAction, useStacks } from "~/lib/stacks";
+import { useAction, useOutbox, useStacks } from "~/lib/stacks";
 
 export type EntryDraft = {
   readonly kind: "buy_in" | "cash_out" | "adjustment";
@@ -23,16 +25,14 @@ export type EntryDraft = {
   readonly replaces?: Entry;
 };
 
-const titles = { buy_in: "Buy in", cash_out: "Cash out", adjustment: "Adjust result" } as const;
-const QUICK_AMOUNTS = [20, 50, 100, 200, 500];
+const titles = { buy_in: "Buy in", cash_out: "Cash out", adjustment: "Adjust" } as const;
+const kinds = ["buy_in", "cash_out", "adjustment"] as const;
 
 /** The amount as someone would type it in their locale: "120.50", no symbol or grouping. */
 const amountText = (amount: MinorUnits, currency: GroupDetail["group"]["currency"]) => {
   const digits = minorUnitDigits(currency);
   const magnitude = String(Math.abs(amount)).padStart(digits + 1, "0");
-  const decimal =
-    new Intl.NumberFormat().formatToParts(1.5).find((part) => part.type === "decimal")?.value ??
-    ".";
+  const decimal = decimalSeparator();
   const text =
     digits === 0
       ? magnitude
@@ -40,20 +40,24 @@ const amountText = (amount: MinorUnits, currency: GroupDetail["group"]["currency
   return amount < 0 ? `-${text}` : text;
 };
 
+/** Records one entry for a player, offering the likely buy-in amounts first. */
 export function EntryDialog({
   detail,
   sessionId,
   draft,
+  presets,
   onClose,
 }: {
   detail: GroupDetail;
   sessionId: SessionId;
   draft: EntryDraft;
+  /** Buy-in amounts to offer, most likely first. */
+  presets: ReadonlyArray<number>;
   onClose: () => void;
 }) {
-  const stacks = useStacks();
-  const add = useAction(stacks.Client.mutation("ledger", "addEntry"));
+  const outbox = useOutbox();
   const currency = detail.group.currency;
+  const [kind, setKind] = useState(draft.kind);
   const [amount, setAmount] = useState(() =>
     draft.replaces ? amountText(draft.replaces.amount, currency) : "",
   );
@@ -61,43 +65,43 @@ export function EntryDialog({
 
   const player = detail.players.find((p) => p.id === draft.playerId);
   const others = detail.players.filter((p) => p.id !== draft.playerId);
-  const counterpartyLabel = draft.kind === "buy_in" ? "Whose money" : "Who has the cash";
-  const ownLabel =
-    draft.kind === "buy_in" ? `${player?.displayName}'s own` : `${player?.displayName}`;
+  const counterpartyLabel = kind === "buy_in" ? "Whose money" : "Who has the cash";
+  const ownLabel = kind === "buy_in" ? `${player?.displayName}'s own` : `${player?.displayName}`;
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  const record = (form: HTMLFormElement, value: MinorUnits) => {
+    const data = new FormData(form);
+    const counterparty = kind === "adjustment" ? "" : String(data.get("counterparty") ?? "");
+    const note = String(data.get("note") ?? "").trim();
+    // Recorded at once; the outbox sends it now, or when the connection is back.
+    void outbox.add(sessionId, {
+      id: EntryId.make(newId()),
+      kind,
+      playerId: draft.playerId,
+      counterpartyId: counterparty ? PlayerId.make(counterparty) : null,
+      amount: value,
+      occurredAt: DateTime.nowUnsafe(),
+      note: note || null,
+      replacesEntryId: draft.replaces?.id ?? null,
+    });
+    onClose();
+  };
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const parsed = parseMoney(amount, currency);
-    const value = Option.getOrNull(parsed);
+    const value = Option.getOrNull(parseMoney(amount, currency));
     if (
       value === null ||
-      (draft.kind !== "adjustment" && value < 0) ||
-      (draft.kind === "adjustment" && value === 0)
+      (kind !== "adjustment" && value < 0) ||
+      (kind === "adjustment" && value === 0)
     ) {
       return setAmountError(
-        draft.kind === "adjustment"
+        kind === "adjustment"
           ? "Enter an amount like 15 or -15."
           : `Enter an amount like ${formatMoney(MinorUnits.make(2000), currency)}.`,
       );
     }
-    if (draft.kind === "buy_in" && value === 0) return setAmountError("A buy-in needs an amount.");
-    setAmountError(null);
-    const counterparty = String(form.get("counterparty") ?? "");
-    const note = String(form.get("note") ?? "").trim();
-    const saved = await add.run({
-      params: { sessionId },
-      payload: {
-        id: EntryId.make(newId()),
-        kind: draft.kind,
-        playerId: draft.playerId,
-        counterpartyId: counterparty ? PlayerId.make(counterparty) : null,
-        amount: value,
-        note: note || null,
-        replacesEntryId: draft.replaces?.id ?? null,
-      },
-    });
-    if (saved) onClose();
+    if (kind === "buy_in" && value === 0) return setAmountError("A buy-in needs an amount.");
+    record(event.currentTarget, value);
   };
 
   return (
@@ -105,21 +109,45 @@ export function EntryDialog({
       open
       onOpenChange={(open) => (open ? undefined : onClose())}
       title={
-        draft.replaces
-          ? `Correct ${titles[draft.kind].toLowerCase()}`
-          : `${titles[draft.kind]} · ${player?.displayName}`
+        draft.replaces ? `Correct ${titles[kind].toLowerCase()}` : (player?.displayName ?? "Player")
       }
       description={
         draft.replaces
           ? "The original entry is voided and this one takes its place."
-          : draft.kind === "cash_out"
-            ? "Record $0 if they busted."
-            : draft.kind === "adjustment"
-              ? "For anything the buy-ins and cash-outs missed. Use a minus sign for a loss."
-              : undefined
+          : kind === "adjustment"
+            ? "For anything the buy-ins and cash-outs missed. Use a minus sign for a loss."
+            : undefined
       }
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
+        {draft.replaces ? null : (
+          <fieldset className="grid grid-cols-3 gap-2">
+            <legend className="sr-only">What happened</legend>
+            {kinds.map((option) => (
+              <label
+                key={option}
+                className={cn(
+                  "flex h-10 cursor-pointer items-center justify-center rounded-lg px-2 text-sm outline-offset-2 outline-accent-text shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150 has-[:focus-visible]:outline-2 pointer-coarse:h-11",
+                  kind === option
+                    ? "bg-accent font-semibold text-accent-ink shadow-none"
+                    : "bg-surface hover:bg-sunken",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="kind"
+                  className="sr-only"
+                  checked={kind === option}
+                  onChange={() => {
+                    setKind(option);
+                    setAmountError(null);
+                  }}
+                />
+                {titles[option]}
+              </label>
+            ))}
+          </fieldset>
+        )}
         <Field label="Amount" error={amountError}>
           {(props) => (
             <Input
@@ -129,24 +157,39 @@ export function EntryDialog({
               inputMode="decimal"
               autoComplete="off"
               autoFocus
-              className="font-serif text-2xl tabular-nums"
+              className="font-mono text-2xl tabular-nums"
             />
           )}
         </Field>
-        {draft.kind === "buy_in" && !draft.replaces ? (
-          <div className="flex flex-wrap gap-2">
-            {QUICK_AMOUNTS.map((quick) => (
-              <Button key={quick} size="sm" onClick={() => setAmount(String(quick))}>
-                {quick}
+        {kind === "buy_in" && !draft.replaces && presets.length > 0 ? (
+          <div className="flex gap-2">
+            {presets.map((preset) => (
+              <Button
+                key={preset}
+                size="sm"
+                className="flex-1 font-mono"
+                onClick={() => setAmount(amountText(MinorUnits.make(preset), currency))}
+              >
+                {formatMoney(MinorUnits.make(preset), currency)}
               </Button>
             ))}
           </div>
         ) : null}
-        {draft.kind !== "adjustment" ? (
+        {kind === "cash_out" && !draft.replaces ? (
+          <Button
+            size="sm"
+            onClick={(event) => {
+              if (event.currentTarget.form) record(event.currentTarget.form, MinorUnits.make(0));
+            }}
+          >
+            Bust · {formatMoney(MinorUnits.make(0), currency)}
+          </Button>
+        ) : null}
+        {kind !== "adjustment" ? (
           <Field
             label={counterpartyLabel}
             hint={
-              draft.kind === "buy_in"
+              kind === "buy_in"
                 ? "If someone else covered it, they'll be owed this."
                 : "If someone else is holding it, they'll owe it."
             }
@@ -178,13 +221,12 @@ export function EntryDialog({
             />
           )}
         </Field>
-        {add.error ? <FormError>{add.error}</FormError> : null}
-        <Button type="submit" variant="primary" size="lg" disabled={add.pending}>
-          {add.pending
-            ? "Saving…"
-            : draft.replaces
-              ? "Save correction"
-              : `Record ${titles[draft.kind].toLowerCase()}`}
+        <Button type="submit" variant="primary" size="lg">
+          {draft.replaces
+            ? "Save correction"
+            : kind === "adjustment"
+              ? "Save adjustment"
+              : `Record ${titles[kind].toLowerCase()}`}
         </Button>
       </form>
     </Dialog>

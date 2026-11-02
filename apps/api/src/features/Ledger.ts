@@ -10,16 +10,18 @@ import {
   InvalidRequest,
   NotFound,
   type AddEntryRequest,
+  type CloseSessionRequest,
   type EntryId,
-  type GroupId,
   type RecordSettlementRequest,
   type SessionId,
+  type TripId,
   type VoidEntryRequest,
 } from "@stacks/contracts";
 
 import { EntryRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
 import * as Sessions from "./Sessions.ts";
+import * as Trips from "./Trips.ts";
 import * as Views from "./Views.ts";
 
 const loadEntry = Effect.fn("Ledger.loadEntry")(function* (entryId: EntryId) {
@@ -68,9 +70,10 @@ const validEntry = (candidate: typeof Entry.Type) =>
 const insertEntry = Effect.fn("Ledger.insertEntry")(function* (entry: typeof Entry.Type) {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`
-    insert into entries (id, group_id, session_id, kind, player_id, counterparty_id, amount,
-      occurred_at, note, created_by, replaces_entry_id)
-    values (${entry.id}, ${entry.groupId}, ${entry.sessionId}, ${entry.kind}, ${entry.playerId},
+    insert into entries (id, group_id, session_id, trip_id, kind, player_id, counterparty_id,
+      amount, occurred_at, note, created_by, replaces_entry_id)
+    values (${entry.id}, ${entry.groupId}, ${entry.sessionId}, ${entry.tripId}, ${entry.kind},
+      ${entry.playerId},
       ${entry.counterpartyId}, ${BigInt(entry.amount)}, ${DateTime.toDateUtc(entry.occurredAt)},
       ${entry.note}, ${entry.createdBy}, ${entry.replacesEntryId})
     on conflict (id) do nothing
@@ -107,6 +110,7 @@ export const addEntry = Effect.fn("Ledger.addEntry")(function* (
     id: request.id,
     groupId: session.groupId,
     sessionId,
+    tripId: null,
     kind: request.kind,
     playerId: request.playerId,
     counterpartyId: request.counterpartyId,
@@ -145,6 +149,92 @@ export const addEntry = Effect.fn("Ledger.addEntry")(function* (
   );
 });
 
+/**
+ * Closes a session, which locks its ledger: everyone who bought in must have cashed out. The final
+ * cash-outs can come in the same request, and land with the close or not at all.
+ */
+export const close = Effect.fn("Ledger.close")(function* (
+  sessionId: SessionId,
+  request: typeof CloseSessionRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const { userId } = yield* CurrentUser;
+  const { session } = yield* Sessions.access(sessionId);
+  if (session.status === "closed") return yield* Views.sessionDetail(sessionId);
+  const now = yield* DateTime.now;
+  const endedAt = request.endedAt ?? now;
+  if (DateTime.isLessThan(endedAt, session.startedAt)) {
+    return yield* new InvalidRequest({ message: "A session can't end before it starts." });
+  }
+  const cashOuts = request.cashOuts ?? [];
+  yield* Access.requirePlayersInGroup(
+    session.groupId,
+    cashOuts.map((c) => c.playerId),
+  );
+  const entries = yield* Effect.forEach(cashOuts, (c) =>
+    validEntry({
+      id: c.id,
+      groupId: session.groupId,
+      sessionId,
+      tripId: null,
+      kind: "cash_out",
+      playerId: c.playerId,
+      counterpartyId: null,
+      amount: c.amount,
+      occurredAt: endedAt,
+      note: null,
+      createdBy: userId,
+      createdAt: now,
+      voidedAt: null,
+      voidedBy: null,
+      voidReason: null,
+      replacesEntryId: null,
+    }),
+  );
+
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      const [locked] = yield* sql`select status from sessions where id = ${sessionId} for update`;
+      if (locked?.status === "closed") return;
+      // A cash-out recorded elsewhere meanwhile already settled that player; a second would count
+      // their chips twice.
+      if (cashOuts.length > 0) {
+        const already = yield* sql`
+          select player_id from entries
+          where session_id = ${sessionId} and kind = 'cash_out' and voided_at is null
+            and player_id in ${sql.in(cashOuts.map((c) => c.playerId))}
+            and id not in ${sql.in(cashOuts.map((c) => c.id))}
+        `;
+        if (already.length > 0) {
+          return yield* new InvalidRequest({
+            message: "Someone here already cashed out. Check the table and close again.",
+          });
+        }
+      }
+      for (const entry of entries) yield* insertEntry(entry);
+      const stillPlaying = yield* sql`
+        select sp.player_id from session_players sp
+        where sp.session_id = ${sessionId}
+          and exists (
+            select 1 from entries e where e.session_id = sp.session_id
+              and e.player_id = sp.player_id and e.kind = 'buy_in' and e.voided_at is null
+          )
+          and not exists (
+            select 1 from entries e where e.session_id = sp.session_id
+              and e.player_id = sp.player_id and e.kind = 'cash_out' and e.voided_at is null
+          )
+      `;
+      if (stillPlaying.length > 0) return yield* new Conflict({ reason: "players_not_cashed_out" });
+      yield* sql`
+        update sessions set status = 'closed', ended_at = ${DateTime.toDateUtc(endedAt)},
+          closed_by = ${userId}
+        where id = ${sessionId}
+      `;
+    }),
+  );
+  return yield* Views.sessionDetail(sessionId);
+});
+
 export const voidEntry = Effect.fn("Ledger.voidEntry")(function* (
   entryId: EntryId,
   request: typeof VoidEntryRequest.Type,
@@ -161,11 +251,13 @@ export const voidEntry = Effect.fn("Ledger.voidEntry")(function* (
   return yield* loadEntry(entryId);
 });
 
+/** A payment that squares up part of a trip. Settling after the trip has ended is the usual case. */
 export const recordSettlement = Effect.fn("Ledger.recordSettlement")(function* (
-  groupId: GroupId,
+  tripId: TripId,
   request: typeof RecordSettlementRequest.Type,
 ) {
   const { userId } = yield* CurrentUser;
+  const { groupId } = yield* Trips.load(tripId);
   yield* Access.membership(groupId);
   yield* Access.requirePlayersInGroup(groupId, [request.fromPlayerId, request.toPlayerId]);
   const now = yield* DateTime.now;
@@ -173,6 +265,7 @@ export const recordSettlement = Effect.fn("Ledger.recordSettlement")(function* (
     id: request.id,
     groupId,
     sessionId: null,
+    tripId,
     kind: "settlement",
     playerId: request.fromPlayerId,
     counterpartyId: request.toPlayerId,
