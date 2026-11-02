@@ -62,16 +62,16 @@ density.
 These pairs are the ones people reach for the wrong half of. When a request
 touches one of them, name the distinction proactively:
 
-- **Kerning vs Tracking** — kerning is between two *specific* characters;
+- **Kerning vs Tracking** — kerning is between two _specific_ characters;
   tracking is uniform across a run of text.
-- **Badge vs Tag** — a badge is *attached* and informational; a tag is
-  *standalone*, selectable, or removable.
+- **Badge vs Tag** — a badge is _attached_ and informational; a tag is
+  _standalone_, selectable, or removable.
 - **Tooltip vs Popover** — a tooltip can't hold interactive content; a popover
   can.
 - **Opacity vs Visibility** — opacity zero still occupies space and receives
   pointer events; visibility hidden keeps the space but removes interaction.
-- **Ease-in vs Ease-out** — ease-out for things *entering* the screen; ease-in
-  for things *leaving*.
+- **Ease-in vs Ease-out** — ease-out for things _entering_ the screen; ease-in
+  for things _leaving_.
 - **Modal vs Sheet vs Drawer** — overlay that interrupts vs panel sliding from a
   side edge vs panel pulling up from the bottom.
 - **Voice vs Tone** — voice is the constant personality; tone shifts with the
@@ -87,20 +87,20 @@ touches one of them, name the distinction proactively:
 
 Use these to jump straight to the right slice of `terms-index.md`:
 
-| Category | Covers |
-|---|---|
-| Typography | How text is set, spaced, and read |
-| Color | How color is defined, mixed, and applied |
-| Iconography | How icons are drawn and balanced |
-| Layout | How space and structure organise a page |
-| Interaction | How elements respond to input |
-| Motion | How things move and transition |
-| Accessibility | How interfaces work for everyone |
-| Information Architecture | How content is structured and found |
-| Copywriting | How words guide and reassure |
-| Tools | How design is made and shared |
-| Analysis | How design decisions are measured |
-| Components | The building blocks of an interface |
+| Category                 | Covers                                   |
+| ------------------------ | ---------------------------------------- |
+| Typography               | How text is set, spaced, and read        |
+| Color                    | How color is defined, mixed, and applied |
+| Iconography              | How icons are drawn and balanced         |
+| Layout                   | How space and structure organise a page  |
+| Interaction              | How elements respond to input            |
+| Motion                   | How things move and transition           |
+| Accessibility            | How interfaces work for everyone         |
+| Information Architecture | How content is structured and found      |
+| Copywriting              | How words guide and reassure             |
+| Tools                    | How design is made and shared            |
+| Analysis                 | How design decisions are measured        |
+| Components               | The building blocks of an interface      |
 
 ## Examples
 

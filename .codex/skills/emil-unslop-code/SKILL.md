@@ -1,11 +1,11 @@
 ---
 name: emil-unslop-code
-description: "Strip the tells that mark code as AI-generated — narrated comments, try-catch theater, silent fallbacks, dead scaffolding, `as any` — then make the diff read like the codebase it lands in. Use when cleaning up agent-written code, before opening a PR, when a diff \"looks AI-generated\", or as a pass after any generated change. Triggers on: code slop, AI slop, slop, de-slop, unslop, clean up this code, obvious comments, redundant comments, narrated comments, commented-out code, stale comments, try-catch, swallowed error, silent failure, fallback, defensive, null checks, as any, ts-ignore, non-null assertion, console.log, debug logs, TODO, dead code, unused imports, duplicate helper, one-call wrapper, V2, enhanced, legacy alias, backwards compatibility, minimal diff, drive-by changes, tautological test, skipped test, \"reads like Copilot wrote it\"."
+description: 'Strip the tells that mark code as AI-generated — narrated comments, try-catch theater, silent fallbacks, dead scaffolding, `as any` — then make the diff read like the codebase it lands in. Use when cleaning up agent-written code, before opening a PR, when a diff "looks AI-generated", or as a pass after any generated change. Triggers on: code slop, AI slop, slop, de-slop, unslop, clean up this code, obvious comments, redundant comments, narrated comments, commented-out code, stale comments, try-catch, swallowed error, silent failure, fallback, defensive, null checks, as any, ts-ignore, non-null assertion, console.log, debug logs, TODO, dead code, unused imports, duplicate helper, one-call wrapper, V2, enhanced, legacy alias, backwards compatibility, minimal diff, drive-by changes, tautological test, skipped test, "reads like Copilot wrote it".'
 ---
 
 # Unslop Code
 
-Nobody flags AI code for one bad line. They recognize the accumulation: a comment narrating every statement, a try-catch around code that can't throw, a fallback to an empty array, a helper that already exists two files over. Each choice is defensible alone; together they're a watermark. The cause is mechanical: models were trained where code that *runs* wins, so they over-defend, over-comment, and over-scaffold — everything that makes a snippet survive in isolation makes it slop inside a codebase.
+Nobody flags AI code for one bad line. They recognize the accumulation: a comment narrating every statement, a try-catch around code that can't throw, a fallback to an empty array, a helper that already exists two files over. Each choice is defensible alone; together they're a watermark. The cause is mechanical: models were trained where code that _runs_ wins, so they over-defend, over-comment, and over-scaffold — everything that makes a snippet survive in isolation makes it slop inside a codebase.
 
 Slop is rarely buggy. It compiles, it passes tests, and it still costs you: it buries intent, hides real failures behind quiet fallbacks, and doubles the surface the next reader has to hold in their head. This skill is a pass over any generated change, and the default fix for almost every pattern in it is deletion, not rewriting.
 
@@ -26,7 +26,7 @@ Comments carry the strongest signal, and one test covers all of them: **does thi
 
 ### Comments that talk to the reviewer
 
-`// Updated to use the new API`. `// Removed the old implementation`. `// Now handles null`. `// NEW:`, `// Fixed:`. These describe the *diff*, not the code — and the moment the change merges they describe nothing, because the next reader never saw the old version. That explanation belongs in the commit message. Delete.
+`// Updated to use the new API`. `// Removed the old implementation`. `// Now handles null`. `// NEW:`, `// Fixed:`. These describe the _diff_, not the code — and the moment the change merges they describe nothing, because the next reader never saw the old version. That explanation belongs in the commit message. Delete.
 
 ### Comments that lie
 
@@ -76,7 +76,7 @@ The same null-and-range check repeated in the handler, the service, and the help
 
 ### Generic names
 
-`data`, `result`, `item`, `temp`, `handler`, `processData`. The model names what the value *is structurally*; name what it *means*: `unpaidInvoices`, `retryDelayMs`. If you can't name the domain fact, you haven't understood the line — which is the thing worth fixing.
+`data`, `result`, `item`, `temp`, `handler`, `processData`. The model names what the value _is structurally_; name what it _means_: `unpaidInvoices`, `retryDelayMs`. If you can't name the domain fact, you haven't understood the line — which is the thing worth fixing.
 
 ### Version-suffixed names
 

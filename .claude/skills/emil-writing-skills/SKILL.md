@@ -1,11 +1,11 @@
 ---
 name: emil-writing-skills
-description: "How to write skill files that actually change what an agent does — encode process not output, pair every rule with its why, be strict instead of vague, cut lines that don't change behavior, keep skills focused, and test by running. Use when creating a new SKILL.md, reviewing or refining an existing skill, packaging taste or conventions into a reusable skill file, or diagnosing why a skill isn't affecting the agent's output. Triggers on: skill, SKILL.md, skill file, write a skill, create a skill, improve a skill, agent instructions, CLAUDE.md, AGENTS.md, system prompt rules, taste, conventions, decision tree, \"the agent ignores my skill\", \"skill doesn't work\", package my preferences, transfer taste."
+description: 'How to write skill files that actually change what an agent does — encode process not output, pair every rule with its why, be strict instead of vague, cut lines that don''t change behavior, keep skills focused, and test by running. Use when creating a new SKILL.md, reviewing or refining an existing skill, packaging taste or conventions into a reusable skill file, or diagnosing why a skill isn''t affecting the agent''s output. Triggers on: skill, SKILL.md, skill file, write a skill, create a skill, improve a skill, agent instructions, CLAUDE.md, AGENTS.md, system prompt rules, taste, conventions, decision tree, "the agent ignores my skill", "skill doesn''t work", package my preferences, transfer taste.'
 ---
 
 # Writing Skills
 
-Agents are probabilistic — ask the same question twice and you get two different answers. A skill fights that not by forcing the same *output* every time, but the same *process*. The outputs should still differ, every context is different, but the reasoning becomes yours and stays the same every run. Write a skill like you're guiding a less experienced designer who happens to be very fast.
+Agents are probabilistic — ask the same question twice and you get two different answers. A skill fights that not by forcing the same _output_ every time, but the same _process_. The outputs should still differ, every context is different, but the reasoning becomes yours and stays the same every run. Write a skill like you're guiding a less experienced designer who happens to be very fast.
 
 ## Core Principles
 
@@ -19,26 +19,28 @@ Give the agent a decision procedure it can walk every single time, not a descrip
 Is the element entering or exiting the viewport?
 ├── Yes → ease-out
 └── No
-    ├── Is it moving/morphing on screen?
-    │   └── Yes → ease-in-out
-    └── Is it a hover change?
-        ├── Yes → ease
-        └── Is it constant motion?
-            ├── Yes → linear
-            └── Default → ease-out
+├── Is it moving/morphing on screen?
+│ └── Yes → ease-in-out
+└── Is it a hover change?
+├── Yes → ease
+└── Is it constant motion?
+├── Yes → linear
+└── Default → ease-out
 ```
 
 Without this, the agent picks whatever feels right that day. With it, every run walks the same tree.
 
 ### 2. Write down the why
 
-When a rule doesn't cover a situation, the agent guesses — and its guess looks exactly like a decision. A rule without reasoning gets applied blindly, including where it shouldn't be. A rule *with* reasoning generalizes, because the agent can extend the logic to cases you never wrote down.
+When a rule doesn't cover a situation, the agent guesses — and its guess looks exactly like a decision. A rule without reasoning gets applied blindly, including where it shouldn't be. A rule _with_ reasoning generalizes, because the agent can extend the logic to cases you never wrote down.
 
 ```md
 <!-- Bad — rule only -->
+
 Start scale animations from 0.95.
 
 <!-- Good — rule + reasoning -->
+
 Start scale animations from 0.95, not 0. Elements appearing from
 nothing feel unnatural — real objects always have a visible shape.
 The higher the initial value, the more gentle and elegant the entrance.
@@ -50,10 +52,12 @@ Vague language is the most common failure mode. Words like "reasonably", "tastef
 
 ```md
 <!-- Bad — unactionable -->
+
 Try to keep animations reasonably short. Use tasteful easing curves
 where appropriate.
 
 <!-- Good — concrete and strict -->
+
 UI animations stay under 300ms. Exit animations are ~20% faster than
 entrances. Larger elements animate slower than smaller ones.
 ```

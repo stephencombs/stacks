@@ -1,6 +1,6 @@
 ---
 name: emil-ui-polish
-description: "The invisible details that make interfaces feel finished — font rendering, layout-shift prevention, interaction states, hit areas, and structural hygiene. Use when building or reviewing UI components, doing a polish pass, fixing \"something feels off/unfinished\", or working on text rendering, hover/focus/selection states, scrollbars, stacking, truncation, or empty states. Triggers on: polish, details, font-smoothing, antialiased, font rendering, tabular-nums, tabular numbers, layout shift, CLS, jumping text, skeleton, placeholder, scrollbar, z-index, stacking context, isolation, focus ring, focus outline, ::selection, hover state, active state, pressed state, scale on press, hit area, tap target, touch target, optical alignment, icon centering, truncation, line-clamp, ellipsis, curly quotes, text-wrap balance, safe-area, scroll-margin, empty state, pointer-events, user-select, flash on refresh, \"feels off\", \"feels unfinished\", \"make it feel better\"."
+description: 'The invisible details that make interfaces feel finished — font rendering, layout-shift prevention, interaction states, hit areas, and structural hygiene. Use when building or reviewing UI components, doing a polish pass, fixing "something feels off/unfinished", or working on text rendering, hover/focus/selection states, scrollbars, stacking, truncation, or empty states. Triggers on: polish, details, font-smoothing, antialiased, font rendering, tabular-nums, tabular numbers, layout shift, CLS, jumping text, skeleton, placeholder, scrollbar, z-index, stacking context, isolation, focus ring, focus outline, ::selection, hover state, active state, pressed state, scale on press, hit area, tap target, touch target, optical alignment, icon centering, truncation, line-clamp, ellipsis, curly quotes, text-wrap balance, safe-area, scroll-margin, empty state, pointer-events, user-select, flash on refresh, "feels off", "feels unfinished", "make it feel better".'
 ---
 
 # UI Polish
@@ -29,11 +29,17 @@ Weight changes on hover or selection reflow the text and shift layout. Keep weig
 
 ```css
 /* Bad — layout shift */
-.tab:hover { font-weight: 600; }
+.tab:hover {
+  font-weight: 600;
+}
 
 /* Good — constant weight, color signals state */
-.tab { font-weight: 500; }
-.tab.selected { color: var(--color-primary); }
+.tab {
+  font-weight: 500;
+}
+.tab.selected {
+  color: var(--color-primary);
+}
 ```
 
 Define weights as variables (`--font-weight-normal: 400; --font-weight-medium: 500; --font-weight-semibold: 600; --font-weight-bold: 700;`) so they're adjustable globally.
@@ -148,8 +154,12 @@ Grow a small control's touchable region with a pseudo-element that bleeds past i
 }
 
 /* Notches and home indicators */
-.footer { padding-bottom: env(safe-area-inset-bottom); }
-.sidebar { padding-left: env(safe-area-inset-left); }
+.footer {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.sidebar {
+  padding-left: env(safe-area-inset-left);
+}
 
 /* Truncate text in grid cells */
 .grid-cell-text {
@@ -162,21 +172,21 @@ Grow a small control's touchable region with a pseudo-element that bleeds past i
 
 ## Frequent Offenders
 
-| Problem | Remedy |
-| --- | --- |
-| Bold-on-hover tabs shifting layout | Constant weight; signal with color |
-| Timer/price digits jiggling | `font-variant-numeric: tabular-nums` |
-| Content jumping as images/skeletons load | Hardcode dimensions or `aspect-ratio` |
-| `transition: all` | List exact properties |
-| `scale(0.9)` on press | `scale(0.96)` — below `0.95` feels exaggerated |
-| Brand-colored focus outline | Grey, black, or white only |
-| `z-index: 9999` | Fixed scale, or `isolation: isolate` |
-| 20px icon button with 20px hit area | Pseudo-element to 44×44 (40×40 desktop) |
-| Icon visually off-center in button | −2px padding on icon side; fix SVG for asymmetric icons |
-| Custom page scrollbar | Native on the page; customize only small scrollers |
-| Blank div for empty list | Headline + explanation + action, sized like the filled state |
-| Decorative layer blocking clicks | `pointer-events: none` |
-| State flashing on refresh | Persist + set initial state before render |
+| Problem                                  | Remedy                                                       |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| Bold-on-hover tabs shifting layout       | Constant weight; signal with color                           |
+| Timer/price digits jiggling              | `font-variant-numeric: tabular-nums`                         |
+| Content jumping as images/skeletons load | Hardcode dimensions or `aspect-ratio`                        |
+| `transition: all`                        | List exact properties                                        |
+| `scale(0.9)` on press                    | `scale(0.96)` — below `0.95` feels exaggerated               |
+| Brand-colored focus outline              | Grey, black, or white only                                   |
+| `z-index: 9999`                          | Fixed scale, or `isolation: isolate`                         |
+| 20px icon button with 20px hit area      | Pseudo-element to 44×44 (40×40 desktop)                      |
+| Icon visually off-center in button       | −2px padding on icon side; fix SVG for asymmetric icons      |
+| Custom page scrollbar                    | Native on the page; customize only small scrollers           |
+| Blank div for empty list                 | Headline + explanation + action, sized like the filled state |
+| Decorative layer blocking clicks         | `pointer-events: none`                                       |
+| State flashing on refresh                | Persist + set initial state before render                    |
 
 ## Review Checklist
 

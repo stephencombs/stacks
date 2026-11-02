@@ -87,7 +87,7 @@ Once, globally, at the layout root — not re-declared per component.
 - `-webkit-text-stroke` — outlines glyph contours; despite the prefix it works in all modern engines.
 - `text-shadow` — a shadow that follows letterforms rather than the box.
 
-A known artifact: stroked text sometimes shows seams *inside* the letters. Those seams are overlapping contours in the font itself — variable fonts commonly leave shape intersections unmerged — and no CSS will remove them; a static instance of the font will.
+A known artifact: stroked text sometimes shows seams _inside_ the letters. Those seams are overlapping contours in the font itself — variable fonts commonly leave shape intersections unmerged — and no CSS will remove them; a static instance of the font will.
 
 ## The floors
 

@@ -1,6 +1,6 @@
 ---
 name: emil-prototype
-description: "Explore an interface direction by building several genuinely different versions behind a live picker, instead of one hardcoded guess. Use when someone asks for a few options, variations, or directions for a component or flow, says they aren't sure which approach to take, wants two ideas compared with real product data, or wants the numbers behind an interaction put on live controls. Triggers on: prototype, prototyping, explore, exploration, variation, variations, variants, versions, options, directions, \"try a few\", \"show me some\", \"a couple of options\", \"which feels better\", \"not sure if\", compare, side by side, riff, mock up, playground, sandbox, throwaway route, /proto, control panel, sliders, DialKit, tweak the values, slow motion, replay."
+description: 'Explore an interface direction by building several genuinely different versions behind a live picker, instead of one hardcoded guess. Use when someone asks for a few options, variations, or directions for a component or flow, says they aren''t sure which approach to take, wants two ideas compared with real product data, or wants the numbers behind an interaction put on live controls. Triggers on: prototype, prototyping, explore, exploration, variation, variations, variants, versions, options, directions, "try a few", "show me some", "a couple of options", "which feels better", "not sure if", compare, side by side, riff, mock up, playground, sandbox, throwaway route, /proto, control panel, sliders, DialKit, tweak the values, slow motion, replay.'
 ---
 
 # Prototyping Interfaces
@@ -19,7 +19,7 @@ Divergence is not an excuse to drop the craft bar. A sloppy variant doesn't wide
 
 1. **Never touch production code during exploration.** Prototypes live in their own throwaway directory, imported by nothing. Prototype code is written for switching between options, not for shipping; left inside the real component it stays there as dead props and unused variants. The in-place branch in Phase 5 is the single exception, and it earns it by keeping the variants outside the real component anyway — all it adds at the call site is one marked mount block that Phase 7 reverts. Integration happens only in Phase 7, only for the variant the user picked.
 2. **Real materials, worst content.** Real fonts, real tokens, real components — a prototype built from different materials answers a question about an interface you aren't building. Then fill it with the content that breaks it: the longest name a real user has, the two-line title, forty rows, the empty state. Pretty placeholder content makes every variant look fine and hides the decision.
-3. **Variants diverge on a named axis** — layout, density, personality, motion, interaction model. Before building, you must be able to state each variant's axis in a phrase. Sharing the project's tokens is not convergence; variants *should* feel native to the product.
+3. **Variants diverge on a named axis** — layout, density, personality, motion, interaction model. Before building, you must be able to state each variant's axis in a phrase. Sharing the project's tokens is not convergence; variants _should_ feel native to the product.
 4. **Every variant fully works.** Real interactions, real motion, real states. No dead buttons, no lorem ipsum, no "imagine this part".
 5. **The picker is chrome, not a contestant.** Its markup, styles, and behavior are specified in [PICKER.md](PICKER.md) — copy them verbatim. Its look is not a design decision and never adapts to the project.
 6. **The output is a decision, not code.** Every run ends with the chosen values and the rejected options written down (Phase 7), then the surface deleted.
@@ -46,20 +46,20 @@ No project at all (empty directory, pure exploration)? Skip to the standalone br
 
 The brief decides which sibling skills you take into the run. Load them **now**, before writing variant code — they are what makes each variant look designed instead of assembled, and retrofitting craft after the picker is built means editing every variant.
 
-| When the brief involves | Load |
-| --- | --- |
-| Text as the design — headlines, editorial, docs, data tables, a type scale | `emil-typography` |
-| Palette, accent, theme, dark mode, contrast | `emil-color` |
-| Cards, modals, dropdowns, elevation, borders, glass, anything that stacks | `emil-surfaces` |
-| Motion — entrances, exits, gestures, drag, press and hover feedback | `emil-animations` |
-| Inputs, buttons, validation, signup, checkout, settings | `emil-forms-and-inputs` |
-| A hero, pricing table, landing page, blog, or changelog | `emil-marketing-pages` |
-| Long lists, heavy media, anything that could feel slow | `emil-performance` |
-| The API of the component being promoted (Phase 7 only) | `emil-component-design` |
+| When the brief involves                                                    | Load                    |
+| -------------------------------------------------------------------------- | ----------------------- |
+| Text as the design — headlines, editorial, docs, data tables, a type scale | `emil-typography`       |
+| Palette, accent, theme, dark mode, contrast                                | `emil-color`            |
+| Cards, modals, dropdowns, elevation, borders, glass, anything that stacks  | `emil-surfaces`         |
+| Motion — entrances, exits, gestures, drag, press and hover feedback        | `emil-animations`       |
+| Inputs, buttons, validation, signup, checkout, settings                    | `emil-forms-and-inputs` |
+| A hero, pricing table, landing page, blog, or changelog                    | `emil-marketing-pages`  |
+| Long lists, heavy media, anything that could feel slow                     | `emil-performance`      |
+| The API of the component being promoted (Phase 7 only)                     | `emil-component-design` |
 
 **Every run, no exceptions:** `emil-design-foundations` before building (hierarchy, spacing, restraint — it owns the calls that decide whether any of this reads as designed), then `emil-ui-polish` and `emil-touch-and-accessibility` before the user ever sees the picker.
 
-Invoke each skill by name; if one isn't installed, say so and proceed rather than inventing its rules. The loadout applies to *every* variant equally — the quiet variant gets the same type craft as the loud one, or the comparison is rigged.
+Invoke each skill by name; if one isn't installed, say so and proceed rather than inventing its rules. The loadout applies to _every_ variant equally — the quiet variant gets the same type craft as the loud one, or the comparison is rigged.
 
 **Completion criterion:** you can name each loaded skill and the dimension it owns in this run, and no variant was written from memory of a rule you could have looked up.
 
@@ -100,10 +100,10 @@ Run the harness and flip through every variant yourself before showing it: every
 
 Then present the set and **stop — the choice belongs to the user**:
 
-| # | Variant | Axis | When it's the right choice | Its cost |
-| --- | --- | --- | --- | --- |
-| 1 | Quiet | Minimal motion, borders over shadows | The product is a daily-use tool | Least memorable |
-| 2 | Editorial | Large type, generous whitespace | The moment deserves weight | Eats vertical space |
+| #   | Variant   | Axis                                 | When it's the right choice      | Its cost            |
+| --- | --------- | ------------------------------------ | ------------------------------- | ------------------- |
+| 1   | Quiet     | Minimal motion, borders over shadows | The product is a daily-use tool | Least memorable     |
+| 2   | Editorial | Large type, generous whitespace      | The moment deserves weight      | Eats vertical space |
 
 Close with where the picker is running (URL or file path) and the keys to flip.
 
@@ -115,24 +115,25 @@ When the user picks, write the decision down first — it's the only artifact th
 
 ```md
 Dropdown entrance — decided from /proto/dropdown
+
 - Direction: scale + fade, not slide
 - scale from 0.96, opacity 0 → 1
 - 180ms enter, 140ms exit, cubic-bezier(0.32, 0.72, 0, 1)
 - Rejected: slide-down felt heavy at 200ms and jittery below it
 ```
 
-The rejected options are the part everyone skips and the part that saves the most time — without them the same discussion happens again in three weeks. Then integrate the winner where it belongs, following the project's conventions (file layout, naming, tokens; `emil-component-design` if it becomes a shared component), and tear the surface down: delete the prototype directory and route, and on the in-place branch revert the mount block too. Grep for the fence comments and confirm nothing is left — a dev-only picker that survives the run is exactly the dead code hard rule 1 exists to prevent. If the user wants another round instead, keep the harness and run Phase 4 again, diverging *around* the direction they gravitated to.
+The rejected options are the part everyone skips and the part that saves the most time — without them the same discussion happens again in three weeks. Then integrate the winner where it belongs, following the project's conventions (file layout, naming, tokens; `emil-component-design` if it becomes a shared component), and tear the surface down: delete the prototype directory and route, and on the in-place branch revert the mount block too. Grep for the fence comments and confirm nothing is left — a dev-only picker that survives the run is exactly the dead code hard rule 1 exists to prevent. If the user wants another round instead, keep the harness and run Phase 4 again, diverging _around_ the direction they gravitated to.
 
 ## Invocation variants
 
-| Invocation | Behavior |
-| --- | --- |
-| `<description>` | Full workflow: scope → recon → loadout → 3 variants → picker → wait for choice |
-| `<description> x5` | Same, with that many variants (capped at 5) |
-| `tune <variant>` | Keep one variant, put its numbers on the control panel from [CONTROLS.md](CONTROLS.md) |
-| `riff <variant>` | New round: keep the harness, generate a fresh set diverging around that variant's direction |
-| `keep <variant>` | Write the decision, promote that variant, delete the prototype surface |
-| `keep <variant>, leave the picker` | Promote, but keep the prototype surface around |
+| Invocation                         | Behavior                                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| `<description>`                    | Full workflow: scope → recon → loadout → 3 variants → picker → wait for choice              |
+| `<description> x5`                 | Same, with that many variants (capped at 5)                                                 |
+| `tune <variant>`                   | Keep one variant, put its numbers on the control panel from [CONTROLS.md](CONTROLS.md)      |
+| `riff <variant>`                   | New round: keep the harness, generate a fresh set diverging around that variant's direction |
+| `keep <variant>`                   | Write the decision, promote that variant, delete the prototype surface                      |
+| `keep <variant>, leave the picker` | Promote, but keep the prototype surface around                                              |
 
 ## Tone
 

@@ -19,8 +19,9 @@ In a crowded B2B category the same signal is emotional: everyone's competitor al
 **Trap.** Inventing a value people ought to want, then trying to educate them into wanting it.
 
 **Ask.**
-- What are people already doing, in some clumsy way, to get the value you're offering? Show me the workaround. *(Strong answer: a specific behavior you have watched, with a tool it abuses.)*
-- Where in their day or week does your user feel bad about this, and what do they do next? *(Strong: a moment, a feeling, a coping ritual.)*
+
+- What are people already doing, in some clumsy way, to get the value you're offering? Show me the workaround. _(Strong answer: a specific behavior you have watched, with a tool it abuses.)_
+- Where in their day or week does your user feel bad about this, and what do they do next? _(Strong: a moment, a feeling, a coping ritual.)_
 
 ### 2. Answer "why this instead of what came before"
 
@@ -33,8 +34,9 @@ In a crowded B2B category the same signal is emotional: everyone's competitor al
 **Trap.** Believing distribution or a better feature list will make up for the absence of a reason to switch.
 
 **Ask.**
-- Why would someone use this instead of what they use today, and would that answer still hold if you had the best distribution in the world? *(Strong: a thing the old way cannot do, not a thing yours does better.)*
-- Is this a digital version of the old thing, or has the category been rebuilt around what the new technology makes possible? *(Strong: a hierarchy you inverted.)*
+
+- Why would someone use this instead of what they use today, and would that answer still hold if you had the best distribution in the world? _(Strong: a thing the old way cannot do, not a thing yours does better.)_
+- Is this a digital version of the old thing, or has the category been rebuilt around what the new technology makes possible? _(Strong: a hierarchy you inverted.)_
 - What is the sizzle that gets someone to try it, and what is the enduring value that keeps them, and are you confusing the two?
 
 ### 3. Say the real motive out loud
@@ -48,7 +50,8 @@ In a crowded B2B category the same signal is emotional: everyone's competitor al
 **Trap.** Dressing the motive up in mission language until the team forgets what the product is for.
 
 **Ask.**
-- Which of the three (money, mate, unplug) is this really serving, and can you say it without dressing it up? *(Strong: one word, no qualifier.)*
+
+- Which of the three (money, mate, unplug) is this really serving, and can you say it without dressing it up? _(Strong: one word, no qualifier.)_
 - What practice does a team adopt when they adopt your tool, and is it a consensus practice among great teams or just your preference?
 
 ### 4. Build for a named person with a specific bad feeling
@@ -64,8 +67,9 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Personas, aggregated feedback, and anyone on the team who is insulated from the consequences of what they shipped.
 
 **Ask.**
-- Who, by name and email, has this problem today, and how exactly do they work around it? *(Strong: you can message them right now.)*
-- What specific moment made them feel bad, and what did they promise themselves they would never do again? *(Strong: a story with a date in it.)*
+
+- Who, by name and email, has this problem today, and how exactly do they work around it? _(Strong: you can message them right now.)_
+- What specific moment made them feel bad, and what did they promise themselves they would never do again? _(Strong: a story with a date in it.)_
 - Who on your team receives the complaints about this, and is it the person who built it?
 
 ### 5. Treat what customers say as a signal, not a finding
@@ -79,7 +83,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** A comfortable explanation, repeated until it is load-bearing.
 
 **Ask.**
-- When a customer said no, what did they literally say, and what do you think the real reason was? *(Strong: the quote, then a reason that is not flattering to you.)*
+
+- When a customer said no, what did they literally say, and what do you think the real reason was? _(Strong: the quote, then a reason that is not flattering to you.)_
 - Is the fix you are proposing the thing you happen to be best at? What would a founder with the opposite background do?
 - Which outsider has told you something about this idea you did not want to hear?
 
@@ -98,7 +103,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Onboarding that asks for setup before it has shown value; a first session designed by people who have not been new users in a year.
 
 **Ask.**
-- What is the one good idea, and how many steps stand between someone hearing about it and experiencing it? *(Strong: one sentence, and a number under five.)*
+
+- What is the one good idea, and how many steps stand between someone hearing about it and experiencing it? _(Strong: one sentence, and a number under five.)_
 - Does a new user see value within three seconds of the first screen? What do they see instead?
 - When did you last go through a fresh install as a brand-new user, and what broke?
 
@@ -113,7 +119,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** A roadmap that is a list of inputs.
 
 **Ask.**
-- What single solution absorbs fifty of your users' problems, rather than one feature per complaint? *(Strong: a mechanism, not a feature.)*
+
+- What single solution absorbs fifty of your users' problems, rather than one feature per complaint? _(Strong: a mechanism, not a feature.)_
 - Inside the big general feature everyone is asking for, what concentrated pool of use cases could you solve natively instead?
 
 ### 8. Think a lot instead of swinging a lot
@@ -127,6 +134,7 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Velocity as a proxy for progress.
 
 **Ask.**
+
 - For each thing on the roadmap, how will it interact with everything already shipped, and what will you be supporting forever because of it?
 - Are you actually moving faster than competitors, or does it feel that way because someone else is doing the typing?
 
@@ -141,6 +149,7 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** A settings page as the answer to a disagreement.
 
 **Ask.**
+
 - What existing system or feature could you extend instead, and do you need this feature at all?
 - Where is the switch or mode in your design, and what would it take to remove it so it works for everyone by default?
 - What does the novice see first, and how do you get out of the way of the person who uses it every day?
@@ -156,7 +165,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Choosing between two moderate options that were both wrong.
 
 **Ask.**
-- What is the one promise your product makes? *(Strong: a sentence a user would repeat.)*
+
+- What is the one promise your product makes? _(Strong: a sentence a user would repeat.)_
 - What is the most extreme version of a solution along that trait? Have you built it and felt it?
 
 ### 11. Refuse the requests that trade the user's day for the buyer's report
@@ -170,7 +180,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** "Focus on the user" as if the user were one person; find where incentives inside your user base are misaligned and decide, looking for the win-win where it exists.
 
 **Ask.**
-- Which requests will you refuse categorically, and does the answer protect the daily user from the buyer's wishes? *(Strong: a named category and a reason.)*
+
+- Which requests will you refuse categorically, and does the answer protect the daily user from the buyer's wishes? _(Strong: a named category and a reason.)_
 - Where do the incentives of the person who buys and the person who uses diverge, and which side wins when they do?
 - Of the ten things prospects say they need, which three decide the deal?
 
@@ -185,6 +196,7 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Falling in love with the comp.
 
 **Ask.**
+
 - What does this look like with real, ugly, uncontrolled data instead of your mockup?
 - Which feature exists because of a specific product problem you observed, and which exists because it looked good in the design?
 
@@ -203,7 +215,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Trying to prove the whole idea in one launch.
 
 **Ask.**
-- What must be true for this to work, in order? Give me the four links and tell me which one you are testing right now. *(Strong: four sentences, one marked.)*
+
+- What must be true for this to work, in order? Give me the four links and tell me which one you are testing right now. _(Strong: four sentences, one marked.)_
 - For the link you are testing this month, what is executed at 100% and what are you deliberately half-building?
 
 ### 14. Engineer out every excuse before the test
@@ -217,7 +230,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Leaving yourself an out.
 
 **Ask.**
-- If this test fails, what excuse will you have left? What confounding variable have you not eliminated? *(Strong: "none, and here is how".)*
+
+- If this test fails, what excuse will you have left? What confounding variable have you not eliminated? _(Strong: "none, and here is how".)_
 - Once you stop pushing by hand, what has to happen for the product to grow on its own, and how will you know it did not?
 
 ### 15. Something workable at 10% of the time, released through widening circles
@@ -231,6 +245,7 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Estimating instead of shipping early, and polishing a version nobody has used.
 
 **Ask.**
+
 - If this takes three months, what is working and testable internally by the end of week one, and what assumption does it test?
 - What are your circles, and what would "nobody in early access touched it" make you do?
 - Can you put a version in front of people in a day? If not, why does this one deserve the slow path?
@@ -246,7 +261,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Squinting at a dashboard for fit.
 
 **Ask.**
-- What broke last week because too many people used this? *(Strong: a specific outage or a metric you had to invent.)*
+
+- What broke last week because too many people used this? _(Strong: a specific outage or a metric you had to invent.)_
 - What evidence, other than the status report, says this project matters?
 
 ---
@@ -264,7 +280,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** "If we build it better, they will come."
 
 **Ask.**
-- Who brings the supply, the users, or the buyers, and what is your plan for that beyond making the product better? *(Strong: a named channel and a first hundred.)*
+
+- Who brings the supply, the users, or the buyers, and what is your plan for that beyond making the product better? _(Strong: a named channel and a first hundred.)_
 - Who uses this and who signs the check, and does your motion reach the person with the budget?
 - Which territory in this market is unclaimed, and who benefits from a neutral party holding it?
 - Is this adopted bottom-up by individuals? Then what does it feel like in the first ten seconds compared to the incumbent?
@@ -281,6 +298,7 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** "Users won't notice" as a decision rule.
 
 **Ask.**
+
 - Which irrational quality investment are you making that a rational team would skip, and is it the thing users notice first?
 - Do you believe this product has to be good, or do you privately think quality does not matter because sloppy products still make money?
 
@@ -295,7 +313,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Calling a temporary technical lead a moat, and polishing something the next platform release will delete.
 
 **Ask.**
-- Which part of what you built will be trivial in three years, and what is the product moat that survives that? *(Strong: names the disposable part without flinching.)*
+
+- Which part of what you built will be trivial in three years, and what is the product moat that survives that? _(Strong: names the disposable part without flinching.)_
 - If the platform or model provider ships your feature at their next event, why will customers keep choosing you?
 - Which parts are hardened enough to obsess over, and which will the next release make obsolete?
 - When someone says they could build it in a weekend, what is under the surface they are missing?
@@ -311,7 +330,8 @@ Keep the loop unfiltered: put live chat in the product and let users tell you th
 **Trap.** Selling a feeling of productivity, and pricing on the thing that is easy to meter.
 
 **Ask.**
-- Does this complete a job the customer can measure, or are you selling productivity nobody can attribute? *(Strong: a number the customer already tracks.)*
+
+- Does this complete a job the customer can measure, or are you selling productivity nobody can attribute? _(Strong: a number the customer already tracks.)_
 - Could you get paid only when the outcome happens? If not, what would have to change about the product?
 - What is the most common message in your support inbox, and what does it say people would pay for?
 - If you cut the cost of this interaction a hundredfold, what would customers start doing that they could not afford before?

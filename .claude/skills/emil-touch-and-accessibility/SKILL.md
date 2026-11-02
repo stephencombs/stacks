@@ -38,7 +38,7 @@ Visual size can stay small; the hit area cannot. Expand it with a pseudo-element
 }
 
 .icon-button::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -10px; /* 24px + 2*10px = 44px hit area */
 }
@@ -61,7 +61,9 @@ Or with sizing directly:
 Prevent double-tap zoom on interactive controls:
 
 ```css
-button, a, input {
+button,
+a,
+input {
   touch-action: manipulation;
 }
 ```
@@ -99,11 +101,7 @@ Without both attributes, iOS either refuses to autoplay or opens fullscreen:
 Same for illustrations built out of divs/CSS — give them a role and label:
 
 ```jsx
-<div
-  role="img"
-  aria-label="Abstract geometric pattern"
-  className="decorative-illustration"
-/>
+<div role="img" aria-label="Abstract geometric pattern" className="decorative-illustration" />
 ```
 
 ### 6. Tab order only includes visible elements
@@ -125,8 +123,8 @@ And keyboard focus must never land off-screen — scroll focused elements into v
 ```jsx
 function handleFocus(e) {
   e.target.scrollIntoView({
-    behavior: 'smooth',
-    block: 'nearest',
+    behavior: "smooth",
+    block: "nearest",
   });
 }
 ```
@@ -140,16 +138,9 @@ When a modal or dialog opens, move focus into it (first interactive element, or 
 Every animation needs a reduced-motion path. For video, that means offering a play button instead of autoplaying:
 
 ```jsx
-const prefersReducedMotion = window.matchMedia(
-  '(prefers-reduced-motion: reduce)'
-).matches;
+const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-<video
-  autoPlay={!prefersReducedMotion}
-  controls={prefersReducedMotion}
-  muted
-  playsinline
-/>
+<video autoPlay={!prefersReducedMotion} controls={prefersReducedMotion} muted playsinline />;
 ```
 
 ### 9. Freeze time-limited actions when the tab is hidden
@@ -161,7 +152,7 @@ let timeoutId;
 let remainingTime;
 let startTime;
 
-document.addEventListener('visibilitychange', () => {
+document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     // Pause the timer
     clearTimeout(timeoutId);
@@ -179,8 +170,8 @@ document.addEventListener('visibilitychange', () => {
 Display `Cmd` on macOS, `Ctrl` elsewhere — and bind the matching key:
 
 ```js
-const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-const modKey = isMac ? 'Cmd' : 'Ctrl';
+const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+const modKey = isMac ? "Cmd" : "Ctrl";
 
 // Display: "Save (Cmd+S)" on Mac, "Save (Ctrl+S)" on Windows
 ```
@@ -208,7 +199,7 @@ const [isWarm, setIsWarm] = useState(false);
 
 ```css
 .submenu-trigger::after {
-  content: '';
+  content: "";
   position: absolute;
   /* Creates a "safe zone" for cursor movement */
   clip-path: polygon(0 0, 100% 0, 100% 100%);

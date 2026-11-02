@@ -1,6 +1,6 @@
 # Lane F — Motion
 
-The ship-check subset of motion: the mistakes that read as *broken* or *slow* to a user, not the ones that read as unrefined to a designer. This lane doesn't re-time the app or pick nicer curves. It catches what's objectively wrong and hands taste to `emil-animations` after launch. If you need to see what an animation is doing frame by frame before judging it, that's `emil-ask-lapse`.
+The ship-check subset of motion: the mistakes that read as _broken_ or _slow_ to a user, not the ones that read as unrefined to a designer. This lane doesn't re-time the app or pick nicer curves. It catches what's objectively wrong and hands taste to `emil-animations` after launch. If you need to see what an animation is doing frame by frame before judging it, that's `emil-ask-lapse`.
 
 Layout-property animation and `transition: all` are performance checks (B5, B6). Reduced motion is an accessibility check (A8). Count each once.
 
@@ -45,12 +45,12 @@ If it feels slow, it is slow. Past 300ms the user is waiting for the interface t
 
 **Hunt for:** durations of 400ms and up (`duration-500`, `duration: 0.5`, `0.6s`) on product UI; `transition` with a long `delay`.
 
-| What | Duration |
-| --- | --- |
+| What                                   | Duration  |
+| -------------------------------------- | --------- |
 | Hover, press, color and shadow changes | 100–150ms |
-| Tooltips, dropdowns, popovers | 150–250ms |
-| Modals, drawers, toasts | 200–300ms |
-| Page-level transitions | 300–400ms |
+| Tooltips, dropdowns, popovers          | 150–250ms |
+| Modals, drawers, toasts                | 200–300ms |
+| Page-level transitions                 | 300–400ms |
 
 Exits run 20–30% faster than their entrance; the user has already decided to leave. A full-screen sheet or a very steep curve can justify more. A 500ms fade on a dropdown can't.
 
@@ -62,10 +62,19 @@ An element scaling up from nothing reads as a glitch; real objects always have a
 
 ```css
 /* Bad */
-@keyframes pop { from { transform: scale(0); } }
+@keyframes pop {
+  from {
+    transform: scale(0);
+  }
+}
 
 /* Good */
-@keyframes pop { from { transform: scale(0.95); opacity: 0; } }
+@keyframes pop {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+}
 ```
 
 `0.95` for panels, `0.97` for small elements. Travel distances stay small (8–16px) unless the element really is coming from off-screen, like a drawer.
@@ -91,8 +100,13 @@ Radix and Base UI expose the origin as a CSS variable; use it.
 **Hunt for:** `@keyframes` / `animation:` on anything with an open/closed toggle (drawers, accordions, toggles, tabs, toasts); gesture-driven motion (drag-to-dismiss, sheets) using a fixed-duration tween instead of a spring.
 
 ```css
-.drawer { transform: translateX(-100%); transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1); }
-.drawer[data-open] { transform: translateX(0); }
+.drawer {
+  transform: translateX(-100%);
+  transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.drawer[data-open] {
+  transform: translateX(0);
+}
 ```
 
 Reserve keyframes for one-shots that always run to completion: loaders, a first-run entrance. Put on the device list: "open and close each drawer, menu, and accordion as fast as you can and watch for jumps".

@@ -32,7 +32,7 @@ A family whose name contains "Display" is not automatically a display face — m
 
 No typography fix requires a new typeface. Smoothing, wrap modes, tabular figures, underline tuning — all of it operates inside whatever family the project already uses. Only swap or add a face when the task explicitly asks for one, and never pull in a commercial font to tick a review box.
 
-When a face change *is* the task, two honest options:
+When a face change _is_ the task, two honest options:
 
 ```css
 /* Native feel: hand rendering to the operating system */

@@ -1,6 +1,6 @@
 ---
 name: emil-unslop-writing
-description: "Strip the tells that mark prose as AI-written, then put a human voice back in. Use when drafting or reviewing any text a person will read — READMEs, docs, release notes, blog posts, commit messages, marketing copy, UI microcopy — or when the user says text \"sounds like AI\", \"reads like ChatGPT\", or wants it \"de-slopped\". Triggers on: slop, de-slop, unslop, AI tells, sounds like AI, reads like ChatGPT, robotic writing, humanize, rewrite this, delve, leverage, crucial, testament, landscape, tapestry, em dash, em dashes, rule of three, \"not just\", hedging, puffery, filler words, passive voice, chatbot phrases, \"I hope this helps\", README, changelog, release notes, blog post, docs copy, marketing copy, microcopy, tone of voice."
+description: 'Strip the tells that mark prose as AI-written, then put a human voice back in. Use when drafting or reviewing any text a person will read — READMEs, docs, release notes, blog posts, commit messages, marketing copy, UI microcopy — or when the user says text "sounds like AI", "reads like ChatGPT", or wants it "de-slopped". Triggers on: slop, de-slop, unslop, AI tells, sounds like AI, reads like ChatGPT, robotic writing, humanize, rewrite this, delve, leverage, crucial, testament, landscape, tapestry, em dash, em dashes, rule of three, "not just", hedging, puffery, filler words, passive voice, chatbot phrases, "I hope this helps", README, changelog, release notes, blog post, docs copy, marketing copy, microcopy, tone of voice.'
 ---
 
 # Unslop Writing
@@ -22,23 +22,23 @@ This skill is a pass over any prose, in two halves. First strip the tells. Then 
 
 These words are wildly overrepresented in model output, and readers have learned to pattern-match on them. It doesn't matter that they're real words a human could use — statistically, they aren't.
 
-| Slop | Write instead |
-| --- | --- |
-| delve into | dig into, look at |
-| crucial, pivotal | important, or name the consequence |
-| leverage, utilize | use |
-| facilitate | help |
-| foster, cultivate | build, grow |
-| enhance | improve, or the specific change |
-| showcase | show |
-| underscore | show, stress |
+| Slop                           | Write instead                       |
+| ------------------------------ | ----------------------------------- |
+| delve into                     | dig into, look at                   |
+| crucial, pivotal               | important, or name the consequence  |
+| leverage, utilize              | use                                 |
+| facilitate                     | help                                |
+| foster, cultivate              | build, grow                         |
+| enhance                        | improve, or the specific change     |
+| showcase                       | show                                |
+| underscore                     | show, stress                        |
 | landscape, tapestry (abstract) | field, mix — or delete the sentence |
-| garner | get, earn |
-| additionally | also, and |
-| numerous | many |
-| in the event that | if |
+| garner                         | get, earn                           |
+| additionally                   | also, and                           |
+| numerous                       | many                                |
+| in the event that              | if                                  |
 
-Same rule for metaphor jargon that dresses a plain idea in a technical coat: *substrate* (base), *wedge* (way in), *vector* (way, method), *north star* (goal), *flywheel* (the actual feedback loop, described), *primitive* as a noun, *harness* and *scaffolding* as metaphors, *paradigm*, *nexus*. If the concrete word exists, the abstract one is costing you credibility, not adding depth.
+Same rule for metaphor jargon that dresses a plain idea in a technical coat: _substrate_ (base), _wedge_ (way in), _vector_ (way, method), _north star_ (goal), _flywheel_ (the actual feedback loop, described), _primitive_ as a noun, _harness_ and _scaffolding_ as metaphors, _paradigm_, _nexus_. If the concrete word exists, the abstract one is costing you credibility, not adding depth.
 
 ### Say "is" and "has"
 
@@ -72,7 +72,7 @@ Models group ideas into threes compulsively — "fast, reliable, and secure" —
 
 ### Repeat the word
 
-Cycling synonyms — *the component*, *the element*, *the widget*, *the control*, all meaning one thing — is a school-essay habit models inherited. Repetition of the right word is not a flaw; it's how the reader tracks what you're talking about. Pick the word and keep it.
+Cycling synonyms — _the component_, _the element_, _the widget_, _the control_, all meaning one thing — is a school-essay habit models inherited. Repetition of the right word is not a flaw; it's how the reader tracks what you're talking about. Pick the word and keep it.
 
 ### One idea per sentence
 

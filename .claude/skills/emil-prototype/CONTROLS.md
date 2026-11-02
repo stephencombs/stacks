@@ -26,7 +26,7 @@ The picker answers "which direction"; the panel answers "which value". Add it wh
 A slider that re-renders the whole tree on every input stutters, and the user reads that stutter as the animation feeling bad — then spends ten minutes fixing an animation that was fine all along. Outside React, set them imperatively on the prototype root:
 
 ```js
-root.style.setProperty('--duration', `${value}ms`);
+root.style.setProperty("--duration", `${value}ms`);
 ```
 
 **2. The number is visible, and copyable.**

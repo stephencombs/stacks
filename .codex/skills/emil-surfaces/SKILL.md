@@ -1,6 +1,6 @@
 ---
 name: emil-surfaces
-description: "Shadows, borders, gradients, depth, and dark-mode surface treatment for interfaces. Use when styling cards, buttons, containers, modals, dropdowns, or images, choosing between borders and shadows, fixing nested border radii, adding gradients or fades, defining elevation, or adapting surfaces to dark mode. Triggers on: box-shadow, shadow, border, borders, border-radius, rounded corners, nested radius, concentric radius, elevation, depth, layering, surface, card, container, gradient, gradient banding, eased gradient, mask-image, fade, fade-out, hairline border, 0.5px border, divider, outline, image outline, image border, dark mode, dark theme, theme variables, color scale, oklch, \"looks flat\", \"border looks harsh\", \"card feels off\"."
+description: 'Shadows, borders, gradients, depth, and dark-mode surface treatment for interfaces. Use when styling cards, buttons, containers, modals, dropdowns, or images, choosing between borders and shadows, fixing nested border radii, adding gradients or fades, defining elevation, or adapting surfaces to dark mode. Triggers on: box-shadow, shadow, border, borders, border-radius, rounded corners, nested radius, concentric radius, elevation, depth, layering, surface, card, container, gradient, gradient banding, eased gradient, mask-image, fade, fade-out, hairline border, 0.5px border, divider, outline, image outline, image border, dark mode, dark theme, theme variables, color scale, oklch, "looks flat", "border looks harsh", "card feels off".'
 ---
 
 # Surfaces
@@ -64,8 +64,12 @@ The inner radius is computed, never copied:
 
 ```tsx
 // Tailwind — subtract the padding when picking the child's radius
-<section className="rounded-3xl p-3">   {/* 24px outer, 12px gap */}
-  <article className="rounded-xl">      {/* 24 − 12 = 12px ✓ */}
+<section className="rounded-3xl p-3">
+  {" "}
+  {/* 24px outer, 12px gap */}
+  <article className="rounded-xl">
+    {" "}
+    {/* 24 − 12 = 12px ✓ */}
     ...
   </article>
 </section>
@@ -78,13 +82,9 @@ A card or button that draws a solid border to look raised has two problems: the 
 ```css
 :root {
   --elevation-raised:
-    0 0 0 1px rgb(0 0 0 / 0.05),
-    0 1px 3px rgb(0 0 0 / 0.05),
-    0 4px 10px -4px rgb(0 0 0 / 0.05);
+    0 0 0 1px rgb(0 0 0 / 0.05), 0 1px 3px rgb(0 0 0 / 0.05), 0 4px 10px -4px rgb(0 0 0 / 0.05);
   --elevation-raised-hover:
-    0 0 0 1px rgb(0 0 0 / 0.07),
-    0 1px 3px rgb(0 0 0 / 0.07),
-    0 4px 10px -4px rgb(0 0 0 / 0.08);
+    0 0 0 1px rgb(0 0 0 / 0.07), 0 1px 3px rgb(0 0 0 / 0.07), 0 4px 10px -4px rgb(0 0 0 / 0.08);
 }
 
 /* Hook into however the project switches themes:
@@ -130,8 +130,7 @@ For the borders you keep, use density-aware hairlines so dividers stay crisp on 
 :root {
   --border-hairline: 1px;
 
-  @media only screen and (min-device-pixel-ratio: 2),
-    only screen and (min-resolution: 192dpi) {
+  @media only screen and (min-device-pixel-ratio: 2), only screen and (min-resolution: 192dpi) {
     --border-hairline: 0.5px;
   }
 }

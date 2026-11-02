@@ -30,7 +30,7 @@ The title template and per-route wiring are a fix. The words are content: take t
 
 ## I2. Shared links have a preview — SHOULD FIX, BLOCKER for a launch that depends on sharing
 
-Launch day *is* people pasting the link into Slack, X, iMessage, and LinkedIn. With no Open Graph image the link is a bare URL; with a broken one it's a grey box.
+Launch day _is_ people pasting the link into Slack, X, iMessage, and LinkedIn. With no Open Graph image the link is a bare URL; with a broken one it's a grey box.
 
 **Hunt for:** `openGraph` / `twitter` in metadata, or `og:image` / `twitter:card` meta tags; an `opengraph-image` file in the app directory; an image path that doesn't exist in `public/`; an image under 1200×630.
 

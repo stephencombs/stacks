@@ -27,9 +27,8 @@ Clicking the label must focus the input:
 ### 2. Use the right input type
 
 ```html
-<input type="email" />    <input type="password" />
-<input type="tel" />      <input type="url" />
-<input type="number" />   <input type="search" />
+<input type="email" /> <input type="password" /> <input type="tel" /> <input type="url" />
+<input type="number" /> <input type="search" />
 ```
 
 This gets you the right mobile keyboard, browser validation, and autofill behavior for free.
@@ -39,7 +38,9 @@ This gets you the right mobile keyboard, browser validation, and autofill behavi
 Inputs smaller than 16px cause iOS Safari to zoom in on focus. Set it globally:
 
 ```css
-input, textarea, select {
+input,
+textarea,
+select {
   font-size: 16px;
 }
 ```
@@ -51,7 +52,10 @@ If the design calls for smaller text, keep the computed font-size at 16px on tou
 Every input and control needs a clear focus state. Style `:focus-visible` (not bare `:focus`) so keyboard users get a ring without mouse users seeing one on every click, and never `outline: none` without a replacement:
 
 ```css
-input:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+input:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
 ```
 
 ### 5. Kill noisy browser behaviors when they don't help
@@ -80,16 +84,15 @@ Prefix/suffix icons and labels should be absolutely positioned on top of the inp
   pointer-events: none;
 }
 
-.input-field { padding-left: 40px; }
+.input-field {
+  padding-left: 40px;
+}
 ```
 
 Clickable decorations (like a clear button) should refocus the input:
 
 ```jsx
-<button
-  className="input-icon-button"
-  onClick={() => inputRef.current?.focus()}
->
+<button className="input-icon-button" onClick={() => inputRef.current?.focus()}>
   <SearchIcon />
 </button>
 ```
@@ -99,9 +102,9 @@ Clickable decorations (like a clear button) should refocus the input:
 Autofocus the first input when a modal opens (if the modal contains one). Do NOT autofocus on touch devices — it pops the keyboard open unexpectedly:
 
 ```jsx
-const isTouchDevice = 'ontouchstart' in window;
+const isTouchDevice = "ontouchstart" in window;
 
-<input autoFocus={!isTouchDevice} />
+<input autoFocus={!isTouchDevice} />;
 ```
 
 ### 8. Always wrap inputs in a `<form>` — Enter must submit
@@ -117,7 +120,7 @@ For textareas (where Enter inserts a newline), support `Cmd+Enter` (Mac) / `Ctrl
 
 ```jsx
 function handleKeyDown(e) {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
     handleSubmit();
   }
 }
@@ -129,10 +132,10 @@ Never put click handlers on elements that aren't buttons:
 
 ```html
 <!-- Good -->
-<button onClick={handleClick}>Click me</button>
+<button onClick="{handleClick}">Click me</button>
 <!-- Bad -->
-<div onClick={handleClick}>Click me</div>
-<span onClick={handleClick}>Click me</span>
+<div onClick="{handleClick}">Click me</div>
+<span onClick="{handleClick}">Click me</span>
 ```
 
 Disable the button while submitting to prevent duplicate network requests, and say what's happening:
@@ -148,14 +151,16 @@ const [isSubmitting, setIsSubmitting] = useState(false);
     setIsSubmitting(false);
   }}
 >
-  {isSubmitting ? 'Submitting...' : 'Submit'}
-</button>
+  {isSubmitting ? "Submitting..." : "Submit"}
+</button>;
 ```
 
 Make buttons feel pressable with a subtle scale on `:active`:
 
 ```css
-.button:active { transform: scale(0.97); }
+.button:active {
+  transform: scale(0.97);
+}
 ```
 
 If a button's action has a keyboard shortcut, surface it as a tooltip:
@@ -192,7 +197,10 @@ The label, the control, AND the gap between them must all be clickable:
 }
 
 /* Make the entire row clickable, not just the checkbox */
-.checkbox-wrapper label { cursor: pointer; flex: 1; }
+.checkbox-wrapper label {
+  cursor: pointer;
+  flex: 1;
+}
 ```
 
 Or wrap everything in one label:
@@ -208,7 +216,7 @@ Or wrap everything in one label:
 
 ```jsx
 function handleDelete() {
-  if (confirm('Are you sure you want to delete this?')) deleteItem();
+  if (confirm("Are you sure you want to delete this?")) deleteItem();
 }
 ```
 

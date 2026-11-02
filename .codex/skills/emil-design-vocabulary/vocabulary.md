@@ -1,7 +1,6 @@
 # Design Vocabulary
 
-*The words designers use when they know what they're looking at.*
-
+_The words designers use when they know what they're looking at._
 
 ## Typography
 
@@ -47,7 +46,6 @@
 
 **Subscript** — Lowered characters for formulas or notation. The HTML sub element has the same problem as sup: oversized by default and disruptive to line rhythm if left unstyled.
 
-
 ## Color
 
 **sRGB** — The standard color space most screens have used for decades. All hex values live here. Its gamut is limited: there are colors a modern display can show that sRGB cannot describe.
@@ -76,7 +74,6 @@
 
 **Blending** — How a layer interacts with what's beneath it. Multiply darkens, Screen lightens, Overlay does both depending on the base color. Useful for integrating images with colored surfaces and adding depth to illustrations.
 
-
 ## Iconography
 
 **Stroke weight** — How thick the lines of an icon are. Thin strokes disappear at small sizes. At large sizes they look frail. Weight needs to scale with size.
@@ -90,7 +87,6 @@
 **Pixel hinting** — Adjusting icon paths to sit cleanly on a pixel grid at small sizes. A full-detail logo at 16px turns to mush without it.
 
 **Icon library** — A set of icons drawn at the same size, weight, and radius. Mixing two libraries, even similar ones, creates subtle mismatches that compound across a product.
-
 
 ## Layout
 
@@ -130,7 +126,6 @@
 
 **Z-index** — The stacking order of elements on the same plane. Modals, tooltips, and dropdowns need explicit z-index values or they clip behind things they should sit above.
 
-
 ## Interaction
 
 **Affordance** — The visual signal that tells you how something can be used. A button looks pressable. A link looks clickable. When affordance is missing, users guess.
@@ -157,7 +152,6 @@
 
 **Skip link** — A visually hidden link that jumps to the main content. Appears on focus for keyboard users. Without it, every page requires tabbing through the full navigation first.
 
-
 ## Motion
 
 **Easing** — The rate at which an animation speeds up or slows down. Ease-out decelerates into place and feels natural. Ease-in starts slow and makes the interface feel like it's dragging.
@@ -175,7 +169,6 @@
 **Reduced motion** — A user preference for less animation. Ignoring it can trigger vestibular symptoms. Any significant movement should check for it.
 
 **Skeleton shimmer** — A moving gradient that sweeps across a skeleton loader to suggest activity. Should respect reduced motion preferences.
-
 
 ## Accessibility
 
@@ -201,7 +194,6 @@
 
 **Color-only state** — Using color as the sole signal for a state change. An error shown only by a red border is invisible to colorblind users. Always pair color with an icon or text.
 
-
 ## Information Architecture
 
 **Progressive disclosure** — Showing only what is needed at each step, revealing complexity as the user goes deeper. The opposite is putting everything on one page.
@@ -220,7 +212,6 @@
 
 **Confirmation dialog** — A prompt before a destructive or irreversible action. Should describe what will be lost, not just ask are you sure. Keep the destructive and safe actions visually far apart.
 
-
 ## Copywriting
 
 **Microcopy** — Short UI text: labels, error messages, placeholders, tooltips. Has an outsized effect on how trustworthy a product feels.
@@ -236,7 +227,6 @@
 **Front-loading** — Putting the most important word first. Export ready beats Your export is complete and available for download. Users scan.
 
 **Inline error** — An error message next to the field that caused it. A summary at the top of a form makes users hunt. Inline is unambiguous.
-
 
 ## Tools
 
@@ -266,7 +256,6 @@
 
 **Skeuomorphism** — A design approach that models interfaces on real-world objects: a notes app that looks like a legal pad, a calendar with stitched leather, a trash can that looks like an actual bin. The idea was to make unfamiliar software feel approachable by referencing the physical world. Not to be confused with using shadows or gradients, which are just visual depth tools.
 
-
 ## Analysis
 
 **A/B test** — Two design variants running simultaneously to measure which performs better. Validates decisions with real behaviour rather than internal opinion. Results are only as good as the metric being measured.
@@ -288,7 +277,6 @@
 **NPS** — Net Promoter Score. A measure of how likely users are to recommend a product, on a scale of 0 to 10. A blunt instrument, but widely used as a rough signal of overall satisfaction.
 
 **Scroll depth** — How far down a page users actually read. Most don't get to the bottom. Content and CTAs buried below the fold may be seen by far fewer people than assumed.
-
 
 ## Components
 

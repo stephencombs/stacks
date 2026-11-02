@@ -29,7 +29,9 @@ Without a wrapping `<form>`, Enter does nothing, password managers can't find th
 ```jsx
 <form onSubmit={handleSubmit}>
   <input type="email" name="email" />
-  <button type="button" onClick={onCancel}>Cancel</button>
+  <button type="button" onClick={onCancel}>
+    Cancel
+  </button>
   <button type="submit">Continue</button>
 </form>
 ```
@@ -37,9 +39,11 @@ Without a wrapping `<form>`, Enter does nothing, password managers can't find th
 Textareas submit on Cmd+Enter (Mac) / Ctrl+Enter (Windows), since Enter inserts a newline:
 
 ```jsx
-<textarea onKeyDown={(e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleSubmit(e);
-}} />
+<textarea
+  onKeyDown={(e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleSubmit(e);
+  }}
+/>
 ```
 
 ## D3. A failed submit says so, and keeps what was typed — BLOCKER
@@ -52,7 +56,7 @@ Fix: on failure, keep every field's value, re-enable the button, and show a mess
 
 ## D4. Validation waits for the user to finish — SHOULD FIX
 
-Flagging a field as invalid while the user is still typing their first attempt yells "invalid email" after one character. Validate on blur or on submit. Once a field *has* shown an error, switch to validating on change so the error clears the moment they fix it: reward early, punish late.
+Flagging a field as invalid while the user is still typing their first attempt yells "invalid email" after one character. Validate on blur or on submit. Once a field _has_ shown an error, switch to validating on change so the error clears the moment they fix it: reward early, punish late.
 
 **Hunt for:** validation run inside `onChange` with no touched or submitted gate; schema resolvers configured with `mode: "onChange"` (react-hook-form: use `mode: "onBlur"` or `"onTouched"` with `reValidateMode: "onChange"`).
 
@@ -62,11 +66,11 @@ An error summary at the top of the form makes the user hunt. Each message render
 
 **Hunt for:** a single `{error && <Alert>}` at the top of a multi-field form; messages like "Invalid input", "Error", "Required", "Validation failed".
 
-| Instead of | Write |
-| --- | --- |
-| "Invalid input" | "Your email must include an @" |
-| "Required" | "Enter your company name" |
-| "Password error" | "Use at least 8 characters" |
+| Instead of       | Write                          |
+| ---------------- | ------------------------------ |
+| "Invalid input"  | "Your email must include an @" |
+| "Required"       | "Enter your company name"      |
+| "Password error" | "Use at least 8 characters"    |
 
 After a failed submit, move focus to the first invalid field so the keyboard and screen reader user lands on the problem.
 
@@ -77,11 +81,13 @@ The right `type` gets you the right mobile keyboard, browser validation, and aut
 **Hunt for:** `type="text"` on email, phone, URL, and search fields; password fields with no `autocomplete`; `autocomplete="off"` on identity, address, or payment fields.
 
 ```html
-<input type="email"    autocomplete="email" />
-<input type="password" autocomplete="current-password" />  <!-- login -->
-<input type="password" autocomplete="new-password" />      <!-- signup, change password -->
-<input type="text"     autocomplete="one-time-code" inputmode="numeric" />
-<input type="tel"      autocomplete="tel" />
+<input type="email" autocomplete="email" />
+<input type="password" autocomplete="current-password" />
+<!-- login -->
+<input type="password" autocomplete="new-password" />
+<!-- signup, change password -->
+<input type="text" autocomplete="one-time-code" inputmode="numeric" />
+<input type="tel" autocomplete="tel" />
 ```
 
 Turn the noise **off** where it doesn't help: `spellcheck="false"` and `autocomplete="off"` on usernames, slugs, search fields, API keys, and codes; `data-1p-ignore` / `data-lpignore="true"` on fields where a password-manager overlay doesn't belong (a search box, a project name).
@@ -101,8 +107,12 @@ A button with no pressed state feels unresponsive, and on touch (where hover doe
 **Hunt for:** the shared `Button` component with `:hover` but no `:active`.
 
 ```css
-.button { transition: transform 100ms ease-out; }
-.button:active { transform: scale(0.97); }
+.button {
+  transition: transform 100ms ease-out;
+}
+.button:active {
+  transform: scale(0.97);
+}
 ```
 
 Never below `0.95`; it reads as exaggerated.
@@ -122,12 +132,14 @@ The label, the control, and the gap between them must all be clickable. A 16px c
 
 ## D10. Input decorations sit inside the input — SHOULD FIX
 
-A prefix icon rendered as a *sibling* of the input, inside a wrapper styled to look like the input, lies about the hit area: clicking the icon does nothing. Decorations are absolutely positioned over the real input, with padding making room. Non-interactive ones get `pointer-events: none`; interactive ones (a clear button) refocus the input after acting.
+A prefix icon rendered as a _sibling_ of the input, inside a wrapper styled to look like the input, lies about the hit area: clicking the icon does nothing. Decorations are absolutely positioned over the real input, with padding making room. Non-interactive ones get `pointer-events: none`; interactive ones (a clear button) refocus the input after acting.
 
 **Hunt for:** wrappers with `border` + `focus-within` styling containing an icon and a borderless input side by side.
 
 ```css
-.input-wrapper { position: relative; }
+.input-wrapper {
+  position: relative;
+}
 .input-icon {
   position: absolute;
   left: 12px;
@@ -135,7 +147,9 @@ A prefix icon rendered as a *sibling* of the input, inside a wrapper styled to l
   transform: translateY(-50%);
   pointer-events: none;
 }
-.input-field { padding-left: 40px; }
+.input-field {
+  padding-left: 40px;
+}
 ```
 
 ## D11. Forms are prefilled — POLISH

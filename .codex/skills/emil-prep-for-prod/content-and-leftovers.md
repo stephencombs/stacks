@@ -37,12 +37,12 @@ Never fix this by rewording. Remove the section or flag it; the user confirms wh
 
 **Hunt for:** button labels `Submit` / `OK` / `Click here` / `Yes` / `No`; error strings `Something went wrong` / `An error occurred` / `Invalid` / `Error`; links whose whole text is "here" or "learn more" (also unreadable out of context to a screen reader).
 
-| Instead of | Write |
-| --- | --- |
-| "Submit" | "Save changes", "Send invite", "Create project" |
-| "Invalid input" | "Your email must include an @" |
-| "No items" | "No projects yet. Create one to get started." |
-| "Please confirm your selection before proceeding" | "Confirm" |
+| Instead of                                        | Write                                           |
+| ------------------------------------------------- | ----------------------------------------------- |
+| "Submit"                                          | "Save changes", "Send invite", "Create project" |
+| "Invalid input"                                   | "Your email must include an @"                  |
+| "No items"                                        | "No projects yet. Create one to get started."   |
+| "Please confirm your selection before proceeding" | "Confirm"                                       |
 
 Sentence case for UI, not Title Case On Every Label. When the right label is obvious from the handler (`onClick={saveChanges}`), apply it. When it isn't, flag it.
 
@@ -53,7 +53,9 @@ When CSS asks for a weight or italic that was never loaded, the browser fakes it
 **Hunt for:** `font-weight` values used in CSS vs the weights loaded in `@font-face` / `next/font`; `italic` / `<em>` with no italic file loaded; no `font-synthesis` anywhere.
 
 ```css
-html { font-synthesis: none; }
+html {
+  font-synthesis: none;
+}
 ```
 
 Apply it, then list any weight that's used but not loaded. Loading a new font file is the user's call (it costs bytes, see B2); using the nearest loaded weight is the other option.
@@ -63,8 +65,14 @@ Apply it, then list any weight that's used but not loaded. Loading a new font fi
 A headline that wraps to "seven words on the first line / one" looks unfinished at exactly the breakpoint nobody checked.
 
 ```css
-h1, h2, h3 { text-wrap: balance; }
-p { text-wrap: pretty; }
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
 ```
 
 Body copy caps near `65ch`. A paragraph running the full width of a 1440px screen is work to read.
@@ -94,7 +102,9 @@ An animation inspector, a control panel, or a devtools drawer visible to every v
 **Hunt for:** `<Lapse`, `mountLapse(`, `@aiforui/lapse/install`; `leva` / `<Leva` / `useControls`; `ReactQueryDevtools`; `tweakpane`, `dat.gui`, `stats.js`; `react-scan`, `why-did-you-render`; `eruda` / `vConsole`; debug overlays and grid overlays toggled by a constant; feature-flag panels. For each, find the mount and check it's gated.
 
 ```jsx
-{process.env.NODE_ENV === "development" && <Lapse />}
+{
+  process.env.NODE_ENV === "development" && <Lapse />;
+}
 ```
 
 ```js
@@ -133,7 +143,7 @@ Anything in a client bundle is public. A secret key behind `NEXT_PUBLIC_` / `VIT
 
 **Hunt for:** `localhost`, `127.0.0.1`, `ngrok`, staging hostnames in source (not config); `NEXT_PUBLIC_*` / `VITE_*` / `PUBLIC_*` variable names containing `SECRET`, `PRIVATE`, `SERVICE_ROLE`, or `_KEY` where the service's public key isn't meant; string literals shaped like keys (`sk_live_`, `sk_test_`, `eyJ…`); `.env` files tracked by git.
 
-Report the file and the variable *name*, never the value. Rotating a leaked key is the user's job and it's urgent; say so at the top of the report, above the verdict.
+Report the file and the variable _name_, never the value. Rotating a leaked key is the user's job and it's urgent; say so at the top of the report, above the verdict.
 
 ### H13. Commented-out code and stale markers — SHOULD FIX
 

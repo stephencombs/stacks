@@ -1,6 +1,6 @@
 # Lane B — Performance
 
-The lane where the dev machine lies. Every check here reproduces on a mid-range phone and hides on a fast laptop. Fast UI is mostly work you *don't* do, so most fixes here delete or defer something. For anything deeper, the owning skill is `emil-performance`.
+The lane where the dev machine lies. Every check here reproduces on a mid-range phone and hides on a fast laptop. Fast UI is mostly work you _don't_ do, so most fixes here delete or defer something. For anything deeper, the owning skill is `emil-performance`.
 
 Layout shift from content that arrives late is split between this lane (assets: images, fonts, video) and lane E (data: skeletons, empty states, persisted UI state).
 
@@ -15,7 +15,9 @@ The single most visible launch-day bug. An image or video without dimensions has
 ```
 
 ```css
-.video-frame { aspect-ratio: 16 / 9; }
+.video-frame {
+  aspect-ratio: 16 / 9;
+}
 ```
 
 The attributes don't fix the rendered size. They give the browser the ratio so it reserves the box before the bytes arrive.
@@ -56,7 +58,7 @@ A 4000px PNG decoded to show a 64px avatar costs bandwidth, decode time, and mem
 
 **Hunt for:** raw `<img>` in a project that has an image component; `.png` / `.jpg` photos in `public/` over ~300KB; avatars and thumbnails pointing at the original upload; `unoptimized` on `next/image`.
 
-Fix: the framework's image component with `sizes`, or `srcset` by hand; WebP or AVIF for photos; SVG for anything drawn. A raster image scaled *up* is the mirror-image finding: it ships blurry on every retina screen.
+Fix: the framework's image component with `sizes`, or `srcset` by hand; WebP or AVIF for photos; SVG for anything drawn. A raster image scaled _up_ is the mirror-image finding: it ships blurry on every retina screen.
 
 ## B5. Only `transform` and `opacity` animate — BLOCKER on frequent interactions, SHOULD FIX otherwise
 
@@ -64,13 +66,13 @@ Animating `width`, `height`, `margin`, `padding`, `top`, `left`, or `border-widt
 
 **Hunt for:** `transition:` and `@keyframes` declaring any of the properties above; `animate={{ height }}`, `animate={{ width }}`; sidebars that animate `width`; accordions that animate `height`.
 
-| Instead of | Animate |
-| --- | --- |
-| `padding` / `width` / `height` to grow or shrink | `scale()` |
-| `margin` / `top` / `left` to move | `translate()` |
-| `visibility` / `display` swaps | `opacity` |
-| `box-shadow` | opacity of a pseudo-element that holds the larger shadow |
-| `border-radius` | `clip-path: inset(0 round 12px)` |
+| Instead of                                       | Animate                                                  |
+| ------------------------------------------------ | -------------------------------------------------------- |
+| `padding` / `width` / `height` to grow or shrink | `scale()`                                                |
+| `margin` / `top` / `left` to move                | `translate()`                                            |
+| `visibility` / `display` swaps                   | `opacity`                                                |
+| `box-shadow`                                     | opacity of a pseudo-element that holds the larger shadow |
+| `border-radius`                                  | `clip-path: inset(0 round 12px)`                         |
 
 `height: auto` isn't animatable. Measure and animate the pixel value once, animate `grid-template-rows: 0fr → 1fr`, or clip an inner element. A sidebar that opens forty times a session and animates `width` is a blocker; a rarely opened settings accordion animating `height` is a should-fix.
 
@@ -82,10 +84,16 @@ Animating `width`, `height`, `margin`, `padding`, `top`, `left`, or `border-widt
 
 ```css
 /* Bad */
-.button { transition: all 200ms ease; }
+.button {
+  transition: all 200ms ease;
+}
 
 /* Good */
-.button { transition: background-color 150ms ease, transform 150ms var(--ease-out); }
+.button {
+  transition:
+    background-color 150ms ease,
+    transform 150ms var(--ease-out);
+}
 ```
 
 ```tsx
@@ -189,7 +197,10 @@ function setTheme(theme) {
 ```
 
 ```css
-.no-transitions, .no-transitions * { transition: none !important; }
+.no-transitions,
+.no-transitions * {
+  transition: none !important;
+}
 ```
 
 ## B15. Content routes are static — SHOULD FIX
@@ -215,7 +226,10 @@ A request per keystroke hammers the server and creates race conditions where an 
 useEffect(() => {
   const controller = new AbortController();
   const id = setTimeout(() => search(query, controller.signal), 300);
-  return () => { clearTimeout(id); controller.abort(); };
+  return () => {
+    clearTimeout(id);
+    controller.abort();
+  };
 }, [query]);
 ```
 
@@ -223,7 +237,7 @@ useEffect(() => {
 
 A chart library, a rich-text editor, a syntax highlighter, or a confetti effect imported at the top of the root layout is downloaded and parsed by every visitor, including the ones who never open the screen that uses it.
 
-**Hunt for:** large dependencies imported in the root layout or a shared provider; modals and editors imported statically by the page that *might* open them; whole icon packs or `lodash` imported as a namespace.
+**Hunt for:** large dependencies imported in the root layout or a shared provider; modals and editors imported statically by the page that _might_ open them; whole icon packs or `lodash` imported as a namespace.
 
 ```jsx
 const Editor = dynamic(() => import("./editor"), { loading: () => <EditorSkeleton /> });
@@ -237,4 +251,4 @@ Devtools, inspectors, and debug panels cost bytes as well as embarrassment. The 
 
 ## B19. Verify on a mid-range phone — always
 
-None of the above is proven on the dev machine. Profile with the DevTools Performance panel on a real phone over remote debugging, not with CPU throttling; throttling models a slow CPU, not a weak GPU or a small memory budget. Run Lighthouse against the *production build*, never the dev server. Report this as a device check, never as verified.
+None of the above is proven on the dev machine. Profile with the DevTools Performance panel on a real phone over remote debugging, not with CPU throttling; throttling models a slow CPU, not a weak GPU or a small memory budget. Run Lighthouse against the _production build_, never the dev server. Report this as a device check, never as verified.

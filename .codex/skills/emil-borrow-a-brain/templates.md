@@ -40,14 +40,17 @@ type: essay
 **Thesis:** Startups take off because founders push them: recruit users manually, delight them pathologically, do unscalable things.
 
 ## Claims
+
 - **Startups don't take off by themselves.** Founders assume launch = growth; in fact the first users are hand-recruited. Example: Stripe's founders installing the product on people's laptops on the spot (the "Collison installation"). (`ds`)
 - **Delight users to a degree that seems pathological.** Early on, your attention is the product's best feature; Wufoo mailed handwritten thank-you notes. (`ds`)
 - ...
 
 ## Coined terms
+
 - **Collison installation** — closing a signup by setting the product up for the user right there. (`ds`)
 
 ## Quotable
+
 - "Startups take off because the founders make them take off." (`ds`)
 ```
 
@@ -70,6 +73,7 @@ One paragraph: what this theme is inside their thinking and why it matters to th
 - ...
 
 ## Key source articles
+
 `/slug-one/` · `/slug-two/` · `/slug-three/`
 ```
 
@@ -121,7 +125,7 @@ Everything else is a corollary of this.
 
 1. **<Bold claim.>** <Two or three sentences of their reasoning, in their terms, with the concrete example.> (`<slug>`, `references/<theme>.md`)
 2. ...
-<10 to 14 entries>
+   <10 to 14 entries>
 
 ## The <Name> method, end to end
 

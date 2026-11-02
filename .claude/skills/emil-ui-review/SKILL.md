@@ -1,13 +1,13 @@
 ---
 name: emil-ui-review
-description: "Review interface code the way a design engineer would — catch the spacing, motion, accessibility, and polish mistakes AI leaves behind. Use when reviewing a UI diff, a generated component, or a pull request that touches the interface, when someone asks \"does this look right / feel right\", or after an agent builds UI and you want it held to a craft bar before it ships. Triggers on: review, code review, UI review, design review, PR review, critique, \"does this look right\", \"is this good\", \"feels off\", \"catch mistakes\", AI-generated UI, generated component, polish pass, quality bar, ship it, sign off, nitpick, design QA."
+description: 'Review interface code the way a design engineer would — catch the spacing, motion, accessibility, and polish mistakes AI leaves behind. Use when reviewing a UI diff, a generated component, or a pull request that touches the interface, when someone asks "does this look right / feel right", or after an agent builds UI and you want it held to a craft bar before it ships. Triggers on: review, code review, UI review, design review, PR review, critique, "does this look right", "is this good", "feels off", "catch mistakes", AI-generated UI, generated component, polish pass, quality bar, ship it, sign off, nitpick, design QA.'
 ---
 
 # UI Review
 
 A specialized review skill. It does one thing: judge interface code against a high craft bar and report what's wrong, ranked by how much it hurts. It doesn't build features, fix unrelated bugs, or review backend logic. Point it at a diff, a component, or a page.
 
-This is the reviewing counterpart to the building skills. Where `emil-typography`, `emil-color`, `emil-surfaces`, `emil-ui-polish`, `emil-forms-and-inputs`, `emil-touch-and-accessibility`, `emil-performance`, `emil-animations`, and `emil-component-design` tell an agent how to *build* an interface, this skill tells it how to *catch* the interface that was built wrong. When a finding needs a precise value or a deeper rule, defer to the matching skill — this one owns the review *method* and the cross-dimensional bar, not every detail.
+This is the reviewing counterpart to the building skills. Where `emil-typography`, `emil-color`, `emil-surfaces`, `emil-ui-polish`, `emil-forms-and-inputs`, `emil-touch-and-accessibility`, `emil-performance`, `emil-animations`, and `emil-component-design` tell an agent how to _build_ an interface, this skill tells it how to _catch_ the interface that was built wrong. When a finding needs a precise value or a deeper rule, defer to the matching skill — this one owns the review _method_ and the cross-dimensional bar, not every detail.
 
 ## Operating posture
 

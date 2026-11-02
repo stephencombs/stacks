@@ -18,28 +18,52 @@ Any of the legacy notations qualifies: hex in 3, 6, or 8 digits (`#c00`, `#e11d4
 
 ```css
 /* before */
-.alert-title { color: #e11d48; }
-.hero        { background: #164e63; }
-.callout     { border-color: #fef3c7; }
+.alert-title {
+  color: #e11d48;
+}
+.hero {
+  background: #164e63;
+}
+.callout {
+  border-color: #fef3c7;
+}
 
 /* after */
-.alert-title { color: oklch(0.586 0.222 17.585); }
-.hero        { background: oklch(0.398 0.066 227.392); }
-.callout     { border-color: oklch(0.962 0.058 95.617); }
+.alert-title {
+  color: oklch(0.586 0.222 17.585);
+}
+.hero {
+  background: oklch(0.398 0.066 227.392);
+}
+.callout {
+  border-color: oklch(0.962 0.058 95.617);
+}
 ```
 
 Function notations follow the same substitution, with any alpha channel moving behind a slash:
 
 ```css
 /* before */
-.badge   { background: rgb(22, 163, 74); }
-.divider { border-top: 1px solid rgba(255, 255, 255, 0.12); }
-.link    { color: hsl(268, 60%, 45%); }
+.badge {
+  background: rgb(22, 163, 74);
+}
+.divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.link {
+  color: hsl(268, 60%, 45%);
+}
 
 /* after */
-.badge   { background: oklch(0.627 0.17 149.214); }
-.divider { border-top: 1px solid oklch(1 0 0 / 0.12); }
-.link    { color: oklch(0.468 0.202 299.662); }
+.badge {
+  background: oklch(0.627 0.17 149.214);
+}
+.divider {
+  border-top: 1px solid oklch(1 0 0 / 0.12);
+}
+.link {
+  color: oklch(0.468 0.202 299.662);
+}
 ```
 
 When alpha is fully opaque, write the three-channel form — no `/ 1` suffix.

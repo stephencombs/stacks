@@ -51,14 +51,16 @@ A spinner collapses the page to nothing, then the content arrives and everything
 **Hunt for:** a centered spinner as the loading state of a list, table, card grid, or page; skeletons with a different height or row count than the loaded content; `dynamic()` / `lazy()` imports with no sized fallback.
 
 ```css
-.row-skeleton { height: 48px; }   /* the loaded row's height, not a guess */
+.row-skeleton {
+  height: 48px;
+} /* the loaded row's height, not a guess */
 ```
 
 Spinners are right for an action inside a control (a submitting button). Skeletons are right for content.
 
 ## E5. Persisted state is correct on first paint — SHOULD FIX
 
-The theme that flashes light before going dark, the sidebar that renders open and then snaps shut, the tab that resets and then jumps to the saved one. Each is a value read in `useEffect` *after* the first paint.
+The theme that flashes light before going dark, the sidebar that renders open and then snaps shut, the tab that resets and then jumps to the saved one. Each is a value read in `useEffect` _after_ the first paint.
 
 **Hunt for:** `useEffect` that reads `localStorage` and then calls a state setter for theme, sidebar, layout, tab, or density; `dark:` classes applied by a client-only hook; `useState(false)` followed by an effect that corrects it.
 
@@ -75,7 +77,11 @@ Proportional digits have different widths, so a ticking counter or a price that 
 **Hunt for:** counters, timers, prices, percentages, table number columns, and pagination without `tabular-nums`; buttons with swapping labels and no fixed or minimum width.
 
 ```css
-.counter, .price, td.numeric { font-variant-numeric: tabular-nums; }
+.counter,
+.price,
+td.numeric {
+  font-variant-numeric: tabular-nums;
+}
 ```
 
 Tailwind: `tabular-nums`.
@@ -88,11 +94,17 @@ Bold-on-hover or bold-on-selected reflows the text and shifts every sibling by a
 
 ```css
 /* Bad */
-.tab:hover { font-weight: 600; }
+.tab:hover {
+  font-weight: 600;
+}
 
 /* Good */
-.tab { font-weight: 500; }
-.tab[aria-selected="true"] { color: var(--gray-12); }
+.tab {
+  font-weight: 500;
+}
+.tab[aria-selected="true"] {
+  color: var(--gray-12);
+}
 ```
 
 ## E8. Late UI doesn't push content — SHOULD FIX
@@ -133,7 +145,9 @@ The dev data had names like "Test Project". Real data has a 90-character project
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.card-text { overflow-wrap: break-word; }
+.card-text {
+  overflow-wrap: break-word;
+}
 ```
 
 A flex child needs `min-width: 0` before `text-overflow: ellipsis` does anything. Truncation needs an escape hatch: a `title` attribute, a tooltip, or an expand control. An ellipsis with no way to read the rest hides data.
@@ -145,7 +159,10 @@ A gradient overlay, a glow, or an illustration positioned over a control swallow
 **Hunt for:** absolutely positioned decorative elements (gradients, noise, glows, fades) without `pointer-events: none`.
 
 ```css
-.hero-glow, .fade-overlay { pointer-events: none; }
+.hero-glow,
+.fade-overlay {
+  pointer-events: none;
+}
 ```
 
 Code-built illustrations also get `user-select: none`.

@@ -25,10 +25,10 @@ A `<div onClick>` isn't focusable, isn't reachable by Tab, doesn't fire on Enter
 
 ```html
 <!-- Bad -->
-<div onClick={handleClick}>Save</div>
+<div onClick="{handleClick}">Save</div>
 
 <!-- Good -->
-<button type="button" onClick={handleClick}>Save</button>
+<button type="button" onClick="{handleClick}">Save</button>
 ```
 
 `type="button"` matters: a bare `<button>` inside a form is a submit button. Navigation is `<a href>`. Actions are `<button>`. A card whose whole surface is one `<a>` reads the entire card as a single link and blocks text selection; give it a distinct CTA link instead.
@@ -103,7 +103,11 @@ A red border is invisible to colorblind users and silent to screen readers. Thre
 <div className="field">
   <label htmlFor="email">Email</label>
   <input id="email" aria-invalid={!!error} aria-describedby={error ? "email-error" : undefined} />
-  {error && <p id="email-error" className="error"><AlertIcon aria-hidden /> {error}</p>}
+  {error && (
+    <p id="email-error" className="error">
+      <AlertIcon aria-hidden /> {error}
+    </p>
+  )}
 </div>
 ```
 
@@ -116,10 +120,14 @@ Motion can make people sick. `prefers-reduced-motion: reduce` means **remove the
 **Hunt for:** `transform`/`translate`/`scale` animations and `animate={{ x, y }}` with no `prefers-reduced-motion` or `useReducedMotion` anywhere in the file or the tokens; autoplaying video and GIFs; `scroll-behavior: smooth`; infinite loops; parallax.
 
 ```css
-.modal { animation: scale-in 200ms var(--ease-out); }
+.modal {
+  animation: scale-in 200ms var(--ease-out);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .modal { animation: fade-in 200ms var(--ease-out); }
+  .modal {
+    animation: fade-in 200ms var(--ease-out);
+  }
 }
 ```
 
@@ -139,7 +147,7 @@ Specific cases:
 
 The blanket `* { animation: none !important; transition: none !important; }` is a finding, not a fix (Hard Rule 6). It removes the fades that tell the user something happened.
 
-Verify with DevTools → Rendering → *Emulate CSS media feature prefers-reduced-motion*. The common failure is a "reduced" variant that still moves because one transform lives in a shared class.
+Verify with DevTools → Rendering → _Emulate CSS media feature prefers-reduced-motion_. The common failure is a "reduced" variant that still moves because one transform lives in a shared class.
 
 ## A9. Contrast passes in both themes — BLOCKER for body text, SHOULD FIX otherwise
 
@@ -151,10 +159,14 @@ The repair is one-dimensional. Move the foreground's lightness away from the bac
 
 ```css
 /* fails: lavender label nearly as light as its lavender card */
-.card-label { color: oklch(0.72 0.14 300); }
+.card-label {
+  color: oklch(0.72 0.14 300);
+}
 
 /* passes: only L moved */
-.card-label { color: oklch(0.42 0.14 300); }
+.card-label {
+  color: oklch(0.42 0.14 300);
+}
 ```
 
 Raising chroma to "make it pop" does nothing for contrast. Placeholder text isn't exempt: if it carries information it needs 4.5:1 too, which is one more reason it can't be the label.
@@ -245,7 +257,7 @@ A toast, a form result, or a "3 results" count that appears silently doesn't exi
 <div role="alert">{error}</div>                          {/* errors that need attention now */}
 ```
 
-The live region must exist in the DOM *before* the message is put into it, or nothing is announced. Sonner and the common toast primitives do this already; the finding is the hand-rolled one.
+The live region must exist in the DOM _before_ the message is put into it, or nothing is announced. Sonner and the common toast primitives do this already; the finding is the hand-rolled one.
 
 ## A17. Time-limited actions pause when the tab is hidden — SHOULD FIX
 

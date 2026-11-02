@@ -1,6 +1,6 @@
 ---
 name: emil-unslop-design
-description: "Strip the visual tells that mark an interface as AI-generated — indigo gradients, glassmorphism, emoji feature grids, the centered-hero sameness — then put a point of view back in. Use when a screen \"looks AI-generated\", \"looks vibe-coded\", \"looks like every other landing page\", or generic; when reviewing agent-built UI before it ships; or as a pass after generating any marketing page, dashboard, or app screen. Triggers on: slop, AI slop, design slop, de-slop, unslop, looks AI generated, vibe coded, generic, template look, cookie cutter, purple gradient, indigo, violet, gradient text, bg-clip-text, glassmorphism, backdrop-blur, glow, neon, gradient orb, blob, bento grid, feature grid, icon cards, emoji icons, sparkles, ✨, 🚀, centered hero, announcement badge, pill badge, stats row, testimonial grid, logo wall, dark mode default, Inter, tracking-tight, font-black, rounded-2xl, hover scale, fade-in on scroll, \"make it look less AI\", \"make it unique\", \"give it personality\", distinctive design."
+description: 'Strip the visual tells that mark an interface as AI-generated — indigo gradients, glassmorphism, emoji feature grids, the centered-hero sameness — then put a point of view back in. Use when a screen "looks AI-generated", "looks vibe-coded", "looks like every other landing page", or generic; when reviewing agent-built UI before it ships; or as a pass after generating any marketing page, dashboard, or app screen. Triggers on: slop, AI slop, design slop, de-slop, unslop, looks AI generated, vibe coded, generic, template look, cookie cutter, purple gradient, indigo, violet, gradient text, bg-clip-text, glassmorphism, backdrop-blur, glow, neon, gradient orb, blob, bento grid, feature grid, icon cards, emoji icons, sparkles, ✨, 🚀, centered hero, announcement badge, pill badge, stats row, testimonial grid, logo wall, dark mode default, Inter, tracking-tight, font-black, rounded-2xl, hover scale, fade-in on scroll, "make it look less AI", "make it unique", "give it personality", distinctive design.'
 ---
 
 # Unslop Design
@@ -11,7 +11,7 @@ This skill is a pass over any generated interface, in two halves. First strip th
 
 ## The pass
 
-1. Squint test first: could this screen belong to any of ten thousand other products? Find the elements that tie it to *this* product specifically. If the answer is "the logo", everything else is up for review.
+1. Squint test first: could this screen belong to any of ten thousand other products? Find the elements that tie it to _this_ product specifically. If the answer is "the logo", everything else is up for review.
 2. Subtract before you restyle (see "Subtract first"). Half the tells on a generated screen are elements that shouldn't exist at all, and there's no point picking a better color for something you're about to delete.
 3. Sweep what's left in order: color, then typography, then layout, then decoration, then iconography, then the copy on the screen, then motion. Color goes first because it's the loudest tell — a page can survive a common layout, but not indigo-to-purple.
 4. Put a point of view back in (see "Looking designed by someone").
@@ -29,7 +29,7 @@ This is the highest-leverage step in the whole pass. Deletion is free, it can't 
 
 ### Indigo is not the brand color
 
-`bg-indigo-500`, violet, and the blue-purple family are the single strongest tell — models absorbed them from years of Tailwind examples, and now every generated UI on earth defaults to them. Purple is not banned; *unchosen* purple is. If the palette wasn't derived from the product's domain, brand, or content, derive one (the color skill covers building it in OKLCH). A finance tool, a farming app, and an AI startup should not share a hue by accident.
+`bg-indigo-500`, violet, and the blue-purple family are the single strongest tell — models absorbed them from years of Tailwind examples, and now every generated UI on earth defaults to them. Purple is not banned; _unchosen_ purple is. If the palette wasn't derived from the product's domain, brand, or content, derive one (the color skill covers building it in OKLCH). A finance tool, a farming app, and an AI startup should not share a hue by accident.
 
 ### One gradient per screen, chosen — or none
 
@@ -75,7 +75,7 @@ Blurred gradient orbs and animated blobs exist to fill space the design didn't k
 
 ### One depth cue per surface
 
-Border, shadow, ring, *and* gradient on the same card is a model hedging. Pick the depth system — shadows or borders, per the surfaces skill — and apply it consistently. And stop `rounded-2xl` from being the answer to every radius: radii come from a scale, and nested radii are derived, not repeated.
+Border, shadow, ring, _and_ gradient on the same card is a model hedging. Pick the depth system — shadows or borders, per the surfaces skill — and apply it consistently. And stop `rounded-2xl` from being the answer to every radius: radii come from a scale, and nested radii are derived, not repeated.
 
 ## Iconography
 
@@ -89,7 +89,7 @@ The ✨ sparkle badge on every AI feature is already a cliché. If a feature bei
 
 ## Fabricated proof
 
-"Trusted by 10,000+ developers" on an unlaunched product, a testimonial grid of stock-avatar quotes, a logo wall of companies that never said yes — models generate social proof as a *layout*, filled with invented content. This is the design equivalent of unslop-writing's vague attribution, except worse: it's a lie in the interface. Real numbers, real quotes with real names, or cut the section entirely. An empty spot where fake proof used to be is a stronger signal than the fake proof.
+"Trusted by 10,000+ developers" on an unlaunched product, a testimonial grid of stock-avatar quotes, a logo wall of companies that never said yes — models generate social proof as a _layout_, filled with invented content. This is the design equivalent of unslop-writing's vague attribution, except worse: it's a lie in the interface. Real numbers, real quotes with real names, or cut the section entirely. An empty spot where fake proof used to be is a stronger signal than the fake proof.
 
 ## The copy on the screen
 

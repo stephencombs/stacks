@@ -24,12 +24,12 @@ State what you dropped in step 3 in one line above the matrix, so the user knows
 
 Four columns, in this order:
 
-| Column | What goes in it | Why |
-| --- | --- | --- |
-| **Feature** | 2–5 word name, then one line of what the user sees — never how it's built | The name is what gets ticked; the line is what they're agreeing to |
-| **Has it** | ✓ or — per non-base variant | The user remembers "the one from Trim", not the feature's name; this column is their index |
-| **`<Base>` today** | What the base does instead, in the same terms as the feature line | It turns the checkbox into a trade. Without it, every box gets ticked and the base's character disappears |
-| **Choice** | Add · Add as switcher | Below |
+| Column             | What goes in it                                                           | Why                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Feature**        | 2–5 word name, then one line of what the user sees — never how it's built | The name is what gets ticked; the line is what they're agreeing to                                        |
+| **Has it**         | ✓ or — per non-base variant                                               | The user remembers "the one from Trim", not the feature's name; this column is their index                |
+| **`<Base>` today** | What the base does instead, in the same terms as the feature line         | It turns the checkbox into a trade. Without it, every box gets ticked and the base's character disappears |
+| **Choice**         | Add · Add as switcher                                                     | Below                                                                                                     |
 
 Below the rows, one free-text line: "Anything else about how `<Base>` should work?" — it catches the feature you didn't list.
 
@@ -60,6 +60,7 @@ After a mix, the Phase 7 block adds a base line, one line per adopted feature wi
 
 ```md
 Scene — decided from /proto/timeline, mixed from Trim and Filmstrip
+
 - Base: Scene (whole-scene bar; shots as segments)
 - Adopted from Trim: in/out trim handles, as a switcher (Trim on | off)
 - Adopted from Filmstrip + Trim: zoom to this take, as a switcher (Scene | Take)

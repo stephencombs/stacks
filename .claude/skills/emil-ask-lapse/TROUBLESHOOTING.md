@@ -14,7 +14,7 @@ Two things confirm the diagnosis before you go changing imports:
 Two engines exist. Causes, in order of likelihood:
 
 1. The package was **aliased** to a bare `lapse` with npm's `npm:` syntax, so two copies are installed and each has its own module-level singleton. Remove the alias — the MCP server and the Playwright adapter both depend on the scoped name.
-2. A private `new LapseEngine()` was passed to `<Lapse engine={…}>` or `mountLapse({ engine })`. That is what the option is *for*; drop it to share the singleton.
+2. A private `new LapseEngine()` was passed to `<Lapse engine={…}>` or `mountLapse({ engine })`. That is what the option is _for_; drop it to share the singleton.
 3. Duplicate copies from a monorepo hoisting split. Check `node_modules/@aiforui/lapse` resolves to one path.
 
 ## The panel never appears
@@ -76,7 +76,7 @@ Recording is heavy on very large or complex pages — it snapshots the DOM every
 
 The error carries the take's full vocabulary — read it rather than guessing again. Two legitimate absences: ambient animations get no start moment, and a take that never comes to rest gets no `settle`. The vocabulary describes the take you actually recorded.
 
-Moment ids are deterministic within one capture but **not stable across captures**. Comparing two takes is `diffTakes`'s job, and it aligns by moment *name*, never by millisecond.
+Moment ids are deterministic within one capture but **not stable across captures**. Comparing two takes is `diffTakes`'s job, and it aligns by moment _name_, never by millisecond.
 
 ## A trigger says `unattributed`
 

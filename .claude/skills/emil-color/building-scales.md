@@ -20,7 +20,7 @@ Applied to a magenta-pink brand hue (H = 330):
 
 ```css
 :root {
-  --berry-50:  oklch(0.97 0.007 330);
+  --berry-50: oklch(0.97 0.007 330);
   --berry-100: oklch(0.895 0.042 330);
   --berry-200: oklch(0.82 0.103 330);
   --berry-300: oklch(0.745 0.189 330);
@@ -41,14 +41,14 @@ Note the absolute chroma peaking near 400 rather than 500 — at this hue the sR
 To make several hues feel like one system (the classic "brand + success + warning" trio), equalize two things across them:
 
 - **The same L per step number** — every `-500` sits at the same lightness, so rows of the palette look equally bright.
-- **The same fraction of each hue's own ceiling** — *not* the same absolute C. Ceilings differ wildly between hues, so a shared absolute value over-saturates the roomy hues and flattens the cramped ones.
+- **The same fraction of each hue's own ceiling** — _not_ the same absolute C. Ceilings differ wildly between hues, so a shared absolute value over-saturates the roomy hues and flattens the cramped ones.
 
 ```css
 :root {
   /* all at L 0.65, each at 70% of its own sRGB ceiling */
-  --teal-500:   oklch(0.65 0.08 185);   /* ceiling here ≈ 0.115 */
-  --amber-500:  oklch(0.65 0.096 75);   /* ceiling here ≈ 0.137 */
-  --violet-500: oklch(0.65 0.155 300);  /* ceiling here ≈ 0.221 */
+  --teal-500: oklch(0.65 0.08 185); /* ceiling here ≈ 0.115 */
+  --amber-500: oklch(0.65 0.096 75); /* ceiling here ≈ 0.137 */
+  --violet-500: oklch(0.65 0.155 300); /* ceiling here ≈ 0.221 */
 }
 ```
 

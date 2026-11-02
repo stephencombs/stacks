@@ -12,16 +12,24 @@ Read before pasting:
 ## Head
 
 ```html
-<html lang="en">                                       <!-- ← the content's real language -->
+<html lang="en">
+  <!-- ← the content's real language -->
 
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+  />
 
-<!-- Two-theme apps. Single-theme apps: one theme-color, and color-scheme set to that one scheme. -->
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />   <!-- ← header background, light -->
-<meta name="theme-color" media="(prefers-color-scheme: dark)"  content="#0a0a0a" />   <!-- ← header background, dark -->
-<meta name="color-scheme" content="light dark" />
+  <!-- Two-theme apps. Single-theme apps: one theme-color, and color-scheme set to that one scheme. -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <!-- ← header background, light -->
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0a" />
+  <!-- ← header background, dark -->
+  <meta name="color-scheme" content="light dark" />
 
-<link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin />  <!-- ← skip with next/font -->
+  <link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- ← skip with next/font -->
+</html>
 ```
 
 Next.js App Router equivalent, in the root layout:
@@ -40,9 +48,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://example.com"),          // ← the production origin
+  metadataBase: new URL("https://example.com"), // ← the production origin
   title: { default: "Product", template: "%s · Product" }, // ← the product's name
-  description: "…",                                       // ← existing copy, or the human list
+  description: "…", // ← existing copy, or the human list
 };
 ```
 
@@ -52,10 +60,10 @@ export const metadata: Metadata = {
 
 ```css
 html {
-  -webkit-text-size-adjust: 100%;            /* no font inflation in landscape */
-  -webkit-tap-highlight-color: transparent;  /* every control then needs its own :active */
-  font-synthesis: none;                      /* a missing weight fails visibly instead of being faked */
-  overscroll-behavior: none;                 /* app shells only; drop on a scrolling document */
+  -webkit-text-size-adjust: 100%; /* no font inflation in landscape */
+  -webkit-tap-highlight-color: transparent; /* every control then needs its own :active */
+  font-synthesis: none; /* a missing weight fails visibly instead of being faked */
+  overscroll-behavior: none; /* app shells only; drop on a scrolling document */
 }
 
 body {
@@ -70,35 +78,56 @@ body {
 }
 
 /* iOS zooms into any input under 16px and never zooms back */
-input, textarea, select {
+input,
+textarea,
+select {
   font-size: 16px;
 }
 
 /* No double-tap-zoom wait on controls */
-button, a, input, select, textarea, [role="button"] {
+button,
+a,
+input,
+select,
+textarea,
+[role="button"] {
   touch-action: manipulation;
 }
 
 /* Controls aren't selectable. Content is: never on body */
-button, [role="button"] {
+button,
+[role="button"] {
   user-select: none;
   -webkit-user-select: none;
 }
 
 /* Headings break evenly; paragraphs don't strand a word */
-h1, h2, h3 { text-wrap: balance; }
-p { text-wrap: pretty; }
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
 
 /* In-page links clear the sticky header */
-[id] { scroll-margin-top: 64px; }            /* ← the sticky header's height */
+[id] {
+  scroll-margin-top: 64px;
+} /* ← the sticky header's height */
 
 /* Smooth scrolling is opt-in for people who haven't asked for less motion */
 @media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 /* Theme switches don't tween every color at its own speed */
-.no-transitions, .no-transitions * { transition: none !important; }
+.no-transitions,
+.no-transitions * {
+  transition: none !important;
+}
 ```
 
 ## The two gates
@@ -109,7 +138,9 @@ These aren't rules to paste. They're the two places the rest of the stylesheet h
 
 ```css
 @media (hover: hover) and (pointer: fine) {
-  .button:hover { background: var(--gray-3); }
+  .button:hover {
+    background: var(--gray-3);
+  }
 }
 ```
 
@@ -124,8 +155,12 @@ module.exports = { future: { hoverOnlyWhenSupported: true } };
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  .modal   { animation-name: fade-in; }      /* was scale-in */
-  .drawer  { transition-property: opacity; } /* was transform */
+  .modal {
+    animation-name: fade-in;
+  } /* was scale-in */
+  .drawer {
+    transition-property: opacity;
+  } /* was transform */
 }
 ```
 
@@ -150,7 +185,9 @@ Only when the project already uses `next-themes`. Match its existing `attribute`
 ## Dev-only mounts
 
 ```jsx
-{process.env.NODE_ENV === "development" && <Lapse />}
+{
+  process.env.NODE_ENV === "development" && <Lapse />;
+}
 ```
 
 Every inspector, control panel, and devtools drawer found in recon sits behind this gate, imported dynamically so the package stays out of the production bundle (H9).

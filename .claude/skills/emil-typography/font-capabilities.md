@@ -12,14 +12,14 @@ Neither wins by default. A project using exactly one or two weights often ships 
 
 Each axis of variation carries a four-letter tag. Five tags are registered standards; everything else is up to the type designer, and a given font exposes only the axes it was built with.
 
-| Tag | Axis | What it varies |
-| --- | --- | --- |
-| `wght` | Weight | Stroke heaviness, the territory of `font-weight` |
-| `wdth` | Width | How condensed or extended the glyphs are |
+| Tag    | Axis         | What it varies                                        |
+| ------ | ------------ | ----------------------------------------------------- |
+| `wght` | Weight       | Stroke heaviness, the territory of `font-weight`      |
+| `wdth` | Width        | How condensed or extended the glyphs are              |
 | `opsz` | Optical size | Contrast, spacing and detail retuned per display size |
-| `slnt` | Slant | Oblique angle |
-| `ital` | Italic | Toggles true italic forms |
-| custom | — | Anything the designer invents, in uppercase tags |
+| `slnt` | Slant        | Oblique angle                                         |
+| `ital` | Italic       | Toggles true italic forms                             |
+| custom | —            | Anything the designer invents, in uppercase tags      |
 
 Fraunces is a good tour: alongside `wght` and `opsz` it exposes `SOFT` (rounds the corners) and `WONK` (swaps in deliberately irregular alternates). A leaner file like Manrope's variable build exposes `wght` alone.
 

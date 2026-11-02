@@ -86,22 +86,22 @@ When asked to review or fix typography in a codebase:
 
 ## Fast diagnoses
 
-| Symptom | Likely cause | Fix |
-| --- | --- | --- |
-| Layout twitches as a number ticks | Proportional figures | `font-variant-numeric: tabular-nums` |
-| Bold looks smudged or too black | Weight file never loaded, browser faked it | Load the weight; set `font-synthesis: none` |
-| Tapping a field on iPhone zooms the page | Input text under `16px` | `16px` on small viewports (`text-base md:text-sm`) |
-| Headline breaks seven words / one word | Default greedy wrapping | `text-wrap: balance` |
-| Paragraph ends on a stranded single word | No orphan control | `text-wrap: pretty` |
-| Underline slices through g, y, p | Skip-ink or position off | `text-decoration-skip-ink: auto`, `from-font` metrics |
-| Long URL blows out a card | No break opportunity | `overflow-wrap: break-word` |
-| Weight change does nothing on some machines | Weight set via `"wght"` raw tag | `font-weight` |
-| Text feels cramped in one component, airy in another | One-off sizes and line-heights | Route everything through the scale |
-| Reading a paragraph feels like work | Measure far beyond 75 characters | Cap the column near `65ch` |
-| ALL-CAPS strings scattered through JSX | Casing baked into copy | Sentence case + `text-transform: uppercase` |
-| Ellipsis with no way to see the rest | Truncation without an escape hatch | Tooltip, title attribute, or expand control |
-| Layout mirrored wrong in Arabic/Hebrew | Physical margin/padding/text-align | Logical properties, `text-align: start` |
-| Faint gray text failing audits | Contrast under `4.5:1` | Darken until AA passes (`3:1` allowed ≥ ~`24px`) |
+| Symptom                                              | Likely cause                               | Fix                                                   |
+| ---------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------- |
+| Layout twitches as a number ticks                    | Proportional figures                       | `font-variant-numeric: tabular-nums`                  |
+| Bold looks smudged or too black                      | Weight file never loaded, browser faked it | Load the weight; set `font-synthesis: none`           |
+| Tapping a field on iPhone zooms the page             | Input text under `16px`                    | `16px` on small viewports (`text-base md:text-sm`)    |
+| Headline breaks seven words / one word               | Default greedy wrapping                    | `text-wrap: balance`                                  |
+| Paragraph ends on a stranded single word             | No orphan control                          | `text-wrap: pretty`                                   |
+| Underline slices through g, y, p                     | Skip-ink or position off                   | `text-decoration-skip-ink: auto`, `from-font` metrics |
+| Long URL blows out a card                            | No break opportunity                       | `overflow-wrap: break-word`                           |
+| Weight change does nothing on some machines          | Weight set via `"wght"` raw tag            | `font-weight`                                         |
+| Text feels cramped in one component, airy in another | One-off sizes and line-heights             | Route everything through the scale                    |
+| Reading a paragraph feels like work                  | Measure far beyond 75 characters           | Cap the column near `65ch`                            |
+| ALL-CAPS strings scattered through JSX               | Casing baked into copy                     | Sentence case + `text-transform: uppercase`           |
+| Ellipsis with no way to see the rest                 | Truncation without an escape hatch         | Tooltip, title attribute, or expand control           |
+| Layout mirrored wrong in Arabic/Hebrew               | Physical margin/padding/text-align         | Logical properties, `text-align: start`               |
+| Faint gray text failing audits                       | Contrast under `4.5:1`                     | Darken until AA passes (`3:1` allowed ≥ ~`24px`)      |
 
 ## Checklist
 

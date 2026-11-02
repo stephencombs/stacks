@@ -11,10 +11,10 @@ Animation in a product interface is feedback, not decoration. The best UI animat
 
 ## Quick Reference
 
-| Topic | Where |
-| --- | --- |
-| Modals, drawers, popovers, dropdowns, toasts, tooltips — exact recipes | [patterns.md](patterns.md) |
-| Enter/exit + stagger, icon swaps, press feedback, page-load rules | [patterns.md](patterns.md) |
+| Topic                                                                   | Where                          |
+| ----------------------------------------------------------------------- | ------------------------------ |
+| Modals, drawers, popovers, dropdowns, toasts, tooltips — exact recipes  | [patterns.md](patterns.md)     |
+| Enter/exit + stagger, icon swaps, press feedback, page-load rules       | [patterns.md](patterns.md)     |
 | Springs, performance, interruptibility, easing curve library, debugging | [techniques.md](techniques.md) |
 
 ## Decision Framework 1: Should this animate at all?
@@ -43,12 +43,12 @@ Use a **spring** instead of a curve when motion is gesture-driven or interruptib
 
 ## Decision Framework 3: What duration?
 
-| What | Duration |
-| --- | --- |
+| What                               | Duration  |
+| ---------------------------------- | --------- |
 | Hover, press, color/shadow changes | 100–150ms |
-| Tooltips, dropdowns, popovers | 150–250ms |
-| Modals, drawers, toasts | 200–300ms |
-| Page-level transitions | 300–400ms |
+| Tooltips, dropdowns, popovers      | 150–250ms |
+| Modals, drawers, toasts            | 200–300ms |
+| Page-level transitions             | 300–400ms |
 
 Rules of thumb:
 
@@ -64,8 +64,13 @@ Rules of thumb:
 2. **Interactive state gets CSS transitions; one-shots get keyframes.** Transitions retarget smoothly when the user reverses mid-animation (open → close while still opening); keyframes restart and look broken. Reserve `@keyframes` for enter sequences and loaders that always run to completion.
 
    ```css
-   .drawer { transform: translateX(-100%); transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1); }
-   .drawer[data-open] { transform: translateX(0); }
+   .drawer {
+     transform: translateX(-100%);
+     transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1);
+   }
+   .drawer[data-open] {
+     transform: translateX(0);
+   }
    ```
 
 3. **Never enter from `scale(0)`.** Elements should always have a visible shape — start at `scale(0.95)` (or `0.97` for small elements) with `opacity: 0`, and settle to `scale(1)`, `opacity: 1`.
@@ -73,7 +78,9 @@ Rules of thumb:
 4. **Make scaling origin-aware.** Popovers, dropdowns, and tooltips must scale from their trigger, not from center. Set `transform-origin` to the trigger side — Radix and Base UI expose it as a CSS variable:
 
    ```css
-   .popover { transform-origin: var(--radix-popper-transform-origin, var(--transform-origin, top)); }
+   .popover {
+     transform-origin: var(--radix-popper-transform-origin, var(--transform-origin, top));
+   }
    ```
 
 5. **Paired elements share timing.** Modal + overlay, drawer + backdrop, tooltip + arrow — if they move as a unit, give them identical duration and easing. Mismatched timing reads as broken.
@@ -81,8 +88,12 @@ Rules of thumb:
 6. **Press feedback: `scale(0.96)` on `:active`.** Use a CSS transition (150ms, ease-out) so releasing mid-press smoothly returns. Never go below `0.95` — it looks exaggerated. Not every button needs it; skip it on high-frequency controls.
 
    ```css
-   .pressable { transition: scale 150ms ease-out; }
-   .pressable:active { scale: 0.96; }
+   .pressable {
+     transition: scale 150ms ease-out;
+   }
+   .pressable:active {
+     scale: 0.96;
+   }
    ```
 
 7. **Exits are quieter than enters.** The user's attention is already on the next thing. Fade out with a small directional nudge (`translateY(-12px)`, opacity 0, ~150ms ease-in) — not a dramatic full-height slide, and not an instant `display: none` that severs spatial context.
@@ -93,7 +104,10 @@ Rules of thumb:
 
    ```css
    @media (prefers-reduced-motion: reduce) {
-     .modal { animation: none; transition: none; }
+     .modal {
+       animation: none;
+       transition: none;
+     }
    }
    ```
 
@@ -105,21 +119,21 @@ Rules of thumb:
 
 ## Common Mistakes
 
-| Smell | Fix |
-| --- | --- |
-| `transition: all 400ms ease-in` | Name the properties, 200ms, `ease-out` |
-| Enter from `scale(0)` or `translateY(100vh)` | `scale(0.95)` + `opacity: 0`, small travel |
-| Animating `height`/`width`/`margin` | `transform` + `opacity`; grid-rows or clip tricks for expansion |
-| Popover scales from center | `transform-origin` from the trigger |
-| Modal and overlay use different durations | Identical duration + easing for paired elements |
-| Keyframe animation on an open/close toggle | CSS transition (interruptible) |
-| Animating arrow-key navigation / keyboard actions | No animation on keyboard-initiated changes |
-| Exit animation longer or louder than enter | Exit ~20–30% faster, subtler |
-| Element flickers on hover | Animate a child element so the hover area stays still |
-| Shaky 1px jitter at animation start/end | `will-change: transform` on the animated element |
-| Sequential tooltips each wait for a delay | First tooltip delays; siblings open instantly |
-| No reduced-motion handling | Add the media query / `useReducedMotion()` the moment you add motion |
-| New dependency for a simple fade | Use the project's existing stack |
+| Smell                                             | Fix                                                                  |
+| ------------------------------------------------- | -------------------------------------------------------------------- |
+| `transition: all 400ms ease-in`                   | Name the properties, 200ms, `ease-out`                               |
+| Enter from `scale(0)` or `translateY(100vh)`      | `scale(0.95)` + `opacity: 0`, small travel                           |
+| Animating `height`/`width`/`margin`               | `transform` + `opacity`; grid-rows or clip tricks for expansion      |
+| Popover scales from center                        | `transform-origin` from the trigger                                  |
+| Modal and overlay use different durations         | Identical duration + easing for paired elements                      |
+| Keyframe animation on an open/close toggle        | CSS transition (interruptible)                                       |
+| Animating arrow-key navigation / keyboard actions | No animation on keyboard-initiated changes                           |
+| Exit animation longer or louder than enter        | Exit ~20–30% faster, subtler                                         |
+| Element flickers on hover                         | Animate a child element so the hover area stays still                |
+| Shaky 1px jitter at animation start/end           | `will-change: transform` on the animated element                     |
+| Sequential tooltips each wait for a delay         | First tooltip delays; siblings open instantly                        |
+| No reduced-motion handling                        | Add the media query / `useReducedMotion()` the moment you add motion |
+| New dependency for a simple fade                  | Use the project's existing stack                                     |
 
 ## Review checklist
 

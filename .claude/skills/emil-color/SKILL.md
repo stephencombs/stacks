@@ -14,8 +14,8 @@ An `oklch()` value reads like a measurement, not a recipe. Lightness tells you h
 ## How to read a value
 
 ```css
-color: oklch(0.586 0.222 17.585);          /* a saturated crimson */
-color: oklch(0.398 0.066 227.392 / 0.9);   /* deep slate-cyan at 90% opacity */
+color: oklch(0.586 0.222 17.585); /* a saturated crimson */
+color: oklch(0.398 0.066 227.392 / 0.9); /* deep slate-cyan at 90% opacity */
 ```
 
 The channels, in order:
@@ -37,7 +37,7 @@ Three decimals per channel is plenty of precision; trim trailing zeros and write
 
 **One hue per ramp.** Every step of a tonal scale keeps the identical H. If converting an old scale to oklch reveals more than about 10° of hue spread between its ends, the ramp drifts visibly — rebuild it. How in [building-scales.md](building-scales.md).
 
-**Vividness is relative, not absolute.** Each hue has its own chroma ceiling at a given lightness, so two hues sharing one absolute C won't look equally saturated. For sibling colors, hold L constant and give each hue the same *fraction* of its own ceiling.
+**Vividness is relative, not absolute.** Each hue has its own chroma ceiling at a given lightness, so two hues sharing one absolute C won't look equally saturated. For sibling colors, hold L constant and give each hue the same _fraction_ of its own ceiling.
 
 **Check the gamut before shipping high chroma.** Plenty of syntactically valid oklch values can't be shown on an sRGB screen. Clamp C (holding L and H) until the color fits, and serve P3-only chroma behind a `@media (color-gamut: p3)` gate on top of an sRGB base value. Patterns in [gamut-p3-tailwind.md](gamut-p3-tailwind.md).
 

@@ -21,8 +21,8 @@ If several terms could fit, list the best match first, then 1–2 alternates wit
 
 1. **Read for intent, not keywords.** Users describe symptoms and behavior ("it fires too often", "the page jumps", "my z-index doesn't work"), not the technical name. Map the symptom to the glossary below.
 2. **Quote the glossary verbatim.** Its descriptions are authoritative — use them as-is, don't paraphrase.
-3. **Disambiguate close terms.** When two compete (*Debounce* vs *Throttle*, *Lazy loading* vs *Code splitting*, *SSR* vs *SSG*, *Controlled* vs *Uncontrolled*), contrast them so the user can pick.
-4. **When nothing matches exactly,** name the closest term and say plainly it's an approximation, or describe the concept in the glossary's vocabulary (e.g. "that's a *race condition* between two *optimistic updates*").
+3. **Disambiguate close terms.** When two compete (_Debounce_ vs _Throttle_, _Lazy loading_ vs _Code splitting_, _SSR_ vs _SSG_, _Controlled_ vs _Uncontrolled_), contrast them so the user can pick.
+4. **When nothing matches exactly,** name the closest term and say plainly it's an approximation, or describe the concept in the glossary's vocabulary (e.g. "that's a _race condition_ between two _optimistic updates_").
 5. **Stay within this glossary.** If a term genuinely isn't here, say so rather than inventing one — though you may explain the concept using these words.
 6. **Keep it tight.** A naming question wants a name, not an essay. Lead with the term; expand only if asked.
 
@@ -31,6 +31,7 @@ If several terms could fit, list the best match first, then 1–2 alternates wit
 **Example 1 — symptom-based**
 User: "What's it called when the search input waits until I stop typing before it actually searches?"
 Output:
+
 ```
 **Debounce** — Wait until the events stop (typing, resizing) before running the handler, so it fires once at the end instead of on every event.
 
@@ -41,6 +42,7 @@ Close alternate:
 **Example 2 — behavior-based**
 User: "The thing where the like button updates instantly even though the request hasn't finished."
 Output:
+
 ```
 **Optimistic update** — The UI updates immediately as if the request already succeeded, then rolls back if it fails.
 ```
@@ -48,6 +50,7 @@ Output:
 **Example 3 — browser quirk**
 User: "My dropdown has z-index 9999 but it still renders behind the header."
 Output:
+
 ```
 **Stacking context** — A group whose children's z-index values only compete with each other, not the rest of the page — why a huge z-index can still lose to an element outside the group.
 ```
@@ -55,6 +58,7 @@ Output:
 ## Glossary
 
 ### Rendering & Loading — how a page gets to the screen
+
 - **Server-side rendering (SSR)** — The server sends fully-built HTML for each request, so content shows before JavaScript loads.
 - **Static site generation (SSG)** — Pages are pre-built once at deploy time and served as ready-made HTML.
 - **Client-side rendering (CSR)** — The browser receives a nearly empty page and JavaScript builds the UI.
@@ -66,6 +70,7 @@ Output:
 - **Layout shift** — Content jumps around as images, fonts, or data load in, moving what the user was about to click.
 
 ### Components & Patterns — structuring UI code
+
 - **Controlled component** — The parent owns an input's value through props and state; every change flows through code.
 - **Uncontrolled component** — The DOM owns the input's value; you read it only when you need it.
 - **Compound components** — One component split into pieces that share state, like Tabs, Tabs.List, and Tabs.Panel.
@@ -78,6 +83,7 @@ Output:
 - **Polymorphic component** — A component that can render as a different tag or component, usually via an `as` prop.
 
 ### State & Data — keeping UI and data in sync
+
 - **Optimistic update** — The UI updates immediately as if the request already succeeded, then rolls back if it fails.
 - **Single source of truth** — One place owns each piece of state; everything else reads from it instead of keeping copies.
 - **Derived state** — A value computed from existing state on the fly instead of stored separately and kept in sync by hand.
@@ -91,6 +97,7 @@ Output:
 - **Exponential backoff** — Retrying a failed request with growing delays between attempts.
 
 ### Events & Input — how the browser reports user actions
+
 - **Debounce** — Wait until the events stop (typing, resizing) before running the handler, so it fires once at the end instead of on every event.
 - **Throttle** — Run the handler at most once per interval while events keep firing, like during scrolling.
 - **Event bubbling** — An event travels up from the element to its ancestors, so parents hear their children's events.
@@ -101,6 +108,7 @@ Output:
 - **Hit area** — The region that responds to a tap or click, often padded larger than the visible element.
 
 ### CSS Behavior — why styles do what they do
+
 - **Specificity** — The scoring system that decides which of two conflicting CSS rules wins.
 - **Cascade** — The order and priority rules CSS uses to resolve competing styles from different sources.
 - **Stacking context** — A group whose children's z-index values only compete with each other, not the rest of the page — why a huge z-index can still lose to an element outside the group.
@@ -114,6 +122,7 @@ Output:
 - **Safe area** — The insets that keep content clear of notches, rounded corners, and the home indicator.
 
 ### Performance — making it fast, keeping it fast
+
 - **Code splitting** — Breaking the JavaScript bundle into chunks so each page loads only the code it uses.
 - **Lazy loading** — Deferring images, components, or code until they're actually needed.
 - **Tree shaking** — Dropping code no one imports from the bundle at build time.
@@ -127,6 +136,7 @@ Output:
 - **Core Web Vitals** — Google's user-experience metrics: LCP (loading), CLS (visual stability), and INP (responsiveness).
 
 ### Accessibility Mechanics — the machinery behind an accessible UI
+
 - **Semantic HTML** — Using elements for what they mean (button, nav, h1) so browsers and assistive tech understand the page.
 - **ARIA** — Attributes that describe an element's role and state to assistive technology when HTML alone can't.
 - **Accessible name** — The text a screen reader announces for an element, from its label, content, or aria-label.
@@ -138,6 +148,7 @@ Output:
 - **Reduced motion** — Respecting the user's prefers-reduced-motion setting by toning down or removing animation.
 
 ### Delivery & the Network — getting assets to the user
+
 - **CDN** — Servers distributed near users that serve static files fast.
 - **Cache busting** — Fingerprinting file names with a hash so browsers fetch new versions the moment they change.
 - **CORS** — The browser's rules for when a page on one domain may call an API on another.

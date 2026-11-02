@@ -9,7 +9,10 @@ The lane where "works in Chrome" means nothing. Every item here is a real-hardwa
 **Hunt for:** `user-scalable`, `maximum-scale`, `maximumScale`, `userScalable` in the viewport meta tag or the Next.js `viewport` export.
 
 ```html
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+/>
 ```
 
 ## C2. Hover is gated — SHOULD FIX
@@ -20,7 +23,9 @@ Touch has no hover, so the first tap applies `:hover` and leaves it there. A but
 
 ```css
 @media (hover: hover) and (pointer: fine) {
-  .button:hover { background: var(--gray-3); }
+  .button:hover {
+    background: var(--gray-3);
+  }
 }
 ```
 
@@ -31,11 +36,19 @@ iOS Safari zooms the page when focus lands on an input under 16px and doesn't zo
 **Hunt for:** `font-size` under 16px on `input`, `textarea`, `select`; `text-sm` / `text-xs` on them or on a shared `Input` component; a contenteditable editor with small text.
 
 ```css
-input, textarea, select { font-size: 16px; }
+input,
+textarea,
+select {
+  font-size: 16px;
+}
 
 /* if desktop needs smaller inputs */
 @media (pointer: coarse) {
-  input, textarea, select { font-size: 16px; }
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 ```
 
@@ -69,10 +82,21 @@ Two causes stack. `touch-action: manipulation` removes the double-tap-zoom wait 
 **Hunt for:** tappable elements with no `touch-action`; buttons with no `:active` rule.
 
 ```css
-button, a, input, [role="button"] { touch-action: manipulation; }
+button,
+a,
+input,
+[role="button"] {
+  touch-action: manipulation;
+}
 
-.button { transition: transform 100ms var(--ease-out), background-color 100ms; }
-.button:active { transform: scale(0.97); }
+.button {
+  transition:
+    transform 100ms var(--ease-out),
+    background-color 100ms;
+}
+.button:active {
+  transform: scale(0.97);
+}
 ```
 
 ## C6. Tap highlight is off, and press feedback replaces it — SHOULD FIX
@@ -80,18 +104,24 @@ button, a, input, [role="button"] { touch-action: manipulation; }
 iOS and Android paint a translucent flash on anything with a click handler. It's the loudest "this is a website" signal. Remove it globally, then make sure every control has its own `:active` state (C5), because you've removed the only feedback the browser gave.
 
 ```css
-html { -webkit-tap-highlight-color: transparent; }
+html {
+  -webkit-tap-highlight-color: transparent;
+}
 ```
 
 ## C7. Viewport height is `dvh` or `svh`, not `vh` — SHOULD FIX
 
-`100vh` is the *largest* viewport, with the URL bar collapsed. On load the bar is visible, so a `100vh` shell overflows and a bottom-pinned button sits under it.
+`100vh` is the _largest_ viewport, with the URL bar collapsed. On load the bar is visible, so a `100vh` shell overflows and a bottom-pinned button sits under it.
 
 **Hunt for:** `100vh`, `h-screen`, `min-h-screen`, `max-h-screen`, `calc(100vh - …)`.
 
 ```css
-.app  { height: 100dvh; }      /* app shells, drawers: tracks the visible area */
-.hero { min-height: 100svh; }  /* marketing heroes: stable, never overflows, no shift on scroll */
+.app {
+  height: 100dvh;
+} /* app shells, drawers: tracks the visible area */
+.hero {
+  min-height: 100svh;
+} /* marketing heroes: stable, never overflows, no shift on scroll */
 ```
 
 Tailwind: `h-dvh`, `min-h-svh`. Desktop-only admin tools can keep `vh`; note it and move on.
@@ -103,9 +133,15 @@ Fixed headers, bottom tab bars, toasts, and sheets sit under the notch or the ho
 **Hunt for:** `position: fixed` / `sticky` elements at `top: 0` or `bottom: 0` with no `env(safe-area-inset-*)`; the toaster's offset; `env()` used without the meta tag.
 
 ```css
-.app-header { padding-top: env(safe-area-inset-top); }
-.bottom-bar { padding-bottom: env(safe-area-inset-bottom); }
-.sheet      { padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
+.app-header {
+  padding-top: env(safe-area-inset-top);
+}
+.bottom-bar {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.sheet {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
 ```
 
 ## C9. Scroll doesn't chain or pull-to-refresh in app UI — SHOULD FIX
@@ -115,8 +151,14 @@ Inside an app shell, a drawer, or a chat list, scrolling past the end should not
 **Hunt for:** `preventDefault` inside `touchmove`; inner scroll containers (`overflow-y: auto`) without `overscroll-behavior`; modals whose background scrolls when the modal content hits its end.
 
 ```css
-html, body { overscroll-behavior: none; }        /* skip on a scrolling document where pull-to-refresh is welcome */
-.sheet-content { overflow-y: auto; overscroll-behavior: contain; }
+html,
+body {
+  overscroll-behavior: none;
+} /* skip on a scrolling document where pull-to-refresh is welcome */
+.sheet-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 ```
 
 ## C10. Controls aren't selectable; content is — SHOULD FIX
@@ -126,7 +168,11 @@ Long-pressing a button selects its label on iOS; long-pressing a link pops the c
 **Hunt for:** `user-select: none` / `select-none` on `body`, `*`, or a layout wrapper (a defect); buttons and tabs without it (a polish item).
 
 ```css
-button, [role="button"], .tab, .chip, .drag-handle {
+button,
+[role="button"],
+.tab,
+.chip,
+.drag-handle {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -140,8 +186,12 @@ A horizontal carousel without `touch-action: pan-y` makes the page jitter while 
 **Hunt for:** carousels, sliders, drag-to-dismiss sheets, sortable lists, and canvases with no `touch-action`.
 
 ```css
-.carousel     { touch-action: pan-y; }  /* I handle horizontal; browser keeps vertical */
-.drag-surface { touch-action: none; }   /* I handle every axis; only on a real gesture surface */
+.carousel {
+  touch-action: pan-y;
+} /* I handle horizontal; browser keeps vertical */
+.drag-surface {
+  touch-action: none;
+} /* I handle every axis; only on a real gesture surface */
 ```
 
 For a native-scroll carousel, prefer `scroll-snap-type: x mandatory` on the track and `scroll-snap-align: start` on slides over a JS gesture.
@@ -168,7 +218,7 @@ Under `prefers-reduced-motion: reduce`, don't autoplay; show controls (A8).
 
 ```jsx
 const isCoarse = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-<input autoFocus={!isCoarse} />
+<input autoFocus={!isCoarse} />;
 ```
 
 ## C14. The keyboard doesn't cover the input — SHOULD FIX
@@ -186,7 +236,9 @@ A fixed bottom button sits over the final form field and over the home indicator
 An 80px sticky header on a 667px viewport in landscape leaves almost no content. Cap it, and give anchored elements `scroll-margin-top` so in-page links don't land under it.
 
 ```css
-[id] { scroll-margin-top: 64px; } /* the sticky header's height; read it from the code */
+[id] {
+  scroll-margin-top: 64px;
+} /* the sticky header's height; read it from the code */
 ```
 
 ## C17. Nothing scrolls sideways — SHOULD FIX
@@ -196,8 +248,13 @@ One element wider than the viewport makes the whole page pan horizontally on a p
 **Hunt for:** `width: 100vw` / `w-screen`; fixed pixel widths over ~340px; `<table>` and `<pre>` with no scrolling wrapper; user-generated strings with no `overflow-wrap`.
 
 ```css
-.card-text { overflow-wrap: break-word; }
-.table-wrap, pre { overflow-x: auto; }
+.card-text {
+  overflow-wrap: break-word;
+}
+.table-wrap,
+pre {
+  overflow-x: auto;
+}
 ```
 
 Fix the element that overflows. `overflow-x: hidden` on `body` hides the symptom and breaks `position: sticky`.

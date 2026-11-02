@@ -1,6 +1,6 @@
 ---
 name: emil-design-foundations
-description: "Core visual design judgment — hierarchy, spacing, typography, color, layout, information architecture, interaction states, and UI copy, expressed as paired right/wrong decisions. Use when building, styling, or reviewing any interface; when choosing type, colors, borders, shadows, spacing, icons, empty states, error messages, or button hierarchy; or when a UI \"looks off\" and needs a design audit. Triggers on: design, UI, visual hierarchy, spacing, padding, margin, gap, whitespace, typography, font, kerning, tracking, letter-spacing, line-height, line length, color, palette, dark mode, contrast, WCAG, border, shadow, border-radius, icon, iconography, illustration, layout, grid, breakpoint, alignment, empty state, error message, microcopy, copywriting, button, tooltip, popover, badge, tag, toast, form, input, focus ring, accessibility, a11y, information architecture, navigation, tabs, onboarding, looks off, feels cheap, polish, design review, design critique."
+description: 'Core visual design judgment — hierarchy, spacing, typography, color, layout, information architecture, interaction states, and UI copy, expressed as paired right/wrong decisions. Use when building, styling, or reviewing any interface; when choosing type, colors, borders, shadows, spacing, icons, empty states, error messages, or button hierarchy; or when a UI "looks off" and needs a design audit. Triggers on: design, UI, visual hierarchy, spacing, padding, margin, gap, whitespace, typography, font, kerning, tracking, letter-spacing, line-height, line length, color, palette, dark mode, contrast, WCAG, border, shadow, border-radius, icon, iconography, illustration, layout, grid, breakpoint, alignment, empty state, error message, microcopy, copywriting, button, tooltip, popover, badge, tag, toast, form, input, focus ring, accessibility, a11y, information architecture, navigation, tabs, onboarding, looks off, feels cheap, polish, design review, design critique.'
 ---
 
 # Design Foundations
@@ -11,8 +11,8 @@ Taste is trained, not innate. It's the practiced ability to see past "it works" 
 
 ## Quick Reference
 
-| Topic | File |
-| --- | --- |
+| Topic                                                                                                         | File                                                     |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Iconography and illustration craft (stroke weights, optical alignment, icon semantics, illustration cohesion) | [icons-and-illustrations.md](icons-and-illustrations.md) |
 
 ## Core Principles

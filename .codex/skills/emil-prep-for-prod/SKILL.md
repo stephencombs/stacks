@@ -1,6 +1,6 @@
 ---
 name: emil-prep-for-prod
-description: "Pre-launch sweep of a web app across nine lanes (accessibility, performance, mobile, forms, stability and states, motion, theming, content and leftovers, marketing and SEO), then fix what a diff can fix and list what needs a device or a human. Catches layout shift, unpreloaded fonts, animated layout properties, missing reduced-motion, icon buttons without labels, removed focus rings, div-buttons, unassociated labels, double-submitting forms, sticky hover on touch, inputs that zoom iOS, 100vh bugs, missing safe areas, blank empty and error states, dark mode that was never opened, flash on refresh, z-index 9999, lorem ipsum, console.log, dev tools mounted in production, missing metadata and OG images, and the rest of what separates \"works on my laptop\" from \"ready to ship\". Use before a launch, a release, or a demo, or to audit the whole interface at once. Triggers on: prep for prod, production ready, ready for production, is this ready to ship, ship check, pre-launch, prelaunch checklist, launch checklist, before launch, before release, before the demo, go live, going live, launch day, final pass, final sweep, release candidate, QA pass, production audit, hardening, \"works on my machine\", what did I forget, what's left before shipping."
+description: 'Pre-launch sweep of a web app across nine lanes (accessibility, performance, mobile, forms, stability and states, motion, theming, content and leftovers, marketing and SEO), then fix what a diff can fix and list what needs a device or a human. Catches layout shift, unpreloaded fonts, animated layout properties, missing reduced-motion, icon buttons without labels, removed focus rings, div-buttons, unassociated labels, double-submitting forms, sticky hover on touch, inputs that zoom iOS, 100vh bugs, missing safe areas, blank empty and error states, dark mode that was never opened, flash on refresh, z-index 9999, lorem ipsum, console.log, dev tools mounted in production, missing metadata and OG images, and the rest of what separates "works on my laptop" from "ready to ship". Use before a launch, a release, or a demo, or to audit the whole interface at once. Triggers on: prep for prod, production ready, ready for production, is this ready to ship, ship check, pre-launch, prelaunch checklist, launch checklist, before launch, before release, before the demo, go live, going live, launch day, final pass, final sweep, release candidate, QA pass, production audit, hardening, "works on my machine", what did I forget, what''s left before shipping.'
 ---
 
 # Preparing For Production
@@ -9,17 +9,17 @@ A ship-check skill. It does one thing: sweep a web app before it goes live and l
 
 It is the only skill here that crosses every other one, and it goes an inch deep on each. It does not design anything. When a finding needs more than a one-line fix, it hands off to the skill that owns the topic:
 
-| Lane | File | Owning skill for deep fixes |
-| --- | --- | --- |
-| A. Accessibility | [accessibility.md](accessibility.md) | `emil-touch-and-accessibility`, `emil-color` |
-| B. Performance | [performance.md](performance.md) | `emil-performance` |
-| C. Mobile | [mobile.md](mobile.md) | `emil-mobile-native` |
-| D. Forms | [forms.md](forms.md) | `emil-forms-and-inputs` |
-| E. Stability & states | [stability-and-states.md](stability-and-states.md) | `emil-ui-polish`, `emil-design-foundations` |
-| F. Motion | [motion.md](motion.md) | `emil-animations` |
-| G. Theming | [theming.md](theming.md) | `emil-surfaces`, `emil-color` |
+| Lane                   | File                                                 | Owning skill for deep fixes                                 |
+| ---------------------- | ---------------------------------------------------- | ----------------------------------------------------------- |
+| A. Accessibility       | [accessibility.md](accessibility.md)                 | `emil-touch-and-accessibility`, `emil-color`                |
+| B. Performance         | [performance.md](performance.md)                     | `emil-performance`                                          |
+| C. Mobile              | [mobile.md](mobile.md)                               | `emil-mobile-native`                                        |
+| D. Forms               | [forms.md](forms.md)                                 | `emil-forms-and-inputs`                                     |
+| E. Stability & states  | [stability-and-states.md](stability-and-states.md)   | `emil-ui-polish`, `emil-design-foundations`                 |
+| F. Motion              | [motion.md](motion.md)                               | `emil-animations`                                           |
+| G. Theming             | [theming.md](theming.md)                             | `emil-surfaces`, `emil-color`                               |
 | H. Content & leftovers | [content-and-leftovers.md](content-and-leftovers.md) | `emil-typography`, `emil-unslop-code`, `emil-unslop-design` |
-| I. Marketing & SEO | [marketing.md](marketing.md) | `emil-marketing-pages` |
+| I. Marketing & SEO     | [marketing.md](marketing.md)                         | `emil-marketing-pages`                                      |
 
 Each lane file is a catalog of checks with what to hunt for, why it matters, and the exact fix. Load a lane file when you sweep that lane and when you write a fix from it. [baseline.md](baseline.md) holds the global meta tags and root CSS that resolve a dozen findings at once. Never approximate a value that appears in these files; copy it.
 
@@ -115,11 +115,11 @@ low vision, motion-sensitive, touch)?
             └── No → POLISH
 ```
 
-| Severity | Examples |
-| --- | --- |
-| **BLOCKER** | Focus escapes a modal; icon buttons with no name; `outline: none` sitewide; inputs zoom iOS; layout shifts on load; `user-scalable=no`; submit fires twice; blank empty state on the first screen a new user sees; error state that renders nothing; lorem ipsum or fabricated testimonials on a public page; Lapse or a Leva panel mounted in production; `console.log` of user data; animating layout properties on a frequent interaction; no reduced-motion on large movement; dark mode with unreadable text; no `<title>` |
-| **SHOULD FIX** | Sticky hover on touch; tap highlight flash; `100vh` app shell; missing safe areas; no `:active` feedback; fonts not preloaded; long list not virtualized; `transition: all`; placeholder as the only label; spinner where a skeleton belongs; theme flash on refresh; `z-index: 9999`; `ease-in` on an entrance; missing OG image; content routes fetched per request |
-| **POLISH** | Tabular numbers on counters; `text-wrap: balance` on headings; `theme-color` per scheme; `enterkeyhint`; `scroll-margin-top` under a sticky header; `…` instead of `...`; RSS feed; intro animation gated per session |
+| Severity       | Examples                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **BLOCKER**    | Focus escapes a modal; icon buttons with no name; `outline: none` sitewide; inputs zoom iOS; layout shifts on load; `user-scalable=no`; submit fires twice; blank empty state on the first screen a new user sees; error state that renders nothing; lorem ipsum or fabricated testimonials on a public page; Lapse or a Leva panel mounted in production; `console.log` of user data; animating layout properties on a frequent interaction; no reduced-motion on large movement; dark mode with unreadable text; no `<title>` |
+| **SHOULD FIX** | Sticky hover on touch; tap highlight flash; `100vh` app shell; missing safe areas; no `:active` feedback; fonts not preloaded; long list not virtualized; `transition: all`; placeholder as the only label; spinner where a skeleton belongs; theme flash on refresh; `z-index: 9999`; `ease-in` on an entrance; missing OG image; content routes fetched per request                                                                                                                                                           |
+| **POLISH**     | Tabular numbers on counters; `text-wrap: balance` on headings; `theme-color` per scheme; `enterkeyhint`; `scroll-margin-top` under a sticky header; `…` instead of `...`; RSS feed; intro animation gated per session                                                                                                                                                                                                                                                                                                           |
 
 The lane files carry a default severity per check. The tree overrides the default when context demands: a missing `alt` on the only product image is a blocker, a `100vh` on a desktop-only tool is nothing.
 
@@ -132,7 +132,7 @@ Apply fixes in this order, so that a fix never masks a finding above it:
 3. **Per-component fixes**, grouped by file.
 4. **Polish**, only if the diff is still small enough to review in one sitting.
 
-Group by file, keep each edit minimal, and never restructure markup unless the finding *is* the markup (a `<div onClick>` that must become a `<button>`). Don't reformat files you touch. After fixing, run the project's typecheck and build. A ship check that breaks the build has negative value; report the command and its result.
+Group by file, keep each edit minimal, and never restructure markup unless the finding _is_ the markup (a `<div onClick>` that must become a `<button>`). Don't reformat files you touch. After fixing, run the project's typecheck and build. A ship check that breaks the build has negative value; report the command and its result.
 
 When a fix is bigger than a few lines (a hand-rolled modal that needs a focus trap, a list that needs virtualizing, a dark mode that needs a designed surface set), don't attempt it inside the sweep. Put it on the human list with the owning skill named, so it gets done properly: "replace the hand-rolled modal in `Share.tsx` with the project's Dialog primitive; run `/emil-touch-and-accessibility`".
 
@@ -155,14 +155,14 @@ One line, first. Don't bury the one thing that matters under sixty rows.
 
 One markdown table per lane that has findings, in lane order A → I. One row per finding, sorted by severity. Never a "Before:/After:" list. The **Status** column says whether the fix was applied. A lane with no findings gets one line: "B. Performance: clean."
 
-| Severity | Before | After | Why | Status |
-| --- | --- | --- | --- | --- |
-| BLOCKER | `<button><CloseIcon /></button>` at `Dialog.tsx:41` | `<button aria-label="Close dialog">` | Screen readers announce "button" with no name | Fixed |
-| BLOCKER | `<Lapse />` mounted unconditionally at `layout.tsx:18` | Mounted only when `process.env.NODE_ENV === "development"` | The animation inspector ships to every visitor | Fixed |
-| BLOCKER | `projects.length === 0` renders `null` at `Projects.tsx:33` | — | Every new account opens to a blank page | Open (needs copy) |
-| SHOULD FIX | `height: 100vh` on `.app` at `layout.css:8` | `height: 100dvh` | `100vh` overflows behind the mobile URL bar | Fixed |
-| SHOULD FIX | `transition: all 300ms` at `Button.tsx:20` | `transition: background-color 150ms, transform 150ms var(--ease-out)` | `all` animates unintended properties off the GPU | Fixed |
-| POLISH | `.counter` at `Stats.tsx:14` has no `tabular-nums` | `font-variant-numeric: tabular-nums` | Changing digits shift the layout | Fixed |
+| Severity   | Before                                                      | After                                                                 | Why                                              | Status            |
+| ---------- | ----------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------ | ----------------- |
+| BLOCKER    | `<button><CloseIcon /></button>` at `Dialog.tsx:41`         | `<button aria-label="Close dialog">`                                  | Screen readers announce "button" with no name    | Fixed             |
+| BLOCKER    | `<Lapse />` mounted unconditionally at `layout.tsx:18`      | Mounted only when `process.env.NODE_ENV === "development"`            | The animation inspector ships to every visitor   | Fixed             |
+| BLOCKER    | `projects.length === 0` renders `null` at `Projects.tsx:33` | —                                                                     | Every new account opens to a blank page          | Open (needs copy) |
+| SHOULD FIX | `height: 100vh` on `.app` at `layout.css:8`                 | `height: 100dvh`                                                      | `100vh` overflows behind the mobile URL bar      | Fixed             |
+| SHOULD FIX | `transition: all 300ms` at `Button.tsx:20`                  | `transition: background-color 150ms, transform 150ms var(--ease-out)` | `all` animates unintended properties off the GPU | Fixed             |
+| POLISH     | `.counter` at `Stats.tsx:14` has no `tabular-nums`          | `font-variant-numeric: tabular-nums`                                  | Changing digits shift the layout                 | Fixed             |
 
 Cite `file:line` for every row. When one root cause produces many instances (forty ungated `:hover` rules), report it as one row with the count and fix it at the root.
 
@@ -170,7 +170,7 @@ Cite `file:line` for every row. When one root cause produces many instances (for
 
 Two short lists. Omit either if empty, but say so.
 
-- **Needs a device**: what you could not verify from code. Be specific about *what to look for*: "open the drawer on an iPhone and confirm the bottom padding clears the home indicator", "tab through the settings page with VoiceOver on and confirm the sidebar is read before the content", "scroll the dashboard on a 2-year-old Android and watch the sidebar open for dropped frames", "sign up with a fresh account and screenshot every screen before adding data", "toggle dark mode on the pricing page and read every line of text".
+- **Needs a device**: what you could not verify from code. Be specific about _what to look for_: "open the drawer on an iPhone and confirm the bottom padding clears the home indicator", "tab through the settings page with VoiceOver on and confirm the sidebar is read before the content", "scroll the dashboard on a 2-year-old Android and watch the sidebar open for dropped frames", "sign up with a fresh account and screenshot every screen before adding data", "toggle dark mode on the pricing page and read every line of text".
 - **Needs a human**: fixes you did not apply because they change a decision, need a value you'd have to invent, or are bigger than a ship check. Each with the one-line why, the exact change you'd make if told to, and the owning skill when there is one.
 
 ### Part 4 — Verification (REQUIRED)
@@ -179,56 +179,56 @@ The commands you ran after fixing (typecheck, build, tests) and their results, v
 
 ## Invocation Variants
 
-| Invocation | Behavior |
-| --- | --- |
-| bare | Full workflow: recon → all lanes → vet → fix → report |
-| `audit` | Same sweep, no fixes. Every row's status is "Open". Use when the user wants to review before anything changes. |
-| `a11y` / `perf` / `mobile` / `forms` / `states` / `motion` / `theme` / `content` / `marketing` | Recon + that lane only. Several can be combined. Composes with `audit`. |
-| `quick` | Blockers only, every lane, fixes applied. For the hour before a demo. |
-| `<path or component>` | Scope every phase to that file, route, or component. |
+| Invocation                                                                                     | Behavior                                                                                                       |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| bare                                                                                           | Full workflow: recon → all lanes → vet → fix → report                                                          |
+| `audit`                                                                                        | Same sweep, no fixes. Every row's status is "Open". Use when the user wants to review before anything changes. |
+| `a11y` / `perf` / `mobile` / `forms` / `states` / `motion` / `theme` / `content` / `marketing` | Recon + that lane only. Several can be combined. Composes with `audit`.                                        |
+| `quick`                                                                                        | Blockers only, every lane, fixes applied. For the hour before a demo.                                          |
+| `<path or component>`                                                                          | Scope every phase to that file, route, or component.                                                           |
 
 ## Never Ship
 
 Cross-lane self-check before you write the verdict. Any of these open is a **Not yet**.
 
-| Never | Instead |
-| --- | --- |
-| Icon button with no accessible name | `aria-label` that names the action ("Search", not "icon") |
-| `outline: none` with no visible replacement | `:focus-visible` outline with `outline-offset: 2px`, in grey, black, or white |
-| `<div onClick>` doing a button's job | `<button type="button">` |
-| Modal that lets focus escape or doesn't return it | A dialog primitive: trap focus, restore to the trigger on close |
-| Closed drawer or panel still in the tab order | `inert` or `visibility: hidden` |
-| `<label>` not associated with its input, or a placeholder as the label | `for`/`id`, or wrap the input |
-| Error shown by color alone | Color + icon + colocated message, `aria-invalid` |
-| Text under 4.5:1 in either theme | Move the foreground's lightness away from the background's |
-| Movement with no `prefers-reduced-motion` handling | Swap movement for opacity under `reduce` |
-| `user-scalable=no` or `maximum-scale=1` | 16px inputs |
-| Input font size under 16px on touch | `font-size: 16px` (`text-base md:text-sm`) |
-| Submit button that stays enabled while submitting | `disabled={isSubmitting}` and a label that says what's happening |
-| Inputs outside a `<form>` | `<form onSubmit>` so Enter submits |
-| Destructive action with no confirmation | A confirmation dialog, not `window.confirm()` |
-| Ungated `:hover`, or an action reachable only on hover | `@media (hover: hover) and (pointer: fine)`; render the control always |
-| `100vh` for an app shell or bottom-pinned UI | `100dvh` |
-| `env(safe-area-inset-*)` without `viewport-fit=cover` | Add the meta tag or the value is `0` |
-| Image or video with no reserved dimensions | `width`/`height` attributes or `aspect-ratio` |
-| Fonts loaded without `preload`, or with unused weights | Preload the used `woff2` files, only the used weights |
-| Animating `width`/`height`/`margin`/`padding`/`top`/`left` | `transform` / `opacity` |
-| `transition: all`, or Tailwind's bare `transition` | Named properties |
-| `setState` per frame in a scroll, drag, or rAF handler | A ref write or a motion value |
-| 1,000+ row list rendered directly | Virtualize |
-| A list that renders `null` when empty | Headline + one line + the action that creates the first item |
-| A failed request that renders nothing, or "Something went wrong" | What happened + a specific recovery action |
-| A wait over 400ms with no indicator | A skeleton that holds the loaded shape |
-| Theme or sidebar state that flashes on refresh | Read the stored value before first paint |
-| A dark mode nobody opened | Open every route in it, or remove the toggle |
-| `ease-in` on an entrance, or an entrance from `scale(0)` | `ease-out` from `scale(0.95)` + opacity |
-| Animation on a keyboard shortcut or a 100+/day action | No animation |
-| Lapse, Leva, devtools, or a prototype picker mounted in production | Gate the mount on `NODE_ENV === "development"` |
-| `/proto`, `/lab`, or `/test` routes publicly reachable | Gate them out of the production build |
-| `console.log`, `debugger`, lorem ipsum, fabricated stats or testimonials | Delete; real content or none |
-| A page with no `<title>`, description, or OG image | Per-route metadata |
-| Blog, docs, or changelog fetched at request time | Static generation with revalidation |
-| Declaring it ready from device emulation | Real hardware, and say what to check |
+| Never                                                                    | Instead                                                                       |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Icon button with no accessible name                                      | `aria-label` that names the action ("Search", not "icon")                     |
+| `outline: none` with no visible replacement                              | `:focus-visible` outline with `outline-offset: 2px`, in grey, black, or white |
+| `<div onClick>` doing a button's job                                     | `<button type="button">`                                                      |
+| Modal that lets focus escape or doesn't return it                        | A dialog primitive: trap focus, restore to the trigger on close               |
+| Closed drawer or panel still in the tab order                            | `inert` or `visibility: hidden`                                               |
+| `<label>` not associated with its input, or a placeholder as the label   | `for`/`id`, or wrap the input                                                 |
+| Error shown by color alone                                               | Color + icon + colocated message, `aria-invalid`                              |
+| Text under 4.5:1 in either theme                                         | Move the foreground's lightness away from the background's                    |
+| Movement with no `prefers-reduced-motion` handling                       | Swap movement for opacity under `reduce`                                      |
+| `user-scalable=no` or `maximum-scale=1`                                  | 16px inputs                                                                   |
+| Input font size under 16px on touch                                      | `font-size: 16px` (`text-base md:text-sm`)                                    |
+| Submit button that stays enabled while submitting                        | `disabled={isSubmitting}` and a label that says what's happening              |
+| Inputs outside a `<form>`                                                | `<form onSubmit>` so Enter submits                                            |
+| Destructive action with no confirmation                                  | A confirmation dialog, not `window.confirm()`                                 |
+| Ungated `:hover`, or an action reachable only on hover                   | `@media (hover: hover) and (pointer: fine)`; render the control always        |
+| `100vh` for an app shell or bottom-pinned UI                             | `100dvh`                                                                      |
+| `env(safe-area-inset-*)` without `viewport-fit=cover`                    | Add the meta tag or the value is `0`                                          |
+| Image or video with no reserved dimensions                               | `width`/`height` attributes or `aspect-ratio`                                 |
+| Fonts loaded without `preload`, or with unused weights                   | Preload the used `woff2` files, only the used weights                         |
+| Animating `width`/`height`/`margin`/`padding`/`top`/`left`               | `transform` / `opacity`                                                       |
+| `transition: all`, or Tailwind's bare `transition`                       | Named properties                                                              |
+| `setState` per frame in a scroll, drag, or rAF handler                   | A ref write or a motion value                                                 |
+| 1,000+ row list rendered directly                                        | Virtualize                                                                    |
+| A list that renders `null` when empty                                    | Headline + one line + the action that creates the first item                  |
+| A failed request that renders nothing, or "Something went wrong"         | What happened + a specific recovery action                                    |
+| A wait over 400ms with no indicator                                      | A skeleton that holds the loaded shape                                        |
+| Theme or sidebar state that flashes on refresh                           | Read the stored value before first paint                                      |
+| A dark mode nobody opened                                                | Open every route in it, or remove the toggle                                  |
+| `ease-in` on an entrance, or an entrance from `scale(0)`                 | `ease-out` from `scale(0.95)` + opacity                                       |
+| Animation on a keyboard shortcut or a 100+/day action                    | No animation                                                                  |
+| Lapse, Leva, devtools, or a prototype picker mounted in production       | Gate the mount on `NODE_ENV === "development"`                                |
+| `/proto`, `/lab`, or `/test` routes publicly reachable                   | Gate them out of the production build                                         |
+| `console.log`, `debugger`, lorem ipsum, fabricated stats or testimonials | Delete; real content or none                                                  |
+| A page with no `<title>`, description, or OG image                       | Per-route metadata                                                            |
+| Blog, docs, or changelog fetched at request time                         | Static generation with revalidation                                           |
+| Declaring it ready from device emulation                                 | Real hardware, and say what to check                                          |
 
 ## Tone
 

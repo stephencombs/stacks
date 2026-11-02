@@ -1,6 +1,6 @@
 ---
 name: emil-build-a-tool
-description: "Analyze what the user is actually trying to build and suggest the tool that gets them there — a means to an end, not the end itself. When prompting for an artifact directly keeps landing on \"closer, but not quite\", stop iterating on the output and build the small tool that produces it: diagnose why the direct path fails, propose the tool that closes that exact gap, put the taste decisions on live controls, and export exactly what the project needs. Use when the user says \"build me a tool for this\", describes a result the agent keeps missing, or has burned a round or two of re-prompting on the same artifact."
+description: 'Analyze what the user is actually trying to build and suggest the tool that gets them there — a means to an end, not the end itself. When prompting for an artifact directly keeps landing on "closer, but not quite", stop iterating on the output and build the small tool that produces it: diagnose why the direct path fails, propose the tool that closes that exact gap, put the taste decisions on live controls, and export exactly what the project needs. Use when the user says "build me a tool for this", describes a result the agent keeps missing, or has burned a round or two of re-prompting on the same artifact.'
 disable-model-invocation: true
 ---
 
@@ -23,20 +23,20 @@ Answer these four questions from the conversation before proposing anything. Ask
 
 Why does prompting keep missing?
 ├── The result depends on judgment calls only the user's eye can make
-│   (density, balance, color, "when it feels right")
-│   → **dial-in tool** — rebuild the process, bind every taste value to a live control
+│ (density, balance, color, "when it feels right")
+│ → **dial-in tool** — rebuild the process, bind every taste value to a live control
 ├── The result must match something that already exists
-│   (a design, another app's output, a reference image)
-│   → **matching tool** — reproduce the process that made the reference,
-│     render output next to it at the same size
+│ (a design, another app's output, a reference image)
+│ → **matching tool** — reproduce the process that made the reference,
+│ render output next to it at the same size
 ├── The result exists but in the wrong form
-│   (right pixels, wrong format; right data, wrong structure)
-│   → **converter** — ingest the source, export exactly what the project needs
+│ (right pixels, wrong format; right data, wrong structure)
+│ → **converter** — ingest the source, export exactly what the project needs
 ├── The result can only be judged in a state that's slow to reach
-│   (a specific screen, dataset, viewport, moment in an interaction)
-│   → **stage** — a route that puts the work in that state instantly, every time
+│ (a specific screen, dataset, viewport, moment in an interaction)
+│ → **stage** — a route that puts the work in that state instantly, every time
 └── There is no target yet — the user is searching and will know it when they see it
-    → exploration, not matching: hand off to the `emil-get-creative` skill
+→ exploration, not matching: hand off to the `emil-get-creative` skill
 
 Most real tools combine two branches — a matching tool usually needs dial-in controls, a stage often wants a converter's export. Name the combination you're proposing.
 
@@ -46,7 +46,7 @@ Most real tools combine two branches — a matching tool usually needs dial-in c
 - The result is fully determined, with no judgment calls left → build it directly; a tool with nothing to decide is a detour.
 - Unclear which side you're on → make one honest direct attempt first. One attempt is cheaper than the wrong call in either direction.
 
-**The stop-the-loop rule.** If a round of "closer, but not quite" has already happened, the diagnosis is done for you — that loop *is* the evidence. Say so explicitly and propose the tool, instead of quietly retrying the same prompt in different words. Every further attempt is another paid spin at a target the user can already see.
+**The stop-the-loop rule.** If a round of "closer, but not quite" has already happened, the diagnosis is done for you — that loop _is_ the evidence. Say so explicitly and propose the tool, instead of quietly retrying the same prompt in different words. Every further attempt is another paid spin at a target the user can already see.
 
 ## Phase 2 — Suggest the tool
 
@@ -68,7 +68,7 @@ One sitting, no ceremony — it's scaffolding, not a product:
 3. **The target stays on screen.** If there's a reference, render the output beside it at the size it will ship at. Matching from memory across a tab switch is how "close enough" ships.
 4. **Every judgment call is a live control.** If you'd otherwise hardcode a number you're not sure about, you'd be guessing at the user's eye — bind it instead. Fixed values are only for the rules of the process. Give every control tested bounds; a slider that reaches a broken render teaches the user to distrust the tool.
 5. **Instant feedback.** Everything re-renders as controls move. A tool with an "apply" step loses the see-tweak-see loop that justifies its existence. If you use a panel library like leva, keep every row unconditional — conditionally rendered rows inside folders break the panel layout.
-6. **Save writes a file.** One button persists the full current configuration as JSON in the project — plus the exported artifact data if that's separate — and shows the written path in the UI. Production imports that file, so saving *is* shipping the decision; values eyeballed off a panel are how the shipped version drifts from the approved one.
+6. **Save writes a file.** One button persists the full current configuration as JSON in the project — plus the exported artifact data if that's separate — and shows the written path in the UI. Production imports that file, so saving _is_ shipping the decision; values eyeballed off a panel are how the shipped version drifts from the approved one.
 
 Then hand it off in two lines — the URL and the verbs — and stop. The dialing-in belongs to the user; hovering with suggestions defeats the purpose of having built them a tool.
 
@@ -82,11 +82,11 @@ When the user picks a keeper:
 
 ## Invocation variants
 
-| Invocation | Behavior |
-| --- | --- |
-| `<the thing you're stuck on>` | Full workflow: diagnose → suggest → build → hand off |
-| `diagnose` | Phases 1–2 only: analyze the situation and suggest the tool, build nothing |
-| `harvest` | Read the latest saved config and wire it into the real artifact |
-| `harvest <path/to/config.json>` | Same, from a specific saved config |
-| `more knobs` | Promote hardcoded values in the current tool to controls |
-| `export as <format>` | Add or replace the exporter |
+| Invocation                      | Behavior                                                                   |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| `<the thing you're stuck on>`   | Full workflow: diagnose → suggest → build → hand off                       |
+| `diagnose`                      | Phases 1–2 only: analyze the situation and suggest the tool, build nothing |
+| `harvest`                       | Read the latest saved config and wire it into the real artifact            |
+| `harvest <path/to/config.json>` | Same, from a specific saved config                                         |
+| `more knobs`                    | Promote hardcoded values in the current tool to controls                   |
+| `export as <format>`            | Add or replace the exporter                                                |

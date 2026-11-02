@@ -1,6 +1,6 @@
 # Lane G — Theming
 
-The lane for the theme nobody opened. Most apps are built in one color scheme and *have* a second one. The second gets a token flip, a glance at the homepage, and ships with invisible cards, unreadable badges, and a logo that disappears. This lane is a defect sweep of the other theme, not a redesign of it. Owning skills: `emil-surfaces` (shadows, borders, dark surfaces) and `emil-color` (values, contrast).
+The lane for the theme nobody opened. Most apps are built in one color scheme and _have_ a second one. The second gets a token flip, a glance at the homepage, and ships with invisible cards, unreadable badges, and a logo that disappears. This lane is a defect sweep of the other theme, not a redesign of it. Owning skills: `emil-surfaces` (shadows, borders, dark surfaces) and `emil-color` (values, contrast).
 
 First, from recon, establish which case you're in:
 
@@ -21,8 +21,12 @@ A dark-only app that never declares it gets white native scrollbars, light form 
 **Hunt for:** `<meta name="color-scheme">` and the CSS `color-scheme` property; a dark-only app with neither; a light-only app declaring `light dark`.
 
 ```css
-:root { color-scheme: light; }        /* light-only */
-:root { color-scheme: dark; }         /* dark-only: native controls and scrollbars go dark */
+:root {
+  color-scheme: light;
+} /* light-only */
+:root {
+  color-scheme: dark;
+} /* dark-only: native controls and scrollbars go dark */
 ```
 
 ## G2. Half a dark mode is worse than none — BLOCKER when reachable
@@ -39,7 +43,7 @@ Contrast was checked in the theme the app was designed in. The muted grey that p
 
 **Hunt for:** hardcoded color values inside components (`#6b7280`, `text-gray-500`, `text-black`, `bg-white`) that don't flip; muted / secondary / placeholder / disabled text tokens in the dark theme; colored badges and alerts (tinted background + same-hue text); text over images.
 
-The measurement and the repair are A9: find the real pair, then move the foreground's lightness. Here the job is to check every pair *twice*. Fast triage on a dark surface (L ≤ 0.25): foregrounds want L at or over 0.75.
+The measurement and the repair are A9: find the real pair, then move the foreground's lightness. Here the job is to check every pair _twice_. Fast triage on a dark surface (L ≤ 0.25): foregrounds want L at or over 0.75.
 
 ## G4. Hardcoded colors don't flip — SHOULD FIX
 

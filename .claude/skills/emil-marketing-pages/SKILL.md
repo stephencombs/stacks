@@ -23,6 +23,7 @@ Marketing pages earn more animation budget than product UI — a visitor sees a 
 Marketing pages can be more elaborate than product UI, but the same discipline applies.
 
 **Never add:**
+
 - Scroll animations — fade-ups, fade-ins, translate-Y-on-scroll as sections enter the viewport
 - Scroll hijacking
 - Parallax that doesn't map 1:1 to scroll position
@@ -34,11 +35,11 @@ All of these move without the user asking. Motion disconnected from input feels 
 
 ```jsx
 useEffect(() => {
-  const hasSeenIntro = sessionStorage.getItem('hasSeenIntro');
+  const hasSeenIntro = sessionStorage.getItem("hasSeenIntro");
   if (hasSeenIntro) {
     setSkipIntro(true);
   } else {
-    sessionStorage.setItem('hasSeenIntro', 'true');
+    sessionStorage.setItem("hasSeenIntro", "true");
   }
 }, []);
 ```
@@ -50,10 +51,10 @@ Use `sessionStorage`, not `localStorage` — the intro should play again on a ge
 **Preload fonts** so text doesn't reflow when the webfont lands:
 
 ```jsx
-import { preload } from 'react-dom';
+import { preload } from "react-dom";
 
 // In app initialization
-preload('/fonts/inter-var.woff2', { as: 'font', type: 'font/woff2' });
+preload("/fonts/inter-var.woff2", { as: "font", type: "font/woff2" });
 ```
 
 **Preload above-the-fold images:**
@@ -92,14 +93,14 @@ Submenu content that appears on hover must still exist in the DOM at all times �
 
 CTAs adapt to auth state — a logged-in user being told to "Sign Up" is a dead end:
 
-| State | CTA |
-| --- | --- |
-| Logged out | "Get Started" or "Sign Up" |
-| Logged in | "Go to Dashboard" or "Open App" |
+| State      | CTA                             |
+| ---------- | ------------------------------- |
+| Logged out | "Get Started" or "Sign Up"      |
+| Logged in  | "Go to Dashboard" or "Open App" |
 
 ```jsx
-<Button href={isLoggedIn ? '/dashboard' : '/signup'}>
-  {isLoggedIn ? 'Go to Dashboard' : 'Get Started'}
+<Button href={isLoggedIn ? "/dashboard" : "/signup"}>
+  {isLoggedIn ? "Go to Dashboard" : "Get Started"}
 </Button>
 ```
 
@@ -121,7 +122,8 @@ CTAs adapt to auth state — a logged-in user being told to "Sign Up" is a dead 
 - **Balance headings** so multi-line titles don't leave a stranded word:
 
   ```css
-  article h1, article h2 {
+  article h1,
+  article h2 {
     text-wrap: balance;
   }
   ```
@@ -136,8 +138,8 @@ Decorative illustrations built from DOM elements need three things: an accessibl
   aria-label="Illustration showing data flow"
   className="illustration"
   style={{
-    userSelect: 'none',
-    pointerEvents: 'none',
+    userSelect: "none",
+    pointerEvents: "none",
   }}
 />
 ```

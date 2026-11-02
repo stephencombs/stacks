@@ -70,7 +70,7 @@ Tokens named `--color-<name>-<step>` inside `@theme` automatically materialize t
 
 ```css
 @theme {
-  --color-berry-50:  oklch(0.97 0.007 330);
+  --color-berry-50: oklch(0.97 0.007 330);
   --color-berry-100: oklch(0.895 0.042 330);
   --color-berry-200: oklch(0.82 0.103 330);
   --color-berry-300: oklch(0.745 0.189 330);
@@ -94,5 +94,5 @@ The slash modifier composes transparently with oklch tokens: `text-berry-600/75`
 
 1. Re-express every `@theme` color token as oklch.
 2. Chase down `theme()` calls and component-level hardcoded hex that duplicated those tokens, and point them at the converted values.
-3. Re-run your contrast checks and eyeball dark mode: exact conversion preserves each color, but colors that were *approximated* by eye in hex often turn out slightly off once measured perceptually.
+3. Re-run your contrast checks and eyeball dark mode: exact conversion preserves each color, but colors that were _approximated_ by eye in hex often turn out slightly off once measured perceptually.
 4. Where the brand wants more punch than sRGB allows, add the `@media (color-gamut: p3)` layer from above rather than raising the base token's chroma.

@@ -69,11 +69,11 @@ an unlisted variant is a bug, not an option.
 
 ```md
 Is it the single most important action on the screen?
- ├── Yes → variant="primary"
- └── No
-      ├── Is it destructive, or hard to undo?
-      │    └── Yes → variant="danger"
-      └── Default → variant="secondary"
+├── Yes → variant="primary"
+└── No
+├── Is it destructive, or hard to undo?
+│ └── Yes → variant="danger"
+└── Default → variant="secondary"
 ```
 
 For token docs, the load-bearing rule is which layer is allowed: components use semantic tokens (`--bg-surface`), never primitives (`--gray-100`) and never raw values. Then a flowchart per role — "what background do I use", "what text color do I use" — built from the semantic tokens found in step 1.
@@ -88,10 +88,10 @@ For token docs, the load-bearing rule is which layer is allowed: components use 
 
 Docs are a hypothesis until an agent has run against them. Ask for a real screen in one sentence — "Build a settings screen for notification preferences. Use our existing components." — then read the drift:
 
-| The drift | The hole | The fix |
-| --- | --- | --- |
-| Hardcoded a color | Token rule isn't findable or isn't strict | Move the layer rule into the root file |
-| Invented a variant | Docs list variants without "nothing else exists" | Close the set explicitly (and tell the user if the union type isn't strict) |
-| Picked the wrong component | No "when to use it vs the alternative" line | Add the comparison for that pair |
+| The drift                  | The hole                                         | The fix                                                                     |
+| -------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
+| Hardcoded a color          | Token rule isn't findable or isn't strict        | Move the layer rule into the root file                                      |
+| Invented a variant         | Docs list variants without "nothing else exists" | Close the set explicitly (and tell the user if the union type isn't strict) |
+| Picked the wrong component | No "when to use it vs the alternative" line      | Add the comparison for that pair                                            |
 
 Fix the docs, never just the output — correcting the output fixes one screen, patching the doc fixes every screen after it. Repeat until a fresh prompt produces a screen with zero drift.

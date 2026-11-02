@@ -10,11 +10,17 @@ Legacy workflows fix contrast by fiddling with all of R, G, and B (or worse, HSL
 
 ```css
 /* fails: lavender text nearly as light as its lavender card */
-.card       { background: oklch(0.93 0.03 300); }
-.card-label { color: oklch(0.72 0.14 300); }
+.card {
+  background: oklch(0.93 0.03 300);
+}
+.card-label {
+  color: oklch(0.72 0.14 300);
+}
 
 /* passes: only L moved; the hue and vividness survive */
-.card-label { color: oklch(0.42 0.14 300); }
+.card-label {
+  color: oklch(0.42 0.14 300);
+}
 ```
 
 Raising C to "make it pop" is the classic dead end — vividness is not contrast.

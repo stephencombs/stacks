@@ -8,25 +8,25 @@ Built-in CSS keywords (`ease-out`, `ease-in-out`) are usually too weak to feel i
 
 ```css
 /* ease-out — enters, exits, user-initiated UI */
---ease-out-quad:  cubic-bezier(0.25, 0.46, 0.45, 0.94);
+--ease-out-quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 --ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
 --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
 --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
---ease-out-expo:  cubic-bezier(0.19, 1, 0.22, 1);
---ease-out-circ:  cubic-bezier(0.075, 0.82, 0.165, 1);
+--ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+--ease-out-circ: cubic-bezier(0.075, 0.82, 0.165, 1);
 
 /* ease-in-out — elements moving/morphing on screen */
---ease-in-out-quad:  cubic-bezier(0.455, 0.03, 0.515, 0.955);
+--ease-in-out-quad: cubic-bezier(0.455, 0.03, 0.515, 0.955);
 --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
 --ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
 --ease-in-out-quint: cubic-bezier(0.86, 0, 0.07, 1);
---ease-in-out-expo:  cubic-bezier(1, 0, 0, 1);
---ease-in-out-circ:  cubic-bezier(0.785, 0.135, 0.15, 0.86);
+--ease-in-out-expo: cubic-bezier(1, 0, 0, 1);
+--ease-in-out-circ: cubic-bezier(0.785, 0.135, 0.15, 0.86);
 ```
 
 Why ease-out works for enters: the fast start delivers immediate visual feedback — the element "jumps" toward its destination, then settles. Ease-in inverts that and back-loads the movement, which is why the same duration feels slower and sluggish.
 
-`linear` is only for constant-rate motion: marquees, tickers, and time visualization (a hold-to-delete progress ring should be linear because it *is* time).
+`linear` is only for constant-rate motion: marquees, tickers, and time visualization (a hold-to-delete progress ring should be linear because it _is_ time).
 
 ## Springs
 
@@ -57,11 +57,18 @@ A transition interpolates from wherever the element currently is toward its newe
 
 ```css
 /* Interruptible — hitting close mid-open reverses from the current position */
-.side-panel { transform: translateX(100%); transition: transform 240ms ease-out; }
-.side-panel[data-open] { transform: translateX(0); }
+.side-panel {
+  transform: translateX(100%);
+  transition: transform 240ms ease-out;
+}
+.side-panel[data-open] {
+  transform: translateX(0);
+}
 
 /* Not interruptible — closing mid-open replays or jumps */
-.side-panel[data-open] { animation: panel-in 240ms ease-out forwards; }
+.side-panel[data-open] {
+  animation: panel-in 240ms ease-out forwards;
+}
 ```
 
 Rule: anything the user can toggle gets a transition. Keyframes only for sequences that always run to completion.
@@ -94,10 +101,14 @@ Never animate:
 Every animated element needs its own reduced-motion handling — this is part of shipping the animation, not a follow-up.
 
 ```css
-.modal { animation: fadeIn 200ms ease-out; }
+.modal {
+  animation: fadeIn 200ms ease-out;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .modal { animation: none; }   /* transition: none for transitions; no !important */
+  .modal {
+    animation: none;
+  } /* transition: none for transitions; no !important */
 }
 ```
 
@@ -107,22 +118,22 @@ Every animated element needs its own reduced-motion handling — this is part of
 
 ```tsx
 const reduce = useReducedMotion();
-<motion.div initial={reduce ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} />
+<motion.div initial={reduce ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} />;
 ```
 
 ## Debugging & Polish Fixes
 
-| Symptom | Fix |
-| --- | --- |
-| Animation feels off, can't say why | Screen-record it and scrub frame by frame — details invisible at full speed show up |
-| Shaky/jittery start or end | `will-change: transform` |
-| Hover state flickers | The hover moved the element out from under the cursor — animate a child, keep the parent's hover area static |
-| Transition between two states looks disconnected | Add a subtle `blur(2px)` during the transition to bridge the states (keep well under 20px) |
-| Hover animations firing on phones | Wrap in `@media (hover: hover) and (pointer: fine)` |
-| Everything transitions when theme toggles | Temporarily disable transitions during the theme swap |
-| Small icon buttons hard to hit | Expand the hit area to a 44px minimum with an absolutely-positioned pseudo-element — don't scale the visual |
-| Sequential tooltips feel sluggish | Delay + animate only the first; siblings open instantly (`data-instant`) |
-| Spinner feels slow even though load time is fixed | Spin it faster — perceived speed is real UX |
+| Symptom                                           | Fix                                                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Animation feels off, can't say why                | Screen-record it and scrub frame by frame — details invisible at full speed show up                          |
+| Shaky/jittery start or end                        | `will-change: transform`                                                                                     |
+| Hover state flickers                              | The hover moved the element out from under the cursor — animate a child, keep the parent's hover area static |
+| Transition between two states looks disconnected  | Add a subtle `blur(2px)` during the transition to bridge the states (keep well under 20px)                   |
+| Hover animations firing on phones                 | Wrap in `@media (hover: hover) and (pointer: fine)`                                                          |
+| Everything transitions when theme toggles         | Temporarily disable transitions during the theme swap                                                        |
+| Small icon buttons hard to hit                    | Expand the hit area to a 44px minimum with an absolutely-positioned pseudo-element — don't scale the visual  |
+| Sequential tooltips feel sluggish                 | Delay + animate only the first; siblings open instantly (`data-instant`)                                     |
+| Spinner feels slow even though load time is fixed | Spin it faster — perceived speed is real UX                                                                  |
 
 ### Hover flicker fix
 
@@ -131,14 +142,20 @@ const reduce = useReducedMotion();
 ```
 
 ```css
-.card-inner { transition: transform 200ms ease; }
-.card:hover .card-inner { transform: translateY(-20%); } /* parent hover area never moves */
+.card-inner {
+  transition: transform 200ms ease;
+}
+.card:hover .card-inner {
+  transform: translateY(-20%);
+} /* parent hover area never moves */
 ```
 
 ### 44px hit area
 
 ```css
-.icon-button { position: relative; }
+.icon-button {
+  position: relative;
+}
 .icon-button::after {
   content: "";
   position: absolute;

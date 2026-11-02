@@ -18,8 +18,13 @@ Enter: fade + slight scale-up from `0.95`–`0.97`, 200–250ms ease-out. Exit: 
     opacity 200ms cubic-bezier(0.32, 0.72, 0, 1),
     transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
 }
-.overlay[data-open] { opacity: 1; }
-.modal[data-open] { opacity: 1; transform: scale(1); }
+.overlay[data-open] {
+  opacity: 1;
+}
+.modal[data-open] {
+  opacity: 1;
+  transform: scale(1);
+}
 ```
 
 Avoid: sliding modals in from off-screen, scaling from 0, bounce on a dialog (it's an interruption, not a toy).
@@ -33,7 +38,9 @@ Slides from its edge with a translate transition (interruptible — users close 
   transform: translateX(100%);
   transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
 }
-.drawer[data-open] { transform: translateX(0); }
+.drawer[data-open] {
+  transform: translateX(0);
+}
 ```
 
 If the drawer is draggable (mobile sheet), use a spring so release velocity carries into the animation: `{ type: "spring", duration: 0.5, bounce: 0 }`. For drag-to-dismiss, trigger dismissal when velocity (`swipeAmount / timeTaken`) exceeds ~0.10, not only on distance thresholds.
@@ -48,12 +55,17 @@ Fade + scale from `0.95`, 150–200ms ease-out, **origin-aware**: scale from the
   /* Base UI: var(--transform-origin) */
   opacity: 0;
   transform: scale(0.95);
-  transition: opacity 150ms ease-out, transform 150ms ease-out;
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
 }
-.dropdown[data-open] { opacity: 1; transform: scale(1); }
+.dropdown[data-open] {
+  opacity: 1;
+  transform: scale(1);
+}
 ```
 
-A small directional nudge (`translateY(-4px)` → `0` when opening downward) adds polish. Keyboard navigation *inside* the menu gets no animation — highlight moves instantly.
+A small directional nudge (`translateY(-4px)` → `0` when opening downward) adds polish. Keyboard navigation _inside_ the menu gets no animation — highlight moves instantly.
 
 ## Tooltip
 
@@ -62,11 +74,18 @@ Fast and subtle: fade + `scale(0.97)`, ~125ms ease-out, origin-aware. The critic
 ```css
 .tooltip {
   transform-origin: var(--transform-origin);
-  transition: transform 125ms ease-out, opacity 125ms ease-out;
+  transition:
+    transform 125ms ease-out,
+    opacity 125ms ease-out;
 }
 .tooltip[data-starting-style],
-.tooltip[data-ending-style] { opacity: 0; transform: scale(0.97); }
-.tooltip[data-instant] { transition-duration: 0ms; }
+.tooltip[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.tooltip[data-instant] {
+  transition-duration: 0ms;
+}
 ```
 
 Radix UI and Base UI support this via the `data-instant` attribute.
@@ -89,9 +108,11 @@ const piece = {
 
 <motion.section variants={list} initial="hide" animate="show">
   {sections.map((s) => (
-    <motion.div key={s.id} variants={piece}>{s.content}</motion.div>
+    <motion.div key={s.id} variants={piece}>
+      {s.content}
+    </motion.div>
   ))}
-</motion.section>
+</motion.section>;
 ```
 
 ```css
@@ -104,7 +125,11 @@ const piece = {
   animation-delay: calc(var(--n, 0) * 90ms);
 }
 @keyframes rise-in {
-  to { opacity: 1; translate: 0 0; filter: none; }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    filter: none;
+  }
 }
 ```
 
@@ -118,8 +143,9 @@ An exit deserves less emphasis than an enter — by the time something leaves, a
 - Don't cut straight to `display: none` — instant disappearance severs spatial context.
 
 ```tsx
-<motion.div exit={{ opacity: 0, y: -8, filter: "blur(2px)",
-  transition: { duration: 0.14, ease: "easeIn" } }} />
+<motion.div
+  exit={{ opacity: 0, y: -8, filter: "blur(2px)", transition: { duration: 0.14, ease: "easeIn" } }}
+/>
 ```
 
 Reserve a full off-screen slide (`x: "-100%"`) for moments where the destination itself is the information — a swiped-away list card, a closing drawer.
@@ -135,11 +161,13 @@ Icons that change with state (play → pause, like → liked, copy → check) de
 
 ```tsx
 <AnimatePresence mode="popLayout" initial={false}>
-  <motion.span key={copied ? "check" : "copy"}
+  <motion.span
+    key={copied ? "check" : "copy"}
     initial={{ scale: 0.3, opacity: 0, filter: "blur(3px)" }}
     animate={{ scale: 1, opacity: 1, filter: "blur(0px)" }}
     exit={{ scale: 0.3, opacity: 0, filter: "blur(3px)" }}
-    transition={{ type: "spring", duration: 0.35, bounce: 0 }}>
+    transition={{ type: "spring", duration: 0.35, bounce: 0 }}
+  >
     {copied ? <CheckIcon /> : <CopyIcon />}
   </motion.span>
 </AnimatePresence>

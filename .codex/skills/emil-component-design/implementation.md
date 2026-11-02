@@ -11,11 +11,7 @@ const DialogContext = createContext(null);
 
 function Dialog({ children }) {
   const [open, setOpen] = useState(false);
-  return (
-    <DialogContext.Provider value={{ open, setOpen }}>
-      {children}
-    </DialogContext.Provider>
-  );
+  return <DialogContext.Provider value={{ open, setOpen }}>{children}</DialogContext.Provider>;
 }
 
 function DialogTrigger(props) {
@@ -90,18 +86,13 @@ Allow arbitrary HTML attributes to pass through:
 
 ```jsx
 function Button({ variant, size, className, ...props }) {
-  return (
-    <button
-      className={cn(buttonVariants({ variant, size }), className)}
-      {...props}
-    />
-  );
+  return <button className={cn(buttonVariants({ variant, size }), className)} {...props} />;
 }
 
 // Now these work:
 <Button data-testid="submit" aria-label="Submit form">
   Submit
-</Button>
+</Button>;
 ```
 
 ## Sensible defaults
@@ -133,12 +124,9 @@ function Card({ children, header, footer }) {
 }
 
 // Usage
-<Card
-  header={<h2>Title</h2>}
-  footer={<Button>Save</Button>}
->
+<Card header={<h2>Title</h2>} footer={<Button>Save</Button>}>
   Main content
-</Card>
+</Card>;
 ```
 
 ## Error boundaries
@@ -147,11 +135,7 @@ Wrap complex components in error boundaries so one broken widget doesn't take do
 
 ```jsx
 function ComponentWithErrorBoundary({ children }) {
-  return (
-    <ErrorBoundary fallback={<ErrorFallback />}>
-      {children}
-    </ErrorBoundary>
-  );
+  return <ErrorBoundary fallback={<ErrorFallback />}>{children}</ErrorBoundary>;
 }
 ```
 

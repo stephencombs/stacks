@@ -9,9 +9,9 @@ A component API is a contract. Good ones make the common case a one-liner and th
 
 ## Quick Reference
 
-| Topic | Where |
-|---|---|
-| Core API decisions (composition, compound, props, state) | This file |
+| Topic                                                                                            | Where                                  |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| Core API decisions (composition, compound, props, state)                                         | This file                              |
 | Implementation patterns (context, controlled/uncontrolled, asChild, refs, slots, file structure) | [implementation.md](implementation.md) |
 
 ## Core Principles
@@ -66,12 +66,14 @@ When a component has multiple related parts sharing implicit state, split it int
 ```
 
 Use compound components when:
+
 - Multiple related elements share implicit state
 - The component has slots (header, body, footer)
 - The order or presence of children varies between usages
 - Consumers need flexible composition
 
 Don't use them when:
+
 - The component is simple with a fixed structure
 - It has 1-3 props
 - The structure never changes
@@ -108,6 +110,7 @@ Too little customization and users fork your component or add hacky workarounds.
 ```
 
 Layer customization in this order:
+
 1. **Variants** — predefined options (`primary`, `secondary`, `destructive`)
 2. **Size** — predefined sizes (`sm`, `md`, `lg`)
 3. **className** — escape hatch for one-off overrides

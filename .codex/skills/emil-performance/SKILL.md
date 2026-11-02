@@ -5,7 +5,7 @@ description: "Rules for making UI fast — virtualization, transition specificit
 
 # Interface Performance
 
-Fast UI is mostly about work you *don't* do: don't render DOM nodes nobody can see, don't make the browser watch properties that never change, don't animate what the GPU can't composite, don't fetch at request time what you could build at build time, and don't move layout after the user has started reading it. Most jank is self-inflicted — the fix is usually deleting or deferring work, not adding cleverness.
+Fast UI is mostly about work you _don't_ do: don't render DOM nodes nobody can see, don't make the browser watch properties that never change, don't animate what the GPU can't composite, don't fetch at request time what you could build at build time, and don't move layout after the user has started reading it. Most jank is self-inflicted — the fix is usually deleting or deferring work, not adding cleverness.
 
 All CSS below is written as plain CSS for clarity. When implementing, match the project's existing styling system (Tailwind, CSS Modules, styled-components, etc.) rather than imposing a new one.
 
@@ -51,23 +51,31 @@ By default the browser waits until motion actually begins before lifting an elem
 
 ```css
 /* Sensible — the panel slides, so promote its transform ahead of time */
-.slide-panel { will-change: transform; }
+.slide-panel {
+  will-change: transform;
+}
 
 /* Sensible — a slide paired with a fade */
-.slide-panel { will-change: transform, opacity; }
+.slide-panel {
+  will-change: transform, opacity;
+}
 
 /* Wrong — `all` defeats the point of the hint */
-.slide-panel { will-change: all; }
+.slide-panel {
+  will-change: all;
+}
 
 /* Useless — these run through layout and paint regardless */
-.slide-panel { will-change: height, color; }
+.slide-panel {
+  will-change: height, color;
+}
 ```
 
-| Rendering path | Properties | Does `will-change` pay off? |
-| --- | --- | --- |
-| Compositor | `opacity`, `transform`, `filter` (blur, brightness), `clip-path` | Yes — pre-promotion smooths the first frame |
-| Paint | `color`, `background`, `border` | No |
-| Layout | `width`, `height`, `top`/`left`, `margin` | No |
+| Rendering path | Properties                                                       | Does `will-change` pay off?                 |
+| -------------- | ---------------------------------------------------------------- | ------------------------------------------- |
+| Compositor     | `opacity`, `transform`, `filter` (blur, brightness), `clip-path` | Yes — pre-promotion smooths the first frame |
+| Paint          | `color`, `background`, `border`                                  | No                                          |
+| Layout         | `width`, `height`, `top`/`left`, `margin`                        | No                                          |
 
 Browsers have gotten good at managing layers themselves, so treat this as a targeted fix: reach for it after you've observed a first-frame hiccup (Safari is the usual offender), never as routine seasoning. Each promoted layer holds GPU memory, so a page peppered with `will-change` pays real cost for stutters it never had.
 
@@ -76,7 +84,7 @@ Browsers have gotten good at managing layers themselves, so treat this as a targ
 Don't render hundreds of DOM nodes when only a handful are visible:
 
 ```jsx
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 function VirtualList({ items }) {
   const parentRef = useRef(null);
@@ -88,13 +96,13 @@ function VirtualList({ items }) {
   });
 
   return (
-    <div ref={parentRef} style={{ height: '400px', overflow: 'auto' }}>
+    <div ref={parentRef} style={{ height: "400px", overflow: "auto" }}>
       <div style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((virtualItem) => (
           <div
             key={virtualItem.key}
             style={{
-              position: 'absolute',
+              position: "absolute",
               top: virtualItem.start,
               height: virtualItem.size,
             }}
@@ -151,12 +159,12 @@ Also avoid animating CSS variables in deep component trees — every variable ch
 - Preload fonts so text doesn't reflow when they land:
 
 ```jsx
-import { preload } from 'react-dom';
+import { preload } from "react-dom";
 
-preload('/fonts/inter-var.woff2', {
-  as: 'font',
-  type: 'font/woff2',
-  crossOrigin: 'anonymous',
+preload("/fonts/inter-var.woff2", {
+  as: "font",
+  type: "font/woff2",
+  crossOrigin: "anonymous",
 });
 // Plain HTML equivalent:
 // <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin />
@@ -169,6 +177,7 @@ Preload above-the-fold images:
 ```html
 <link rel="preload" as="image" href="/hero.webp" />
 ```
+
 Below-the-fold images get `loading="lazy"` so they don't compete with critical resources.
 
 ### 8. Stop work that's off-screen
@@ -210,12 +219,12 @@ Flipping themes with transitions enabled makes every color on the page tween ind
 
 ```js
 function setTheme(theme) {
-  document.documentElement.classList.add('no-transitions');
-  document.documentElement.setAttribute('data-theme', theme);
+  document.documentElement.classList.add("no-transitions");
+  document.documentElement.setAttribute("data-theme", theme);
   // Re-enable after paint (double rAF)
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      document.documentElement.classList.remove('no-transitions');
+      document.documentElement.classList.remove("no-transitions");
     });
   });
 }
@@ -223,7 +232,9 @@ function setTheme(theme) {
 
 ```css
 .no-transitions,
-.no-transitions * { transition: none !important; }
+.no-transitions * {
+  transition: none !important;
+}
 ```
 
 ## Review Checklist
