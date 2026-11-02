@@ -23,6 +23,11 @@ import { AddGuestSheet } from "../features/AddGuestSheet";
 import { webUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
 import { Chip } from "../features/Chip";
+import {
+  GuestPaymentHandlesAction,
+  PaymentAppsSection,
+  playerHandlesMeta,
+} from "../features/PaymentHandles";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ groupId: string }>;
@@ -67,28 +72,39 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
       <View className="gap-2">
         <SectionHeading>Members</SectionHeading>
         <List>
-          {members.map((player) => (
-            <Row
-              key={player.id}
-              {...(canManage(player)
-                ? {
-                    onPress: () => setManaging(player),
-                    accessibilityHint: "Change their role or remove them",
-                  }
-                : {})}
-            >
-              <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-              <Text numberOfLines={1} className="flex-1 text-base text-ink">
-                {player.displayName}
-                {player.id === detail.myPlayerId ? (
-                  <Text className="text-muted"> (you)</Text>
-                ) : null}
-              </Text>
-              {player.role ? <Tag>{roleNames[player.role]}</Tag> : null}
-            </Row>
-          ))}
+          {members.map((player) => {
+            const handles = playerHandlesMeta(player);
+            return (
+              <Row
+                key={player.id}
+                {...(canManage(player)
+                  ? {
+                      onPress: () => setManaging(player),
+                      accessibilityHint: "Change their role or remove them",
+                    }
+                  : {})}
+              >
+                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
+                <View className="flex-1">
+                  <Text numberOfLines={1} className="text-base text-ink">
+                    {player.displayName}
+                    {player.id === detail.myPlayerId ? (
+                      <Text className="text-muted"> (you)</Text>
+                    ) : null}
+                  </Text>
+                  {handles ? (
+                    <Text numberOfLines={1} className="text-xs text-muted">
+                      {handles}
+                    </Text>
+                  ) : null}
+                </View>
+                {player.role ? <Tag>{roleNames[player.role]}</Tag> : null}
+              </Row>
+            );
+          })}
         </List>
       </View>
+      <PaymentAppsSection detail={detail} />
       <View className="gap-2">
         <SectionHeading
           action={
@@ -109,25 +125,38 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
           </Text>
         ) : (
           <List>
-            {guests.map((player) => (
-              <Row key={player.id}>
-                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-                <Text className="flex-1 text-base text-ink">{player.displayName}</Text>
-                {player.claimCode ? (
-                  <Button
-                    label={shared === player.id ? "Copied" : "Send claim link"}
-                    size="sm"
-                    onPress={() =>
-                      void share(
-                        `${webUrl}/claim/${player.claimCode}`,
-                        `Claim your Stacks history in ${detail.group.name}:`,
-                        player.id,
-                      )
-                    }
-                  />
-                ) : null}
-              </Row>
-            ))}
+            {guests.map((player) => {
+              const handles = playerHandlesMeta(player);
+              return (
+                <Row key={player.id} className="flex-wrap">
+                  <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
+                  <View className="flex-1 basis-32">
+                    <Text className="text-base text-ink">{player.displayName}</Text>
+                    {handles ? (
+                      <Text numberOfLines={1} className="text-xs text-muted">
+                        {handles}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View className="ml-auto flex-row items-center gap-2">
+                    <GuestPaymentHandlesAction detail={detail} player={player} />
+                    {player.claimCode ? (
+                      <Button
+                        label={shared === player.id ? "Copied" : "Send claim link"}
+                        size="sm"
+                        onPress={() =>
+                          void share(
+                            `${webUrl}/claim/${player.claimCode}`,
+                            `Claim your Stacks history in ${detail.group.name}:`,
+                            player.id,
+                          )
+                        }
+                      />
+                    ) : null}
+                  </View>
+                </Row>
+              );
+            })}
           </List>
         )}
       </View>

@@ -30,6 +30,7 @@ import { Chip } from "~/features/Chip";
 import { VoidEntryDialog } from "~/features/EntryDialogs";
 import { PlayerName } from "~/features/Player";
 import { TransferRow } from "~/features/TransferRow";
+import { ShareSettleUpButton } from "~/features/PayLinks";
 import { TripHeader } from "~/features/TripHeader";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
@@ -112,12 +113,18 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
           Debts show up here when someone covers a buy-in or holds someone else's cash.
         </EmptyState>
       ) : (
-        <Section title="Suggested payments">
+        <Section
+          title="Suggested payments"
+          action={
+            <ShareSettleUpButton detail={detail} tripName={trip.trip.name} transfers={ordered} />
+          }
+        >
           <List>
             {ordered.map((transfer) => (
               <TransferRow
                 key={`${transfer.from}:${transfer.to}`}
                 detail={detail}
+                tripName={trip.trip.name}
                 transfer={transfer}
                 onMarkPaid={setPaying}
               />

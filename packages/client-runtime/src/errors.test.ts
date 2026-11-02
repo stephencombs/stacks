@@ -10,6 +10,9 @@ it("explains API errors in plain words", () => {
   expect(describeError(new Forbidden({ reason: "admins_only" }))).toBe(
     "Only the group's admins can do that.",
   );
+  expect(describeError(new Forbidden({ reason: "not_your_player" }))).toBe(
+    "You can only edit your own payment apps, or a guest's if you're an admin.",
+  );
   expect(
     describeError(new InvalidRequest({ message: "A session can't end before it starts." })),
   ).toBe("A session can't end before it starts.");

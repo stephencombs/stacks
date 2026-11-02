@@ -8,6 +8,7 @@ import {
   InviteId,
   MemberRole,
   MinorUnits,
+  PaymentHandles,
   PlayerId,
   Seat,
   SeatingId,
@@ -51,6 +52,7 @@ export const PlayerRow = Schema.Struct({
   userId: Schema.NullOr(UserId),
   role: Schema.NullOr(MemberRole),
   claimCode: Schema.NullOr(Schema.String),
+  ...PaymentHandles.fields,
 });
 
 export const InviteRow = Schema.Struct({

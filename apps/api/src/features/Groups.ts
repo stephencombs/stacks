@@ -9,11 +9,13 @@ import {
   NotFound,
   type CreateGroupRequest,
   GroupId,
+  PlayerId,
   SessionId,
   TripId,
   type GroupListItem,
+  type SetPaymentHandlesRequest,
   type SetRoleRequest,
-  type UserId,
+  UserId,
 } from "@stacks/contracts";
 import { balances } from "@stacks/shared/balances";
 
@@ -233,4 +235,31 @@ export const setRole = Effect.fn("Groups.setRole")(function* (
     where group_id = ${groupId} and user_id = ${targetUserId}
   `;
   return ok;
+});
+
+export const setPaymentHandles = Effect.fn("Groups.setPaymentHandles")(function* (
+  groupId: GroupId,
+  playerId: PlayerId,
+  request: typeof SetPaymentHandlesRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const member = yield* Access.membership(groupId);
+  const [target] = yield* sql`
+    select id, user_id from players where id = ${playerId} and group_id = ${groupId}
+  `.pipe(
+    Effect.flatMap(
+      Access.decodeRows(Schema.Struct({ id: PlayerId, userId: Schema.NullOr(UserId) })),
+    ),
+  );
+  if (!target) return yield* new NotFound({ resource: "player" });
+  if (target.id !== member.playerId) {
+    if (target.userId !== null) return yield* new Forbidden({ reason: "not_your_player" });
+    yield* Access.requireAdmin(member);
+  }
+  yield* sql`
+    update players
+    set venmo = ${request.venmo}, cash_app = ${request.cashApp}, paypal = ${request.paypal}
+    where id = ${playerId} and group_id = ${groupId}
+  `;
+  return yield* Views.groupDetail(member);
 });

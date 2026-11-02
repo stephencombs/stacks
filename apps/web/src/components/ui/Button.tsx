@@ -85,3 +85,22 @@ export function ButtonLink({
     </Link>
   );
 }
+
+export function ExternalLink({
+  variant = "secondary",
+  size = "md",
+  className,
+  children,
+  ...props
+}: ComponentProps<"a"> & { variant?: Variant; size?: Size }) {
+  return (
+    <a
+      target="_blank"
+      rel="noopener noreferrer"
+      className={classes(variant, size, className)}
+      {...props}
+    >
+      {children}
+    </a>
+  );
+}

@@ -23,6 +23,11 @@ import { List, Row, RowText, Skeleton, Tag } from "~/components/ui/Surface";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
 import { Chip } from "~/features/Chip";
 import { GroupHeader } from "~/features/GroupHeader";
+import {
+  GuestPaymentHandlesAction,
+  PaymentAppsSection,
+  playerHandlesMeta,
+} from "~/features/PaymentHandles";
 import { PlayerName } from "~/features/Player";
 import { formatDay } from "@stacks/client-runtime/format";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
@@ -96,6 +101,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
                 title={
                   <PlayerName name={player.displayName} you={player.id === detail.myPlayerId} />
                 }
+                meta={playerHandlesMeta(player)}
               />
               {player.role === "owner" || player.role === "admin" ? (
                 <Tag>{roleNames[player.role]}</Tag>
@@ -106,6 +112,8 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
         </List>
         {setRole.error ? <FormError>{setRole.error}</FormError> : null}
       </Section>
+
+      <PaymentAppsSection detail={detail} />
 
       <Section
         title="Guests"
@@ -124,15 +132,18 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
         ) : (
           <List>
             {guests.map((player) => (
-              <Row key={player.id}>
+              <Row key={player.id} className="flex-wrap">
                 <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
-                <RowText title={player.displayName} />
-                {player.claimCode ? (
-                  <CopyButton
-                    text={`${origin}/claim/${player.claimCode}`}
-                    label="Copy claim link"
-                  />
-                ) : null}
+                <RowText title={player.displayName} meta={playerHandlesMeta(player)} />
+                <span className="ml-auto flex items-center gap-1">
+                  <GuestPaymentHandlesAction detail={detail} player={player} />
+                  {player.claimCode ? (
+                    <CopyButton
+                      text={`${origin}/claim/${player.claimCode}`}
+                      label="Copy claim link"
+                    />
+                  ) : null}
+                </span>
               </Row>
             ))}
           </List>

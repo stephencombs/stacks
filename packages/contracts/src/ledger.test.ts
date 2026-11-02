@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
+import { SetPaymentHandlesRequest } from "./api.ts";
 import { Entry, Session } from "./ledger.ts";
 
 const ALEX = "0192e7a0-0000-7000-8000-000000000001";
@@ -118,6 +119,52 @@ describe("Session", () => {
     expect(Exit.isSuccess(decodeSession(session(ended)))).toBe(true);
     expect(Exit.isSuccess(decodeSession(session({ status: "closed" })))).toBe(false);
     expect(Exit.isSuccess(decodeSession(session({ endedAt: "2026-10-28T01:00:00.000Z" })))).toBe(
+      false,
+    );
+  });
+});
+
+describe("SetPaymentHandlesRequest", () => {
+  const decode = Schema.decodeUnknownSync(SetPaymentHandlesRequest);
+  const acceptsHandles = (input: unknown) =>
+    Exit.isSuccess(Schema.decodeUnknownExit(SetPaymentHandlesRequest)(input));
+
+  it("strips prefixes and whitespace from clean handles", () => {
+    expect(
+      decode({
+        venmo: "  @alex_smith-1  ",
+        cashApp: " $AlexCash99 ",
+        paypal: " https://paypal.me/AlexPay ",
+      }),
+    ).toEqual({
+      venmo: "alex_smith-1",
+      cashApp: "AlexCash99",
+      paypal: "AlexPay",
+    });
+    expect(decode({ venmo: null, cashApp: null, paypal: "@alex" })).toEqual({
+      venmo: null,
+      cashApp: null,
+      paypal: "alex",
+    });
+  });
+
+  it("rejects empty, malformed, or unsafe handles", () => {
+    for (const bad of [
+      "",
+      "   ",
+      "@",
+      "$",
+      "@@alex",
+      "$$alex",
+      "alex smith",
+      "alex/evil",
+      "alex?x=1",
+      "a".repeat(31),
+    ]) {
+      expect(acceptsHandles({ venmo: bad, cashApp: null, paypal: null })).toBe(false);
+    }
+    expect(acceptsHandles({ venmo: null, cashApp: "a".repeat(21), paypal: null })).toBe(false);
+    expect(acceptsHandles({ venmo: null, cashApp: null, paypal: "https://evil.com/alex" })).toBe(
       false,
     );
   });
