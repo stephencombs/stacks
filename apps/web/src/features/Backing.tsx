@@ -18,7 +18,8 @@ import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
-import { SectionHeading, Surface } from "~/components/ui/Surface";
+import { Note, Section } from "~/components/ui/Page";
+import { List, Row, RowText } from "~/components/ui/Surface";
 import { useAction, useStacks } from "~/lib/stacks";
 
 /** Stakes: money one player gave another to play with, and what comes back. */
@@ -33,37 +34,38 @@ export function BackingSection({ detail, trip }: { detail: GroupDetail; trip: Tr
   const me = userId ? UserId.make(userId) : null;
 
   return (
-    <section className="flex flex-col gap-2">
-      <SectionHeading
-        action={
-          <Button size="sm" variant="ghost" onClick={() => setBacking(true)}>
-            <HandCoins className="size-4" aria-hidden />
-            Back a player
-          </Button>
-        }
-      >
-        Backing
-      </SectionHeading>
+    <Section
+      title="Backing"
+      action={
+        <Button size="sm" variant="ghost" onClick={() => setBacking(true)}>
+          <HandCoins className="size-4" aria-hidden />
+          Back a player
+        </Button>
+      }
+    >
       {trip.stakes.length === 0 ? (
-        <p className="text-sm text-muted">
-          When someone gives another player money to play with on this trip, add it here. The backer
-          gets it back plus their share of the winnings, or what's left if it's lost.
-        </p>
+        <Note>
+          When someone gives another player money to play with, add it here. The backer gets it back
+          plus their share of the winnings, or what's left if it's lost.
+        </Note>
       ) : (
-        <Surface className="divide-y divide-line">
+        <List>
           {trip.stakes.map((view) => {
             const { title, status } = stakeLines(view, names, detail.group.currency);
             const { stake } = view;
             const voided = stake.voidedAt !== null;
             return (
-              <div key={stake.id} className="flex items-center gap-4 px-5 py-3">
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className={voided ? "text-muted line-through" : undefined}>{title}</span>
-                  <span className="text-sm text-muted tabular-nums">
-                    {status}
-                    {stake.note ? ` · ${stake.note}` : ""}
-                  </span>
-                </div>
+              <Row key={stake.id}>
+                <RowText
+                  title={title}
+                  struck={voided}
+                  meta={
+                    <span className="tabular-nums">
+                      {status}
+                      {stake.note ? ` · ${stake.note}` : ""}
+                    </span>
+                  }
+                />
                 {!voided && canChangeStake(detail, view, me) ? (
                   <Menu label={`Actions for ${title}`}>
                     {stake.endedAt === null ? (
@@ -82,10 +84,10 @@ export function BackingSection({ detail, trip }: { detail: GroupDetail; trip: Tr
                     </MenuItem>
                   </Menu>
                 ) : null}
-              </div>
+              </Row>
             );
           })}
-        </Surface>
+        </List>
       )}
       {(end.error ?? reopen.error) ? <FormError>{end.error ?? reopen.error}</FormError> : null}
       {backing ? (
@@ -98,7 +100,7 @@ export function BackingSection({ detail, trip }: { detail: GroupDetail; trip: Tr
           onClose={() => setVoiding(null)}
         />
       ) : null}
-    </section>
+    </Section>
   );
 }
 

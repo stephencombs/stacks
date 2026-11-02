@@ -5,7 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { cn } from "../components/ui/cn";
-import { tripTabs, type TripTab } from "./tripTabs";
+import { tripTabs, type TripTab } from "./tripTabConfig";
 
 const Tabs = createBottomTabNavigator();
 

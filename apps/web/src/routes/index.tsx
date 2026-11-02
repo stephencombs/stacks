@@ -10,7 +10,7 @@ export const Route = createFileRoute("/")({ component: Home });
 function Home() {
   const stacks = useStacks();
   return (
-    <Loaded query={stacks.groups} skeleton={<Skeleton className="mt-4 h-40" />}>
+    <Loaded query={stacks.groups} skeleton={<Skeleton className="h-40" />}>
       {(groups) => {
         const current = groups.find((item) => item.currentTripId)?.currentTripId;
         return current ? (

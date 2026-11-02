@@ -1,15 +1,16 @@
 import { useUser } from "@clerk/react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { CurrencyCode, GroupId } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
-import { ChevronRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { BalanceLabel } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
-import { EmptyState, PageTitle, Skeleton, Surface, Tag } from "~/components/ui/Surface";
+import { EmptyState, PageHeader } from "~/components/ui/Page";
+import { List, RowLink, RowText, Skeleton, Tag } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 /** Every group you're in, with your balance in each, and a way to start one. */
@@ -18,53 +19,44 @@ export function GroupsList() {
   const [creating, setCreating] = useState(false);
   return (
     <>
-      <div className="flex items-end justify-between gap-4 pt-4">
-        <PageTitle>Your groups</PageTitle>
-        <Button variant="primary" onClick={() => setCreating(true)}>
-          <Plus className="size-4" aria-hidden />
-          New group
-        </Button>
-      </div>
+      <PageHeader
+        title="Your groups"
+        action={
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            <Plus className="size-4" aria-hidden />
+            New group
+          </Button>
+        }
+      />
       <Loaded query={stacks.groups} skeleton={<Skeleton className="h-40" />}>
         {(groups) =>
           groups.length === 0 ? (
-            <EmptyState
-              title="Start a group for the people you play with"
-              action={
-                <Button variant="primary" onClick={() => setCreating(true)}>
-                  Create a group
-                </Button>
-              }
-            >
+            <EmptyState title="Start a group for the people you play with">
               A group keeps one shared ledger. If a friend already made one, open the invite link
               they sent you to join it.
             </EmptyState>
           ) : (
-            <Surface className="divide-y divide-line">
+            <List>
               {groups.map((item) => (
-                <Link
+                <RowLink
                   key={item.group.id}
                   to="/groups/$groupId"
                   params={{ groupId: item.group.id }}
-                  className="flex items-center gap-4 px-5 py-4 transition-colors duration-150 first:rounded-t-xl last:rounded-b-xl hover:bg-sunken"
                 >
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-lg font-semibold">{item.group.name}</span>
-                      {item.liveSessionCount > 0 ? <Tag tone="live">Live</Tag> : null}
-                    </div>
-                    <span className="text-sm">
+                  <RowText
+                    title={item.group.name}
+                    meta={
                       <BalanceLabel
                         amount={item.myBalance}
                         currency={item.group.currency}
                         subject="you"
                       />
-                    </span>
-                  </div>
-                  <ChevronRight className="size-5 text-faint" aria-hidden />
-                </Link>
+                    }
+                  />
+                  {item.liveSessionCount > 0 ? <Tag tone="live">Live</Tag> : null}
+                </RowLink>
               ))}
-            </Surface>
+            </List>
           )
         }
       </Loaded>

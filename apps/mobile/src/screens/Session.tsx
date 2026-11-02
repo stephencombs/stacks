@@ -287,10 +287,7 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
                 >
                   <Chip chip={chipOf(group, playerId)} name={name} size={32} />
                   <View className="flex-1 gap-0.5">
-                    <Text
-                      numberOfLines={1}
-                      className="font-display text-lg tracking-wide text-ink uppercase"
-                    >
+                    <Text numberOfLines={1} className="text-base font-medium text-ink">
                       {name}
                       {playerId === group.myPlayerId ? (
                         <Text className="font-sans text-sm tracking-normal text-muted normal-case">

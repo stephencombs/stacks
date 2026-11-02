@@ -327,7 +327,7 @@ function Payer({ detail, playerId }: { detail: GroupDetail; playerId: PlayerId }
   return (
     <View className="flex-row items-center gap-1.5">
       <Chip chip={chipOf(detail, playerId)} name={name} size={22} />
-      <Text className="font-display text-lg tracking-wide text-ink uppercase">{name}</Text>
+      <Text className="text-base font-medium text-ink">{name}</Text>
     </View>
   );
 }

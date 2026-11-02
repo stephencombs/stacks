@@ -13,12 +13,12 @@ function SessionPage() {
   return (
     <Loaded
       query={stacks.session(SessionId.make(sessionId))}
-      skeleton={<Skeleton className="mt-4 h-96" />}
+      skeleton={<Skeleton className="h-96" />}
     >
       {(session) => (
         <Loaded
           query={stacks.group(session.session.groupId)}
-          skeleton={<Skeleton className="mt-4 h-96" />}
+          skeleton={<Skeleton className="h-96" />}
         >
           {(group) => <SessionView session={session} group={group} />}
         </Loaded>

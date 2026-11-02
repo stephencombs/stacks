@@ -50,12 +50,10 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
           accessibilityRole="button"
           accessibilityLabel={`${trip.name}, live board`}
           onPress={() => navigation.navigate("Trip", { tripId: trip.id })}
-          className="gap-4 rounded-2xl border border-line bg-canvas p-5 active:opacity-90"
+          className="gap-3 rounded-xl bg-surface p-4 active:opacity-90"
         >
           <View className="gap-1">
-            <Text numberOfLines={1} className="font-display text-4xl leading-10 text-ink uppercase">
-              {trip.name}
-            </Text>
+            <Text className="text-lg font-semibold text-ink">{trip.name}</Text>
             <Text className="text-sm text-muted">Going · {tripDates(trip)}</Text>
           </View>
           <Loaded query={stacks.trip(trip.id)} skeleton={<View className="h-6" />}>

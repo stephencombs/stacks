@@ -8,7 +8,7 @@ type Size = "sm" | "md" | "lg";
 
 const base =
   "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap select-none " +
-  "transition-[background-color,color,scale,box-shadow] duration-150 active:scale-[0.98] " +
+  "transition-[background-color,color,scale,box-shadow] duration-150 active:scale-[0.96] " +
   "disabled:pointer-events-none disabled:bg-disabled disabled:text-muted disabled:shadow-none";
 
 const variants: Record<Variant, string> = {
@@ -24,7 +24,7 @@ const variants: Record<Variant, string> = {
 
 const sizes: Record<Size, string> = {
   // Touch screens get 44px targets; a mouse can use the tighter sizes.
-  sm: "h-8 px-3 text-sm pointer-coarse:h-11",
+  sm: "h-10 px-3 text-sm pointer-coarse:h-11",
   md: "h-10 px-4 text-sm pointer-coarse:h-11",
   lg: "h-12 px-5 text-base",
 };

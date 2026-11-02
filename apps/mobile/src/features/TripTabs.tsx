@@ -4,7 +4,7 @@ import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
 
-import { tripTabs, type TripTab } from "./tripTabs";
+import { tripTabs, type TripTab } from "./tripTabConfig";
 
 const Tabs = createNativeBottomTabNavigator();
 

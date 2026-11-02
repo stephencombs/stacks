@@ -23,7 +23,7 @@ import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { SessionView } from "./Session";
 import { SettleView } from "../features/SettleUp";
 import { TripTabs } from "../features/TripTabs";
-import { tripTabs, type TripTab } from "../features/tripTabs";
+import { tripTabs, type TripTab } from "../features/tripTabConfig";
 
 type Props = StaticScreenProps<{ tripId: string; tab?: TripTab }>;
 

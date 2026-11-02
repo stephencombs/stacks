@@ -1,4 +1,6 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+import { describeError } from "@stacks/client-runtime/errors";
+import * as Cause from "effect/Cause";
 import { VenueId, type GroupId, type Venue } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
@@ -32,16 +34,16 @@ function VenueOption({
       aria-pressed={selected}
       className={cn(
         "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150",
-        selected ? "bg-accent text-accent-ink" : "hover:bg-sunken",
+        selected ? "bg-accent/15" : "hover:bg-sunken",
       )}
     >
       <Icon
-        className={cn("size-4 shrink-0", selected ? "text-accent-ink" : "text-muted")}
+        className={cn("size-4 shrink-0", selected ? "text-accent-text" : "text-muted")}
         aria-hidden
       />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-medium">{venue.name}</span>
-        <span className={cn("truncate text-sm", selected ? "text-accent-ink/70" : "text-muted")}>
+        <span className="truncate text-sm text-muted">
           {[
             place ||
               (venue.kind === "online" ? "Online" : venue.kind === "home" ? "Home game" : ""),
@@ -51,7 +53,7 @@ function VenueOption({
             .join(" · ")}
         </span>
       </span>
-      {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+      {selected ? <Check className="size-4 shrink-0 text-accent-text" aria-hidden /> : null}
     </button>
   );
 }
@@ -68,11 +70,20 @@ function VenueResults({
   onSelect: (venue: Venue) => void;
 }) {
   const stacks = useStacks();
-  const result = useAtomValue(stacks.venueSearch(groupId, search));
+  const query = stacks.venueSearch(groupId, search);
+  const result = useAtomValue(query);
+  const retry = useAtomRefresh(query);
   const venues = AsyncResult.getOrElse(result, () => []);
   if (AsyncResult.isInitial(result) || (result.waiting && venues.length === 0)) {
     return <p className="px-3 py-2 text-sm text-muted">Searching…</p>;
   }
+  if (AsyncResult.isFailure(result))
+    return (
+      <div className="flex flex-col gap-3 px-3">
+        <FormError>{describeError(Cause.squash(result.cause))}</FormError>
+        <Button onClick={retry}>Retry venue search</Button>
+      </div>
+    );
   if (venues.length === 0)
     return <p className="px-3 py-2 text-sm text-muted">No venues match “{search.q}”.</p>;
   return (
@@ -247,8 +258,8 @@ function AddVenueDialog({
               <label
                 key={option}
                 className={cn(
-                  "flex h-11 cursor-pointer items-center justify-center rounded-lg outline-offset-2 outline-ink has-[:focus-visible]:outline-2 text-sm shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
-                  kind === option ? "bg-accent text-accent-ink shadow-none" : "hover:bg-sunken",
+                  "flex h-11 cursor-pointer items-center justify-center rounded-lg outline-offset-2 outline-ink has-[:focus-visible]:outline-2 text-sm font-medium shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
+                  kind === option ? "bg-accent/15 text-accent-text shadow-none" : "hover:bg-sunken",
                 )}
               >
                 <input

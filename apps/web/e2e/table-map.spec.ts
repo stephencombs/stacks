@@ -46,8 +46,12 @@ test.describe.serial("seats at a blackjack table", () => {
     await page.getByRole("button", { name: "Add venue" }).click();
     await page.getByText("Blackjack", { exact: true }).click();
     await page.getByRole("checkbox", { name: /Gus/ }).check();
+    await page.route(/\/frame-5-\d+\.webp/, (route) => route.abort());
     await page.getByRole("button", { name: "Start session" }).click();
     await expect(page.getByText("Live", { exact: true })).toBeVisible();
+    await expect(page.getByText("Couldn't load the table artwork.")).toBeVisible();
+    await page.unroute(/\/frame-5-\d+\.webp/);
+    await page.getByRole("button", { name: "Retry table artwork" }).click();
     // Anyone can mark the table high limit.
     const highLimit = page.getByRole("button", { name: "High limit" });
     await highLimit.click();

@@ -86,21 +86,31 @@ export function EntryDialog({
     onClose();
   };
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const value = Option.getOrNull(parseMoney(amount, currency));
+  const validateAmount = (text: string) => {
+    const value = Option.getOrNull(parseMoney(text, currency));
     if (
       value === null ||
       (kind !== "adjustment" && value < 0) ||
       (kind === "adjustment" && value === 0)
     ) {
-      return setAmountError(
-        kind === "adjustment"
-          ? "Enter an amount like 15 or -15."
-          : `Enter an amount like ${formatMoney(MinorUnits.make(2000), currency)}.`,
-      );
+      return kind === "adjustment"
+        ? "Enter an amount like 15 or -15."
+        : `Enter an amount like ${formatMoney(MinorUnits.make(2000), currency)}.`;
     }
-    if (kind === "buy_in" && value === 0) return setAmountError("A buy-in needs an amount.");
+    if (kind === "buy_in" && value === 0) return "A buy-in needs an amount.";
+    return null;
+  };
+
+  const changeAmount = (text: string) => {
+    setAmount(text);
+    if (amountError) setAmountError(validateAmount(text));
+  };
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const error = validateAmount(amount);
+    if (error) return setAmountError(error);
+    const value = Option.getOrThrow(parseMoney(amount, currency));
     record(event.currentTarget, value);
   };
 
@@ -153,11 +163,11 @@ export function EntryDialog({
             <Input
               {...props}
               value={amount}
-              onChange={(event) => setAmount(event.target.value)}
+              onChange={(event) => changeAmount(event.target.value)}
               inputMode="decimal"
               autoComplete="off"
-              autoFocus
-              className="font-mono text-2xl tabular-nums"
+              autoFocus={matchMedia("(pointer: fine)").matches}
+              className="text-2xl tabular-nums"
             />
           )}
         </Field>
@@ -167,8 +177,8 @@ export function EntryDialog({
               <Button
                 key={preset}
                 size="sm"
-                className="flex-1 font-mono"
-                onClick={() => setAmount(amountText(MinorUnits.make(preset), currency))}
+                className="flex-1 tabular-nums"
+                onClick={() => changeAmount(amountText(MinorUnits.make(preset), currency))}
               >
                 {formatMoney(MinorUnits.make(preset), currency)}
               </Button>

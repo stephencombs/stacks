@@ -15,84 +15,19 @@ import {
   tonightBoard,
   tripAwards,
   tripDays,
-  tripFeed,
   tripNights,
   tripStandings,
   tripStats,
 } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
-import { useEffect, useState } from "react";
-import {
-  AccessibilityInfo,
-  Animated,
-  Easing,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { cn } from "../components/ui/cn";
 import { Chip } from "./Chip";
 
-// Board readouts: small mono caps, like the labels on a sportsbook screen.
-const label = "font-mono text-[11px] tracking-[1px] uppercase";
+const label = "text-sm";
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
-/** The latest results sliding past, like the LED strip over a sportsbook. Still with Reduce Motion. */
-function Ticker({ items }: { items: ReadonlyArray<{ key: string; text: string }> }) {
-  const [offset] = useState(() => new Animated.Value(0));
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    if (width === 0) return;
-    let loop: Animated.CompositeAnimation | null = null;
-    let live = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
-      if (!live || reduce) return;
-      loop = Animated.loop(
-        Animated.timing(offset, {
-          toValue: -width / 2,
-          duration: width * 25,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-      );
-      loop.start();
-    });
-    return () => {
-      live = false;
-      loop?.stop();
-    };
-  }, [offset, width]);
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      className="overflow-hidden border-b border-line bg-sunken py-2"
-    >
-      {/* A horizontal scroll view lets the strip run wider than the screen; it never scrolls. */}
-      <ScrollView horizontal scrollEnabled={false} showsHorizontalScrollIndicator={false}>
-        <Animated.View
-          onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-          style={{ flexDirection: "row", transform: [{ translateX: offset }] }}
-        >
-          {items.map((item) => (
-            <Text
-              key={item.key}
-              numberOfLines={1}
-              style={{ flexShrink: 0 }}
-              className="mr-8 font-mono text-xs text-accent-text"
-            >
-              {item.text}
-            </Text>
-          ))}
-        </Animated.View>
-      </ScrollView>
-    </View>
-  );
-}
-
-/** The trip as a casino sportsbook board: ticker, standings, awards and night-by-night. */
 export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const currency = detail.group.currency;
   const names = playerNames(detail);
@@ -101,26 +36,18 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const standings = tripStandings(closed, localClock);
   const nights = tripNights(closed, localClock);
   const awards = tripAwards(closed, localClock);
-  const feed = tripFeed(closed);
   const tonight = nights.at(-1);
   const total = standings.reduce((sum, s) => sum + s.net, 0);
-  const ticker = ["a", "b"].flatMap((copy) =>
-    feed.map((f) => ({
-      key: `${copy}-${f.session.session.id}-${f.playerId}`,
-      text: `${name(f.playerId).toUpperCase()} ${boardMoney(f.net, currency)} · ${f.session.venue.name.toUpperCase()}`,
-    })),
-  );
 
   return (
     <View className="flex-1 bg-canvas">
-      {ticker.length > 0 ? <Ticker items={ticker} /> : null}
-      <View className="gap-7 px-4 pt-5 pb-8">
+      <View className="gap-6 px-4 pt-4 pb-8">
         <View className="flex-row items-end justify-between gap-4">
           <View className="flex-1 gap-1">
             <Text className={cn(label, "text-muted")}>
               {trip.trip.endedAt === null ? "On the board" : "Final board"}
             </Text>
-            <Text numberOfLines={1} className="font-display text-4xl leading-10 text-ink uppercase">
+            <Text className="text-lg font-semibold text-ink">
               {tonight ? nightLabel(tonight) : "Before the first hand"}
             </Text>
           </View>
@@ -134,7 +61,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 
         <View className="gap-2">
           <View className="flex-row justify-between">
-            <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+            <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
               The board
             </Text>
             <Text className={cn(label, "text-muted")}>
@@ -173,10 +100,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                     <Chip chip={chipOf(detail, s.playerId)} name={name(s.playerId)} size={30} />
                     <View className="flex-1">
                       <View className="flex-row items-center gap-2">
-                        <Text
-                          numberOfLines={1}
-                          className="shrink font-display text-lg leading-6 tracking-wide text-ink uppercase"
-                        >
+                        <Text numberOfLines={1} className="shrink text-base font-medium text-ink">
                           {name(s.playerId)}
                         </Text>
                         {s.hot ? (
@@ -204,7 +128,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 
         {awards.length > 0 ? (
           <View className="gap-2">
-            <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+            <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
               Awards
             </Text>
             <View className="flex-row flex-wrap gap-2">
@@ -221,10 +145,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                       name={name(award.playerId)}
                       size={22}
                     />
-                    <Text
-                      numberOfLines={1}
-                      className="shrink font-display text-lg leading-6 tracking-wide text-ink uppercase"
-                    >
+                    <Text numberOfLines={1} className="shrink text-base font-medium text-ink">
                       {name(award.playerId)}
                     </Text>
                   </View>
@@ -237,7 +158,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 
         {nights.length > 0 ? (
           <View className="gap-1">
-            <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+            <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
               Night by night
             </Text>
             {nights.toReversed().map((night, index) => (
@@ -287,7 +208,9 @@ export function TonightBoard({ detail, trip }: { detail: GroupDetail; trip: Trip
       <View className="flex-row items-end justify-between gap-4">
         <View className="flex-1 gap-1">
           <Text className={cn(label, "text-muted")}>Who's up</Text>
-          <Text className="font-display text-4xl leading-10 text-ink uppercase">Tonight</Text>
+          <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
+            Tonight
+          </Text>
         </View>
         {inPlayTotal > 0 ? (
           <View className="items-end">
@@ -340,10 +263,7 @@ export function TonightBoard({ detail, trip }: { detail: GroupDetail; trip: Trip
                 <Text className="w-6 font-mono text-xl text-accent-text">{r.rank}</Text>
                 <Chip chip={chipOf(detail, r.playerId)} name={name(r.playerId)} size={30} />
                 <View className="flex-1">
-                  <Text
-                    numberOfLines={1}
-                    className="font-display text-lg leading-6 tracking-wide text-ink uppercase"
-                  >
+                  <Text numberOfLines={1} className="text-base font-medium text-ink">
                     {name(r.playerId)}
                   </Text>
                   {inPlay || you ? (
@@ -439,7 +359,7 @@ function TripNumbers({ detail, trip }: { detail: GroupDetail; trip: TripDetail }
     <>
       <View className="gap-2">
         <View className="flex-row items-baseline justify-between">
-          <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+          <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
             As a team
           </Text>
           <Text className={cn(label, "text-muted")}>
@@ -449,7 +369,7 @@ function TripNumbers({ detail, trip }: { detail: GroupDetail; trip: TripDetail }
         <View accessible className="gap-3 rounded-xl border border-line bg-surface p-4">
           <Text
             className={cn(
-              "font-display text-2xl leading-7 tracking-wide uppercase",
+              "text-lg font-semibold",
               current ? (current.result === "win" ? "text-win" : "text-loss") : "text-muted",
             )}
           >
@@ -477,7 +397,7 @@ function TripNumbers({ detail, trip }: { detail: GroupDetail; trip: TripDetail }
       </View>
 
       <View className="gap-2">
-        <Text accessibilityRole="header" className="text-[15px] font-semibold text-ink">
+        <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
           The numbers
         </Text>
         <View className="flex-row flex-wrap gap-2">
@@ -521,10 +441,7 @@ export function DaysBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
       {days.toReversed().map((day) => (
         <View key={day.key} className="gap-2">
           <View className="flex-row items-baseline justify-between">
-            <Text
-              accessibilityRole="header"
-              className="font-display text-xl tracking-wide text-ink uppercase"
-            >
+            <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
               {nightLabel(nights.find((n) => n.key === day.key)!)}
             </Text>
             <Text className={cn(label, "text-muted")}>

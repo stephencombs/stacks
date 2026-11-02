@@ -3,7 +3,7 @@ import type { StaticScreenProps } from "@react-navigation/native";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { View } from "react-native";
 
-import type { TripTab } from "../features/tripTabs";
+import type { TripTab } from "../features/tripTabConfig";
 import { useStacks } from "../lib/stacks";
 import { GroupsScreen } from "./Groups";
 import { TripHome } from "./Trip";

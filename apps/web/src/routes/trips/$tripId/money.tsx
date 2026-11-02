@@ -23,9 +23,11 @@ import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
-import { EmptyState, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
+import { EmptyState, Note, Section } from "~/components/ui/Page";
+import { List, Row, RowText, Skeleton } from "~/components/ui/Surface";
 import { BackingSection } from "~/features/Backing";
 import { Chip } from "~/features/Chip";
+import { PlayerName } from "~/features/Player";
 import { VoidEntryDialog } from "~/features/EntryDialogs";
 import { TripHeader } from "~/features/TripHeader";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
@@ -38,12 +40,9 @@ function SettleUp() {
   const { tripId } = Route.useParams();
   const stacks = useStacks();
   return (
-    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="mt-4 h-96" />}>
+    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="h-96" />}>
       {(trip) => (
-        <Loaded
-          query={stacks.group(trip.trip.groupId)}
-          skeleton={<Skeleton className="mt-4 h-96" />}
-        >
+        <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
           {(detail) => <SettleUpView detail={detail} trip={trip} />}
         </Loaded>
       )}
@@ -79,22 +78,9 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
   );
   const transfers = settleUp(balanceOf);
   const me = detail.myPlayerId;
+  // Yours first: they're the ones you can act on.
   const involvesMe = (transfer: Transfer) => transfer.from === me || transfer.to === me;
-  const mine = transfers.filter(involvesMe);
-  const others = transfers.filter((transfer) => !involvesMe(transfer));
-  const transferRow = (transfer: Transfer) => (
-    <div key={`${transfer.from}:${transfer.to}`} className="flex items-center gap-3 px-5 py-3.5">
-      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-        <Payer detail={detail} playerId={transfer.from} />
-        <ArrowRight className="size-4 text-accent-text" role="img" aria-label="pays" />
-        <Payer detail={detail} playerId={transfer.to} />
-      </span>
-      <Money amount={transfer.amount} currency={currency} className="text-lg font-bold" />
-      <Button size="sm" onClick={() => setPaying(transfer)}>
-        Mark paid
-      </Button>
-    </div>
-  );
+  const ordered = transfers.toSorted((a, b) => Number(involvesMe(b)) - Number(involvesMe(a)));
 
   const record = async (payment: Omit<Payment, "id">) => {
     const id = EntryId.make(newId());
@@ -114,101 +100,121 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
 
   return (
     <>
-      <TripHeader
-        group={detail}
-        trip={trip}
-        current="money"
-        action={<Button onClick={() => setRecording(true)}>Record a payment</Button>}
-      />
+      <TripHeader group={detail} trip={trip} current="money" />
 
-      <section className="flex flex-col gap-2">
-        <SectionHeading>You</SectionHeading>
-        <Surface className="divide-y divide-line">
-          <p className="px-5 py-4 font-mono text-2xl font-bold">
-            <BalanceLabel
-              amount={balanceOf.get(me) ?? MinorUnits.make(0)}
-              currency={currency}
-              subject="you"
-            />
-          </p>
-          {mine.map(transferRow)}
-        </Surface>
-        {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
-      </section>
+      <p className="text-3xl font-semibold tracking-tight">
+        <BalanceLabel
+          amount={balanceOf.get(me) ?? MinorUnits.make(0)}
+          currency={currency}
+          subject="you"
+        />
+      </p>
 
       {transfers.length === 0 ? (
         <EmptyState title="Everyone's square">
-          Nobody owes anybody on this trip. Debts show up here when someone covers a buy-in or holds
-          someone else's cash.
+          Debts show up here when someone covers a buy-in or holds someone else's cash.
         </EmptyState>
-      ) : others.length > 0 ? (
-        <section className="flex flex-col gap-2">
-          <SectionHeading>
-            {mine.length > 0 ? "Everyone else" : "Suggested payments"}
-          </SectionHeading>
-          <Surface className="divide-y divide-line">{others.map(transferRow)}</Surface>
-        </section>
-      ) : null}
-      {transfers.length > 0 ? (
-        <p className="-mt-4 text-sm text-muted">
-          Payments that clear every balance. Pay however you like; Stacks only keeps the record.
-        </p>
-      ) : null}
+      ) : (
+        <Section title="Settle up">
+          <List>
+            {ordered.map((transfer) => (
+              <Row key={`${transfer.from}:${transfer.to}`} className="flex-wrap">
+                <span className="flex min-w-0 flex-1 basis-40 items-center gap-2 font-medium">
+                  <Payer detail={detail} playerId={transfer.from} />
+                  <ArrowRight className="size-4 shrink-0 text-faint" role="img" aria-label="pays" />
+                  <Payer detail={detail} playerId={transfer.to} />
+                </span>
+                <span className="ml-auto flex items-center gap-3">
+                  <Money amount={transfer.amount} currency={currency} className="font-semibold" />
+                  <Button size="sm" onClick={() => setPaying(transfer)}>
+                    Mark paid
+                  </Button>
+                </span>
+              </Row>
+            ))}
+          </List>
+          <Note>
+            These clear every balance. Pay however you like; Stacks only keeps the record.
+          </Note>
+          {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
+        </Section>
+      )}
 
-      <section className="flex flex-col gap-2">
-        <SectionHeading>Balances</SectionHeading>
-        <Surface className="divide-y divide-line">
+      <Section title="Balances">
+        <List>
           {detail.players
             .toSorted((a, b) => Number(b.id === me) - Number(a.id === me))
             .map((player) => (
-              <div key={player.id} className="flex items-center gap-3 px-5 py-3">
-                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-                <span className="min-w-0 flex-1 truncate">
-                  {names.get(player.id)}
-                  {player.id === me ? <span className="text-muted"> (you)</span> : null}
-                  {player.userId === null ? <span className="text-muted"> · guest</span> : null}
-                </span>
-                <span className="text-sm">
+              <Row key={player.id}>
+                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
+                <RowText
+                  title={
+                    <PlayerName
+                      name={names.get(player.id) ?? player.displayName}
+                      you={player.id === me}
+                      guest={player.userId === null}
+                    />
+                  }
+                />
+                <span className="font-medium">
                   <BalanceLabel
                     amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
                     currency={currency}
                   />
                 </span>
-              </div>
+              </Row>
             ))}
-        </Surface>
-      </section>
+        </List>
+      </Section>
 
       <BackingSection detail={detail} trip={trip} />
 
-      <section className="flex flex-col gap-2">
-        <SectionHeading>Payments</SectionHeading>
+      <Section
+        title="Payments"
+        action={
+          <Button size="sm" variant="ghost" onClick={() => setRecording(true)}>
+            Record a payment
+          </Button>
+        }
+      >
         {trip.settlements.length === 0 && unsaved.length === 0 ? (
-          <p className="text-sm text-muted">Payments you record show up here.</p>
+          <Note>Payments you record show up here.</Note>
         ) : (
-          <Surface className="divide-y divide-line">
+          <List>
             {unsaved.map((payment) => (
-              <div key={payment.id} className="flex items-center gap-4 px-5 py-3">
-                <span className="w-24 shrink-0 text-sm text-muted">Saving…</span>
-                <span className="flex-1">
-                  {names.get(payment.from)} paid {names.get(payment.to)}{" "}
-                  <Money amount={payment.amount} currency={currency} className="font-medium" />
-                </span>
-              </div>
+              <Row key={payment.id}>
+                <RowText
+                  title={
+                    <>
+                      {names.get(payment.from)} paid {names.get(payment.to)}{" "}
+                      <Money amount={payment.amount} currency={currency} />
+                    </>
+                  }
+                  meta="Saving…"
+                />
+              </Row>
             ))}
             {trip.settlements.map((entry) => {
               const voided = entry.voidedAt !== null;
               return (
-                <div key={entry.id} className="flex items-center gap-4 px-5 py-3">
-                  <span className="w-24 shrink-0 font-mono text-xs text-muted">
-                    {formatDay(entry.occurredAt)}
-                  </span>
-                  <span className={voided ? "flex-1 text-muted line-through" : "flex-1"}>
-                    {names.get(entry.playerId)} paid{" "}
-                    {entry.counterpartyId ? names.get(entry.counterpartyId) : ""}{" "}
-                    <Money amount={entry.amount} currency={currency} className="font-medium" />
-                    {entry.note ? <span className="text-muted"> · {entry.note}</span> : null}
-                  </span>
+                <Row key={entry.id}>
+                  <RowText
+                    struck={voided}
+                    title={
+                      <>
+                        {names.get(entry.playerId)} paid{" "}
+                        {entry.counterpartyId ? names.get(entry.counterpartyId) : ""}{" "}
+                        <Money amount={entry.amount} currency={currency} />
+                      </>
+                    }
+                    meta={[
+                      formatDay(entry.occurredAt),
+                      entry.note,
+                      voided ? `Voided${entry.voidReason ? `: ${entry.voidReason}` : ""}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  />
                   {!voided && (isAdmin(detail) || entry.playerId === detail.myPlayerId) ? (
                     <Menu
                       label={`Actions for ${names.get(entry.playerId)} paid ${entry.counterpartyId ? names.get(entry.counterpartyId) : ""} ${formatMoney(entry.amount, currency)}`}
@@ -218,12 +224,12 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
                       </MenuItem>
                     </Menu>
                   ) : null}
-                </div>
+                </Row>
               );
             })}
-          </Surface>
+          </List>
         )}
-      </section>
+      </Section>
 
       {paying ? (
         <RecordPaymentDialog
@@ -250,9 +256,9 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
 function Payer({ detail, playerId }: { detail: GroupDetail; playerId: PlayerId }) {
   const name = detail.players.find((player) => player.id === playerId)?.displayName ?? "Someone";
   return (
-    <span className="flex items-center gap-1.5">
+    <span className="flex min-w-0 items-center gap-1.5">
       <Chip chip={chipOf(detail, playerId)} name={name} size={22} />
-      <span className="font-display text-lg leading-tight tracking-wide uppercase">{name}</span>
+      <span className="truncate">{name}</span>
     </span>
   );
 }

@@ -2,7 +2,7 @@ import type { GroupDetail } from "@stacks/contracts";
 import type { ReactNode } from "react";
 
 import { BackLink, Tab, Tabs } from "~/components/ui/Nav";
-import { PageTitle } from "~/components/ui/Surface";
+import { PageHeader } from "~/components/ui/Page";
 
 const tabs = [
   { key: "home", label: "Trips", to: "/groups/$groupId" },
@@ -20,28 +20,25 @@ export function GroupHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 pt-2">
-      <BackLink to="/groups">Your groups</BackLink>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <PageTitle
-          context={`${detail.players.length} ${detail.players.length === 1 ? "player" : "players"} · ${detail.group.currency}`}
-        >
-          {detail.group.name}
-        </PageTitle>
-        {action}
-      </div>
-      <Tabs label="Group">
-        {tabs.map((tab) => (
-          <Tab
-            key={tab.key}
-            to={tab.to}
-            params={{ groupId: detail.group.id }}
-            current={tab.key === current}
-          >
-            {tab.label}
-          </Tab>
-        ))}
-      </Tabs>
-    </div>
+    <PageHeader
+      back={<BackLink to="/groups">Your groups</BackLink>}
+      title={detail.group.name}
+      documentTitle={`${tabs.find((tab) => tab.key === current)!.label} · ${detail.group.name}`}
+      action={action}
+      tabs={
+        <Tabs label="Group">
+          {tabs.map((tab) => (
+            <Tab
+              key={tab.key}
+              to={tab.to}
+              params={{ groupId: detail.group.id }}
+              current={tab.key === current}
+            >
+              {tab.label}
+            </Tab>
+          ))}
+        </Tabs>
+      }
+    />
   );
 }

@@ -1,17 +1,19 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import { boardMoney, chipOf, localClock, tripDates } from "@stacks/client-runtime/trip";
+import { chipOf, localClock, tripDates } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
-import { ChevronRight, Plane } from "lucide-react";
+import { Plane } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
+import { Money } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input } from "~/components/ui/Field";
-import { EmptyState, SectionHeading, Surface } from "~/components/ui/Surface";
+import { EmptyState, Section } from "~/components/ui/Page";
+import { List, RowLink, RowText } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 import { Chip } from "./Chip";
 
@@ -19,7 +21,7 @@ import { Chip } from "./Chip";
 const localDay = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
-/** The group's trips: the ones going now as a jump onto their boards, then past trips. */
+/** The group's trips: the ones going now, with who's leading, then past trips. */
 export function TripsSection({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
   const going = detail.trips.filter((trip) => trip.endedAt === null);
@@ -27,9 +29,9 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
 
   if (detail.trips.length === 0) {
     return (
-      <EmptyState title="No trips yet" action={<StartTripButton detail={detail} />}>
-        Every session is part of a trip, like a weekend in Vegas or this month's home games. Start
-        one, and its sessions get their own leaderboard, awards and settle-up.
+      <EmptyState title="No trips yet">
+        Every session is part of a trip, like a weekend in Vegas or this month's home games. Each
+        trip keeps its own leaderboard and settle-up.
       </EmptyState>
     );
   }
@@ -37,51 +39,34 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
   return (
     <>
       {going.length > 0 ? (
-        <section className="flex flex-col gap-2">
-          <SectionHeading>Going now</SectionHeading>
-          {going.map((trip) => (
-            <Link
-              key={trip.id}
-              to="/trips/$tripId"
-              params={{ tripId: trip.id }}
-              className="flex flex-col gap-4 rounded-2xl border border-line bg-canvas p-5 text-ink transition-[scale,border-color] duration-150 hover:border-accent/40 active:scale-[0.99]"
-            >
-              <span className="flex items-center justify-between gap-3">
-                <span className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate font-display text-4xl leading-none tracking-tight uppercase">
-                    {trip.name}
-                  </span>
-                  <span className="text-sm text-muted">Going · {tripDates(trip)}</span>
+        <Section
+          title="Going now"
+          action={<StartTripButton detail={detail} variant="ghost" size="sm" />}
+        >
+          <List>
+            {going.map((trip) => (
+              <RowLink key={trip.id} to="/trips/$tripId" params={{ tripId: trip.id }}>
+                <span className="flex min-w-0 flex-1 flex-col gap-2">
+                  <RowText title={trip.name} meta={tripDates(trip)} />
+                  <Loaded query={stacks.trip(trip.id)} skeleton={<span className="h-6" />}>
+                    {(detailed) => <Leaders detail={detail} trip={detailed} />}
+                  </Loaded>
                 </span>
-                <ChevronRight className="size-5 shrink-0 text-muted" aria-hidden />
-              </span>
-              <Loaded query={stacks.trip(trip.id)} skeleton={<span className="h-6" />}>
-                {(detailed) => <Leaders detail={detail} trip={detailed} />}
-              </Loaded>
-            </Link>
-          ))}
-        </section>
+              </RowLink>
+            ))}
+          </List>
+        </Section>
       ) : null}
       {past.length > 0 ? (
-        <section className="flex flex-col gap-2">
-          <SectionHeading>Past trips</SectionHeading>
-          <Surface className="divide-y divide-line">
+        <Section title="Past trips">
+          <List>
             {past.map((trip) => (
-              <Link
-                key={trip.id}
-                to="/trips/$tripId"
-                params={{ tripId: trip.id }}
-                className="flex min-h-12 items-center justify-between gap-3 px-5 py-3 first:rounded-t-xl last:rounded-b-xl hover:bg-sunken/50"
-              >
-                <span className="truncate font-medium">{trip.name}</span>
-                <span className="flex shrink-0 items-center gap-1 text-sm text-muted">
-                  {tripDates(trip)}
-                  <ChevronRight className="size-4" aria-hidden />
-                </span>
-              </Link>
+              <RowLink key={trip.id} to="/trips/$tripId" params={{ tripId: trip.id }}>
+                <RowText title={trip.name} meta={tripDates(trip)} />
+              </RowLink>
             ))}
-          </Surface>
-        </section>
+          </List>
+        </Section>
       ) : null}
     </>
   );
@@ -91,14 +76,16 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
 export function StartTripButton({
   detail,
   variant = "primary",
+  size = "md",
 }: {
   detail: GroupDetail;
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "ghost";
+  size?: "sm" | "md";
 }) {
   const [starting, setStarting] = useState(false);
   return (
     <>
-      <Button variant={variant} onClick={() => setStarting(true)}>
+      <Button variant={variant} size={size} onClick={() => setStarting(true)}>
         <Plane className="size-4" aria-hidden />
         Start a trip
       </Button>
@@ -115,16 +102,12 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   if (top.length === 0)
     return <span className="text-sm text-muted">Close a session to put it on the board.</span>;
   return (
-    <span className="flex flex-wrap gap-x-4 gap-y-2">
+    <span className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
       {top.map((s) => (
-        <span key={s.playerId} className="flex items-center gap-2">
-          <span className="font-mono text-sm text-accent-text">{s.rank}</span>
+        <span key={s.playerId} className="flex items-center gap-1.5">
           <Chip chip={chipOf(detail, s.playerId)} name={names.get(s.playerId) ?? ""} size={22} />
-          <span
-            className={`font-mono text-sm tabular-nums ${s.net >= 0 ? "text-win" : "text-loss"}`}
-          >
-            {boardMoney(s.net, detail.group.currency)}
-          </span>
+          <span className="text-muted">{names.get(s.playerId)}</span>
+          <Money amount={s.net} currency={detail.group.currency} tone="result" />
         </span>
       ))}
     </span>

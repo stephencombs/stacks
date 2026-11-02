@@ -1,4 +1,6 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+import { describeError } from "@stacks/client-runtime/errors";
+import * as Cause from "effect/Cause";
 import { VenueId, type GroupId, type Venue } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
@@ -67,11 +69,20 @@ function SearchResults({
   onSelect: (venue: Venue) => void;
 }) {
   const stacks = useStacks();
-  const result = useAtomValue(stacks.venueSearch(groupId, search));
+  const query = stacks.venueSearch(groupId, search);
+  const result = useAtomValue(query);
+  const retry = useAtomRefresh(query);
   const venues = AsyncResult.getOrElse(result, () => []);
   if (AsyncResult.isInitial(result) || (result.waiting && venues.length === 0)) {
     return <Text className="px-3 py-2 text-sm text-muted">Searching…</Text>;
   }
+  if (AsyncResult.isFailure(result))
+    return (
+      <View className="gap-3 px-3">
+        <FormError>{describeError(Cause.squash(result.cause))}</FormError>
+        <Button label="Retry venue search" onPress={retry} />
+      </View>
+    );
   if (venues.length === 0)
     return <Text className="px-3 py-2 text-sm text-muted">No venues match “{search.q}”.</Text>;
   return (
