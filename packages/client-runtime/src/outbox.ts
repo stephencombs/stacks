@@ -22,8 +22,6 @@ export interface OutboxStorage {
   readonly save: (value: string) => void;
 }
 
-const SENT_KEPT = 200;
-
 /** Sends one entry; resolves with the failure, or null once the server has it. */
 export type SendEntry = (pending: Pending) => Promise<{ readonly error: unknown }>;
 
@@ -64,7 +62,7 @@ export const makeOutbox = (storage: OutboxStorage, send: SendEntry) => {
       if (!next) return;
       const { error } = await send(next);
       if (error === null) {
-        sent = [...sent, next].slice(-SENT_KEPT);
+        sent = sent.concat(next);
         set(pending.filter((p) => p.entry.id !== next.entry.id));
       } else if (isRetryable(error)) return;
       else

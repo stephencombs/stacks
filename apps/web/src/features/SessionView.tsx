@@ -28,6 +28,7 @@ import { Chip } from "~/features/Chip";
 import { PlayerName } from "~/features/Player";
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
 import { TableMap } from "~/features/TableMap";
+import { PersonalLimits } from "~/features/PersonalLimits";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
 import { tableView } from "@stacks/client-runtime/table";
@@ -38,6 +39,7 @@ import { seatCount, seatsNow } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import { playerResults, type PlayerResult } from "@stacks/shared/results";
 import {
+  Loaded,
   useAction,
   useOutbox,
   usePending,
@@ -202,6 +204,22 @@ export function SessionView({
         tabs={notes}
       />
 
+      <Loaded query={stacks.trip(session.tripId)} skeleton={<></>}>
+        {(trip) => (
+          <PersonalLimits
+            group={group}
+            trip={trip}
+            local={{
+              sessionId: session.id,
+              status: session.status,
+              myJoinedAt: detail.myJoinedAt ?? null,
+              playing:
+                detail.playerIds.includes(group.myPlayerId) && !cashedOut.has(group.myPlayerId),
+              net: resultOf.get(group.myPlayerId)?.net ?? MinorUnits.make(0),
+            }}
+          />
+        )}
+      </Loaded>
       {live && focusPlayerId ? (
         <div className="flex flex-wrap items-center gap-3">
           <Button

@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import { GroupId, InviteId, PlayerId, SessionId, TripId, UserId, VenueId } from "./ids.ts";
+import { EntryId, GroupId, InviteId, PlayerId, SessionId, TripId, UserId, VenueId } from "./ids.ts";
 import { Entry, Game, Seat, Seating, Session, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 
@@ -85,6 +85,18 @@ export const SessionSummary = Schema.Struct({
   playerIds: Schema.Array(PlayerId),
   /** Who's still at a live table: seated and not cashed out. Empty once it closes. */
   playing: Schema.Array(PlayerId),
+  myJoinedAt: Schema.optionalKey(Schema.NullOr(Schema.DateTimeUtc)),
+  ledgerEntryIds: Schema.optionalKey(Schema.Array(EntryId)),
+  myLedgerEntries: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        id: EntryId,
+        kind: Schema.Literals(["buy_in", "cash_out", "adjustment"]),
+        amount: MinorUnits,
+        voidedAt: Schema.NullOr(Schema.DateTimeUtc),
+      }),
+    ),
+  ),
   results: Schema.Array(PlayerResult),
 });
 export type SessionSummary = typeof SessionSummary.Type;
@@ -93,6 +105,7 @@ export const SessionDetail = Schema.Struct({
   session: Session,
   venue: Venue,
   playerIds: Schema.Array(PlayerId),
+  myJoinedAt: Schema.optionalKey(Schema.NullOr(Schema.DateTimeUtc)),
   results: Schema.Array(PlayerResult),
   entries: Schema.Array(Entry),
   /** Every sit, move and stand, oldest first. */
@@ -205,3 +218,10 @@ export const GroupStats = Schema.Struct({
   ),
 });
 export type GroupStats = typeof GroupStats.Type;
+
+export const UserLimits = Schema.Struct({
+  lossLimit: Schema.NullOr(MinorUnits.check(Schema.isGreaterThan(0))),
+  currency: CurrencyCode,
+  sessionReminderMinutes: Schema.NullOr(Schema.Literals([120, 180, 240])),
+});
+export type UserLimits = typeof UserLimits.Type;

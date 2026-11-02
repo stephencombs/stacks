@@ -112,6 +112,13 @@ export const usePending = (sessionId: SessionId) => {
   return pending.filter((p) => p.sessionId === sessionId);
 };
 
+export const useAllOutboxEntries = () => {
+  const outbox = useOutbox();
+  const pending = useSyncExternalStore(outbox.subscribe, outbox.pending);
+  const sent = useSyncExternalStore(outbox.subscribe, outbox.sent);
+  return { pending, sent };
+};
+
 /**
  * Everything recorded here for a session that the given saved entries don't include yet:
  * entries still waiting, and ones the server confirmed that haven't come back in a refetch.

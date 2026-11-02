@@ -48,6 +48,10 @@
       "types": "./src/outbox.ts",
       "import": "./src/outbox.ts"
     },
+    "./limits": {
+      "types": "./src/limits.ts",
+      "import": "./src/limits.ts"
+    },
     "./pay": {
       "types": "./src/pay.ts",
       "import": "./src/pay.ts"

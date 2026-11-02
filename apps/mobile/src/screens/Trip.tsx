@@ -15,6 +15,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { List, PageTitle, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { ToastHost } from "../components/ui/Toast";
 import { LiveBar } from "../features/LiveBar";
+import { PersonalLimits } from "../features/PersonalLimits";
 import { TripStats } from "../features/RaceStats";
 import { SessionList } from "../features/SessionList";
 import { DaysBoard, TonightBoard, TripBoard } from "../features/TripBoard";
@@ -79,6 +80,7 @@ function TripTabScreen({
           contentContainerClassName="gap-6 pt-4 pb-24"
         >
           <TripTitle trip={trip} group={group} />
+          <PersonalLimits group={group} trip={trip} settings={tab === "table"} />
           {tab === "table" ? (
             <TableTab trip={trip} group={group} mine={mine} />
           ) : tab === "board" ? (

@@ -116,6 +116,12 @@ describe("outbox", () => {
     expect(stuck.pending()).toEqual([]);
   });
 
+  it("retains confirmations beyond 200 entries for stale trip views", async () => {
+    const outbox = makeOutbox(memory(), async () => ({ error: null }));
+    for (let index = 0; index < 201; index++) await outbox.add(session, entry(1));
+    expect(outbox.sent()).toHaveLength(201);
+  });
+
   it("starts empty when what's stored can't be read", () => {
     expect(makeOutbox(memory("not json"), offline).pending()).toEqual([]);
   });
