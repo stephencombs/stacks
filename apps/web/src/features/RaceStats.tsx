@@ -420,7 +420,7 @@ function Sheet({
                 <span
                   className={cn(
                     "absolute inset-x-1 rounded-[2px] transition-opacity duration-150",
-                    p.net >= 0 ? "bg-win" : "bg-loss",
+                    p.net > 0 ? "bg-win" : p.net < 0 ? "bg-loss" : "bg-muted",
                     shown !== null && shown !== i && "opacity-40",
                   )}
                   style={

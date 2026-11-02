@@ -2,6 +2,9 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreBinaries": ["eas"],
   "workspaces": {
+    "apps/web": {
+      "entry": ["src/design/main.tsx"]
+    },
     "apps/mobile": {
       "ignoreDependencies": ["@babel/core", "@react-navigation/elements", "expo-updates", "serve"]
     }

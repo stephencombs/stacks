@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Stacks design system</title>
+    <script>
+      try {
+        var choice = localStorage.getItem("stacks-theme");
+        if (
+          choice === "light" ||
+          (choice === "system" && matchMedia("(prefers-color-scheme: light)").matches)
+        )
+          document.documentElement.dataset.theme = "light";
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/design/main.tsx"></script>
+  </body>
+</html>

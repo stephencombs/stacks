@@ -54,7 +54,7 @@ export function Sheet({
               <Text
                 accessibilityRole="header"
                 numberOfLines={1}
-                className="flex-1 text-center text-[17px] font-semibold text-ink"
+                className="flex-1 text-center type-body font-semibold text-ink"
               >
                 {title}
               </Text>
@@ -75,7 +75,7 @@ export function Sheet({
               contentContainerClassName="gap-5 px-4 pt-2 pb-8"
             >
               {description ? (
-                <Text className="px-1 text-center text-[15px] text-muted">{description}</Text>
+                <Text className="px-1 text-center type-callout text-muted">{description}</Text>
               ) : null}
               {children}
             </ScrollView>

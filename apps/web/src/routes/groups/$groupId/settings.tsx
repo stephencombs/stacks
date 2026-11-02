@@ -183,7 +183,7 @@ function InviteSection({ detail, origin }: { detail: GroupDetail; origin: string
               payload: { id: InviteId.make(newId()), maxUses: null },
             })
           }
-          disabled={create.pending}
+          pending={create.pending}
         >
           New invite link
         </Button>
@@ -259,8 +259,8 @@ function LeaveDialog({
         {leave.error ? <FormError>{leave.error}</FormError> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={() => onOpenChange(false)}>Stay</Button>
-          <Button variant="danger" onClick={() => void confirm()} disabled={leave.pending}>
-            {leave.pending ? "Leaving…" : "Leave group"}
+          <Button variant="danger" onClick={() => void confirm()} pending={leave.pending}>
+            Leave group
           </Button>
         </div>
       </div>
@@ -295,8 +295,8 @@ function RemoveMemberDialog({
         {remove.error ? <FormError>{remove.error}</FormError> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Keep them</Button>
-          <Button variant="danger" onClick={() => void confirm()} disabled={remove.pending}>
-            {remove.pending ? "Removing…" : "Remove"}
+          <Button variant="danger" onClick={() => void confirm()} pending={remove.pending}>
+            Remove
           </Button>
         </div>
       </div>
@@ -330,8 +330,8 @@ function RevokeInviteDialog({
         {revoke.error ? <FormError>{revoke.error}</FormError> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Keep it</Button>
-          <Button variant="danger" onClick={() => void confirm()} disabled={revoke.pending}>
-            {revoke.pending ? "Revoking…" : "Revoke link"}
+          <Button variant="danger" onClick={() => void confirm()} pending={revoke.pending}>
+            Revoke link
           </Button>
         </div>
       </div>

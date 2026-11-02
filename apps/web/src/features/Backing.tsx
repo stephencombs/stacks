@@ -211,8 +211,8 @@ function BackDialog({
           {(props) => <Input {...props} name="note" maxLength={280} autoComplete="off" />}
         </Field>
         {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
-        <Button type="submit" variant="primary" size="lg" disabled={create.pending}>
-          {create.pending ? "Saving…" : "Back them"}
+        <Button type="submit" variant="primary" size="lg" pending={create.pending}>
+          Back them
         </Button>
       </form>
     </Dialog>
@@ -253,8 +253,8 @@ function VoidStakeDialog({
         {voidStake.error ? <FormError>{voidStake.error}</FormError> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Keep it</Button>
-          <Button type="submit" variant="danger" disabled={voidStake.pending}>
-            {voidStake.pending ? "Voiding…" : "Void stake"}
+          <Button type="submit" variant="danger" pending={voidStake.pending}>
+            Void stake
           </Button>
         </div>
       </form>

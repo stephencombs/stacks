@@ -32,9 +32,9 @@ function Claim() {
               variant="primary"
               size="lg"
               onClick={() => void confirm()}
-              disabled={claim.pending}
+              pending={claim.pending}
             >
-              {claim.pending ? "Claiming…" : `Yes, I'm ${preview.displayName}`}
+              {`Yes, I'm ${preview.displayName}`}
             </Button>
           </div>
         </>

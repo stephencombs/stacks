@@ -13,9 +13,8 @@ import * as Option from "effect/Option";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "~/components/ui/Button";
-import { cn } from "~/components/ui/cn";
 import { Dialog } from "~/components/ui/Dialog";
-import { Field, FormError, Input, Select } from "~/components/ui/Field";
+import { Field, FormError, Input, RadioCards, Select } from "~/components/ui/Field";
 import { useAction, useOutbox, useStacks } from "~/lib/stacks";
 
 export type EntryDraft = {
@@ -131,32 +130,15 @@ export function EntryDialog({
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         {draft.replaces ? null : (
-          <fieldset className="grid grid-cols-3 gap-2">
-            <legend className="sr-only">What happened</legend>
-            {kinds.map((option) => (
-              <label
-                key={option}
-                className={cn(
-                  "flex h-10 cursor-pointer items-center justify-center rounded-lg px-2 text-sm outline-offset-2 outline-accent-text shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150 has-[:focus-visible]:outline-2 pointer-coarse:h-11",
-                  kind === option
-                    ? "bg-accent font-semibold text-accent-ink shadow-none"
-                    : "bg-surface hover:bg-sunken",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="kind"
-                  className="sr-only"
-                  checked={kind === option}
-                  onChange={() => {
-                    setKind(option);
-                    setAmountError(null);
-                  }}
-                />
-                {titles[option]}
-              </label>
-            ))}
-          </fieldset>
+          <RadioCards
+            label={<span className="sr-only">What happened</span>}
+            options={kinds.map((option) => ({ value: option, label: titles[option] }))}
+            value={kind}
+            onChange={(option) => {
+              setKind(option);
+              setAmountError(null);
+            }}
+          />
         )}
         <Field label="Amount" error={amountError}>
           {(props) => (
@@ -270,8 +252,8 @@ export function VoidEntryDialog({ entry, onClose }: { entry: Entry | null; onClo
         {voidEntry.error ? <FormError>{voidEntry.error}</FormError> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Keep it</Button>
-          <Button type="submit" variant="danger" disabled={voidEntry.pending}>
-            {voidEntry.pending ? "Voiding…" : "Void entry"}
+          <Button type="submit" variant="danger" pending={voidEntry.pending}>
+            Void entry
           </Button>
         </div>
       </form>

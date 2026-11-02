@@ -514,9 +514,9 @@ function ReopenSession({ detail, group }: { detail: SessionDetail; group: GroupD
     <div className="flex flex-col items-start gap-2">
       <Button
         onClick={() => void reopen.run({ params: { sessionId: detail.session.id } })}
-        disabled={reopen.pending}
+        pending={reopen.pending}
       >
-        {reopen.pending ? "Reopening…" : "Reopen session"}
+        Reopen session
       </Button>
       <Note>Reopen to fix a mistake. Closed sessions can't be edited.</Note>
       {reopen.error ? <FormError>{reopen.error}</FormError> : null}
@@ -568,19 +568,15 @@ function CloseSessionDialog({
   const outbox = useOutbox();
   const unsent = usePending(detail.session.id).length;
   const [missing, setMissing] = useState(false);
-  const confirm = async (form: HTMLFormElement, next: boolean) => {
-    const data = new FormData(form);
-    const cashOuts = playing.map((player) => ({
-      player,
-      amount: Option.getOrNull(parseMoney(String(data.get(player.id) ?? ""), currency)),
-    }));
-    if (cashOuts.some(({ amount }) => amount === null || amount < 0)) return setMissing(true);
-    setMissing(false);
+  const [closing, setClosing] = useState<"close" | "move" | null>(null);
+  const sendClose = async (
+    cashOuts: ReadonlyArray<{ player: { id: PlayerId }; amount: MinorUnits | null }>,
+  ) => {
     // Anything still waiting to be sent goes first, so the close counts it.
     await outbox.flush();
-    if (outbox.pending().some((p) => p.sessionId === detail.session.id)) return;
+    if (outbox.pending().some((p) => p.sessionId === detail.session.id)) return false;
     // The last cash-outs travel with the close: one request for the whole table.
-    const closed = await close.run({
+    return close.run({
       params: { sessionId: detail.session.id },
       payload: {
         cashOuts: cashOuts.map(({ player, amount }) => ({
@@ -590,6 +586,17 @@ function CloseSessionDialog({
         })),
       },
     });
+  };
+  const confirm = async (form: HTMLFormElement, next: boolean) => {
+    const data = new FormData(form);
+    const cashOuts = playing.map((player) => ({
+      player,
+      amount: Option.getOrNull(parseMoney(String(data.get(player.id) ?? ""), currency)),
+    }));
+    if (cashOuts.some(({ amount }) => amount === null || amount < 0)) return setMissing(true);
+    setMissing(false);
+    setClosing(next ? "move" : "close");
+    const closed = await sendClose(cashOuts).finally(() => setClosing(null));
     if (!closed) return;
     onOpenChange(false);
     if (next)
@@ -610,8 +617,7 @@ function CloseSessionDialog({
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
-          const next = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value");
-          void confirm(event.currentTarget, next === "move");
+          void confirm(event.currentTarget, false);
         }}
       >
         {playing.length > 0 ? (
@@ -645,16 +651,22 @@ function CloseSessionDialog({
         {close.error ? <FormError>{close.error}</FormError> : null}
         <div className="flex flex-wrap justify-end gap-2">
           <Button onClick={() => onOpenChange(false)}>Keep playing</Button>
+          {/* Not a submit button: Enter in a cash-out field must close, not move tables. */}
           <Button
-            type="submit"
-            value="move"
-            disabled={close.pending}
+            disabled={closing !== null}
+            pending={closing === "move"}
+            onClick={(event) => void confirm(event.currentTarget.form!, true)}
             title="Close and start another session with the same players"
           >
             Close and move tables
           </Button>
-          <Button type="submit" variant="primary" disabled={close.pending}>
-            {close.pending ? "Closing…" : "Close session"}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={closing !== null}
+            pending={closing === "close"}
+          >
+            Close session
           </Button>
         </div>
       </form>
@@ -705,7 +717,7 @@ function AddPlayerDialog({
                   </option>
                 ))}
               </Select>
-              <Button type="submit" variant="primary" size="lg" disabled={add.pending}>
+              <Button type="submit" variant="primary" size="lg" pending={add.pending}>
                 Add to session
               </Button>
             </form>

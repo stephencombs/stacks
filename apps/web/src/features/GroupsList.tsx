@@ -143,8 +143,8 @@ function CreateGroupDialog({
           )}
         </Field>
         {create.error ? <FormError>{create.error}</FormError> : null}
-        <Button type="submit" variant="primary" size="lg" disabled={create.pending}>
-          {create.pending ? "Creating…" : "Create group"}
+        <Button type="submit" variant="primary" size="lg" pending={create.pending}>
+          Create group
         </Button>
       </form>
     </Dialog>

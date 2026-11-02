@@ -25,7 +25,7 @@ export function LiveBar() {
         to="/trips/$tripId"
         params={{ tripId: seat.tripId }}
         aria-label={`Back to your table at ${seat.venueName}`}
-        className="pointer-events-auto mx-auto flex min-h-14 w-full max-w-[40rem] items-center gap-3 rounded-xl bg-surface px-4 py-3 shadow-[0_0_0_1px_var(--color-line-strong),0_8px_24px_-8px_rgb(0_0_0/0.4)] hover:bg-sunken"
+        className="pointer-events-auto mx-auto flex min-h-14 w-full max-w-[40rem] items-center gap-3 rounded-xl bg-surface px-4 py-3 shadow-(--elevation-popover) hover:bg-sunken"
       >
         <Tag tone="live">Live</Tag>
         <span className="min-w-0 flex-1 truncate font-medium">{seat.venueName}</span>

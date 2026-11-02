@@ -285,7 +285,7 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
                   }
                   className="min-h-16 flex-1 flex-row items-center gap-3 py-3 pl-4 active:bg-sunken"
                 >
-                  <Chip chip={chipOf(group, playerId)} name={name} size={32} />
+                  <Chip chip={chipOf(group, playerId)} name={name} size={30} />
                   <View className="flex-1 gap-0.5">
                     <Text numberOfLines={1} className="text-base font-medium text-ink">
                       {name}
@@ -641,7 +641,7 @@ function HighLimitToggle({ detail }: { detail: SessionDetail }) {
       accessibilityLabel="High-limit table"
       accessibilityState={{ checked: on, disabled: set.pending }}
       disabled={set.pending}
-      hitSlop={8}
+      hitSlop={10}
       onPress={() =>
         void set.run({ params: { sessionId: detail.session.id }, payload: { highLimit: !on } })
       }
@@ -650,14 +650,7 @@ function HighLimitToggle({ detail }: { detail: SessionDetail }) {
         on ? "bg-accent/20" : "border border-line-strong",
       )}
     >
-      <Text
-        className={cn(
-          "font-mono text-[11px] tracking-[1px] uppercase",
-          on ? "text-accent-text" : "text-muted",
-        )}
-      >
-        High limit
-      </Text>
+      <Text className={cn("type-label", on ? "text-accent-text" : "text-muted")}>High limit</Text>
     </Pressable>
   );
 }
@@ -680,18 +673,15 @@ function CloseSheet({
   const unsent = usePending(detail.session.id).length;
   const [chips, setChips] = useState<ReadonlyMap<PlayerId, string>>(new Map());
   const [missing, setMissing] = useState(false);
-  const confirm = async (next: boolean) => {
-    const cashOuts = playing.map((player) => ({
-      player,
-      amount: Option.getOrNull(parseMoney(chips.get(player.id) ?? "", currency)),
-    }));
-    if (cashOuts.some(({ amount }) => amount === null || amount < 0)) return setMissing(true);
-    setMissing(false);
+  const [closing, setClosing] = useState<"close" | "move" | null>(null);
+  const sendClose = async (
+    cashOuts: ReadonlyArray<{ player: { id: PlayerId }; amount: MinorUnits | null }>,
+  ) => {
     // Anything still waiting to be sent goes first, so the close counts it.
     await outbox.flush();
-    if (outbox.pending().some((p) => p.sessionId === detail.session.id)) return;
+    if (outbox.pending().some((p) => p.sessionId === detail.session.id)) return false;
     // The last cash-outs travel with the close: one request for the whole table.
-    const closed = await close.run({
+    return close.run({
       params: { sessionId: detail.session.id },
       payload: {
         cashOuts: cashOuts.map(({ player, amount }) => ({
@@ -701,6 +691,16 @@ function CloseSheet({
         })),
       },
     });
+  };
+  const confirm = async (next: boolean) => {
+    const cashOuts = playing.map((player) => ({
+      player,
+      amount: Option.getOrNull(parseMoney(chips.get(player.id) ?? "", currency)),
+    }));
+    if (cashOuts.some(({ amount }) => amount === null || amount < 0)) return setMissing(true);
+    setMissing(false);
+    setClosing(next ? "move" : "close");
+    const closed = await sendClose(cashOuts).finally(() => setClosing(null));
     if (!closed) return;
     succeed();
     onClose();
@@ -719,14 +719,16 @@ function CloseSheet({
             label="Close session"
             variant="primary"
             size="lg"
-            pending={close.pending}
+            disabled={closing !== null}
+            pending={closing === "close"}
             onPress={() => void confirm(false)}
           />
           <Button
             label="Close and move tables"
             accessibilityLabel="Close and start another session with the same players"
             size="lg"
-            disabled={close.pending}
+            disabled={closing !== null}
+            pending={closing === "move"}
             onPress={() => void confirm(true)}
           />
           <Button label="Keep playing" variant="ghost" onPress={onClose} />
@@ -860,9 +862,7 @@ function TicketStub({
             index > 0 && "border-l border-dashed border-line-strong",
           )}
         >
-          <Text className="font-mono text-[11px] tracking-[1px] text-muted uppercase">
-            {cell.label}
-          </Text>
+          <Text className="type-label text-muted">{cell.label}</Text>
           {cell.value}
         </View>
       ))}

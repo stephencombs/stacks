@@ -50,8 +50,8 @@ export function AddGuestDialog({
           {(props) => <Input {...props} name="displayName" maxLength={60} autoComplete="off" />}
         </Field>
         {add.error ? <FormError>{add.error}</FormError> : null}
-        <Button type="submit" variant="primary" size="lg" disabled={add.pending}>
-          {add.pending ? "Adding…" : "Add guest"}
+        <Button type="submit" variant="primary" size="lg" pending={add.pending}>
+          Add guest
         </Button>
       </form>
     </Dialog>

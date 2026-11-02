@@ -96,7 +96,9 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
         <View key={s.playerId} className="flex-row items-center gap-2">
           <Text className="font-mono text-sm text-accent-text">{s.rank}</Text>
           <Chip chip={chipOf(detail, s.playerId)} name={names.get(s.playerId) ?? ""} size={22} />
-          <Text className={`font-mono text-sm ${s.net >= 0 ? "text-win" : "text-loss"}`}>
+          <Text
+            className={`font-mono text-sm ${s.net > 0 ? "text-win" : s.net < 0 ? "text-loss" : "text-muted"}`}
+          >
             {boardMoney(s.net, detail.group.currency)}
           </Text>
         </View>
@@ -162,7 +164,7 @@ function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () 
         maxLength={60}
         placeholder={`Vegas ${now.getFullYear()}`}
       />
-      <Choice label="Started" options={STARTS} value={daysAgo} onChange={setDaysAgo} columns={2} />
+      <Choice label="Started" options={STARTS} value={daysAgo} onChange={setDaysAgo} />
       {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
     </Sheet>
   );

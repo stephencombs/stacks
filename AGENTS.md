@@ -49,6 +49,7 @@ A change that works on the path you tested and is missing everywhere else is the
 - `apps/api`: Cloudflare Worker serving the Effect `HttpApi` defined in contracts. `src/features` holds one module of service functions per feature, `src/http/Api.ts` the thin handlers, `src/db/migrations` the SQL migrations (append new ones to `migrations/index.ts`).
 - `apps/web`: React 19, Vite (through vite-plus), TanStack Router file routes, Tailwind v4. Data goes through `src/lib/stacks.tsx`: `<Loaded query={…}>` renders a query with its loading and error states, and `useAction(mutation)` runs a write, refreshes what's on screen and turns failures into a sentence. Screens never call the API client directly.
 - `apps/web/src/components/ui` exports own their look: pick a `variant` or `size`, and pass only layout classes (margin, width, flex). A look that belongs to one screen stays in that screen.
+- `DESIGN.md` is the design system: read it before building UI. `/design.html` on the web dev server shows the shared web parts and their states.
 - `apps/web/e2e` holds the Playwright test of the full loop against the real Clerk development instance (`pnpm --filter @stacks/web test:e2e`). Run it after changing a flow it covers.
 - `apps/mobile`: Expo with a dev client, React Navigation native-stack (static config), Uniwind.
 - `packages/contracts`: Effect Schema types and the `StacksApi` definition. No runtime logic.

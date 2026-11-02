@@ -26,7 +26,7 @@ const apply = () => {
   else delete root.dataset.theme;
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", light ? "#f1f3f6" : "#0e1116");
+    ?.setAttribute("content", light ? "#f2f3f6" : "#090b0f");
   requestAnimationFrame(() => requestAnimationFrame(() => delete root.dataset.themeSwitching));
 };
 

@@ -116,13 +116,13 @@ function DeleteTripDialog({
           <Button onClick={onClose}>Keep it</Button>
           <Button
             variant="danger"
-            disabled={remove.pending}
+            pending={remove.pending}
             onClick={async () => {
               if (await remove.run({ params: { tripId: trip.trip.id } }))
                 void navigate({ to: "/groups/$groupId", params: { groupId: group.group.id } });
             }}
           >
-            {remove.pending ? "Deleting…" : "Delete trip"}
+            Delete trip
           </Button>
         </div>
       </div>

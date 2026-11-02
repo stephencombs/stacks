@@ -4,6 +4,7 @@ import { useCSSVariable } from "uniwind";
 import type { IconName } from "./Icon";
 
 const symbols: Record<IconName, SFSymbol> = {
+  alert: "exclamationmark.circle",
   "chevron-right": "chevron.right",
   check: "checkmark",
   "arrow-right": "arrow.right",
@@ -17,7 +18,7 @@ export function Icon({
   size = 20,
 }: {
   name: IconName;
-  color: "ink" | "muted" | "faint" | "accent-ink" | "accent-text";
+  color: "ink" | "muted" | "faint" | "accent-ink" | "accent-text" | "danger";
   size?: number;
 }) {
   const tint = useCSSVariable(`--color-${color}`);

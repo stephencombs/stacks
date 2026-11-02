@@ -8,7 +8,6 @@ import { useCSSVariable, useUniwind } from "uniwind";
 
 import { cn } from "../components/ui/cn";
 
-const label = "font-mono text-[11px] tracking-[1px] uppercase";
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
 type Placed = Venue & { lat: number; lng: number };
@@ -128,7 +127,7 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
               <Text numberOfLines={1} className="text-base text-ink">
                 {stop.venue.name}
               </Text>
-              <Text className={cn(label, "text-muted")}>
+              <Text className="type-label text-muted">
                 {stop.visits} {stop.visits === 1 ? "session" : "sessions"}
                 {placed(stop.venue) ? "" : " · not on the map"}
               </Text>

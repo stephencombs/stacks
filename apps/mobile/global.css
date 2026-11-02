@@ -7,7 +7,8 @@
   --font-mono: "JetBrainsMono_500Medium";
 }
 
-/* Keep in step with apps/web/src/index.css. Dark is the default; see lib/theme.ts. */
+/* Keep in step with apps/web/src/index.css; its src/design/tokens.test.ts fails when they drift. Dark
+   is the default; see lib/theme.ts. */
 @layer theme {
   :root {
     @variant light {
@@ -23,10 +24,10 @@
       --color-line-strong: oklch(0.2 0.015 260 / 0.18);
       --color-accent: oklch(0.8 0.16 75);
       --color-accent-ink: oklch(0.2 0.02 75);
-      --color-accent-text: oklch(0.52 0.12 65);
-      --color-win: oklch(0.5 0.13 150);
-      --color-loss: oklch(0.54 0.19 25);
-      --color-live: oklch(0.54 0.19 25);
+      --color-accent-text: oklch(0.5 0.112 65);
+      --color-win: oklch(0.48 0.13 150);
+      --color-loss: oklch(0.52 0.19 25);
+      --color-live: oklch(0.5 0.112 65);
       --color-danger: oklch(0.52 0.19 25);
       --color-disabled: oklch(0.86 0.005 260);
 
@@ -35,7 +36,7 @@
       --color-chip-1-ink: oklch(0.98 0 0);
       --color-chip-2: oklch(0.5 0.15 255);
       --color-chip-2-ink: oklch(0.98 0 0);
-      --color-chip-3: oklch(0.55 0.1 190);
+      --color-chip-3: oklch(0.55 0.095 190);
       --color-chip-3-ink: oklch(0.98 0 0);
       --color-chip-4: oklch(0.34 0.01 260);
       --color-chip-4-ink: oklch(0.98 0 0);
@@ -60,12 +61,12 @@
       --color-faint: oklch(0.54 0.01 260);
       --color-line: oklch(0.25 0.01 260);
       --color-line-strong: oklch(0.32 0.01 260);
-      --color-accent: oklch(0.83 0.16 75);
+      --color-accent: oklch(0.83 0.148 75);
       --color-accent-ink: oklch(0.2 0.02 75);
-      --color-accent-text: oklch(0.83 0.16 75);
+      --color-accent-text: oklch(0.83 0.148 75);
       --color-win: oklch(0.8 0.17 150);
       --color-loss: oklch(0.7 0.19 25);
-      --color-live: oklch(0.7 0.19 25);
+      --color-live: oklch(0.83 0.148 75);
       --color-danger: oklch(0.7 0.19 25);
       --color-disabled: oklch(0.27 0.01 260);
 
@@ -74,7 +75,7 @@
       --color-chip-1-ink: oklch(0.98 0 0);
       --color-chip-2: oklch(0.5 0.15 255);
       --color-chip-2-ink: oklch(0.98 0 0);
-      --color-chip-3: oklch(0.55 0.1 190);
+      --color-chip-3: oklch(0.55 0.095 190);
       --color-chip-3-ink: oklch(0.98 0 0);
       --color-chip-4: oklch(0.34 0.01 260);
       --color-chip-4-ink: oklch(0.98 0 0);
@@ -89,4 +90,26 @@
       --color-chip-edge: oklch(0.97 0.01 90);
     }
   }
+}
+
+/* Type roles, the same names as apps/web/src/index.css. Text doesn't inherit color here: pair each
+   with text-ink or another palette color. */
+@utility type-title {
+  @apply font-display text-[40px] leading-[40px] uppercase;
+}
+@utility type-headline {
+  @apply font-display text-4xl leading-10 uppercase;
+}
+@utility type-callout {
+  @apply text-[15px];
+}
+@utility type-label {
+  @apply font-mono text-[11px] tracking-[1px] uppercase;
+}
+/* The iOS body and footnote sizes, for native controls. */
+@utility type-body {
+  @apply text-[17px];
+}
+@utility type-footnote {
+  @apply text-[13px];
 }
