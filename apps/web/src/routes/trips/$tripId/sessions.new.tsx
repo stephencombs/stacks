@@ -15,6 +15,7 @@ import { UserPlus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "~/components/ui/Button";
+import { Checkbox } from "~/components/ui/Checkbox";
 import { FormError, Input } from "~/components/ui/Field";
 import { PageTitle, SectionHeading, Skeleton, Surface } from "~/components/ui/Surface";
 import { cn } from "~/components/ui/cn";
@@ -164,12 +165,7 @@ function NewSessionForm({
           ))}
         </div>
         <label className="mt-2 flex cursor-pointer items-center gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={highLimit}
-            onChange={(event) => setHighLimit(event.target.checked)}
-            className="size-5 accent-[var(--color-accent)]"
-          />
+          <Checkbox checked={highLimit} onCheckedChange={setHighLimit} />
           High-limit table
         </label>
       </fieldset>
@@ -188,11 +184,9 @@ function NewSessionForm({
               key={player.id}
               className="flex cursor-pointer items-center gap-3 px-5 py-3 hover:bg-sunken"
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={playerIds.has(player.id)}
-                onChange={() => toggle(player.id)}
-                className="size-5 accent-[var(--color-accent)]"
+                onCheckedChange={() => toggle(player.id)}
               />
               <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
               <span>
@@ -210,13 +204,12 @@ function NewSessionForm({
 
       <div className="flex flex-col gap-3">
         <label className="flex items-center gap-3 text-sm">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={earlier !== null}
-            onChange={(event) => {
+            onCheckedChange={(checked) => {
               const now = Date.now();
               setEarlier(
-                event.target.checked
+                checked
                   ? {
                       value: localInputValue(new Date(now - 2 * 3_600_000)),
                       max: localInputValue(new Date(now)),
@@ -224,7 +217,6 @@ function NewSessionForm({
                   : null,
               );
             }}
-            className="size-5 accent-[var(--color-accent)]"
           />
           We started earlier
         </label>

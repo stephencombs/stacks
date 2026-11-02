@@ -55,6 +55,7 @@ A change that works on the path you tested and is missing everywhere else is the
 - `packages/shared`: pure ledger logic shared by the API and clients: `money`, `results`, `balances`, `settleUp`. Import a subpath; there's no root export.
 - `packages/client-runtime`: client code shared by web and mobile. Import an explicit subpath (`@stacks/client-runtime/api`); there's no root export.
 - Charts, the T3Code way, with no chart library: shape the data in `packages/shared`, take scales from `@stacks/client-runtime/chart`, and draw it per platform: SVG on web, `react-native-svg` and plain views on mobile.
+- New web components are copied from shadcn/ui's Base UI versions (coss ui if shadcn lacks one) and adapted to our tokens; no `shadcn init`. Watch the names: our `accent` is the brand gold and our `muted` is text, so shadcn's `bg-accent` and `bg-muted` compile but mean something else.
 - Dependency versions live in the `catalog:` in `pnpm-workspace.yaml`. Add a shared dependency there, not as a version in one package.
 
 ## Taste

@@ -132,7 +132,7 @@ These are pure functions with thorough unit tests, and they're the first code wr
 ### Web (`apps/web`)
 
 - Vite, React 19, TanStack Router (file routes), and Tailwind v4 with OKLCH tokens.
-- Base UI primitives wrapped in `components/ui` that own their look (the T3Code rule: pick a variant, don't restyle with `className`).
+- Base UI primitives wrapped in `components/ui` that own their look (the T3Code rule: pick a variant, don't restyle with `className`). New components are copied from shadcn/ui's Base UI versions (coss ui if shadcn lacks one) and adapted to our tokens; no `shadcn init`.
 - `@clerk/react` for auth, and `@effect/atom-react` for the atoms from client-runtime.
 - Deploy to Vercel (as T3Code does) or Cloudflare Pages.
 
