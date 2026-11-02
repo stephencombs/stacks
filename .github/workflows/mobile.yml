@@ -36,4 +36,11 @@ jobs:
           node-version-file: .node-version
           cache: true
           run-install: true
+      # Metro keys its entries by file content, so a cache from an older lockfile is safe.
+      # Dependency transforms are most of the bundle; only changed app files miss.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/metro-cache
+          key: metro-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: metro-${{ runner.os }}-
       - run: vp run --filter @stacks/mobile build
