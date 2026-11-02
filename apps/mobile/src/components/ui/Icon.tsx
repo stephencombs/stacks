@@ -1,7 +1,8 @@
-import { ArrowRight, Check, ChevronRight, Delete, X } from "lucide-react-native";
+import { ArrowRight, Check, ChevronRight, CircleAlert, Delete, X } from "lucide-react-native";
 import { useCSSVariable } from "uniwind";
 
 const icons = {
+  alert: CircleAlert,
   "chevron-right": ChevronRight,
   check: Check,
   "arrow-right": ArrowRight,
@@ -18,7 +19,7 @@ export function Icon({
   size = 20,
 }: {
   name: IconName;
-  color: "ink" | "muted" | "faint" | "accent-ink" | "accent-text";
+  color: "ink" | "muted" | "faint" | "accent-ink" | "accent-text" | "danger";
   size?: number;
 }) {
   const Glyph = icons[name];

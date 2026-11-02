@@ -4,7 +4,7 @@ import { useId, type ComponentProps, type ReactElement, type ReactNode } from "r
 import { cn } from "./cn";
 
 const control =
-  "w-full rounded-lg bg-surface px-3 text-base text-ink shadow-[inset_0_0_0_1px_var(--color-line-strong)] " +
+  "w-full rounded-lg bg-surface px-3 text-base text-ink shadow-(--elevation-control) " +
   "transition-shadow duration-150 placeholder:text-muted hover:shadow-[inset_0_0_0_1px_var(--color-faint)] " +
   "focus:shadow-[inset_0_0_0_2px_var(--color-ink)] focus:outline-none aria-invalid:shadow-[inset_0_0_0_2px_var(--color-danger)] " +
   "disabled:bg-sunken disabled:text-muted";
@@ -85,5 +85,50 @@ export function FormError({ children }: { children: ReactNode }) {
       <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>{children}</span>
     </p>
+  );
+}
+
+/** A form value picked from a few short options, as a grid of cards. Set columns with `className`. */
+export function RadioCards<Value extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  className,
+}: {
+  label: ReactNode;
+  options: ReadonlyArray<{ readonly value: Value; readonly label: string }>;
+  value: Value;
+  onChange: (value: Value) => void;
+  className?: string;
+}) {
+  const name = useId();
+  return (
+    <fieldset>
+      <legend className="mb-1.5 text-sm font-medium">{label}</legend>
+      <div className={cn("grid grid-cols-3 gap-2", className)}>
+        {options.map((option) => (
+          <label
+            key={option.value}
+            className={cn(
+              "flex h-11 cursor-pointer items-center justify-center rounded-lg px-2 text-center text-sm font-medium outline-offset-2 outline-ink transition-colors duration-150 has-[:focus-visible]:outline-2",
+              option.value === value
+                ? "bg-accent/15 text-accent-text"
+                : "shadow-(--elevation-control) hover:bg-sunken",
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={option.value === value}
+              onChange={() => onChange(option.value)}
+              className="sr-only"
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }

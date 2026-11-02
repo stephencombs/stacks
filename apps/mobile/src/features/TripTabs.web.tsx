@@ -63,7 +63,7 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             <View className={cn("h-0.5 w-6 rounded-full", current ? "bg-ink" : "bg-transparent")} />
             <Text
               className={cn(
-                "text-[15px]",
+                "type-callout",
                 current ? "font-semibold text-ink" : "font-medium text-muted",
               )}
             >

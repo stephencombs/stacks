@@ -50,10 +50,7 @@ export function Row({
 export function PageTitle({ context, children }: { context?: string; children: string }) {
   return (
     <View className="gap-1">
-      <Text
-        accessibilityRole="header"
-        className="font-display text-[40px] leading-[40px] text-ink uppercase"
-      >
+      <Text accessibilityRole="header" className="type-title text-ink">
         {children}
       </Text>
       {context ? <Text className="text-sm text-muted">{context}</Text> : null}

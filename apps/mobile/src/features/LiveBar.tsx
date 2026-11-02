@@ -49,7 +49,7 @@ export function LiveBar({
         className="min-h-13 flex-row items-center gap-3 rounded-xl border border-line-strong bg-surface px-4 py-3 active:bg-sunken"
       >
         <View className="size-2 rounded-full bg-live" />
-        <Text className="font-mono text-[11px] tracking-[1px] text-live uppercase">Live</Text>
+        <Text className="type-label text-live">Live</Text>
         <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
           {seat.venueName}
         </Text>

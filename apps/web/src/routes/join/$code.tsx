@@ -78,10 +78,10 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
             type="submit"
             variant="primary"
             size="lg"
-            disabled={accept.pending}
+            pending={accept.pending}
             className="self-start"
           >
-            {accept.pending ? "Joining…" : "Join group"}
+            Join group
           </Button>
         </form>
       )}

@@ -16,11 +16,10 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "~/components/ui/Button";
 import { Checkbox } from "~/components/ui/Checkbox";
-import { FormError, Input } from "~/components/ui/Field";
+import { FormError, Input, RadioCards } from "~/components/ui/Field";
 import { BackLink } from "~/components/ui/Nav";
 import { Note, PageHeader, Section } from "~/components/ui/Page";
 import { List, Row, RowText, Skeleton } from "~/components/ui/Surface";
-import { cn } from "~/components/ui/cn";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
 import { Chip } from "~/features/Chip";
 import { PlayerName } from "~/features/Player";
@@ -145,28 +144,13 @@ function NewSessionForm({
       </Section>
 
       <Section title="Game">
-        <div role="radiogroup" aria-label="Game" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {GAMES.map((option) => (
-            <label
-              key={option}
-              className={cn(
-                "flex h-11 cursor-pointer items-center justify-center rounded-lg px-2 text-center text-sm font-medium outline-offset-2 outline-ink transition-colors duration-150 has-[:focus-visible]:outline-2",
-                game === option
-                  ? "bg-accent/15 text-accent-text"
-                  : "shadow-[inset_0_0_0_1px_var(--color-line-strong)] hover:bg-sunken",
-              )}
-            >
-              <input
-                type="radio"
-                name="game"
-                className="sr-only"
-                checked={game === option}
-                onChange={() => setGame(option)}
-              />
-              {gameNames[option]}
-            </label>
-          ))}
-        </div>
+        <RadioCards
+          label={<span className="sr-only">Game</span>}
+          options={GAMES.map((option) => ({ value: option, label: gameNames[option] }))}
+          value={game}
+          onChange={setGame}
+          className="grid-cols-2 sm:grid-cols-4"
+        />
         <label className="mt-1 flex min-h-11 cursor-pointer items-center gap-3 text-sm">
           <Checkbox checked={highLimit} onCheckedChange={setHighLimit} />
           High-limit table
@@ -242,10 +226,10 @@ function NewSessionForm({
         type="submit"
         variant="primary"
         size="lg"
-        disabled={create.pending}
+        pending={create.pending}
         className="w-full sm:w-auto sm:self-start"
       >
-        {create.pending ? "Starting…" : "Start session"}
+        Start session
       </Button>
 
       <AddGuestDialog

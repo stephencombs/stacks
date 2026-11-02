@@ -151,7 +151,6 @@ function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: () => voi
         options={CURRENCIES.map((code) => ({ value: code, label: code }))}
         value={currency}
         onChange={setCurrency}
-        columns={4}
       />
       {create.error ? <FormError>{create.error}</FormError> : null}
     </Sheet>
@@ -177,13 +176,7 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <Text className="text-sm text-muted">{user.primaryEmailAddress.emailAddress}</Text>
         ) : null}
       </View>
-      <Choice
-        label="Appearance"
-        options={themeChoices}
-        value={theme}
-        onChange={setTheme}
-        columns={3}
-      />
+      <Choice label="Appearance" options={themeChoices} value={theme} onChange={setTheme} />
     </Sheet>
   );
 }

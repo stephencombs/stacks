@@ -7,13 +7,7 @@ import { cn } from "./cn";
 /** A raised card on the canvas. */
 export function Surface({ className, ...props }: ComponentProps<"div">) {
   return (
-    <div
-      className={cn(
-        "rounded-xl bg-surface shadow-[0_0_0_1px_var(--color-line),0_1px_2px_rgb(0_0_0/0.04),0_2px_8px_-2px_rgb(0_0_0/0.05)]",
-        className,
-      )}
-      {...props}
-    />
+    <div className={cn("rounded-xl bg-surface shadow-(--elevation-card)", className)} {...props} />
   );
 }
 
@@ -96,9 +90,7 @@ export function Tag({
     <span
       className={cn(
         "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium",
-        tone === "live"
-          ? "bg-[color-mix(in_oklch,var(--color-live)_16%,transparent)] text-live"
-          : "bg-sunken text-muted",
+        tone === "live" ? "bg-live/15 text-live" : "bg-sunken text-muted",
       )}
     >
       {tone === "live" ? <span className="size-1.5 rounded-full bg-live" aria-hidden /> : null}

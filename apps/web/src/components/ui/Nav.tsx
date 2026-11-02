@@ -35,7 +35,7 @@ export function Tab({
     <Link
       aria-current={current ? "page" : undefined}
       className={cn(
-        "relative inline-flex h-11 min-w-10 items-center justify-center text-[15px] font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-offset-[-2px] pointer-coarse:min-w-11",
+        "relative inline-flex h-11 min-w-10 items-center justify-center type-callout font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-offset-[-2px] pointer-coarse:min-w-11",
         "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full",
         current ? "text-ink after:bg-ink" : "text-muted hover:text-ink",
       )}

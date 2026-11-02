@@ -35,9 +35,7 @@ export function PageHeader({
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex items-center gap-3">
-            <h1 className="min-w-0 font-display text-[2.5rem] leading-[0.95] tracking-[-0.01em] uppercase wrap-anywhere">
-              {title}
-            </h1>
+            <h1 className="min-w-0 type-title wrap-anywhere">{title}</h1>
             {tag}
           </div>
           {context ? <p className="text-sm text-muted wrap-anywhere">{context}</p> : null}

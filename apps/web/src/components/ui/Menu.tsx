@@ -26,7 +26,7 @@ export function Menu({
       </BaseMenu.Trigger>
       <BaseMenu.Portal>
         <BaseMenu.Positioner sideOffset={4} align="end">
-          <BaseMenu.Popup className="min-w-44 origin-[var(--transform-origin)] rounded-xl bg-surface p-1 shadow-[0_0_0_1px_var(--color-line-strong),0_4px_12px_-2px_rgb(0_0_0/0.25),0_12px_32px_-8px_rgb(0_0_0/0.3)] outline-none transition-[scale,opacity] duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] data-[ending-style]:duration-100 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+          <BaseMenu.Popup className="min-w-44 origin-[var(--transform-origin)] rounded-xl bg-surface p-1 shadow-(--elevation-popover) outline-none transition-[scale,opacity] duration-150 ease-snap data-[ending-style]:duration-100 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
             {children}
           </BaseMenu.Popup>
         </BaseMenu.Positioner>

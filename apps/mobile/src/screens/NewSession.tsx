@@ -151,7 +151,7 @@ function NewSessionForm({
           <VenuePicker groupId={detail.group.id} selected={venue} onSelect={setVenue} />
         </Surface>
       </View>
-      <Choice label="Game" options={GAMES} value={game} onChange={setGame} columns={2} />
+      <Choice label="Game" options={GAMES} value={game} onChange={setGame} />
       <View className="flex-row items-center justify-between rounded-xl bg-surface px-4 py-3">
         <Text className="text-base text-ink">High-limit table</Text>
         <Switch
@@ -186,7 +186,7 @@ function NewSessionForm({
                   className="flex-1 flex-row items-center gap-3"
                 >
                   <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
-                  <Text className="flex-1 text-[17px] text-ink">
+                  <Text className="flex-1 type-body text-ink">
                     {player.displayName}
                     {player.id === detail.myPlayerId ? (
                       <Text className="text-muted"> (you)</Text>
@@ -201,13 +201,7 @@ function NewSessionForm({
         </List>
         <Text className="text-sm text-muted">Anyone else can join the session later.</Text>
       </View>
-      <Choice
-        label="Started"
-        options={STARTS}
-        value={startedAgo}
-        onChange={setStartedAgo}
-        columns={2}
-      />
+      <Choice label="Started" options={STARTS} value={startedAgo} onChange={setStartedAgo} />
       {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
       <Button
         label="Start session"

@@ -160,7 +160,7 @@ export function EntrySheet({
           adjustsFontSizeToFit
           numberOfLines={1}
           style={{ lineHeight: 72 }}
-          className={cn("font-mono text-[60px]", amount ? "text-ink" : "text-faint")}
+          className={cn("font-mono text-6xl", amount ? "text-ink" : "text-faint")}
         >
           {value === null
             ? amount || formatMoney(MinorUnits.make(0), currency)
@@ -169,7 +169,7 @@ export function EntrySheet({
               })}
         </Text>
         {amountError ? (
-          <Text accessibilityLiveRegion="polite" className="text-center text-[13px] text-danger">
+          <Text accessibilityLiveRegion="polite" className="text-center type-footnote text-danger">
             {amountError}
           </Text>
         ) : null}
@@ -212,9 +212,7 @@ export function EntrySheet({
               {key === "back" ? (
                 <Icon name="delete" color="ink" size={24} />
               ) : (
-                <Text className="text-[28px] font-medium text-ink">
-                  {key === "sign" ? "±" : key}
-                </Text>
+                <Text className="text-3xl font-medium text-ink">{key === "sign" ? "±" : key}</Text>
               )}
             </Pressable>
           ),
@@ -248,8 +246,8 @@ export function EntrySheet({
             onPress={() => setChoosingWhose(true)}
             className="min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken"
           >
-            <Text className="text-[17px] text-ink">{whoseLabel}</Text>
-            <Text numberOfLines={1} className="flex-1 text-right text-[17px] text-muted">
+            <Text className="type-body text-ink">{whoseLabel}</Text>
+            <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
               {whose ?? (kind === "buy_in" ? "Their own" : "They do")}
             </Text>
             <Icon name="chevron-right" color="faint" size={16} />
@@ -268,8 +266,8 @@ export function EntrySheet({
                 "border-t border-line",
             )}
           >
-            <Text className="flex-1 text-[17px] text-ink">Note</Text>
-            <Text className="text-[17px] text-muted">Add</Text>
+            <Text className="flex-1 type-body text-ink">Note</Text>
+            <Text className="type-body text-muted">Add</Text>
             <Icon name="chevron-right" color="faint" size={16} />
           </Pressable>
         )}

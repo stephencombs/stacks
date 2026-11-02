@@ -460,7 +460,7 @@ function Sheet({
               <View
                 className={cn(
                   "absolute inset-x-0 rounded-[2px]",
-                  p.net >= 0 ? "bg-win" : "bg-loss",
+                  p.net > 0 ? "bg-win" : p.net < 0 ? "bg-loss" : "bg-muted",
                   shown !== null && shown !== i && "opacity-40",
                 )}
                 style={{

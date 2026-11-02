@@ -14,6 +14,13 @@ const surfaces: Record<Variant, string> = {
   ghost: "active:bg-fill",
   danger: "bg-fill active:opacity-70",
 };
+const spinners: Record<Variant, string> = {
+  primary: "accent-accent-ink",
+  tint: "accent-accent-text",
+  secondary: "accent-ink",
+  ghost: "accent-ink",
+  danger: "accent-danger",
+};
 const labels: Record<Variant, string> = {
   primary: "text-accent-ink",
   tint: "text-accent-text",
@@ -29,10 +36,10 @@ const sizes: Record<Size, string> = {
   xl: "min-h-14 px-6 py-4 rounded-full",
 };
 const text: Record<Size, string> = {
-  sm: "text-[15px]",
-  md: "text-[15px]",
-  lg: "text-[17px]",
-  xl: "text-[17px]",
+  sm: "type-callout",
+  md: "type-callout",
+  lg: "type-body",
+  xl: "type-body",
 };
 
 export function Button({
@@ -76,12 +83,19 @@ export function Button({
         "flex-row items-center justify-center gap-2",
         surfaces[variant],
         sizes[size],
-        inactive && "opacity-50",
+        disabled && !pending && (variant === "ghost" ? "bg-transparent" : "bg-disabled"),
         className,
       )}
     >
-      {pending ? <ActivityIndicator size="small" /> : icon}
-      <Text className={cn("font-semibold", labels[variant], text[size])} numberOfLines={1}>
+      {pending ? <ActivityIndicator size="small" colorClassName={spinners[variant]} /> : icon}
+      <Text
+        className={cn(
+          "font-semibold",
+          disabled && !pending ? "text-muted" : labels[variant],
+          text[size],
+        )}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </Pressable>

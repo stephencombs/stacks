@@ -165,8 +165,8 @@ function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: ()
           )}
         </Field>
         {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
-        <Button type="submit" variant="primary" size="lg" disabled={create.pending}>
-          {create.pending ? "Starting…" : "Start trip"}
+        <Button type="submit" variant="primary" size="lg" pending={create.pending}>
+          Start trip
         </Button>
       </form>
     </Dialog>

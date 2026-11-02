@@ -9,7 +9,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
-import { Field, FormError, Input } from "~/components/ui/Field";
+import { Field, FormError, Input, RadioCards } from "~/components/ui/Field";
 import { cn } from "~/components/ui/cn";
 import { useDebounced } from "~/lib/useDebounced";
 import { useAction, useStacks } from "~/lib/stacks";
@@ -147,9 +147,9 @@ export function VenuePicker({
         />
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={locate} disabled={locating === "busy"}>
+        <Button size="sm" onClick={locate} pending={locating === "busy"}>
           <LocateFixed className="size-4" aria-hidden />
-          {locating === "busy" ? "Finding you…" : near ? "Near you" : "Near me"}
+          {near ? "Near you" : "Near me"}
         </Button>
         <Button size="sm" onClick={() => setAdding(true)}>
           Add a venue
@@ -251,30 +251,16 @@ function AddVenueDialog({
       description="Casinos you add are shared with everyone on Stacks. Home games stay private to this group."
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <fieldset className="flex flex-col gap-1.5">
-          <legend className="mb-1.5 text-sm font-medium">Kind</legend>
-          <div className="grid grid-cols-3 gap-2">
-            {(["casino", "online", "home"] as const).map((option) => (
-              <label
-                key={option}
-                className={cn(
-                  "flex h-11 cursor-pointer items-center justify-center rounded-lg outline-offset-2 outline-ink has-[:focus-visible]:outline-2 text-sm font-medium shadow-[inset_0_0_0_1px_var(--color-line-strong)] transition-colors duration-150",
-                  kind === option ? "bg-accent/15 text-accent-text shadow-none" : "hover:bg-sunken",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="kind"
-                  value={option}
-                  checked={kind === option}
-                  onChange={() => setKind(option)}
-                  className="sr-only"
-                />
-                {option === "casino" ? "Casino" : option === "online" ? "Online" : "Home game"}
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <RadioCards
+          label="Kind"
+          options={[
+            { value: "casino", label: "Casino" },
+            { value: "online", label: "Online" },
+            { value: "home", label: "Home game" },
+          ]}
+          value={kind}
+          onChange={setKind}
+        />
         <Field label="Name" error={nameError}>
           {(props) => (
             <Input
@@ -294,8 +280,8 @@ function AddVenueDialog({
           </Field>
         ) : null}
         {create.error ? <FormError>{create.error}</FormError> : null}
-        <Button type="submit" variant="primary" size="lg" disabled={create.pending}>
-          {create.pending ? "Adding…" : "Add venue"}
+        <Button type="submit" variant="primary" size="lg" pending={create.pending}>
+          Add venue
         </Button>
       </form>
     </Dialog>

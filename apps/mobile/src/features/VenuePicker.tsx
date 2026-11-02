@@ -158,7 +158,7 @@ export function VenuePicker({
       />
       <View className="flex-row gap-2">
         <Button
-          label={locating === "busy" ? "Finding you…" : near ? "Near you" : "Near me"}
+          label={near ? "Near you" : "Near me"}
           size="sm"
           pending={locating === "busy"}
           onPress={() => void locate()}
@@ -277,7 +277,6 @@ function AddVenueSheet({
         ]}
         value={kind}
         onChange={setKind}
-        columns={3}
       />
       <TextField
         label="Name"

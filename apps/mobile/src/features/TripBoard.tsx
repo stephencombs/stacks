@@ -230,8 +230,8 @@ export function TonightBoard({ detail, trip }: { detail: GroupDetail; trip: Trip
           onPress={() => navigation.navigate("Session", { sessionId: s.session.id })}
           className="min-h-11 flex-row items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2 active:opacity-80"
         >
-          <View className="size-2 rounded-full bg-loss" />
-          <Text className={cn(label, "text-loss")}>Live</Text>
+          <View className="size-2 rounded-full bg-live" />
+          <Text className={cn(label, "text-live")}>Live</Text>
           <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
             {s.venue.name}
           </Text>

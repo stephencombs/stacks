@@ -150,7 +150,7 @@ function Starting() {
   if (!stalled) return <View className="flex-1 bg-canvas" />;
   return (
     <View className="flex-1 justify-center gap-4 bg-canvas px-6">
-      <Text accessibilityRole="header" className="font-display text-4xl text-ink uppercase">
+      <Text accessibilityRole="header" className="type-headline text-ink">
         Can't sign in yet
       </Text>
       <Text className="text-lg text-muted">
