@@ -149,7 +149,7 @@ These are pure functions with thorough unit tests, and they're the first code wr
 - `vite-plus` (`vp`) for dev, build, test (Vitest), lint (oxlint) and format. `@tsc-rs/typescript` for fast typechecking, and `knip` to catch unused code and dependencies.
 - Root scripts: `dev`, `dev:web`, `dev:api`, `typecheck`, `lint`, `fmt`, `test`, and `check:changed`.
 - `AGENTS.md`/`CLAUDE.md` adapted from T3Code's: glossary (group, session, entry, settlement, balance, result), "hit every surface" (web + mobile + API + contracts), taste rules, and test rules (`it.effect` with `TestClock`, no sleeps).
-- GitHub Actions: lint, typecheck and test on every PR, with change detection so only affected packages run. Separate workflows for web previews, the API deploy with per-PR preview stages through alchemy, and EAS preview builds.
+- GitHub Actions: lint, typecheck and test on every PR; the mobile bundle only when its inputs change. Each push to `main` migrates and deploys the development environment through wrangler; production gets its own deploy once it exists. Pushes to `main` also run the Playwright suites, and they run nightly too. EAS preview builds stay manual. No per-PR preview stages while there is one deployed database.
 - A local dev database: Postgres in Docker (or a Neon branch), plain SQL migrations run by Effect's `PgMigrator` (no Drizzle: one schema language, and no release-candidate ORM to pin), and a seed script that builds a realistic group of 4 people, 30 sessions and some settlements. The venue catalog has its own import script (see phase 2). An empty database is a bad test.
 
 ## Delivery phases

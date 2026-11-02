@@ -14,8 +14,8 @@
     },
   ],
   "env": {
-    // `wrangler deploy --env production`: one Worker serves the API and the built web app.
-    "production": {
+    // `wrangler deploy --env development`: one Worker serves the API and the built web app.
+    "development": {
       "name": "stacks",
       "workers_dev": true,
       "vars": { "CLERK_AUTHORIZED_PARTIES": "https://stacks.stephen-jcombs.workers.dev" },
