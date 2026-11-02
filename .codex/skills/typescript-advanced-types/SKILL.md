@@ -282,11 +282,7 @@ Detailed sections (starting with `## Advanced Patterns`) live in `references/det
 
 ```typescript
 // Type assertion tests
-type AssertEqual<T, U> = [T] extends [U]
-  ? [U] extends [T]
-    ? true
-    : false
-  : false;
+type AssertEqual<T, U> = [T] extends [U] ? ([U] extends [T] ? true : false) : false;
 
 type Test1 = AssertEqual<string, string>; // true
 type Test2 = AssertEqual<string, number>; // false
