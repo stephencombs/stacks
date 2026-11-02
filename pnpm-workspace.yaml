@@ -45,6 +45,10 @@ overrides:
   # The patch below points @effect/vitest at vite-plus's bundled vitest. A second vitest
   # instance fails every test file with "Cannot read properties of undefined (reading 'config')".
   "@effect/vitest>vitest": "-"
+  # Security fixes these tools' exact pins block. Drop each once the parent ships it.
+  "miniflare>undici": 7.30.1
+  node-forge: 1.4.1
+  "serve>compression": 1.8.2
 
 packageExtensions:
   "@effect/vitest@*":

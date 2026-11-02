@@ -14,6 +14,7 @@
     "fmt:check": "vp fmt --check",
     "test": "vp run -r test",
     "knip": "knip",
+    "prepare": "vp config --hooks --no-agent",
     "deploy": "vp run --filter @stacks/web build && vp run --filter @stacks/api deploy"
   },
   "devDependencies": {

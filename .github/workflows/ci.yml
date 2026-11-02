@@ -2,6 +2,10 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - .agents/**
+      - .claude/**
+      - .codex/**
   push:
     branches:
       - main
@@ -27,15 +31,15 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/stacks_test
     steps:
-      - uses: actions/checkout@v6
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
         with:
           node-version-file: .node-version
           cache: true
@@ -45,14 +49,17 @@ jobs:
       - run: vp run knip
       - run: vp run typecheck
       - run: vp run test
+      - run: vp run --filter @stacks/api db:seed
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 
   build:
     name: Build web and api
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
         with:
           node-version-file: .node-version
           cache: true
@@ -61,17 +68,35 @@ jobs:
       - run: vp run --filter @stacks/web build
       - run: vp run --filter @stacks/api build
 
-  mobile-bundle:
-    name: Bundle mobile (iOS + Android JS)
+  deploy:
+    name: Deploy development
+    needs: [check, build]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-development
+      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v6
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
         with:
           node-version-file: .node-version
           cache: true
           run-install: true
-      - run: vp run --filter @stacks/mobile build
+      # Runs can finish out of order, and an older commit must not replace a newer deploy.
+      # Migrations go first, so each one has to work with the Worker that is still live.
+      - run: |
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)" != "$GITHUB_SHA" ]; then
+            echo "main has moved on; the newer commit's run deploys it."
+            exit 0
+          fi
+          vp run --filter @stacks/api db:migrate
+          vp run deploy
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
+            https://stacks.stephen-jcombs.workers.dev/api/health
         env:
-          CI: "1"
+          GH_TOKEN: ${{ github.token }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

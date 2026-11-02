@@ -1,0 +1,66 @@
+name: E2E
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - .agents/**
+      - .claude/**
+      - .codex/**
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Playwright (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web, mobile]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stacks
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Publishable, and already committed in apps/web/.env.production.
+      VITE_CLERK_PUBLISHABLE_KEY: pk_test_cmljaC1qYWd1YXItNjczOS5jbGVyay5hY2NvdW50cy5kZXYk
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_cmljaC1qYWd1YXItNjczOS5jbGVyay5hY2NvdW50cy5kZXYk
+      EXPO_PUBLIC_API_URL: http://localhost:8787
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: true
+      - run: vp run --filter @stacks/api db:migrate
+      # Playwright and the API dev server both read their Clerk keys from this file.
+      - run: |
+          printf 'CLERK_SECRET_KEY=%s\nCLERK_AUTHORIZED_PARTIES=http://localhost:5173,http://localhost:8081\n' \
+            "$CLERK_SECRET_KEY" > apps/api/.dev.vars
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      - run: pnpm --filter @stacks/${{ matrix.app }} exec playwright install --with-deps chromium
+      - run: vp run --filter @stacks/${{ matrix.app }} test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-${{ matrix.app }}
+          path: apps/${{ matrix.app }}/test-results
+          retention-days: 7

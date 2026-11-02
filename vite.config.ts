@@ -15,8 +15,10 @@ const GENERATED = [
   "apps/mobile/android/**",
   "apps/mobile/.expo/**",
   "apps/mobile/uniwind-types.d.ts",
-  // ReUI's agent skill, replaced as a whole when it updates.
-  ".claude/skills/reui/**",
+  // Agent skills are vendored and replaced as a whole when they update.
+  ".agents/skills/**",
+  ".claude/skills/**",
+  ".codex/skills/**",
 ];
 
 export default defineConfig({
