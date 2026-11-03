@@ -86,10 +86,11 @@ export function RowsSkeleton({
   );
 }
 
-function SectionSkeleton({ children }: { children: ReactNode }) {
+/** A section heading and its content. `action` is a heading with a button, which stands taller. */
+function SectionSkeleton({ action = false, children }: { action?: boolean; children: ReactNode }) {
   return (
     <View className="gap-2">
-      <View className="min-h-9 justify-center">
+      <View className={cn("justify-center", action ? "min-h-11" : "min-h-9")}>
         <SkeletonText size="lg" className="w-36" />
       </View>
       {children}
@@ -180,9 +181,11 @@ export function BoardSkeleton() {
           <SkeletonText size="lg" className="w-16" />
         </View>
       </View>
-      <SectionSkeleton>
+      {/* Standings has a plain heading, shorter than a section's. */}
+      <View className="gap-2">
+        <SkeletonText size="lg" className="w-36" />
         <RowsSkeleton rows={4} chip />
-      </SectionSkeleton>
+      </View>
     </SkeletonScreen>
   );
 }
@@ -191,7 +194,11 @@ export function BoardSkeleton() {
 export function AllTimeSkeleton() {
   return (
     <SkeletonScreen label="Loading all-time stats">
-      <SkeletonText className="w-48" />
+      {/* "The group has played 6 sessions over 12 hours." takes two lines on a phone. */}
+      <View>
+        <SkeletonText className="w-full" />
+        <SkeletonText className="w-16" />
+      </View>
       <HeroSkeleton />
       <View className="gap-1">
         <SkeletonText size="sm" className="w-40" />
@@ -203,11 +210,13 @@ export function AllTimeSkeleton() {
   );
 }
 
-/** Settle up loading: your balance, then who pays whom. */
+/** Settle up loading: your balance under its heading and Share, then who pays whom. */
 export function SettleUpSkeleton() {
   return (
     <SkeletonScreen label="Loading settle up">
-      <HeroSkeleton chart={false} tiles={false} />
+      <SectionSkeleton action>
+        <HeroSkeleton chart={false} tiles={false} />
+      </SectionSkeleton>
       <SectionSkeleton>
         <RowsSkeleton rows={3} chip meta={false} />
       </SectionSkeleton>
@@ -220,10 +229,21 @@ export function GroupSkeleton() {
   return (
     <SkeletonScreen label="Loading the group">
       <TitleSkeleton />
-      <SectionSkeleton>
-        <RowsSkeleton rows={2} />
+      <SectionSkeleton action>
+        <View className="gap-3 rounded-xl bg-surface p-4">
+          <View className="gap-1">
+            <SkeletonText size="lg" className="w-44" />
+            <SkeletonText size="sm" className="w-36" />
+          </View>
+          <View className="h-[22px] flex-row items-center gap-4">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-24" />
+          </View>
+        </View>
+        <RowsSkeleton rows={1} meta={false} />
       </SectionSkeleton>
-      <SectionSkeleton>
+      <SectionSkeleton action>
         <View className="overflow-hidden rounded-xl bg-surface">
           <View className="flex-row gap-4 px-4 py-3.5">
             {keys(4).map((key) => (
@@ -253,7 +273,14 @@ export function GroupSkeleton() {
 export function SessionScreenSkeleton() {
   return (
     <SkeletonScreen label="Loading the session">
-      <TitleSkeleton />
+      <View className="gap-3">
+        <TitleSkeleton />
+        <View className="h-6 flex-row items-center gap-2">
+          <Skeleton className="h-6 w-14" />
+          <Skeleton className="h-6 w-20" />
+          <SkeletonText size="sm" className="w-16" />
+        </View>
+      </View>
       <Skeleton className="-mx-4 aspect-[1.8] rounded-none" />
       <View className="flex-row overflow-hidden rounded-xl bg-surface">
         {["w-6", "w-16", "w-14"].map((width, i) => (
@@ -288,12 +315,66 @@ export function SessionScreenSkeleton() {
   );
 }
 
-/** A pushed list screen loading, titled by its header: a section of rows. */
-export function ListScreenSkeleton({ rows = 4, label }: { rows?: number; label: string }) {
+/** An invite link loading: the link, when it expires, then Share and Revoke. */
+export function InviteLinkSkeleton() {
   return (
-    <SkeletonScreen label={label}>
+    <View className="gap-2 rounded-xl bg-surface px-4 py-3.5">
+      <SkeletonText size="sm" className="w-64" />
+      <SkeletonText size="sm" className="w-48" />
+      <View className="flex-row gap-2">
+        <Skeleton className="h-11 flex-1 rounded-full" />
+        <View className="w-24" />
+      </View>
+    </View>
+  );
+}
+
+/** People loading, titled by its header: invite links, then members with their roles. */
+export function PeopleSkeleton() {
+  return (
+    <SkeletonScreen label="Loading people">
+      <SectionSkeleton action>
+        <InviteLinkSkeleton />
+      </SectionSkeleton>
       <SectionSkeleton>
-        <RowsSkeleton rows={rows} />
+        <View className="overflow-hidden rounded-xl bg-surface">
+          {keys(4).map((key, i) => (
+            <View
+              key={key}
+              className={cn(
+                "flex-row items-center gap-3 px-4 py-3.5",
+                i > 0 && "border-t border-line",
+              )}
+            >
+              <Skeleton className="size-[26px] rounded-full" />
+              <View className="flex-1">
+                <SkeletonText className={titleWidths[i % titleWidths.length]!} />
+              </View>
+              <Skeleton className="h-6 w-16" />
+            </View>
+          ))}
+        </View>
+      </SectionSkeleton>
+    </SkeletonScreen>
+  );
+}
+
+/** Group settings loading, titled by its header: payment apps, the ledger, and leaving. */
+export function SettingsSkeleton() {
+  return (
+    <SkeletonScreen label="Loading settings">
+      <SectionSkeleton action>
+        <View>
+          <SkeletonText size="sm" className="w-full" />
+          <SkeletonText size="sm" className="w-40" />
+        </View>
+      </SectionSkeleton>
+      <SectionSkeleton>
+        <Skeleton className="h-11 rounded-full" />
+        <View>
+          <SkeletonText size="sm" className="w-full" />
+          <SkeletonText size="sm" className="w-28" />
+        </View>
       </SectionSkeleton>
     </SkeletonScreen>
   );
