@@ -20,6 +20,7 @@ import {
   raceHeadline,
   recordLine,
   resolveEntry,
+  returnLabel,
   streakLine,
   tripLines,
   unsettledAmount,
@@ -279,4 +280,8 @@ it("leads the race with the gap to the next player, falling back to your result"
     line: null,
   });
   expect(raceHeadline(board, "nobody" as never, names, usd)).toBeNull();
+});
+
+it("words a return on buy-ins with its sign", () => {
+  expect([0.55, -0.3, 0, 0.004, null].map(returnLabel)).toEqual(["+55%", "-30%", "0%", "0%", "–"]);
 });

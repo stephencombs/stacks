@@ -1,21 +1,25 @@
 import type { GroupDetail, PlayerId, SessionId, TripDetail } from "@stacks/contracts";
-import { barTrack } from "@stacks/client-runtime/chart";
+import { around, barTrack, lineScale, spreadLabels } from "@stacks/client-runtime/chart";
 import { formatDay, playerNames } from "@stacks/client-runtime/format";
-import { boardMoney, chipOf, localClock } from "@stacks/client-runtime/trip";
-import { racePlaces, runningTotals, statSheet, type StatsSession } from "@stacks/shared/stats";
+import { boardMoney, chipOf, localClock, returnLabel } from "@stacks/client-runtime/trip";
+import {
+  raceLines,
+  runningTotals,
+  statSheet,
+  type RaceMeasure,
+  type StatsSession,
+} from "@stacks/shared/stats";
 import { tripNights } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { Money } from "~/components/Money";
 import { Note } from "~/components/ui/Page";
+import { Segmented } from "~/components/ui/Segmented";
 import { List, Row, RowText, Surface } from "~/components/ui/Surface";
 import { cn } from "~/components/ui/cn";
+import { useWidth } from "~/lib/useWidth";
 import { Chip } from "./Chip";
-
-// Chip 4 is near-black, so its line on the board takes the chip's light edge instead.
-const lineColor = (chip: number) =>
-  chip === 4 ? "var(--color-muted)" : `var(--color-chip-${chip})`;
 
 /** A closed session as the race sees it, oldest first. */
 type RaceSession = StatsSession & {
@@ -101,6 +105,16 @@ export function RaceStats<S extends RaceSession>({
 
 type Line = { playerId: PlayerId; name: string; chip: number; running: ReadonlyArray<number> };
 
+const measures = [
+  { value: "money", label: "Money" },
+  { value: "return", label: "% of buy-in" },
+] as const;
+const HEIGHT = 168;
+const PAD = { x: 16, y: 14 };
+/** Room past the furthest point for each line's initial, and below the plot for the day marks. */
+const LABEL = 30;
+const MARKS = 22;
+
 function Race<S extends RaceSession>({
   sessions,
   players,
@@ -123,35 +137,43 @@ function Race<S extends RaceSession>({
   const [pinned, setPinned] = useState<number | null>(null);
   const at = pinned === null ? last : Math.min(pinned, last);
   const setAt = (next: number) => setPinned(next >= last ? null : next);
-  const box = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-  useLayoutEffect(() => {
-    const element = box.current!;
-    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+  const [measure, setMeasure] = useState<RaceMeasure>("money");
+  const [box, width] = useWidth<HTMLDivElement>();
 
-  // Places, not dollars: one big winner would flatten everyone else's line.
-  const places = racePlaces(
+  const lines = raceLines(
     sessions,
     players.map((p) => p.playerId),
+    measure,
+  ).map((line, i) => ({ ...line, ...players[i]! }));
+  const pickedIndex = lines.findIndex((l) => l.playerId === picked);
+  const plot = lineScale(
+    lines.map((l) => l.line),
+    { width: Math.max(0, width - LABEL), height: HEIGHT },
+    PAD,
+    around(pickedIndex, lines.length),
   );
-  const height = 40 * Math.max(2, players.length) + 28;
-  const pad = { x: 10, top: 12, bottom: 28 };
-  const x = (i: number) => pad.x + (i / Math.max(1, last)) * (width - 2 * pad.x);
-  const y = (place: number) =>
-    pad.top + (place / Math.max(1, players.length - 1)) * (height - pad.top - pad.bottom);
-  const standing = players
-    .map((p) => ({ ...p, now: p.running[at]! }))
-    .toSorted((a, b) => places[at]!.get(a.playerId)! - places[at]!.get(b.playerId)!);
+  const reading = (value: number | null) =>
+    measure === "money" ? boardMoney(value ?? 0, currency) : returnLabel(value);
+  const standing = lines
+    .map((l) => ({ ...l, now: l.values[at]! }))
+    .toSorted((a, b) => (b.now ?? -Infinity) - (a.now ?? -Infinity));
   const [leader, second] = standing;
   const session = sessions[at]!;
+  // Yours draws last, on top of everyone else's.
+  const drawn = lines.toSorted(
+    (a, b) => Number(a.playerId === picked) - Number(b.playerId === picked),
+  );
+  const point = at + 1;
+  const labels = spreadLabels(
+    drawn.map(({ line }) => plot.y(line[point]!)),
+    13,
+    { min: 6, max: HEIGHT - 6 },
+  );
 
   const scrub = (clientX: number) => {
     const rect = box.current!.getBoundingClientRect();
-    const fraction = (clientX - rect.left - pad.x) / (rect.width - 2 * pad.x);
-    setAt(Math.max(0, Math.min(last, Math.round(fraction * last))));
+    const fraction = (clientX - rect.left - PAD.x) / (rect.width - LABEL - 2 * PAD.x);
+    setAt(Math.max(0, Math.min(last, Math.round(fraction * (last + 1)) - 1)));
   };
 
   return (
@@ -162,12 +184,17 @@ function Race<S extends RaceSession>({
             `${leader!.name} leads`
           ) : leader!.now === second.now ? (
             `${leader!.name} and ${second.name} are tied`
-          ) : (
+          ) : measure === "money" ? (
             <>
               {leader!.name} leads by{" "}
               <span className="text-win tabular-nums">
-                {boardMoney(leader!.now - second.now, currency, false)}
+                {boardMoney(leader!.now! - second.now!, currency, false)}
               </span>
+            </>
+          ) : (
+            <>
+              {leader!.name} leads at{" "}
+              <span className="text-win tabular-nums">{returnLabel(leader!.now)}</span>
             </>
           )}
         </h2>
@@ -176,80 +203,95 @@ function Race<S extends RaceSession>({
           {formatDay(session.session.startedAt)}
         </Note>
       </header>
+      <Segmented label="Measure" options={measures} value={measure} onChange={setMeasure} />
 
-      <div
-        ref={box}
-        aria-hidden
-        className="cursor-ew-resize touch-pan-y select-none"
-        onPointerDown={(event) => scrub(event.clientX)}
-        onPointerMove={(event) =>
-          event.pointerType === "mouse" || event.buttons ? scrub(event.clientX) : undefined
-        }
-      >
-        {width > 0 ? (
-          <svg width={width} height={height} className="block overflow-visible">
-            {players.map((p, place) => (
+      <Surface>
+        <div
+          ref={box}
+          aria-hidden
+          className="relative cursor-ew-resize touch-pan-y select-none"
+          style={{ height: HEIGHT + MARKS }}
+          onPointerDown={(event) => scrub(event.clientX)}
+          onPointerMove={(event) =>
+            event.pointerType === "mouse" || event.buttons ? scrub(event.clientX) : undefined
+          }
+        >
+          {width > 0 ? (
+            <svg width={width} height={HEIGHT + MARKS} className="block overflow-visible">
               <line
-                key={p.playerId}
-                x1={pad.x}
-                x2={width - pad.x}
-                y1={y(place)}
-                y2={y(place)}
-                stroke="var(--color-line)"
-                strokeDasharray="2 4"
+                x1={0}
+                x2={width - LABEL}
+                y1={plot.zero}
+                y2={plot.zero}
+                stroke="var(--color-line-strong)"
+                strokeDasharray="3 4"
               />
-            ))}
-            {marks.map((mark) => (
-              <text
-                key={mark.index}
-                x={x(mark.index)}
-                y={height - 8}
-                className="fill-muted text-xs"
-              >
-                {mark.label}
-              </text>
-            ))}
-            {players.toReversed().map((p) => {
-              const points = places.map((m, i) => `${x(i)},${y(m.get(p.playerId)!)}`);
-              return (
-                <g key={p.playerId} stroke={lineColor(p.chip)} fill="none" strokeLinejoin="round">
-                  <polyline
-                    points={points.slice(at).join(" ")}
-                    strokeOpacity={0.18}
-                    strokeWidth={2}
-                  />
-                  <polyline
-                    points={points.slice(0, at + 1).join(" ")}
-                    strokeWidth={p.playerId === picked ? 4 : 2.5}
-                    strokeLinecap="round"
-                  />
-                </g>
-              );
-            })}
-            <line
-              x1={x(at)}
-              x2={x(at)}
-              y1={pad.top - 6}
-              y2={height - pad.bottom + 6}
-              stroke="var(--color-accent)"
-              strokeWidth={1.5}
-            />
-            {players.map((p) => (
-              <circle
-                key={p.playerId}
-                cx={x(at)}
-                cy={y(places[at]!.get(p.playerId)!)}
-                r={6}
-                fill={lineColor(p.chip)}
-                stroke="var(--color-canvas)"
-                strokeWidth={2}
+              {marks.map((mark) => (
+                <text
+                  key={mark.index}
+                  x={plot.x(mark.index + 1)}
+                  y={HEIGHT + MARKS - 8}
+                  textAnchor="middle"
+                  className="fill-muted text-xs"
+                >
+                  {mark.label}
+                </text>
+              ))}
+              <line
+                x1={plot.x(point)}
+                x2={plot.x(point)}
+                y1={PAD.y / 2}
+                y2={HEIGHT - PAD.y / 2}
+                stroke="var(--color-line-strong)"
               />
-            ))}
-          </svg>
-        ) : (
-          <div style={{ height }} />
-        )}
-      </div>
+              {drawn.map(({ playerId, name, line, values }, i) => {
+                const yours = playerId === picked;
+                const color = yours ? "var(--color-accent)" : "var(--color-muted)";
+                const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
+                const now = { x: plot.x(point), y: plot.y(line[point]!) };
+                const off = plot.clipped(line[point]!);
+                return (
+                  <g key={playerId}>
+                    <polyline
+                      points={points.slice(point).join(" ")}
+                      fill="none"
+                      stroke={color}
+                      strokeOpacity={0.15}
+                      strokeWidth={2}
+                      strokeLinejoin="round"
+                    />
+                    <polyline
+                      points={points.slice(0, point + 1).join(" ")}
+                      fill="none"
+                      stroke={color}
+                      strokeOpacity={yours ? 1 : 0.45}
+                      strokeWidth={yours ? 3 : 2}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                    {yours ? (
+                      <circle cx={now.x} cy={now.y} r={10} fill={color} fillOpacity={0.2} />
+                    ) : null}
+                    <circle cx={now.x} cy={now.y} r={yours ? 4.5 : 3} fill={color} />
+                    <text
+                      x={now.x + 9}
+                      y={labels[i]}
+                      dominantBaseline="central"
+                      className={
+                        yours ? "fill-accent-text text-xs font-semibold" : "fill-muted text-xs"
+                      }
+                    >
+                      {name.slice(0, 1).toUpperCase()}
+                      {off === 1 ? " ↑" : off === -1 ? " ↓" : ""}
+                    </text>
+                    <title>{`${name}: ${reading(values[at]!)}`}</title>
+                  </g>
+                );
+              })}
+            </svg>
+          ) : null}
+        </div>
+      </Surface>
       <input
         type="range"
         min={0}
@@ -278,13 +320,19 @@ function Race<S extends RaceSession>({
                   {place + 1}
                 </span>
                 <Chip chip={p.chip} name={p.name} size={28} />
-                <span
-                  aria-hidden
-                  className="h-0.5 w-4 shrink-0 rounded-full"
-                  style={{ background: lineColor(p.chip) }}
-                />
                 <RowText title={p.name} />
-                <Money amount={p.now} currency={currency} tone="result" className="font-semibold" />
+                <span
+                  className={cn(
+                    "font-semibold tabular-nums",
+                    p.now === null || p.now === 0
+                      ? "text-muted"
+                      : p.now > 0
+                        ? "text-win"
+                        : "text-loss",
+                  )}
+                >
+                  {reading(p.now)}
+                </span>
               </Row>
             </button>
           </li>

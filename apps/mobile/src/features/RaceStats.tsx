@@ -1,8 +1,14 @@
 import type { GroupDetail, PlayerId, SessionId, TripDetail } from "@stacks/contracts";
-import { barTrack } from "@stacks/client-runtime/chart";
+import { around, barTrack, lineScale, spreadLabels } from "@stacks/client-runtime/chart";
 import { formatDay, playerNames } from "@stacks/client-runtime/format";
-import { boardMoney, chipOf, localClock } from "@stacks/client-runtime/trip";
-import { racePlaces, runningTotals, statSheet, type StatsSession } from "@stacks/shared/stats";
+import { boardMoney, chipOf, localClock, returnLabel } from "@stacks/client-runtime/trip";
+import {
+  raceLines,
+  runningTotals,
+  statSheet,
+  type RaceMeasure,
+  type StatsSession,
+} from "@stacks/shared/stats";
 import { tripNights } from "@stacks/shared/trips";
 import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
@@ -10,6 +16,7 @@ import { PanResponder, Pressable, Text, View } from "react-native";
 import Svg, { Circle, G, Line, Polyline, Text as SvgText } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 
+import { Choice } from "../components/ui/Field";
 import { cn } from "../components/ui/cn";
 import { Chip } from "./Chip";
 
@@ -110,21 +117,15 @@ export function RaceStats<S extends RaceSession>({
   );
 }
 
-/** Line colors by chip. Chip 4 is near-black, so its line takes the board's light gray instead. */
-function useLineColors() {
-  const colors = useCSSVariable([
-    "--color-muted",
-    "--color-chip-1",
-    "--color-chip-2",
-    "--color-chip-3",
-    "--color-chip-5",
-    "--color-chip-6",
-    "--color-chip-7",
-    "--color-chip-8",
-  ]).map(String);
-  const [muted, ...chips] = colors;
-  return (chip: number) => (chip === 4 ? muted! : chips[chip < 4 ? chip - 1 : chip - 2]!);
-}
+const measures = [
+  { value: "money", label: "Money" },
+  { value: "return", label: "% of buy-in" },
+] as const;
+const HEIGHT = 168;
+const PAD = { x: 16, y: 14 };
+/** Room past the furthest point for each line's initial, and below the plot for the day marks. */
+const LABEL = 30;
+const MARKS = 22;
 
 function Race<S extends RaceSession>({
   sessions,
@@ -150,32 +151,55 @@ function Race<S extends RaceSession>({
   const [pinned, setPinned] = useState<number | null>(null);
   const at = pinned === null ? last : Math.min(pinned, last);
   const setAt = (next: number) => setPinned(next >= last ? null : next);
+  const [measure, setMeasure] = useState<RaceMeasure>("money");
   const [width, setWidth] = useState(0);
-  const lineColor = useLineColors();
-  const [rule, amber, board] = useCSSVariable([
-    "--color-line",
+  const [accent, accentText, muted, ring] = useCSSVariable([
     "--color-accent",
-    "--color-canvas",
+    "--color-accent-text",
+    "--color-muted",
+    "--color-line-strong",
   ]).map(String);
 
-  // Places, not dollars: one big winner would flatten everyone else's line.
-  const places = racePlaces(
+  const lines = raceLines(
     sessions,
     players.map((p) => p.playerId),
+    measure,
+  ).map((line, i) => ({ ...line, ...players[i]! }));
+  const plot = lineScale(
+    lines.map((l) => l.line),
+    { width: Math.max(0, width - LABEL), height: HEIGHT },
+    PAD,
+    around(
+      lines.findIndex((l) => l.playerId === picked),
+      lines.length,
+    ),
   );
-  const height = 40 * Math.max(2, players.length) + 28;
-  const pad = { x: 10, top: 12, bottom: 28 };
-  const x = (i: number) => pad.x + (i / Math.max(1, last)) * (width - 2 * pad.x);
-  const y = (place: number) =>
-    pad.top + (place / Math.max(1, players.length - 1)) * (height - pad.top - pad.bottom);
-  const standing = players
-    .map((p) => ({ ...p, now: p.running[at]! }))
-    .toSorted((a, b) => places[at]!.get(a.playerId)! - places[at]!.get(b.playerId)!);
+  const reading = (value: number | null) =>
+    measure === "money" ? boardMoney(value ?? 0, currency) : returnLabel(value);
+  const standing = lines
+    .map((l) => ({ ...l, now: l.values[at]! }))
+    .toSorted((a, b) => (b.now ?? -Infinity) - (a.now ?? -Infinity));
   const [leader, second] = standing;
   const session = sessions[at]!;
+  // Yours draws last, on top of everyone else's.
+  const drawn = lines.toSorted(
+    (a, b) => Number(a.playerId === picked) - Number(b.playerId === picked),
+  );
+  const point = at + 1;
+  const labels = spreadLabels(
+    drawn.map(({ line }) => plot.y(line[point]!)),
+    13,
+    { min: 6, max: HEIGHT - 6 },
+  );
   const scrub = (locationX: number) =>
     setAt(
-      Math.max(0, Math.min(last, Math.round(((locationX - pad.x) / (width - 2 * pad.x)) * last))),
+      Math.max(
+        0,
+        Math.min(
+          last,
+          Math.round(((locationX - PAD.x) / (width - LABEL - 2 * PAD.x)) * (last + 1)) - 1,
+        ),
+      ),
     );
   // Only a sideways drag scrubs; an up-or-down swipe that starts on the chart scrolls the page.
   const drag = PanResponder.create({
@@ -184,11 +208,17 @@ function Race<S extends RaceSession>({
     onPanResponderGrant: (event) => scrub(event.nativeEvent.locationX),
     onPanResponderMove: (event) => scrub(event.nativeEvent.locationX),
   });
+  const lead =
+    second && leader!.now !== second.now
+      ? measure === "money"
+        ? boardMoney(leader!.now! - second.now!, currency, false)
+        : returnLabel(leader!.now)
+      : null;
   const headline = !second
     ? `${leader!.name} leads`
-    : leader!.now === second.now
+    : lead === null
       ? `${leader!.name} and ${second.name} are tied`
-      : `${leader!.name} leads by`;
+      : `${leader!.name} leads ${measure === "money" ? "by" : "at"}`;
 
   return (
     <View className="gap-4">
@@ -199,17 +229,19 @@ function Race<S extends RaceSession>({
         </Text>
         <Text accessibilityRole="header" className="text-xl font-semibold text-ink">
           {headline}
-          {second && leader!.now !== second.now ? (
-            <Text className="font-mono text-3xl text-win">
-              {" "}
-              {boardMoney(leader!.now - second.now, currency, false)}
-            </Text>
-          ) : null}
+          {lead === null ? null : <Text className="font-mono text-3xl text-win"> {lead}</Text>}
         </Text>
         <Text className="text-sm text-muted">
           Session {at + 1}: {session.venue.name}, {formatDay(session.session.startedAt)}
         </Text>
       </View>
+      <Choice
+        label="Measure"
+        labelHidden
+        options={measures}
+        value={measure}
+        onChange={setMeasure}
+      />
 
       <View
         accessible
@@ -229,69 +261,80 @@ function Race<S extends RaceSession>({
         }
         onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
         {...drag.panHandlers}
-        style={{ height }}
+        className="overflow-hidden rounded-xl bg-surface"
+        style={{ height: HEIGHT + MARKS }}
       >
         {width > 0 ? (
-          <Svg width={width} height={height} pointerEvents="none">
-            {players.map((p, place) => (
-              <Line
-                key={p.playerId}
-                x1={pad.x}
-                x2={width - pad.x}
-                y1={y(place)}
-                y2={y(place)}
-                stroke={rule}
-                strokeDasharray="2 4"
-              />
-            ))}
+          <Svg width={width} height={HEIGHT + MARKS} pointerEvents="none">
+            <Line
+              x1={0}
+              x2={width - LABEL}
+              y1={plot.zero}
+              y2={plot.zero}
+              stroke={ring}
+              strokeDasharray="3 4"
+            />
             {marks.map((mark) => (
               <SvgText
                 key={mark.index}
-                x={x(mark.index)}
-                y={height - 8}
-                fill={lineColor(4)}
-                fontSize={10}
-                fontFamily="JetBrainsMono_500Medium"
+                x={plot.x(mark.index + 1)}
+                y={HEIGHT + MARKS - 8}
+                textAnchor="middle"
+                fill={muted}
+                fontSize={11}
               >
                 {mark.label}
               </SvgText>
             ))}
-            {players.toReversed().map((p) => {
-              const points = places.map((m, i) => `${x(i)},${y(m.get(p.playerId)!)}`);
+            <Line
+              x1={plot.x(point)}
+              x2={plot.x(point)}
+              y1={PAD.y / 2}
+              y2={HEIGHT - PAD.y / 2}
+              stroke={ring}
+            />
+            {drawn.map(({ playerId, name, line }, i) => {
+              const yours = playerId === picked;
+              const color = yours ? accent : muted;
+              const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
+              const now = { x: plot.x(point), y: plot.y(line[point]!) };
+              const off = plot.clipped(line[point]!);
               return (
-                <G key={p.playerId} stroke={lineColor(p.chip)} fill="none" strokeLinejoin="round">
+                <G key={playerId}>
                   <Polyline
-                    points={points.slice(at).join(" ")}
-                    strokeOpacity={0.18}
+                    points={points.slice(point).join(" ")}
+                    fill="none"
+                    stroke={color}
+                    strokeOpacity={0.15}
                     strokeWidth={2}
+                    strokeLinejoin="round"
                   />
                   <Polyline
-                    points={points.slice(0, at + 1).join(" ")}
-                    strokeWidth={p.playerId === picked ? 4 : 2.5}
+                    points={points.slice(0, point + 1).join(" ")}
+                    fill="none"
+                    stroke={color}
+                    strokeOpacity={yours ? 1 : 0.45}
+                    strokeWidth={yours ? 3 : 2}
+                    strokeLinejoin="round"
                     strokeLinecap="round"
                   />
+                  {yours ? (
+                    <Circle cx={now.x} cy={now.y} r={10} fill={color} fillOpacity={0.2} />
+                  ) : null}
+                  <Circle cx={now.x} cy={now.y} r={yours ? 4.5 : 3} fill={color} />
+                  <SvgText
+                    x={now.x + 9}
+                    y={labels[i]! + 4}
+                    fontSize={12}
+                    fontWeight={yours ? "600" : "400"}
+                    fill={yours ? accentText : muted}
+                  >
+                    {name.slice(0, 1).toUpperCase()}
+                    {off === 1 ? " ↑" : off === -1 ? " ↓" : ""}
+                  </SvgText>
                 </G>
               );
             })}
-            <Line
-              x1={x(at)}
-              x2={x(at)}
-              y1={pad.top - 6}
-              y2={height - pad.bottom + 6}
-              stroke={amber}
-              strokeWidth={1.5}
-            />
-            {players.map((p) => (
-              <Circle
-                key={p.playerId}
-                cx={x(at)}
-                cy={y(places[at]!.get(p.playerId)!)}
-                r={6}
-                fill={lineColor(p.chip)}
-                stroke={board}
-                strokeWidth={2}
-              />
-            ))}
           </Svg>
         ) : null}
       </View>
@@ -302,7 +345,7 @@ function Race<S extends RaceSession>({
             key={p.playerId}
             accessibilityRole="button"
             accessibilityState={{ selected: p.playerId === picked }}
-            accessibilityLabel={`${place + 1}. ${p.name}: ${boardMoney(p.now, currency)}`}
+            accessibilityLabel={`${place + 1}. ${p.name}: ${reading(p.now)}`}
             accessibilityHint="Shows their stats"
             onPress={() => onPick(p.playerId)}
             className={cn(
@@ -311,18 +354,12 @@ function Race<S extends RaceSession>({
               p.playerId === picked && "border-l-[3px] border-l-accent",
             )}
           >
-            <Text className="w-5 font-mono text-lg text-accent-text">{place + 1}</Text>
+            <Text className="w-5 font-mono text-lg text-muted">{place + 1}</Text>
             <Chip chip={p.chip} name={p.name} size={26} />
-            <View
-              className="h-0.5 w-4 rounded-full"
-              style={{ backgroundColor: lineColor(p.chip) }}
-            />
             <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
               {p.name}
             </Text>
-            <Text className={cn("font-mono text-lg", tone(p.now))}>
-              {boardMoney(p.now, currency)}
-            </Text>
+            <Text className={cn("font-mono text-lg", tone(p.now ?? 0))}>{reading(p.now)}</Text>
           </Pressable>
         ))}
       </View>
