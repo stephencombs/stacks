@@ -5,6 +5,7 @@ import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { ChevronRight } from "lucide-react";
 
 import { Tag } from "~/components/ui/Surface";
+import { cn } from "~/components/ui/cn";
 import { useStacks } from "~/lib/stacks";
 
 /**
@@ -20,7 +21,13 @@ export function LiveBar() {
   const onIt = [`/sessions/${seat.id}`];
   if (onIt.includes(pathname)) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div
+      className={cn(
+        "pointer-events-none fixed inset-x-0 bottom-0 z-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))]",
+        // A wide trip page shows your live table in its rail already.
+        pathname.startsWith(`/trips/${seat.tripId}`) && "lg:hidden",
+      )}
+    >
       <Link
         to="/sessions/$sessionId"
         params={{ sessionId: seat.id }}

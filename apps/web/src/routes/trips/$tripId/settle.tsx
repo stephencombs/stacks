@@ -34,6 +34,7 @@ import { PlayerName } from "~/features/Player";
 import { TransferRow } from "~/features/TransferRow";
 import { ShareSettleUpButton } from "~/features/PayLinks";
 import { TripHeader } from "~/features/TripHeader";
+import { TripLayout, TripRail } from "~/features/TripRail";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/trips/$tripId/settle")({ component: SettleUp });
@@ -106,137 +107,138 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
   return (
     <>
       <TripHeader group={detail} trip={trip} current="settle" />
+      <TripLayout rail={<TripRail group={detail} trip={trip} on="settle" />}>
+        <BalanceHero
+          balance={balanceOf.get(me) ?? MinorUnits.make(0)}
+          payments={transfers.filter(involvesMe).length}
+          currency={currency}
+        />
 
-      <BalanceHero
-        balance={balanceOf.get(me) ?? MinorUnits.make(0)}
-        payments={transfers.filter(involvesMe).length}
-        currency={currency}
-      />
+        {transfers.length === 0 ? (
+          <EmptyState title="Everyone's square">
+            Debts show up here when someone covers a buy-in or holds someone else's cash.
+          </EmptyState>
+        ) : (
+          <Section
+            title="Suggested payments"
+            action={
+              <ShareSettleUpButton detail={detail} tripName={trip.trip.name} transfers={ordered} />
+            }
+          >
+            <List>
+              {ordered.map((transfer) => (
+                <TransferRow
+                  key={`${transfer.from}:${transfer.to}`}
+                  detail={detail}
+                  tripName={trip.trip.name}
+                  transfer={transfer}
+                  onMarkPaid={setPaying}
+                />
+              ))}
+            </List>
+            <Note>
+              These clear every balance. Pay however you like; Color Up only keeps the record.
+            </Note>
+            {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
+          </Section>
+        )}
 
-      {transfers.length === 0 ? (
-        <EmptyState title="Everyone's square">
-          Debts show up here when someone covers a buy-in or holds someone else's cash.
-        </EmptyState>
-      ) : (
+        <Section title="Balances">
+          <List>
+            {detail.players
+              .toSorted((a, b) => Number(b.id === me) - Number(a.id === me))
+              .map((player) => (
+                <Row key={player.id}>
+                  <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
+                  <RowText
+                    title={
+                      <PlayerName
+                        name={names.get(player.id) ?? player.displayName}
+                        you={player.id === me}
+                        guest={player.userId === null}
+                      />
+                    }
+                  />
+                  <BalanceBar
+                    balance={balanceOf.get(player.id) ?? 0}
+                    track={track}
+                    className="w-16 sm:w-28"
+                  />
+                  <span className="min-w-28 text-right whitespace-nowrap font-medium">
+                    <BalanceLabel
+                      amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
+                      currency={currency}
+                    />
+                  </span>
+                </Row>
+              ))}
+          </List>
+        </Section>
+
+        <BackingSection detail={detail} trip={trip} />
+
         <Section
-          title="Suggested payments"
+          title="Payment history"
           action={
-            <ShareSettleUpButton detail={detail} tripName={trip.trip.name} transfers={ordered} />
+            <Button size="sm" variant="ghost" onClick={() => setRecording(true)}>
+              Record a payment
+            </Button>
           }
         >
-          <List>
-            {ordered.map((transfer) => (
-              <TransferRow
-                key={`${transfer.from}:${transfer.to}`}
-                detail={detail}
-                tripName={trip.trip.name}
-                transfer={transfer}
-                onMarkPaid={setPaying}
-              />
-            ))}
-          </List>
-          <Note>
-            These clear every balance. Pay however you like; Color Up only keeps the record.
-          </Note>
-          {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
-        </Section>
-      )}
-
-      <Section title="Balances">
-        <List>
-          {detail.players
-            .toSorted((a, b) => Number(b.id === me) - Number(a.id === me))
-            .map((player) => (
-              <Row key={player.id}>
-                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
-                <RowText
-                  title={
-                    <PlayerName
-                      name={names.get(player.id) ?? player.displayName}
-                      you={player.id === me}
-                      guest={player.userId === null}
-                    />
-                  }
-                />
-                <BalanceBar
-                  balance={balanceOf.get(player.id) ?? 0}
-                  track={track}
-                  className="w-16 sm:w-28"
-                />
-                <span className="min-w-28 text-right whitespace-nowrap font-medium">
-                  <BalanceLabel
-                    amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
-                    currency={currency}
-                  />
-                </span>
-              </Row>
-            ))}
-        </List>
-      </Section>
-
-      <BackingSection detail={detail} trip={trip} />
-
-      <Section
-        title="Payment history"
-        action={
-          <Button size="sm" variant="ghost" onClick={() => setRecording(true)}>
-            Record a payment
-          </Button>
-        }
-      >
-        {trip.settlements.length === 0 && unsaved.length === 0 ? (
-          <Note>Payments you record show up here.</Note>
-        ) : (
-          <List>
-            {unsaved.map((payment) => (
-              <Row key={payment.id}>
-                <RowText
-                  title={
-                    <>
-                      {names.get(payment.from)} paid {names.get(payment.to)}{" "}
-                      <Money amount={payment.amount} currency={currency} />
-                    </>
-                  }
-                  meta="Saving…"
-                />
-              </Row>
-            ))}
-            {trip.settlements.map((entry) => {
-              const voided = entry.voidedAt !== null;
-              return (
-                <Row key={entry.id}>
+          {trip.settlements.length === 0 && unsaved.length === 0 ? (
+            <Note>Payments you record show up here.</Note>
+          ) : (
+            <List>
+              {unsaved.map((payment) => (
+                <Row key={payment.id}>
                   <RowText
-                    struck={voided}
                     title={
                       <>
-                        {names.get(entry.playerId)} paid{" "}
-                        {entry.counterpartyId ? names.get(entry.counterpartyId) : ""}{" "}
-                        <Money amount={entry.amount} currency={currency} />
+                        {names.get(payment.from)} paid {names.get(payment.to)}{" "}
+                        <Money amount={payment.amount} currency={currency} />
                       </>
                     }
-                    meta={[
-                      formatDay(entry.occurredAt),
-                      entry.note,
-                      voided ? `Voided${entry.voidReason ? `: ${entry.voidReason}` : ""}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
+                    meta="Saving…"
                   />
-                  {!voided && (isAdmin(detail) || entry.playerId === detail.myPlayerId) ? (
-                    <Menu
-                      label={`Actions for ${names.get(entry.playerId)} paid ${entry.counterpartyId ? names.get(entry.counterpartyId) : ""} ${formatMoney(entry.amount, currency)}`}
-                    >
-                      <MenuItem tone="danger" onClick={() => setVoiding(entry)}>
-                        Void
-                      </MenuItem>
-                    </Menu>
-                  ) : null}
                 </Row>
-              );
-            })}
-          </List>
-        )}
-      </Section>
+              ))}
+              {trip.settlements.map((entry) => {
+                const voided = entry.voidedAt !== null;
+                return (
+                  <Row key={entry.id}>
+                    <RowText
+                      struck={voided}
+                      title={
+                        <>
+                          {names.get(entry.playerId)} paid{" "}
+                          {entry.counterpartyId ? names.get(entry.counterpartyId) : ""}{" "}
+                          <Money amount={entry.amount} currency={currency} />
+                        </>
+                      }
+                      meta={[
+                        formatDay(entry.occurredAt),
+                        entry.note,
+                        voided ? `Voided${entry.voidReason ? `: ${entry.voidReason}` : ""}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    />
+                    {!voided && (isAdmin(detail) || entry.playerId === detail.myPlayerId) ? (
+                      <Menu
+                        label={`Actions for ${names.get(entry.playerId)} paid ${entry.counterpartyId ? names.get(entry.counterpartyId) : ""} ${formatMoney(entry.amount, currency)}`}
+                      >
+                        <MenuItem tone="danger" onClick={() => setVoiding(entry)}>
+                          Void
+                        </MenuItem>
+                      </Menu>
+                    ) : null}
+                  </Row>
+                );
+              })}
+            </List>
+          )}
+        </Section>
+      </TripLayout>
 
       {paying ? (
         <RecordPaymentDialog
