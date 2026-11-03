@@ -6,6 +6,7 @@ import { runningTotals } from "@stacks/shared/stats";
 import { tripStandings } from "@stacks/shared/trips";
 
 import { Money } from "~/components/Money";
+import { cn } from "~/components/ui/cn";
 import { Glow, Surface } from "~/components/ui/Surface";
 import { useWidth } from "~/lib/useWidth";
 
@@ -14,7 +15,7 @@ const PAD = { x: 16, y: 12 };
 /** Room past the last point for each line's initial. */
 const LABEL = 18;
 
-/** The trip as a race: everyone's running total session by session, with yours drawn in gold. */
+/** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in gold. */
 export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const currency = detail.group.currency;
   const names = playerNames(detail);
@@ -38,14 +39,18 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
 
   return (
     <Surface className="relative overflow-hidden">
-      <Glow tone="accent" />
+      <Glow tone={head.tone} />
       <div className="relative flex flex-col px-4 pt-4">
         <h2 className="text-sm font-medium text-muted">{head.label}</h2>
         <Money
-          amount={head.net}
+          amount={head.gap ?? head.net}
           currency={currency}
-          tone="result"
-          className="mt-2 font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl"
+          tone={head.gap === null ? "result" : "plain"}
+          className={cn(
+            head.tone === "win" && "text-win",
+            head.tone === "loss" && "text-loss",
+            "mt-2 font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl",
+          )}
         />
         {head.line ? <p className="mt-1.5 text-sm text-muted">{head.line}</p> : null}
       </div>

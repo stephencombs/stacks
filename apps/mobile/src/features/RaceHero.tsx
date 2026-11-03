@@ -11,13 +11,14 @@ import { useCSSVariable } from "uniwind";
 
 import { Money } from "../components/Money";
 import { Glow } from "../components/ui/Glow";
+import { cn } from "../components/ui/cn";
 
 const HEIGHT = 128;
 const PAD = { x: 16, y: 12 };
 /** Room past the last point for each line's initial. */
 const LABEL = 18;
 
-/** The trip as a race: everyone's running total session by session, with yours drawn in gold. */
+/** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in gold. */
 export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const [accent, accentText, muted, ring] = useCSSVariable([
     "--color-accent",
@@ -47,17 +48,21 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
 
   return (
     <View className="overflow-hidden rounded-xl bg-surface">
-      <Glow tone="accent" />
+      <Glow tone={head.tone} />
       <View className="px-4 pt-4">
         <Text accessibilityRole="header" className="text-sm font-medium text-muted">
           {head.label}
         </Text>
         <Money
-          amount={MinorUnits.make(head.net)}
+          amount={MinorUnits.make(head.gap ?? head.net)}
           currency={currency}
-          tone="result"
+          tone={head.gap === null ? "result" : "plain"}
           fit
-          className="mt-2 font-display text-6xl leading-[64px]"
+          className={cn(
+            head.tone === "win" && "text-win",
+            head.tone === "loss" && "text-loss",
+            "mt-2 font-display text-6xl leading-[64px]",
+          )}
         />
         {head.line ? <Text className="mt-1.5 text-sm text-muted">{head.line}</Text> : null}
       </View>

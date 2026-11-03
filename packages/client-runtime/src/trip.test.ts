@@ -234,7 +234,7 @@ it("heads your balance by which way it runs and how many payments clear it", () 
   expect(balanceHeadline(0, 0)).toEqual({ label: "You're square", tone: "accent", line: null });
 });
 
-it("says where you stand on the board and the gap that matters", () => {
+it("leads the race with the gap to the next player, falling back to your result", () => {
   const [me, priya, dev] = ["p1", "p2", "p3"] as unknown as ReadonlyArray<
     Parameters<typeof raceHeadline>[1]
   >;
@@ -249,15 +249,34 @@ it("says where you stand on the board and the gap that matters", () => {
     { playerId: priya!, net: 18000, rank: 2 },
   ];
   expect(raceHeadline(board, me!, names, usd)).toEqual({
-    label: "You lead",
+    label: "Ahead of Priya",
+    gap: 9500,
     net: 27500,
-    line: "$95 ahead of Priya",
+    tone: "win",
+    line: "1st of 3 · +$275 for the trip",
   });
   expect(raceHeadline(board, dev!, names, usd)).toEqual({
-    label: "3rd of 3",
+    label: "Behind Priya",
+    gap: 39000,
     net: -21000,
-    line: "$485 behind Maya",
+    tone: "loss",
+    line: "3rd of 3 · -$210 for the trip",
   });
-  expect(raceHeadline([{ playerId: me!, net: 500, rank: 1 }], me!, names, usd)?.line).toBeNull();
+  const tied = [
+    { playerId: me!, net: 500, rank: 1 },
+    { playerId: priya!, net: 500, rank: 1 },
+  ];
+  expect(raceHeadline(tied, me!, names, usd)).toMatchObject({
+    label: "Tied for the lead with Priya",
+    gap: null,
+    tone: "accent",
+  });
+  expect(raceHeadline([{ playerId: me!, net: 500, rank: 1 }], me!, names, usd)).toEqual({
+    label: "You lead",
+    gap: null,
+    net: 500,
+    tone: "accent",
+    line: null,
+  });
   expect(raceHeadline(board, "nobody" as never, names, usd)).toBeNull();
 });

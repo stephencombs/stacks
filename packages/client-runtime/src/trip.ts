@@ -131,7 +131,11 @@ export const balanceHeadline = (balance: number, payments: number) => ({
         : `${payments} payments square you up`,
 });
 
-/** Where you stand on the board, said over the race: your place, and the gap to the next one that matters. */
+/**
+ * Where you stand on the board, led by the gap that matters: to the player just ahead, or when
+ * you lead, to the one just behind. With no gap to show (tied, or alone on the board) the figure
+ * falls back to your trip result.
+ */
 export const raceHeadline = (
   standings: ReadonlyArray<Pick<TripStanding, "playerId" | "net" | "rank">>,
   me: PlayerId,
@@ -142,23 +146,38 @@ export const raceHeadline = (
   const mine = order.find((s) => s.playerId === me);
   if (!mine) return null;
   const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
-  const gap = (a: number, b: number) => boardMoney(Math.abs(a - b), currency, false);
-  const leader = order[0]!;
-  const next = order.find((s) => s.playerId !== me);
-  const line = !next
-    ? null
-    : leader.playerId !== me
-      ? leader.net === mine.net
-        ? `Tied with ${name(leader.playerId)} for the lead`
-        : `${gap(leader.net, mine.net)} behind ${name(leader.playerId)}`
-      : next.net === mine.net
-        ? `Tied with ${name(next.playerId)}`
-        : `${gap(mine.net, next.net)} ahead of ${name(next.playerId)}`;
-  return {
-    label: mine.rank === 1 ? "You lead" : `${ordinal(mine.rank)} of ${order.length}`,
-    net: mine.net,
-    line,
-  };
+  const place = `${ordinal(mine.rank)} of ${order.length} · ${boardMoney(mine.net, currency)} for the trip`;
+  const tied = order.find((s) => s.playerId !== me && s.net === mine.net);
+  const above = order.findLast((s) => s.net > mine.net);
+  const below = order.find((s) => s.net < mine.net);
+  if (tied)
+    return {
+      label:
+        mine.rank === 1
+          ? `Tied for the lead with ${name(tied.playerId)}`
+          : `Tied with ${name(tied.playerId)}`,
+      gap: null,
+      net: mine.net,
+      tone: "accent" as const,
+      line: place,
+    };
+  if (above)
+    return {
+      label: `Behind ${name(above.playerId)}`,
+      gap: above.net - mine.net,
+      net: mine.net,
+      tone: "loss" as const,
+      line: place,
+    };
+  if (below)
+    return {
+      label: `Ahead of ${name(below.playerId)}`,
+      gap: mine.net - below.net,
+      net: mine.net,
+      tone: "win" as const,
+      line: place,
+    };
+  return { label: "You lead", gap: null, net: mine.net, tone: "accent" as const, line: null };
 };
 
 /** A night's or a trip's record: "4W · 3L · 1 even", leaving out what's zero. */
