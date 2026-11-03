@@ -15,6 +15,7 @@ import { EmptyState, Note, Section } from "~/components/ui/Page";
 import { Skeleton, Surface } from "~/components/ui/Surface";
 import { GroupHeader } from "~/features/GroupHeader";
 import { RaceStats } from "~/features/RaceStats";
+import { TripHero } from "~/features/TripHero";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/groups/$groupId/stats")({ component: Stats });
@@ -66,8 +67,15 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
   const byNet = <R extends { results: ReadonlyArray<PlayerResult> }>(rows: ReadonlyArray<R>) =>
     rows.toSorted((a, b) => tableNet(b.results) - tableNet(a.results));
 
+  const tripCount = new Set(sessions.map((s) => s.tripId)).size;
   return (
     <>
+      <TripHero
+        group={detail}
+        sessions={sessions}
+        label={`All time with ${detail.group.name}`}
+        span={`${tripCount} ${tripCount === 1 ? "trip" : "trips"}`}
+      />
       <RaceStats
         detail={detail}
         sessions={sessions}

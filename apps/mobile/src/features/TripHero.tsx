@@ -1,7 +1,7 @@
-import { MinorUnits, type GroupDetail, type TripDetail } from "@stacks/contracts";
+import { MinorUnits, type GroupDetail } from "@stacks/contracts";
 import { lineScale } from "@stacks/client-runtime/chart";
 import { localClock, ordinal, tripLines } from "@stacks/client-runtime/trip";
-import { playerTrip, tripNights, tripStandings } from "@stacks/shared/trips";
+import { playerTrip, tripNights, tripStandings, type TripSession } from "@stacks/shared/trips";
 import { useState, type ReactNode } from "react";
 import { Text, View, type LayoutChangeEvent } from "react-native";
 import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from "react-native-svg";
@@ -13,10 +13,21 @@ import { Glow } from "../components/ui/Glow";
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const HEIGHT = 96;
 
-/** Your trip at a glance: where you stand, the line you drew getting there, and how it went. */
-export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
+/** Your result at a glance, for a trip or all time: where you stand, the line you drew getting there, and how it went. */
+export function TripHero({
+  group,
+  sessions: closed,
+  label = "Your trip",
+  span,
+}: {
+  group: GroupDetail;
+  /** Closed sessions, in any order. */
+  sessions: ReadonlyArray<TripSession>;
+  label?: string;
+  /** What the sessions cover after their count, like "2 nights"; nights by default. */
+  span?: string;
+}) {
   const currency = group.group.currency;
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
   const mine = playerTrip(closed, group.myPlayerId);
   const tone = mine.net > 0 ? "win" : mine.net < 0 ? "loss" : "accent";
   const [color, ring] = useCSSVariable([`--color-${tone}`, "--color-line-strong"]).map(String);
@@ -39,11 +50,11 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
       <View className="px-4 pt-4">
         <View className="flex-row items-baseline justify-between">
           <Text accessibilityRole="header" className="text-sm font-medium text-muted">
-            Your trip
+            {label}
           </Text>
           <Text className="text-sm text-muted">
             {plural(mine.played, "session")} ·{" "}
-            {plural(tripNights(closed, localClock).length, "night")}
+            {span ?? plural(tripNights(closed, localClock).length, "night")}
           </Text>
         </View>
         <Money

@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { ButtonLink } from "~/components/ui/Button";
 import { EmptyState, Section } from "~/components/ui/Page";
 import { Skeleton } from "~/components/ui/Surface";
-import { SessionList } from "~/features/SessionList";
+import { LiveSessionCard, SessionList } from "~/features/SessionList";
 import { PersonalLimits } from "~/features/PersonalLimits";
 import { TripHero } from "~/features/TripHero";
 import { TripHeader } from "~/features/TripHeader";
@@ -49,12 +49,11 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
     <>
       <TripHeader group={group} trip={trip} current="sessions" action={startSession} />
       <PersonalLimits group={group} trip={trip} settings />
-      <TripHero group={group} trip={trip} />
-      {mine ? (
-        <Section title="Your live session">
-          <SessionList sessions={[mine]} detail={group} />
-        </Section>
-      ) : null}
+      <TripHero
+        group={group}
+        sessions={trip.sessions.filter((s) => s.session.status === "closed")}
+      />
+      {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}
       {live.length > 0 ? (
         <Section title={mine ? "Other live sessions" : "Live sessions"}>
           <SessionList sessions={live} detail={group} />

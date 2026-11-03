@@ -1,7 +1,7 @@
-import type { GroupDetail, TripDetail } from "@stacks/contracts";
+import type { GroupDetail } from "@stacks/contracts";
 import { lineScale } from "@stacks/client-runtime/chart";
 import { localClock, ordinal, tripLines } from "@stacks/client-runtime/trip";
-import { playerTrip, tripNights, tripStandings } from "@stacks/shared/trips";
+import { playerTrip, tripNights, tripStandings, type TripSession } from "@stacks/shared/trips";
 import type { ReactNode } from "react";
 
 import { Money } from "~/components/Money";
@@ -10,10 +10,21 @@ import { useWidth } from "~/lib/useWidth";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-/** Your trip at a glance: where you stand, the line you drew getting there, and how it went. */
-export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
+/** Your result at a glance, for a trip or all time: where you stand, the line you drew getting there, and how it went. */
+export function TripHero({
+  group,
+  sessions: closed,
+  label = "Your trip",
+  span,
+}: {
+  group: GroupDetail;
+  /** Closed sessions, in any order. */
+  sessions: ReadonlyArray<TripSession>;
+  label?: string;
+  /** What the sessions cover after their count, like "2 nights"; nights by default. */
+  span?: string;
+}) {
   const currency = group.group.currency;
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
   const mine = playerTrip(closed, group.myPlayerId);
   if (mine.played === 0) return null;
   const standings = tripStandings(closed, localClock);
@@ -26,10 +37,10 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
       <Glow tone={tone} />
       <div className="relative flex flex-col px-4 pt-4">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-medium text-muted">Your trip</h2>
+          <h2 className="text-sm font-medium text-muted">{label}</h2>
           <span className="text-sm text-muted">
             {plural(mine.played, "session")} ·{" "}
-            {plural(tripNights(closed, localClock).length, "night")}
+            {span ?? plural(tripNights(closed, localClock).length, "night")}
           </span>
         </div>
         <Money

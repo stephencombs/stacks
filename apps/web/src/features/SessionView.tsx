@@ -27,6 +27,7 @@ import { List, Row, RowText, Tag } from "~/components/ui/Surface";
 import { Chip } from "~/features/Chip";
 import { PlayerName } from "~/features/Player";
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
+import { SeatHero, TableStats } from "~/features/SeatHero";
 import { TableMap } from "~/features/TableMap";
 import { PersonalLimits } from "~/features/PersonalLimits";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
@@ -158,10 +159,6 @@ export function SessionView({
     mySeated && !cashedOut.has(group.myPlayerId)
       ? group.myPlayerId
       : (seats.find((id) => !cashedOut.has(id)) ?? seats[0]);
-  const focusBought = focusPlayerId !== undefined && (resultOf.get(focusPlayerId)?.buyIn ?? 0) > 0;
-  const focusOut = focusPlayerId !== undefined && cashedOut.has(focusPlayerId);
-  const focusIsMe = focusPlayerId === group.myPlayerId;
-  const focusName = focusPlayerId ? (names.get(focusPlayerId) ?? "Player") : "Player";
   // Imported sessions end when they start: no length was recorded.
   const timed = session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt);
   const facts = (
@@ -171,20 +168,29 @@ export function SessionView({
       {timed
         ? ` to ${formatTime(session.endedAt!)} (${formatDuration(session.startedAt, session.endedAt!)})`
         : ""}
-      <br />
-      {/* Imported sessions only have each player's net, so there's no money in or out to show. */}
-      {buyIn === 0 && cashOut === 0 ? (
-        <>
-          Table net <Money amount={total((r) => r.net)} currency={currency} tone="result" />
-        </>
-      ) : (
-        <>
-          In <Money amount={buyIn} currency={currency} /> · Out{" "}
-          <Money amount={cashOut} currency={currency} />
-        </>
-      )}
     </>
   );
+  // Imported sessions only have each player's net, so there's no money in or out to show.
+  const tableStats = (
+    <TableStats
+      items={[
+        { label: "Players", value: detail.playerIds.length },
+        ...(buyIn === 0 && cashOut === 0
+          ? [
+              {
+                label: "Table net",
+                value: <Money amount={total((r) => r.net)} currency={currency} tone="result" />,
+              },
+            ]
+          : [
+              { label: "In", value: <Money amount={buyIn} currency={currency} /> },
+              { label: "Out", value: <Money amount={cashOut} currency={currency} /> },
+            ]),
+      ]}
+    />
+  );
+  const heroPlayerId = live ? focusPlayerId : mySeated ? group.myPlayerId : undefined;
+  const heroRebuy = heroPlayerId === undefined ? undefined : rebought.get(heroPlayerId);
   const notes = session.notes ? (
     <p className="max-w-[65ch] text-sm text-pretty whitespace-pre-line">{session.notes}</p>
   ) : null;
@@ -220,26 +226,6 @@ export function SessionView({
           />
         )}
       </Loaded>
-      {live && focusPlayerId ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={() => setDraft({ kind: "buy_in", playerId: focusPlayerId })}
-          >
-            {focusIsMe ? (focusBought && !focusOut ? "Rebuy" : "Buy in") : `Buy in · ${focusName}`}
-          </Button>
-          {focusBought && !focusOut ? (
-            <Button
-              variant="tint"
-              size="lg"
-              onClick={() => setDraft({ kind: "cash_out", playerId: focusPlayerId })}
-            >
-              {focusIsMe ? "Cash out" : `Cash out · ${focusName}`}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
 
       {seatCount(session) ? (
         <TableMap
@@ -256,9 +242,34 @@ export function SessionView({
           chipOf={(playerId) => chipOf(group, playerId)}
         />
       ) : null}
+      {tableStats}
+      {heroPlayerId ? (
+        <SeatHero
+          name={names.get(heroPlayerId) ?? "Player"}
+          chip={chipOf(group, heroPlayerId)}
+          seat={seatsNow(detail.seatings).get(heroPlayerId)}
+          you={heroPlayerId === group.myPlayerId}
+          result={resultOf.get(heroPlayerId)}
+          live={live}
+          out={cashedOut.has(heroPlayerId)}
+          rebuyAmount={lastBuyIn(heroPlayerId)?.amount}
+          undoing={heroRebuy !== undefined}
+          currency={currency}
+          onBuyIn={() => setDraft({ kind: "buy_in", playerId: heroPlayerId })}
+          onRebuy={() => {
+            const last = lastBuyIn(heroPlayerId);
+            if (last) rebuy(heroPlayerId, last.amount);
+          }}
+          onUndo={() => {
+            forget(heroPlayerId);
+            if (heroRebuy) void undo(heroRebuy);
+          }}
+          onCashOut={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
+        />
+      ) : null}
 
       <Section
-        title="Players"
+        title="At the table"
         action={
           live ? (
             <Button size="sm" variant="ghost" onClick={() => setAddingPlayer(true)}>
