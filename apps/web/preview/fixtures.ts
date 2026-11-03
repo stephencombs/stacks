@@ -238,10 +238,10 @@ const stats = {
     buyIn: 0,
     cashOut: 0,
     adjustment: 0,
-    net: [30000, 2000, 1000, -41000, -470000][i],
+    net: [30000, 2000, 1000, -41000, -470000, 0][i],
   })),
   byGame: [{ key: "blackjack", sessionCount: 2, results: summaries[0]!.results }],
-  byVenue: [{ key: venue(0, "Wynn"), sessionCount: 2, results: summaries[0]!.results }],
+  byVenue: summaries.map((s) => ({ key: s.venue, sessionCount: 1, results: s.results })),
   bySeat: [],
   bySession: summaries.map((s) => ({
     sessionId: s.session.id,
