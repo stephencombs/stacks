@@ -356,9 +356,11 @@ function VoidPaymentSheet({ entry, onClose }: { entry: Entry; onClose: () => voi
 function Payer({ detail, playerId }: { detail: GroupDetail; playerId: PlayerId }) {
   const name = detail.players.find((player) => player.id === playerId)?.displayName ?? "Someone";
   return (
-    <View className="flex-row items-center gap-1.5">
+    <View className="max-w-full shrink flex-row items-center gap-1.5">
       <Chip chip={chipOf(detail, playerId)} name={name} size={22} />
-      <Text className="text-base font-medium text-ink">{name}</Text>
+      <Text numberOfLines={1} className="shrink text-base font-medium text-ink">
+        {name}
+      </Text>
     </View>
   );
 }
