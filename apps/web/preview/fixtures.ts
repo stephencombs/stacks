@@ -96,7 +96,10 @@ const summaries = raw.map(([v, game, d, h, rows], i) => ({
     tableSeats: null,
     highLimit: false,
   },
-  venue: venue(i, v),
+  venue: venue(
+    raw.findIndex(([name]) => name === v),
+    v,
+  ),
   playerIds: Object.keys(rows).map((k) => P[+k]),
   playing: [],
   ledgerEntryIds: [],
@@ -172,7 +175,7 @@ const work = {
   trip: {
     id: u(10),
     groupId: u(9),
-    name: "Friday home games",
+    name: "Friday home games at Dev's place, winter league",
     startedAt: at(2, 18),
     endedAt: at(9, 23),
     createdBy: "user_maya",
@@ -195,6 +198,30 @@ groupList.push({
   liveSessionCount: 0,
   currentTripId: null,
   trips: [work.trip],
+  mySession: null,
+});
+// A group with a long name and no trips yet: only Group is offered until its first trip.
+const fresh = {
+  group: {
+    id: u(20),
+    name: "The Montgomery-Vance high rollers' society",
+    currency: "USD",
+    createdAt: at(30, 12),
+  },
+  role: "owner",
+  myPlayerId: P[0],
+  players: players.slice(0, 1),
+  trips: [],
+  unsettled: [],
+};
+groupList.push({
+  group: fresh.group,
+  role: "owner",
+  myPlayerId: P[0],
+  myBalance: 0,
+  liveSessionCount: 0,
+  currentTripId: null,
+  trips: [],
   mySession: null,
 });
 const entry = (n: number, p: number, amount: number, mins: number) => ({
@@ -245,7 +272,11 @@ const stats = {
     net: [30000, 2000, 1000, -41000, -470000, 0][i],
   })),
   byGame: [{ key: "blackjack", sessionCount: 2, results: summaries[0]!.results }],
-  byVenue: summaries.map((s) => ({ key: s.venue, sessionCount: 1, results: s.results })),
+  byVenue: [...Map.groupBy(summaries, (s) => s.venue.id).values()].map((played) => ({
+    key: played[0]!.venue,
+    sessionCount: played.length,
+    results: played.flatMap((s) => s.results),
+  })),
   bySeat: [],
   bySession: summaries.map((s) => ({
     sessionId: s.session.id,
@@ -286,6 +317,8 @@ export const routes: Record<string, unknown> = {
   }),
   [`/api/groups/${work.group.id}`]: check(GroupDetail, workDetail),
   [`/api/groups/${work.group.id}/invites`]: check(Schema.Array(Invite), []),
+  [`/api/groups/${fresh.group.id}`]: check(GroupDetail, fresh),
+  [`/api/groups/${fresh.group.id}/invites`]: check(Schema.Array(Invite), []),
   [`/api/trips/${work.trip.id}`]: check(TripDetail, {
     trip: work.trip,
     sessions: [],
