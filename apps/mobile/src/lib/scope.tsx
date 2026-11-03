@@ -1,12 +1,15 @@
 import { useAtomValue } from "@effect/atom-react";
+import { CommonActions, useNavigation } from "@react-navigation/native";
 import { GroupId, TripId } from "@stacks/contracts";
 import { tripInScope } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import {
   createContext,
   use,
+  useEffect,
   useEffectEvent,
   useLayoutEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -87,6 +90,31 @@ export function useLinkedScope(
     else if (group) setGroup(GroupId.make(group));
   });
   useLayoutEffect(() => apply(tripId, groupId), [tripId, groupId]);
+}
+
+/**
+ * A place's address names what's in scope. A link still sets the scope, as `useLinkedScope`
+ * does; after that the address follows the scope, so a place opened from the tab bar or switched
+ * from the scope sheet keeps an address that opens it again.
+ */
+export function usePlaceAddress(
+  link: { tripId?: string | undefined; groupId?: string | undefined } | undefined,
+  key: "tripId" | "groupId",
+) {
+  useLinkedScope(link);
+  const navigation = useNavigation();
+  const { scope } = useScope();
+  const id = key === "tripId" ? scope?.trip?.id : scope?.item.group.id;
+  const named = link?.[key];
+  const last = useRef(id);
+  useEffect(() => {
+    // A link that arrives names a scope that isn't applied yet, so only a change of scope, or
+    // an address with nothing in it, moves the address.
+    const moved = last.current !== undefined && last.current !== id;
+    last.current = id;
+    if (id === undefined || id === named || (named !== undefined && !moved)) return;
+    navigation.dispatch(CommonActions.setParams({ [key]: id }));
+  }, [id, named, key, navigation]);
 }
 
 /** Renders the scope once your groups have loaded; nothing if you're in none. */

@@ -16,7 +16,7 @@ import { GroupSkeleton } from "../features/ScreenSkeletons";
 import { TripsSection } from "../features/Trips";
 import { webUrl } from "../lib/config";
 import { useGo } from "../lib/go";
-import { ScopeLoaded, useLinkedScope } from "../lib/scope";
+import { ScopeLoaded, usePlaceAddress } from "../lib/scope";
 import { shareLink } from "../lib/share";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
@@ -28,7 +28,7 @@ const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 /** The group in scope: its trips, its people, its settings. */
 export function GroupScreen({ route }: Props) {
   const stacks = useStacks();
-  useLinkedScope(route.params);
+  usePlaceAddress(route.params, "groupId");
   return (
     <Screen>
       <ScopeLoaded skeleton={<GroupSkeleton />}>
