@@ -19,10 +19,16 @@ export default (): ExpoConfig => ({
   name,
   slug: "stacks",
   scheme,
-  version: "0.0.0",
+  version: "1.0.0",
+  icon: "./assets/icon.png",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
-  ios: { bundleIdentifier: id, supportsTablet: true },
+  ios: {
+    bundleIdentifier: id,
+    supportsTablet: true,
+    // Only HTTPS and Apple's own crypto, which is exempt; saves the export-compliance prompt on every upload.
+    config: { usesNonExemptEncryption: false },
+  },
   android: {
     package: id,
     // Google's map on Android needs a key in the build; without one the route shows as a list.

@@ -36,7 +36,10 @@
     },
     "production": {
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_API_URL": "https://stacks.stephen-jcombs.workers.dev",
+        "EXPO_PUBLIC_WEB_URL": "https://stacks.stephen-jcombs.workers.dev",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_cmljaC1qYWd1YXItNjczOS5jbGVyay5hY2NvdW50cy5kZXYk"
       },
       "autoIncrement": true,
       "channel": "production"
