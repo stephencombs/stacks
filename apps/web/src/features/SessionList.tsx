@@ -6,7 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { Money } from "~/components/Money";
 import { ButtonLink } from "~/components/ui/Button";
 import { Glow, List, RowLink, RowText, Surface, Tag } from "~/components/ui/Surface";
-import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
+import { formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
 
 function SessionRow({ summary, detail }: { summary: SessionSummary; detail: GroupDetail }) {
   const { session, venue, results } = summary;
@@ -16,7 +16,7 @@ function SessionRow({ summary, detail }: { summary: SessionSummary; detail: Grou
     <RowLink to="/sessions/$sessionId" params={{ sessionId: session.id }}>
       <RowText
         title={venue.name}
-        meta={`${gameNames[session.game]} · ${live ? `since ${formatTime(session.startedAt)}` : formatDay(session.startedAt)}`}
+        meta={`${gameNames[session.game]} · ${live ? "since " : ""}${formatTime(session.startedAt)}`}
       />
       {live ? <Tag tone="live">Live</Tag> : null}
       {mine && !live ? (
@@ -31,6 +31,7 @@ function SessionRow({ summary, detail }: { summary: SessionSummary; detail: Grou
   );
 }
 
+/** Sessions as rows. Closed ones show their start time: they sit under the heading of their day. */
 export function SessionList({
   sessions,
   detail,

@@ -29,7 +29,8 @@ import { PlayerName } from "~/features/Player";
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
 import { SeatHero, TableStats } from "~/features/SeatHero";
 import { TableMap } from "~/features/TableMap";
-import { PersonalLimits } from "~/features/PersonalLimits";
+import { LimitNotices } from "~/features/PersonalLimits";
+import { Tonight } from "~/features/TripBoard";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
 import { tableView } from "@stacks/client-runtime/table";
@@ -207,12 +208,13 @@ export function SessionView({
         title={venue.name}
         tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Closed"}</Tag>}
         context={facts}
-        tabs={notes}
-      />
+      >
+        {notes}
+      </PageHeader>
 
       <Loaded query={stacks.trip(session.tripId)} skeleton={<></>}>
         {(trip) => (
-          <PersonalLimits
+          <LimitNotices
             group={group}
             trip={trip}
             local={{
@@ -402,16 +404,22 @@ export function SessionView({
               </ButtonLink>
             ) : null}
             <ButtonLink
-              to="/trips/$tripId/results"
+              to="/trips/$tripId/board"
               params={{ tripId: session.tripId }}
               variant={tripEnded ? "primary" : "secondary"}
             >
-              See results
+              See the board
             </ButtonLink>
           </div>
         )}
         {voidEntry.error ? <FormError>{voidEntry.error}</FormError> : null}
       </Section>
+
+      {live ? (
+        <Loaded query={stacks.trip(session.tripId)} skeleton={<></>}>
+          {(trip) => <Tonight detail={group} trip={trip} sessionId={session.id} />}
+        </Loaded>
+      ) : null}
 
       <Section title="History">
         {detail.entries.length === 0 && unsaved.length === 0 ? (

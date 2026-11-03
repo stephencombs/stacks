@@ -50,7 +50,12 @@ export function Row({
 export function RowLink({
   children,
   ...props
-}: LinkProps & { children: ReactNode; "aria-label"?: string }) {
+}: LinkProps & {
+  children: ReactNode;
+  "aria-label"?: string;
+  "aria-current"?: "page";
+  onClick?: () => void;
+}) {
   return (
     <Link className={cn(row, pressable)} {...props}>
       {children}

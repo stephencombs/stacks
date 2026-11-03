@@ -30,16 +30,15 @@ test.describe.serial("seats at a blackjack table", () => {
     await page.getByRole("button", { name: "New group" }).click();
     await page.getByLabel("Group name").fill("Table crew");
     await page.getByRole("button", { name: "Create group" }).click();
-    await page.getByRole("link", { name: "People" }).click();
+    await page.getByRole("link", { name: /^1 member/ }).click();
     await page.getByRole("button", { name: "Add a guest" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Gus");
     await page.getByRole("button", { name: "Add guest" }).click();
     await expect(page.getByRole("button", { name: "Copy claim link" })).toBeVisible();
-    await page.getByRole("link", { name: "Trips" }).click();
-    await page.getByRole("button", { name: "Start a trip" }).click();
+    // The group's first trip opens straight onto its first session.
+    await page.getByRole("link", { name: "Table crew" }).click();
     await page.getByLabel("Trip name").fill("Seats");
     await page.getByRole("button", { name: "Start trip" }).click();
-    await page.getByRole("link", { name: "Start a session" }).first().click();
     await page.getByRole("button", { name: "Add a venue" }).click();
     await page.getByLabel("Name", { exact: true }).fill(`Palazzo ${Date.now().toString(36)}`);
     await page.getByLabel("City").fill("Las Vegas");

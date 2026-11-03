@@ -39,7 +39,11 @@ export function Menu({
         </BaseMenu.Trigger>
       )}
       <BaseMenu.Portal>
-        <BaseMenu.Positioner sideOffset={4} align={align ?? (trigger ? "start" : "end")}>
+        <BaseMenu.Positioner
+          className="z-40"
+          sideOffset={4}
+          align={align ?? (trigger ? "start" : "end")}
+        >
           <BaseMenu.Popup className="max-h-96 min-w-52 origin-[var(--transform-origin)] overflow-y-auto rounded-xl bg-surface p-1 shadow-(--elevation-popover) outline-none transition-[scale,opacity] duration-150 ease-snap data-[ending-style]:duration-100 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
             {children}
           </BaseMenu.Popup>
@@ -47,14 +51,6 @@ export function Menu({
       </BaseMenu.Portal>
     </BaseMenu.Root>
   );
-}
-
-export function MenuLabel({ children }: { children: ReactNode }) {
-  return <div className="px-3 pt-2 pb-1 text-xs font-medium text-muted">{children}</div>;
-}
-
-export function MenuSeparator() {
-  return <BaseMenu.Separator className="my-1 h-px bg-line" />;
 }
 
 export function MenuItem({

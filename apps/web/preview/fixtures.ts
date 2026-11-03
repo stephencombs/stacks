@@ -13,14 +13,15 @@ import * as Schema from "effect/Schema";
 const u = (n: number) => `0192e7a0-0000-7000-8000-${String(n).padStart(12, "0")}`;
 const at = (day: number, hour: number) => new Date(Date.UTC(2026, 9, day, hour)).toISOString();
 const ids = { group: u(1), trip: u(2), oldTrip: u(3), live: u(50) };
-const P = [u(101), u(102), u(103), u(104), u(105)];
-const names = ["Maya", "Priya", "Alexandria Montgomery-Vance", "Dev", "Jonah"];
+const P = [u(101), u(102), u(103), u(104), u(105), u(106)];
+const names = ["Maya", "Priya", "Alexandria Montgomery-Vance", "Dev", "Jonah", "Sam"];
 const handles = { venmo: null, cashApp: null, paypal: null };
 const players = P.map((id, i) => ({
   id,
   displayName: names[i],
   userId: i === 4 ? null : `user_${names[i]!.toLowerCase().split(" ")[0]}`,
-  role: i === 0 ? "owner" : i === 4 ? null : "member",
+  // Jonah is a guest; Sam left the group.
+  role: i === 0 ? "owner" : i >= 4 ? null : "member",
   claimCode: i === 4 ? "JONAH-CLAIM" : null,
   ...handles,
 }));
@@ -148,9 +149,9 @@ const groupDetail = {
   myPlayerId: P[0],
   players,
   trips: [trip, oldTrip],
-  unsettled: [],
+  unsettled: [{ tripId: ids.oldTrip, amount: 4500 }],
 };
-const groupList = [
+const groupList: Array<unknown> = [
   {
     group: groupDetail.group,
     role: "owner",
@@ -162,6 +163,36 @@ const groupList = [
     mySession: { id: ids.live, tripId: ids.trip, venueName: "Bellagio", startedAt: liveStart },
   },
 ];
+const work = {
+  group: { id: u(9), name: "Work poker night", currency: "USD", createdAt: at(2, 12) },
+  trip: {
+    id: u(10),
+    groupId: u(9),
+    name: "Friday home games",
+    startedAt: at(2, 18),
+    endedAt: at(9, 23),
+    createdBy: "user_maya",
+    createdAt: at(2, 18),
+  },
+};
+const workDetail = {
+  group: work.group,
+  role: "member",
+  myPlayerId: P[0],
+  players: players.slice(0, 2),
+  trips: [work.trip],
+  unsettled: [],
+};
+groupList.push({
+  group: work.group,
+  role: "member",
+  myPlayerId: P[0],
+  myBalance: 0,
+  liveSessionCount: 0,
+  currentTripId: null,
+  trips: [work.trip],
+  mySession: null,
+});
 const entry = (n: number, p: number, amount: number, mins: number) => ({
   id: u(600 + n),
   groupId: ids.group,
@@ -207,10 +238,10 @@ const stats = {
     buyIn: 0,
     cashOut: 0,
     adjustment: 0,
-    net: [30000, 2000, 1000, -41000, -470000][i],
+    net: [30000, 2000, 1000, -41000, -470000, 0][i],
   })),
   byGame: [{ key: "blackjack", sessionCount: 2, results: summaries[0]!.results }],
-  byVenue: [{ key: venue(0, "Wynn"), sessionCount: 2, results: summaries[0]!.results }],
+  byVenue: summaries.map((s) => ({ key: s.venue, sessionCount: 1, results: s.results })),
   bySeat: [],
   bySession: summaries.map((s) => ({
     sessionId: s.session.id,
@@ -249,6 +280,17 @@ export const routes: Record<string, unknown> = {
     trip: oldTrip,
     sessions: summaries.slice(0, 2),
   }),
+  [`/api/groups/${work.group.id}`]: check(GroupDetail, workDetail),
+  [`/api/groups/${work.group.id}/invites`]: check(Schema.Array(Invite), []),
+  [`/api/trips/${work.trip.id}`]: check(TripDetail, {
+    trip: work.trip,
+    sessions: [],
+    balances: [],
+    transfers: [],
+    settlements: [],
+    stakes: [],
+  }),
+  [`/api/trips/${work.trip.id}/limits`]: check(UserLimits, limits),
   [`/api/trips/${ids.trip}/limits`]: check(UserLimits, limits),
   [`/api/trips/${ids.oldTrip}/limits`]: check(UserLimits, limits),
   [`/api/sessions/${ids.live}`]: check(SessionDetail, sessionDetail),
