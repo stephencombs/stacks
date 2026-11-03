@@ -126,8 +126,8 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
       >
         {guests.length === 0 ? (
           <Note>
-            Add friends who aren't on Stacks yet. When they sign up through their claim link, their
-            history becomes theirs.
+            Add friends who aren't on Color Up yet. When they sign up through their claim link,
+            their history becomes theirs.
           </Note>
         ) : (
           <List>

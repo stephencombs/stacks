@@ -1,12 +1,13 @@
-import { ClerkFailed, SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/react";
+import { ClerkFailed, UserButton, useAuth } from "@clerk/react";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { Link, Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Button } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuChoice } from "~/components/ui/Menu";
+import { BrandMark } from "~/components/BrandMark";
+import { Landing } from "~/features/Landing";
 import { LiveBar } from "~/features/LiveBar";
 import { StacksProvider } from "~/lib/stacks";
 import { setTheme, useTheme } from "~/lib/theme";
@@ -61,8 +62,8 @@ function Wordmark() {
       to="/"
       className="flex min-h-11 items-center gap-2 font-display text-2xl tracking-wide uppercase"
     >
-      <span aria-hidden className="size-3 rotate-45 rounded-[3px] bg-accent" />
-      Stacks
+      <BrandMark className="size-7" />
+      Color Up
     </Link>
   );
 }
@@ -91,29 +92,9 @@ function Loading() {
 
 function SignedOut() {
   const { pathname } = useLocation();
-  const invited = pathname.startsWith("/join/") || pathname.startsWith("/claim/");
   return (
     <Frame tools={<ThemeMenu />}>
-      <main className="flex flex-1 flex-col justify-center gap-5 pb-24">
-        <h1 className="max-w-[14ch] font-display text-6xl leading-[0.9] tracking-[-0.01em] uppercase sm:text-7xl">
-          {invited ? "You've been invited to a group." : "Keep the casino trip honest."}
-        </h1>
-        <p className="max-w-[46ch] text-lg text-muted">
-          {invited
-            ? "Sign in or create an account to see who invited you and join their ledger."
-            : "Log buy-ins and cash-outs as you play. Stacks works out everyone's results and who owes whom. You pay each other however you like."}
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <SignUpButton mode="modal">
-            <Button variant="primary" size="lg">
-              Create an account
-            </Button>
-          </SignUpButton>
-          <SignInButton mode="modal">
-            <Button size="lg">Sign in</Button>
-          </SignInButton>
-        </div>
-      </main>
+      <Landing invited={pathname.startsWith("/join/") || pathname.startsWith("/claim/")} />
     </Frame>
   );
 }

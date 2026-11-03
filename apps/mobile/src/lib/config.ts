@@ -10,5 +10,5 @@ const devApiUrl = () => {
 
 export const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? devApiUrl();
 
-/** Invite and claim links open the web app, which works whether or not Stacks is installed. */
+/** Invite and claim links open the web app, which works whether or not Color Up is installed. */
 export const webUrl = process.env.EXPO_PUBLIC_WEB_URL ?? "http://localhost:5173";

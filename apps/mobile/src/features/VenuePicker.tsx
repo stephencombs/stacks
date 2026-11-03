@@ -128,7 +128,7 @@ export function VenuePicker({
     setLocating("idle");
   };
 
-  // Someone who has already let Stacks see where they are gets nearby venues first, unasked.
+  // Someone who has already let Color Up see where they are gets nearby venues first, unasked.
   useEffect(() => {
     if (selected) return;
     let current = true;

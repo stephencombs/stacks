@@ -1,4 +1,4 @@
-import { MinorUnits, type GroupDetail } from "@stacks/contracts";
+import { MinorUnits, type CurrencyCode, type PlayerId } from "@stacks/contracts";
 import { lineScale } from "@stacks/client-runtime/chart";
 import { localClock, ordinal, tripLines } from "@stacks/client-runtime/trip";
 import { playerTrip, tripNights, tripStandings, type TripSession } from "@stacks/shared/trips";
@@ -15,26 +15,28 @@ const HEIGHT = 96;
 
 /** Your result at a glance, for a trip or all time: where you stand, the line you drew getting there, and how it went. */
 export function TripHero({
-  group,
+  currency,
+  me,
   sessions: closed,
   label = "Your trip",
   span,
 }: {
-  group: GroupDetail;
+  currency: CurrencyCode;
+  /** Whose result this is. */
+  me: PlayerId;
   /** Closed sessions, in any order. */
   sessions: ReadonlyArray<TripSession>;
   label?: string;
   /** What the sessions cover after their count, like "2 nights"; nights by default. */
   span?: string;
 }) {
-  const currency = group.group.currency;
-  const mine = playerTrip(closed, group.myPlayerId);
+  const mine = playerTrip(closed, me);
   const tone = mine.net > 0 ? "win" : mine.net < 0 ? "loss" : "accent";
   const [color, ring] = useCSSVariable([`--color-${tone}`, "--color-line-strong"]).map(String);
   const [width, setWidth] = useState(0);
   if (mine.played === 0) return null;
   const standings = tripStandings(closed, localClock);
-  const rank = standings.find((s) => s.playerId === group.myPlayerId)?.rank;
+  const rank = standings.find((s) => s.playerId === me)?.rank;
   const lines = tripLines(mine, currency);
   const onLayout = (event: LayoutChangeEvent) => {
     const next = Math.round(event.nativeEvent.layout.width);

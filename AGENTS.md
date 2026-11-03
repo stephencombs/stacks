@@ -1,6 +1,6 @@
-# Stacks
+# Color Up
 
-Stacks is a casino-session ledger for groups of friends. Members log buy-ins and cash-outs during a session; the app works out each person's result and who owes whom. It ships as a web app and a native iOS/Android app on one shared core. The repo follows [T3Code](https://github.com/pingdotgg/t3code)'s layout and habits. `PLAN.md` holds the product scope and delivery phases.
+Color Up is a casino-session ledger for groups of friends. Its working name was Stacks, which the code keeps: the repo, the `@stacks/*` packages and the `stacks://` app scheme. Users only ever see Color Up. Members log buy-ins and cash-outs during a session; the app works out each person's result and who owes whom. It ships as a web app and a native iOS/Android app on one shared core. The repo follows [T3Code](https://github.com/pingdotgg/t3code)'s layout and habits. `PLAN.md` holds the product scope and delivery phases.
 
 Fight for the smallest model that makes the correct behavior unsurprising. Don't keep complexity because it exists, and don't add machinery because it looks impressive.
 

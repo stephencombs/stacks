@@ -722,7 +722,7 @@ function CloseSessionDialog({
         ) : null}
         {unsent > 0 ? (
           <FormError>
-            {unsent === 1 ? "1 entry hasn't" : `${unsent} entries haven't`} reached Stacks yet.
+            {unsent === 1 ? "1 entry hasn't" : `${unsent} entries haven't`} reached Color Up yet.
             Close once they have, so nothing is left out.
           </FormError>
         ) : null}

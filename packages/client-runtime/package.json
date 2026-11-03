@@ -55,6 +55,10 @@
     "./pay": {
       "types": "./src/pay.ts",
       "import": "./src/pay.ts"
+    },
+    "./sample": {
+      "types": "./src/sample.ts",
+      "import": "./src/sample.ts"
     }
   },
   "scripts": {

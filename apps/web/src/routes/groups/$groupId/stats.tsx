@@ -71,7 +71,8 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
   return (
     <>
       <TripHero
-        group={detail}
+        currency={detail.group.currency}
+        me={detail.myPlayerId}
         sessions={sessions}
         label={`All time with ${detail.group.name}`}
         span={`${tripCount} ${tripCount === 1 ? "trip" : "trips"}`}
