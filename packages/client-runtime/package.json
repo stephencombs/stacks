@@ -59,6 +59,10 @@
     "./sample": {
       "types": "./src/sample.ts",
       "import": "./src/sample.ts"
+    },
+    "./freshness": {
+      "types": "./src/freshness.ts",
+      "import": "./src/freshness.ts"
     }
   },
   "scripts": {

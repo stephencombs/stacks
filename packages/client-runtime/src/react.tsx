@@ -1,12 +1,14 @@
-import { useAtomSet } from "@effect/atom-react";
+import { useAtomRefresh, useAtomSet } from "@effect/atom-react";
 import type { SessionId, TripId } from "@stacks/contracts";
 import * as Cause from "effect/Cause";
 import * as Exit from "effect/Exit";
 import type * as Atom from "effect/reactivity/Atom";
+import type * as AsyncResult from "effect/reactivity/AsyncResult";
 import {
   createContext,
   use,
   useEffect,
+  useEffectEvent,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -14,6 +16,7 @@ import {
 
 import { LEDGER_KEYS, type Stacks } from "./api.ts";
 import { describeError } from "./errors.ts";
+import { shouldRevalidate } from "./freshness.ts";
 import { makeOutbox, type Outbox, type OutboxStorage, type Pending } from "./outbox.ts";
 import { makeLastTripStore, type LastTripStorage } from "./trip.ts";
 
@@ -167,3 +170,29 @@ export const useRememberTrip = (tripId: TripId) => {
     store?.set(tripId);
   }, [store, tripId]);
 };
+
+/** When each query last refetched in the background, so screens sharing one ask only once. */
+const lastRevalidated = new WeakMap<object, number>();
+
+/**
+ * Keeps a shown query fresh without ever blanking it: when the screen mounts, and whenever
+ * `onWake` reports the app coming back (focus, reconnect, foreground), stale data refetches in the
+ * background while the old copy stays up. `onWake` must be a stable, module-level function.
+ */
+export function useRevalidate<A, E>(
+  query: Atom.Atom<AsyncResult.AsyncResult<A, E>>,
+  result: AsyncResult.AsyncResult<A, E>,
+  onWake: (revalidate: () => void) => () => void,
+) {
+  const refresh = useAtomRefresh(query);
+  const revalidate = useEffectEvent(() => {
+    const now = Date.now();
+    if (!shouldRevalidate(result, now, lastRevalidated.get(query))) return;
+    lastRevalidated.set(query, now);
+    refresh();
+  });
+  useEffect(() => {
+    revalidate();
+    return onWake(() => revalidate());
+  }, [onWake]);
+}

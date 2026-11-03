@@ -16,9 +16,11 @@ import {
   useOutbox,
   usePending,
   useRememberTrip,
+  useRevalidate,
   useUnsaved,
   useStacks,
 } from "@stacks/client-runtime/react";
+import { CACHE_MS } from "@stacks/client-runtime/freshness";
 import type { LastTripStorage } from "@stacks/client-runtime/trip";
 import type { GroupDetail, TripDetail, TripId } from "@stacks/contracts";
 import { useState, type ReactNode } from "react";
@@ -41,7 +43,7 @@ export function StacksProvider({ userId, children }: { userId: string; children:
   const [tripStorage] = useState(() => lastTripStorage(userId));
   return (
     <StacksContext value={stacks}>
-      <RegistryProvider>
+      <RegistryProvider defaultIdleTTL={CACHE_MS}>
         <LastTripProvider storage={tripStorage}>
           <OutboxProvider storage={storage} wake={wakeOutbox}>
             {children}
@@ -67,6 +69,19 @@ const lastTripStorage = (userId: string): LastTripStorage => ({
   },
 });
 
+/** The tab coming back into view or the network returning: shown data may be stale. */
+const onWake = (revalidate: () => void) => {
+  const visible = () => (document.visibilityState === "visible" ? revalidate() : undefined);
+  window.addEventListener("focus", revalidate);
+  window.addEventListener("online", revalidate);
+  document.addEventListener("visibilitychange", visible);
+  return () => {
+    window.removeEventListener("focus", revalidate);
+    window.removeEventListener("online", revalidate);
+    document.removeEventListener("visibilitychange", visible);
+  };
+};
+
 /** Retry as soon as the browser is back online or the tab comes back. */
 const wakeOutbox = (flush: () => void) => {
   const visible = () => (document.visibilityState === "visible" ? flush() : undefined);
@@ -91,6 +106,7 @@ export function Loaded<A, E>({
   children: (value: A) => ReactNode;
 }) {
   const result = useAtomValue(query);
+  useRevalidate(query, result, onWake);
   return AsyncResult.match(result, {
     onInitial: () => skeleton ?? <Skeleton className="h-32 w-full" />,
     // A failed refresh keeps showing what was there before.

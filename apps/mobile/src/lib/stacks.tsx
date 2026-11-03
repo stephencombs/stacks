@@ -18,11 +18,13 @@ import {
   useStacks,
   useLastTrip,
   useRememberTrip,
+  useRevalidate,
 } from "@stacks/client-runtime/react";
+import { CACHE_MS } from "@stacks/client-runtime/freshness";
 import { File, Paths } from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
@@ -63,7 +65,7 @@ export function StacksProvider({ userId, children }: { userId: string; children:
   });
   return (
     <StacksContext value={stacks}>
-      <RegistryProvider>
+      <RegistryProvider defaultIdleTTL={CACHE_MS}>
         <LastTripProvider storage={tripStorage}>
           <OutboxProvider storage={storage} wake={wakeOutbox}>
             <RefusalHaptic />
@@ -78,6 +80,14 @@ export function StacksProvider({ userId, children }: { userId: string; children:
 export { useAction, useLastTrip, useRememberTrip, useOutbox, usePending, useStacks, useUnsaved };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
+/** The app coming back to the foreground: shown data may be stale. */
+const onWake = (revalidate: () => void) => {
+  const subscription = AppState.addEventListener("change", (state) =>
+    state === "active" ? revalidate() : undefined,
+  );
+  return () => subscription.remove();
+};
+
 export function Loaded<A, E>({
   query,
   skeleton,
@@ -88,6 +98,7 @@ export function Loaded<A, E>({
   children: (value: A) => ReactNode;
 }) {
   const result = useAtomValue(query);
+  useRevalidate(query, result, onWake);
   return AsyncResult.match(result, {
     onInitial: () => skeleton ?? <Skeleton className="h-32" />,
     // A failed refresh keeps showing what was there before.
