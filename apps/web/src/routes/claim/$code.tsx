@@ -3,8 +3,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
 import { PageHeader } from "~/components/ui/Page";
-import { Skeleton } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
+import { InviteSkeleton } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/claim/$code")({ component: Claim });
 
@@ -22,7 +22,7 @@ function Claim() {
     }
   };
   return (
-    <Loaded query={stacks.claimPreview(code)} skeleton={<Skeleton className="h-64" />}>
+    <Loaded query={stacks.claimPreview(code)} skeleton={<InviteSkeleton />}>
       {(preview) => (
         <>
           <PageHeader title={`Are you ${preview.displayName}?`} context={preview.groupName} />

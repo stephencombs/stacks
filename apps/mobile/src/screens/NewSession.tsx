@@ -20,11 +20,12 @@ import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Choice, FormError } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
-import { List, Row, SectionHeading, Skeleton, Surface } from "../components/ui/Surface";
+import { List, Row, SectionHeading, Surface } from "../components/ui/Surface";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { VenuePicker } from "../features/VenuePicker";
 import { Chip } from "../features/Chip";
-import { Loaded, useAction, useStacks } from "../lib/stacks";
+import { Loaded, TripLoaded, useAction, useStacks } from "../lib/stacks";
+import { FormScreenSkeleton } from "../features/ScreenSkeletons";
 
 type Props = StaticScreenProps<{
   tripId: string;
@@ -36,27 +37,20 @@ export function NewSessionScreen({ route }: Props) {
   const stacks = useStacks();
   return (
     <Screen>
-      <Loaded
-        query={stacks.trip(TripId.make(route.params.tripId))}
-        skeleton={<Skeleton className="h-96" />}
-      >
-        {(trip) => (
-          <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
-            {(detail) =>
-              route.params.from ? (
-                <Loaded
-                  query={stacks.session(SessionId.make(route.params.from))}
-                  skeleton={<Skeleton className="h-96" />}
-                >
-                  {(from) => <NewSessionForm detail={detail} trip={trip} from={from} />}
-                </Loaded>
-              ) : (
-                <NewSessionForm detail={detail} trip={trip} />
-              )
-            }
-          </Loaded>
-        )}
-      </Loaded>
+      <TripLoaded tripId={TripId.make(route.params.tripId)} skeleton={<FormScreenSkeleton />}>
+        {(trip, detail) =>
+          route.params.from ? (
+            <Loaded
+              query={stacks.session(SessionId.make(route.params.from))}
+              skeleton={<FormScreenSkeleton />}
+            >
+              {(from) => <NewSessionForm detail={detail} trip={trip} from={from} />}
+            </Loaded>
+          ) : (
+            <NewSessionForm detail={detail} trip={trip} />
+          )
+        }
+      </TripLoaded>
     </Screen>
   );
 }

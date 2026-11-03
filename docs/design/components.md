@@ -143,6 +143,17 @@ A page-level destructive action, like deleting a trip, goes in the menu and open
 
 Copies a link or code and confirms it. Use it instead of writing to the clipboard from a screen.
 
-## EmptyState, Skeleton
+## EmptyState
 
-`EmptyState` says what's missing and what to do: "No sessions on this trip yet", then a line on how to start. On mobile it takes an `action`; on web it sits beside the page's own action. Never "No data". It's in `Page.tsx` on web and `Surface.tsx` on mobile. `Skeleton` holds the shape of content while it loads; `<Loaded>` already handles this for a query.
+`EmptyState` says what's missing and what to do: "No sessions on this trip yet", then a line on how to start. On mobile it takes an `action`; on web it sits beside the page's own action. Never "No data". It's in `Page.tsx` on web and `Surface.tsx` on mobile.
+
+## Loading
+
+A page waits in its own shape, then appears once, whole, and nothing on it moves after.
+
+- **Skeletons are the page, unfilled.** Use the page skeletons in `PageSkeletons.tsx` (web) and `ScreenSkeletons.tsx` (mobile): the same header, cards, rows and gaps as the real page, with `SkeletonText` bars sitting in line boxes the height of the text they replace. Never one tall `Skeleton` block for a whole page; a page that doesn't have a skeleton yet gets one built from those parts.
+- **One wait, not a staircase.** A page that needs several queries passes the same skeleton to each stage. Trip pages use `TripLoaded`, which starts the trip, group and limits requests together and paints once they're all in. `Prefetch` starts a query early; `Settled` waits on one without failing the page when it fails.
+- **Nothing pops in above content.** Anything the page shows near the top waits with the page (limits do), rather than arriving after it and pushing everything down. Something that loads on its own further down reserves its height (`RowsSkeleton rows={1}` for a single row).
+- **Slow loads only.** Web skeletons fade in after 300ms measured from the navigation, so a quick load goes straight from the last page to this one with no grey flash.
+- **Display type doesn't jump.** Until Barlow Condensed loads, web sets display text in a fallback face scaled to Barlow's width and line box (`Barlow Condensed Fallback` in `index.css`). If the display font changes, recalibrate it.
+- **The header stays put on desktop.** The wordmark row spans the full width on every page; only the content column changes width.

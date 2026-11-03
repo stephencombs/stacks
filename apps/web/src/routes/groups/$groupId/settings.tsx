@@ -19,7 +19,7 @@ import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { Note, Section } from "~/components/ui/Page";
-import { List, Row, RowText, Skeleton, Tag } from "~/components/ui/Surface";
+import { List, Row, RowText, Tag } from "~/components/ui/Surface";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
 import { Chip } from "~/features/Chip";
 import { GroupHeader } from "~/features/GroupHeader";
@@ -30,7 +30,8 @@ import {
 } from "~/features/PaymentHandles";
 import { PlayerName } from "~/features/Player";
 import { csvFilename, formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/format";
-import { Loaded, useAction, useStacks } from "~/lib/stacks";
+import { Loaded, Prefetch, useAction, useStacks } from "~/lib/stacks";
+import { GroupPageSkeleton, RowsSkeleton } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/groups/$groupId/settings")({ component: People });
 
@@ -38,9 +39,13 @@ function People() {
   const { groupId } = Route.useParams();
   const stacks = useStacks();
   return (
-    <Loaded query={stacks.group(GroupId.make(groupId))} skeleton={<Skeleton className="h-96" />}>
-      {(detail) => <PeopleView detail={detail} />}
-    </Loaded>
+    <>
+      {/* The invites list sits mid-page, so its request starts with the page's. */}
+      <Prefetch query={stacks.invites(GroupId.make(groupId))} />
+      <Loaded query={stacks.group(GroupId.make(groupId))} skeleton={<GroupPageSkeleton rows={5} />}>
+        {(detail) => <PeopleView detail={detail} />}
+      </Loaded>
+    </>
   );
 }
 
@@ -229,7 +234,10 @@ function InviteSection({ detail, origin }: { detail: GroupDetail; origin: string
         </Button>
       }
     >
-      <Loaded query={stacks.invites(detail.group.id)} skeleton={<Skeleton className="h-16" />}>
+      <Loaded
+        query={stacks.invites(detail.group.id)}
+        skeleton={<RowsSkeleton rows={1} trailing={false} />}
+      >
         {(invites) =>
           invites.length === 0 ? (
             <Note>Make a link and send it to anyone you want in the group. Links last a week.</Note>

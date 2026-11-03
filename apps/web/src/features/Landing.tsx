@@ -38,7 +38,7 @@ function Ctas() {
 export function Landing({ invited }: { invited: boolean }) {
   if (invited)
     return (
-      <main className="flex flex-1 flex-col justify-center gap-5 pb-24">
+      <main className="flex w-full flex-1 flex-col justify-center gap-5 pb-24 lg:mx-auto lg:max-w-2xl">
         <h1 className="max-w-[14ch] font-display text-6xl leading-[0.9] tracking-[-0.01em] text-balance uppercase sm:text-7xl">
           You've been invited to a group.
         </h1>
@@ -50,7 +50,7 @@ export function Landing({ invited }: { invited: boolean }) {
     );
 
   return (
-    <main className="flex flex-1 flex-col gap-16 pt-10 pb-24 sm:pt-16">
+    <main className="flex w-full flex-1 flex-col gap-16 pt-10 pb-24 sm:pt-16 lg:mx-auto lg:max-w-2xl">
       <section className="flex flex-col gap-5">
         <h1 className="max-w-[14ch] font-display text-6xl leading-[0.9] tracking-[-0.01em] text-balance uppercase sm:text-7xl">
           Keep the casino trip honest.

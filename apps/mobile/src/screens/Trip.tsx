@@ -12,7 +12,7 @@ import { Button } from "../components/ui/Button";
 import { Choice, FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
-import { List, PageTitle, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
+import { List, PageTitle, Row, SectionHeading } from "../components/ui/Surface";
 import { ToastHost } from "../components/ui/Toast";
 import { LiveBar } from "../features/LiveBar";
 import { PersonalLimits } from "../features/PersonalLimits";
@@ -21,10 +21,11 @@ import { LiveSessionCard, SessionList } from "../features/SessionList";
 import { DaysBoard, TonightBoard, TripBoard } from "../features/TripBoard";
 import { TripHero } from "../features/TripHero";
 import { TripRoute } from "../features/TripRoute";
-import { Loaded, useAction, useLastTrip, useRememberTrip, useStacks } from "../lib/stacks";
+import { TripLoaded, useAction, useLastTrip, useRememberTrip, useStacks } from "../lib/stacks";
 import { SettleView } from "../features/SettleUp";
 import { TripTabs } from "../features/TripTabs";
 import type { TripTab } from "../features/tripTabConfig";
+import { TripScreenSkeleton } from "../features/ScreenSkeletons";
 
 type Props = StaticScreenProps<{ tripId: string; tab?: TripTab }>;
 
@@ -33,27 +34,20 @@ export function TripScreen({ route }: Props) {
 }
 
 export function TripHome({ tripId, tab }: { tripId: TripId; tab?: TripTab | undefined }) {
-  const stacks = useStacks();
   useRememberTrip(tripId);
+  // The tab bar is there from the first frame; each tab waits in its own shape.
   return (
-    <Loaded query={stacks.trip(tripId)} skeleton={<Skeleton className="m-4 h-96" />}>
-      {(trip) => (
-        <Loaded
-          query={stacks.group(trip.trip.groupId)}
-          skeleton={<Skeleton className="m-4 h-96" />}
-        >
-          {(group) => (
-            <TripTabs
-              key={tab ?? "default"}
-              initial={tab ?? "table"}
-              render={(shown, barHeight) => (
-                <TripTabScreen trip={trip} group={group} tab={shown} barHeight={barHeight} />
-              )}
-            />
+    <TripTabs
+      key={tab ?? "default"}
+      initial={tab ?? "table"}
+      render={(shown, barHeight) => (
+        <TripLoaded tripId={tripId} skeleton={<TripScreenSkeleton tab={shown} />}>
+          {(trip, group) => (
+            <TripTabScreen trip={trip} group={group} tab={shown} barHeight={barHeight} />
           )}
-        </Loaded>
+        </TripLoaded>
       )}
-    </Loaded>
+    />
   );
 }
 
@@ -93,7 +87,8 @@ function TripTabScreen({
           )}
         </ScrollView>
       </ToastHost>
-      <LiveBar bottom={barHeight} />
+      {/* The Sessions tab already shows your live table as a card. */}
+      {tab === "table" && mine ? null : <LiveBar bottom={barHeight} />}
     </View>
   );
 }

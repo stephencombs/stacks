@@ -4,27 +4,22 @@ import { Plus } from "lucide-react";
 
 import { ButtonLink } from "~/components/ui/Button";
 import { EmptyState, Section } from "~/components/ui/Page";
-import { Skeleton } from "~/components/ui/Surface";
 import { LiveSessionCard, SessionList } from "~/features/SessionList";
 import { PersonalLimits } from "~/features/PersonalLimits";
 import { TripHero } from "~/features/TripHero";
 import { TripHeader } from "~/features/TripHeader";
 import { SessionTable, TripLayout, TripRail } from "~/features/TripRail";
-import { Loaded, useStacks } from "~/lib/stacks";
+import { TripLoaded } from "~/lib/stacks";
+import { TripPageSkeleton } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/trips/$tripId/")({ component: TripPage });
 
 function TripPage() {
   const { tripId } = Route.useParams();
-  const stacks = useStacks();
   return (
-    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="h-96" />}>
-      {(trip) => (
-        <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
-          {(group) => <TripView trip={trip} group={group} />}
-        </Loaded>
-      )}
-    </Loaded>
+    <TripLoaded tripId={TripId.make(tripId)} skeleton={<TripPageSkeleton on="sessions" />}>
+      {(trip, group) => <TripView trip={trip} group={group} />}
+    </TripLoaded>
   );
 }
 

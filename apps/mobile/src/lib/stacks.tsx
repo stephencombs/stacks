@@ -1,3 +1,4 @@
+import type { GroupDetail, TripDetail, TripId } from "@stacks/contracts";
 import { getClerkInstance } from "@clerk/expo";
 import { RegistryProvider, useAtomValue } from "@effect/atom-react";
 import * as Cause from "effect/Cause";
@@ -114,4 +115,62 @@ function RefusalHaptic() {
     [outbox],
   );
   return null;
+}
+
+/**
+ * Waits for a query without depending on it: renders once it has answered either way, so a screen
+ * can hold its first paint until a side query is in, and still render if that query fails.
+ */
+export function Settled<A, E>({
+  query,
+  skeleton,
+  children,
+}: {
+  query: Atom.Atom<AsyncResult.AsyncResult<A, E>>;
+  skeleton: ReactNode;
+  children: ReactNode;
+}) {
+  return AsyncResult.isInitial(useAtomValue(query)) ? skeleton : children;
+}
+
+/** Starts a query early, so whatever reads it later finds it loading or loaded. */
+export function Prefetch<A, E>({ query }: { query: Atom.Atom<AsyncResult.AsyncResult<A, E>> }) {
+  useAtomValue(query);
+  return null;
+}
+
+/**
+ * A trip screen's data: the trip, its group, and your limits for it, behind one skeleton. The group
+ * and limits requests start alongside the trip's when your groups already say which group it is,
+ * and the screen paints once with everything it shows.
+ */
+export function TripLoaded({
+  tripId,
+  skeleton,
+  children,
+}: {
+  tripId: TripId;
+  skeleton: ReactNode;
+  children: (trip: TripDetail, group: GroupDetail) => ReactNode;
+}) {
+  const stacks = useStacks();
+  const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
+  const groupId = groups.find((item) => item.trips.some((trip) => trip.id === tripId))?.group.id;
+  return (
+    <>
+      {groupId ? <Prefetch query={stacks.group(groupId)} /> : null}
+      <Prefetch query={stacks.limits(tripId)} />
+      <Loaded query={stacks.trip(tripId)} skeleton={skeleton}>
+        {(trip) => (
+          <Loaded query={stacks.group(trip.trip.groupId)} skeleton={skeleton}>
+            {(group) => (
+              <Settled query={stacks.limits(tripId)} skeleton={skeleton}>
+                {children(trip, group)}
+              </Settled>
+            )}
+          </Loaded>
+        )}
+      </Loaded>
+    </>
+  );
 }

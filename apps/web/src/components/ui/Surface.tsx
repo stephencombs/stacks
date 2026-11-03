@@ -99,8 +99,11 @@ export function Tag({
   );
 }
 
+/** A placeholder block. For text, prefer `SkeletonText`, which sits in a real line box. */
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn("animate-pulse rounded-lg bg-sunken", className)} />;
+  return (
+    <span aria-hidden className={cn("block animate-skeleton rounded-md bg-fill", className)} />
+  );
 }
 
 /** A soft light behind a hero card's figure, in the color of how it's going. Put it first inside a `relative overflow-hidden` card. */

@@ -12,9 +12,10 @@ import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, List, PageTitle, Row, Skeleton, Tag } from "../components/ui/Surface";
+import { EmptyState, List, PageTitle, Row, Tag } from "../components/ui/Surface";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { setTheme, useTheme } from "../lib/theme";
+import { RowsSkeleton } from "../features/ScreenSkeletons";
 
 export function GroupsScreen() {
   const stacks = useStacks();
@@ -36,7 +37,7 @@ export function GroupsScreen() {
           <Button label="Account" onPress={() => setAccount(true)} />
         </View>
       </View>
-      <Loaded query={stacks.groups} skeleton={<Skeleton className="h-40" />}>
+      <Loaded query={stacks.groups} skeleton={<RowsSkeleton rows={3} trailing={false} />}>
         {(groups) =>
           groups.length === 0 ? (
             <EmptyState

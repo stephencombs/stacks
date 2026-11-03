@@ -3,10 +3,10 @@ import { GroupId, type GroupDetail } from "@stacks/contracts";
 import { Plus } from "lucide-react";
 
 import { ButtonLink } from "~/components/ui/Button";
-import { Skeleton } from "~/components/ui/Surface";
 import { GroupHeader } from "~/features/GroupHeader";
 import { StartTripButton, TripsSection } from "~/features/Trips";
 import { Loaded, useStacks } from "~/lib/stacks";
+import { GroupPageSkeleton } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/groups/$groupId/")({ component: GroupHome });
 
@@ -14,7 +14,7 @@ function GroupHome() {
   const { groupId } = Route.useParams();
   const stacks = useStacks();
   return (
-    <Loaded query={stacks.group(GroupId.make(groupId))} skeleton={<Skeleton className="h-96" />}>
+    <Loaded query={stacks.group(GroupId.make(groupId))} skeleton={<GroupPageSkeleton />}>
       {(detail) => <GroupHomeView detail={detail} />}
     </Loaded>
   );

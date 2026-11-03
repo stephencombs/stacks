@@ -3,33 +3,28 @@ import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { useState } from "react";
 
 import { Segmented } from "~/components/ui/Segmented";
-import { Skeleton } from "~/components/ui/Surface";
 import { TripStats } from "~/features/RaceStats";
 import { DaysBoard, TonightBoard, TripBoard } from "~/features/TripBoard";
 import { TripHeader } from "~/features/TripHeader";
 import { TripLayout, TripRail } from "~/features/TripRail";
-import { Loaded, useStacks } from "~/lib/stacks";
+import { TripLoaded } from "~/lib/stacks";
+import { TripPageSkeleton } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/trips/$tripId/results")({ component: ResultsPage });
 
 function ResultsPage() {
   const { tripId } = Route.useParams();
-  const stacks = useStacks();
   return (
-    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="h-96" />}>
-      {(trip) => (
-        <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
-          {(group) => (
-            <>
-              <TripHeader group={group} trip={trip} current="results" />
-              <TripLayout rail={<TripRail group={group} trip={trip} on="results" />}>
-                <Results group={group} trip={trip} />
-              </TripLayout>
-            </>
-          )}
-        </Loaded>
+    <TripLoaded tripId={TripId.make(tripId)} skeleton={<TripPageSkeleton on="results" />}>
+      {(trip, group) => (
+        <>
+          <TripHeader group={group} trip={trip} current="results" />
+          <TripLayout rail={<TripRail group={group} trip={trip} on="results" />}>
+            <Results group={group} trip={trip} />
+          </TripLayout>
+        </>
       )}
-    </Loaded>
+    </TripLoaded>
   );
 }
 

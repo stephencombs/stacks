@@ -109,6 +109,7 @@ export function EmptyState({
   );
 }
 
+/** A placeholder block. For text, prefer `SkeletonText`, which sits in a real line box. */
 export function Skeleton({ className }: { className?: string }) {
-  return <View accessibilityElementsHidden className={cn("rounded-xl bg-sunken", className)} />;
+  return <View accessibilityElementsHidden className={cn("rounded-md bg-fill", className)} />;
 }

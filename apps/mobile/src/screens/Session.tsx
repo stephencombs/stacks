@@ -38,7 +38,7 @@ import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { List, PageTitle, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
+import { List, PageTitle, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { useToast } from "../components/ui/Toast";
 import { cn } from "../components/ui/cn";
 import { AddGuestSheet } from "../features/AddGuestSheet";
@@ -47,8 +47,11 @@ import { Reveal } from "../features/Reveal";
 import { SeatHero } from "../features/SeatHero";
 import { TableMap } from "../features/TableMap";
 import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
+import { SessionScreenSkeleton } from "../features/ScreenSkeletons";
 import {
   Loaded,
+  Prefetch,
+  Settled,
   useAction,
   useOutbox,
   usePending,
@@ -65,15 +68,32 @@ export function SessionScreen({ route }: Props) {
     <Screen table={SessionId.make(route.params.sessionId)}>
       <Loaded
         query={stacks.session(SessionId.make(route.params.sessionId))}
-        skeleton={<Skeleton className="h-96" />}
+        skeleton={<SessionScreenSkeleton />}
       >
         {(session) => (
-          <Loaded
-            query={stacks.group(session.session.groupId)}
-            skeleton={<Skeleton className="h-96" />}
-          >
-            {(group) => <SessionView detail={session} group={group} />}
-          </Loaded>
+          // The screen also shows the trip's limits, so it waits for those too rather than
+          // shifting, asking for everything at once.
+          <>
+            <Prefetch query={stacks.trip(session.session.tripId)} />
+            <Prefetch query={stacks.limits(session.session.tripId)} />
+            <Prefetch query={stacks.group(session.session.groupId)} />
+            <Settled
+              query={stacks.trip(session.session.tripId)}
+              skeleton={<SessionScreenSkeleton />}
+            >
+              <Settled
+                query={stacks.limits(session.session.tripId)}
+                skeleton={<SessionScreenSkeleton />}
+              >
+                <Loaded
+                  query={stacks.group(session.session.groupId)}
+                  skeleton={<SessionScreenSkeleton />}
+                >
+                  {(group) => <SessionView detail={session} group={group} />}
+                </Loaded>
+              </Settled>
+            </Settled>
+          </>
         )}
       </Loaded>
     </Screen>

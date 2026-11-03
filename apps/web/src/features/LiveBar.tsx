@@ -18,14 +18,15 @@ export function LiveBar() {
   const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
   const seat = groups.flatMap((item) => (item.mySession ? [item.mySession] : []))[0];
   if (!seat) return null;
-  const onIt = [`/sessions/${seat.id}`];
-  if (onIt.includes(pathname)) return null;
+  const trip = `/trips/${seat.tripId}`;
+  // The session itself, and its trip's Sessions tab, already show your table.
+  if (pathname === `/sessions/${seat.id}` || pathname.replace(/\/$/, "") === trip) return null;
   return (
     <div
       className={cn(
         "pointer-events-none fixed inset-x-0 bottom-0 z-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))]",
         // A wide trip page shows your live table in its rail already.
-        pathname.startsWith(`/trips/${seat.tripId}`) && "lg:hidden",
+        pathname.startsWith(trip) && "lg:hidden",
       )}
     >
       <Link

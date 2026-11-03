@@ -12,10 +12,11 @@ import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Screen } from "../components/ui/Screen";
-import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
+import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
 import { RaceStats } from "../features/RaceStats";
 import { TripHero } from "../features/TripHero";
-import { Loaded, useStacks } from "../lib/stacks";
+import { Loaded, Prefetch, useStacks } from "../lib/stacks";
+import { ListScreenSkeleton } from "../features/ScreenSkeletons";
 
 type Props = StaticScreenProps<{ groupId: string }>;
 
@@ -24,9 +25,16 @@ export function StatsScreen({ route }: Props) {
   const groupId = GroupId.make(route.params.groupId);
   return (
     <Screen>
-      <Loaded query={stacks.group(groupId)} skeleton={<Skeleton className="h-96" />}>
+      <Prefetch query={stacks.stats(groupId)} />
+      <Loaded
+        query={stacks.group(groupId)}
+        skeleton={<ListScreenSkeleton label="Loading stats" hero />}
+      >
         {(detail) => (
-          <Loaded query={stacks.stats(groupId)} skeleton={<Skeleton className="h-64" />}>
+          <Loaded
+            query={stacks.stats(groupId)}
+            skeleton={<ListScreenSkeleton label="Loading stats" hero />}
+          >
             {(stats) => <StatsView detail={detail} stats={stats} />}
           </Loaded>
         )}
