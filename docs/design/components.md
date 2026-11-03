@@ -52,7 +52,7 @@ How many options?
 
 A form value from a few short options, where the choice deserves weight, is `RadioCards` on web: `kind` of an entry or venue, the game of a session. Set columns with `className`.
 
-Moving between places is the app's navigation (see Navigation below), never `Segmented`. The same data at another scope or measure is `Segmented`: the Board's This trip / All time, the race's Money / % of buy-in.
+Moving between places is the app's navigation (see Navigation below; `PlaceTabs` on mobile), never `Segmented` or `Choice`. The same data at another scope or measure is `Segmented`: the Board's This trip / All time, the race's Money / % of buy-in.
 
 ## Field, Input, Select (web), TextField (mobile)
 

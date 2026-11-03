@@ -1,21 +1,25 @@
-import type { SessionId } from "@stacks/contracts";
-import type { ReactNode } from "react";
+import { createContext, use, type ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 
-import { LiveBar } from "../../features/LiveBar";
+import { LiveBar, type ShowsTable } from "../../features/LiveBar";
 import { ToastHost } from "./Toast";
 
+/** How tall the tab bar is under the current screen: zero outside the places. */
+export const TabBarHeight = createContext(0);
+
 /**
- * A scrolling screen on the canvas, padded clear of the home indicator, that can show toasts and
- * the live bar for your table. `table` is the session a screen shows itself, so no bar for it.
+ * A scrolling screen on the canvas, padded clear of the home indicator and any tab bar, that can
+ * show toasts and the live bar for your table. `shows` is what of your table the screen already
+ * shows, so the bar stays away there.
  */
-export function Screen({ children, table }: { children: ReactNode; table?: SessionId }) {
+export function Screen({ children, shows }: { children: ReactNode; shows?: ShowsTable }) {
+  const bar = use(TabBarHeight);
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-canvas"
     >
-      <ToastHost>
+      <ToastHost {...(bar ? { above: bar } : {})}>
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
@@ -25,7 +29,7 @@ export function Screen({ children, table }: { children: ReactNode; table?: Sessi
           {children}
         </ScrollView>
       </ToastHost>
-      <LiveBar {...(table ? { except: table } : {})} />
+      <LiveBar {...(shows ? { shows } : {})} {...(bar ? { bottom: bar } : {})} />
     </KeyboardAvoidingView>
   );
 }

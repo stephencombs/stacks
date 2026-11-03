@@ -17,7 +17,6 @@ import {
   useUnsaved,
   useStacks,
   useLastTrip,
-  useRememberTrip,
   useRevalidate,
 } from "@stacks/client-runtime/react";
 import { CACHE_MS } from "@stacks/client-runtime/freshness";
@@ -77,7 +76,7 @@ export function StacksProvider({ userId, children }: { userId: string; children:
   );
 }
 
-export { useAction, useLastTrip, useRememberTrip, useOutbox, usePending, useStacks, useUnsaved };
+export { useAction, useLastTrip, useOutbox, usePending, useStacks, useUnsaved };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 /** The app coming back to the foreground: shown data may be stale. */

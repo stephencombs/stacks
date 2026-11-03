@@ -1,5 +1,4 @@
-import { useNavigation } from "@react-navigation/native";
-import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
+import { TripId, type GroupDetail, type GroupId, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
 import {
@@ -19,13 +18,15 @@ import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading } from "../components/ui/Surface";
+import { useGo } from "../lib/go";
+import { useScope } from "../lib/scope";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { Chip } from "./Chip";
 import { Skeleton } from "../components/ui/Surface";
 
-/** The group's trips: the ones going now as a jump onto their boards, then past trips. */
+/** The group's trips: the ones going now with their leaders, then past trips. Each opens its sessions. */
 export function TripsSection({ detail }: { detail: GroupDetail }) {
-  const navigation = useNavigation();
+  const go = useGo();
   const stacks = useStacks();
   const [starting, setStarting] = useState(false);
   const going = detail.trips.filter((trip) => trip.endedAt === null);
@@ -36,7 +37,7 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
       <SectionHeading
         action={
           <Button
-            label="Start a trip"
+            label="New trip"
             size="sm"
             variant={detail.trips.length === 0 ? "primary" : "ghost"}
             onPress={() => setStarting(true)}
@@ -55,8 +56,8 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
         <Pressable
           key={trip.id}
           accessibilityRole="button"
-          accessibilityLabel={`${trip.name}, live board`}
-          onPress={() => navigation.navigate("Trip", { tripId: trip.id })}
+          accessibilityLabel={`${trip.name}, going`}
+          onPress={() => go.trip(trip.id)}
           className="gap-3 rounded-xl bg-surface p-4 active:opacity-90"
         >
           <View className="gap-1">
@@ -84,10 +85,7 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
               key={trip.id}
               accessibilityHint="Opens the trip"
               onPress={() =>
-                navigation.navigate("Trip", {
-                  tripId: trip.id,
-                  ...(unsettledAmount(detail, trip.id) ? { tab: "money" as const } : {}),
-                })
+                go.trip(trip.id, unsettledAmount(detail, trip.id) ? "SettleUp" : "Sessions")
               }
             >
               <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
@@ -101,7 +99,13 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
           ))}
         </List>
       ) : null}
-      {starting ? <StartTripSheet detail={detail} onClose={() => setStarting(false)} /> : null}
+      {starting ? (
+        <StartTripSheet
+          groupId={detail.group.id}
+          first={detail.trips.length === 0}
+          onClose={() => setStarting(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -137,8 +141,24 @@ const STARTS = [
   { value: "3", label: "3 days ago" },
 ] as const;
 
-function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
-  const navigation = useNavigation();
+/**
+ * Starts a trip and puts it in scope. A group's first trip brings Sessions, Board and Settle up
+ * into the tab bar, so that one stays put; any later one opens its sessions.
+ */
+export function StartTripSheet({
+  groupId,
+  first,
+  onClose,
+  onStarted,
+}: {
+  groupId: GroupId;
+  first: boolean;
+  onClose: () => void;
+  /** After the trip starts, for a sheet that opened this one. */
+  onStarted?: () => void;
+}) {
+  const go = useGo();
+  const { setTrip } = useScope();
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("trips", "create"));
   const [now] = useState(() => new Date());
@@ -152,7 +172,7 @@ function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () 
     // A trip starts at midnight of its first day.
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - Number(daysAgo));
     const saved = await create.run({
-      params: { groupId: detail.group.id },
+      params: { groupId },
       payload: {
         id: TripId.make(newId()),
         name: name.trim(),
@@ -161,8 +181,9 @@ function StartTripSheet({ detail, onClose }: { detail: GroupDetail; onClose: () 
     });
     if (!saved) return;
     onClose();
-    if (detail.trips.length === 0) navigation.navigate("NewSession", { tripId: saved.id });
-    else navigation.navigate("Trip", { tripId: saved.id });
+    onStarted?.();
+    if (first) setTrip(saved.id);
+    else go.trip(saved.id);
   };
 
   return (
