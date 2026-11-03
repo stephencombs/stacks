@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { resolveScope, type Scope } from "./resolveScope";
+import { resolveScope, type Scope } from "@stacks/client-runtime/scope";
 import { Loaded, useLastTrip, useStacks } from "./stacks";
 
 /**

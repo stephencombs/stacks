@@ -1,8 +1,9 @@
 import { useClerk, useUser } from "@clerk/react";
 import { useAtomValue } from "@effect/atom-react";
 import { Link, useLocation, useParams } from "@tanstack/react-router";
-import type { GroupListItem, Trip, TripId } from "@stacks/contracts";
+import type { GroupId, GroupListItem, Trip, TripId } from "@stacks/contracts";
 import { formatTime } from "@stacks/client-runtime/format";
+import { resolveScope, tripIsLive } from "@stacks/client-runtime/scope";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { scopeTrips, tripDates, tripInScope, unsettledAmount } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
@@ -56,14 +57,19 @@ function useScope() {
   const seat = groups.flatMap((item) => (item.mySession ? [item.mySession] : []))[0] ?? null;
   const wanted =
     params.tripId ?? (seat && seat.id === params.sessionId ? seat.tripId : null) ?? lastTripId;
-  const item = params.groupId
-    ? groups.find((group) => group.group.id === params.groupId)
-    : (groups.find((group) => group.trips.some((trip) => trip.id === wanted)) ??
-      // A trip your groups don't list yet, like one just started, waits for them.
-      (params.tripId ? undefined : groups[0]));
-  const trip = item
-    ? (item.trips.find((trip) => trip.id === wanted) ?? tripInScope(item.trips, lastTripId))
-    : undefined;
+  // A trip your groups don't list yet, like one just started, waits for them.
+  const unlisted =
+    params.tripId !== undefined &&
+    !groups.some((group) => group.trips.some((trip) => trip.id === params.tripId));
+  const scope = unlisted
+    ? null
+    : resolveScope(
+        groups,
+        wanted as TripId | null,
+        (params.groupId as GroupId | undefined) ?? null,
+      );
+  const item = scope?.item;
+  const trip = scope?.trip;
   return {
     loading: AsyncResult.isInitial(result),
     groups,
@@ -251,7 +257,7 @@ function Sidebar({ scope, place }: { scope: Scope; place: Place | null }) {
                 )}
               >
                 <span className="truncate">{other.name}</span>
-                {seat?.tripId === other.id ? <Tag tone="live">Live</Tag> : null}
+                {tripIsLive(item, other) ? <Tag tone="live">Live</Tag> : null}
               </Link>
             ))}
           </>
@@ -346,7 +352,7 @@ function ScopeSheet({
                     key={trip.id}
                     trip={trip}
                     current={trip.id === scope.trip?.id}
-                    live={item.mySession?.tripId === trip.id}
+                    live={tripIsLive(item, trip)}
                     left={unsettledAmount(detail, trip.id)}
                     currency={item.group.currency}
                     onClose={onClose}

@@ -12,7 +12,7 @@ import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
 import { useGo } from "../lib/go";
-import type { Scope } from "../lib/resolveScope";
+import { tripIsLive, type Scope } from "@stacks/client-runtime/scope";
 import { useScope } from "../lib/scope";
 import { useStacks } from "../lib/stacks";
 import { StartTripSheet } from "./Trips";
@@ -52,13 +52,6 @@ export function ScopeButton() {
     </>
   );
 }
-
-/** Live while you're at one of its tables, or while it's the group's only trip going and someone plays. */
-const isLive = (item: GroupListItem, trip: Trip) =>
-  item.mySession?.tripId === trip.id ||
-  (trip.endedAt === null &&
-    item.liveSessionCount > 0 &&
-    item.trips.filter((other) => other.endedAt === null).length === 1);
 
 function ScopeSheet({ scope, onClose }: { scope: Scope; onClose: () => void }) {
   const stacks = useStacks();
@@ -113,7 +106,7 @@ function ScopeSheet({ scope, onClose }: { scope: Scope; onClose: () => void }) {
                       >
                         {trip.name}
                       </Text>
-                      {isLive(item, trip) ? <Tag tone="live">Live</Tag> : null}
+                      {tripIsLive(item, trip) ? <Tag tone="live">Live</Tag> : null}
                     </View>
                     <Text numberOfLines={1} className="text-sm text-muted">
                       {tripDates(trip)}

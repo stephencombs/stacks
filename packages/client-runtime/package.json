@@ -28,6 +28,10 @@
       "types": "./src/chart.ts",
       "import": "./src/chart.ts"
     },
+    "./scope": {
+      "types": "./src/scope.ts",
+      "import": "./src/scope.ts"
+    },
     "./trip": {
       "types": "./src/trip.ts",
       "import": "./src/trip.ts"
