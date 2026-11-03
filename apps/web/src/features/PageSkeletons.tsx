@@ -301,7 +301,7 @@ export function SessionPageSkeleton() {
       <HeaderSkeleton back context title="w-56 sm:w-72" />
       <div className="flex flex-col gap-3">
         <Skeleton className="-mx-4 aspect-[1.8] rounded-none sm:mx-0 sm:rounded-2xl" />
-        <Skeleton className="h-10 w-56 rounded-lg" />
+        <Skeleton className="h-12 w-56 rounded-lg pointer-coarse:h-[52px]" />
       </div>
       <Surface className="flex divide-x divide-line">
         {["w-6", "w-16", "w-14"].map((width) => (
@@ -333,6 +333,31 @@ export function SessionPageSkeleton() {
   );
 }
 
+/** The hub's trips: the running one with its leaders under it, then an ended one. */
+function TripRowsSkeleton() {
+  return (
+    <Surface className="overflow-hidden">
+      <div className="divide-y divide-line">
+        <div className="flex flex-col gap-2 px-4 py-3">
+          <span className="flex flex-col gap-0.5">
+            <SkeletonText className="w-36" />
+            <SkeletonText size="sm" className="w-24" />
+          </span>
+          <span className="flex h-[22px] items-center gap-4">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-24" />
+          </span>
+        </div>
+        <div className="flex min-h-14 flex-col gap-0.5 px-4 py-3">
+          <SkeletonText className="w-44" />
+          <SkeletonText size="sm" className="w-28" />
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
 /** A Group page loading: the hub's trips, people and settings, or People's lists, or Settings. */
 export function GroupPageSkeleton({ on }: { on: "hub" | "people" | "settings" }) {
   return (
@@ -341,7 +366,7 @@ export function GroupPageSkeleton({ on }: { on: "hub" | "people" | "settings" })
         <>
           <HeaderSkeleton context title="w-56 sm:w-72" />
           <SectionSkeleton>
-            <RowsSkeleton rows={2} trailing={false} />
+            <TripRowsSkeleton />
           </SectionSkeleton>
           <SectionSkeleton>
             <RowsSkeleton rows={1} chip trailing={false} />
@@ -364,11 +389,15 @@ export function GroupPageSkeleton({ on }: { on: "hub" | "people" | "settings" })
         <>
           <HeaderSkeleton back />
           <SectionSkeleton>
-            <RowsSkeleton rows={3} trailing={false} />
+            <SkeletonText size="sm" className="w-80 max-w-full" />
           </SectionSkeleton>
           <SectionSkeleton>
-            <Skeleton className="h-10 w-36 rounded-lg" />
+            <Skeleton className="h-10 w-36 rounded-lg pointer-coarse:h-11" />
             <SkeletonText size="sm" className="w-80 max-w-full" />
+          </SectionSkeleton>
+          <SectionSkeleton>
+            <Skeleton className="h-10 w-32 rounded-lg pointer-coarse:h-11" />
+            <SkeletonText size="sm" className="w-64 max-w-full" />
           </SectionSkeleton>
         </>
       )}
