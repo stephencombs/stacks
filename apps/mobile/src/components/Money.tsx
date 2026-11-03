@@ -12,15 +12,20 @@ export function Money({
   amount,
   currency,
   tone = "plain",
+  fit = false,
   className,
 }: {
   amount: MinorUnits;
   currency: CurrencyCode;
   tone?: "plain" | "result";
+  /** Shrink to one line instead of wrapping, for a hero figure on a narrow phone. */
+  fit?: boolean;
   className?: string;
 }) {
   return (
     <Text
+      numberOfLines={fit ? 1 : undefined}
+      adjustsFontSizeToFit={fit}
       className={cn(
         "font-mono",
         tone === "plain" && "text-ink",

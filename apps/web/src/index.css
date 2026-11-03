@@ -9,16 +9,16 @@
   --ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
   --animate-rack: rack 320ms var(--ease-snap) both;
 
-  --color-canvas: oklch(0.15 0.01 260);
-  --color-surface: oklch(0.19 0.01 260);
-  --color-sunken: oklch(0.12 0.01 260);
-  --color-fill: oklch(0.27 0.01 260);
+  --color-canvas: oklch(0.11 0.008 260);
+  --color-surface: oklch(0.215 0.008 260);
+  --color-sunken: oklch(0.16 0.008 260);
+  --color-fill: oklch(0.285 0.008 260);
   --color-raised: oklch(0.4 0.01 260);
   --color-ink: oklch(0.96 0 0);
   --color-muted: oklch(0.7 0.01 260);
   --color-faint: oklch(0.54 0.01 260);
-  --color-line: oklch(0.25 0.01 260);
-  --color-line-strong: oklch(0.32 0.01 260);
+  --color-line: oklch(0.285 0.008 260);
+  --color-line-strong: oklch(0.36 0.008 260);
   --color-accent: oklch(0.83 0.148 75);
   --color-accent-ink: oklch(0.2 0.02 75);
   --color-accent-text: oklch(0.83 0.148 75);
@@ -26,7 +26,7 @@
   --color-loss: oklch(0.7 0.19 25);
   --color-live: oklch(0.83 0.148 75);
   --color-danger: oklch(0.7 0.19 25);
-  --color-disabled: oklch(0.27 0.01 260);
+  --color-disabled: oklch(0.285 0.008 260);
 }
 
 /* Player chips, in joining order: casino chip colors. Chips read these through var(), so they're
@@ -53,11 +53,14 @@
 
 /* Elevation switches with the theme, so these sit outside @theme: Tailwind inlines --shadow-* values
    into its utilities, and an inlined value can't flip. Read them with shadow-(--elevation-card).
-   Depth doesn't show on dark grounds, so resting surfaces there are a ring alone. */
+   Depth doesn't show on dark grounds, so resting surfaces there are a ring with a faint top edge,
+   the way light catches a raised card. */
 :root {
   --elevation-control: inset 0 0 0 1px var(--color-line-strong);
-  --elevation-card: 0 0 0 1px var(--color-line);
-  --elevation-popover: 0 0 0 1px var(--color-line-strong), 0 8px 24px -4px rgb(0 0 0 / 0.5);
+  --elevation-card: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 0 1px var(--color-line);
+  --elevation-popover:
+    inset 0 1px 0 rgb(255 255 255 / 0.06), 0 0 0 1px var(--color-line-strong),
+    0 8px 24px -4px rgb(0 0 0 / 0.5);
   --elevation-sheet: 0 0 0 1px var(--color-line), 0 24px 48px -12px rgb(0 0 0 / 0.5);
 }
 

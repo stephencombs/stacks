@@ -12,12 +12,16 @@ import {
 
 import {
   awardLine,
+  balanceHeadline,
   boardMoney,
   localClock,
   makeLastTripStore,
+  ordinal,
+  raceHeadline,
   recordLine,
   resolveEntry,
   streakLine,
+  tripLines,
   unsettledAmount,
 } from "./trip.ts";
 
@@ -184,4 +188,95 @@ it("persists and notifies on last-viewed trip changes", () => {
     unsettledAmount({ unsettled: [{ tripId: second, amount: MinorUnits.make(4500) }] }, second),
   ).toBe(4500);
   expect(unsettledAmount({ unsettled: [] }, second)).toBeNull();
+});
+
+it("names places on the board", () => {
+  expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(ordinal)).toEqual([
+    "1st",
+    "2nd",
+    "3rd",
+    "4th",
+    "11th",
+    "12th",
+    "13th",
+    "21st",
+    "22nd",
+    "101st",
+  ]);
+});
+
+it("says how far a trip climbed from its low, and how often it won", () => {
+  const trip = {
+    net: 27500,
+    line: [0, -12500, -6500, 27500],
+    played: 3,
+    won: 2,
+    low: -12500,
+    best: null,
+  };
+  expect(tripLines(trip, usd)).toEqual({ climb: "Up $400 from your low", winRate: "67%" });
+  expect(tripLines({ ...trip, low: 0 }, usd).climb).toBeNull();
+  expect(tripLines({ ...trip, net: -12500 }, usd).climb).toBeNull();
+  expect(tripLines({ ...trip, played: 0, won: 0 }, usd).winRate).toBe("–");
+});
+
+it("heads your balance by which way it runs and how many payments clear it", () => {
+  expect(balanceHeadline(18500, 1)).toEqual({
+    label: "You're owed",
+    tone: "win",
+    line: "One payment squares you up",
+  });
+  expect(balanceHeadline(-6000, 2)).toEqual({
+    label: "You owe",
+    tone: "loss",
+    line: "2 payments square you up",
+  });
+  expect(balanceHeadline(0, 0)).toEqual({ label: "You're square", tone: "accent", line: null });
+});
+
+it("leads the race with the gap to the next player, falling back to your result", () => {
+  const [me, priya, dev] = ["p1", "p2", "p3"] as unknown as ReadonlyArray<
+    Parameters<typeof raceHeadline>[1]
+  >;
+  const names = new Map([
+    [me!, "Maya"],
+    [priya!, "Priya"],
+    [dev!, "Dev"],
+  ]);
+  const board = [
+    { playerId: dev!, net: -21000, rank: 3 },
+    { playerId: me!, net: 27500, rank: 1 },
+    { playerId: priya!, net: 18000, rank: 2 },
+  ];
+  expect(raceHeadline(board, me!, names, usd)).toEqual({
+    label: "Ahead of Priya",
+    gap: 9500,
+    net: 27500,
+    tone: "win",
+    line: "1st of 3 · +$275 for the trip",
+  });
+  expect(raceHeadline(board, dev!, names, usd)).toEqual({
+    label: "Behind Priya",
+    gap: 39000,
+    net: -21000,
+    tone: "loss",
+    line: "3rd of 3 · -$210 for the trip",
+  });
+  const tied = [
+    { playerId: me!, net: 500, rank: 1 },
+    { playerId: priya!, net: 500, rank: 1 },
+  ];
+  expect(raceHeadline(tied, me!, names, usd)).toMatchObject({
+    label: "Tied for the lead with Priya",
+    gap: null,
+    tone: "accent",
+  });
+  expect(raceHeadline([{ playerId: me!, net: 500, rank: 1 }], me!, names, usd)).toEqual({
+    label: "You lead",
+    gap: null,
+    net: 500,
+    tone: "accent",
+    line: null,
+  });
+  expect(raceHeadline(board, "nobody" as never, names, usd)).toBeNull();
 });
