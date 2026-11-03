@@ -8,14 +8,14 @@ const script = html.match(/<script>([\s\S]*?)<\/script>/)![1]!;
 it.each([
   { saved: "light", systemLight: false, theme: "light", chrome: "#f2f3f6" },
   { saved: "system", systemLight: true, theme: "light", chrome: "#f2f3f6" },
-  { saved: "system", systemLight: false, theme: undefined, chrome: "#090b0f" },
-  { saved: "dark", systemLight: true, theme: undefined, chrome: "#090b0f" },
-  { saved: null, systemLight: true, theme: undefined, chrome: "#090b0f" },
+  { saved: "system", systemLight: false, theme: undefined, chrome: "#030407" },
+  { saved: "dark", systemLight: true, theme: undefined, chrome: "#030407" },
+  { saved: null, systemLight: true, theme: undefined, chrome: "#030407" },
 ])(
   "restores $saved with system light=$systemLight before paint",
   ({ saved, systemLight, theme, chrome }) => {
     const dataset: Record<string, string> = {};
-    const meta = { content: "#090b0f" };
+    const meta = { content: "#030407" };
     runInNewContext(script, {
       localStorage: { getItem: () => saved },
       matchMedia: () => ({ matches: systemLight }),
