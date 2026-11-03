@@ -20,6 +20,8 @@ import { Route as GroupsGroupIdStatsRouteImport } from './routes/groups/$groupId
 import { Route as TripsTripIdIndexRouteImport } from './routes/trips/$tripId/index'
 import { Route as TripsTripIdBoardRouteImport } from './routes/trips/$tripId/board'
 import { Route as TripsTripIdMoneyRouteImport } from './routes/trips/$tripId/money'
+import { Route as TripsTripIdResultsRouteImport } from './routes/trips/$tripId/results'
+import { Route as TripsTripIdSettleRouteImport } from './routes/trips/$tripId/settle'
 import { Route as TripsTripIdSessionsNewRouteImport } from './routes/trips/$tripId/sessions.new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -77,6 +79,16 @@ const TripsTripIdMoneyRoute = TripsTripIdMoneyRouteImport.update({
   path: '/trips/$tripId/money',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TripsTripIdResultsRoute = TripsTripIdResultsRouteImport.update({
+  id: '/trips/$tripId/results',
+  path: '/trips/$tripId/results',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TripsTripIdSettleRoute = TripsTripIdSettleRouteImport.update({
+  id: '/trips/$tripId/settle',
+  path: '/trips/$tripId/settle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TripsTripIdSessionsNewRoute = TripsTripIdSessionsNewRouteImport.update({
   id: '/trips/$tripId/sessions/new',
   path: '/trips/$tripId/sessions/new',
@@ -93,6 +105,8 @@ export interface FileRoutesByFullPath {
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
   '/trips/$tripId/board': typeof TripsTripIdBoardRoute
   '/trips/$tripId/money': typeof TripsTripIdMoneyRoute
+  '/trips/$tripId/results': typeof TripsTripIdResultsRoute
+  '/trips/$tripId/settle': typeof TripsTripIdSettleRoute
   '/groups/$groupId/': typeof GroupsGroupIdIndexRoute
   '/trips/$tripId/': typeof TripsTripIdIndexRoute
   '/trips/$tripId/sessions/new': typeof TripsTripIdSessionsNewRoute
@@ -107,6 +121,8 @@ export interface FileRoutesByTo {
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
   '/trips/$tripId/board': typeof TripsTripIdBoardRoute
   '/trips/$tripId/money': typeof TripsTripIdMoneyRoute
+  '/trips/$tripId/results': typeof TripsTripIdResultsRoute
+  '/trips/$tripId/settle': typeof TripsTripIdSettleRoute
   '/groups/$groupId': typeof GroupsGroupIdIndexRoute
   '/trips/$tripId': typeof TripsTripIdIndexRoute
   '/trips/$tripId/sessions/new': typeof TripsTripIdSessionsNewRoute
@@ -122,6 +138,8 @@ export interface FileRoutesById {
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
   '/trips/$tripId/board': typeof TripsTripIdBoardRoute
   '/trips/$tripId/money': typeof TripsTripIdMoneyRoute
+  '/trips/$tripId/results': typeof TripsTripIdResultsRoute
+  '/trips/$tripId/settle': typeof TripsTripIdSettleRoute
   '/groups/$groupId/': typeof GroupsGroupIdIndexRoute
   '/trips/$tripId/': typeof TripsTripIdIndexRoute
   '/trips/$tripId/sessions/new': typeof TripsTripIdSessionsNewRoute
@@ -138,6 +156,8 @@ export interface FileRouteTypes {
     | '/groups/$groupId/stats'
     | '/trips/$tripId/board'
     | '/trips/$tripId/money'
+    | '/trips/$tripId/results'
+    | '/trips/$tripId/settle'
     | '/groups/$groupId/'
     | '/trips/$tripId/'
     | '/trips/$tripId/sessions/new'
@@ -152,6 +172,8 @@ export interface FileRouteTypes {
     | '/groups/$groupId/stats'
     | '/trips/$tripId/board'
     | '/trips/$tripId/money'
+    | '/trips/$tripId/results'
+    | '/trips/$tripId/settle'
     | '/groups/$groupId'
     | '/trips/$tripId'
     | '/trips/$tripId/sessions/new'
@@ -166,6 +188,8 @@ export interface FileRouteTypes {
     | '/groups/$groupId/stats'
     | '/trips/$tripId/board'
     | '/trips/$tripId/money'
+    | '/trips/$tripId/results'
+    | '/trips/$tripId/settle'
     | '/groups/$groupId/'
     | '/trips/$tripId/'
     | '/trips/$tripId/sessions/new'
@@ -181,6 +205,8 @@ export interface RootRouteChildren {
   GroupsGroupIdStatsRoute: typeof GroupsGroupIdStatsRoute
   TripsTripIdBoardRoute: typeof TripsTripIdBoardRoute
   TripsTripIdMoneyRoute: typeof TripsTripIdMoneyRoute
+  TripsTripIdResultsRoute: typeof TripsTripIdResultsRoute
+  TripsTripIdSettleRoute: typeof TripsTripIdSettleRoute
   GroupsGroupIdIndexRoute: typeof GroupsGroupIdIndexRoute
   TripsTripIdIndexRoute: typeof TripsTripIdIndexRoute
   TripsTripIdSessionsNewRoute: typeof TripsTripIdSessionsNewRoute
@@ -265,6 +291,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TripsTripIdMoneyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trips/$tripId/results': {
+      id: '/trips/$tripId/results'
+      path: '/trips/$tripId/results'
+      fullPath: '/trips/$tripId/results'
+      preLoaderRoute: typeof TripsTripIdResultsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trips/$tripId/settle': {
+      id: '/trips/$tripId/settle'
+      path: '/trips/$tripId/settle'
+      fullPath: '/trips/$tripId/settle'
+      preLoaderRoute: typeof TripsTripIdSettleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trips/$tripId/sessions/new': {
       id: '/trips/$tripId/sessions/new'
       path: '/trips/$tripId/sessions/new'
@@ -285,6 +325,8 @@ const rootRouteChildren: RootRouteChildren = {
   GroupsGroupIdStatsRoute: GroupsGroupIdStatsRoute,
   TripsTripIdBoardRoute: TripsTripIdBoardRoute,
   TripsTripIdMoneyRoute: TripsTripIdMoneyRoute,
+  TripsTripIdResultsRoute: TripsTripIdResultsRoute,
+  TripsTripIdSettleRoute: TripsTripIdSettleRoute,
   GroupsGroupIdIndexRoute: GroupsGroupIdIndexRoute,
   TripsTripIdIndexRoute: TripsTripIdIndexRoute,
   TripsTripIdSessionsNewRoute: TripsTripIdSessionsNewRoute,

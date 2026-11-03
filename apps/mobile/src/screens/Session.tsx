@@ -45,7 +45,15 @@ import { Chip } from "../features/Chip";
 import { Reveal } from "../features/Reveal";
 import { TableMap } from "../features/TableMap";
 import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
-import { Loaded, useAction, useOutbox, usePending, useStacks, useUnsaved } from "../lib/stacks";
+import {
+  Loaded,
+  useAction,
+  useOutbox,
+  usePending,
+  useRememberTrip,
+  useStacks,
+  useUnsaved,
+} from "../lib/stacks";
 
 type Props = StaticScreenProps<{ sessionId: string }>;
 
@@ -75,10 +83,12 @@ function KeepAwake() {
   return null;
 }
 
-export function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDetail }) {
+function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDetail }) {
   const stacks = useStacks();
+  const navigation = useNavigation();
   const { userId } = useAuth();
   const { session, venue } = detail;
+  useRememberTrip(session.tripId);
   const live = session.status === "live";
   const currency = group.group.currency;
   const names = playerNames(group);
@@ -369,6 +379,24 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
         ) : null}
       </View>
 
+      {!live ? (
+        <View className="flex-row gap-2">
+          {group.trips.some((trip) => trip.id === session.tripId && trip.endedAt === null) ? (
+            <Button
+              label="Start another session"
+              className="flex-1"
+              onPress={() =>
+                navigation.navigate("NewSession", { tripId: session.tripId, from: session.id })
+              }
+            />
+          ) : null}
+          <Button
+            label="See results"
+            className="flex-1"
+            onPress={() => navigation.navigate("Trip", { tripId: session.tripId, tab: "board" })}
+          />
+        </View>
+      ) : null}
       <View className="gap-2">
         <SectionHeading>History</SectionHeading>
         {history.length === 0 ? (
@@ -379,8 +407,13 @@ export function SessionView({ detail, group }: { detail: SessionDetail; group: G
           <List>
             {history.map((item) => {
               const { entry, saving } = item;
-              const voided = undone.has(entry.id) || (!item.saving && item.entry.voidedAt !== null);
-              const voidReason = item.saving ? null : item.entry.voidReason;
+              const locallyUndone = undone.has(entry.id);
+              const voided = locallyUndone || (!item.saving && item.entry.voidedAt !== null);
+              const voidReason = locallyUndone
+                ? "Undone"
+                : item.saving
+                  ? null
+                  : item.entry.voidReason;
               const counterparty = entry.counterpartyId ? names.get(entry.counterpartyId) : null;
               const actionable = live && !item.saving && !voided && canVoid(item.entry);
               const content = (

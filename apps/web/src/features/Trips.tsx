@@ -2,7 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import { chipOf, localClock, tripDates } from "@stacks/client-runtime/trip";
+import { chipOf, localClock, tripDates, unsettledAmount } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { Plane } from "lucide-react";
@@ -12,28 +12,22 @@ import { Money } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input } from "~/components/ui/Field";
-import { EmptyState, Section } from "~/components/ui/Page";
-import { List, RowLink, RowText } from "~/components/ui/Surface";
-import { Loaded, useAction, useStacks } from "~/lib/stacks";
+import { Note, Section } from "~/components/ui/Page";
+import { List, RowLink, RowText, Surface } from "~/components/ui/Surface";
+import { Loaded, useAction, useLastTrip, useStacks } from "~/lib/stacks";
 import { Chip } from "./Chip";
 
 /** `date` inputs want a local calendar day. */
 const localDay = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
-/** The group's trips: the ones going now, with who's leading, then past trips. */
 export function TripsSection({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
   const going = detail.trips.filter((trip) => trip.endedAt === null);
   const past = detail.trips.filter((trip) => trip.endedAt !== null);
 
   if (detail.trips.length === 0) {
-    return (
-      <EmptyState title="No trips yet">
-        Every session is part of a trip, like a weekend in Vegas or this month's home games. Each
-        trip keeps its own leaderboard and settle-up.
-      </EmptyState>
-    );
+    return <FirstTripSection detail={detail} />;
   }
 
   return (
@@ -60,11 +54,23 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
       {past.length > 0 ? (
         <Section title="Past trips">
           <List>
-            {past.map((trip) => (
-              <RowLink key={trip.id} to="/trips/$tripId" params={{ tripId: trip.id }}>
-                <RowText title={trip.name} meta={tripDates(trip)} />
-              </RowLink>
-            ))}
+            {past.map((trip) => {
+              const left = unsettledAmount(detail, trip.id);
+              return (
+                <RowLink
+                  key={trip.id}
+                  to={left !== null ? "/trips/$tripId/settle" : "/trips/$tripId"}
+                  params={{ tripId: trip.id }}
+                >
+                  <RowText title={trip.name} meta={tripDates(trip)} />
+                  {left !== null ? (
+                    <span className="shrink-0 text-sm font-medium text-accent-text">
+                      <Money amount={left} currency={detail.group.currency} /> left to settle
+                    </span>
+                  ) : null}
+                </RowLink>
+              );
+            })}
           </List>
         </Section>
       ) : null}
@@ -72,7 +78,28 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
   );
 }
 
-/** Opens the dialog that starts a trip, and goes to its board once it's saved. */
+function FirstTripSection({ detail }: { detail: GroupDetail }) {
+  const navigate = useNavigate();
+  const { setLastTripId } = useLastTrip();
+  return (
+    <Section title="Name your first trip">
+      <Surface className="flex flex-col gap-4 p-4">
+        <Note>
+          Every session in {detail.group.name} belongs to a trip, like a weekend in Vegas or this
+          month's home games. Name your first trip to start a session.
+        </Note>
+        <TripForm
+          detail={detail}
+          onCreated={(tripId) => {
+            setLastTripId(tripId);
+            void navigate({ to: "/trips/$tripId/sessions/new", params: { tripId } });
+          }}
+        />
+      </Surface>
+    </Section>
+  );
+}
+
 export function StartTripButton({
   detail,
   variant = "primary",
@@ -115,8 +142,35 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
 }
 
 function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
-  const stacks = useStacks();
   const navigate = useNavigate();
+  const { setLastTripId } = useLastTrip();
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => (open ? undefined : onClose())}
+      title="Start a trip"
+      description="Sessions you start in it go on its board and settle up on their own."
+    >
+      <TripForm
+        detail={detail}
+        onCreated={(tripId) => {
+          setLastTripId(tripId);
+          onClose();
+          void navigate({ to: "/trips/$tripId", params: { tripId } });
+        }}
+      />
+    </Dialog>
+  );
+}
+
+function TripForm({
+  detail,
+  onCreated,
+}: {
+  detail: GroupDetail;
+  onCreated: (tripId: TripId) => void;
+}) {
+  const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("trips", "create"));
   const [problem, setProblem] = useState<string | null>(null);
   const [now] = useState(() => new Date());
@@ -129,46 +183,36 @@ function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: ()
     const day = String(form.get("startedOn") ?? today);
     if (!name) return setProblem("Give the trip a name.");
     setProblem(null);
-    // A trip starts at midnight of its first day.
     const startedAt = DateTime.makeUnsafe(new Date(`${day}T00:00`).getTime());
     const saved = await create.run({
       params: { groupId: detail.group.id },
       payload: { id: TripId.make(newId()), name, startedAt },
     });
-    if (!saved) return;
-    onClose();
-    void navigate({ to: "/trips/$tripId", params: { tripId: saved.id } });
+    if (saved) onCreated(saved.id);
   };
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => (open ? undefined : onClose())}
-      title="Start a trip"
-      description="Sessions you start in it go on its board and settle up on their own."
-    >
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        <Field label="Trip name">
-          {(props) => (
-            <Input
-              {...props}
-              name="name"
-              maxLength={60}
-              autoComplete="off"
-              placeholder={`Vegas ${now.getFullYear()}`}
-            />
-          )}
-        </Field>
-        <Field label="Started on" hint="Shown with the trip, in its dates.">
-          {(props) => (
-            <Input {...props} type="date" name="startedOn" defaultValue={today} max={today} />
-          )}
-        </Field>
-        {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
-        <Button type="submit" variant="primary" size="lg" pending={create.pending}>
-          Start trip
-        </Button>
-      </form>
-    </Dialog>
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <Field label="Trip name">
+        {(props) => (
+          <Input
+            {...props}
+            name="name"
+            maxLength={60}
+            autoComplete="off"
+            placeholder={`Vegas ${now.getFullYear()}`}
+          />
+        )}
+      </Field>
+      <Field label="Started on" hint="Shown with the trip, in its dates.">
+        {(props) => (
+          <Input {...props} type="date" name="startedOn" defaultValue={today} max={today} />
+        )}
+      </Field>
+      {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
+      <Button type="submit" variant="primary" size="lg" pending={create.pending}>
+        Start trip
+      </Button>
+    </form>
   );
 }

@@ -190,10 +190,11 @@ export function Gallery() {
 
       <Section title="A session">
         <Segmented
-          label="Show"
+          label="View"
+          variant="quiet"
           options={[
+            { value: "trip", label: "Standings" },
             { value: "tonight", label: "Tonight" },
-            { value: "trip", label: "Trip" },
             { value: "days", label: "Days" },
           ]}
           value={view}
@@ -201,13 +202,13 @@ export function Gallery() {
         />
         <Tabs label="Trip">
           <Tab to="/" current>
-            Table
+            Sessions
           </Tab>
           <Tab to="/" current={false}>
-            Board
+            Results
           </Tab>
           <Tab to="/" current={false}>
-            Money
+            Settle up
           </Tab>
         </Tabs>
         <div className="flex flex-wrap items-center gap-2">

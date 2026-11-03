@@ -23,14 +23,15 @@ function GroupHome() {
 function GroupHomeView({ detail }: { detail: GroupDetail }) {
   // Trips come newest first, so the first one still going is where tonight's sessions go.
   const going = detail.trips.find((trip) => trip.endedAt === null);
-  const action = going ? (
-    <ButtonLink to="/trips/$tripId/sessions/new" params={{ tripId: going.id }} variant="primary">
-      <Plus className="size-4" aria-hidden />
-      Start a session
-    </ButtonLink>
-  ) : (
-    <StartTripButton detail={detail} />
-  );
+  const action =
+    detail.trips.length === 0 ? null : going ? (
+      <ButtonLink to="/trips/$tripId/sessions/new" params={{ tripId: going.id }} variant="primary">
+        <Plus className="size-4" aria-hidden />
+        Start a session
+      </ButtonLink>
+    ) : (
+      <StartTripButton detail={detail} />
+    );
 
   return (
     <>

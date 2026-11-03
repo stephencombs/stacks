@@ -8,13 +8,17 @@ import { makeStacksClient } from "@stacks/client-runtime/api";
 import { describeError } from "@stacks/client-runtime/errors";
 import {
   OutboxProvider,
+  LastTripProvider,
   StacksContext,
   useAction,
   useOutbox,
   usePending,
   useUnsaved,
   useStacks,
+  useLastTrip,
+  useRememberTrip,
 } from "@stacks/client-runtime/react";
+import { File, Paths } from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Platform } from "react-native";
@@ -38,19 +42,39 @@ export function StacksProvider({ userId, children }: { userId: string; children:
     }),
   );
   const [storage] = useState(() => outboxStorage(userId));
+  const [tripStorage] = useState(() => {
+    const key = `last-trip-${userId}`;
+    if (Platform.OS === "web")
+      return {
+        load: () => localStorage.getItem(key),
+        save: (value: string | null) =>
+          value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value),
+      };
+    const file = new File(Paths.document, key);
+    return {
+      load: () => (file.exists ? file.textSync() : null),
+      save: (value: string | null) => {
+        if (value === null) {
+          if (file.exists) file.delete();
+        } else file.write(value);
+      },
+    };
+  });
   return (
     <StacksContext value={stacks}>
       <RegistryProvider>
-        <OutboxProvider storage={storage} wake={wakeOutbox}>
-          <RefusalHaptic />
-          {children}
-        </OutboxProvider>
+        <LastTripProvider storage={tripStorage}>
+          <OutboxProvider storage={storage} wake={wakeOutbox}>
+            <RefusalHaptic />
+            {children}
+          </OutboxProvider>
+        </LastTripProvider>
       </RegistryProvider>
     </StacksContext>
   );
 }
 
-export { useAction, useOutbox, usePending, useStacks, useUnsaved };
+export { useAction, useLastTrip, useRememberTrip, useOutbox, usePending, useStacks, useUnsaved };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 export function Loaded<A, E>({

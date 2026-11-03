@@ -34,7 +34,7 @@ import { StatsScreen } from "./screens/Stats";
 import { TripScreen } from "./screens/Trip";
 
 // The trip's tabs are a navigator inside Home and Trip; these give them their own addresses.
-const tripTabPaths = { Table: "", Board: "board", Money: "money" };
+const tripTabPaths = { Sessions: "", Results: "results", SettleUp: "settle" };
 
 const RootStack = createNativeStackNavigator({
   screenOptions: {

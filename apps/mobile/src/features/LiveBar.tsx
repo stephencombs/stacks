@@ -43,9 +43,7 @@ export function LiveBar({
         accessibilityRole="button"
         accessibilityLabel={`Back to your table at ${seat.venueName}, since ${formatTime(seat.startedAt)}`}
         accessibilityHint="Goes back to your table"
-        onPress={
-          onPress ?? (() => navigation.navigate("Trip", { tripId: seat.tripId, tab: "table" }))
-        }
+        onPress={onPress ?? (() => navigation.navigate("Session", { sessionId: seat.id }))}
         className="min-h-13 flex-row items-center gap-3 rounded-xl border border-line-strong bg-surface px-4 py-3 active:bg-sunken"
       >
         <View className="size-2 rounded-full bg-live" />

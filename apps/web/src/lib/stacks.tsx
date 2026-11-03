@@ -8,14 +8,18 @@ import { makeStacksClient } from "@stacks/client-runtime/api";
 import { describeError } from "@stacks/client-runtime/errors";
 import type { OutboxStorage } from "@stacks/client-runtime/outbox";
 import {
+  LastTripProvider,
   OutboxProvider,
   StacksContext,
   useAction,
+  useLastTrip,
   useOutbox,
   usePending,
+  useRememberTrip,
   useUnsaved,
   useStacks,
 } from "@stacks/client-runtime/react";
+import type { LastTripStorage } from "@stacks/client-runtime/trip";
 import { useState, type ReactNode } from "react";
 
 import { FormError } from "~/components/ui/Field";
@@ -33,12 +37,15 @@ export function StacksProvider({ userId, children }: { userId: string; children:
     }),
   );
   const [storage] = useState(() => outboxStorage(userId));
+  const [tripStorage] = useState(() => lastTripStorage(userId));
   return (
     <StacksContext value={stacks}>
       <RegistryProvider>
-        <OutboxProvider storage={storage} wake={wakeOutbox}>
-          {children}
-        </OutboxProvider>
+        <LastTripProvider storage={tripStorage}>
+          <OutboxProvider storage={storage} wake={wakeOutbox}>
+            {children}
+          </OutboxProvider>
+        </LastTripProvider>
       </RegistryProvider>
     </StacksContext>
   );
@@ -48,6 +55,15 @@ export function StacksProvider({ userId, children }: { userId: string; children:
 const outboxStorage = (userId: string): OutboxStorage => ({
   load: () => localStorage.getItem(`stacks-outbox-${userId}`),
   save: (value) => localStorage.setItem(`stacks-outbox-${userId}`, value),
+});
+
+const lastTripStorage = (userId: string): LastTripStorage => ({
+  load: () => localStorage.getItem(`stacks-last-trip-${userId}`),
+  save: (value) => {
+    const key = `stacks-last-trip-${userId}`;
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  },
 });
 
 /** Retry as soon as the browser is back online or the tab comes back. */
@@ -61,7 +77,7 @@ const wakeOutbox = (flush: () => void) => {
   };
 };
 
-export { useAction, useOutbox, usePending, useStacks, useUnsaved };
+export { useAction, useLastTrip, useOutbox, usePending, useRememberTrip, useStacks, useUnsaved };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 export function Loaded<A, E>({

@@ -17,7 +17,7 @@ import {
 } from "@stacks/contracts";
 import { balances } from "@stacks/shared/balances";
 import { resultsBy } from "@stacks/shared/results";
-import { settleUp } from "@stacks/shared/settleUp";
+import { leftToSettle, settleUp } from "@stacks/shared/settleUp";
 import { stakeOutcomes, withStakes } from "@stacks/shared/stakes";
 
 import {
@@ -245,11 +245,27 @@ export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Mem
     ],
     { concurrency: "unbounded" },
   );
+  const ended = trips.filter((trip) => trip.endedAt !== null);
+  const unsettled =
+    ended.length === 0
+      ? []
+      : (yield* Effect.forEach(
+          ended,
+          (trip) =>
+            tripLedger(trip.id).pipe(
+              Effect.map(({ owed }) => ({
+                tripId: trip.id,
+                amount: leftToSettle(settleUp(owed)),
+              })),
+            ),
+          { concurrency: "unbounded" },
+        )).filter((item) => item.amount > 0);
   return {
     group: group!,
     role: member.role,
     myPlayerId: member.playerId,
     players,
     trips,
+    unsettled,
   } satisfies GroupDetail;
 });

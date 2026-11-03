@@ -82,6 +82,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
       const group = yield* groupWith(alex, bea);
       const [before] = yield* alex.groups.list();
       expect(before).toMatchObject({ currentTripId: group.tripId, mySession: null });
+      expect(before?.trips.map((t) => t.id)).toEqual([group.tripId]);
 
       const sessionId = yield* startSession(alex, group, group.tripId);
       const [seated] = yield* alex.groups.list();
@@ -93,8 +94,46 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
       const trip = yield* alex.trips.get({ params: { tripId: group.tripId } });
       expect(trip.sessions.map((s) => s.playerIds)).toEqual([[group.myPlayerId]]);
 
-      yield* alex.sessions.close({ params: { sessionId }, payload: { endedAt: day(2) } });
+      const beaId = group.players.find((p) => p.id !== group.myPlayerId)!.id;
+      yield* alex.ledger.addEntry({
+        params: { sessionId },
+        payload: {
+          id: ids.entry(),
+          kind: "buy_in",
+          playerId: group.myPlayerId,
+          counterpartyId: beaId,
+          amount: usd(8000),
+          note: null,
+          replacesEntryId: null,
+        },
+      });
+      yield* alex.sessions.close({
+        params: { sessionId },
+        payload: {
+          endedAt: day(2),
+          cashOuts: [{ id: ids.entry(), playerId: group.myPlayerId, amount: usd(0) }],
+        },
+      });
+      expect((yield* alex.groups.get({ params: { groupId: group.group.id } })).unsettled).toEqual(
+        [],
+      );
       yield* alex.trips.end({ params: { tripId: group.tripId }, payload: { endedAt: day(3) } });
+      expect((yield* alex.groups.get({ params: { groupId: group.group.id } })).unsettled).toEqual([
+        { tripId: group.tripId, amount: 8000 },
+      ]);
+      yield* alex.ledger.recordSettlement({
+        params: { tripId: group.tripId },
+        payload: {
+          id: ids.entry(),
+          fromPlayerId: group.myPlayerId,
+          toPlayerId: beaId,
+          amount: usd(8000),
+          note: null,
+        },
+      });
+      expect((yield* alex.groups.get({ params: { groupId: group.group.id } })).unsettled).toEqual(
+        [],
+      );
       const [after] = yield* alex.groups.list();
       expect(after).toMatchObject({ currentTripId: null, mySession: null });
     }),
