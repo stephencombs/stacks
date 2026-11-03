@@ -414,6 +414,13 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                 : item.saving
                   ? null
                   : item.entry.voidReason;
+              const voidedById = item.saving ? null : item.entry.voidedBy;
+              const voidedBy = locallyUndone
+                ? (names.get(group.myPlayerId) ?? null)
+                : voidedById
+                  ? (group.players.find((player) => player.userId === voidedById)?.displayName ??
+                    null)
+                  : null;
               const counterparty = entry.counterpartyId ? names.get(entry.counterpartyId) : null;
               const actionable = live && !item.saving && !voided && canVoid(item.entry);
               const content = (
@@ -451,13 +458,16 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                           item.saving
                             ? (item.entry.failed ?? "Saved on this phone, sending")
                             : null,
-                          voided ? `Voided${voidReason ? `: ${voidReason}` : ""}` : null,
+                          voided
+                            ? `${voidedBy ? `Voided by ${voidedBy}` : "Voided"}${voidReason ? `: ${voidReason}` : ""}`
+                            : null,
                         ]
                           .filter(Boolean)
                           .join(" · ")}
                       </Text>
                     ) : null}
                   </View>
+                  {entry.replacesEntryId ? <Tag>Corrected</Tag> : null}
                 </>
               );
               if (item.saving && item.entry.failed !== null) {

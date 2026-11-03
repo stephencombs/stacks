@@ -148,7 +148,7 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("button", { name: "Rebuy for Gus", exact: true }).click();
     await expect(gus).toContainText("In $200");
     await alex.getByRole("button", { name: "Undo rebuy for Gus" }).click();
-    await expect(alex.getByText("Voided: Undone")).toBeVisible();
+    await expect(alex.getByText("Voided by Alex: Undone")).toBeVisible();
     await expect(gus).toContainText("In $100");
     // While everyone's at the table, tonight counts their chips as in play, not as losses.
     await alex.getByRole("link", { name: "Vegas weekend" }).click();

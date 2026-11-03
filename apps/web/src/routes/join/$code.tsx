@@ -40,7 +40,11 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
     if (!displayName) return setNameError("Enter the name your friends know you by.");
     setNameError(null);
     const joined = await accept.run({ params: { code }, payload: { displayName } });
-    if (joined) void navigate({ to: "/groups/$groupId", params: { groupId: joined.group.id } });
+    if (joined) {
+      const trip = joined.trips.find((item) => item.endedAt === null);
+      if (trip) void navigate({ to: "/trips/$tripId", params: { tripId: trip.id } });
+      else void navigate({ to: "/groups/$groupId", params: { groupId: joined.group.id } });
+    }
   };
 
   return (
@@ -52,9 +56,23 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
       {preview.alreadyMember ? (
         <div className="flex flex-col items-start gap-4">
           <p className="text-muted">You're already in this group.</p>
-          <ButtonLink to="/groups/$groupId" params={{ groupId: preview.groupId }} variant="primary">
-            Open group
-          </ButtonLink>
+          {preview.currentTripId ? (
+            <ButtonLink
+              to="/trips/$tripId"
+              params={{ tripId: preview.currentTripId }}
+              variant="primary"
+            >
+              Open trip
+            </ButtonLink>
+          ) : (
+            <ButtonLink
+              to="/groups/$groupId"
+              params={{ groupId: preview.groupId }}
+              variant="primary"
+            >
+              Open group
+            </ButtonLink>
+          )}
         </div>
       ) : preview.status !== "open" ? (
         <p className="text-muted">

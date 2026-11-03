@@ -1,6 +1,6 @@
 import { useUser } from "@clerk/expo";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import type { InvitePreview } from "@stacks/contracts";
+import type { GroupDetail, InvitePreview } from "@stacks/contracts";
 import { useState } from "react";
 import { Text } from "react-native";
 
@@ -41,12 +41,17 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
   const [nameError, setNameError] = useState<string | null>(null);
   const openGroup = (groupId: string) =>
     navigation.dispatch(StackActions.replace("Group", { groupId }));
+  const openDetail = (detail: GroupDetail) => {
+    const trip = detail.trips.find((item) => item.endedAt === null);
+    if (trip) navigation.dispatch(StackActions.replace("Trip", { tripId: trip.id }));
+    else openGroup(detail.group.id);
+  };
 
   const join = async () => {
     if (!name.trim()) return setNameError("Enter the name your friends know you by.");
     setNameError(null);
     const joined = await accept.run({ params: { code }, payload: { displayName: name.trim() } });
-    if (joined) openGroup(joined.group.id);
+    if (joined) openDetail(joined);
   };
 
   return (
@@ -59,7 +64,17 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
       {preview.alreadyMember ? (
         <>
           <Text className="text-base text-muted">You're already in this group.</Text>
-          <Button label="Open group" variant="primary" onPress={() => openGroup(preview.groupId)} />
+          <Button
+            label={preview.currentTripId ? "Open trip" : "Open group"}
+            variant="primary"
+            onPress={() =>
+              preview.currentTripId
+                ? navigation.dispatch(
+                    StackActions.replace("Trip", { tripId: preview.currentTripId }),
+                  )
+                : openGroup(preview.groupId)
+            }
+          />
         </>
       ) : preview.status !== "open" ? (
         <Text className="text-base text-muted">
@@ -94,7 +109,11 @@ export function ClaimScreen({ route }: Props) {
   const claim = useAction(stacks.Client.mutation("guests", "claim"));
   const confirm = async () => {
     const claimed = await claim.run({ params: { code: route.params.code } });
-    if (claimed) navigation.dispatch(StackActions.replace("Group", { groupId: claimed.group.id }));
+    if (claimed) {
+      const trip = claimed.trips.find((item) => item.endedAt === null);
+      if (trip) navigation.dispatch(StackActions.replace("Trip", { tripId: trip.id }));
+      else navigation.dispatch(StackActions.replace("Group", { groupId: claimed.group.id }));
+    }
   };
   return (
     <Screen>

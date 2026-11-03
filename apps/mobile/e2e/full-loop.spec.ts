@@ -141,7 +141,7 @@ test.describe.serial("live mode on a phone", () => {
       .click();
     await shoot(alex, "rebuy-undo");
     await visible(alex.getByRole("button", { name: "Undo rebuy for Gus" })).click();
-    await expect(alex.getByText("Voided: Undone").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("Voided by Alex: Undone").filter({ visible: true })).toBeVisible();
     await expect(
       alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),
     ).toBeVisible();

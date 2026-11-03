@@ -169,6 +169,7 @@ export const InvitePreview = Schema.Struct({
   memberCount: Schema.Int,
   status: Schema.Literals(["open", "expired", "revoked", "used_up"]),
   alreadyMember: Schema.Boolean,
+  currentTripId: Schema.NullOr(TripId),
 });
 export type InvitePreview = typeof InvitePreview.Type;
 
