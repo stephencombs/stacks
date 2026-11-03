@@ -17,7 +17,7 @@ import { ToastHost } from "../components/ui/Toast";
 import { LiveBar } from "../features/LiveBar";
 import { PersonalLimits } from "../features/PersonalLimits";
 import { TripStats } from "../features/RaceStats";
-import { SessionList } from "../features/SessionList";
+import { LiveSessionCard, SessionList } from "../features/SessionList";
 import { DaysBoard, TonightBoard, TripBoard } from "../features/TripBoard";
 import { TripHero } from "../features/TripHero";
 import { TripRoute } from "../features/TripRoute";
@@ -230,7 +230,11 @@ function TableTab({
   const closed = trip.sessions.filter((s) => s.session.status === "closed").toReversed();
   return (
     <View className="gap-6 px-4">
-      <TripHero group={group} trip={trip} />
+      <TripHero
+        group={group}
+        sessions={trip.sessions.filter((s) => s.session.status === "closed")}
+      />
+      {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}
       {trip.trip.endedAt === null ? (
         <Button
           label="Start a session"
@@ -241,12 +245,6 @@ function TableTab({
       ) : (
         <Text className="text-base text-muted">This trip has ended. Reopen it to play more.</Text>
       )}
-      {mine ? (
-        <View className="gap-2">
-          <SectionHeading>Your live session</SectionHeading>
-          <SessionList sessions={[mine]} detail={group} />
-        </View>
-      ) : null}
       {live.length > 0 ? (
         <View className="gap-2">
           <SectionHeading>{mine ? "Other live sessions" : "Live sessions"}</SectionHeading>
