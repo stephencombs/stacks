@@ -1,4 +1,4 @@
-import { CommonActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import type { StaticScreenProps } from "@react-navigation/native";
 import { InviteId, type GroupDetail } from "@stacks/contracts";
 import { isFormerMember, isGuest } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
@@ -28,10 +28,7 @@ const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 /** The group in scope: its trips, its people, its settings. */
 export function GroupScreen({ route }: Props) {
   const stacks = useStacks();
-  const navigation = useNavigation();
-  useLinkedScope(route.params, () =>
-    navigation.dispatch(CommonActions.setParams({ groupId: undefined })),
-  );
+  useLinkedScope(route.params);
   return (
     <Screen>
       <ScopeLoaded skeleton={<GroupSkeleton />}>

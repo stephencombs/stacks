@@ -1,4 +1,4 @@
-import { CommonActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import type { StaticScreenProps } from "@react-navigation/native";
 
 import { Screen } from "../components/ui/Screen";
 import { PageTitle } from "../components/ui/Surface";
@@ -11,10 +11,7 @@ type Props = StaticScreenProps<{ tripId?: string } | undefined>;
 
 /** Who owes whom on the trip in scope: payments, balances, backing and history. */
 export function SettleUpScreen({ route }: Props) {
-  const navigation = useNavigation();
-  useLinkedScope(route.params, () =>
-    navigation.dispatch(CommonActions.setParams({ tripId: undefined })),
-  );
+  useLinkedScope(route.params);
   return (
     <Screen>
       <PageTitle>Settle up</PageTitle>

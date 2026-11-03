@@ -1,4 +1,4 @@
-import { CommonActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import type { StaticScreenProps } from "@react-navigation/native";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { playerNames } from "@stacks/client-runtime/format";
 import { boardMoney, localClock, nightLabel } from "@stacks/client-runtime/trip";
@@ -22,10 +22,7 @@ type Props = StaticScreenProps<{ tripId?: string } | undefined>;
 
 /** What's being played: your live table first, then the trip, then its sessions night by night. */
 export function SessionsScreen({ route }: Props) {
-  const navigation = useNavigation();
-  useLinkedScope(route.params, () =>
-    navigation.dispatch(CommonActions.setParams({ tripId: undefined })),
-  );
+  useLinkedScope(route.params);
   const { scope } = useScope();
   // Your table comes first when it's on this trip, so the skeleton holds its place.
   const live = scope?.trip !== undefined && scope.item.mySession?.tripId === scope.trip.id;
@@ -62,8 +59,8 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
         <PageTitle>Sessions</PageTitle>
         <TripOptionsButton trip={trip} group={group} />
       </View>
-      <LimitNotices group={group} trip={trip} />
       {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}
+      <LimitNotices group={group} trip={trip} />
       <TripHero currency={group.group.currency} me={group.myPlayerId} sessions={closed} />
       {going ? (
         <Button

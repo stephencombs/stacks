@@ -52,7 +52,7 @@ How many options?
 
 A form value from a few short options, where the choice deserves weight, is `RadioCards` on web: `kind` of an entry or venue, the game of a session. Set columns with `className`.
 
-Switching between pages is `Tabs` on web and `TripTabs` on mobile, not `Segmented`. The same data shown another way on one page is `Segmented`.
+Switching between pages is `Tabs` on web and the places' tab bar (`PlaceTabs`) on mobile, not `Segmented`. The same data shown another way on one page is `Segmented`.
 
 ## Field, Input, Select (web), TextField (mobile)
 

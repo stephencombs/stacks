@@ -73,12 +73,11 @@ export const useScopeHasTrip = () => {
 };
 
 /**
- * A screen opened at an address that names a trip or group puts it in scope before it paints, then
- * forgets the address, so a later link to the same place applies again.
+ * A screen opened at an address that names a trip or group puts it in scope before it paints.
+ * Moving around inside the app sets the scope directly, so only links carry these params.
  */
 export function useLinkedScope(
   link: { tripId?: string | undefined; groupId?: string | undefined } | undefined,
-  forget?: () => void,
 ) {
   const { setTrip, setGroup } = useScope();
   const tripId = link?.tripId;
@@ -86,8 +85,6 @@ export function useLinkedScope(
   const apply = useEffectEvent((trip: string | undefined, group: string | undefined) => {
     if (trip) setTrip(TripId.make(trip));
     else if (group) setGroup(GroupId.make(group));
-    else return;
-    forget?.();
   });
   useLayoutEffect(() => apply(tripId, groupId), [tripId, groupId]);
 }

@@ -23,9 +23,7 @@ export function BoardScreen({ route }: Props) {
   const params = route.params;
   // A group's old Stats address names only the group, and meant all time.
   const view = params?.view ?? (params?.groupId && !params.tripId ? "all" : "trip");
-  useLinkedScope(params, () =>
-    navigation.dispatch(CommonActions.setParams({ tripId: undefined, groupId: undefined, view })),
-  );
+  useLinkedScope(params);
   return (
     <Screen>
       <PageTitle>Board</PageTitle>

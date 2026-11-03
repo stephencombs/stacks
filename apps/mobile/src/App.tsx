@@ -131,24 +131,22 @@ const Places = createPlaceTabs({
       screen: SessionsStack,
       if: useScopeHasTrip,
       options: placeTab("Sessions", "suit.club.fill"),
-      linking: { path: "", initialRouteName: "Sessions" },
+      linking: { initialRouteName: "Sessions" },
     },
     BoardTab: {
       screen: BoardStack,
       if: useScopeHasTrip,
       options: placeTab("Board", "chart.line.uptrend.xyaxis"),
-      linking: { path: "" },
     },
     SettleTab: {
       screen: SettleStack,
       if: useScopeHasTrip,
       options: placeTab("Settle up", "arrow.left.arrow.right"),
-      linking: { path: "" },
     },
     GroupTab: {
       screen: GroupStack,
       options: placeTab("Group", "person.2"),
-      linking: { path: "", initialRouteName: "Group" },
+      linking: { initialRouteName: "Group" },
     },
   },
 });
@@ -157,7 +155,7 @@ const RootStack = createNativeStackNavigator({
   initialRouteName: "Places",
   screenOptions: stackOptions,
   screens: {
-    Places: { screen: Places, options: { headerShown: false }, linking: "" },
+    Places: { screen: Places, options: { headerShown: false } },
     Groups: { screen: GroupsScreen, options: { title: "Your groups" }, linking: "groups" },
     Join: { screen: JoinScreen, options: { title: "Join a group" }, linking: "join/:code" },
     Claim: {
