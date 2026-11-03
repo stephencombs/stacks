@@ -158,7 +158,7 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByText("$450", { exact: true })).toBeVisible();
     await expect(alex.getByRole("list", { name: "Tonight" })).toContainText("In play $150");
     await shoot(alex, "tonight-live");
-    await alex.getByRole("link", { name: /^Back to your table/ }).click();
+    await alex.getByRole("link", { name: /^Back to (your|the) table/ }).click();
 
     await alex.getByRole("button", { name: "Close session" }).click();
     await alex.getByRole("dialog").getByRole("button", { name: "Close session" }).click();
@@ -175,13 +175,13 @@ test.describe.serial("a group's first night out", () => {
     await expect(gus).toContainText("+$20");
     await shoot(alex, "session-live");
 
-    // Away from the table, the live bar keeps it one tap away.
+    // Away from the table it's one tap away: the live bar, or on a wide trip page the rail.
     await alex.getByRole("link", { name: "Vegas weekend" }).click();
     await alex
       .getByRole("navigation", { name: "Trip" })
       .getByRole("link", { name: "Results" })
       .click();
-    await alex.getByRole("link", { name: /^Back to your table/ }).click();
+    await alex.getByRole("link", { name: /^Back to (your|the) table/ }).click();
     await expect(alex.getByRole("button", { name: "Close session" })).toBeVisible();
 
     // Moving tables closes this one and opens the next with the same place, game and players.

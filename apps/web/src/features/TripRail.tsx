@@ -67,7 +67,7 @@ function RailBoard({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
           params={{ tripId: trip.trip.id }}
           className="inline-flex min-h-10 items-center rounded-lg px-2 text-sm text-muted transition-colors duration-150 hover:text-ink"
         >
-          Results
+          Full results
         </Link>
       </div>
       <ol className="pb-1">
