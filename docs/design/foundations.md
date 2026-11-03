@@ -90,6 +90,17 @@ Web only. Mobile surfaces are flat: a `surface` on a `canvas` is enough, as in i
 - Depth on dark comes mostly from the gap between `canvas` and `surface`: a near-black page under clearly lighter cards. Keep that gap if you retune either.
 - Use `border-line` or `divide-line` to separate rows, and a shadow to raise something. Inputs keep a visible edge.
 
+## Layers
+
+Web stacks fixed parts on four steps of Tailwind's scale. Anything else in a page stays at `z-auto`, or uses `isolate` for its own stacking.
+
+| Class  | Use it for                                          |
+| ------ | --------------------------------------------------- |
+| `z-10` | `LiveBar`, floating over content                    |
+| `z-20` | The bottom bar and the sidebar                      |
+| `z-30` | The skip link, above the bars once focused          |
+| `z-40` | `Dialog` and `Menu`, over everything, bars included |
+
 ## Motion
 
 Motion says what just happened. If it doesn't, cut it. Web uses CSS transitions and keyframes, and mobile uses React Native's `Animated`. Don't add a library.
