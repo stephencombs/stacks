@@ -113,20 +113,20 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
         >
           You
         </SectionHeading>
-        <View className="overflow-hidden rounded-3xl bg-surface">
+        <View className="overflow-hidden rounded-xl bg-surface">
           <Glow tone={head.tone} />
-          <View className="gap-1 px-4 pt-4 pb-4">
-            <Text className="type-label text-muted">{head.label}</Text>
+          <View className="p-4">
+            <Text className="text-sm font-medium text-muted">{head.label}</Text>
             <Money
               amount={MinorUnits.make(Math.abs(myBalance))}
               currency={currency}
               fit
               className={cn(
-                "font-display text-6xl leading-[64px]",
+                "mt-2 font-display text-6xl leading-[64px]",
                 myBalance > 0 ? "text-win" : myBalance < 0 ? "text-loss" : "text-muted",
               )}
             />
-            {head.line ? <Text className="text-sm text-muted">{head.line}</Text> : null}
+            {head.line ? <Text className="mt-1.5 text-sm text-muted">{head.line}</Text> : null}
           </View>
           {mine.map(transferRow)}
         </View>
@@ -169,7 +169,7 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
                 <BalanceLabel
                   amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
                   currency={currency}
-                  className="min-w-24 text-right"
+                  className="min-w-28 text-right"
                 />
               </Row>
             ))}

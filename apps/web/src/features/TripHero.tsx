@@ -24,9 +24,9 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
   return (
     <Surface className="relative overflow-hidden">
       <Glow tone={tone} />
-      <div className="relative flex flex-col gap-1 px-5 pt-5">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xs font-medium tracking-wider text-muted uppercase">Your trip</h2>
+      <div className="relative flex flex-col px-4 pt-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-sm font-medium text-muted">Your trip</h2>
           <span className="text-sm text-muted">
             {plural(mine.played, "session")} ·{" "}
             {plural(tripNights(closed, localClock).length, "night")}
@@ -36,9 +36,9 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
           amount={mine.net}
           currency={currency}
           tone="result"
-          className="font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl"
+          className="mt-2 font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl"
         />
-        {lines.climb ? <p className="text-sm text-muted">{lines.climb}</p> : null}
+        {lines.climb ? <p className="mt-1.5 text-sm text-muted">{lines.climb}</p> : null}
       </div>
       <TripLine line={mine.line} tone={tone} />
       <dl className="relative flex divide-x divide-line border-t border-line">
@@ -50,8 +50,8 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
           {rank === undefined ? (
             "–"
           ) : (
-            <span className="text-accent-text">
-              {ordinal(rank)} <span className="text-muted">of {standings.length}</span>
+            <span>
+              {ordinal(rank)} <span className="font-normal text-muted">of {standings.length}</span>
             </span>
           )}
         </Tile>
@@ -62,10 +62,8 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
 
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-auto flex-col gap-0.5 px-5 py-3 max-sm:px-4">
-      <dt className="text-xs font-medium tracking-wider whitespace-nowrap text-muted uppercase">
-        {label}
-      </dt>
+    <div className="flex flex-auto flex-col gap-0.5 px-4 py-3">
+      <dt className="text-sm whitespace-nowrap text-muted">{label}</dt>
       <dd className="text-lg font-semibold whitespace-nowrap tabular-nums">{children}</dd>
     </div>
   );
@@ -73,7 +71,7 @@ function Tile({ label, children }: { label: string; children: ReactNode }) {
 
 const HEIGHT = 96;
 
-/** The running total as a line from zero, filled down to the axis, ending on a dot. */
+/** The running total as a line from zero, filled to break-even, ending on a dot. */
 function TripLine({
   line,
   tone,
@@ -82,7 +80,7 @@ function TripLine({
   tone: "win" | "loss" | "accent";
 }) {
   const [box, width] = useWidth<HTMLDivElement>();
-  const plot = lineScale([line], { width, height: HEIGHT }, { x: 12, y: 10 });
+  const plot = lineScale([line], { width, height: HEIGHT }, { x: 16, y: 10 });
   const points = plot.points(line);
   const end = { x: plot.x(line.length - 1), y: plot.y(line.at(-1)!) };
   const color = `var(--color-${tone})`;
@@ -106,7 +104,7 @@ function TripLine({
             strokeDasharray="3 4"
           />
           <polygon
-            points={`${plot.x(0)},${HEIGHT} ${points} ${end.x},${HEIGHT}`}
+            points={`${plot.x(0)},${plot.zero} ${points} ${end.x},${plot.zero}`}
             fill="url(#trip-fill)"
           />
           <polyline

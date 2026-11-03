@@ -109,7 +109,7 @@ export function Glow({ tone }: { tone: "win" | "loss" | "accent" }) {
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none absolute -top-24 -right-20 size-72 rounded-full blur-3xl",
+        "pointer-events-none absolute -top-24 -right-20 size-72 rounded-full blur-3xl [[data-theme=light]_&]:opacity-50",
         tone === "win" ? "bg-win/20" : tone === "loss" ? "bg-loss/15" : "bg-accent/15",
       )}
     />

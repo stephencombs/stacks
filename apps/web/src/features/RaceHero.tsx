@@ -10,7 +10,7 @@ import { Glow, Surface } from "~/components/ui/Surface";
 import { useWidth } from "~/lib/useWidth";
 
 const HEIGHT = 128;
-const PAD = { x: 12, y: 12 };
+const PAD = { x: 16, y: 12 };
 /** Room past the last point for each line's initial. */
 const LABEL = 18;
 
@@ -39,17 +39,15 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
   return (
     <Surface className="relative overflow-hidden">
       <Glow tone="accent" />
-      <div className="relative flex flex-col gap-1 px-5 pt-5">
-        <h2 className="text-xs font-medium tracking-wider text-accent-text uppercase">
-          {head.label}
-        </h2>
+      <div className="relative flex flex-col px-4 pt-4">
+        <h2 className="text-sm font-medium text-muted">{head.label}</h2>
         <Money
           amount={head.net}
           currency={currency}
           tone="result"
-          className="font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl"
+          className="mt-2 font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl"
         />
-        {head.line ? <p className="text-sm text-muted">{head.line}</p> : null}
+        {head.line ? <p className="mt-1.5 text-sm text-muted">{head.line}</p> : null}
       </div>
       <div ref={box} aria-hidden className="relative mt-3 mb-4" style={{ height: HEIGHT }}>
         {width > 0 ? (

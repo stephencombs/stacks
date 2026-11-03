@@ -65,7 +65,6 @@ Amounts are `Money` with a weight or size beside it, such as `font-semibold` in 
 | `rounded-md`   | Tags, a selected segment                      |
 | `rounded-lg`   | Web buttons and inputs, menu items, skeletons |
 | `rounded-xl`   | Cards, menus, mobile fields                   |
-| `rounded-3xl`  | Mobile hero cards                             |
 | `rounded-2xl`  | Dialogs and sheets                            |
 | `rounded-full` | Chips, status dots, mobile buttons            |
 

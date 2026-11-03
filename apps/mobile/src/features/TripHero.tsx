@@ -29,16 +29,16 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
     const next = Math.round(event.nativeEvent.layout.width);
     if (next !== width) setWidth(next);
   };
-  const plot = lineScale([mine.line], { width, height: HEIGHT }, { x: 12, y: 10 });
+  const plot = lineScale([mine.line], { width, height: HEIGHT }, { x: 16, y: 10 });
   const points = plot.points(mine.line);
   const end = { x: plot.x(mine.line.length - 1), y: plot.y(mine.line.at(-1)!) };
 
   return (
-    <View onLayout={onLayout} className="overflow-hidden rounded-3xl bg-surface">
+    <View onLayout={onLayout} className="overflow-hidden rounded-xl bg-surface">
       <Glow tone={tone} />
-      <View className="gap-1 px-5 pt-5">
-        <View className="flex-row items-center justify-between">
-          <Text accessibilityRole="header" className="type-label text-muted">
+      <View className="px-4 pt-4">
+        <View className="flex-row items-baseline justify-between">
+          <Text accessibilityRole="header" className="text-sm font-medium text-muted">
             Your trip
           </Text>
           <Text className="text-sm text-muted">
@@ -51,9 +51,9 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
           currency={currency}
           tone="result"
           fit
-          className="font-display text-6xl leading-[64px]"
+          className="mt-2 font-display text-6xl leading-[64px]"
         />
-        {lines.climb ? <Text className="text-sm text-muted">{lines.climb}</Text> : null}
+        {lines.climb ? <Text className="mt-1.5 text-sm text-muted">{lines.climb}</Text> : null}
       </View>
       <View
         accessibilityElementsHidden
@@ -77,7 +77,7 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
               strokeDasharray="3 4"
             />
             <Polygon
-              points={`${plot.x(0)},${HEIGHT} ${points} ${end.x},${HEIGHT}`}
+              points={`${plot.x(0)},${plot.zero} ${points} ${end.x},${plot.zero}`}
               fill="url(#fill)"
             />
             <Polyline
@@ -112,7 +112,7 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
           )}
         </Tile>
         <Tile label="Board" divided>
-          <Text className="font-mono text-lg text-accent-text">
+          <Text className="font-mono text-lg text-ink">
             {rank === undefined ? "–" : ordinal(rank)}
             <Text className="text-sm text-muted"> of {standings.length}</Text>
           </Text>
@@ -134,9 +134,9 @@ function Tile({
   return (
     <View
       accessible
-      className={divided ? "grow gap-0.5 border-l border-line px-4 py-3" : "grow gap-0.5 px-5 py-3"}
+      className={divided ? "grow gap-0.5 border-l border-line px-4 py-3" : "grow gap-0.5 px-4 py-3"}
     >
-      <Text className="type-label text-muted">{label}</Text>
+      <Text className="text-sm text-muted">{label}</Text>
       {children}
     </View>
   );

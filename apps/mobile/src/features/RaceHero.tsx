@@ -13,7 +13,7 @@ import { Money } from "../components/Money";
 import { Glow } from "../components/ui/Glow";
 
 const HEIGHT = 128;
-const PAD = { x: 12, y: 12 };
+const PAD = { x: 16, y: 12 };
 /** Room past the last point for each line's initial. */
 const LABEL = 18;
 
@@ -46,10 +46,10 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
   const drawn = lines.toSorted((a, b) => Number(a.playerId === me) - Number(b.playerId === me));
 
   return (
-    <View className="overflow-hidden rounded-3xl bg-surface">
+    <View className="overflow-hidden rounded-xl bg-surface">
       <Glow tone="accent" />
-      <View className="gap-1 px-5 pt-5">
-        <Text accessibilityRole="header" className="type-label text-accent-text">
+      <View className="px-4 pt-4">
+        <Text accessibilityRole="header" className="text-sm font-medium text-muted">
           {head.label}
         </Text>
         <Money
@@ -57,9 +57,9 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
           currency={currency}
           tone="result"
           fit
-          className="font-display text-6xl leading-[64px]"
+          className="mt-2 font-display text-6xl leading-[64px]"
         />
-        {head.line ? <Text className="text-sm text-muted">{head.line}</Text> : null}
+        {head.line ? <Text className="mt-1.5 text-sm text-muted">{head.line}</Text> : null}
       </View>
       <View
         accessibilityElementsHidden

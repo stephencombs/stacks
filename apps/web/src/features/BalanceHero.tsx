@@ -20,17 +20,17 @@ export function BalanceHero({
   return (
     <Surface className="relative overflow-hidden">
       <Glow tone={head.tone} />
-      <div className="relative flex flex-col gap-1 p-5">
-        <h2 className="text-xs font-medium tracking-wider text-muted uppercase">{head.label}</h2>
+      <div className="relative flex flex-col p-4">
+        <h2 className="text-sm font-medium text-muted">{head.label}</h2>
         <Money
           amount={Math.abs(balance)}
           currency={currency}
           className={cn(
-            "font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl",
+            "mt-2 font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl",
             balance > 0 ? "text-win" : balance < 0 ? "text-loss" : "text-muted",
           )}
         />
-        {head.line ? <p className="text-sm text-muted">{head.line}</p> : null}
+        {head.line ? <p className="mt-1.5 text-sm text-muted">{head.line}</p> : null}
       </div>
     </Surface>
   );
