@@ -170,7 +170,17 @@ function Places({
               layout={layout}
             />
           ))
-        : null}
+        : scope.loading
+          ? places.map((entry) => (
+              <PlaceLink
+                key={entry.key}
+                icon={icon(entry.icon)}
+                label={entry.label}
+                current={place === entry.key}
+                layout={layout}
+              />
+            ))
+          : null}
       {groupId ? (
         <PlaceLink
           to="/groups/$groupId"
@@ -180,13 +190,15 @@ function Places({
           current={place === "group"}
           layout={layout}
         />
+      ) : scope.loading ? (
+        <PlaceLink icon={icon(Users)} label="Group" current={place === "group"} layout={layout} />
       ) : null}
     </>
   );
 }
 
 function BottomBar({ scope, place }: { scope: Scope; place: Place | null }) {
-  if (!scope.item && !scope.tripId) return null;
+  if (!scope.item && !scope.tripId && !scope.loading) return null;
   return (
     <nav
       aria-label="Places"
@@ -224,8 +236,8 @@ function Sidebar({ scope, place }: { scope: Scope; place: Place | null }) {
           <span className="truncate font-medium">{seat.venueName}</span>
         </Link>
       ) : null}
-      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-        {item && item.trips.length > 0 ? (
+      {item && item.trips.length > 0 ? (
+        <div className="flex min-h-0 flex-col gap-0.5 overflow-y-auto">
           <>
             <h2 className="px-3 pb-1 text-xs font-medium text-muted">Trips</h2>
             {scopeTrips(item.trips).map((other) => (
@@ -243,9 +255,11 @@ function Sidebar({ scope, place }: { scope: Scope; place: Place | null }) {
               </Link>
             ))}
           </>
-        ) : null}
+        </div>
+      ) : null}
+      <div className="mt-auto flex flex-col">
+        <You layout="side" scope={scope} />
       </div>
-      <You layout="side" scope={scope} />
     </aside>
   );
 }
@@ -255,7 +269,7 @@ function ScopeControl({ scope, className }: { scope: Scope; className?: string }
   const stacks = useStacks();
   const [open, setOpen] = useState<"scope" | "trip" | "group" | null>(null);
   const { item, trip } = scope;
-  if (!item) return <Skeleton className={cn("h-11 w-40 rounded-lg", className)} />;
+  if (!item) return <Skeleton className={cn("h-12 w-40 rounded-lg", className)} />;
   return (
     <>
       <ScopeButton

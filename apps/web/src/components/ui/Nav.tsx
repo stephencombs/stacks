@@ -19,7 +19,7 @@ export function BackLink({ children, ...props }: LinkProps & { children: ReactNo
 
 /**
  * One of the four places. `bar` is an item in the bottom bar on narrow screens, icon over label;
- * `side` is a row in the sidebar on wide ones.
+ * `side` is a row in the sidebar on wide ones. With no `to` yet, it holds its place, inert.
  */
 export function PlaceLink({
   icon,
@@ -31,7 +31,9 @@ export function PlaceLink({
   return (
     <Link
       aria-current={current ? "page" : undefined}
+      aria-disabled={props.to === undefined || undefined}
       className={cn(
+        props.to === undefined && "pointer-events-none",
         "transition-colors duration-150 focus-visible:outline-offset-[-2px]",
         layout === "bar"
           ? "flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium"

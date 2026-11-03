@@ -120,12 +120,18 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   if (top.length === 0)
     return <span className="text-sm text-muted">Close a session to put it on the board.</span>;
   return (
-    <span className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+    // One line, as tall as its skeleton: long names truncate rather than wrap.
+    <span className="flex min-w-0 gap-x-4 text-sm">
       {top.map((s) => (
-        <span key={s.playerId} className="flex items-center gap-1.5">
+        <span key={s.playerId} className="flex min-w-0 items-center gap-1.5">
           <Chip chip={chipOf(detail, s.playerId)} name={names.get(s.playerId) ?? ""} size={22} />
-          <span className="text-muted">{names.get(s.playerId)}</span>
-          <Money amount={s.net} currency={detail.group.currency} tone="result" />
+          <span className="truncate text-muted">{names.get(s.playerId)}</span>
+          <Money
+            amount={s.net}
+            currency={detail.group.currency}
+            tone="result"
+            className="shrink-0"
+          />
         </span>
       ))}
     </span>
