@@ -6,13 +6,16 @@ import { Money } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
 import { Row } from "~/components/ui/Surface";
 import { Chip } from "~/features/Chip";
+import { PayLinks } from "~/features/PayLinks";
 
 export function TransferRow({
   detail,
+  tripName,
   transfer,
   onMarkPaid,
 }: {
   detail: GroupDetail;
+  tripName: string;
   transfer: Transfer;
   onMarkPaid: (transfer: Transfer) => void;
 }) {
@@ -33,6 +36,7 @@ export function TransferRow({
           Mark paid
         </Button>
       </span>
+      <PayLinks detail={detail} tripName={tripName} transfer={transfer} />
     </Row>
   );
 }

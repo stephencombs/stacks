@@ -15,6 +15,22 @@ export const Group = Schema.Struct({
 });
 export type Group = typeof Group.Type;
 
+export const VenmoHandle = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,30}$/));
+export type VenmoHandle = typeof VenmoHandle.Type;
+
+export const CashAppHandle = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,20}$/));
+export type CashAppHandle = typeof CashAppHandle.Type;
+
+export const PayPalHandle = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,30}$/));
+export type PayPalHandle = typeof PayPalHandle.Type;
+
+export const PaymentHandles = Schema.Struct({
+  venmo: Schema.NullOr(VenmoHandle),
+  cashApp: Schema.NullOr(CashAppHandle),
+  paypal: Schema.NullOr(PayPalHandle),
+});
+export type PaymentHandles = typeof PaymentHandles.Type;
+
 /**
  * Everyone who can appear in the ledger. A guest carries the `claimCode` that lets them claim it;
  * a former member keeps their history with no `role` and no `claimCode`.
@@ -25,6 +41,7 @@ export const Player = Schema.Struct({
   userId: Schema.NullOr(UserId),
   role: Schema.NullOr(MemberRole),
   claimCode: Schema.NullOr(Schema.String),
+  ...PaymentHandles.fields,
 });
 export type Player = typeof Player.Type;
 

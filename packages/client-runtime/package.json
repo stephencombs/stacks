@@ -47,6 +47,10 @@
     "./outbox": {
       "types": "./src/outbox.ts",
       "import": "./src/outbox.ts"
+    },
+    "./pay": {
+      "types": "./src/pay.ts",
+      "import": "./src/pay.ts"
     }
   },
   "scripts": {

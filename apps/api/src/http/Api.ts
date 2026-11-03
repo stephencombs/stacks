@@ -33,6 +33,9 @@ const groups = HttpApiBuilder.group(StacksApi, "groups", (handlers) =>
     )
     .handle("setRole", ({ params, payload }) =>
       serve(Groups.setRole(params.groupId, params.userId, payload)),
+    )
+    .handle("setPaymentHandles", ({ params, payload }) =>
+      serve(Groups.setPaymentHandles(params.groupId, params.playerId, payload)),
     ),
 );
 

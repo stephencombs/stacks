@@ -26,6 +26,7 @@ import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface"
 import { cn } from "../components/ui/cn";
 import { BackingSection } from "./Backing";
 import { Chip } from "./Chip";
+import { PayLinks, ShareSettleUpButton } from "./PayLinks";
 import { useAction, useStacks } from "../lib/stacks";
 
 type Payment = {
@@ -59,18 +60,21 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
   const mine = transfers.filter(involvesMe);
   const others = transfers.filter((transfer) => !involvesMe(transfer));
   const transferRow = (transfer: Transfer) => (
-    <Row key={`${transfer.from}:${transfer.to}`}>
-      <View
-        accessible
-        accessibilityLabel={`${names.get(transfer.from)} pays ${names.get(transfer.to)}`}
-        className="flex-1 flex-row flex-wrap items-center gap-x-1.5"
-      >
-        <Payer detail={detail} playerId={transfer.from} />
-        <Icon name="arrow-right" color="accent-text" size={16} />
-        <Payer detail={detail} playerId={transfer.to} />
+    <Row key={`${transfer.from}:${transfer.to}`} className="flex-col items-stretch gap-2.5">
+      <View className="flex-row items-center gap-3">
+        <View
+          accessible
+          accessibilityLabel={`${names.get(transfer.from)} pays ${names.get(transfer.to)}`}
+          className="flex-1 flex-row flex-wrap items-center gap-x-1.5"
+        >
+          <Payer detail={detail} playerId={transfer.from} />
+          <Icon name="arrow-right" color="accent-text" size={16} />
+          <Payer detail={detail} playerId={transfer.to} />
+        </View>
+        <Money amount={transfer.amount} currency={currency} className="text-lg" />
+        <Button label="Mark paid" size="sm" onPress={() => setPaying(transfer)} />
       </View>
-      <Money amount={transfer.amount} currency={currency} className="text-lg" />
-      <Button label="Mark paid" size="sm" onPress={() => setPaying(transfer)} />
+      <PayLinks detail={detail} tripName={trip.trip.name} transfer={transfer} />
     </Row>
   );
 
@@ -93,7 +97,17 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
   return (
     <>
       <View className="gap-2">
-        <SectionHeading>You</SectionHeading>
+        <SectionHeading
+          action={
+            <ShareSettleUpButton
+              detail={detail}
+              tripName={trip.trip.name}
+              transfers={[...mine, ...others]}
+            />
+          }
+        >
+          You
+        </SectionHeading>
         <List>
           <Row>
             <BalanceLabel

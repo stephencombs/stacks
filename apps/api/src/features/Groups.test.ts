@@ -155,6 +155,118 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
       expect(session.playerIds).toEqual([group.players[1]!.id]);
     }),
   );
+
+  it.effect(
+    "lets members edit their own payment handles and admins edit guests, normalizing prefixes",
+    () =>
+      Effect.gen(function* () {
+        const { alex, bea, cal, eve, gus } = yield* users("alex", "bea", "cal", "eve", "gus");
+        const group = yield* groupWith(alex, bea, cal);
+        const groupId = group.group.id;
+        const alexPlayerId = group.players[0]!.id;
+        const beaPlayerId = group.players[1]!.id;
+        const calPlayerId = group.players[2]!.id;
+
+        yield* alex.groups.setRole({
+          params: { groupId, userId: group.players[1]!.userId! },
+          payload: { role: "admin" },
+        });
+
+        const updatedSelf = yield* cal.groups.setPaymentHandles({
+          params: { groupId, playerId: calPlayerId },
+          payload: {
+            venmo: " @cal-pay ",
+            cashApp: " $CalCash99 ",
+            paypal: " paypal.me/CalPay ",
+          },
+        });
+        expect(updatedSelf.players.find((p) => p.id === calPlayerId)).toMatchObject({
+          venmo: "cal-pay",
+          cashApp: "CalCash99",
+          paypal: "CalPay",
+        });
+
+        const clearedSelf = yield* cal.groups.setPaymentHandles({
+          params: { groupId, playerId: calPlayerId },
+          payload: { venmo: null, cashApp: null, paypal: null },
+        });
+        expect(clearedSelf.players.find((p) => p.id === calPlayerId)).toMatchObject({
+          venmo: null,
+          cashApp: null,
+          paypal: null,
+        });
+
+        expect(
+          yield* Effect.flip(
+            alex.groups.setPaymentHandles({
+              params: { groupId, playerId: beaPlayerId },
+              payload: { venmo: "bea", cashApp: null, paypal: null },
+            }),
+          ),
+        ).toMatchObject({ _tag: "Forbidden", reason: "not_your_player" });
+
+        expect(
+          yield* Effect.flip(
+            eve.groups.setPaymentHandles({
+              params: { groupId, playerId: alexPlayerId },
+              payload: { venmo: "alex", cashApp: null, paypal: null },
+            }),
+          ),
+        ).toMatchObject({ _tag: "Forbidden", reason: "not_a_member" });
+
+        const guestId = ids.player();
+        const withGuest = yield* cal.guests.add({
+          params: { groupId },
+          payload: { id: guestId, displayName: "Gus" },
+        });
+        const guestCode = withGuest.players.find((p) => p.id === guestId)!.claimCode!;
+
+        expect(
+          yield* Effect.flip(
+            cal.groups.setPaymentHandles({
+              params: { groupId, playerId: guestId },
+              payload: { venmo: "gus", cashApp: null, paypal: null },
+            }),
+          ),
+        ).toMatchObject({ _tag: "Forbidden", reason: "admins_only" });
+
+        const adminEditedGuest = yield* bea.groups.setPaymentHandles({
+          params: { groupId, playerId: guestId },
+          payload: { venmo: "@gus_v", cashApp: "$gusC", paypal: null },
+        });
+        expect(adminEditedGuest.players.find((p) => p.id === guestId)).toMatchObject({
+          venmo: "gus_v",
+          cashApp: "gusC",
+          paypal: null,
+        });
+
+        const ownerEditedGuest = yield* alex.groups.setPaymentHandles({
+          params: { groupId, playerId: guestId },
+          payload: { venmo: "gus_v", cashApp: "gusC", paypal: "gusPay" },
+        });
+        expect(ownerEditedGuest.players.find((p) => p.id === guestId)).toMatchObject({
+          venmo: "gus_v",
+          cashApp: "gusC",
+          paypal: "gusPay",
+        });
+
+        expect(
+          yield* Effect.flip(
+            alex.groups.setPaymentHandles({
+              params: { groupId, playerId: ids.player() },
+              payload: { venmo: "nobody", cashApp: null, paypal: null },
+            }),
+          ),
+        ).toMatchObject({ _tag: "NotFound", resource: "player" });
+
+        const claimed = yield* gus.guests.claim({ params: { code: guestCode } });
+        expect(claimed.players.find((p) => p.id === guestId)).toMatchObject({
+          venmo: "gus_v",
+          cashApp: "gusC",
+          paypal: "gusPay",
+        });
+      }),
+  );
 });
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("stats", (it) => {

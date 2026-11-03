@@ -9,6 +9,7 @@ import seatings from "./0006_seatings.ts";
 import tableSeats from "./0007_table_seats.ts";
 import fiveSeatDefault from "./0008_five_seat_default.ts";
 import highLimit from "./0009_high_limit.ts";
+import paymentHandles from "./0010_payment_handles.ts";
 
 export const migrations = Migrator.fromRecord({
   "0001_init": init,
@@ -20,4 +21,5 @@ export const migrations = Migrator.fromRecord({
   "0007_table_seats": tableSeats,
   "0008_five_seat_default": fiveSeatDefault,
   "0009_high_limit": highLimit,
+  "0010_payment_handles": paymentHandles,
 });

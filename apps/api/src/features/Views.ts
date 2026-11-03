@@ -232,7 +232,8 @@ export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Mem
         Effect.flatMap(decodeRows(GroupRow)),
       ),
       sql`
-        select p.id, p.display_name, p.user_id, m.role, p.claim_code
+        select p.id, p.display_name, p.user_id, m.role, p.claim_code,
+          p.venmo, p.cash_app, p.paypal
         from players p
         left join memberships m
           on m.group_id = p.group_id and m.user_id = p.user_id and m.left_at is null

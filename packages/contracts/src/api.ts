@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as HttpApi from "effect/http-api/HttpApi";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
@@ -42,6 +43,30 @@ export type HealthResponse = typeof HealthResponse.Type;
 const Name = (maxLength: number) =>
   Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(maxLength));
 const Note = Schema.String.check(Schema.isMaxLength(280));
+
+const normalizedHandle = (pattern: RegExp, stripPrefix: RegExp) =>
+  Schema.String.check(Schema.isPattern(pattern)).pipe(
+    Schema.decodeTo(
+      Schema.String,
+      SchemaTransformation.transform({
+        decode: (value) => value.trim().replace(stripPrefix, ""),
+        encode: (value) => value,
+      }),
+    ),
+  );
+
+export const VenmoHandleInput = normalizedHandle(/^\s*@?[A-Za-z0-9_-]{1,30}\s*$/, /^@/);
+export const CashAppHandleInput = normalizedHandle(/^\s*\$?[A-Za-z0-9_-]{1,20}\s*$/, /^\$/);
+export const PayPalHandleInput = normalizedHandle(
+  /^\s*(?:(?:https?:\/\/)?(?:www\.)?(?:paypal\.me|paypal\.com\/paypalme)\/|@)?[A-Za-z0-9_-]{1,30}\s*$/i,
+  /^(?:(?:https?:\/\/)?(?:www\.)?(?:paypal\.me|paypal\.com\/paypalme)\/|@)/i,
+);
+
+export const SetPaymentHandlesRequest = Schema.Struct({
+  venmo: Schema.NullOr(VenmoHandleInput),
+  cashApp: Schema.NullOr(CashAppHandleInput),
+  paypal: Schema.NullOr(PayPalHandleInput),
+});
 
 export const CreateGroupRequest = Schema.Struct({
   id: GroupId,
@@ -215,6 +240,18 @@ const GroupsGroup = HttpApiGroup.make("groups")
       success: Ok,
       error: [Forbidden, NotFound, Conflict],
     }),
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "setPaymentHandles",
+      "/groups/:groupId/players/:playerId/payment-handles",
+      {
+        params: Schema.Struct({ groupId: GroupId, playerId: PlayerId }),
+        payload: SetPaymentHandlesRequest,
+        success: GroupDetail,
+        error: [Forbidden, NotFound],
+      },
+    ),
   )
   .middleware(Authentication);
 
