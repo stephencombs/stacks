@@ -34,6 +34,7 @@ export function LiveBar({
     return null;
   return (
     <View
+      pointerEvents="box-none"
       className="absolute inset-x-0 px-3"
       style={
         bottom === undefined
