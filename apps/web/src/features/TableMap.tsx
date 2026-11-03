@@ -644,7 +644,7 @@ export function TableMap({
         </div>
       )}
       {live && sizes.length > 1 ? (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3 px-4 sm:px-0">
           <Segmented
             label="Table size"
             options={sizes.map((option) => ({ value: option, label: `${option} seats` }))}
