@@ -13,7 +13,7 @@ import { Money } from "../components/Money";
 import { Glow } from "../components/ui/Glow";
 
 const HEIGHT = 128;
-const PAD = { x: 8, y: 12 };
+const PAD = { x: 12, y: 12 };
 /** Room past the last point for each line's initial. */
 const LABEL = 18;
 
@@ -56,6 +56,7 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
           amount={MinorUnits.make(head.net)}
           currency={currency}
           tone="result"
+          fit
           className="font-display text-6xl leading-[64px]"
         />
         {head.line ? <Text className="text-sm text-muted">{head.line}</Text> : null}

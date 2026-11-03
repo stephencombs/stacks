@@ -36,12 +36,12 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
           amount={mine.net}
           currency={currency}
           tone="result"
-          className="font-display text-6xl leading-none tracking-[-0.01em]"
+          className="font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl"
         />
         {lines.climb ? <p className="text-sm text-muted">{lines.climb}</p> : null}
       </div>
       <TripLine line={mine.line} tone={tone} />
-      <dl className="relative grid grid-cols-3 divide-x divide-line border-t border-line">
+      <dl className="relative flex divide-x divide-line border-t border-line">
         <Tile label="Win rate">{lines.winRate}</Tile>
         <Tile label="Best">
           {mine.best ? <Money amount={mine.best.net} currency={currency} tone="result" /> : "–"}
@@ -62,9 +62,11 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
 
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5 px-5 py-3">
-      <dt className="text-xs font-medium tracking-wider text-muted uppercase">{label}</dt>
-      <dd className="text-lg font-semibold tabular-nums">{children}</dd>
+    <div className="flex flex-auto flex-col gap-0.5 px-5 py-3 max-sm:px-4">
+      <dt className="text-xs font-medium tracking-wider whitespace-nowrap text-muted uppercase">
+        {label}
+      </dt>
+      <dd className="text-lg font-semibold whitespace-nowrap tabular-nums">{children}</dd>
     </div>
   );
 }
@@ -80,7 +82,7 @@ function TripLine({
   tone: "win" | "loss" | "accent";
 }) {
   const [box, width] = useWidth<HTMLDivElement>();
-  const plot = lineScale([line], { width, height: HEIGHT }, { x: 8, y: 10 });
+  const plot = lineScale([line], { width, height: HEIGHT }, { x: 12, y: 10 });
   const points = plot.points(line);
   const end = { x: plot.x(line.length - 1), y: plot.y(line.at(-1)!) };
   const color = `var(--color-${tone})`;
@@ -88,7 +90,7 @@ function TripLine({
   return (
     <div ref={box} aria-hidden className="relative mt-3" style={{ height: HEIGHT }}>
       {width > 0 ? (
-        <svg width={width} height={HEIGHT} className="block overflow-visible">
+        <svg width={width} height={HEIGHT} className="block overflow-visible select-none">
           <defs>
             <linearGradient id="trip-fill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor={color} stopOpacity={0.28} />

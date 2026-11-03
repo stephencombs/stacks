@@ -120,6 +120,7 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
             <Money
               amount={MinorUnits.make(Math.abs(myBalance))}
               currency={currency}
+              fit
               className={cn(
                 "font-display text-6xl leading-[64px]",
                 myBalance > 0 ? "text-win" : myBalance < 0 ? "text-loss" : "text-muted",
@@ -168,7 +169,7 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
                 <BalanceLabel
                   amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
                   currency={currency}
-                  className="w-24 text-right"
+                  className="min-w-24 text-right"
                 />
               </Row>
             ))}

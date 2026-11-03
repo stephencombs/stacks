@@ -26,7 +26,7 @@ export function BalanceHero({
           amount={Math.abs(balance)}
           currency={currency}
           className={cn(
-            "font-display text-6xl leading-none tracking-[-0.01em]",
+            "font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl",
             balance > 0 ? "text-win" : balance < 0 ? "text-loss" : "text-muted",
           )}
         />

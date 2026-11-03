@@ -29,7 +29,7 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
     const next = Math.round(event.nativeEvent.layout.width);
     if (next !== width) setWidth(next);
   };
-  const plot = lineScale([mine.line], { width, height: HEIGHT }, { x: 8, y: 10 });
+  const plot = lineScale([mine.line], { width, height: HEIGHT }, { x: 12, y: 10 });
   const points = plot.points(mine.line);
   const end = { x: plot.x(mine.line.length - 1), y: plot.y(mine.line.at(-1)!) };
 
@@ -50,6 +50,7 @@ export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail
           amount={MinorUnits.make(mine.net)}
           currency={currency}
           tone="result"
+          fit
           className="font-display text-6xl leading-[64px]"
         />
         {lines.climb ? <Text className="text-sm text-muted">{lines.climb}</Text> : null}
@@ -133,9 +134,7 @@ function Tile({
   return (
     <View
       accessible
-      className={
-        divided ? "flex-1 gap-0.5 border-l border-line px-4 py-3" : "flex-1 gap-0.5 px-5 py-3"
-      }
+      className={divided ? "grow gap-0.5 border-l border-line px-4 py-3" : "grow gap-0.5 px-5 py-3"}
     >
       <Text className="type-label text-muted">{label}</Text>
       {children}

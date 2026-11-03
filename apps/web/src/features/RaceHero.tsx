@@ -10,7 +10,7 @@ import { Glow, Surface } from "~/components/ui/Surface";
 import { useWidth } from "~/lib/useWidth";
 
 const HEIGHT = 128;
-const PAD = { x: 8, y: 12 };
+const PAD = { x: 12, y: 12 };
 /** Room past the last point for each line's initial. */
 const LABEL = 18;
 
@@ -47,13 +47,13 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
           amount={head.net}
           currency={currency}
           tone="result"
-          className="font-display text-6xl leading-none tracking-[-0.01em]"
+          className="font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl"
         />
         {head.line ? <p className="text-sm text-muted">{head.line}</p> : null}
       </div>
       <div ref={box} aria-hidden className="relative mt-3 mb-4" style={{ height: HEIGHT }}>
         {width > 0 ? (
-          <svg width={width} height={HEIGHT} className="block overflow-visible">
+          <svg width={width} height={HEIGHT} className="block overflow-visible select-none">
             <line
               x1={0}
               x2={width - LABEL}
