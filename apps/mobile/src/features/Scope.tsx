@@ -1,6 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
-import type { GroupListItem, Trip } from "@stacks/contracts";
 import { scopeTrips, tripDates, unsettledAmount } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useState } from "react";
@@ -15,7 +14,7 @@ import { useGo } from "../lib/go";
 import { tripIsLive, type Scope } from "@stacks/client-runtime/scope";
 import { useScope } from "../lib/scope";
 import { useStacks } from "../lib/stacks";
-import { StartTripSheet } from "./Trips";
+import { NoTrips, StartTripSheet } from "./Trips";
 
 /** Where you are: the group over the trip, at the top of every place. Tapping it switches. */
 export function ScopeButton() {
@@ -23,9 +22,16 @@ export function ScopeButton() {
   const [open, setOpen] = useState(false);
   if (!scope)
     return (
-      <View accessibilityElementsHidden className="min-h-11 w-36 justify-center gap-1.5 px-3">
-        <Skeleton className="h-2.5 w-20" />
-        <Skeleton className="h-4 w-28" />
+      <View
+        accessibilityElementsHidden
+        className="min-h-11 w-36 justify-center rounded-xl border border-line bg-sunken px-3 py-1"
+      >
+        <View className="h-4 justify-center">
+          <Skeleton className="h-2.5 w-20" />
+        </View>
+        <View className="h-6 justify-center">
+          <Skeleton className="h-4 w-28" />
+        </View>
       </View>
     );
   const { item, trip } = scope;
@@ -73,20 +79,20 @@ function ScopeSheet({ scope, onClose }: { scope: Scope; onClose: () => void }) {
       <View className="gap-2">
         <SectionHeading
           action={
-            <Button
-              label="New trip"
-              size="sm"
-              variant={item.trips.length === 0 ? "primary" : "ghost"}
-              onPress={() => setStarting(true)}
-            />
+            item.trips.length === 0 ? undefined : (
+              <Button
+                label="New trip"
+                size="sm"
+                variant="ghost"
+                onPress={() => setStarting(true)}
+              />
+            )
           }
         >
           Trips
         </SectionHeading>
         {item.trips.length === 0 ? (
-          <Text className="text-sm text-muted">
-            Every session is part of a trip, like a weekend in Vegas or this month's home games.
-          </Text>
+          <NoTrips onStart={() => setStarting(true)} />
         ) : (
           <List>
             {scopeTrips(item.trips).map((trip) => {
@@ -100,10 +106,7 @@ function ScopeSheet({ scope, onClose }: { scope: Scope; onClose: () => void }) {
                 >
                   <View className="min-w-0 flex-1 gap-0.5">
                     <View className="flex-row items-center gap-2">
-                      <Text
-                        numberOfLines={1}
-                        className={`shrink text-base text-ink ${here ? "font-semibold" : "font-medium"}`}
-                      >
+                      <Text numberOfLines={1} className="shrink text-base font-medium text-ink">
                         {trip.name}
                       </Text>
                       {tripIsLive(item, trip) ? <Tag tone="live">Live</Tag> : null}

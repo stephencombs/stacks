@@ -40,8 +40,8 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             />
             <Text
               className={cn(
-                "type-callout",
-                current ? "font-semibold text-accent-text" : "font-medium text-muted",
+                "type-callout font-medium",
+                current ? "text-accent-text" : "text-muted",
               )}
             >
               {descriptors[route.key]!.options.title}
