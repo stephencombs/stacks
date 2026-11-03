@@ -1,4 +1,4 @@
-import { createContext, use, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { cn } from "~/components/ui/cn";
 import { Skeleton, Surface } from "~/components/ui/Surface";
@@ -38,8 +38,11 @@ export function SkeletonText({
   );
 }
 
-/** When the current page was navigated to, so a skeleton's delay counts from then. */
-export const PageStart = createContext(0);
+/** When the latest navigation started, so a skeleton's delay counts from then. */
+let navigatedAt = 0;
+export const markNavigation = () => {
+  navigatedAt = performance.now();
+};
 
 /**
  * A whole page loading: announced once, and only shown once the wait is long enough to see. A page
@@ -47,8 +50,7 @@ export const PageStart = createContext(0);
  * than from the mount; otherwise each stage would start the wait again and the page would blink.
  */
 function SkeletonPage({ label, children }: { label: string; children: ReactNode }) {
-  const start = use(PageStart);
-  const [waited] = useState(() => performance.now() - start);
+  const [waited] = useState(() => performance.now() - navigatedAt);
   return (
     <div
       role="status"

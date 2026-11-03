@@ -4,9 +4,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./index.css";
+import { markNavigation } from "./features/PageSkeletons";
 import { routeTree } from "./routeTree.gen";
 
 const router = createRouter({ routeTree, defaultPreload: "intent" });
+// Page skeletons time their reveal from the navigation, not from when they mount.
+router.subscribe("onBeforeNavigate", markNavigation);
 
 declare module "@tanstack/react-router" {
   interface Register {

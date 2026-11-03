@@ -2,7 +2,7 @@ import { ClerkFailed, UserButton, useAuth } from "@clerk/react";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { Link, Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { FormError } from "~/components/ui/Field";
 import { cn } from "~/components/ui/cn";
@@ -10,7 +10,6 @@ import { Menu, MenuChoice } from "~/components/ui/Menu";
 import { BrandMark } from "~/components/BrandMark";
 import { Landing } from "~/features/Landing";
 import { LiveBar } from "~/features/LiveBar";
-import { PageStart } from "~/features/PageSkeletons";
 import { StacksProvider } from "~/lib/stacks";
 import { setTheme, useTheme } from "~/lib/theme";
 
@@ -23,8 +22,6 @@ function Root() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const { pathname } = useLocation();
   const wide = wideRoute.test(pathname);
-  // Recomputed on each navigation; page skeletons time their reveal from it.
-  const pageStart = useMemo(() => performance.now(), [pathname]);
   if (!isLoaded) return <Loading />;
   if (!isSignedIn) return <SignedOut />;
   return (
@@ -51,9 +48,7 @@ function Root() {
             !wide && "lg:mx-auto lg:max-w-2xl",
           )}
         >
-          <PageStart value={pageStart}>
-            <Outlet />
-          </PageStart>
+          <Outlet />
         </main>
         <LiveBar />
       </Frame>
