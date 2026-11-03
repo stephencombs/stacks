@@ -97,8 +97,17 @@ function SectionSkeleton({ children }: { children: ReactNode }) {
   );
 }
 
-/** The trip card: label, figure, comparison, a 96px chart and three tiles. */
-function HeroSkeleton({ chart = true, tiles = true }: { chart?: boolean; tiles?: boolean }) {
+/**
+ * A hero card: label, figure, comparison, then the trip card's 96px chart and three tiles, the
+ * race's 128px chart, or neither.
+ */
+function HeroSkeleton({
+  chart = "trip",
+  tiles = true,
+}: {
+  chart?: "trip" | "race" | false;
+  tiles?: boolean;
+}) {
   return (
     <View className="overflow-hidden rounded-xl bg-surface">
       <View className="px-4 pt-4">
@@ -106,7 +115,13 @@ function HeroSkeleton({ chart = true, tiles = true }: { chart?: boolean; tiles?:
         <SkeletonText size="figure" className="mt-2 w-40" />
         <SkeletonText size="sm" className="mt-1.5 w-48" />
       </View>
-      {chart ? <View className="mt-3 h-24" /> : <View className="h-4" />}
+      {chart === "trip" ? (
+        <View className="mt-3 h-24" />
+      ) : chart === "race" ? (
+        <View className="mt-3 mb-4 h-32" />
+      ) : (
+        <View className="h-4" />
+      )}
       {tiles ? (
         <View className="flex-row border-t border-line">
           {["w-12", "w-16", "w-14"].map((width, i) => (
@@ -124,32 +139,113 @@ function HeroSkeleton({ chart = true, tiles = true }: { chart?: boolean; tiles?:
   );
 }
 
-/** A trip tab loading: the title, then the tab's own shape. */
-export function TripScreenSkeleton({ tab }: { tab: "table" | "board" | "money" }) {
+/*
+ * The places. Board and Settle up draw their title (and the Board its This trip / All time
+ * switch) before anything loads, so their skeletons start below it.
+ */
+
+/**
+ * Sessions loading: the title beside the trip's "…", your live table when you're at one, the trip
+ * card, Start a session, and the latest night.
+ */
+export function SessionsSkeleton({ live = false }: { live?: boolean }) {
   return (
-    <View className="flex-1 bg-canvas">
-      <View className="px-4 pt-4">
-        <SkeletonScreen label="Loading the trip">
-          <TitleSkeleton />
-          {tab === "money" ? (
-            <>
-              <HeroSkeleton chart={false} tiles={false} />
-              <SectionSkeleton>
-                <RowsSkeleton rows={4} chip meta={false} />
-              </SectionSkeleton>
-            </>
-          ) : (
-            <>
-              <HeroSkeleton tiles={tab === "table"} />
-              {tab === "table" ? <Skeleton className="h-[52px] rounded-full" /> : null}
-              <SectionSkeleton>
-                <RowsSkeleton rows={4} chip={tab === "board"} />
-              </SectionSkeleton>
-            </>
-          )}
-        </SkeletonScreen>
+    <SkeletonScreen label="Loading sessions">
+      <View className="flex-row items-center justify-between gap-3">
+        <SkeletonText size="title" className="w-40" />
+        <Skeleton className="size-11 rounded-full" />
       </View>
-    </View>
+      {live ? <Skeleton className="h-[200px] rounded-xl" /> : null}
+      <HeroSkeleton />
+      <Skeleton className="h-[52px] rounded-full" />
+      <SectionSkeleton>
+        <RowsSkeleton rows={3} />
+      </SectionSkeleton>
+    </SkeletonScreen>
+  );
+}
+
+/** The Board for a trip loading: the race, the night it's on, then the standings. */
+export function BoardSkeleton() {
+  return (
+    <SkeletonScreen label="Loading the board">
+      <HeroSkeleton chart="race" tiles={false} />
+      <View className="flex-row items-end justify-between">
+        <View className="gap-1">
+          <SkeletonText size="sm" className="w-24" />
+          <SkeletonText size="lg" className="w-36" />
+        </View>
+        <View className="items-end gap-1">
+          <SkeletonText size="sm" className="w-10" />
+          <SkeletonText size="lg" className="w-16" />
+        </View>
+      </View>
+      <SectionSkeleton>
+        <RowsSkeleton rows={4} chip />
+      </SectionSkeleton>
+    </SkeletonScreen>
+  );
+}
+
+/** The Board across every trip loading: the summary line, your all-time card, then the race. */
+export function AllTimeSkeleton() {
+  return (
+    <SkeletonScreen label="Loading all-time stats">
+      <SkeletonText className="w-48" />
+      <HeroSkeleton />
+      <View className="gap-1">
+        <SkeletonText size="sm" className="w-40" />
+        <SkeletonText size="lg" className="w-52" />
+        <SkeletonText size="sm" className="w-44" />
+      </View>
+      <Skeleton className="h-[190px] rounded-xl" />
+    </SkeletonScreen>
+  );
+}
+
+/** Settle up loading: your balance, then who pays whom. */
+export function SettleUpSkeleton() {
+  return (
+    <SkeletonScreen label="Loading settle up">
+      <HeroSkeleton chart={false} tiles={false} />
+      <SectionSkeleton>
+        <RowsSkeleton rows={3} chip meta={false} />
+      </SectionSkeleton>
+    </SkeletonScreen>
+  );
+}
+
+/** The group loading: its name and who's in it, its trips, its people, its settings. */
+export function GroupSkeleton() {
+  return (
+    <SkeletonScreen label="Loading the group">
+      <TitleSkeleton />
+      <SectionSkeleton>
+        <RowsSkeleton rows={2} />
+      </SectionSkeleton>
+      <SectionSkeleton>
+        <View className="overflow-hidden rounded-xl bg-surface">
+          <View className="flex-row gap-4 px-4 py-3.5">
+            {keys(4).map((key) => (
+              <View key={key} className="w-16 items-center gap-1">
+                <Skeleton className="size-[34px] rounded-full" />
+                <SkeletonText size="sm" className="w-12" />
+                <SkeletonText size="sm" className="w-10" />
+              </View>
+            ))}
+          </View>
+          <View className="flex-row items-center gap-3 border-t border-line px-4 py-3.5">
+            <View className="flex-1 gap-0.5">
+              <SkeletonText className="w-40" />
+              <SkeletonText size="sm" className="w-52" />
+            </View>
+          </View>
+        </View>
+      </SectionSkeleton>
+      <SectionSkeleton>
+        <RowsSkeleton rows={1} trailing={false} />
+      </SectionSkeleton>
+    </SkeletonScreen>
   );
 }
 
@@ -192,20 +288,10 @@ export function SessionScreenSkeleton() {
   );
 }
 
-/** A list screen loading: its title, then rows. */
-export function ListScreenSkeleton({
-  rows = 4,
-  hero = false,
-  label,
-}: {
-  rows?: number;
-  hero?: boolean;
-  label: string;
-}) {
+/** A pushed list screen loading, titled by its header: a section of rows. */
+export function ListScreenSkeleton({ rows = 4, label }: { rows?: number; label: string }) {
   return (
     <SkeletonScreen label={label}>
-      <TitleSkeleton context={false} />
-      {hero ? <HeroSkeleton /> : null}
       <SectionSkeleton>
         <RowsSkeleton rows={rows} />
       </SectionSkeleton>

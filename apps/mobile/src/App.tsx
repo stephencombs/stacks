@@ -13,77 +13,157 @@ import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { Button } from "./components/ui/Button";
+import { TabBarHeight } from "./components/ui/Screen";
 import { Landing } from "./features/Landing";
+import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./features/PlaceTabs";
+import { ScopeButton } from "./features/Scope";
+import { YouButton } from "./features/You";
 import { clerkPublishableKey } from "./lib/config";
-import { StacksProvider } from "./lib/stacks";
+import { ScopeProvider, useScopeHasTrip } from "./lib/scope";
+import { Prefetch, StacksProvider, useLastTrip, useStacks } from "./lib/stacks";
 import "./lib/theme";
+import { BoardScreen } from "./screens/Board";
 import { ClaimScreen, JoinScreen } from "./screens/Invites";
 import { GroupScreen } from "./screens/Group";
-import { GroupsScreen } from "./screens/Groups";
-import { HomeScreen } from "./screens/Home";
+import { GroupSettingsScreen } from "./screens/GroupSettings";
+import { GroupsScreen, NoGroups } from "./screens/Groups";
 import { NewSessionScreen } from "./screens/NewSession";
 import { PeopleScreen } from "./screens/People";
 import { SessionScreen } from "./screens/Session";
-import { StatsScreen } from "./screens/Stats";
-import { TripScreen } from "./screens/Trip";
+import { SessionsScreen } from "./screens/Sessions";
+import { SettleUpScreen } from "./screens/SettleUp";
 
-// The trip's tabs are a navigator inside Home and Trip; these give them their own addresses.
-const tripTabPaths = { Sessions: "", Results: "results", SettleUp: "settle" };
+const stackOptions = {
+  headerTransparent: false,
+  headerShadowVisible: false,
+  headerBackButtonDisplayMode: "minimal",
+  headerRight: () => <YouButton />,
+} as const;
 
-const RootStack = createNativeStackNavigator({
-  screenOptions: {
-    headerTransparent: false,
-    headerShadowVisible: false,
-    headerBackButtonDisplayMode: "minimal",
-  },
+/** A place's own page: the scope where a back button would be, and You beside it. */
+const placeOptions = { title: "", headerLeft: () => <ScopeButton /> };
+
+const SessionsStack = createNativeStackNavigator({
+  screenOptions: stackOptions,
   screens: {
-    Home: {
-      screen: HomeScreen,
-      options: { title: "" },
-      linking: { path: "", screens: tripTabPaths },
-    },
-    Groups: { screen: GroupsScreen, options: { title: "Color Up" }, linking: { path: "groups" } },
-    Group: { screen: GroupScreen, options: { title: "" }, linking: { path: "groups/:groupId" } },
+    Sessions: { screen: SessionsScreen, options: placeOptions, linking: "trips/:tripId" },
+    Session: { screen: SessionScreen, options: { title: "" }, linking: "sessions/:sessionId" },
     NewSession: {
       screen: NewSessionScreen,
       options: { title: "Start a session" },
-      linking: { path: "trips/:tripId/sessions/new" },
+      linking: "trips/:tripId/sessions/new",
     },
-    Session: {
-      screen: SessionScreen,
-      options: { title: "" },
-      linking: { path: "sessions/:sessionId" },
+  },
+});
+
+const BoardStack = createNativeStackNavigator({
+  screenOptions: stackOptions,
+  screens: {
+    Board: {
+      screen: BoardScreen,
+      options: placeOptions,
+      // A trip's old Results page and a group's old Stats page are the Board now.
+      linking: {
+        path: "trips/:tripId/board",
+        alias: ["trips/:tripId/results", "groups/:groupId/stats"],
+      },
     },
-    Stats: {
-      screen: StatsScreen,
-      options: { title: "Stats" },
-      linking: { path: "groups/:groupId/stats" },
-    },
+  },
+});
+
+const SettleStack = createNativeStackNavigator({
+  screenOptions: stackOptions,
+  screens: {
+    SettleUp: { screen: SettleUpScreen, options: placeOptions, linking: "trips/:tripId/settle" },
+  },
+});
+
+const GroupStack = createNativeStackNavigator({
+  screenOptions: stackOptions,
+  screens: {
+    Group: { screen: GroupScreen, options: placeOptions, linking: "groups/:groupId" },
     People: {
       screen: PeopleScreen,
       options: { title: "People" },
-      linking: { path: "groups/:groupId/people" },
+      linking: "groups/:groupId/people",
     },
-    Trip: {
-      screen: TripScreen,
-      options: { title: "" },
-      linking: { path: "trips/:tripId", screens: tripTabPaths },
+    GroupSettings: {
+      screen: GroupSettingsScreen,
+      options: { title: "Settings" },
+      linking: "groups/:groupId/settings",
     },
-    Join: {
-      screen: JoinScreen,
-      options: { title: "Join a group" },
-      linking: { path: "join/:code" },
+  },
+});
+
+/** Around the tabs: the last trip's requests start early, and screens learn the bar's height. */
+function PlacesLayout({ children }: { children: ReactNode }) {
+  const stacks = useStacks();
+  const { lastTripId } = useLastTrip();
+  const bar = useTabBarHeight();
+  return (
+    <>
+      {lastTripId ? (
+        <>
+          <Prefetch query={stacks.trip(lastTripId)} />
+          <Prefetch query={stacks.limits(lastTripId)} />
+        </>
+      ) : null}
+      <NoGroups>
+        <TabBarHeight value={bar}>{children}</TabBarHeight>
+      </NoGroups>
+    </>
+  );
+}
+
+const Places = createPlaceTabs({
+  ...placeTabsConfig,
+  initialRouteName: "SessionsTab",
+  layout: ({ children }) => <PlacesLayout>{children}</PlacesLayout>,
+  screens: {
+    // A group with no trips has nothing for the first three places, so only Group is offered.
+    SessionsTab: {
+      screen: SessionsStack,
+      if: useScopeHasTrip,
+      options: placeTab("Sessions", "suit.club.fill"),
+      linking: { path: "", initialRouteName: "Sessions" },
     },
+    BoardTab: {
+      screen: BoardStack,
+      if: useScopeHasTrip,
+      options: placeTab("Board", "chart.line.uptrend.xyaxis"),
+      linking: { path: "" },
+    },
+    SettleTab: {
+      screen: SettleStack,
+      if: useScopeHasTrip,
+      options: placeTab("Settle up", "arrow.left.arrow.right"),
+      linking: { path: "" },
+    },
+    GroupTab: {
+      screen: GroupStack,
+      options: placeTab("Group", "person.2"),
+      linking: { path: "", initialRouteName: "Group" },
+    },
+  },
+});
+
+const RootStack = createNativeStackNavigator({
+  initialRouteName: "Places",
+  screenOptions: stackOptions,
+  screens: {
+    Places: { screen: Places, options: { headerShown: false }, linking: "" },
+    Groups: { screen: GroupsScreen, options: { title: "Your groups" }, linking: "groups" },
+    Join: { screen: JoinScreen, options: { title: "Join a group" }, linking: "join/:code" },
     Claim: {
       screen: ClaimScreen,
       options: { title: "Claim your history" },
-      linking: { path: "claim/:code" },
+      linking: "claim/:code",
     },
   },
 });
@@ -109,6 +189,8 @@ function Root() {
   const linking = {
     enabled: "auto" as const,
     prefixes: [Linking.createURL("/")],
+    // A link straight to a session or an invite still has the places to go back to.
+    config: { initialRouteName: "Places" as const },
     getInitialURL: async () => {
       const url = pendingLink.current ?? (await Linking.getInitialURL());
       pendingLink.current = null;
@@ -119,7 +201,9 @@ function Root() {
   if (!isSignedIn) return <SignedOut />;
   return (
     <StacksProvider key={userId} userId={userId}>
-      <Navigation linking={linking} theme={theme} />
+      <ScopeProvider>
+        <Navigation linking={linking} theme={theme} />
+      </ScopeProvider>
     </StacksProvider>
   );
 }

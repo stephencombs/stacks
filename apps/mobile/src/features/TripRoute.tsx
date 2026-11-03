@@ -7,6 +7,7 @@ import { Linking, Platform, Pressable, Text, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { cn } from "../components/ui/cn";
+import { SectionHeading } from "../components/ui/Surface";
 
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
@@ -45,24 +46,23 @@ const directions = (venue: Venue) => {
 const canDrawMap =
   Platform.OS === "ios" || Boolean(Constants.expoConfig?.android?.config?.googleMaps?.apiKey);
 
-/** The casinos the trip played, in the order it first reached each, on the phone's own map. */
+/**
+ * The Board's "By casino": the casinos the trip played, in the order it first reached each, on the
+ * phone's own map. Nothing until a session closes.
+ */
 export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const currency = detail.group.currency;
   const { theme } = useUniwind();
   const accent = String(useCSSVariable("--color-accent"));
   const route = tripRoute(trip.sessions.filter((s) => s.session.status === "closed"));
-  if (route.stops.length === 0)
-    return (
-      <Text className="mx-4 rounded-xl border border-line bg-surface p-4 text-sm text-muted">
-        Close a session to put the first casino on the map.
-      </Text>
-    );
+  if (route.stops.length === 0) return null;
   const onMap = route.stops.filter((s) => placed(s.venue));
   const camera = onMap.length > 0 ? cameraFor(onMap.map((s) => s.venue as Placed)) : null;
   const line = route.path.filter(placed).map((v) => ({ latitude: v.lat, longitude: v.lng }));
   const colorScheme = theme === "dark" ? "DARK" : "LIGHT";
   return (
-    <View className="gap-3 px-4 pb-8">
+    <View className="gap-2">
+      <SectionHeading>By casino</SectionHeading>
       {canDrawMap && camera ? (
         <View
           className="h-72 overflow-hidden rounded-xl border border-line"

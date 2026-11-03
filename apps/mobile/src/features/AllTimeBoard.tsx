@@ -1,8 +1,7 @@
-import type { StaticScreenProps } from "@react-navigation/native";
 import {
-  GroupId,
   MinorUnits,
   type GroupDetail,
+  type GroupId,
   type GroupStats,
   type PlayerResult,
 } from "@stacks/contracts";
@@ -11,35 +10,26 @@ import { seatLabel } from "@stacks/client-runtime/table";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { Screen } from "../components/ui/Screen";
 import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
-import { RaceStats } from "../features/RaceStats";
-import { TripHero } from "../features/TripHero";
 import { Loaded, Prefetch, useStacks } from "../lib/stacks";
-import { ListScreenSkeleton } from "../features/ScreenSkeletons";
+import { RaceStats } from "./RaceStats";
+import { AllTimeSkeleton } from "./ScreenSkeletons";
+import { TripHero } from "./TripHero";
 
-type Props = StaticScreenProps<{ groupId: string }>;
-
-export function StatsScreen({ route }: Props) {
+/** The Board across every trip: what the group's Stats page used to show. */
+export function AllTimeBoard({ groupId }: { groupId: GroupId }) {
   const stacks = useStacks();
-  const groupId = GroupId.make(route.params.groupId);
   return (
-    <Screen>
+    <>
       <Prefetch query={stacks.stats(groupId)} />
-      <Loaded
-        query={stacks.group(groupId)}
-        skeleton={<ListScreenSkeleton label="Loading stats" hero />}
-      >
+      <Loaded query={stacks.group(groupId)} skeleton={<AllTimeSkeleton />}>
         {(detail) => (
-          <Loaded
-            query={stacks.stats(groupId)}
-            skeleton={<ListScreenSkeleton label="Loading stats" hero />}
-          >
+          <Loaded query={stacks.stats(groupId)} skeleton={<AllTimeSkeleton />}>
             {(stats) => <StatsView detail={detail} stats={stats} />}
           </Loaded>
         )}
       </Loaded>
-    </Screen>
+    </>
   );
 }
 
@@ -85,16 +75,14 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
         label={`All time with ${detail.group.name}`}
         span={`${tripCount} ${tripCount === 1 ? "trip" : "trips"}`}
       />
-      <View className="-mx-4">
-        <RaceStats
-          detail={detail}
-          sessions={sessions}
-          marks={marks}
-          where={(session) => trips.get(session.tripId) ?? ""}
-          latest="All-time"
-          empty="Stats count closed sessions, so close one to see how everyone's doing."
-        />
-      </View>
+      <RaceStats
+        detail={detail}
+        sessions={sessions}
+        marks={marks}
+        where={(session) => trips.get(session.tripId) ?? ""}
+        latest="All-time"
+        empty="Stats count closed sessions, so close one to see how everyone's doing."
+      />
       <View className="gap-2">
         <SectionHeading>By game</SectionHeading>
         <List>

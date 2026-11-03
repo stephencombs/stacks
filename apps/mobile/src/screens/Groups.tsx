@@ -1,10 +1,11 @@
-import { useClerk, useUser } from "@clerk/expo";
-import { useNavigation } from "@react-navigation/native";
+import { useUser } from "@clerk/expo";
+import { useAtomValue } from "@effect/atom-react";
 import { CurrencyCode, GroupId } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
-import { themeChoices } from "@stacks/client-runtime/theme";
-import { useState } from "react";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import { useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BalanceLabel } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -13,29 +14,41 @@ import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, PageTitle, Row, Tag } from "../components/ui/Surface";
+import { YouButton } from "../features/You";
+import { useGo } from "../lib/go";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
-import { setTheme, useTheme } from "../lib/theme";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
 
+/**
+ * The places once you're in a group; until then, a way to start one. Join and claim links still
+ * open over this, so a friend's invite is the other way in.
+ */
+export function NoGroups({ children }: { children: ReactNode }) {
+  const stacks = useStacks();
+  const insets = useSafeAreaInsets();
+  const groups = useAtomValue(stacks.groups);
+  if (!AsyncResult.isSuccess(groups) || groups.value.length > 0) return children;
+  return (
+    <View className="flex-1 bg-canvas" style={{ paddingTop: insets.top }}>
+      <View className="flex-row justify-end px-2">
+        <YouButton />
+      </View>
+      <GroupsScreen />
+    </View>
+  );
+}
+
+/** Every group you're in, and a new one. */
 export function GroupsScreen() {
   const stacks = useStacks();
-  const navigation = useNavigation();
+  const go = useGo();
   const [creating, setCreating] = useState(false);
-  const [account, setAccount] = useState(false);
 
   return (
     <Screen>
       <View className="gap-3">
         <PageTitle>Your groups</PageTitle>
-        <View className="flex-row gap-2">
-          <Button
-            label="New group"
-            variant="primary"
-            className="flex-1"
-            onPress={() => setCreating(true)}
-          />
-          <Button label="Account" onPress={() => setAccount(true)} />
-        </View>
+        <Button label="New group" variant="primary" onPress={() => setCreating(true)} />
       </View>
       <Loaded query={stacks.groups} skeleton={<RowsSkeleton rows={3} trailing={false} />}>
         {(groups) =>
@@ -59,7 +72,7 @@ export function GroupsScreen() {
                 <Row
                   key={item.group.id}
                   accessibilityHint="Opens the group"
-                  onPress={() => navigation.navigate("Group", { groupId: item.group.id })}
+                  onPress={() => go.group(item.group.id)}
                 >
                   <View className="flex-1 gap-1">
                     <View className="flex-row items-center gap-2">
@@ -82,7 +95,6 @@ export function GroupsScreen() {
         }
       </Loaded>
       <CreateGroupSheet open={creating} onClose={() => setCreating(false)} />
-      <AccountSheet open={account} onClose={() => setAccount(false)} />
     </Screen>
   );
 }
@@ -91,7 +103,7 @@ const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "MXN", "JPY"] as const;
 
 function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const stacks = useStacks();
-  const navigation = useNavigation();
+  const go = useGo();
   const { user } = useUser();
   const create = useAction(stacks.Client.mutation("groups", "create"));
   const [name, setName] = useState("");
@@ -113,7 +125,7 @@ function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: () => voi
     if (detail) {
       onClose();
       setName("");
-      navigation.navigate("Group", { groupId: detail.group.id });
+      go.group(detail.group.id);
     }
   };
 
@@ -154,30 +166,6 @@ function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: () => voi
         onChange={setCurrency}
       />
       {create.error ? <FormError>{create.error}</FormError> : null}
-    </Sheet>
-  );
-}
-
-function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user } = useUser();
-  const { signOut } = useClerk();
-  const theme = useTheme();
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="Account"
-      footer={<Button label="Sign out" variant="danger" onPress={() => void signOut()} />}
-    >
-      <View className="gap-1">
-        <Text className="text-base text-ink">
-          {user?.fullName ?? user?.primaryEmailAddress?.emailAddress}
-        </Text>
-        {user?.primaryEmailAddress ? (
-          <Text className="text-sm text-muted">{user.primaryEmailAddress.emailAddress}</Text>
-        ) : null}
-      </View>
-      <Choice label="Appearance" options={themeChoices} value={theme} onChange={setTheme} />
     </Sheet>
   );
 }

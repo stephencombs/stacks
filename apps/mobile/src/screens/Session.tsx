@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/expo";
-import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import type { StaticScreenProps } from "@react-navigation/native";
 import {
   EntryId,
   MinorUnits,
@@ -23,7 +23,7 @@ import { tableView } from "@stacks/client-runtime/table";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { formatMoney, parseMoney } from "@stacks/shared/money";
 import { playerResults } from "@stacks/shared/results";
-import { PersonalLimits } from "../features/PersonalLimits";
+import { LimitNotices } from "../features/PersonalLimits";
 import { seatCount, seatsNow } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import * as DateTime from "effect/DateTime";
@@ -55,17 +55,18 @@ import {
   useAction,
   useOutbox,
   usePending,
-  useRememberTrip,
   useStacks,
   useUnsaved,
 } from "../lib/stacks";
+import { useGo } from "../lib/go";
+import { useLinkedScope } from "../lib/scope";
 
 type Props = StaticScreenProps<{ sessionId: string }>;
 
 export function SessionScreen({ route }: Props) {
   const stacks = useStacks();
   return (
-    <Screen table={SessionId.make(route.params.sessionId)}>
+    <Screen shows={{ session: SessionId.make(route.params.sessionId) }}>
       <Loaded
         query={stacks.session(SessionId.make(route.params.sessionId))}
         skeleton={<SessionScreenSkeleton />}
@@ -107,10 +108,10 @@ function KeepAwake() {
 
 function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDetail }) {
   const stacks = useStacks();
-  const navigation = useNavigation();
+  const go = useGo();
   const { userId } = useAuth();
   const { session, venue } = detail;
-  useRememberTrip(session.tripId);
+  useLinkedScope({ tripId: session.tripId });
   const live = session.status === "live";
   const currency = group.group.currency;
   const names = playerNames(group);
@@ -245,7 +246,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
       {live ? <KeepAwake /> : null}
       <Loaded query={stacks.trip(session.tripId)} skeleton={<></>}>
         {(trip) => (
-          <PersonalLimits
+          <LimitNotices
             group={group}
             trip={trip}
             local={{
@@ -457,15 +458,13 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
             <Button
               label="Start another session"
               className="flex-1"
-              onPress={() =>
-                navigation.navigate("NewSession", { tripId: session.tripId, from: session.id })
-              }
+              onPress={() => go.newSession(session.tripId, session.id)}
             />
           ) : null}
           <Button
-            label="See results"
+            label="See the board"
             className="flex-1"
-            onPress={() => navigation.navigate("Trip", { tripId: session.tripId, tab: "board" })}
+            onPress={() => go.trip(session.tripId, "Board")}
           />
         </View>
       ) : null}
@@ -782,7 +781,7 @@ function CloseSheet({
   onClose: () => void;
 }) {
   const stacks = useStacks();
-  const navigation = useNavigation();
+  const go = useGo();
   const close = useAction(stacks.Client.mutation("sessions", "close"));
   const outbox = useOutbox();
   const unsent = usePending(detail.session.id).length;
@@ -819,8 +818,7 @@ function CloseSheet({
     if (!closed) return;
     succeed();
     onClose();
-    if (next)
-      navigation.navigate("NewSession", { tripId: detail.session.tripId, from: detail.session.id });
+    if (next) go.newSession(detail.session.tripId, detail.session.id);
   };
   return (
     <Sheet
