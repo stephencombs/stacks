@@ -43,12 +43,14 @@ A change that works on the path you tested and is missing everywhere else is the
 - Test meaningful logic and observable behavior. Ledger math (`results`, `balances`, `settleUp`) gets thorough unit and property tests.
 - Effect tests use `it.effect` on the `TestClock`. No sleeps, no polling loops, no retries. A test that needs a timeout to pass is wrong.
 - A bug fix in logic, data or protocol starts with a failing test.
+- See UI changes in the real app before calling them done. `pnpm --filter @stacks/web dev:preview` runs the web app signed in, against fixture data, with no Clerk or database; the `preview-color-up` skill covers routes, fixtures and screenshots.
 
 ## Where code lives
 
 - `apps/api`: Cloudflare Worker serving the Effect `HttpApi` defined in contracts. `src/features` holds one module of service functions per feature, `src/http/Api.ts` the thin handlers, `src/db/migrations` the SQL migrations (append new ones to `migrations/index.ts`).
 - `apps/web`: React 19, Vite (through vite-plus), TanStack Router file routes, Tailwind v4. Data goes through `src/lib/stacks.tsx`: `<Loaded query={…}>` renders a query with its loading and error states, and `useAction(mutation)` runs a write, refreshes what's on screen and turns failures into a sentence. Screens never call the API client directly.
 - `apps/web/src/components/ui` exports own their look: pick a `variant` or `size`, and pass only layout classes (margin, width, flex). A look that belongs to one screen stays in that screen.
+- `docs/internals/navigation.md` decides where content lives and how people move between it. Read it before adding a page, tab, menu or route.
 - `DESIGN.md` is the design system: read it before building UI. `/design.html` on the web dev server shows the shared web parts and their states.
 - `apps/web/e2e` holds the Playwright test of the full loop against the real Clerk development instance (`pnpm --filter @stacks/web test:e2e`). Run it after changing a flow it covers.
 - `apps/mobile`: Expo with a dev client, React Navigation native-stack (static config), Uniwind.
@@ -73,5 +75,20 @@ A change that works on the path you tested and is missing everywhere else is the
 
 - Never open a PR unless asked.
 - Conventional commit titles in plain language: `feat(mobile): live session quick rebuy`.
-- UI changes need before/after screenshots.
-- Don't commit plans or scratch notes beyond `PLAN.md`.
+- UI changes need before/after screenshots. Host them on a `pr-assets/<branch>` orphan branch, never in the PR's own commits.
+
+## Documentation
+
+Most changes need no doc change. Agents can read the code.
+
+- `docs/internals/` holds decisions and their reasons, constraints that span apps, and traps the source can't show. Before adding a paragraph, ask what a maintainer would get wrong without it. If reading the code answers the question, leave it out.
+- Don't document every feature, list fields or files, narrate control flow, or append PR summaries. Types, tests and code already record the implementation.
+- A local reason goes in a short comment beside the code. Use an internal doc when the reasoning crosses apps or needs context the code can't carry.
+- When a decision changes, rewrite or remove the text it affects. Don't append a second account. A new page needs a durable reason to exist, and a line in `docs/README.md`.
+- `DESIGN.md` and `docs/design/` say which part to use and how it should look. Keep them in step with `apps/web/src/components/ui` and the mobile components.
+
+## Plans and work artifacts
+
+- `PLAN.md` is the product scope and its phases. Don't commit other plans, research notes or agent scratch files; keep working material outside the worktree.
+- Research that leads to a decision lands as the decision, in `docs/internals/`, with a link or two to its strongest sources.
+- A merged PR is the implementation record. Don't keep a second checklist in the repo.

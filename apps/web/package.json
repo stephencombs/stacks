@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vp dev",
+    "dev:preview": "vp dev --config preview/vite.config.ts",
     "build": "vp build",
     "preview": "vp preview",
     "test": "vp test run --passWithNoTests",
