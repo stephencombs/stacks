@@ -94,7 +94,7 @@ jobs:
           vp run --filter @stacks/api db:migrate
           vp run deploy
           curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
-            https://stacks.stephen-jcombs.workers.dev/api/health
+            https://colorup.stephen-jcombs.workers.dev/api/health
         env:
           GH_TOKEN: ${{ github.token }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
