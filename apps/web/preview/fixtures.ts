@@ -99,6 +99,8 @@ const summaries = raw.map(([v, game, d, h, rows], i) => ({
   venue: venue(i, v),
   playerIds: Object.keys(rows).map((k) => P[+k]),
   playing: [],
+  ledgerEntryIds: [],
+  myLedgerEntries: [],
   results: Object.entries(rows).map(([k, r]) => result(+k, r)),
 }));
 const liveStart = new Date(Date.now() - 132 * 60_000).toISOString();
@@ -122,6 +124,8 @@ const liveSummary = {
   playerIds: Object.keys(liveRows).map((k) => P[+k]),
   playing: Object.keys(liveRows).map((k) => P[+k]),
   myJoinedAt: liveStart,
+  ledgerEntryIds: [u(601), u(602), u(603)],
+  myLedgerEntries: [{ id: u(601), kind: "buy_in", amount: 30000, voidedAt: null }],
   results: Object.entries(liveRows).map(([k, r]) => result(+k, r, true)),
 };
 const tripDetail = {
