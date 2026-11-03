@@ -9,6 +9,7 @@ import { LiveSessionCard, SessionList } from "~/features/SessionList";
 import { PersonalLimits } from "~/features/PersonalLimits";
 import { TripHero } from "~/features/TripHero";
 import { TripHeader } from "~/features/TripHeader";
+import { SessionTable, TripLayout, TripRail } from "~/features/TripRail";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/trips/$tripId/")({ component: TripPage });
@@ -48,29 +49,44 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   return (
     <>
       <TripHeader group={group} trip={trip} current="sessions" action={startSession} />
-      <PersonalLimits group={group} trip={trip} settings />
-      <TripHero
-        currency={group.group.currency}
-        me={group.myPlayerId}
-        sessions={trip.sessions.filter((s) => s.session.status === "closed")}
-      />
-      {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}
-      {live.length > 0 ? (
-        <Section title={mine ? "Other live sessions" : "Live sessions"}>
-          <SessionList sessions={live} detail={group} />
-        </Section>
-      ) : null}
-      {closed.length > 0 ? (
-        <Section title="Past sessions">
-          <SessionList sessions={closed} detail={group} />
-        </Section>
-      ) : !mine && live.length === 0 ? (
-        <EmptyState title="No sessions on this trip yet">
-          {trip.trip.endedAt === null
-            ? "Start one when you sit down to play."
-            : "This trip ended before anyone played."}
-        </EmptyState>
-      ) : null}
+      <TripLayout rail={<TripRail group={group} trip={trip} on="sessions" />}>
+        <PersonalLimits group={group} trip={trip} settings />
+        <TripHero
+          currency={group.group.currency}
+          me={group.myPlayerId}
+          sessions={trip.sessions.filter((s) => s.session.status === "closed")}
+        />
+        {/* On a wide screen your live table sits in the rail instead. */}
+        {mine ? (
+          <div className="lg:hidden">
+            <LiveSessionCard summary={mine} detail={group} />
+          </div>
+        ) : null}
+        {live.length > 0 ? (
+          <Section title={mine ? "Other live sessions" : "Live sessions"}>
+            <SessionList sessions={live} detail={group} />
+          </Section>
+        ) : null}
+        {closed.length > 0 ? (
+          <Section
+            title="Past sessions"
+            aside={`${closed.length} ${closed.length === 1 ? "session" : "sessions"}`}
+          >
+            <div className="lg:hidden">
+              <SessionList sessions={closed} detail={group} />
+            </div>
+            <div className="hidden lg:block">
+              <SessionTable sessions={closed} group={group} />
+            </div>
+          </Section>
+        ) : !mine && live.length === 0 ? (
+          <EmptyState title="No sessions on this trip yet">
+            {trip.trip.endedAt === null
+              ? "Start one when you sit down to play."
+              : "This trip ended before anyone played."}
+          </EmptyState>
+        ) : null}
+      </TripLayout>
     </>
   );
 }

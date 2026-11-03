@@ -7,6 +7,7 @@ import { Skeleton } from "~/components/ui/Surface";
 import { TripStats } from "~/features/RaceStats";
 import { DaysBoard, TonightBoard, TripBoard } from "~/features/TripBoard";
 import { TripHeader } from "~/features/TripHeader";
+import { TripLayout, TripRail } from "~/features/TripRail";
 import { Loaded, useStacks } from "~/lib/stacks";
 
 export const Route = createFileRoute("/trips/$tripId/results")({ component: ResultsPage });
@@ -21,7 +22,9 @@ function ResultsPage() {
           {(group) => (
             <>
               <TripHeader group={group} trip={trip} current="results" />
-              <Results group={group} trip={trip} />
+              <TripLayout rail={<TripRail group={group} trip={trip} on="results" />}>
+                <Results group={group} trip={trip} />
+              </TripLayout>
             </>
           )}
         </Loaded>

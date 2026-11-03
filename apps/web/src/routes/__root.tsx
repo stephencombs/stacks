@@ -5,6 +5,7 @@ import { Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FormError } from "~/components/ui/Field";
+import { cn } from "~/components/ui/cn";
 import { Menu, MenuChoice } from "~/components/ui/Menu";
 import { BrandMark } from "~/components/BrandMark";
 import { Landing } from "~/features/Landing";
@@ -45,8 +46,16 @@ function Root() {
 
 /** The column every page sits in, under the wordmark. */
 function Frame({ tools, children }: { tools?: ReactNode; children?: ReactNode }) {
+  // A trip's pages carry a rail on wide screens, so their column widens; everything else stays a reading column.
+  const wide = /^\/trips\/[^/]+(\/(results|settle))?\/?$/.test(useLocation().pathname);
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col pt-[env(safe-area-inset-top)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
+    <div
+      className={cn(
+        "mx-auto flex min-h-dvh w-full max-w-2xl flex-col pt-[env(safe-area-inset-top)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]",
+        wide &&
+          "lg:max-w-[1200px] lg:pl-[max(2rem,env(safe-area-inset-left))] lg:pr-[max(2rem,env(safe-area-inset-right))]",
+      )}
+    >
       <div className="flex h-16 shrink-0 items-center justify-between">
         <Wordmark />
         {tools}

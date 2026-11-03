@@ -97,6 +97,12 @@ Players at very different stakes would flatten each other, so:
 - **A race can compare stakes fairly.** The Stats race has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
 - **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
 
+## Wide screens: TripLayout, TripRail (web)
+
+From `lg` up, a trip's pages widen to 1200px and take a 340px rail on the right through `TripLayout`. `TripRail` holds the rest of the trip you'd otherwise tab to: your live table, the board, and your balance with Settle up, leaving out whichever one the current tab already shows. Below `lg` the rail drops away and the page is the phone layout, so anything moved into the rail stays in the page there (`lg:hidden`). Past sessions read as `SessionTable` on a wide screen, a row per session that links as one.
+
+Chosen over three other directions for the desktop trip page: one wide reading column (leaves most of a laptop empty), a sessions-by-players ledger table (no charts, scrolls sideways past six players) and a sidebar app shell (every screen would need rebuilding around it). Other pages keep the 672px reading column until they have their own wide layout.
+
 ## PageHeader, Section, Note (web); PageTitle, SectionHeading (mobile)
 
 One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `tabs`, and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip's table, board and money tabs sit under `TripHeader`, not their own page title.
