@@ -24,7 +24,7 @@ export function PageHeader({
   return (
     <header className="flex flex-col gap-3">
       {documentTitle || typeof title === "string" ? (
-        <title>{`${documentTitle ?? title} · Stacks`}</title>
+        <title>{`${documentTitle ?? title} · Color Up`}</title>
       ) : null}
       {back || options ? (
         <div className="flex min-h-9 items-center justify-between gap-3">

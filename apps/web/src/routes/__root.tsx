@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { Button } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuChoice } from "~/components/ui/Menu";
+import { BrandMark } from "~/components/BrandMark";
 import { LiveBar } from "~/features/LiveBar";
 import { StacksProvider } from "~/lib/stacks";
 import { setTheme, useTheme } from "~/lib/theme";
@@ -61,8 +62,8 @@ function Wordmark() {
       to="/"
       className="flex min-h-11 items-center gap-2 font-display text-2xl tracking-wide uppercase"
     >
-      <span aria-hidden className="size-3 rotate-45 rounded-[3px] bg-accent" />
-      Stacks
+      <BrandMark className="size-7" />
+      Color Up
     </Link>
   );
 }
@@ -101,7 +102,7 @@ function SignedOut() {
         <p className="max-w-[46ch] text-lg text-muted">
           {invited
             ? "Sign in or create an account to see who invited you and join their ledger."
-            : "Log buy-ins and cash-outs as you play. Stacks works out everyone's results and who owes whom. You pay each other however you like."}
+            : "Log buy-ins and cash-outs as you play. Color Up works out everyone's results and who owes whom. You pay each other however you like."}
         </p>
         <div className="flex flex-wrap gap-3">
           <SignUpButton mode="modal">

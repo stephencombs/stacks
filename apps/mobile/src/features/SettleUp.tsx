@@ -152,7 +152,7 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
       ) : null}
       {transfers.length > 0 ? (
         <Text className="text-sm text-muted">
-          Payments that clear every balance. Pay however you like; Stacks only keeps the record.
+          Payments that clear every balance. Pay however you like; Color Up only keeps the record.
         </Text>
       ) : null}
 

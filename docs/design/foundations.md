@@ -34,6 +34,10 @@ What color is this text?
 - Tints use Tailwind's opacity modifier: `bg-accent/15`, `bg-live/15`. Disabled text is `text-muted`, filled buttons use `bg-disabled`, outlined and ghost buttons stay transparent, and inputs use `bg-sunken`. Never an opacity.
 - `--color-chip-*` belong to a player. Read them through `chipOf`, and never use them for anything else.
 
+## Brand
+
+The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame around four columns in `chip-2`, `chip-1`, `chip-3` and gold, the gold one tallest. It's `BrandMark` on both clients, beside the uppercase Barlow wordmark in the header and on the sign-in screen. The mark's colors come from the tokens, so it follows the theme; the app icon, favicon and touch icon are fixed renders of the dark version.
+
 ## Type
 
 Web has two faces: Barlow Condensed for the page title, the wordmark and a hero card's figure, and the system sans for everything else, other money included, with `tabular-nums` on any changing number. Mobile adds JetBrains Mono for amounts and board captions.

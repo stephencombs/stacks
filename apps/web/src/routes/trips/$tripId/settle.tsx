@@ -136,7 +136,7 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
             ))}
           </List>
           <Note>
-            These clear every balance. Pay however you like; Stacks only keeps the record.
+            These clear every balance. Pay however you like; Color Up only keeps the record.
           </Note>
           {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
         </Section>

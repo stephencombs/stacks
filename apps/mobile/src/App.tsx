@@ -19,6 +19,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { Button } from "./components/ui/Button";
+import { BrandMark } from "./components/BrandMark";
 import { SignInButton } from "./features/SignInButton";
 import { clerkPublishableKey } from "./lib/config";
 import { StacksProvider } from "./lib/stacks";
@@ -48,7 +49,7 @@ const RootStack = createNativeStackNavigator({
       options: { title: "" },
       linking: { path: "", screens: tripTabPaths },
     },
-    Groups: { screen: GroupsScreen, options: { title: "Stacks" }, linking: { path: "groups" } },
+    Groups: { screen: GroupsScreen, options: { title: "Color Up" }, linking: { path: "groups" } },
     Group: { screen: GroupScreen, options: { title: "" }, linking: { path: "groups/:groupId" } },
     NewSession: {
       screen: NewSessionScreen,
@@ -169,7 +170,7 @@ function Starting() {
         Can't sign in yet
       </Text>
       <Text className="text-lg text-muted">
-        Stacks couldn't reach its sign-in service. Check your connection, then try again.
+        Color Up couldn't reach its sign-in service. Check your connection, then try again.
       </Text>
       <Button label="Try again" variant="primary" size="lg" onPress={() => void reloadAppAsync()} />
     </View>
@@ -180,8 +181,8 @@ function SignedOut() {
   return (
     <View className="flex-1 justify-center gap-6 bg-canvas px-6">
       <View className="flex-row items-center gap-2">
-        <View className="size-3 rotate-45 rounded-[3px] bg-accent" />
-        <Text className="font-display text-2xl tracking-wide text-ink uppercase">Stacks</Text>
+        <BrandMark size={28} />
+        <Text className="font-display text-2xl tracking-wide text-ink uppercase">Color Up</Text>
       </View>
       <View className="gap-3">
         <Text
@@ -192,7 +193,7 @@ function SignedOut() {
         </Text>
       </View>
       <Text className="text-lg text-muted">
-        Log buy-ins and cash-outs as you play. Stacks works out everyone's results and who owes
+        Log buy-ins and cash-outs as you play. Color Up works out everyone's results and who owes
         whom. You pay each other however you like.
       </Text>
       <View className="gap-3">

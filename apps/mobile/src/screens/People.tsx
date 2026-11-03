@@ -121,7 +121,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
         </SectionHeading>
         {guests.length === 0 ? (
           <Text className="text-sm text-muted">
-            Add friends who aren't on Stacks yet. Send them their claim link when they sign up and
+            Add friends who aren't on Color Up yet. Send them their claim link when they sign up and
             their history becomes theirs.
           </Text>
         ) : (
@@ -148,7 +148,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
                         onPress={() =>
                           void share(
                             `${webUrl}/claim/${player.claimCode}`,
-                            `Claim your Stacks history in ${detail.group.name}:`,
+                            `Claim your Color Up history in ${detail.group.name}:`,
                             player.id,
                           )
                         }
@@ -253,8 +253,8 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
                         size="sm"
                         className="flex-1"
                         onPress={() =>
-                          void shareLink(url, `Join ${detail.group.name} on Stacks:`).then((how) =>
-                            how === "copied" ? setCopied(invite.id) : undefined,
+                          void shareLink(url, `Join ${detail.group.name} on Color Up:`).then(
+                            (how) => (how === "copied" ? setCopied(invite.id) : undefined),
                           )
                         }
                       />

@@ -54,11 +54,11 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByLabel("Your name in this group")).toHaveValue("Alex");
     await alex.getByRole("button", { name: "Create group" }).click();
     await expect(alex.getByRole("heading", { name: "Vegas crew" })).toBeVisible();
-    await expect(alex).toHaveTitle("Trips · Vegas crew · Stacks");
+    await expect(alex).toHaveTitle("Trips · Vegas crew · Color Up");
 
     // Alex invites Bea and adds Gus as a guest.
     await alex.getByRole("link", { name: "People" }).click();
-    await expect(alex).toHaveTitle("People · Vegas crew · Stacks");
+    await expect(alex).toHaveTitle("People · Vegas crew · Color Up");
     await alex.getByRole("button", { name: "New invite link" }).click();
     const inviteLink = (await alex.getByText(/\/join\//).textContent())!;
     await alex.getByRole("button", { name: "Add a guest" }).click();

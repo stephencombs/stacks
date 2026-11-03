@@ -44,7 +44,7 @@ export function AddGuestSheet({
       open={open}
       onClose={onClose}
       title="Add a guest"
-      description="For a friend who isn't on Stacks yet. They can claim their history when they sign up."
+      description="For a friend who isn't on Color Up yet. They can claim their history when they sign up."
       footer={
         <Button
           label="Add guest"

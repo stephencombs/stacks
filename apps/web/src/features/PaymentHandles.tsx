@@ -118,7 +118,7 @@ function PaymentHandlesDialog({
       title={self ? "Payment apps" : `${player.displayName}'s payment apps`}
       description={
         self
-          ? `People in ${detail.group.name} get payment links on settle up. Stacks never moves money.`
+          ? `People in ${detail.group.name} get payment links on settle up. Color Up never moves money.`
           : `People in ${detail.group.name} get payment links when paying ${player.displayName}.`
       }
     >
