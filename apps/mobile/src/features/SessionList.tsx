@@ -1,9 +1,12 @@
 import { useNavigation } from "@react-navigation/native";
 import type { GroupDetail, SessionSummary } from "@stacks/contracts";
-import { formatDay, formatTime, gameNames } from "@stacks/client-runtime/format";
+import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
+import * as DateTime from "effect/DateTime";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
+import { Button } from "../components/ui/Button";
+import { Glow } from "../components/ui/Glow";
 import { List, Row, Tag } from "../components/ui/Surface";
 
 export function SessionList({
@@ -48,5 +51,55 @@ export function SessionList({
         );
       })}
     </List>
+  );
+}
+
+/** Your live session, one tap from the table: where, how long, and what you have in play. */
+export function LiveSessionCard({
+  summary,
+  detail,
+}: {
+  summary: SessionSummary;
+  detail: GroupDetail;
+}) {
+  const navigation = useNavigation();
+  const { session, venue, results, playing } = summary;
+  const mine = results.find((result) => result.playerId === detail.myPlayerId);
+  return (
+    <View className="overflow-hidden rounded-xl bg-surface">
+      <Glow tone="accent" />
+      <View className="gap-4 p-4">
+        <View className="flex-row items-center justify-between gap-3">
+          <Tag tone="live">{`Live · ${formatDuration(session.startedAt, DateTime.nowUnsafe())}`}</Tag>
+          <Text className="text-sm text-muted">since {formatTime(session.startedAt)}</Text>
+        </View>
+        <View className="flex-row items-end justify-between gap-3">
+          <View className="min-w-0 flex-1 gap-1">
+            <Text
+              accessibilityRole="header"
+              numberOfLines={1}
+              className="font-display text-3xl text-ink uppercase"
+            >
+              {venue.name}
+            </Text>
+            <Text className="text-sm text-muted">
+              {gameNames[session.game]} · {playing.length} at the table
+            </Text>
+          </View>
+          {mine && mine.buyIn > 0 ? (
+            <View className="items-end gap-1">
+              <Text className="text-sm text-muted">In play</Text>
+              <Money amount={mine.buyIn} currency={detail.group.currency} className="text-2xl" />
+            </View>
+          ) : null}
+        </View>
+        <Button
+          label="Back to the table"
+          variant="primary"
+          size="lg"
+          onPress={() => navigation.navigate("Session", { sessionId: session.id })}
+        />
+      </View>
+    </View>
   );
 }

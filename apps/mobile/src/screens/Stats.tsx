@@ -14,6 +14,7 @@ import { Money } from "../components/Money";
 import { Screen } from "../components/ui/Screen";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { RaceStats } from "../features/RaceStats";
+import { TripHero } from "../features/TripHero";
 import { Loaded, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ groupId: string }>;
@@ -63,11 +64,18 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
   const byNet = <R extends { results: ReadonlyArray<PlayerResult> }>(rows: ReadonlyArray<R>) =>
     rows.toSorted((a, b) => tableNet(b.results) - tableNet(a.results));
 
+  const tripCount = new Set(sessions.map((s) => s.tripId)).size;
   return (
     <>
       <Text className="text-base text-muted">
         {playedSummary(stats.sessionCount, stats.minutesPlayed)}
       </Text>
+      <TripHero
+        group={detail}
+        sessions={sessions}
+        label={`All time with ${detail.group.name}`}
+        span={`${tripCount} ${tripCount === 1 ? "trip" : "trips"}`}
+      />
       <View className="-mx-4">
         <RaceStats
           detail={detail}

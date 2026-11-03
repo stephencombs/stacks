@@ -44,6 +44,7 @@ import { cn } from "../components/ui/cn";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { Chip } from "../features/Chip";
 import { Reveal } from "../features/Reveal";
+import { SeatHero } from "../features/SeatHero";
 import { TableMap } from "../features/TableMap";
 import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
 import {
@@ -195,6 +196,16 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   // Results already in when the screen opened just sit there; ones that land here rack up.
   const [settledAtOpen] = useState(() => (live ? cashedOut : new Set(detail.playerIds)));
   const [closedAtOpen] = useState(!live);
+  const mySeated = detail.playerIds.includes(group.myPlayerId);
+  // While playing, the card follows you, or whoever's still in when you aren't; once closed, you.
+  const heroPlayerId = live
+    ? mySeated && !cashedOut.has(group.myPlayerId)
+      ? group.myPlayerId
+      : (seats.find((id) => !cashedOut.has(id)) ?? seats[0])
+    : mySeated
+      ? group.myPlayerId
+      : undefined;
+  const heroRebuy = heroPlayerId === undefined ? undefined : rebought.get(heroPlayerId);
 
   const canVoid = (entry: Entry) =>
     isAdmin(group) || entry.createdBy === userId || entry.playerId === group.myPlayerId;
@@ -243,11 +254,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
               : ""}
           </Text>
         </View>
-        <TicketStub
-          players={detail.playerIds.length}
-          results={[...results.values()]}
-          currency={currency}
-        />
         {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
       </View>
 
@@ -266,6 +272,35 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
           chipOf={(playerId) => chipOf(group, playerId)}
         />
       ) : null}
+      <TicketStub
+        players={detail.playerIds.length}
+        results={[...results.values()]}
+        currency={currency}
+      />
+      {heroPlayerId ? (
+        <SeatHero
+          name={names.get(heroPlayerId) ?? "Player"}
+          chip={chipOf(group, heroPlayerId)}
+          seat={seatsNow(detail.seatings).get(heroPlayerId)}
+          you={heroPlayerId === group.myPlayerId}
+          result={results.get(heroPlayerId)}
+          live={live}
+          out={cashedOut.has(heroPlayerId)}
+          rebuyAmount={lastBuyIn(heroPlayerId)?.amount}
+          undoing={heroRebuy !== undefined}
+          currency={currency}
+          onBuyIn={() => setDraft({ kind: "buy_in", playerId: heroPlayerId })}
+          onRebuy={() => {
+            const last = lastBuyIn(heroPlayerId);
+            if (last) rebuy(heroPlayerId, last.amount);
+          }}
+          onUndo={() => {
+            forget(heroPlayerId);
+            if (heroRebuy) void undo(heroRebuy);
+          }}
+          onCashOut={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
+        />
+      ) : null}
 
       <View className="gap-3">
         <SectionHeading
@@ -280,7 +315,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
             ) : undefined
           }
         >
-          Players
+          At the table
         </SectionHeading>
         <List>
           {seats.map((playerId, rank) => {
@@ -876,7 +911,7 @@ function AddPlayerSheet({
   );
 }
 
-/** The table at a glance, like the stub of a betting ticket: who sat down, what went in and out. */
+/** The table at a glance: who sat down, what went in and out. */
 function TicketStub({
   players,
   results,
@@ -912,17 +947,14 @@ function TicketStub({
           { label: "Out", value: <Money amount={cashOut} currency={currency} /> },
         ];
   return (
-    <View className="flex-row rounded-xl border border-dashed border-line-strong">
+    <View className="flex-row overflow-hidden rounded-xl bg-surface">
       {cells.map((cell, index) => (
         <View
           key={cell.label}
           accessible
-          className={cn(
-            "flex-1 gap-0.5 px-3 py-2.5",
-            index > 0 && "border-l border-dashed border-line-strong",
-          )}
+          className={cn("grow gap-0.5 px-4 py-3", index > 0 && "border-l border-line")}
         >
-          <Text className="type-label text-muted">{cell.label}</Text>
+          <Text className="text-sm text-muted">{cell.label}</Text>
           {cell.value}
         </View>
       ))}
