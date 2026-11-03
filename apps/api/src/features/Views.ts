@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import {
   MinorUnits,
+  CurrentUser,
   NotFound,
   PlayerId,
   type GroupDetail,
@@ -45,6 +46,7 @@ const summaries = Effect.fn("Views.summaries")(function* (
 ) {
   if (sessions.length === 0) return [];
   const sql = yield* SqlClient.SqlClient;
+  const { userId } = yield* CurrentUser;
   const sessionIds = sessions.map((session) => session.id);
   const venueIds = Array.from(new Set(sessions.map((session) => session.venueId)));
   const [venues, entries, seats] = yield* Effect.all(
@@ -54,13 +56,23 @@ const summaries = Effect.fn("Views.summaries")(function* (
       `.pipe(Effect.flatMap(decodeRows(VenueRow))),
       sql`
         select * from entries
-        where session_id in ${sql.in(sessionIds)} and voided_at is null
+        where session_id in ${sql.in(sessionIds)}
       `.pipe(Effect.flatMap(decodeRows(EntryRow))),
       sql`
-        select session_id, player_id from session_players
-        where session_id in ${sql.in(sessionIds)} order by joined_at
+        select sp.session_id, sp.player_id, sp.joined_at, coalesce(p.user_id = ${userId}, false) as is_me
+        from session_players sp join players p on p.id = sp.player_id
+        where sp.session_id in ${sql.in(sessionIds)} order by sp.joined_at
       `.pipe(
-        Effect.flatMap(decodeRows(Schema.Struct({ sessionId: SessionId, playerId: PlayerId }))),
+        Effect.flatMap(
+          decodeRows(
+            Schema.Struct({
+              sessionId: SessionId,
+              playerId: PlayerId,
+              joinedAt: Schema.DateTimeUtcFromDate,
+              isMe: Schema.Boolean,
+            }),
+          ),
+        ),
       ),
     ],
     { concurrency: "unbounded" },
@@ -69,16 +81,30 @@ const summaries = Effect.fn("Views.summaries")(function* (
   const venueById = new Map<VenueId, (typeof venues)[number]>(venues.map((v) => [v.id, v]));
   const resultsBySession = resultsBy(sessions, entries, (session) => session.id);
   const cashedOut = new Set(
-    entries.filter((e) => e.kind === "cash_out").map((e) => `${e.sessionId}:${e.playerId}`),
+    entries
+      .filter((e) => e.kind === "cash_out" && e.voidedAt === null)
+      .map((e) => `${e.sessionId}:${e.playerId}`),
   );
   return sessions.map((session): SessionSummary => {
     const playerIds = seats
       .filter((seat) => seat.sessionId === session.id)
       .map((seat) => seat.playerId);
+    const mySeat = seats.find((seat) => seat.sessionId === session.id && seat.isMe);
     return {
       session,
       venue: venueById.get(session.venueId)!,
       playerIds,
+      myJoinedAt: mySeat?.joinedAt ?? null,
+      ledgerEntryIds: entries
+        .filter((entry) => entry.sessionId === session.id)
+        .map((entry) => entry.id),
+      myLedgerEntries: entries.flatMap((entry) =>
+        entry.sessionId === session.id &&
+        entry.playerId === mySeat?.playerId &&
+        entry.kind !== "settlement"
+          ? [{ id: entry.id, kind: entry.kind, amount: entry.amount, voidedAt: entry.voidedAt }]
+          : [],
+      ),
       playing:
         session.status === "live"
           ? playerIds.filter((id) => !cashedOut.has(`${session.id}:${id}`))
@@ -120,6 +146,7 @@ export const sessionDetail = Effect.fn("Views.sessionDetail")(function* (session
     session,
     venue: summary!.venue,
     playerIds: playerIds.map((row) => row.playerId),
+    myJoinedAt: summary!.myJoinedAt ?? null,
     results: summary!.results,
     entries,
     seatings,

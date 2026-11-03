@@ -39,6 +39,10 @@
     "./seats": {
       "types": "./src/seats.ts",
       "import": "./src/seats.ts"
+    },
+    "./limits": {
+      "types": "./src/limits.ts",
+      "import": "./src/limits.ts"
     }
   },
   "scripts": {

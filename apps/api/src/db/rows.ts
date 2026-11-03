@@ -146,3 +146,9 @@ export const TripRow = Schema.Struct({
   createdBy: UserId,
   createdAt: Timestamp,
 });
+
+export const UserLimitsRow = Schema.Struct({
+  lossLimit: Schema.NullOr(Amount),
+  currency: CurrencyCode,
+  sessionReminderMinutes: Schema.NullOr(Schema.Literals([120, 180, 240])),
+});

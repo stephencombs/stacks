@@ -23,6 +23,7 @@ import { tableView } from "@stacks/client-runtime/table";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { formatMoney, parseMoney } from "@stacks/shared/money";
 import { playerResults } from "@stacks/shared/results";
+import { PersonalLimits } from "../features/PersonalLimits";
 import { seatCount, seatsNow } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import * as DateTime from "effect/DateTime";
@@ -211,6 +212,22 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   return (
     <>
       {live ? <KeepAwake /> : null}
+      <Loaded query={stacks.trip(session.tripId)} skeleton={<></>}>
+        {(trip) => (
+          <PersonalLimits
+            group={group}
+            trip={trip}
+            local={{
+              sessionId: session.id,
+              status: session.status,
+              myJoinedAt: detail.myJoinedAt ?? null,
+              playing:
+                detail.playerIds.includes(group.myPlayerId) && !cashedOut.has(group.myPlayerId),
+              net: results.get(group.myPlayerId)?.net ?? MinorUnits.make(0),
+            }}
+          />
+        )}
+      </Loaded>
       <View className="gap-3">
         <PageTitle context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
           {venue.name}

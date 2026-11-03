@@ -6,6 +6,7 @@ import { ButtonLink } from "~/components/ui/Button";
 import { EmptyState, Section } from "~/components/ui/Page";
 import { Skeleton } from "~/components/ui/Surface";
 import { SessionList } from "~/features/SessionList";
+import { PersonalLimits } from "~/features/PersonalLimits";
 import { TripHeader } from "~/features/TripHeader";
 import { Loaded, useStacks } from "~/lib/stacks";
 
@@ -46,6 +47,7 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   return (
     <>
       <TripHeader group={group} trip={trip} current="sessions" action={startSession} />
+      <PersonalLimits group={group} trip={trip} settings />
       {mine ? (
         <Section title="Your live session">
           <SessionList sessions={[mine]} detail={group} />

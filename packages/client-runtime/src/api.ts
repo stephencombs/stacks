@@ -34,6 +34,8 @@ export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => 
   const keys = { reactivityKeys: LEDGER_KEYS };
   return {
     Client: StacksClient,
+    limits: (tripId: TripId) =>
+      StacksClient.query("limits", "get", { params: { tripId }, ...keys }),
     groups: StacksClient.query("groups", "list", keys),
     group: (groupId: GroupId) =>
       StacksClient.query("groups", "get", { params: { groupId }, ...keys }),

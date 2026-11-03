@@ -31,6 +31,7 @@ import {
   InvitePreview,
   SessionDetail,
   TripDetail,
+  UserLimits,
   Venue,
   VenueKind,
 } from "./views.ts";
@@ -533,6 +534,29 @@ const TripsGroup = HttpApiGroup.make("trips")
   )
   .middleware(Authentication);
 
+export const UpdateLimitsRequest = Schema.Struct({
+  lossLimit: Schema.NullOr(MinorUnits.check(Schema.isGreaterThan(0))),
+  sessionReminderMinutes: Schema.NullOr(Schema.Literals([120, 180, 240])),
+});
+
+const LimitsGroup = HttpApiGroup.make("limits")
+  .add(
+    HttpApiEndpoint.get("get", "/trips/:tripId/limits", {
+      params: tripParams,
+      success: UserLimits,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("update", "/trips/:tripId/limits", {
+      params: tripParams,
+      payload: UpdateLimitsRequest,
+      success: UserLimits,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .middleware(Authentication);
+
 export class StacksApi extends HttpApi.make("stacks")
   .add(HealthGroup)
   .add(GroupsGroup)
@@ -543,4 +567,5 @@ export class StacksApi extends HttpApi.make("stacks")
   .add(LedgerGroup)
   .add(StakesGroup)
   .add(TripsGroup)
+  .add(LimitsGroup)
   .prefix("/api") {}

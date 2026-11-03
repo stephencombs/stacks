@@ -8,6 +8,7 @@ import * as Groups from "../features/Groups.ts";
 import * as Guests from "../features/Guests.ts";
 import * as Invites from "../features/Invites.ts";
 import * as Ledger from "../features/Ledger.ts";
+import * as Limits from "../features/Limits.ts";
 import * as Sessions from "../features/Sessions.ts";
 import * as Stakes from "../features/Stakes.ts";
 import * as Trips from "../features/Trips.ts";
@@ -109,6 +110,12 @@ const trips = HttpApiBuilder.group(StacksApi, "trips", (handlers) =>
     .handle("delete", ({ params }) => serve(Trips.remove(params.tripId))),
 );
 
+const limits = HttpApiBuilder.group(StacksApi, "limits", (handlers) =>
+  handlers
+    .handle("get", ({ params }) => serve(Limits.get(params.tripId)))
+    .handle("update", ({ params, payload }) => serve(Limits.update(params.tripId, payload))),
+);
+
 export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openapi.json" }).pipe(
-  Layer.provide([health, groups, invites, guests, venues, sessions, ledger, stakes, trips]),
+  Layer.provide([health, groups, invites, guests, venues, sessions, ledger, stakes, trips, limits]),
 );
