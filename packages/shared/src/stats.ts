@@ -12,26 +12,6 @@ export interface StatsSession {
   }>;
 }
 
-/**
- * Everyone's place after each session, 0 for the lead, for the players given in their starting
- * order. A tie keeps the order from the session before, so a line only moves when it passes
- * someone.
- */
-export const racePlaces = (
-  sessions: ReadonlyArray<StatsSession>,
-  players: ReadonlyArray<PlayerId>,
-): ReadonlyArray<ReadonlyMap<PlayerId, number>> => {
-  const totals = new Map(players.map((playerId) => [playerId, 0]));
-  let order = [...players];
-  return sessions.map((session) => {
-    for (const result of session.results)
-      if (totals.has(result.playerId))
-        totals.set(result.playerId, totals.get(result.playerId)! + result.net);
-    order = order.toSorted((a, b) => totals.get(b)! - totals.get(a)!);
-    return new Map(order.map((playerId, place) => [playerId, place]));
-  });
-};
-
 /** A player's total after each session, carried through the ones they sat out. */
 export const runningTotals = (sessions: ReadonlyArray<StatsSession>, playerId: PlayerId) => {
   let total = 0;
@@ -40,6 +20,40 @@ export const runningTotals = (sessions: ReadonlyArray<StatsSession>, playerId: P
     return total;
   });
 };
+
+/**
+ * A player's return after each session: their running result as a share of everything they've
+ * bought in for so far, so players at different stakes compare. Null until they've bought in,
+ * which is also how a player who only ever played on someone else's money stays.
+ */
+export const runningReturns = (sessions: ReadonlyArray<StatsSession>, playerId: PlayerId) => {
+  let net = 0;
+  let buyIn = 0;
+  return sessions.map((session) => {
+    const result = session.results.find((r) => r.playerId === playerId);
+    net += result?.net ?? 0;
+    buyIn += result?.buyIn ?? 0;
+    return buyIn > 0 ? net / buyIn : null;
+  });
+};
+
+/** What the race measures: money won, or return on what each player bought in for. */
+export type RaceMeasure = "money" | "return";
+
+/**
+ * Each player's race line from break-even: a point per session, carried through ones they sat
+ * out. `values` keeps the per-session reading, null for a return before any buy-in.
+ */
+export const raceLines = (
+  sessions: ReadonlyArray<StatsSession>,
+  players: ReadonlyArray<PlayerId>,
+  measure: RaceMeasure,
+) =>
+  players.map((playerId) => {
+    const values: ReadonlyArray<number | null> =
+      measure === "money" ? runningTotals(sessions, playerId) : runningReturns(sessions, playerId);
+    return { playerId, values, line: [0, ...values.map((value) => value ?? 0)] };
+  });
 
 export interface StatSheet<S> {
   readonly total: number;

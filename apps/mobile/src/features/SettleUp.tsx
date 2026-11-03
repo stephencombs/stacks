@@ -63,7 +63,11 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
   const others = transfers.filter((transfer) => !involvesMe(transfer));
   const myBalance = balanceOf.get(me) ?? MinorUnits.make(0);
   const head = balanceHeadline(myBalance, mine.length);
-  const track = barTrack(detail.players.map((player) => balanceOf.get(player.id) ?? 0));
+  // Every bar sits beside its amount, so lengths can compress and still read true.
+  const track = barTrack(
+    detail.players.map((player) => balanceOf.get(player.id) ?? 0),
+    { compress: true, minimum: 0.06 },
+  );
   const transferRow = (transfer: Transfer) => (
     <Row key={`${transfer.from}:${transfer.to}`} className="flex-col items-stretch gap-2.5">
       <View className="flex-row items-center gap-3">
