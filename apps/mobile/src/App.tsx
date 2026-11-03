@@ -19,8 +19,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { Button } from "./components/ui/Button";
-import { BrandMark } from "./components/BrandMark";
-import { SignInButton } from "./features/SignInButton";
+import { Landing } from "./features/Landing";
 import { clerkPublishableKey } from "./lib/config";
 import { StacksProvider } from "./lib/stacks";
 import "./lib/theme";
@@ -178,30 +177,7 @@ function Starting() {
 }
 
 function SignedOut() {
-  return (
-    <View className="flex-1 justify-center gap-6 bg-canvas px-6">
-      <View className="flex-row items-center gap-2">
-        <BrandMark size={28} />
-        <Text className="font-display text-2xl tracking-wide text-ink uppercase">Color Up</Text>
-      </View>
-      <View className="gap-3">
-        <Text
-          accessibilityRole="header"
-          className="font-display text-6xl leading-[56px] text-ink uppercase"
-        >
-          Keep the casino trip honest.
-        </Text>
-      </View>
-      <Text className="text-lg text-muted">
-        Log buy-ins and cash-outs as you play. Color Up works out everyone's results and who owes
-        whom. You pay each other however you like.
-      </Text>
-      <View className="gap-3">
-        <SignInButton mode="sign-up" label="Create an account" variant="primary" />
-        <SignInButton mode="sign-in" label="Sign in" variant="secondary" />
-      </View>
-    </View>
-  );
+  return <Landing />;
 }
 
 export default function App() {

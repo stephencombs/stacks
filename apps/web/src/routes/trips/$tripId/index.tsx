@@ -50,7 +50,8 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
       <TripHeader group={group} trip={trip} current="sessions" action={startSession} />
       <PersonalLimits group={group} trip={trip} settings />
       <TripHero
-        group={group}
+        currency={group.group.currency}
+        me={group.myPlayerId}
         sessions={trip.sessions.filter((s) => s.session.status === "closed")}
       />
       {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}

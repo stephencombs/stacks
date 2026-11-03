@@ -231,7 +231,8 @@ function TableTab({
   return (
     <View className="gap-6 px-4">
       <TripHero
-        group={group}
+        currency={group.group.currency}
+        me={group.myPlayerId}
         sessions={trip.sessions.filter((s) => s.session.status === "closed")}
       />
       {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}

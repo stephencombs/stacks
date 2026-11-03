@@ -1,4 +1,4 @@
-import type { GroupDetail } from "@stacks/contracts";
+import type { CurrencyCode, PlayerId } from "@stacks/contracts";
 import { lineScale } from "@stacks/client-runtime/chart";
 import { localClock, ordinal, tripLines } from "@stacks/client-runtime/trip";
 import { playerTrip, tripNights, tripStandings, type TripSession } from "@stacks/shared/trips";
@@ -12,23 +12,25 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** Your result at a glance, for a trip or all time: where you stand, the line you drew getting there, and how it went. */
 export function TripHero({
-  group,
+  currency,
+  me,
   sessions: closed,
   label = "Your trip",
   span,
 }: {
-  group: GroupDetail;
+  currency: CurrencyCode;
+  /** Whose result this is. */
+  me: PlayerId;
   /** Closed sessions, in any order. */
   sessions: ReadonlyArray<TripSession>;
   label?: string;
   /** What the sessions cover after their count, like "2 nights"; nights by default. */
   span?: string;
 }) {
-  const currency = group.group.currency;
-  const mine = playerTrip(closed, group.myPlayerId);
+  const mine = playerTrip(closed, me);
   if (mine.played === 0) return null;
   const standings = tripStandings(closed, localClock);
-  const rank = standings.find((s) => s.playerId === group.myPlayerId)?.rank;
+  const rank = standings.find((s) => s.playerId === me)?.rank;
   const lines = tripLines(mine, currency);
   const tone = mine.net > 0 ? "win" : mine.net < 0 ? "loss" : "accent";
 
