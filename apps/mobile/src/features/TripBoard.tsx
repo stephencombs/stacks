@@ -24,6 +24,7 @@ import { Pressable, Text, View } from "react-native";
 
 import { cn } from "../components/ui/cn";
 import { Chip } from "./Chip";
+import { RaceHero } from "./RaceHero";
 
 const label = "text-sm";
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
@@ -42,6 +43,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   return (
     <View className="flex-1 bg-canvas">
       <View className="gap-6 px-4 pt-4 pb-8">
+        <RaceHero detail={detail} trip={trip} />
         <View className="flex-row items-end justify-between gap-4">
           <View className="flex-1 gap-1">
             <Text className={cn(label, "text-muted")}>

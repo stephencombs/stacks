@@ -142,6 +142,44 @@ export const tripStandings = (
   });
 };
 
+/** One player's trip: where it stands, the line it drew from zero session by session, and how it went. */
+export interface PlayerTrip<S> {
+  readonly net: number;
+  /** 0, then their total after each session they played, oldest first. */
+  readonly line: ReadonlyArray<number>;
+  readonly played: number;
+  readonly won: number;
+  /** The lowest point of the line, 0 if they never went under. */
+  readonly low: number;
+  readonly best: { readonly net: number; readonly session: S } | null;
+}
+
+export const playerTrip = <S extends TripSession>(
+  sessions: ReadonlyArray<S>,
+  playerId: PlayerId,
+): PlayerTrip<S> => {
+  const mine = sessions
+    .toSorted((a, b) => startOf(a) - startOf(b))
+    .flatMap((session) =>
+      session.results
+        .filter((result) => result.playerId === playerId)
+        .map((result) => ({ session, net: result.net as number })),
+    );
+  const line = [0];
+  for (const { net } of mine) line.push(line.at(-1)! + net);
+  return {
+    net: line.at(-1)!,
+    line,
+    played: mine.length,
+    won: mine.filter((m) => m.net > 0).length,
+    low: Math.min(...line),
+    best: mine.reduce<PlayerTrip<S>["best"]>(
+      (best, m) => (!best || m.net > best.net ? m : best),
+      null,
+    ),
+  };
+};
+
 /** A live table as the board reads it. */
 export interface LiveTable {
   readonly results: ReadonlyArray<Pick<PlayerResult, "playerId" | "buyIn" | "net">>;

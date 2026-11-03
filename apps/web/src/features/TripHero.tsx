@@ -1,0 +1,124 @@
+import type { GroupDetail, TripDetail } from "@stacks/contracts";
+import { lineScale } from "@stacks/client-runtime/chart";
+import { localClock, ordinal, tripLines } from "@stacks/client-runtime/trip";
+import { playerTrip, tripNights, tripStandings } from "@stacks/shared/trips";
+import type { ReactNode } from "react";
+
+import { Money } from "~/components/Money";
+import { Glow, Surface } from "~/components/ui/Surface";
+import { useWidth } from "~/lib/useWidth";
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** Your trip at a glance: where you stand, the line you drew getting there, and how it went. */
+export function TripHero({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
+  const currency = group.group.currency;
+  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const mine = playerTrip(closed, group.myPlayerId);
+  if (mine.played === 0) return null;
+  const standings = tripStandings(closed, localClock);
+  const rank = standings.find((s) => s.playerId === group.myPlayerId)?.rank;
+  const lines = tripLines(mine, currency);
+  const tone = mine.net > 0 ? "win" : mine.net < 0 ? "loss" : "accent";
+
+  return (
+    <Surface className="relative overflow-hidden">
+      <Glow tone={tone} />
+      <div className="relative flex flex-col gap-1 px-5 pt-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xs font-medium tracking-wider text-muted uppercase">Your trip</h2>
+          <span className="text-sm text-muted">
+            {plural(mine.played, "session")} ·{" "}
+            {plural(tripNights(closed, localClock).length, "night")}
+          </span>
+        </div>
+        <Money
+          amount={mine.net}
+          currency={currency}
+          tone="result"
+          className="font-display text-6xl leading-none tracking-[-0.01em]"
+        />
+        {lines.climb ? <p className="text-sm text-muted">{lines.climb}</p> : null}
+      </div>
+      <TripLine line={mine.line} tone={tone} />
+      <dl className="relative grid grid-cols-3 divide-x divide-line border-t border-line">
+        <Tile label="Win rate">{lines.winRate}</Tile>
+        <Tile label="Best">
+          {mine.best ? <Money amount={mine.best.net} currency={currency} tone="result" /> : "–"}
+        </Tile>
+        <Tile label="Board">
+          {rank === undefined ? (
+            "–"
+          ) : (
+            <span className="text-accent-text">
+              {ordinal(rank)} <span className="text-muted">of {standings.length}</span>
+            </span>
+          )}
+        </Tile>
+      </dl>
+    </Surface>
+  );
+}
+
+function Tile({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 px-5 py-3">
+      <dt className="text-xs font-medium tracking-wider text-muted uppercase">{label}</dt>
+      <dd className="text-lg font-semibold tabular-nums">{children}</dd>
+    </div>
+  );
+}
+
+const HEIGHT = 96;
+
+/** The running total as a line from zero, filled down to the axis, ending on a dot. */
+function TripLine({
+  line,
+  tone,
+}: {
+  line: ReadonlyArray<number>;
+  tone: "win" | "loss" | "accent";
+}) {
+  const [box, width] = useWidth<HTMLDivElement>();
+  const plot = lineScale([line], { width, height: HEIGHT }, { x: 8, y: 10 });
+  const points = plot.points(line);
+  const end = { x: plot.x(line.length - 1), y: plot.y(line.at(-1)!) };
+  const color = `var(--color-${tone})`;
+
+  return (
+    <div ref={box} aria-hidden className="relative mt-3" style={{ height: HEIGHT }}>
+      {width > 0 ? (
+        <svg width={width} height={HEIGHT} className="block overflow-visible">
+          <defs>
+            <linearGradient id="trip-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={color} stopOpacity={0.28} />
+              <stop offset="1" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <line
+            x1={0}
+            x2={width}
+            y1={plot.zero}
+            y2={plot.zero}
+            stroke="var(--color-line-strong)"
+            strokeDasharray="3 4"
+          />
+          <polygon
+            points={`${plot.x(0)},${HEIGHT} ${points} ${end.x},${HEIGHT}`}
+            fill="url(#trip-fill)"
+          />
+          <polyline
+            points={points}
+            fill="none"
+            stroke={color}
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <circle cx={end.x} cy={end.y} r={10} fill={color} fillOpacity={0.2} />
+          <circle cx={end.x} cy={end.y} r={4.5} fill={color} />
+        </svg>
+      ) : null}
+    </div>
+  );
+}

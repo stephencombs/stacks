@@ -19,6 +19,7 @@ import { PersonalLimits } from "../features/PersonalLimits";
 import { TripStats } from "../features/RaceStats";
 import { SessionList } from "../features/SessionList";
 import { DaysBoard, TonightBoard, TripBoard } from "../features/TripBoard";
+import { TripHero } from "../features/TripHero";
 import { TripRoute } from "../features/TripRoute";
 import { Loaded, useAction, useLastTrip, useRememberTrip, useStacks } from "../lib/stacks";
 import { SettleView } from "../features/SettleUp";
@@ -229,6 +230,7 @@ function TableTab({
   const closed = trip.sessions.filter((s) => s.session.status === "closed").toReversed();
   return (
     <View className="gap-6 px-4">
+      <TripHero group={group} trip={trip} />
       {trip.trip.endedAt === null ? (
         <Button
           label="Start a session"

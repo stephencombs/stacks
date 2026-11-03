@@ -6,6 +6,7 @@ import { SessionId, VenueId, type PlayerId } from "@stacks/contracts";
 import { ALEX, BEA, CAL, DEE, money } from "./testing/ledgerArbitrary.ts";
 import {
   inPlay,
+  playerTrip,
   tonightBoard,
   tripAwards,
   tripFeed,
@@ -482,5 +483,57 @@ describe("tripRoute", () => {
       venue(1).id,
       venue(3).id,
     ]);
+  });
+});
+
+describe("playerTrip", () => {
+  it("draws one player's trip from zero, in the order they played, skipping tables they sat out", () => {
+    const sessions = [
+      session(22, 20, [
+        [ALEX, 340],
+        [BEA, 110],
+      ]),
+      session(21, 20, [
+        [ALEX, -125],
+        [BEA, 70],
+      ]),
+      session(21, 23, [[BEA, -40]]),
+      session(21, 22, [[ALEX, 60]]),
+    ];
+    const trip = playerTrip(sessions, ALEX);
+    expect(trip).toMatchObject({
+      net: 275,
+      line: [0, -125, -65, 275],
+      played: 3,
+      won: 2,
+      low: -125,
+    });
+    expect(trip.best?.net).toBe(340);
+    expect(trip.best?.session).toBe(sessions[0]);
+  });
+
+  it("is flat for someone who hasn't played", () => {
+    expect(playerTrip([session(21, 20, [[BEA, 500]])], ALEX)).toEqual({
+      net: 0,
+      line: [0],
+      played: 0,
+      won: 0,
+      low: 0,
+      best: null,
+    });
+  });
+
+  const Nets = Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: -5000, maximum: 5000 })));
+
+  it.prop("ends where their results add up to", [Nets], ([nets]) => {
+    const trip = playerTrip(
+      nets.map((n, i) => session(21, i, [[ALEX, n]])),
+      ALEX,
+    );
+    expect(trip.line.at(-1)).toBe(trip.net);
+    expect(trip.net).toBe(nets.reduce((sum, n) => sum + n, 0));
+    expect(trip.line).toHaveLength(nets.length + 1);
+    expect(trip.low).toBe(Math.min(...trip.line));
+    expect(trip.won).toBe(nets.filter((n) => n > 0).length);
   });
 });

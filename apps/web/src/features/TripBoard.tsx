@@ -24,6 +24,7 @@ import { Money } from "~/components/Money";
 import { EmptyState, Section } from "~/components/ui/Page";
 import { List, Row, RowLink, RowText, Tag } from "~/components/ui/Surface";
 import { Chip } from "./Chip";
+import { RaceHero } from "./RaceHero";
 import { PlayerName } from "./Player";
 import { Standing } from "./Standing";
 
@@ -71,6 +72,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 
   return (
     <>
+      <RaceHero detail={detail} trip={trip} />
       <Section title="Standings" aside={plural(closed.length, "session")}>
         <List as="ol" label="Standings">
           {standings.map((s) => {

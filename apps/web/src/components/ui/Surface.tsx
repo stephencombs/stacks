@@ -102,3 +102,16 @@ export function Tag({
 export function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden className={cn("animate-pulse rounded-lg bg-sunken", className)} />;
 }
+
+/** A soft light behind a hero card's figure, in the color of how it's going. Put it first inside a `relative overflow-hidden` card. */
+export function Glow({ tone }: { tone: "win" | "loss" | "accent" }) {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute -top-24 -right-20 size-72 rounded-full blur-3xl",
+        tone === "win" ? "bg-win/20" : tone === "loss" ? "bg-loss/15" : "bg-accent/15",
+      )}
+    />
+  );
+}

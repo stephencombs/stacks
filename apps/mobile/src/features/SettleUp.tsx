@@ -9,7 +9,8 @@ import {
 } from "@stacks/contracts";
 import { formatDay, isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
-import { chipOf } from "@stacks/client-runtime/trip";
+import { barTrack } from "@stacks/client-runtime/chart";
+import { balanceHeadline, chipOf } from "@stacks/client-runtime/trip";
 import { applyPayments } from "@stacks/shared/balances";
 import { parseMoney } from "@stacks/shared/money";
 import { settleUp } from "@stacks/shared/settleUp";
@@ -21,6 +22,7 @@ import { BalanceLabel, Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
+import { Glow } from "../components/ui/Glow";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
@@ -59,6 +61,9 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
   const involvesMe = (transfer: Transfer) => transfer.from === me || transfer.to === me;
   const mine = transfers.filter(involvesMe);
   const others = transfers.filter((transfer) => !involvesMe(transfer));
+  const myBalance = balanceOf.get(me) ?? MinorUnits.make(0);
+  const head = balanceHeadline(myBalance, mine.length);
+  const track = barTrack(detail.players.map((player) => balanceOf.get(player.id) ?? 0));
   const transferRow = (transfer: Transfer) => (
     <Row key={`${transfer.from}:${transfer.to}`} className="flex-col items-stretch gap-2.5">
       <View className="flex-row items-center gap-3">
@@ -108,17 +113,22 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
         >
           You
         </SectionHeading>
-        <List>
-          <Row>
-            <BalanceLabel
-              amount={balanceOf.get(me) ?? MinorUnits.make(0)}
+        <View className="overflow-hidden rounded-3xl bg-surface">
+          <Glow tone={head.tone} />
+          <View className="gap-1 px-4 pt-4 pb-4">
+            <Text className="type-label text-muted">{head.label}</Text>
+            <Money
+              amount={MinorUnits.make(Math.abs(myBalance))}
               currency={currency}
-              subject="you"
-              className="font-mono text-2xl"
+              className={cn(
+                "font-display text-6xl leading-[64px]",
+                myBalance > 0 ? "text-win" : myBalance < 0 ? "text-loss" : "text-muted",
+              )}
             />
-          </Row>
+            {head.line ? <Text className="text-sm text-muted">{head.line}</Text> : null}
+          </View>
           {mine.map(transferRow)}
-        </List>
+        </View>
         {recordSettlement.error ? <FormError>{recordSettlement.error}</FormError> : null}
       </View>
 
@@ -154,9 +164,11 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
                   {player.id === me ? <Text className="text-muted"> (you)</Text> : null}
                   {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
                 </Text>
+                <BalanceBar balance={balanceOf.get(player.id) ?? 0} track={track} />
                 <BalanceLabel
                   amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
                   currency={currency}
+                  className="w-24 text-right"
                 />
               </Row>
             ))}
@@ -342,6 +354,24 @@ function Payer({ detail, playerId }: { detail: GroupDetail; playerId: PlayerId }
     <View className="flex-row items-center gap-1.5">
       <Chip chip={chipOf(detail, playerId)} name={name} size={22} />
       <Text className="text-base font-medium text-ink">{name}</Text>
+    </View>
+  );
+}
+
+/** A balance as a bar from break-even: right and green when owed, left and red when owing. */
+function BalanceBar({ balance, track }: { balance: number; track: ReturnType<typeof barTrack> }) {
+  const extent = track.extent(balance) * 100;
+  return (
+    <View className="h-1.5 w-16 rounded-full bg-sunken">
+      {balance === 0 ? null : (
+        <View
+          className={cn("absolute inset-y-0 rounded-full", balance > 0 ? "bg-win" : "bg-loss")}
+          style={{
+            left: `${balance > 0 ? track.zero * 100 : track.zero * 100 - extent}%`,
+            width: `${extent}%`,
+          }}
+        />
+      )}
     </View>
   );
 }

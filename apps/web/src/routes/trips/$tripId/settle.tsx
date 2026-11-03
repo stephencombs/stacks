@@ -9,6 +9,7 @@ import {
   type TripDetail,
   type Transfer,
 } from "@stacks/contracts";
+import { barTrack } from "@stacks/client-runtime/chart";
 import { formatDay, isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
@@ -25,6 +26,7 @@ import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { EmptyState, Note, Section } from "~/components/ui/Page";
 import { List, Row, RowText, Skeleton } from "~/components/ui/Surface";
+import { BalanceBar, BalanceHero } from "~/features/BalanceHero";
 import { BackingSection } from "~/features/Backing";
 import { Chip } from "~/features/Chip";
 import { VoidEntryDialog } from "~/features/EntryDialogs";
@@ -79,6 +81,7 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
   const me = detail.myPlayerId;
   const involvesMe = (transfer: Transfer) => transfer.from === me || transfer.to === me;
   const ordered = transfers.toSorted((a, b) => Number(involvesMe(b)) - Number(involvesMe(a)));
+  const track = barTrack(detail.players.map((player) => balanceOf.get(player.id) ?? 0));
 
   const record = async (payment: Omit<Payment, "id">) => {
     const id = EntryId.make(newId());
@@ -100,13 +103,11 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
     <>
       <TripHeader group={detail} trip={trip} current="settle" />
 
-      <p className="text-3xl font-semibold tracking-tight">
-        <BalanceLabel
-          amount={balanceOf.get(me) ?? MinorUnits.make(0)}
-          currency={currency}
-          subject="you"
-        />
-      </p>
+      <BalanceHero
+        balance={balanceOf.get(me) ?? MinorUnits.make(0)}
+        payments={transfers.filter(involvesMe).length}
+        currency={currency}
+      />
 
       {transfers.length === 0 ? (
         <EmptyState title="Everyone's square">
@@ -153,7 +154,12 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
                     />
                   }
                 />
-                <span className="font-medium">
+                <BalanceBar
+                  balance={balanceOf.get(player.id) ?? 0}
+                  track={track}
+                  className="w-16 sm:w-28"
+                />
+                <span className="w-24 text-right font-medium">
                   <BalanceLabel
                     amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
                     currency={currency}

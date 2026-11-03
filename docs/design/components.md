@@ -79,6 +79,14 @@ A row runs chip, then the text in a `min-w-0 flex-1` column, then the amount at 
 
 Don't put a `Surface` inside a `Surface`. Use `bg-sunken` for a well.
 
+## Hero cards: TripHero, BalanceHero, RaceHero
+
+A tab can open on one hero card: the figure that tab exists to show, big enough to read across a table. Sessions opens on `TripHero` (your trip total, your running line, win rate, best session, board place), Settle up on `BalanceHero` (your balance), and Results on `RaceHero` (your place, with everyone's running totals and yours in gold). One per tab, at the top. Don't add a hero to a page that has no single figure.
+
+A hero is a `Surface` on web and a `rounded-3xl bg-surface` view on mobile, with `Glow` first inside it in the tone of the figure: `win` up, `loss` down, `accent` level or about placing. The figure is `Money` in `font-display text-6xl`, over a `text-xs` caps label and under a one-line `text-sm text-muted` comparison. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`) so both clients say the same thing.
+
+Charts in a hero take their scale from `lineScale` in `@stacks/client-runtime/chart` and draw it per platform: SVG on web, `react-native-svg` on mobile. Lines start at break-even, which is a dashed `line-strong` rule. A balance list draws each balance as a bar from break-even with `barTrack`.
+
 ## PageHeader, Section, Note (web); PageTitle, SectionHeading (mobile)
 
 One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `tabs`, and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip's table, board and money tabs sit under `TripHeader`, not their own page title.
@@ -91,7 +99,7 @@ A short state something is in: "Live", "Closed". Tones: `neutral` (default), `li
 
 ## Money, BalanceLabel
 
-Every amount goes through `Money`, except the compact readout on boards, which is `boardMoney`, and places a component can't go (aria labels, string `label` props, table art), which use `formatMoney`. `tone="plain"` is an amount and `tone="result"` is a win or loss. Zero is neither: it stays `muted`. A balance is `BalanceLabel`, which words it ("You're owed $40").
+Every amount goes through `Money`, the hero figures included, except the compact readout on boards, which is `boardMoney`, and places a component can't go (aria labels, string `label` props, table art), which use `formatMoney`. `tone="plain"` is an amount and `tone="result"` is a win or loss. Zero is neither: it stays `muted`. A balance is `BalanceLabel`, which words it ("You're owed $40").
 
 ```tsx
 // Correct

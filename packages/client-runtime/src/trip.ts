@@ -9,7 +9,15 @@ import {
   type Trip,
 } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
-import type { AwardKey, TripAward, TripClock, TripNight, TripSession } from "@stacks/shared/trips";
+import type {
+  AwardKey,
+  PlayerTrip,
+  TripAward,
+  TripStanding,
+  TripClock,
+  TripNight,
+  TripSession,
+} from "@stacks/shared/trips";
 
 import { formatTime } from "./format.ts";
 
@@ -95,6 +103,63 @@ export const chipOf = (detail: GroupDetail, playerId: PlayerId) => {
 /** A run of results in words, once it's at least two long: "3 wins in a row". */
 export const streakLine = (streak: { readonly length: number; readonly winning: boolean }) =>
   streak.length < 2 ? null : `${streak.length} ${streak.winning ? "wins" : "losses"} in a row`;
+
+const ordinals = new Intl.PluralRules("en-US", { type: "ordinal" });
+const suffixes: Record<string, string> = { one: "st", two: "nd", few: "rd", other: "th" };
+
+/** "1st", "2nd", "3rd", "11th": a place on the board. */
+export const ordinal = (n: number) => `${n}${suffixes[ordinals.select(n)] ?? "th"}`;
+
+/** The lines under a player's trip total: how far they climbed, and how often they won. */
+export const tripLines = (trip: PlayerTrip<unknown>, currency: CurrencyCode) => ({
+  climb:
+    trip.low < 0 && trip.net > trip.low
+      ? `Up ${boardMoney(trip.net - trip.low, currency, false)} from your low`
+      : null,
+  winRate: trip.played === 0 ? "–" : `${Math.round((trip.won / trip.played) * 100)}%`,
+});
+
+/** The words over your balance on settle up, and the line under it. The figure is the amount without its sign. */
+export const balanceHeadline = (balance: number, payments: number) => ({
+  label: balance > 0 ? "You're owed" : balance < 0 ? "You owe" : "You're square",
+  tone: balance > 0 ? ("win" as const) : balance < 0 ? ("loss" as const) : ("accent" as const),
+  line:
+    payments === 0
+      ? null
+      : payments === 1
+        ? "One payment squares you up"
+        : `${payments} payments square you up`,
+});
+
+/** Where you stand on the board, said over the race: your place, and the gap to the next one that matters. */
+export const raceHeadline = (
+  standings: ReadonlyArray<Pick<TripStanding, "playerId" | "net" | "rank">>,
+  me: PlayerId,
+  names: ReadonlyMap<PlayerId, string>,
+  currency: CurrencyCode,
+) => {
+  const order = standings.toSorted((a, b) => a.rank - b.rank);
+  const mine = order.find((s) => s.playerId === me);
+  if (!mine) return null;
+  const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
+  const gap = (a: number, b: number) => boardMoney(Math.abs(a - b), currency, false);
+  const leader = order[0]!;
+  const next = order.find((s) => s.playerId !== me);
+  const line = !next
+    ? null
+    : leader.playerId !== me
+      ? leader.net === mine.net
+        ? `Tied with ${name(leader.playerId)} for the lead`
+        : `${gap(leader.net, mine.net)} behind ${name(leader.playerId)}`
+      : next.net === mine.net
+        ? `Tied with ${name(next.playerId)}`
+        : `${gap(mine.net, next.net)} ahead of ${name(next.playerId)}`;
+  return {
+    label: mine.rank === 1 ? "You lead" : `${ordinal(mine.rank)} of ${order.length}`,
+    net: mine.net,
+    line,
+  };
+};
 
 /** A night's or a trip's record: "4W · 3L · 1 even", leaving out what's zero. */
 export const recordLine = (wins: number, losses: number, even: number) =>

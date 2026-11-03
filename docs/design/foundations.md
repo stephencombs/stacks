@@ -36,7 +36,7 @@ What color is this text?
 
 ## Type
 
-Web has two faces: Barlow Condensed for the page title and the wordmark, and the system sans for everything else, money included, with `tabular-nums` on any changing number. Mobile adds JetBrains Mono for amounts and board captions.
+Web has two faces: Barlow Condensed for the page title, the wordmark and a hero card's figure, and the system sans for everything else, other money included, with `tabular-nums` on any changing number. Mobile adds JetBrains Mono for amounts and board captions.
 
 | Role            | Use it for                                          | Web  | Mobile |
 | --------------- | --------------------------------------------------- | ---- | ------ |
@@ -65,6 +65,7 @@ Amounts are `Money` with a weight or size beside it, such as `font-semibold` in 
 | `rounded-md`   | Tags, a selected segment                      |
 | `rounded-lg`   | Web buttons and inputs, menu items, skeletons |
 | `rounded-xl`   | Cards, menus, mobile fields                   |
+| `rounded-3xl`  | Mobile hero cards                             |
 | `rounded-2xl`  | Dialogs and sheets                            |
 | `rounded-full` | Chips, status dots, mobile buttons            |
 
@@ -82,7 +83,8 @@ Web only. Mobile surfaces are flat: a `surface` on a `canvas` is enough, as in i
 | `shadow-(--elevation-sheet)`   | `Dialog`                                  |
 
 - Write the parentheses form. The tokens sit outside `@theme` so they can flip, and Tailwind inlines `--shadow-*` values, which would freeze them to one theme.
-- Dark mode has a ring where light mode has depth, because a shadow doesn't show on a dark ground. Dark overlays keep one black shadow.
+- Dark mode has a ring where light mode has depth, because a shadow doesn't show on a dark ground, plus a faint white top edge on cards and menus, the way light catches something raised. Dark overlays keep one black shadow.
+- Depth on dark comes mostly from the gap between `canvas` and `surface`: a near-black page under clearly lighter cards. Keep that gap if you retune either.
 - Use `border-line` or `divide-line` to separate rows, and a shadow to raise something. Inputs keep a visible edge.
 
 ## Motion
