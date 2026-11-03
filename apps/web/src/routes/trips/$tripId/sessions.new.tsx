@@ -28,7 +28,8 @@ import { PlayerName } from "~/features/Player";
 import { VenuePicker } from "~/features/VenuePicker";
 import { gameNames } from "@stacks/client-runtime/format";
 import { chipOf } from "@stacks/client-runtime/trip";
-import { Loaded, useAction, useRememberTrip, useStacks } from "~/lib/stacks";
+import { Loaded, TripLoaded, useAction, useRememberTrip, useStacks } from "~/lib/stacks";
+import { FormPageSkeleton, SkeletonText } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/trips/$tripId/sessions/new")({
   component: NewSession,
@@ -42,24 +43,17 @@ function NewSession() {
   const { from } = Route.useSearch();
   const stacks = useStacks();
   return (
-    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="h-96" />}>
-      {(trip) => (
-        <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
-          {(detail) =>
-            from ? (
-              <Loaded
-                query={stacks.session(SessionId.make(from))}
-                skeleton={<Skeleton className="h-96" />}
-              >
-                {(session) => <NewSessionForm detail={detail} trip={trip} from={session} />}
-              </Loaded>
-            ) : (
-              <NewSessionForm detail={detail} trip={trip} />
-            )
-          }
-        </Loaded>
-      )}
-    </Loaded>
+    <TripLoaded tripId={TripId.make(tripId)} skeleton={<FormPageSkeleton />}>
+      {(trip, detail) =>
+        from ? (
+          <Loaded query={stacks.session(SessionId.make(from))} skeleton={<FormPageSkeleton />}>
+            {(session) => <NewSessionForm detail={detail} trip={trip} from={session} />}
+          </Loaded>
+        ) : (
+          <NewSessionForm detail={detail} trip={trip} />
+        )
+      }
+    </TripLoaded>
   );
 }
 
@@ -260,7 +254,15 @@ function InlineInvite({ detail }: { detail: GroupDetail }) {
   const origin = window.location.origin;
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-sunken p-3">
-      <Loaded query={stacks.invites(detail.group.id)} skeleton={<Skeleton className="h-10" />}>
+      <Loaded
+        query={stacks.invites(detail.group.id)}
+        skeleton={
+          <span aria-hidden className="flex h-9 items-center justify-between gap-2">
+            <SkeletonText size="sm" className="w-48" />
+            <Skeleton className="h-9 w-20 rounded-lg" />
+          </span>
+        }
+      >
         {(invites) => {
           const active = invites[0];
           return active ? (

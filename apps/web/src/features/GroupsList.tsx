@@ -10,8 +10,9 @@ import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { EmptyState, PageHeader } from "~/components/ui/Page";
-import { List, RowLink, RowText, Skeleton, Tag } from "~/components/ui/Surface";
+import { List, RowLink, RowText, Tag } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
+import { RowsSkeleton } from "~/features/PageSkeletons";
 
 /** Every group you're in, with your balance in each, and a way to start one. */
 export function GroupsList() {
@@ -28,7 +29,14 @@ export function GroupsList() {
           </Button>
         }
       />
-      <Loaded query={stacks.groups} skeleton={<Skeleton className="h-40" />}>
+      <Loaded
+        query={stacks.groups}
+        skeleton={
+          <div className="animate-skeleton-in">
+            <RowsSkeleton rows={3} trailing={false} />
+          </div>
+        }
+      >
         {(groups) =>
           groups.length === 0 ? (
             <EmptyState title="Start a group for the people you play with">

@@ -21,6 +21,17 @@
       type="font/woff2"
       crossorigin
     />
+    <!-- The canvas color before the stylesheet arrives, so a load never flashes white. -->
+    <style>
+      html {
+        background: #090b0f;
+        color-scheme: dark;
+      }
+      html[data-theme="light"] {
+        background: #f2f3f6;
+        color-scheme: light;
+      }
+    </style>
     <!-- Applies the saved theme before first paint, so a light-mode reload never flashes dark.
          Keep in step with src/lib/theme.ts. -->
     <script>

@@ -17,6 +17,7 @@ import { GroupHeader } from "~/features/GroupHeader";
 import { RaceStats } from "~/features/RaceStats";
 import { TripHero } from "~/features/TripHero";
 import { Loaded, useStacks } from "~/lib/stacks";
+import { GroupPageSkeleton } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/groups/$groupId/stats")({ component: Stats });
 
@@ -25,7 +26,7 @@ function Stats() {
   const stacks = useStacks();
   const id = GroupId.make(groupId);
   return (
-    <Loaded query={stacks.group(id)} skeleton={<Skeleton className="h-96" />}>
+    <Loaded query={stacks.group(id)} skeleton={<GroupPageSkeleton hero />}>
       {(detail) => (
         <>
           <GroupHeader detail={detail} current="stats" />

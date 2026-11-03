@@ -4,28 +4,39 @@ import { resolveEntry, tripDates } from "@stacks/client-runtime/trip";
 
 import { ButtonLink } from "~/components/ui/Button";
 import { PageHeader } from "~/components/ui/Page";
-import { List, RowLink, RowText, Skeleton } from "~/components/ui/Surface";
+import { List, RowLink, RowText } from "~/components/ui/Surface";
 import { GroupsList } from "~/features/GroupsList";
-import { Loaded, useLastTrip, useStacks } from "~/lib/stacks";
+import { Loaded, Prefetch, useLastTrip, useStacks } from "~/lib/stacks";
+import { GroupsSkeleton, TripPageSkeleton } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
   const stacks = useStacks();
   const { lastTripId } = useLastTrip();
+  // Most visits land on the last trip, so wait in its shape and start loading it now.
+  const skeleton = lastTripId ? <TripPageSkeleton on="sessions" /> : <GroupsSkeleton />;
   return (
-    <Loaded query={stacks.groups} skeleton={<Skeleton className="h-40" />}>
-      {(groups) => {
-        const entry = resolveEntry(groups, lastTripId);
-        if (entry.kind === "trip") {
-          return <Navigate to="/trips/$tripId" params={{ tripId: entry.tripId }} replace />;
-        }
-        if (entry.kind === "choose") {
-          return <TripChooser trips={entry.trips} />;
-        }
-        return <GroupsList />;
-      }}
-    </Loaded>
+    <>
+      {lastTripId ? (
+        <>
+          <Prefetch query={stacks.trip(lastTripId)} />
+          <Prefetch query={stacks.limits(lastTripId)} />
+        </>
+      ) : null}
+      <Loaded query={stacks.groups} skeleton={skeleton}>
+        {(groups) => {
+          const entry = resolveEntry(groups, lastTripId);
+          if (entry.kind === "trip") {
+            return <Navigate to="/trips/$tripId" params={{ tripId: entry.tripId }} replace />;
+          }
+          if (entry.kind === "choose") {
+            return <TripChooser trips={entry.trips} />;
+          }
+          return <GroupsList />;
+        }}
+      </Loaded>
+    </>
   );
 }
 

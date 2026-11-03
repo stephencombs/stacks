@@ -4,9 +4,10 @@ import { View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Screen } from "../components/ui/Screen";
-import { PageTitle, Skeleton } from "../components/ui/Surface";
+import { PageTitle } from "../components/ui/Surface";
 import { TripsSection } from "../features/Trips";
 import { Loaded, useStacks } from "../lib/stacks";
+import { ListScreenSkeleton } from "../features/ScreenSkeletons";
 
 type Props = StaticScreenProps<{ groupId: string }>;
 
@@ -16,7 +17,7 @@ export function GroupScreen({ route }: Props) {
     <Screen>
       <Loaded
         query={stacks.group(GroupId.make(route.params.groupId))}
-        skeleton={<Skeleton className="h-96" />}
+        skeleton={<ListScreenSkeleton label="Loading the group" />}
       >
         {(detail) => <GroupView detail={detail} />}
       </Loaded>

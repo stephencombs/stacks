@@ -18,7 +18,7 @@ import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
+import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { webUrl } from "../lib/config";
 import { shareCsv, shareLink } from "../lib/share";
@@ -29,6 +29,7 @@ import {
   playerHandlesMeta,
 } from "../features/PaymentHandles";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
+import { ListScreenSkeleton, RowsSkeleton } from "../features/ScreenSkeletons";
 
 type Props = StaticScreenProps<{ groupId: string }>;
 
@@ -38,7 +39,7 @@ export function PeopleScreen({ route }: Props) {
     <Screen>
       <Loaded
         query={stacks.group(GroupId.make(route.params.groupId))}
-        skeleton={<Skeleton className="h-96" />}
+        skeleton={<ListScreenSkeleton label="Loading people" rows={5} />}
       >
         {(detail) => <PeopleView detail={detail} />}
       </Loaded>
@@ -228,7 +229,10 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
       >
         Invite links
       </SectionHeading>
-      <Loaded query={stacks.invites(detail.group.id)} skeleton={<Skeleton className="h-16" />}>
+      <Loaded
+        query={stacks.invites(detail.group.id)}
+        skeleton={<RowsSkeleton rows={1} trailing={false} />}
+      >
         {(invites) =>
           invites.length === 0 ? (
             <Text className="text-sm text-muted">

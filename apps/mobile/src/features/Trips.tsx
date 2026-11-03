@@ -21,6 +21,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading } from "../components/ui/Surface";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { Chip } from "./Chip";
+import { Skeleton } from "../components/ui/Surface";
 
 /** The group's trips: the ones going now as a jump onto their boards, then past trips. */
 export function TripsSection({ detail }: { detail: GroupDetail }) {
@@ -62,7 +63,16 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
             <Text className="text-lg font-semibold text-ink">{trip.name}</Text>
             <Text className="text-sm text-muted">Going · {tripDates(trip)}</Text>
           </View>
-          <Loaded query={stacks.trip(trip.id)} skeleton={<View className="h-6" />}>
+          <Loaded
+            query={stacks.trip(trip.id)}
+            skeleton={
+              <View accessibilityElementsHidden className="h-[22px] flex-row items-center gap-4">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-24" />
+              </View>
+            }
+          >
             {(detailed) => <Leaders detail={detail} trip={detailed} />}
           </Loaded>
         </Pressable>

@@ -6,8 +6,8 @@ import { useState, type FormEvent } from "react";
 import { Button, ButtonLink } from "~/components/ui/Button";
 import { Field, FormError, Input } from "~/components/ui/Field";
 import { PageHeader } from "~/components/ui/Page";
-import { Skeleton } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
+import { InviteSkeleton } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/join/$code")({ component: Join });
 
@@ -15,7 +15,7 @@ function Join() {
   const { code } = Route.useParams();
   const stacks = useStacks();
   return (
-    <Loaded query={stacks.invitePreview(code)} skeleton={<Skeleton className="h-64" />}>
+    <Loaded query={stacks.invitePreview(code)} skeleton={<InviteSkeleton />}>
       {(preview) => <JoinView code={code} preview={preview} />}
     </Loaded>
   );

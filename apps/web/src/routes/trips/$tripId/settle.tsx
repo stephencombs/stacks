@@ -25,7 +25,7 @@ import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { EmptyState, Note, Section } from "~/components/ui/Page";
-import { List, Row, RowText, Skeleton } from "~/components/ui/Surface";
+import { List, Row, RowText } from "~/components/ui/Surface";
 import { BalanceBar, BalanceHero } from "~/features/BalanceHero";
 import { BackingSection } from "~/features/Backing";
 import { Chip } from "~/features/Chip";
@@ -35,21 +35,17 @@ import { TransferRow } from "~/features/TransferRow";
 import { ShareSettleUpButton } from "~/features/PayLinks";
 import { TripHeader } from "~/features/TripHeader";
 import { TripLayout, TripRail } from "~/features/TripRail";
-import { Loaded, useAction, useStacks } from "~/lib/stacks";
+import { useAction, TripLoaded, useStacks } from "~/lib/stacks";
+import { TripPageSkeleton } from "~/features/PageSkeletons";
 
 export const Route = createFileRoute("/trips/$tripId/settle")({ component: SettleUp });
 
 function SettleUp() {
   const { tripId } = Route.useParams();
-  const stacks = useStacks();
   return (
-    <Loaded query={stacks.trip(TripId.make(tripId))} skeleton={<Skeleton className="h-96" />}>
-      {(trip) => (
-        <Loaded query={stacks.group(trip.trip.groupId)} skeleton={<Skeleton className="h-96" />}>
-          {(detail) => <SettleUpView detail={detail} trip={trip} />}
-        </Loaded>
-      )}
-    </Loaded>
+    <TripLoaded tripId={TripId.make(tripId)} skeleton={<TripPageSkeleton on="settle" />}>
+      {(trip, detail) => <SettleUpView detail={detail} trip={trip} />}
+    </TripLoaded>
   );
 }
 

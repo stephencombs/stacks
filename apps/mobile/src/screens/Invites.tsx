@@ -7,8 +7,9 @@ import { Text } from "react-native";
 import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
-import { PageTitle, Skeleton, Surface } from "../components/ui/Surface";
+import { PageTitle, Surface } from "../components/ui/Surface";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
+import { InviteScreenSkeleton } from "../features/ScreenSkeletons";
 
 type Props = StaticScreenProps<{ code: string }>;
 
@@ -22,10 +23,7 @@ export function JoinScreen({ route }: Props) {
   const stacks = useStacks();
   return (
     <Screen>
-      <Loaded
-        query={stacks.invitePreview(route.params.code)}
-        skeleton={<Skeleton className="h-64" />}
-      >
+      <Loaded query={stacks.invitePreview(route.params.code)} skeleton={<InviteScreenSkeleton />}>
         {(preview) => <JoinView code={route.params.code} preview={preview} />}
       </Loaded>
     </Screen>
@@ -117,10 +115,7 @@ export function ClaimScreen({ route }: Props) {
   };
   return (
     <Screen>
-      <Loaded
-        query={stacks.claimPreview(route.params.code)}
-        skeleton={<Skeleton className="h-64" />}
-      >
+      <Loaded query={stacks.claimPreview(route.params.code)} skeleton={<InviteScreenSkeleton />}>
         {(preview) => (
           <Surface className="gap-5 p-5">
             <PageTitle context={preview.groupName}>{`Are you ${preview.displayName}?`}</PageTitle>

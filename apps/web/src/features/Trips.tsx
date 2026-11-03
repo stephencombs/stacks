@@ -13,7 +13,7 @@ import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input } from "~/components/ui/Field";
 import { Note, Section } from "~/components/ui/Page";
-import { List, RowLink, RowText, Surface } from "~/components/ui/Surface";
+import { List, RowLink, RowText, Skeleton, Surface } from "~/components/ui/Surface";
 import { Loaded, useAction, useLastTrip, useStacks } from "~/lib/stacks";
 import { Chip } from "./Chip";
 
@@ -42,7 +42,16 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
               <RowLink key={trip.id} to="/trips/$tripId" params={{ tripId: trip.id }}>
                 <span className="flex min-w-0 flex-1 flex-col gap-2">
                   <RowText title={trip.name} meta={tripDates(trip)} />
-                  <Loaded query={stacks.trip(trip.id)} skeleton={<span className="h-6" />}>
+                  <Loaded
+                    query={stacks.trip(trip.id)}
+                    skeleton={
+                      <span aria-hidden className="flex h-[22px] items-center gap-4">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3 w-24" />
+                      </span>
+                    }
+                  >
                     {(detailed) => <Leaders detail={detail} trip={detailed} />}
                   </Loaded>
                 </span>
