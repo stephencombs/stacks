@@ -176,7 +176,7 @@ function Race<S extends RaceSession>({
             </>
           )}
         </h2>
-        <Note>
+        <Note className="tabular-nums">
           After session {at + 1} of {sessions.length} · {where(session)} · {session.venue.name},{" "}
           {formatDay(session.session.startedAt)}
         </Note>
@@ -396,7 +396,7 @@ export function PlayerSheet({
       <header className="flex items-center gap-3">
         <Chip chip={player.chip} name={player.name} size={40} />
         <div className="flex min-w-0 flex-col">
-          <Note>
+          <Note className="tabular-nums">
             {player.name} · #{rank} of {of} · {runs.sessions}{" "}
             {runs.sessions === 1 ? "session" : "sessions"}
           </Note>

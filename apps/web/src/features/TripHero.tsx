@@ -39,8 +39,8 @@ export function TripHero({
       <Glow tone={tone} />
       <div className="relative flex flex-col px-4 pt-4">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-medium text-muted">{label}</h2>
-          <span className="text-sm text-muted">
+          <h2 className="min-w-0 text-sm font-medium text-muted">{label}</h2>
+          <span className="shrink-0 text-sm text-muted tabular-nums">
             {plural(mine.played, "session")} ·{" "}
             {span ?? plural(tripNights(closed, localClock).length, "night")}
           </span>
