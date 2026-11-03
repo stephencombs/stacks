@@ -16,9 +16,9 @@
   "env": {
     // `wrangler deploy --env development`: one Worker serves the API and the built web app.
     "development": {
-      "name": "stacks",
+      "name": "colorup",
       "workers_dev": true,
-      "vars": { "CLERK_AUTHORIZED_PARTIES": "https://stacks.stephen-jcombs.workers.dev" },
+      "vars": { "CLERK_AUTHORIZED_PARTIES": "https://colorup.stephen-jcombs.workers.dev" },
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "b31cff468a5645638b063167ded46c50" }],
       "assets": {
         "directory": "../web/dist",

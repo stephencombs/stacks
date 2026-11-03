@@ -35,7 +35,7 @@ The mobile app needs a dev client build on your simulator or phone the first tim
 
 ## Deploy
 
-One Cloudflare Worker serves the API and the built web app. It's the development environment, at <https://stacks.stephen-jcombs.workers.dev>, and signs in through Clerk's development instance. There's no production environment yet. The database is any Postgres behind Cloudflare Hyperdrive (Neon's free plan works).
+One Cloudflare Worker serves the API and the built web app. It's the development environment, at <https://colorup.stephen-jcombs.workers.dev>, and signs in through Clerk's development instance. There's no production environment yet. The database is any Postgres behind Cloudflare Hyperdrive (Neon's free plan works).
 
 1. `npx wrangler login` (or set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`).
 2. Create the Hyperdrive config: `npx wrangler hyperdrive create stacks --caching-disabled --connection-string="<postgres url>"`, and put its ID in `apps/api/wrangler.jsonc` under `env.development`. Leave caching off: Hyperdrive otherwise serves reads from a cache for up to a minute, so a screen refreshed after a write shows the old ledger.
