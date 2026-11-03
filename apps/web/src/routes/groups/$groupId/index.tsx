@@ -84,7 +84,7 @@ function GroupHomeView({ detail }: { detail: GroupDetail }) {
       </Section>
       <Section title="Settings">
         <List>
-          <RowLink to="/groups/$groupId/manage" params={params}>
+          <RowLink to="/groups/$groupId/settings" params={params}>
             <RowText title="Payment apps and export" meta="Also where you leave the group" />
           </RowLink>
         </List>

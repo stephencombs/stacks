@@ -68,6 +68,8 @@ the Board is one tap away mid-session.
 
 ## Addresses
 
-Old addresses keep working as redirects: a trip's `/results` goes to its Board, a group's `/stats`
-to the Board's All time scope, and a group's `/settings` to its People. Links shared before the
-change must still land somewhere sensible.
+Web and mobile share addresses: `/trips/:id` (Sessions), `/trips/:id/board` (`?scope=all` for All
+time), `/trips/:id/settle`, `/sessions/:id`, `/groups/:id` (the hub), `/groups/:id/people` and
+`/groups/:id/settings`. Old addresses keep working: a trip's `/results` goes to its Board and a
+group's `/stats` to the Board's All time. A group's `/settings` used to mix people and settings; it
+now opens Settings, which links to People.
