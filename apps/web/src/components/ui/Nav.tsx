@@ -34,7 +34,7 @@ export function PlaceLink({
       aria-disabled={props.to === undefined || undefined}
       className={cn(
         props.to === undefined && "pointer-events-none",
-        "transition-colors duration-150 focus-visible:outline-offset-[-2px]",
+        "transition-[color,background-color,box-shadow,scale] duration-150 active:scale-[0.96] focus-visible:outline-offset-[-2px]",
         layout === "bar"
           ? "flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium"
           : "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium pointer-coarse:h-11",
@@ -68,7 +68,7 @@ export function ScopeButton({
     <button
       type="button"
       className={cn(
-        "inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg bg-surface py-1 pr-2.5 pl-3 text-left shadow-(--elevation-control) transition-[background-color,scale] duration-150 hover:bg-sunken active:scale-[0.98]",
+        "inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg bg-surface py-1 pr-2.5 pl-3 text-left shadow-(--elevation-control) transition-[background-color,scale] duration-150 hover:bg-sunken active:scale-[0.96]",
         className,
       )}
       {...props}

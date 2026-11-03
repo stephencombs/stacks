@@ -251,9 +251,11 @@ function Sidebar({ scope, place }: { scope: Scope; place: Place | null }) {
                 key={other.id}
                 to="/trips/$tripId"
                 params={{ tripId: other.id }}
+                {...(other.id === trip?.id ? { "aria-current": "true" as const } : {})}
                 className={cn(
-                  "flex min-h-9 shrink-0 items-center justify-between gap-2 rounded-lg px-3 text-sm transition-colors duration-150 hover:bg-sunken hover:text-ink",
-                  other.id === trip?.id ? "font-medium text-ink" : "text-muted",
+                  // Inset focus ring: the scrolling list would clip one drawn outside.
+                  "flex min-h-10 shrink-0 items-center justify-between gap-2 rounded-lg px-3 text-sm font-medium transition-colors duration-150 hover:bg-sunken hover:text-ink focus-visible:outline-offset-[-2px] pointer-coarse:min-h-11",
+                  other.id === trip?.id ? "text-ink" : "text-muted",
                 )}
               >
                 <span className="truncate">{other.name}</span>
@@ -485,7 +487,7 @@ export function You({ layout, scope }: { layout: "bar" | "side"; scope?: Scope }
           aria-label="You"
           aria-haspopup="dialog"
           onClick={() => setOpen(true)}
-          className="flex h-12 shrink-0 items-center gap-3 rounded-lg px-2 text-left text-sm transition-colors duration-150 hover:bg-sunken"
+          className="flex h-12 shrink-0 items-center gap-3 rounded-lg px-2 text-left text-sm transition-[background-color,scale] duration-150 hover:bg-sunken active:scale-[0.96]"
         >
           {avatar}
           <span className="flex min-w-0 flex-col">
