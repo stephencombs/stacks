@@ -1,6 +1,6 @@
 import { CurrencyCode, MinorUnits } from "@stacks/contracts";
 import { themeChoices } from "@stacks/client-runtime/theme";
-import { Moon, Plus, Sun, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Layers, Moon, Plus, Sun, Trash2, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
 
 import { BalanceLabel, Money } from "~/components/Money";
@@ -10,7 +10,7 @@ import { Dialog } from "~/components/ui/Dialog";
 import { Checkbox } from "~/components/ui/Checkbox";
 import { Field, FormError, Input, RadioCards, Select } from "~/components/ui/Field";
 import { Menu, MenuChoice, MenuItem } from "~/components/ui/Menu";
-import { BackLink, Tab, Tabs } from "~/components/ui/Nav";
+import { BackLink, PlaceLink, ScopeButton } from "~/components/ui/Nav";
 import { EmptyState, Note, PageHeader, Section } from "~/components/ui/Page";
 import { Segmented } from "~/components/ui/Segmented";
 import { List, Row, RowLink, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
@@ -43,6 +43,12 @@ const inks = [
 const roles = [
   ["type-title", "Vegas weekend"],
   ["type-callout", "Section heading"],
+];
+const places = [
+  { label: "Sessions", icon: Layers },
+  { label: "Board", icon: TrendingUp },
+  { label: "Settle up", icon: ArrowLeftRight },
+  { label: "Group", icon: Users },
 ];
 const players = [
   { chip: 1, name: "Stephen", you: true, in: 400, out: 1125 },
@@ -188,29 +194,54 @@ export function Gallery() {
         </Surface>
       </Section>
 
+      <Section title="Navigation">
+        <Surface className="flex flex-col gap-4 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <ScopeButton context="Thursday crew" label="Vegas weekend" />
+            <ScopeButton label="Thursday crew" />
+          </div>
+          <Note>
+            The scope button: the trip in scope under its group, or a group with no trips yet.
+          </Note>
+          <div className="flex overflow-hidden rounded-lg bg-surface shadow-(--elevation-card)">
+            {places.map((place, i) => (
+              <PlaceLink
+                key={place.label}
+                to="/"
+                icon={<place.icon className="size-5" aria-hidden />}
+                label={place.label}
+                current={i === 1}
+                layout="bar"
+              />
+            ))}
+          </div>
+          <div className="flex w-60 flex-col gap-0.5 rounded-lg bg-canvas p-3">
+            {places.map((place, i) => (
+              <PlaceLink
+                key={place.label}
+                to="/"
+                icon={<place.icon className="size-5" aria-hidden />}
+                label={place.label}
+                current={i === 1}
+                layout="side"
+              />
+            ))}
+          </div>
+          <Note>The four places: the bottom bar on narrow screens, the sidebar on wide ones.</Note>
+          <Segmented
+            label="Board scope"
+            options={[
+              { value: "trip", label: "This trip" },
+              { value: "all", label: "All time" },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+          <Note>A place's scope: the same data, wider.</Note>
+        </Surface>
+      </Section>
+
       <Section title="A session">
-        <Segmented
-          label="View"
-          variant="quiet"
-          options={[
-            { value: "trip", label: "Standings" },
-            { value: "tonight", label: "Tonight" },
-            { value: "days", label: "Days" },
-          ]}
-          value={view}
-          onChange={setView}
-        />
-        <Tabs label="Trip">
-          <Tab to="/" current>
-            Sessions
-          </Tab>
-          <Tab to="/" current={false}>
-            Results
-          </Tab>
-          <Tab to="/" current={false}>
-            Settle up
-          </Tab>
-        </Tabs>
         <div className="flex flex-wrap items-center gap-2">
           <Tag tone="live">Live</Tag>
           <Tag>Closed</Tag>

@@ -1,31 +1,24 @@
-import type { GroupDetail, PlayerId, TripDetail } from "@stacks/contracts";
+import type { GroupDetail, PlayerId, SessionId, TripDetail } from "@stacks/contracts";
 import { playerNames } from "@stacks/client-runtime/format";
 import {
   awardLine,
   awardTitles,
   chipOf,
   localClock,
-  nightLabel,
-  recordLine,
   streakLine,
 } from "@stacks/client-runtime/trip";
-import {
-  tonightBoard,
-  tripAwards,
-  tripDays,
-  tripNights,
-  tripStandings,
-  tripStats,
-} from "@stacks/shared/trips";
+import { tonightBoard, tripAwards, tripStandings, tripStats } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
 import { EmptyState, Section } from "~/components/ui/Page";
-import { List, Row, RowLink, RowText, Tag } from "~/components/ui/Surface";
+import { List, Row, RowText } from "~/components/ui/Surface";
+import { Breakdown, byNet } from "./Breakdown";
 import { Chip } from "./Chip";
 import { RaceHero } from "./RaceHero";
 import { PlayerName } from "./Player";
+import { PlayerSheet } from "./RaceStats";
 import { Standing } from "./Standing";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -57,7 +50,10 @@ function useReorder() {
   };
 }
 
-/** The whole trip: the standings, who earned what, and its numbers. */
+/**
+ * The trip's board: the race, the standings, and the numbers of whoever's picked in them (you, once
+ * you've played), then who earned what and where the table won.
+ */
 export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const currency = detail.group.currency;
   const names = playerNames(detail);
@@ -66,9 +62,16 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const standings = tripStandings(closed, localClock);
   const awards = tripAwards(closed, localClock);
   const row = useReorder();
+  const [picked, setPicked] = useState<PlayerId | null>(null);
 
   if (standings.length === 0)
     return <EmptyState title="Nothing on the board yet">Close a session to start it.</EmptyState>;
+
+  const focus =
+    standings.find((s) => s.playerId === picked) ??
+    standings.find((s) => s.playerId === detail.myPlayerId) ??
+    standings.find((s) => s.rank === 1)!;
+  const venues = Map.groupBy(closed, (s) => s.venue.id);
 
   return (
     <>
@@ -97,11 +100,26 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                 }
                 net={s.net}
                 currency={currency}
+                picked={s.playerId === focus.playerId}
+                onPick={() => setPicked(s.playerId)}
               />
             );
           })}
         </List>
       </Section>
+
+      <PlayerSheet
+        key={focus.playerId}
+        sessions={closed}
+        player={{
+          playerId: focus.playerId,
+          name: name(focus.playerId),
+          chip: chipOf(detail, focus.playerId),
+        }}
+        rank={focus.rank}
+        of={standings.length}
+        currency={currency}
+      />
 
       {awards.length > 0 ? (
         <Section title="Awards">
@@ -119,79 +137,86 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
         </Section>
       ) : null}
 
+      <Breakdown
+        title="By casino"
+        rows={byNet(
+          [...venues.values()].map((sessions) => ({
+            id: sessions[0]!.venue.id,
+            label: sessions[0]!.venue.name,
+            sessionCount: sessions.length,
+            results: sessions.flatMap((s) => s.results),
+          })),
+        )}
+        currency={currency}
+      />
+
       <TripNumbers detail={detail} trip={trip} total={standings.reduce((n, s) => n + s.net, 0)} />
     </>
   );
 }
 
-/** Tonight only: who's up from tables that finished, and what's still in play at live ones. */
-export function TonightBoard({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+/**
+ * Tonight across every table, on a live session's page: who's up from tables that finished, and
+ * what's still in play. Left out when this table is the whole night, since the table says it all.
+ */
+export function Tonight({
+  detail,
+  trip,
+  sessionId,
+}: {
+  detail: GroupDetail;
+  trip: TripDetail;
+  sessionId: SessionId;
+}) {
   const currency = detail.group.currency;
   const names = playerNames(detail);
   const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
+  const now = DateTime.nowUnsafe();
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
   const live = trip.sessions.filter((s) => s.session.status === "live");
-  const rows = tonightBoard(closed, live, localClock, DateTime.nowUnsafe());
+  const rows = tonightBoard(closed, live, localClock, now);
   const inPlayTotal = rows.reduce((sum, r) => sum + r.inPlay, 0);
   const row = useReorder();
+  const tonight = localClock.night(now);
+  const others = trip.sessions.some(
+    (s) =>
+      s.session.id !== sessionId &&
+      (s.session.status === "live" || localClock.night(s.session.startedAt) === tonight),
+  );
+  if (!others || rows.length === 0) return null;
 
   return (
-    <>
-      {live.length > 0 ? (
-        <Section title="At the tables">
-          <List>
-            {live.map((s) => (
-              <RowLink
-                key={s.session.id}
-                to="/sessions/$sessionId"
-                params={{ sessionId: s.session.id }}
-              >
-                <RowText title={s.venue.name} meta={`${s.playing.length} playing`} />
-                <Tag tone="live">Live</Tag>
-              </RowLink>
-            ))}
-          </List>
-        </Section>
-      ) : null}
-
-      {rows.length === 0 ? (
-        <EmptyState title="Nothing on the board tonight">
-          Results land here as players cash out.
-        </EmptyState>
-      ) : (
-        <Section
-          title="Who's up"
-          aside={
-            inPlayTotal > 0 ? (
-              <>
-                In play <Money amount={inPlayTotal} currency={currency} />
-              </>
-            ) : null
-          }
-        >
-          <List as="ol" label="Tonight">
-            {rows.map((r) => (
-              <Standing
-                key={r.playerId}
-                rowRef={row(r.playerId)}
-                rank={r.rank}
-                chip={chipOf(detail, r.playerId)}
-                name={<PlayerName name={name(r.playerId)} you={r.playerId === detail.myPlayerId} />}
-                meta={
-                  r.inPlay > 0 ? (
-                    <>
-                      In play <Money amount={r.inPlay} currency={currency} />
-                    </>
-                  ) : null
-                }
-                net={r.net}
-                currency={currency}
-              />
-            ))}
-          </List>
-        </Section>
-      )}
-    </>
+    <Section
+      title="Tonight"
+      aside={
+        inPlayTotal > 0 ? (
+          <>
+            In play <Money amount={inPlayTotal} currency={currency} />
+          </>
+        ) : null
+      }
+    >
+      <List as="ol" label="Tonight">
+        {rows.map((r) => (
+          <Standing
+            key={r.playerId}
+            rowRef={row(r.playerId)}
+            rank={r.rank}
+            chip={chipOf(detail, r.playerId)}
+            name={<PlayerName name={name(r.playerId)} you={r.playerId === detail.myPlayerId} />}
+            meta={
+              r.inPlay > 0 ? (
+                <>
+                  In play <Money amount={r.inPlay} currency={currency} />
+                </>
+              ) : null
+            }
+            net={r.net}
+            currency={currency}
+          />
+        ))}
+      </List>
+    </Section>
   );
 }
 
@@ -249,63 +274,5 @@ function TripNumbers({
           : null}
       </List>
     </Section>
-  );
-}
-
-/** The trip night by night: every player's net, with their record, or that they sat it out. */
-export function DaysBoard({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
-  const currency = detail.group.currency;
-  const names = playerNames(detail);
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
-  const players = [...new Set(closed.flatMap((s) => s.results.map((r) => r.playerId)))];
-  const days = tripDays(closed, localClock, players);
-  const nights = tripNights(closed, localClock);
-  if (days.length === 0)
-    return <EmptyState title="No nights yet">Close a session to start the first one.</EmptyState>;
-  return (
-    <>
-      {days.toReversed().map((day) => (
-        <Section
-          key={day.key}
-          title={nightLabel(nights.find((n) => n.key === day.key)!)}
-          aside={plural(day.sessions, "table")}
-        >
-          <List>
-            {day.rows.map((row) => (
-              <Row key={row.playerId}>
-                <Chip
-                  chip={chipOf(detail, row.playerId)}
-                  name={names.get(row.playerId) ?? "?"}
-                  size={28}
-                />
-                <RowText
-                  title={
-                    <PlayerName
-                      name={names.get(row.playerId) ?? "Someone"}
-                      you={row.playerId === detail.myPlayerId}
-                    />
-                  }
-                  meta={
-                    row.net === null
-                      ? "No results recorded"
-                      : recordLine(row.wins, row.losses, row.even)
-                  }
-                />
-                {row.net === null ? (
-                  <span className="text-faint">—</span>
-                ) : (
-                  <Money
-                    amount={row.net}
-                    currency={currency}
-                    tone="result"
-                    className="font-semibold"
-                  />
-                )}
-              </Row>
-            ))}
-          </List>
-        </Section>
-      ))}
-    </>
   );
 }

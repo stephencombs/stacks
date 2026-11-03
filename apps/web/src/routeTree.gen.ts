@@ -15,6 +15,8 @@ import { Route as GroupsIndexRouteImport } from './routes/groups/index'
 import { Route as JoinCodeRouteImport } from './routes/join/$code'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions/$sessionId'
 import { Route as GroupsGroupIdIndexRouteImport } from './routes/groups/$groupId/index'
+import { Route as GroupsGroupIdManageRouteImport } from './routes/groups/$groupId/manage'
+import { Route as GroupsGroupIdPeopleRouteImport } from './routes/groups/$groupId/people'
 import { Route as GroupsGroupIdSettingsRouteImport } from './routes/groups/$groupId/settings'
 import { Route as GroupsGroupIdStatsRouteImport } from './routes/groups/$groupId/stats'
 import { Route as TripsTripIdIndexRouteImport } from './routes/trips/$tripId/index'
@@ -52,6 +54,16 @@ const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
 const GroupsGroupIdIndexRoute = GroupsGroupIdIndexRouteImport.update({
   id: '/groups/$groupId/',
   path: '/groups/$groupId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupsGroupIdManageRoute = GroupsGroupIdManageRouteImport.update({
+  id: '/groups/$groupId/manage',
+  path: '/groups/$groupId/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupsGroupIdPeopleRoute = GroupsGroupIdPeopleRouteImport.update({
+  id: '/groups/$groupId/people',
+  path: '/groups/$groupId/people',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GroupsGroupIdSettingsRoute = GroupsGroupIdSettingsRouteImport.update({
@@ -101,6 +113,8 @@ export interface FileRoutesByFullPath {
   '/join/$code': typeof JoinCodeRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/groups/': typeof GroupsIndexRoute
+  '/groups/$groupId/manage': typeof GroupsGroupIdManageRoute
+  '/groups/$groupId/people': typeof GroupsGroupIdPeopleRoute
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
   '/trips/$tripId/board': typeof TripsTripIdBoardRoute
@@ -117,6 +131,8 @@ export interface FileRoutesByTo {
   '/join/$code': typeof JoinCodeRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/groups': typeof GroupsIndexRoute
+  '/groups/$groupId/manage': typeof GroupsGroupIdManageRoute
+  '/groups/$groupId/people': typeof GroupsGroupIdPeopleRoute
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
   '/trips/$tripId/board': typeof TripsTripIdBoardRoute
@@ -134,6 +150,8 @@ export interface FileRoutesById {
   '/join/$code': typeof JoinCodeRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/groups/': typeof GroupsIndexRoute
+  '/groups/$groupId/manage': typeof GroupsGroupIdManageRoute
+  '/groups/$groupId/people': typeof GroupsGroupIdPeopleRoute
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
   '/groups/$groupId/stats': typeof GroupsGroupIdStatsRoute
   '/trips/$tripId/board': typeof TripsTripIdBoardRoute
@@ -152,6 +170,8 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/sessions/$sessionId'
     | '/groups/'
+    | '/groups/$groupId/manage'
+    | '/groups/$groupId/people'
     | '/groups/$groupId/settings'
     | '/groups/$groupId/stats'
     | '/trips/$tripId/board'
@@ -168,6 +188,8 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/sessions/$sessionId'
     | '/groups'
+    | '/groups/$groupId/manage'
+    | '/groups/$groupId/people'
     | '/groups/$groupId/settings'
     | '/groups/$groupId/stats'
     | '/trips/$tripId/board'
@@ -184,6 +206,8 @@ export interface FileRouteTypes {
     | '/join/$code'
     | '/sessions/$sessionId'
     | '/groups/'
+    | '/groups/$groupId/manage'
+    | '/groups/$groupId/people'
     | '/groups/$groupId/settings'
     | '/groups/$groupId/stats'
     | '/trips/$tripId/board'
@@ -201,6 +225,8 @@ export interface RootRouteChildren {
   JoinCodeRoute: typeof JoinCodeRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   GroupsIndexRoute: typeof GroupsIndexRoute
+  GroupsGroupIdManageRoute: typeof GroupsGroupIdManageRoute
+  GroupsGroupIdPeopleRoute: typeof GroupsGroupIdPeopleRoute
   GroupsGroupIdSettingsRoute: typeof GroupsGroupIdSettingsRoute
   GroupsGroupIdStatsRoute: typeof GroupsGroupIdStatsRoute
   TripsTripIdBoardRoute: typeof TripsTripIdBoardRoute
@@ -254,6 +280,20 @@ declare module '@tanstack/react-router' {
       path: '/groups/$groupId'
       fullPath: '/groups/$groupId/'
       preLoaderRoute: typeof GroupsGroupIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/groups/$groupId/manage': {
+      id: '/groups/$groupId/manage'
+      path: '/groups/$groupId/manage'
+      fullPath: '/groups/$groupId/manage'
+      preLoaderRoute: typeof GroupsGroupIdManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/groups/$groupId/people': {
+      id: '/groups/$groupId/people'
+      path: '/groups/$groupId/people'
+      fullPath: '/groups/$groupId/people'
+      preLoaderRoute: typeof GroupsGroupIdPeopleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/groups/$groupId/settings': {
@@ -321,6 +361,8 @@ const rootRouteChildren: RootRouteChildren = {
   JoinCodeRoute: JoinCodeRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   GroupsIndexRoute: GroupsIndexRoute,
+  GroupsGroupIdManageRoute: GroupsGroupIdManageRoute,
+  GroupsGroupIdPeopleRoute: GroupsGroupIdPeopleRoute,
   GroupsGroupIdSettingsRoute: GroupsGroupIdSettingsRoute,
   GroupsGroupIdStatsRoute: GroupsGroupIdStatsRoute,
   TripsTripIdBoardRoute: TripsTripIdBoardRoute,

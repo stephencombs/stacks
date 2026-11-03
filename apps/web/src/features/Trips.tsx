@@ -2,10 +2,16 @@ import { useNavigate } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import { chipOf, localClock, tripDates, unsettledAmount } from "@stacks/client-runtime/trip";
+import {
+  chipOf,
+  localClock,
+  scopeTrips,
+  tripDates,
+  unsettledAmount,
+} from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
-import { Plane } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { Money } from "~/components/Money";
@@ -13,7 +19,7 @@ import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input } from "~/components/ui/Field";
 import { Note, Section } from "~/components/ui/Page";
-import { List, RowLink, RowText, Skeleton, Surface } from "~/components/ui/Surface";
+import { List, RowLink, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
 import { Loaded, useAction, useLastTrip, useStacks } from "~/lib/stacks";
 import { Chip } from "./Chip";
 
@@ -21,69 +27,53 @@ import { Chip } from "./Chip";
 const localDay = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
-export function TripsSection({ detail }: { detail: GroupDetail }) {
+/** The group's trips, going ones first, each with its leaders or what's left to settle. */
+export function TripsSection({ detail, seatTripId }: { detail: GroupDetail; seatTripId?: TripId }) {
   const stacks = useStacks();
-  const going = detail.trips.filter((trip) => trip.endedAt === null);
-  const past = detail.trips.filter((trip) => trip.endedAt !== null);
-
-  if (detail.trips.length === 0) {
-    return <FirstTripSection detail={detail} />;
-  }
-
+  if (detail.trips.length === 0) return <FirstTripSection detail={detail} />;
   return (
-    <>
-      {going.length > 0 ? (
-        <Section
-          title="Going now"
-          action={<StartTripButton detail={detail} variant="ghost" size="sm" />}
-        >
-          <List>
-            {going.map((trip) => (
-              <RowLink key={trip.id} to="/trips/$tripId" params={{ tripId: trip.id }}>
-                <span className="flex min-w-0 flex-1 flex-col gap-2">
+    <Section title="Trips" action={<StartTripButton detail={detail} />}>
+      <List>
+        {scopeTrips(detail.trips).map((trip) => {
+          const left = unsettledAmount(detail, trip.id);
+          return trip.endedAt === null ? (
+            <RowLink key={trip.id} to="/trips/$tripId" params={{ tripId: trip.id }}>
+              <span className="flex min-w-0 flex-1 flex-col gap-2">
+                <span className="flex items-center gap-3">
                   <RowText title={trip.name} meta={tripDates(trip)} />
-                  <Loaded
-                    query={stacks.trip(trip.id)}
-                    skeleton={
-                      <span aria-hidden className="flex h-[22px] items-center gap-4">
-                        <Skeleton className="h-3 w-24" />
-                        <Skeleton className="h-3 w-20" />
-                        <Skeleton className="h-3 w-24" />
-                      </span>
-                    }
-                  >
-                    {(detailed) => <Leaders detail={detail} trip={detailed} />}
-                  </Loaded>
+                  {trip.id === seatTripId ? <Tag tone="live">Live</Tag> : null}
                 </span>
-              </RowLink>
-            ))}
-          </List>
-        </Section>
-      ) : null}
-      {past.length > 0 ? (
-        <Section title="Past trips">
-          <List>
-            {past.map((trip) => {
-              const left = unsettledAmount(detail, trip.id);
-              return (
-                <RowLink
-                  key={trip.id}
-                  to={left !== null ? "/trips/$tripId/settle" : "/trips/$tripId"}
-                  params={{ tripId: trip.id }}
-                >
-                  <RowText title={trip.name} meta={tripDates(trip)} />
-                  {left !== null ? (
-                    <span className="shrink-0 text-sm font-medium text-accent-text">
-                      <Money amount={left} currency={detail.group.currency} /> left to settle
+                <Loaded
+                  query={stacks.trip(trip.id)}
+                  skeleton={
+                    <span aria-hidden className="flex h-[22px] items-center gap-4">
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-3 w-24" />
                     </span>
-                  ) : null}
-                </RowLink>
-              );
-            })}
-          </List>
-        </Section>
-      ) : null}
-    </>
+                  }
+                >
+                  {(detailed) => <Leaders detail={detail} trip={detailed} />}
+                </Loaded>
+              </span>
+            </RowLink>
+          ) : (
+            <RowLink
+              key={trip.id}
+              to={left !== null ? "/trips/$tripId/settle" : "/trips/$tripId"}
+              params={{ tripId: trip.id }}
+            >
+              <RowText title={trip.name} meta={tripDates(trip)} />
+              {left !== null ? (
+                <span className="shrink-0 text-sm font-medium text-accent-text">
+                  <Money amount={left} currency={detail.group.currency} /> left to settle
+                </span>
+              ) : null}
+            </RowLink>
+          );
+        })}
+      </List>
+    </Section>
   );
 }
 
@@ -109,21 +99,13 @@ function FirstTripSection({ detail }: { detail: GroupDetail }) {
   );
 }
 
-export function StartTripButton({
-  detail,
-  variant = "primary",
-  size = "md",
-}: {
-  detail: GroupDetail;
-  variant?: "primary" | "ghost";
-  size?: "sm" | "md";
-}) {
+function StartTripButton({ detail }: { detail: GroupDetail }) {
   const [starting, setStarting] = useState(false);
   return (
     <>
-      <Button variant={variant} size={size} onClick={() => setStarting(true)}>
-        <Plane className="size-4" aria-hidden />
-        Start a trip
+      <Button variant="ghost" size="sm" onClick={() => setStarting(true)}>
+        <Plus className="size-4" aria-hidden />
+        New trip
       </Button>
       {starting ? <StartTripDialog detail={detail} onClose={() => setStarting(false)} /> : null}
     </>
@@ -150,15 +132,15 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   );
 }
 
-function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
+export function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
   const navigate = useNavigate();
   const { setLastTripId } = useLastTrip();
   return (
     <Dialog
       open
       onOpenChange={(open) => (open ? undefined : onClose())}
-      title="Start a trip"
-      description="Sessions you start in it go on its board and settle up on their own."
+      title="New trip"
+      description={`Sessions you start in it go on its board and settle up on their own, in ${detail.group.name}.`}
     >
       <TripForm
         detail={detail}

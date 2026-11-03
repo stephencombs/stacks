@@ -10,7 +10,7 @@ export function PageHeader({
   tag,
   context,
   action,
-  tabs,
+  children,
 }: {
   back?: ReactNode;
   options?: ReactNode;
@@ -19,7 +19,8 @@ export function PageHeader({
   tag?: ReactNode;
   context?: ReactNode;
   action?: ReactNode;
-  tabs?: ReactNode;
+  /** What sits right under the title: a session's notes, or a Segmented that scopes the page. */
+  children?: ReactNode;
 }) {
   return (
     <header className="flex flex-col gap-3">
@@ -42,7 +43,7 @@ export function PageHeader({
         </div>
         {action}
       </div>
-      {tabs}
+      {children}
     </header>
   );
 }

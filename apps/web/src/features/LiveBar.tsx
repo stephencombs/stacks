@@ -5,12 +5,11 @@ import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { ChevronRight } from "lucide-react";
 
 import { Tag } from "~/components/ui/Surface";
-import { cn } from "~/components/ui/cn";
 import { useStacks } from "~/lib/stacks";
 
 /**
- * The table you're seated at, pinned to the bottom of every page that isn't showing it, so a
- * live session never goes missing.
+ * The table you're seated at, floating just above the bottom bar on narrow screens, so a live
+ * session never goes missing. Wide screens carry it in the sidebar instead.
  */
 export function LiveBar() {
   const stacks = useStacks();
@@ -18,17 +17,14 @@ export function LiveBar() {
   const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
   const seat = groups.flatMap((item) => (item.mySession ? [item.mySession] : []))[0];
   if (!seat) return null;
-  const trip = `/trips/${seat.tripId}`;
-  // The session itself, and its trip's Sessions tab, already show your table.
-  if (pathname === `/sessions/${seat.id}` || pathname.replace(/\/$/, "") === trip) return null;
+  // The session itself, and its trip's Sessions, where the live card comes first, already show it.
+  if (
+    pathname === `/sessions/${seat.id}` ||
+    pathname.replace(/\/$/, "") === `/trips/${seat.tripId}`
+  )
+    return null;
   return (
-    <div
-      className={cn(
-        "pointer-events-none fixed inset-x-0 bottom-0 z-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))]",
-        // A wide trip page shows your live table in its rail already.
-        pathname.startsWith(trip) && "lg:hidden",
-      )}
-    >
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:hidden">
       <Link
         to="/sessions/$sessionId"
         params={{ sessionId: seat.id }}
