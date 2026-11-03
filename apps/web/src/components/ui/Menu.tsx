@@ -53,14 +53,6 @@ export function Menu({
   );
 }
 
-export function MenuLabel({ children }: { children: ReactNode }) {
-  return <div className="px-3 pt-2 pb-1 text-xs font-medium text-muted">{children}</div>;
-}
-
-export function MenuSeparator() {
-  return <BaseMenu.Separator className="my-1 h-px bg-line" />;
-}
-
 export function MenuItem({
   onClick,
   tone = "default",

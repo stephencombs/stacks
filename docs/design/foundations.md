@@ -36,7 +36,7 @@ What color is this text?
 
 ## Brand
 
-The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame around four columns in `chip-2`, `chip-1`, `chip-3` and gold, the gold one tallest. It's `BrandMark` on both clients, beside the uppercase Barlow wordmark in the header and on the sign-in screen. The mark's colors come from the tokens, so it follows the theme; the app icon, favicon and touch icon are fixed renders of the dark version.
+The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame around four columns in `chip-2`, `chip-1`, `chip-3` and gold, the gold one tallest. It's `BrandMark` on both clients, beside the uppercase Barlow wordmark at the top of the sidebar and on the sign-in screen. The mark's colors come from the tokens, so it follows the theme; the app icon, favicon and touch icon are fixed renders of the dark version.
 
 ## Type
 
@@ -46,7 +46,7 @@ Web has two faces: Barlow Condensed for the page title, the wordmark and a hero 
 | --------------- | --------------------------------------------------- | ---- | ------ |
 | `type-title`    | The one title on a page (`PageHeader`, `PageTitle`) | 40px | 40px   |
 | `type-headline` | The "Can't sign in yet" screen heading              | none | 36px   |
-| `type-callout`  | Tabs; on mobile, small button labels and captions   | 15px | 15px   |
+| `type-callout`  | On mobile, tabs, small button labels and captions   | 15px | 15px   |
 | `type-label`    | Mono caps on mobile: "Live", the high-limit toggle  | none | 11px   |
 | `type-body`     | Field text, large button labels                     | none | 17px   |
 | `type-footnote` | Field captions, hints, errors                       | none | 13px   |
