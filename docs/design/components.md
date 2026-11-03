@@ -85,7 +85,15 @@ A tab can open on one hero card: the figure that tab exists to show, big enough 
 
 A hero is a `Surface` on web and a `rounded-xl bg-surface` view on mobile, inset `p-4` like the rows around it, with `Glow` first inside it in the tone of the figure: `win` up or ahead, `loss` down or behind, `accent` level or tied. A sentence-case `text-sm font-medium text-muted` label sits over the figure, which is `Money` in `font-display text-6xl` (`text-5xl` below `sm` on web), then one `text-sm text-muted` comparison. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`, never gold. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`) so both clients say the same thing.
 
-Charts in a hero take their scale from `lineScale` in `@stacks/client-runtime/chart` and draw it per platform: SVG on web, `react-native-svg` on mobile. Lines start at break-even, which is a dashed `line-strong` rule. A balance list draws each balance as a bar from break-even with `barTrack`.
+## Charts
+
+Every chart that compares players draws the same way: lines start at break-even, a dashed `line-strong` rule; the line you're following is `accent`, 3px with a halo on its current point; everyone else is `muted` at 45%; each line ends on a dot and the player's initial, spread apart with `spreadLabels` so none overlap. No chip colors on lines: the chip next to a name is identity, the gold line is focus. Scales come from `@stacks/client-runtime/chart` and draw per platform, SVG on web and `react-native-svg` on mobile.
+
+Players at very different stakes would flatten each other, so:
+
+- **A race fits the people near you.** Pass `lineScale` a `focus` from `around(index, count)`. A line far outside that range pins to the edge, and its initial gets an arrow (`J ↓`) from `clipped`.
+- **A race can compare stakes fairly.** The Stats race has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
+- **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
 
 ## PageHeader, Section, Note (web); PageTitle, SectionHeading (mobile)
 

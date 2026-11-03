@@ -81,7 +81,11 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
   const me = detail.myPlayerId;
   const involvesMe = (transfer: Transfer) => transfer.from === me || transfer.to === me;
   const ordered = transfers.toSorted((a, b) => Number(involvesMe(b)) - Number(involvesMe(a)));
-  const track = barTrack(detail.players.map((player) => balanceOf.get(player.id) ?? 0));
+  // Every bar sits beside its amount, so lengths can compress and still read true.
+  const track = barTrack(
+    detail.players.map((player) => balanceOf.get(player.id) ?? 0),
+    { compress: true, minimum: 0.06 },
+  );
 
   const record = async (payment: Omit<Payment, "id">) => {
     const id = EntryId.make(newId());

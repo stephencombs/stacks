@@ -180,6 +180,16 @@ export const raceHeadline = (
   return { label: "You lead", gap: null, net: mine.net, tone: "accent" as const, line: null };
 };
 
+const percent = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  maximumFractionDigits: 0,
+  signDisplay: "exceptZero",
+});
+
+/** A return on buy-ins, "+55%" or "-30%", or "–" for someone who never put money in. */
+export const returnLabel = (value: number | null) =>
+  value === null ? "–" : percent.format(value).replace("−", "-");
+
 /** A night's or a trip's record: "4W · 3L · 1 even", leaving out what's zero. */
 export const recordLine = (wins: number, losses: number, even: number) =>
   [wins ? `${wins}W` : null, losses ? `${losses}L` : null, even ? `${even} even` : null]

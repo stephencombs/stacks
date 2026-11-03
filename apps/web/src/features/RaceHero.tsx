@@ -1,5 +1,5 @@
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
-import { lineScale } from "@stacks/client-runtime/chart";
+import { around, lineScale, spreadLabels } from "@stacks/client-runtime/chart";
 import { playerNames } from "@stacks/client-runtime/format";
 import { localClock, raceHeadline } from "@stacks/client-runtime/trip";
 import { runningTotals } from "@stacks/shared/stats";
@@ -13,7 +13,7 @@ import { useWidth } from "~/lib/useWidth";
 const HEIGHT = 128;
 const PAD = { x: 16, y: 12 };
 /** Room past the last point for each line's initial. */
-const LABEL = 18;
+const LABEL = 30;
 
 /** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in gold. */
 export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
@@ -33,9 +33,18 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
     lines.map((l) => l.line),
     { width: Math.max(0, width - LABEL), height: HEIGHT },
     PAD,
+    around(
+      lines.findIndex((l) => l.playerId === me),
+      lines.length,
+    ),
   );
   // Yours draws last, on top of everyone else's.
   const drawn = lines.toSorted((a, b) => Number(a.playerId === me) - Number(b.playerId === me));
+  const labels = spreadLabels(
+    drawn.map(({ line }) => plot.y(line.at(-1)!)),
+    13,
+    { min: 6, max: HEIGHT - 6 },
+  );
 
   return (
     <Surface className="relative overflow-hidden">
@@ -65,9 +74,10 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
               stroke="var(--color-line-strong)"
               strokeDasharray="3 4"
             />
-            {drawn.map(({ playerId, line }) => {
+            {drawn.map(({ playerId, line }, i) => {
               const yours = playerId === me;
               const end = { x: plot.x(line.length - 1), y: plot.y(line.at(-1)!) };
+              const off = plot.clipped(line.at(-1)!);
               const color = yours ? "var(--color-accent)" : "var(--color-muted)";
               return (
                 <g key={playerId}>
@@ -86,13 +96,14 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
                   <circle cx={end.x} cy={end.y} r={yours ? 4.5 : 3} fill={color} />
                   <text
                     x={end.x + 9}
-                    y={end.y}
+                    y={labels[i]}
                     dominantBaseline="central"
                     className={
                       yours ? "fill-accent-text text-xs font-semibold" : "fill-muted text-xs"
                     }
                   >
                     {(names.get(playerId) ?? "?").slice(0, 1).toUpperCase()}
+                    {off === 1 ? " ↑" : off === -1 ? " ↓" : ""}
                   </text>
                 </g>
               );
