@@ -14,8 +14,8 @@ import * as Linking from "expo-linking";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
-import { Text, View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Text, View, useWindowDimensions } from "react-native";
+import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { Button } from "./components/ui/Button";
@@ -277,8 +277,17 @@ function SignedOut() {
 export default function App() {
   useFonts({ BarlowCondensed_700Bold, JetBrainsMono_500Medium });
   const { theme } = useUniwind();
+  const { width, height } = useWindowDimensions();
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider
+      // A lost first inset event must not hide the loading screen and error boundary.
+      initialMetrics={
+        initialWindowMetrics ?? {
+          frame: { x: 0, y: 0, width, height },
+          insets: { top: 0, right: 0, bottom: 0, left: 0 },
+        }
+      }
+    >
       <StartupBoundary>
         <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
           <Root />
