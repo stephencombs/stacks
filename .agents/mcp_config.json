@@ -8,6 +8,9 @@
     },
     "Neon": {
       "serverUrl": "https://mcp.neon.tech/mcp"
+    },
+    "expo": {
+      "serverUrl": "https://mcp.expo.dev/mcp"
     }
   }
 }
