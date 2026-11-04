@@ -144,7 +144,11 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
             {guests.map((player) => (
               <Row key={player.id} className="flex-wrap">
                 <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
-                <RowText title={player.displayName} meta={playerHandlesMeta(player)} />
+                <RowText
+                  title={player.displayName}
+                  meta={playerHandlesMeta(player)}
+                  className="basis-40"
+                />
                 <span className="ml-auto flex items-center gap-1">
                   <GuestPaymentHandlesAction detail={detail} player={player} />
                   {player.claimCode ? (

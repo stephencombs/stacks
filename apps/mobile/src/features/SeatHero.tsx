@@ -25,11 +25,9 @@ export function SeatHero({
   live,
   out,
   rebuyAmount,
-  undoing,
   currency,
   onBuyIn,
   onRebuy,
-  onUndo,
   onCashOut,
 }: {
   name: string;
@@ -41,12 +39,9 @@ export function SeatHero({
   out: boolean;
   /** The last buy-in, repeated by one tap. */
   rebuyAmount: MinorUnits | undefined;
-  /** True for a few seconds after a quick rebuy, while it can still be taken back. */
-  undoing: boolean;
   currency: CurrencyCode;
   onBuyIn: () => void;
   onRebuy: () => void;
-  onUndo: () => void;
   onCashOut: () => void;
 }) {
   const bought = result !== undefined && result.buyIn > 0;
@@ -98,21 +93,17 @@ export function SeatHero({
               />
             ) : (
               <>
-                {undoing ? (
-                  <Button label="Undo rebuy" size="lg" className="flex-1" onPress={onUndo} />
-                ) : (
-                  <Button
-                    label={
-                      rebuyAmount === undefined
-                        ? "Rebuy"
-                        : `Rebuy +${formatMoney(rebuyAmount, currency)}`
-                    }
-                    variant="primary"
-                    size="lg"
-                    className="flex-1"
-                    onPress={rebuyAmount === undefined ? onBuyIn : onRebuy}
-                  />
-                )}
+                <Button
+                  label={
+                    rebuyAmount === undefined
+                      ? "Rebuy"
+                      : `Rebuy ${formatMoney(rebuyAmount, currency)}`
+                  }
+                  variant="primary"
+                  size="lg"
+                  className="flex-1"
+                  onPress={rebuyAmount === undefined ? onBuyIn : onRebuy}
+                />
                 <Button label="Cash out" size="lg" className="flex-1" onPress={onCashOut} />
               </>
             )}

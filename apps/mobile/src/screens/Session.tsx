@@ -187,15 +187,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
     toast({ message: error });
   };
 
-  // A rebuy's button turns into Undo for a few seconds, where the thumb already is.
-  const [rebought, setRebought] = useState<ReadonlyMap<PlayerId, EntryId>>(new Map());
-  const forget = (playerId: PlayerId, id?: EntryId) =>
-    setRebought((all) => {
-      if (id !== undefined && all.get(playerId) !== id) return all;
-      const next = new Map(all);
-      next.delete(playerId);
-      return next;
-    });
+  // Rebuy stays where it is, so a second tap rebuys again; the toast is where to take one back.
   const rebuy = (playerId: PlayerId, amount: Entry["amount"]) => {
     const id = record({
       kind: "buy_in",
@@ -205,8 +197,10 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
       note: null,
       replacesEntryId: null,
     });
-    setRebought((all) => new Map(all).set(playerId, id));
-    setTimeout(() => forget(playerId, id), UNDO_MS);
+    toast({
+      message: `${names.get(playerId) ?? "Player"} bought in ${formatMoney(amount, currency)}`,
+      action: { label: "Undo", onPress: () => void undo(id) },
+    });
   };
   // While playing you come first; once closed, the table reads like a receipt, best result first.
   const seats = detail.playerIds.toSorted((a, b) =>
@@ -226,7 +220,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
     : mySeated
       ? group.myPlayerId
       : undefined;
-  const heroRebuy = heroPlayerId === undefined ? undefined : rebought.get(heroPlayerId);
 
   const canVoid = (entry: Entry) =>
     isAdmin(group) || entry.createdBy === userId || entry.playerId === group.myPlayerId;
@@ -278,6 +271,25 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
         {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
       </View>
 
+      {heroPlayerId ? (
+        <SeatHero
+          name={names.get(heroPlayerId) ?? "Player"}
+          chip={chipOf(group, heroPlayerId)}
+          seat={seatsNow(detail.seatings).get(heroPlayerId)}
+          you={heroPlayerId === group.myPlayerId}
+          result={results.get(heroPlayerId)}
+          live={live}
+          out={cashedOut.has(heroPlayerId)}
+          rebuyAmount={lastBuyIn(heroPlayerId)?.amount}
+          currency={currency}
+          onBuyIn={() => setDraft({ kind: "buy_in", playerId: heroPlayerId })}
+          onRebuy={() => {
+            const last = lastBuyIn(heroPlayerId);
+            if (last) rebuy(heroPlayerId, last.amount);
+          }}
+          onCashOut={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
+        />
+      ) : null}
       {seatCount(session) ? (
         <TableMap
           detail={detail}
@@ -298,30 +310,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
         results={[...results.values()]}
         currency={currency}
       />
-      {heroPlayerId ? (
-        <SeatHero
-          name={names.get(heroPlayerId) ?? "Player"}
-          chip={chipOf(group, heroPlayerId)}
-          seat={seatsNow(detail.seatings).get(heroPlayerId)}
-          you={heroPlayerId === group.myPlayerId}
-          result={results.get(heroPlayerId)}
-          live={live}
-          out={cashedOut.has(heroPlayerId)}
-          rebuyAmount={lastBuyIn(heroPlayerId)?.amount}
-          undoing={heroRebuy !== undefined}
-          currency={currency}
-          onBuyIn={() => setDraft({ kind: "buy_in", playerId: heroPlayerId })}
-          onRebuy={() => {
-            const last = lastBuyIn(heroPlayerId);
-            if (last) rebuy(heroPlayerId, last.amount);
-          }}
-          onUndo={() => {
-            forget(heroPlayerId);
-            if (heroRebuy) void undo(heroRebuy);
-          }}
-          onCashOut={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
-        />
-      ) : null}
 
       <View className="gap-3">
         <SectionHeading
@@ -343,7 +331,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
             const result = results.get(playerId);
             const name = names.get(playerId) ?? "Player";
             const lastRebuy = lastBuyIn(playerId);
-            const undoable = rebought.get(playerId);
             const out = cashedOut.has(playerId);
             const bought = result !== undefined && result.buyIn > 0;
             // A closed session's results are final, cash-out or not.
@@ -411,21 +398,10 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                     </Reveal>
                   ) : null}
                 </Pressable>
-                {!live || out ? null : undoable ? (
+                {!live || out ? null : lastRebuy ? (
                   <Button
-                    label="Undo"
-                    accessibilityLabel={`Undo rebuy for ${name}`}
-                    size="sm"
-                    className="min-w-20"
-                    onPress={() => {
-                      forget(playerId);
-                      void undo(undoable);
-                    }}
-                  />
-                ) : lastRebuy ? (
-                  <Button
-                    label={`+${formatMoney(lastRebuy.amount, currency)}`}
-                    accessibilityLabel={`Rebuy for ${name}`}
+                    label={`Rebuy ${formatMoney(lastRebuy.amount, currency)}`}
+                    accessibilityLabel={`Rebuy ${formatMoney(lastRebuy.amount, currency)} for ${name}`}
                     variant="tint"
                     size="sm"
                     className="min-w-20"
@@ -644,8 +620,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
     </>
   );
 }
-
-const UNDO_MS = 5000;
 
 const succeed = () => {
   if (Platform.OS !== "web")

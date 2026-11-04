@@ -20,7 +20,7 @@ it("explains API errors in plain words", () => {
 
 it("blames the connection for anything else", () => {
   expect(describeError(new Error("fetch failed"))).toBe(
-    "Couldn't reach Stacks. Check your connection and try again.",
+    "Couldn't reach Color Up. Check your connection and try again.",
   );
 });
 

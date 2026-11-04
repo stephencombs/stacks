@@ -27,7 +27,7 @@ import { flushSync } from "react-dom";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
-import { Segmented } from "~/components/ui/Segmented";
+import { Menu, MenuChoice } from "~/components/ui/Menu";
 import { Skeleton } from "~/components/ui/Surface";
 import { Chip } from "~/features/Chip";
 import { useAction, useStacks } from "~/lib/stacks";
@@ -644,13 +644,14 @@ export function TableMap({
         </div>
       )}
       {live && sizes.length > 1 ? (
-        <div className="mt-3 flex flex-wrap items-center gap-3 px-4 sm:px-0">
-          <Segmented
-            label="Table size"
-            options={sizes.map((option) => ({ value: option, label: `${option} seats` }))}
-            value={size}
-            onChange={(next) => void pickSize(next)}
-          />
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 px-4 sm:px-0">
+          <Menu label={`Table size: ${size} seats`} trigger={`${size} seats`}>
+            <MenuChoice
+              options={sizes.map((option) => ({ value: String(option), label: `${option} seats` }))}
+              value={String(size)}
+              onChange={(next) => void pickSize(Number(next))}
+            />
+          </Menu>
           {(blocked ?? resize.error) ? <FormError>{blocked ?? resize.error}</FormError> : null}
         </div>
       ) : null}

@@ -10,7 +10,7 @@ import {
   type StatsSession,
 } from "@stacks/shared/stats";
 import * as DateTime from "effect/DateTime";
-import { useState } from "react";
+import { useState, type Ref } from "react";
 
 import { Money } from "~/components/Money";
 import { Note } from "~/components/ui/Page";
@@ -322,12 +322,14 @@ function Race<S extends RaceSession>({
 
 /** One player's numbers over these sessions: how often they won, their best and worst, every result. */
 export function PlayerSheet({
+  ref,
   sessions,
   player,
   rank,
   of,
   currency,
 }: {
+  ref?: Ref<HTMLElement>;
   sessions: ReadonlyArray<RaceSession>;
   player: Pick<Line, "playerId" | "name" | "chip">;
   rank: number;
@@ -385,28 +387,32 @@ export function PlayerSheet({
     },
     {
       title: "Average buy-in",
-      meta: `${sheet.venues} ${sheet.venues === 1 ? "casino" : "casinos"} played`,
+      meta: "Per session",
       value: sheet.averageBuyIn === null ? none : figure(sheet.averageBuyIn, true),
     },
   ];
   const focus = shown === null ? null : sheet.played[shown]!;
 
   return (
-    <section aria-label={`${player.name}'s stats`} className="flex flex-col gap-3">
+    <section
+      ref={ref}
+      aria-label={`${player.name}'s numbers`}
+      className="flex scroll-mt-4 flex-col gap-3"
+    >
       <header className="flex items-center gap-3">
         <Chip chip={player.chip} name={player.name} size={40} />
-        <div className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h2 className="text-lg font-semibold wrap-anywhere">{player.name}'s numbers</h2>
           <Note className="tabular-nums">
-            {player.name} · #{rank} of {of} · {runs.sessions}{" "}
-            {runs.sessions === 1 ? "session" : "sessions"}
+            #{rank} of {of} · {runs.sessions} {runs.sessions === 1 ? "session" : "sessions"}
           </Note>
-          <Money
-            amount={sheet.total}
-            currency={currency}
-            tone="result"
-            className="text-2xl font-semibold"
-          />
         </div>
+        <Money
+          amount={sheet.total}
+          currency={currency}
+          tone="result"
+          className="text-2xl font-semibold"
+        />
       </header>
 
       <List>
@@ -424,7 +430,7 @@ export function PlayerSheet({
           <span aria-live="polite" className="text-sm text-muted tabular-nums wrap-anywhere">
             {focus
               ? `${formatDay(focus.session.session.startedAt)} · ${focus.session.venue.name} · ${money(focus.net)}`
-              : "Tap a bar"}
+              : "Pick a bar"}
           </span>
         </div>
         <Surface className="overflow-x-auto" onPointerLeave={() => setShown(null)}>

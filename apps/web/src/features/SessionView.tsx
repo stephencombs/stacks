@@ -16,6 +16,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
 import { Button, ButtonLink } from "~/components/ui/Button";
+import { Checkbox } from "~/components/ui/Checkbox";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { cn } from "~/components/ui/cn";
@@ -114,15 +115,9 @@ export function SessionView({
     void outbox.add(session.id, { ...input, id, occurredAt: DateTime.nowUnsafe() });
     return id;
   };
-  // A rebuy's button turns into Undo for a few seconds, right where it was pressed.
-  const [rebought, setRebought] = useState<ReadonlyMap<PlayerId, EntryId>>(new Map());
-  const forget = (playerId: PlayerId, id?: EntryId) =>
-    setRebought((all) => {
-      if (id !== undefined && all.get(playerId) !== id) return all;
-      const next = new Map(all);
-      next.delete(playerId);
-      return next;
-    });
+  // The last quick rebuy can be taken back for a few seconds, from a bar away from the Rebuy
+  // button, so a second tap rebuys again instead of undoing the first.
+  const [rebought, setRebought] = useState<Rebought | null>(null);
   const rebuy = (playerId: PlayerId, amount: Entry["amount"]) => {
     const id = record({
       kind: "buy_in",
@@ -132,8 +127,8 @@ export function SessionView({
       note: null,
       replacesEntryId: null,
     });
-    setRebought((all) => new Map(all).set(playerId, id));
-    setTimeout(() => forget(playerId, id), UNDO_MS);
+    setRebought({ id, playerId, amount });
+    setTimeout(() => setRebought((last) => (last?.id === id ? null : last)), UNDO_MS);
   };
   const undo = async (id: EntryId) => {
     // An entry the server never got just leaves the outbox; one it has gets voided.
@@ -191,7 +186,6 @@ export function SessionView({
     />
   );
   const heroPlayerId = live ? focusPlayerId : mySeated ? group.myPlayerId : undefined;
-  const heroRebuy = heroPlayerId === undefined ? undefined : rebought.get(heroPlayerId);
   const notes = session.notes ? (
     <p className="max-w-[65ch] text-sm text-pretty whitespace-pre-line">{session.notes}</p>
   ) : null;
@@ -229,6 +223,25 @@ export function SessionView({
         )}
       </Loaded>
 
+      {heroPlayerId ? (
+        <SeatHero
+          name={names.get(heroPlayerId) ?? "Player"}
+          chip={chipOf(group, heroPlayerId)}
+          seat={seatsNow(detail.seatings).get(heroPlayerId)}
+          you={heroPlayerId === group.myPlayerId}
+          result={resultOf.get(heroPlayerId)}
+          live={live}
+          out={cashedOut.has(heroPlayerId)}
+          rebuyAmount={lastBuyIn(heroPlayerId)?.amount}
+          currency={currency}
+          onBuyIn={() => setDraft({ kind: "buy_in", playerId: heroPlayerId })}
+          onRebuy={() => {
+            const last = lastBuyIn(heroPlayerId);
+            if (last) rebuy(heroPlayerId, last.amount);
+          }}
+          onCashOut={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
+        />
+      ) : null}
       {seatCount(session) ? (
         <TableMap
           detail={detail}
@@ -245,30 +258,6 @@ export function SessionView({
         />
       ) : null}
       {tableStats}
-      {heroPlayerId ? (
-        <SeatHero
-          name={names.get(heroPlayerId) ?? "Player"}
-          chip={chipOf(group, heroPlayerId)}
-          seat={seatsNow(detail.seatings).get(heroPlayerId)}
-          you={heroPlayerId === group.myPlayerId}
-          result={resultOf.get(heroPlayerId)}
-          live={live}
-          out={cashedOut.has(heroPlayerId)}
-          rebuyAmount={lastBuyIn(heroPlayerId)?.amount}
-          undoing={heroRebuy !== undefined}
-          currency={currency}
-          onBuyIn={() => setDraft({ kind: "buy_in", playerId: heroPlayerId })}
-          onRebuy={() => {
-            const last = lastBuyIn(heroPlayerId);
-            if (last) rebuy(heroPlayerId, last.amount);
-          }}
-          onUndo={() => {
-            forget(heroPlayerId);
-            if (heroRebuy) void undo(heroRebuy);
-          }}
-          onCashOut={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
-        />
-      ) : null}
 
       <Section
         title="At the table"
@@ -286,7 +275,6 @@ export function SessionView({
             const result = resultOf.get(playerId);
             const name = names.get(playerId) ?? "Player";
             const lastRebuy = lastBuyIn(playerId);
-            const undoable = rebought.get(playerId);
             const out = cashedOut.has(playerId);
             const bought = result !== undefined && result.buyIn > 0;
             // A closed session's results are final, cash-out or not.
@@ -349,27 +337,15 @@ export function SessionView({
                 ) : (
                   <div className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">{row}</div>
                 )}
-                {!live || out ? null : undoable ? (
-                  <Button
-                    size="sm"
-                    className="min-w-20"
-                    aria-label={`Undo rebuy for ${name}`}
-                    onClick={() => {
-                      forget(playerId);
-                      void undo(undoable);
-                    }}
-                  >
-                    Undo
-                  </Button>
-                ) : lastRebuy ? (
+                {!live || out ? null : lastRebuy ? (
                   <Button
                     size="sm"
                     variant="tint"
                     className="min-w-20 tabular-nums"
-                    aria-label={`Rebuy for ${name}`}
+                    aria-label={`Rebuy ${formatMoney(lastRebuy.amount, currency)} for ${name}`}
                     onClick={() => rebuy(playerId, lastRebuy.amount)}
                   >
-                    +{formatMoney(lastRebuy.amount, currency)}
+                    Rebuy {formatMoney(lastRebuy.amount, currency)}
                   </Button>
                 ) : (
                   <Button
@@ -497,6 +473,18 @@ export function SessionView({
 
       {live ? null : <ReopenSession detail={detail} group={group} />}
 
+      {live ? (
+        <UndoBar
+          rebought={rebought}
+          name={rebought ? (names.get(rebought.playerId) ?? "Player") : ""}
+          currency={currency}
+          onUndo={(last) => {
+            setRebought(null);
+            void undo(last.id);
+          }}
+        />
+      ) : null}
+
       {draft ? (
         <EntryDialog
           key={`${draft.kind}:${draft.playerId}:${draft.replaces?.id ?? ""}`}
@@ -528,6 +516,45 @@ export function SessionView({
 }
 
 const UNDO_MS = 5000;
+
+type Rebought = { readonly id: EntryId; readonly playerId: PlayerId; readonly amount: MinorUnits };
+
+/**
+ * Floats where the LiveBar would, which a live session's own page doesn't show. The live region
+ * stays mounted so a screen reader hears each rebuy land.
+ */
+function UndoBar({
+  rebought,
+  name,
+  currency,
+  onUndo,
+}: {
+  rebought: Rebought | null;
+  name: string;
+  currency: CurrencyCode;
+  onUndo: (rebought: Rebought) => void;
+}) {
+  return (
+    <div
+      role="status"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:bottom-0 lg:pr-10 lg:pb-6 lg:pl-70"
+    >
+      {rebought ? (
+        <div
+          key={rebought.id}
+          className="pointer-events-auto mx-auto flex min-h-14 w-full max-w-[40rem] items-center gap-3 rounded-xl bg-surface py-2 pr-2 pl-4 shadow-(--elevation-popover) transition-[translate,opacity] duration-200 ease-snap starting:translate-y-2 starting:opacity-0 motion-reduce:transition-none motion-reduce:starting:translate-y-0"
+        >
+          <span className="min-w-0 flex-1 font-medium">
+            {name} bought in <Money amount={rebought.amount} currency={currency} />
+          </span>
+          <Button variant="ghost" onClick={() => onUndo(rebought)}>
+            Undo
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 const verbs = {
   buy_in: "bought in",
@@ -616,18 +643,22 @@ function HighLimitToggle({ detail }: { detail: SessionDetail }) {
   const set = useAction(stacks.Client.mutation("sessions", "setHighLimit"));
   const on = detail.session.highLimit;
   return (
-    <Button
-      size="sm"
-      variant={on ? "tint" : "ghost"}
-      aria-pressed={on}
-      disabled={set.pending}
-      title={on ? "Played at a high-limit table" : "Mark as a high-limit table"}
-      onClick={() =>
-        void set.run({ params: { sessionId: detail.session.id }, payload: { highLimit: !on } })
-      }
-    >
-      High limit
-    </Button>
+    <div className="flex flex-col items-end">
+      <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-medium transition-colors duration-150 hover:bg-sunken pointer-coarse:min-h-11">
+        <Checkbox
+          checked={on}
+          disabled={set.pending}
+          onCheckedChange={(highLimit) =>
+            void set.run({ params: { sessionId: detail.session.id }, payload: { highLimit } })
+          }
+        />
+        High limit
+      </label>
+      <span role="status" className="text-sm text-muted">
+        {set.pending ? "Saving…" : null}
+      </span>
+      {set.error ? <FormError>{set.error}</FormError> : null}
+    </div>
   );
 }
 
@@ -729,16 +760,26 @@ function CloseSessionDialog({
           </div>
         ) : null}
         {unsent > 0 ? (
-          <FormError>
-            {unsent === 1 ? "1 entry hasn't" : `${unsent} entries haven't`} reached Color Up yet.
-            Close once they have, so nothing is left out.
-          </FormError>
+          <Note>
+            {unsent === 1 ? "1 entry is" : `${unsent} entries are`} still on the way to Color Up.
+            Closing sends {unsent === 1 ? "it" : "them"} first.
+          </Note>
         ) : null}
         {close.error ? <FormError>{close.error}</FormError> : null}
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button onClick={() => onOpenChange(false)}>Keep playing</Button>
+        {/* Three outcomes don't fit a row on a phone, so they stack, the one most people want first. */}
+        <div className="flex flex-col gap-2">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            disabled={closing !== null}
+            pending={closing === "close"}
+          >
+            Close session
+          </Button>
           {/* Not a submit button: Enter in a cash-out field must close, not move tables. */}
           <Button
+            size="lg"
             disabled={closing !== null}
             pending={closing === "move"}
             onClick={(event) => void confirm(event.currentTarget.form!, true)}
@@ -746,13 +787,8 @@ function CloseSessionDialog({
           >
             Close and move tables
           </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={closing !== null}
-            pending={closing === "close"}
-          >
-            Close session
+          <Button variant="ghost" size="lg" onClick={() => onOpenChange(false)}>
+            Keep playing
           </Button>
         </div>
       </form>
