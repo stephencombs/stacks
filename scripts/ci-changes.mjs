@@ -28,8 +28,9 @@ const SKIP_EXACT = new Set([
   ".gitignore",
   ".mcp.json",
   ".github/dependabot.yml",
-  // mobile.yml is the path filter for the bundle workflow.
+  // These workflows filter themselves. A change to either is not a CI input.
   ".github/workflows/mobile.yml",
+  ".github/workflows/testflight.yml",
   "docker-compose.yml",
 ]);
 

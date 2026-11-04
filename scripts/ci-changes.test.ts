@@ -37,6 +37,7 @@ describe("plan", () => {
     "docs/internals/navigation.md",
     "apps/web/README.md",
     ".github/workflows/mobile.yml",
+    ".github/workflows/testflight.yml",
     ".github/dependabot.yml",
     "tools/table-art/scene.py",
     "docker-compose.yml",
