@@ -40,6 +40,7 @@ trip with six closed sessions and a live one you're sitting in, and an ended tri
 | Trip, running        | `0192e7a0-0000-7000-8000-000000000002` |
 | Trip, ended          | `0192e7a0-0000-7000-8000-000000000003` |
 | Live session (yours) | `0192e7a0-0000-7000-8000-000000000050` |
+| Group with no trips  | `0192e7a0-0000-7000-8000-000000000020` |
 
 A request with no fixture answers 404, which the app shows as its not-found state. When a new
 screen needs data, add it to `routes` in `fixtures.ts`. Every fixture is decoded and re-encoded
