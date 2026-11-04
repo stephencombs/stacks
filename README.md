@@ -37,6 +37,8 @@ For development telemetry, add `VITE_POSTHOG_TOKEN` and `VITE_POSTHOG_HOST` to `
 
 The `development-test-events` flag controls client confirmations of session starts, entries and closes. These events can repeat after a retry and are not ledger counts. Telemetry is held in memory, so unsent events are lost when the app closes. Autocapture, page views and replay are off; exception messages and stacks are removed before sending, so errors show occurrence counts but not the original cause.
 
+On mobile, unhandled promise rejections stay with React Native's development warning handler and are not sent to PostHog. The web SDK loads its exception tracking code from PostHog when telemetry is configured.
+
 Before enabling telemetry, configure the PostHog project to discard client IP addresses and keep console log capture disabled. These project settings protect data sent outside event capture. The local development env files do not configure the deployed development build. New mobile dev clients must be rebuilt for the added Expo modules.
 
 ## Deploy

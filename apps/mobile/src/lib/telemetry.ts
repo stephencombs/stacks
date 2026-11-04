@@ -15,7 +15,7 @@ const posthog =
         personProfiles: "never",
         logs: { beforeSend: () => null },
         errorTracking: {
-          autocapture: { uncaughtExceptions: true, unhandledRejections: true, console: false },
+          autocapture: { uncaughtExceptions: true, unhandledRejections: false, console: false },
           exceptionSteps: { enabled: false },
         },
         before_send: (event) => ({
