@@ -44,10 +44,16 @@ const stackOptions = {
   headerShadowVisible: false,
   headerBackButtonDisplayMode: "minimal",
   headerRight: () => <YouButton />,
+  // Your chip and the scope button draw their own shapes, so iOS 26 doesn't wrap them in glass.
+  headerRightBackgroundVisible: false,
 } as const;
 
 /** A place's own page: the scope where a back button would be, and You beside it. */
-const placeOptions = { title: "", headerLeft: () => <ScopeButton /> };
+const placeOptions = {
+  title: "",
+  headerLeft: () => <ScopeButton />,
+  headerLeftBackgroundVisible: false,
+};
 
 const SessionsStack = createNativeStackNavigator({
   screenOptions: stackOptions,

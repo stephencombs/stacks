@@ -10,7 +10,7 @@ import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
 import { SectionHeading } from "../components/ui/Surface";
 import { PaymentAppsSection } from "../features/PaymentHandles";
-import { ListScreenSkeleton } from "../features/ScreenSkeletons";
+import { SettingsSkeleton } from "../features/ScreenSkeletons";
 import { useLinkedScope } from "../lib/scope";
 import { shareCsv } from "../lib/share";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
@@ -25,7 +25,7 @@ export function GroupSettingsScreen({ route }: Props) {
     <Screen>
       <Loaded
         query={stacks.group(GroupId.make(route.params.groupId))}
-        skeleton={<ListScreenSkeleton label="Loading settings" rows={2} />}
+        skeleton={<SettingsSkeleton />}
       >
         {(detail) => <SettingsView detail={detail} />}
       </Loaded>

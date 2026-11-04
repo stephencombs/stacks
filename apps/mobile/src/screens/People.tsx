@@ -26,7 +26,7 @@ import { shareLink } from "../lib/share";
 import { Chip } from "../features/Chip";
 import { GuestPaymentHandlesAction, playerHandlesMeta } from "../features/PaymentHandles";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
-import { ListScreenSkeleton, RowsSkeleton } from "../features/ScreenSkeletons";
+import { InviteLinkSkeleton, PeopleSkeleton } from "../features/ScreenSkeletons";
 
 type Props = StaticScreenProps<{ groupId: string }>;
 
@@ -38,7 +38,7 @@ export function PeopleScreen({ route }: Props) {
     <Screen>
       <Loaded
         query={stacks.group(GroupId.make(route.params.groupId))}
-        skeleton={<ListScreenSkeleton label="Loading people" rows={5} />}
+        skeleton={<PeopleSkeleton />}
       >
         {(detail) => <PeopleView detail={detail} />}
       </Loaded>
@@ -200,10 +200,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
       >
         Invite links
       </SectionHeading>
-      <Loaded
-        query={stacks.invites(detail.group.id)}
-        skeleton={<RowsSkeleton rows={1} trailing={false} />}
-      >
+      <Loaded query={stacks.invites(detail.group.id)} skeleton={<InviteLinkSkeleton />}>
         {(invites) =>
           invites.length === 0 ? (
             <Text className="text-sm text-muted">

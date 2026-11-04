@@ -6,11 +6,12 @@ import { PageTitle } from "../components/ui/Surface";
 import { AllTimeBoard } from "../features/AllTimeBoard";
 import { AllTimeSkeleton, BoardSkeleton } from "../features/ScreenSkeletons";
 import { TripBoard } from "../features/TripBoard";
-import { ScopeLoaded, useLinkedScope } from "../lib/scope";
+import { ScopeLoaded, usePlaceAddress } from "../lib/scope";
 import { TripLoaded } from "../lib/stacks";
 
-type View = "trip" | "all";
-type Props = StaticScreenProps<{ tripId?: string; groupId?: string; view?: View } | undefined>;
+type Props = StaticScreenProps<
+  { tripId?: string; groupId?: string; scope?: "trip" | "all" } | undefined
+>;
 
 const views = [
   { value: "trip", label: "This trip" },
@@ -21,9 +22,10 @@ const views = [
 export function BoardScreen({ route }: Props) {
   const navigation = useNavigation();
   const params = route.params;
-  // A group's old Stats address names only the group, and meant all time.
-  const view = params?.view ?? (params?.groupId && !params.tripId ? "all" : "trip");
-  useLinkedScope(params);
+  // `?scope=all` is All time, as on web. A group's old Stats address names only the group, and
+  // meant all time.
+  const view = params?.scope ?? (params?.groupId ? "all" : "trip");
+  usePlaceAddress(params, "tripId");
   return (
     <Screen>
       <PageTitle>Board</PageTitle>
@@ -32,7 +34,14 @@ export function BoardScreen({ route }: Props) {
         labelHidden
         options={views}
         value={view}
-        onChange={(next) => navigation.dispatch(CommonActions.setParams({ view: next }))}
+        onChange={(next) =>
+          navigation.dispatch(
+            CommonActions.setParams({
+              scope: next === "all" ? next : undefined,
+              groupId: undefined,
+            }),
+          )
+        }
       />
       <ScopeLoaded skeleton={view === "all" ? <AllTimeSkeleton /> : <BoardSkeleton />}>
         {({ item, trip }) =>

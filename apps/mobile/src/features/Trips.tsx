@@ -17,7 +17,7 @@ import { Button } from "../components/ui/Button";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
-import { List, Row, SectionHeading } from "../components/ui/Surface";
+import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
 import { useGo } from "../lib/go";
 import { useScope } from "../lib/scope";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
@@ -36,22 +36,14 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
     <View className="gap-2">
       <SectionHeading
         action={
-          <Button
-            label="New trip"
-            size="sm"
-            variant={detail.trips.length === 0 ? "primary" : "ghost"}
-            onPress={() => setStarting(true)}
-          />
+          detail.trips.length === 0 ? undefined : (
+            <Button label="New trip" size="sm" variant="ghost" onPress={() => setStarting(true)} />
+          )
         }
       >
         Trips
       </SectionHeading>
-      {detail.trips.length === 0 ? (
-        <Text className="text-sm text-muted">
-          Every session is part of a trip, like a weekend in Vegas or this month's home games. Start
-          one, and its sessions get their own leaderboard, awards and settle-up.
-        </Text>
-      ) : null}
+      {detail.trips.length === 0 ? <NoTrips onStart={() => setStarting(true)} /> : null}
       {going.map((trip) => (
         <Pressable
           key={trip.id}
@@ -107,6 +99,19 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
         />
       ) : null}
     </View>
+  );
+}
+
+/** A group with no trips yet: what a trip is, and the way to start the first. */
+export function NoTrips({ onStart }: { onStart: () => void }) {
+  return (
+    <EmptyState
+      title="No trips yet"
+      action={<Button label="Start a trip" variant="primary" onPress={onStart} className="mt-2" />}
+    >
+      Every session is part of a trip, like a weekend in Vegas or this month's home games. Start
+      one, and its sessions get their own leaderboard, awards and settle-up.
+    </EmptyState>
   );
 }
 

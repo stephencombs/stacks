@@ -1,5 +1,5 @@
 import { createContext, use, type ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 
 import { LiveBar, type ShowsTable } from "../../features/LiveBar";
 import { ToastHost } from "./Toast";
@@ -27,6 +27,8 @@ export function Screen({ children, shows }: { children: ReactNode; shows?: Shows
           contentContainerClassName="gap-6 px-4 pt-4 pb-24"
         >
           {children}
+          {/* iOS insets the scroll view for the tab bar; Android's sits over the scene's foot. */}
+          {Platform.OS === "android" && bar ? <View style={{ height: bar }} /> : null}
         </ScrollView>
       </ToastHost>
       <LiveBar {...(shows ? { shows } : {})} {...(bar ? { bottom: bar } : {})} />

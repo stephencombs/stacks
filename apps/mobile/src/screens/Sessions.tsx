@@ -15,14 +15,14 @@ import { LiveSessionCard, SessionList } from "../features/SessionList";
 import { ReopenTrip, TripOptionsButton } from "../features/TripOptions";
 import { TripHero } from "../features/TripHero";
 import { useGo } from "../lib/go";
-import { ScopeLoaded, useLinkedScope, useScope } from "../lib/scope";
+import { ScopeLoaded, usePlaceAddress, useScope } from "../lib/scope";
 import { TripLoaded } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ tripId?: string } | undefined>;
 
 /** What's being played: your live table first, then the trip, then its sessions night by night. */
 export function SessionsScreen({ route }: Props) {
-  useLinkedScope(route.params);
+  usePlaceAddress(route.params, "tripId");
   const { scope } = useScope();
   // Your table comes first when it's on this trip, so the skeleton holds its place.
   const live = scope?.trip !== undefined && scope.item.mySession?.tripId === scope.trip.id;
