@@ -1,6 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
-import type { GroupListItem, Trip } from "@stacks/contracts";
 import { scopeTrips, tripDates, unsettledAmount } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useState } from "react";
