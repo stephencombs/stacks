@@ -21,7 +21,6 @@ import {
   useRevalidate,
 } from "@stacks/client-runtime/react";
 import { CACHE_MS } from "@stacks/client-runtime/freshness";
-import { File, Paths } from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
@@ -31,6 +30,7 @@ import { Skeleton } from "../components/ui/Surface";
 import { apiUrl, clerkPublishableKey } from "./config";
 import { outboxStorage, wakeOutbox } from "./outbox";
 import { captureTestEvent } from "./telemetry";
+import { lastTripStorage } from "./tripStorage";
 
 /**
  * One API client and atom registry per signed-in user. Remounting it with a new `key` on
@@ -46,24 +46,7 @@ export function StacksProvider({ userId, children }: { userId: string; children:
     }),
   );
   const [storage] = useState(() => outboxStorage(userId));
-  const [tripStorage] = useState(() => {
-    const key = `last-trip-${userId}`;
-    if (Platform.OS === "web")
-      return {
-        load: () => localStorage.getItem(key),
-        save: (value: string | null) =>
-          value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value),
-      };
-    const file = new File(Paths.document, key);
-    return {
-      load: () => (file.exists ? file.textSync() : null),
-      save: (value: string | null) => {
-        if (value === null) {
-          if (file.exists) file.delete();
-        } else file.write(value);
-      },
-    };
-  });
+  const [tripStorage] = useState(() => lastTripStorage(userId));
   return (
     <TelemetryContext value={captureTestEvent}>
       <StacksContext value={stacks}>

@@ -37,6 +37,7 @@ export default (): ExpoConfig => ({
   plugins: [
     "@clerk/expo",
     "expo-secure-store",
+    "expo-font",
     "expo-web-browser",
     [
       "expo-location",
@@ -47,5 +48,9 @@ export default (): ExpoConfig => ({
     ],
   ],
   web: { bundler: "metro", output: "single" },
-  extra: { appVariant: variant, eas: { projectId: "e15fb4de-bc0f-49f9-b03d-ed701d1c895c" } },
+  extra: {
+    appVariant: variant,
+    googleMapsEnabled: Boolean(process.env.GOOGLE_MAPS_API_KEY),
+    eas: { projectId: "e15fb4de-bc0f-49f9-b03d-ed701d1c895c" },
+  },
 });
