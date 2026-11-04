@@ -140,6 +140,7 @@ describe("plan", () => {
     });
     expect(jobs([".github/workflows/preview.yml"])).toEqual({ ...none, check: "true" });
     expect(jobs(["scripts/preview.mjs"])).toEqual({ ...none, check: "true" });
+    expect(jobs(["scripts/preview-comment.mjs"])).toEqual({ ...none, check: "true" });
     expect(jobs(["scripts/ci-changes.mjs"])).toEqual({ ...none, check: "true" });
   });
 

@@ -58,7 +58,7 @@ jobs:
       - run: vp run knip
       - if: needs.changes.outputs.typecheck_args != ''
         run: vp run ${{ needs.changes.outputs.typecheck_args }} typecheck
-      - run: vp test run scripts/ci-changes.test.ts
+      - run: vp test run scripts
       # API tests run in their own job. They need Postgres, and these don't.
       - if: needs.changes.outputs.test_args != ''
         run: vp run ${{ needs.changes.outputs.test_args }} test

@@ -40,7 +40,12 @@ jobs:
         run: node scripts/ci-changes.mjs >> "$GITHUB_OUTPUT"
 
   preview:
+    name: Preview
     needs: changes
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     # Closing always deletes the preview. A diff that cannot change the worker skips the deploy.
     if: >-
       always() &&
@@ -74,9 +79,5 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
           OPERATION: ${{ github.event.action == 'closed' && 'delete' || inputs.operation || 'deploy' }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/preview.mjs "$OPERATION" "$PR_NUMBER"
-      - name: Add preview link to job summary
-        if: github.event.action != 'closed' && inputs.operation != 'delete'
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
-        run: echo "Preview https://pr-${PR_NUMBER}-colorup.stephen-jcombs.workers.dev" >> "$GITHUB_STEP_SUMMARY"

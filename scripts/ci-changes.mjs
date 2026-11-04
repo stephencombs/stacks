@@ -166,7 +166,7 @@ function webSuite(path) {
 function special(path) {
   if (path === ".github/workflows/ci.yml") return fullCheck();
   if (path === ".github/workflows/e2e.yml") return jobsOnly({ e2eWeb: true, e2eMobile: true });
-  if (path === ".github/workflows/preview.yml" || path === "scripts/preview.mjs")
+  if (path === ".github/workflows/preview.yml" || path.startsWith("scripts/preview"))
     return jobsOnly({ check: true });
   if (path === "scripts/ci-changes.mjs" || path === "scripts/ci-changes.test.ts")
     return jobsOnly({ check: true });
