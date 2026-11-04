@@ -1,10 +1,10 @@
 import { Link, type LinkProps } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
-import type { ReactNode } from "react";
+import { ChevronDown, ChevronLeft } from "lucide-react";
+import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "./cn";
 
-/** The way up to the page this one sits in. */
+/** The way back to the place this page was pushed onto. */
 export function BackLink({ children, ...props }: LinkProps & { children: ReactNode }) {
   return (
     <Link
@@ -17,31 +17,67 @@ export function BackLink({ children, ...props }: LinkProps & { children: ReactNo
   );
 }
 
-/** A row of tabs that are links, the current one underlined. */
-export function Tabs({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <nav aria-label={label} className="flex gap-6 overflow-x-auto border-b border-line">
-      {children}
-    </nav>
-  );
-}
-
-export function Tab({
+/**
+ * One of the four places. `bar` is an item in the bottom bar on narrow screens, icon over label;
+ * `side` is a row in the sidebar on wide ones. With no `to` yet, it holds its place, inert.
+ */
+export function PlaceLink({
+  icon,
+  label,
   current,
-  children,
+  layout,
   ...props
-}: LinkProps & { current: boolean; children: ReactNode }) {
+}: LinkProps & { icon: ReactNode; label: string; current: boolean; layout: "bar" | "side" }) {
   return (
     <Link
       aria-current={current ? "page" : undefined}
+      aria-disabled={props.to === undefined || undefined}
       className={cn(
-        "relative inline-flex h-11 min-w-10 items-center justify-center type-callout font-medium whitespace-nowrap transition-colors duration-150 focus-visible:outline-offset-[-2px] pointer-coarse:min-w-11",
-        "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full",
-        current ? "text-ink after:bg-ink" : "text-muted hover:text-ink",
+        props.to === undefined && "pointer-events-none",
+        "transition-[color,background-color,box-shadow,scale] duration-150 active:scale-[0.96] focus-visible:outline-offset-[-2px]",
+        layout === "bar"
+          ? "flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium"
+          : "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium pointer-coarse:h-11",
+        current
+          ? layout === "bar"
+            ? "text-accent-text"
+            : "bg-surface text-ink shadow-(--elevation-card) [&_svg]:text-accent-text"
+          : layout === "bar"
+            ? "text-muted hover:text-ink"
+            : "text-muted hover:bg-sunken hover:text-ink",
       )}
       {...props}
     >
-      {children}
+      {icon}
+      <span className="truncate">{label}</span>
     </Link>
+  );
+}
+
+/**
+ * Where you are: the trip in scope with its group over it, as a button that opens the scope sheet.
+ * A group with no trips shows its name alone.
+ */
+export function ScopeButton({
+  context,
+  label,
+  className,
+  ...props
+}: Omit<ComponentProps<"button">, "children"> & { context?: string | undefined; label: string }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg bg-surface py-1 pr-2.5 pl-3 text-left shadow-(--elevation-control) transition-[background-color,scale] duration-150 hover:bg-sunken active:scale-[0.96]",
+        className,
+      )}
+      {...props}
+    >
+      <span className="flex min-w-0 flex-1 flex-col">
+        {context ? <span className="truncate text-xs text-muted">{context}</span> : null}
+        <span className="truncate font-semibold">{label}</span>
+      </span>
+      <ChevronDown className="size-4 shrink-0 text-muted" aria-hidden />
+    </button>
   );
 }

@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/expo";
-import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import type { StaticScreenProps } from "@react-navigation/native";
 import type { GroupDetail, InvitePreview } from "@stacks/contracts";
 import { useState } from "react";
 import { Text } from "react-native";
@@ -8,6 +8,7 @@ import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { PageTitle, Surface } from "../components/ui/Surface";
+import { useGo } from "../lib/go";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { InviteScreenSkeleton } from "../features/ScreenSkeletons";
 
@@ -32,17 +33,15 @@ export function JoinScreen({ route }: Props) {
 
 function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
   const stacks = useStacks();
-  const navigation = useNavigation();
+  const go = useGo();
   const { user } = useUser();
   const accept = useAction(stacks.Client.mutation("invites", "accept"));
   const [name, setName] = useState(user?.firstName ?? "");
   const [nameError, setNameError] = useState<string | null>(null);
-  const openGroup = (groupId: string) =>
-    navigation.dispatch(StackActions.replace("Group", { groupId }));
   const openDetail = (detail: GroupDetail) => {
     const trip = detail.trips.find((item) => item.endedAt === null);
-    if (trip) navigation.dispatch(StackActions.replace("Trip", { tripId: trip.id }));
-    else openGroup(detail.group.id);
+    if (trip) go.trip(trip.id);
+    else go.group(detail.group.id);
   };
 
   const join = async () => {
@@ -66,11 +65,7 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
             label={preview.currentTripId ? "Open trip" : "Open group"}
             variant="primary"
             onPress={() =>
-              preview.currentTripId
-                ? navigation.dispatch(
-                    StackActions.replace("Trip", { tripId: preview.currentTripId }),
-                  )
-                : openGroup(preview.groupId)
+              preview.currentTripId ? go.trip(preview.currentTripId) : go.group(preview.groupId)
             }
           />
         </>
@@ -103,14 +98,14 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
 
 export function ClaimScreen({ route }: Props) {
   const stacks = useStacks();
-  const navigation = useNavigation();
+  const go = useGo();
   const claim = useAction(stacks.Client.mutation("guests", "claim"));
   const confirm = async () => {
     const claimed = await claim.run({ params: { code: route.params.code } });
     if (claimed) {
       const trip = claimed.trips.find((item) => item.endedAt === null);
-      if (trip) navigation.dispatch(StackActions.replace("Trip", { tripId: trip.id }));
-      else navigation.dispatch(StackActions.replace("Group", { groupId: claimed.group.id }));
+      if (trip) go.trip(trip.id);
+      else go.group(claimed.group.id);
     }
   };
   return (

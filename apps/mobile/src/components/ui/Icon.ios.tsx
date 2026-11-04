@@ -6,6 +6,8 @@ import type { IconName } from "./Icon";
 const symbols: Record<IconName, SFSymbol> = {
   alert: "exclamationmark.circle",
   "chevron-right": "chevron.right",
+  "chevron-down": "chevron.down",
+  more: "ellipsis",
   check: "checkmark",
   "arrow-right": "arrow.right",
   close: "xmark",

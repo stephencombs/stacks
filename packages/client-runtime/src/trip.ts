@@ -244,6 +244,24 @@ export const resolveEntry = (
   return { kind: "groups" as const };
 };
 
+/**
+ * The trip a group's pages put in scope: the one already in scope if it belongs to this group,
+ * else the newest one still going, else the newest. Trips arrive newest first.
+ */
+export const tripInScope = <T extends Pick<Trip, "id" | "endedAt">>(
+  trips: ReadonlyArray<T>,
+  current: TripId | null,
+): T | undefined =>
+  trips.find((trip) => trip.id === current) ??
+  trips.find((trip) => trip.endedAt === null) ??
+  trips[0];
+
+/** The scope sheet's order: trips still going, then ended ones, each newest first. */
+export const scopeTrips = <T extends Pick<Trip, "endedAt">>(trips: ReadonlyArray<T>) => [
+  ...trips.filter((trip) => trip.endedAt === null),
+  ...trips.filter((trip) => trip.endedAt !== null),
+];
+
 export const unsettledAmount = (
   detail: Pick<GroupDetail, "unsettled">,
   tripId: TripId,

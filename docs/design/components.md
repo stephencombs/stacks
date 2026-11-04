@@ -4,7 +4,7 @@ Parts live in `apps/web/src/components/ui` and `apps/mobile/src/components/ui`; 
 
 ## Button
 
-Use for an action. Going to another page on web is a `ButtonLink`, which takes the same variants. A row of tabs is `Tabs`.
+Use for an action. Going to another page on web is a `ButtonLink`, which takes the same variants.
 
 Variants: `primary`, `tint`, `secondary`, `ghost`, `danger`. Sizes: `sm`, `md`, `lg`, plus `xl` on mobile. Nothing else exists.
 
@@ -52,7 +52,7 @@ How many options?
 
 A form value from a few short options, where the choice deserves weight, is `RadioCards` on web: `kind` of an entry or venue, the game of a session. Set columns with `className`.
 
-Switching between pages is `Tabs` on web and `TripTabs` on mobile, not `Segmented`. The same data shown another way on one page is `Segmented`.
+Moving between places is the app's navigation (see Navigation below; `PlaceTabs` on mobile), never `Segmented` or `Choice`. The same data at another scope or measure is `Segmented`: the Board's This trip / All time, the race's Money / % of buy-in.
 
 ## Field, Input, Select (web), TextField (mobile)
 
@@ -81,7 +81,7 @@ Don't put a `Surface` inside a `Surface`. Use `bg-sunken` for a well.
 
 ## Hero cards: TripHero, BalanceHero, RaceHero
 
-A tab can open on one hero card: the figure that tab exists to show, big enough to read across a table. Sessions opens on `TripHero` (your trip total, your running line, win rate, best session, board place), Settle up on `BalanceHero` (your balance), and Results on `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in gold). The group's Stats page opens on the same `TripHero` across every trip ("All time with …"). A live session has `SeatHero` under its table map and `TableStats` tiles: your seat's buy-in, or how you finished, with Rebuy and Cash out one tap away. When you're seated at a live session, the Sessions tab shows `LiveSessionCard` under the hero, with "Back to the table" as the screen's primary action.
+A place can open on one hero card: the figure that place exists to show, big enough to read across a table. Sessions has `TripHero` (your trip total, your running line, win rate, best session, board place), Settle up `BalanceHero` (your balance), and the Board's This trip `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in gold). The Board's All time opens on the same `TripHero` across every trip ("All time with …"). A live session has `SeatHero` under its table map and `TableStats` tiles: your seat's buy-in, or how you finished, with Rebuy and Cash out one tap away. When you're seated at a live session, Sessions opens on `LiveSessionCard`, above the hero, with "Back to the table" as the screen's primary action.
 
 One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure. A venue name inside a card can take `font-display uppercase` like a page title; nothing else borrows display type.
 
@@ -94,18 +94,35 @@ Every chart that compares players draws the same way: lines start at break-even,
 Players at very different stakes would flatten each other, so:
 
 - **A race fits the people near you.** Pass `lineScale` a `focus` from `around(index, count)`. A line far outside that range pins to the edge, and its initial gets an arrow (`J ↓`) from `clipped`.
-- **A race can compare stakes fairly.** The Stats race has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
+- **A race can compare stakes fairly.** The All time race has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
 - **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
+
+## Navigation: AppShell, ScopeButton, PlaceLink (web)
+
+Where content lives is decided in [docs/internals/navigation.md](../internals/navigation.md). On web, every signed-in page except an invite or claim link sits in `AppShell` (`features/Shell.tsx`), which draws it from two parts in `ui/Nav.tsx`:
+
+- **`ScopeButton`** says where you are: the trip in scope, its group small above it, and a chevron. It's a real button, outlined like a secondary one, and opens the scope sheet (trips, New trip, the group, your other groups). A group with no trips shows its name alone.
+- **`PlaceLink`** is one of the four places, Sessions, Board, Settle up and Group, with a lucide icon. `layout="bar"` stacks icon over label in the bottom bar; `layout="side"` is a sidebar row. The current place is gold. A group with no trips offers only Group.
+
+Your avatar opens **You**: play limits for the trip in scope, appearance, and account. Nothing personal goes in a place.
+
+```
+How wide is the window?
+ ├── Below lg → a top bar (ScopeButton, avatar) and a bottom bar of PlaceLinks, with the LiveBar floating just above it
+ └── lg and up → a 240px sidebar: wordmark, ScopeButton, PlaceLinks, your live table, this group's trips, You at the foot
+```
+
+The sheets are `Dialog`, so they slide up from the bottom on a phone and sit centered on a wide screen. `Dialog` and `Menu` layer above the bars.
+
+Pages pushed onto a place, like a session onto Sessions or People onto Group, take a `BackLink` in `PageHeader`'s `back`. The back slot only ever goes back; it never switches scope.
 
 ## Wide screens: TripLayout, TripRail (web)
 
-From `lg` up, a trip's pages widen to 1200px and take a 340px rail on the right through `TripLayout`. `TripRail` holds the rest of the trip you'd otherwise tab to: your live table, the board, and your balance with Settle up, leaving out whichever one the current tab already shows. Below `lg` the rail drops away and the page is the phone layout, so anything moved into the rail stays in the page there (`lg:hidden`). Past sessions read as `SessionTable` on a wide screen, a row per session that links as one.
-
-Chosen over three other directions for the desktop trip page: one wide reading column (leaves most of a laptop empty), a sessions-by-players ledger table (no charts, scrolls sideways past six players) and a sidebar app shell (every screen would need rebuilding around it). Other pages keep the 672px reading column until they have their own wide layout.
+Pages keep the 672px reading column beside the sidebar. Sessions is the one exception: from `xl` it widens to take a 320px rail through `TripLayout`, where `TripRail` shows the board and your balance with Settle up, a glance before going to either place. Below `xl` the rail drops away, and nothing moves into it that isn't also elsewhere.
 
 ## PageHeader, Section, Note (web); PageTitle, SectionHeading (mobile)
 
-One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `tabs`, and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip's table, board and money tabs sit under `TripHeader`, not their own page title.
+One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `children` for what sits under the title (a session's notes, the Board's `Segmented`), and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip place's title is the place, through `TripHeader`, since the scope button already names the trip; Sessions carries the trip's ⋯ menu.
 
 Each group of content is a `Section` on web (`title`, plus an `action` or a quiet `aside`) and a `SectionHeading` on mobile. A section's action is a `ghost` or `sm` button or a `Segmented`. Supporting text on web is `Note`.
 
@@ -157,4 +174,4 @@ A page waits in its own shape, then appears once, whole, and nothing on it moves
 - **Once loaded, never blank again.** Queries behave like TanStack Query's defaults: whatever a page loaded stays cached for five minutes after nothing shows it (`CACHE_MS`, the atom registry's default lifetime), so going back to a page shows it at once. Data older than 30 seconds (`STALE_MS`) refetches in the background when a page mounts, when the window regains focus or comes back online, and on mobile when the app returns to the foreground, while the old copy stays on screen. A refresh or a write's refetch keeps showing the previous data; only a first load ever shows a skeleton. `Loaded` does all of this; don't read a query's result without it unless you mean to.
 - **Slow loads only.** Web skeletons fade in after 300ms measured from the navigation, so a quick load goes straight from the last page to this one with no grey flash.
 - **Display type doesn't jump.** Until Barlow Condensed loads, web sets display text in a fallback face scaled to Barlow's width and line box (`Barlow Condensed Fallback` in `index.css`). If the display font changes, recalibrate it.
-- **The header stays put on desktop.** The wordmark row spans the full width on every page; only the content column changes width.
+- **The frame stays put.** `AppShell` renders once and never waits on a page: the scope button holds its place with a skeleton until your groups arrive, and page skeletons cover the content column only.

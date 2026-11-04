@@ -43,7 +43,8 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
     await visible(page.getByRole("button", { name: "New group" })).click();
     await page.getByLabel("Group name").fill("Table crew");
     await visible(page.getByRole("button", { name: "Create group" })).click();
-    await visible(page.getByRole("button", { name: "People" })).click();
+    // People is pushed from the group hub; back returns to it.
+    await visible(page.getByRole("button", { name: /^Members and guests/ })).click();
     await visible(page.getByRole("button", { name: "Add a guest" })).click();
     await page.getByLabel("Name", { exact: true }).fill("Gus");
     await visible(page.getByRole("button", { name: "Add guest" })).click();
@@ -52,6 +53,8 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
     await visible(page.getByRole("button", { name: "Start a trip" })).click();
     await visible(page.getByLabel("Trip name")).fill("Seats");
     await visible(page.getByRole("button", { name: "Start trip" })).click();
+    // The group's first trip brings Sessions into the tab bar.
+    await visible(page.getByRole("tab", { name: "Sessions", exact: true })).click();
     await visible(page.getByRole("button", { name: "Start a session" })).click();
     await visible(page.getByRole("button", { name: "Add a venue" })).click();
     await page.getByLabel("Name", { exact: true }).fill(`Palazzo ${Date.now().toString(36)}`);

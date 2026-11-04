@@ -1,9 +1,20 @@
-import { ArrowRight, Check, ChevronRight, CircleAlert, Delete, X } from "lucide-react-native";
+import {
+  ArrowRight,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CircleAlert,
+  Delete,
+  Ellipsis,
+  X,
+} from "lucide-react-native";
 import { useCSSVariable } from "uniwind";
 
 const icons = {
   alert: CircleAlert,
   "chevron-right": ChevronRight,
+  "chevron-down": ChevronDown,
+  more: Ellipsis,
   check: Check,
   "arrow-right": ArrowRight,
   close: X,

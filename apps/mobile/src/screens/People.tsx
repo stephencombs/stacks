@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/expo";
-import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import type { StaticScreenProps } from "@react-navigation/native";
 import {
   GroupId,
   InviteId,
@@ -8,7 +8,7 @@ import {
   type Invite,
   type Player,
 } from "@stacks/contracts";
-import { csvFilename, formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/format";
+import { formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { useState } from "react";
@@ -21,25 +21,24 @@ import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { webUrl } from "../lib/config";
-import { shareCsv, shareLink } from "../lib/share";
+import { useLinkedScope } from "../lib/scope";
+import { shareLink } from "../lib/share";
 import { Chip } from "../features/Chip";
-import {
-  GuestPaymentHandlesAction,
-  PaymentAppsSection,
-  playerHandlesMeta,
-} from "../features/PaymentHandles";
+import { GuestPaymentHandlesAction, playerHandlesMeta } from "../features/PaymentHandles";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
-import { ListScreenSkeleton, RowsSkeleton } from "../features/ScreenSkeletons";
+import { InviteLinkSkeleton, PeopleSkeleton } from "../features/ScreenSkeletons";
 
 type Props = StaticScreenProps<{ groupId: string }>;
 
+/** Everyone in the group: members and their roles, invite links, guests, and who left. */
 export function PeopleScreen({ route }: Props) {
   const stacks = useStacks();
+  useLinkedScope(route.params);
   return (
     <Screen>
       <Loaded
         query={stacks.group(GroupId.make(route.params.groupId))}
-        skeleton={<ListScreenSkeleton label="Loading people" rows={5} />}
+        skeleton={<PeopleSkeleton />}
       >
         {(detail) => <PeopleView detail={detail} />}
       </Loaded>
@@ -52,7 +51,6 @@ const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 function PeopleView({ detail }: { detail: GroupDetail }) {
   const [addingGuest, setAddingGuest] = useState(false);
   const [managing, setManaging] = useState<Player | null>(null);
-  const [leaving, setLeaving] = useState(false);
   const [shared, setShared] = useState<string | null>(null);
   const { userId } = useAuth();
   const members = detail.players.filter((player) => player.role !== null);
@@ -106,7 +104,6 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
           })}
         </List>
       </View>
-      <PaymentAppsSection detail={detail} />
       <View className="gap-2">
         <SectionHeading
           action={
@@ -171,37 +168,11 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
           </Text>
         </View>
       ) : null}
-      <ExportSection detail={detail} />
-      <View className="gap-2 border-t border-line pt-6">
-        <Button label="Leave group" variant="danger" onPress={() => setLeaving(true)} />
-        <Text className="text-sm text-muted">You can only leave once you're settled up.</Text>
-      </View>
       <AddGuestSheet detail={detail} open={addingGuest} onClose={() => setAddingGuest(false)} />
       {managing ? (
         <ManageMemberSheet detail={detail} player={managing} onClose={() => setManaging(null)} />
       ) : null}
-      {leaving ? <LeaveSheet detail={detail} onClose={() => setLeaving(false)} /> : null}
     </>
-  );
-}
-
-function ExportSection({ detail }: { detail: GroupDetail }) {
-  const stacks = useStacks();
-  const exportCsv = useAction(stacks.Client.mutation("groups", "exportCsv"));
-  const exportLedger = async () => {
-    const csv = await exportCsv.run({ params: { groupId: detail.group.id } });
-    if (csv == null) return;
-    await shareCsv(csvFilename(detail.group.name), csv);
-  };
-  return (
-    <View className="gap-2">
-      <SectionHeading>Ledger</SectionHeading>
-      <Button label="Export CSV" pending={exportCsv.pending} onPress={() => void exportLedger()} />
-      <Text className="text-sm text-muted">
-        Every buy-in, cash-out, adjustment, settlement and void in this group.
-      </Text>
-      {exportCsv.error ? <FormError>{exportCsv.error}</FormError> : null}
-    </View>
   );
 }
 
@@ -229,10 +200,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
       >
         Invite links
       </SectionHeading>
-      <Loaded
-        query={stacks.invites(detail.group.id)}
-        skeleton={<RowsSkeleton rows={1} trailing={false} />}
-      >
+      <Loaded query={stacks.invites(detail.group.id)} skeleton={<InviteLinkSkeleton />}>
         {(invites) =>
           invites.length === 0 ? (
             <Text className="text-sm text-muted">
@@ -337,40 +305,6 @@ function ManageMemberSheet({
       <Button label="Remove from group" variant="danger" onPress={() => setConfirming(true)} />
       <Text className="text-sm text-muted">Their history stays in the group's ledger.</Text>
       {setRole.error ? <FormError>{setRole.error}</FormError> : null}
-    </Sheet>
-  );
-}
-
-function LeaveSheet({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
-  const stacks = useStacks();
-  const navigation = useNavigation();
-  const leave = useAction(stacks.Client.mutation("groups", "leave"));
-  const confirm = async () => {
-    if (await leave.run({ params: { groupId: detail.group.id } })) {
-      onClose();
-      navigation.navigate("Groups");
-    }
-  };
-  return (
-    <Sheet
-      open
-      onClose={onClose}
-      title={`Leave ${detail.group.name}?`}
-      description="Your history stays in the group's ledger. Someone can invite you back."
-      footer={
-        <>
-          <Button
-            label="Leave group"
-            variant="danger"
-            size="lg"
-            pending={leave.pending}
-            onPress={() => void confirm()}
-          />
-          <Button label="Stay" onPress={onClose} />
-        </>
-      }
-    >
-      {leave.error ? <FormError>{leave.error}</FormError> : null}
     </Sheet>
   );
 }

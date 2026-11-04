@@ -1,4 +1,4 @@
-import { type GroupDetail, type TripDetail, type UserLimits } from "@stacks/contracts";
+import type { CurrencyCode, GroupDetail, TripDetail, TripId, UserLimits } from "@stacks/contracts";
 import { reconcileLimitSessions } from "@stacks/client-runtime/limits";
 import { useAllOutboxEntries } from "@stacks/client-runtime/react";
 import {
@@ -17,50 +17,36 @@ import { Money } from "~/components/Money";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 
-export function PersonalLimits({
+/** Where you stand against your private limits for this trip, when a limit applies. */
+export function LimitNotices({
   group,
   trip,
   local,
-  settings = false,
-  showNotices = true,
 }: {
   group: GroupDetail;
   trip: TripDetail;
   local?: LocalSessionOverride;
-  settings?: boolean;
-  showNotices?: boolean;
 }) {
   const stacks = useStacks();
   return (
     <Loaded query={stacks.limits(trip.trip.id)} skeleton={<></>}>
       {(limits) => (
-        <LimitsContent
-          group={group}
-          trip={trip}
-          limits={limits}
-          {...(local ? { local } : {})}
-          settings={settings}
-          showNotices={showNotices}
-        />
+        <Notices group={group} trip={trip} limits={limits} {...(local ? { local } : {})} />
       )}
     </Loaded>
   );
 }
 
-function LimitsContent({
+function Notices({
   group,
   trip,
   limits,
   local,
-  settings,
-  showNotices,
 }: {
   group: GroupDetail;
   trip: TripDetail;
   limits: UserLimits;
   local?: LocalSessionOverride;
-  settings: boolean;
-  showNotices: boolean;
 }) {
   const [now, setNow] = useState(() => DateTime.nowUnsafe());
   const { pending, sent } = useAllOutboxEntries();
@@ -77,12 +63,12 @@ function LimitsContent({
     now,
     ...(local ? { local } : {}),
   });
+  const unavailable = !sessions && limits.lossLimit !== null;
+  if (!unavailable && !(sessions && notices.lossLimit) && !notices.sessionReminder) return null;
   return (
     <div className="flex flex-col gap-3">
-      {showNotices && !sessions && limits.lossLimit !== null ? (
-        <p>Loss limit progress is unavailable until this trip refreshes.</p>
-      ) : null}
-      {showNotices && sessions && notices.lossLimit ? (
+      {unavailable ? <p>Loss limit progress is unavailable until this trip refreshes.</p> : null}
+      {sessions && notices.lossLimit ? (
         <p role="status" className="rounded-lg bg-sunken p-3 text-sm">
           {notices.lossLimit.level === "reached"
             ? "You’ve reached your loss limit"
@@ -92,36 +78,28 @@ function LimitsContent({
           count as money at risk until cashed out.
         </p>
       ) : null}
-      {showNotices && notices.sessionReminder ? (
+      {notices.sessionReminder ? (
         <p role="status" className="rounded-lg bg-sunken p-3 text-sm">
           You’ve been playing for {formatPlayedMinutes(notices.sessionReminder.minutesPlayed)}.
           Consider taking a break.
         </p>
       ) : null}
-      {settings ? (
-        <LimitsForm
-          key={`${limits.lossLimit}-${limits.currency}-${limits.sessionReminderMinutes}`}
-          limits={limits}
-          group={group}
-          trip={trip}
-        />
-      ) : null}
     </div>
   );
 }
 
-function LimitsForm({
+/** Your private limits for one trip, in You. Only you see them. */
+export function LimitsForm({
   limits,
-  group,
-  trip,
+  tripId,
+  currency,
 }: {
   limits: UserLimits;
-  group: GroupDetail;
-  trip: TripDetail;
+  tripId: TripId;
+  currency: CurrencyCode;
 }) {
   const stacks = useStacks();
   const save = useAction(stacks.Client.mutation("limits", "update"));
-  const currency = group.group.currency;
   const [amount, setAmount] = useState(
     limits.lossLimit === null ? "" : editableLimitAmount(limits.lossLimit, limits.currency),
   );
@@ -136,65 +114,54 @@ function LimitsForm({
     const sessionReminderMinutes =
       reminder === "120" ? 120 : reminder === "180" ? 180 : reminder === "240" ? 240 : null;
     await save.run({
-      params: { tripId: trip.trip.id },
+      params: { tripId },
       payload: { lossLimit: parsed, sessionReminderMinutes },
     });
   };
   return (
-    <details className="rounded-lg bg-sunken p-3">
-      <summary className="cursor-pointer font-medium">Private play limits</summary>
-      <form onSubmit={submit} className="mt-3 flex flex-col gap-3">
-        <p className="text-sm text-muted">
-          Only you can see these settings. The loss limit applies to this trip; the session reminder
-          applies to all trips.
-        </p>
-        <Field label={`Loss limit (${currency})`} hint="Leave blank to turn off.">
-          {(props) => (
-            <Input
-              {...props}
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-            />
-          )}
-        </Field>
-        <Field label="Session reminder">
-          {(props) => (
-            <Select
-              {...props}
-              value={reminder}
-              onChange={(event) => setReminder(event.target.value)}
-            >
-              <option value="0">Off</option>
-              <option value="120">2 hours</option>
-              <option value="180">3 hours</option>
-              <option value="240">4 hours</option>
-            </Select>
-          )}
-        </Field>
-        {error || save.error ? <FormError>{error ?? save.error}</FormError> : null}
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" pending={save.pending}>
-            Save limits
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <Field label={`Loss limit (${currency})`} hint="Leave blank to turn off.">
+        {(props) => (
+          <Input
+            {...props}
+            inputMode="decimal"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+          />
+        )}
+      </Field>
+      <Field label="Session reminder">
+        {(props) => (
+          <Select {...props} value={reminder} onChange={(event) => setReminder(event.target.value)}>
+            <option value="0">Off</option>
+            <option value="120">2 hours</option>
+            <option value="180">3 hours</option>
+            <option value="240">4 hours</option>
+          </Select>
+        )}
+      </Field>
+      {error || save.error ? <FormError>{error ?? save.error}</FormError> : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" pending={save.pending}>
+          Save limits
+        </Button>
+        {limits.lossLimit !== null ? (
+          <Button
+            disabled={save.pending}
+            onClick={() =>
+              void save.run({
+                params: { tripId },
+                payload: {
+                  lossLimit: null,
+                  sessionReminderMinutes: limits.sessionReminderMinutes,
+                },
+              })
+            }
+          >
+            Remove loss limit
           </Button>
-          {limits.lossLimit !== null ? (
-            <Button
-              disabled={save.pending}
-              onClick={() =>
-                void save.run({
-                  params: { tripId: trip.trip.id },
-                  payload: {
-                    lossLimit: null,
-                    sessionReminderMinutes: limits.sessionReminderMinutes,
-                  },
-                })
-              }
-            >
-              Remove loss limit
-            </Button>
-          ) : null}
-        </div>
-      </form>
-    </details>
+        ) : null}
+      </div>
+    </form>
   );
 }

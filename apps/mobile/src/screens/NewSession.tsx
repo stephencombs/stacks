@@ -26,6 +26,7 @@ import { VenuePicker } from "../features/VenuePicker";
 import { Chip } from "../features/Chip";
 import { Loaded, TripLoaded, useAction, useStacks } from "../lib/stacks";
 import { FormScreenSkeleton } from "../features/ScreenSkeletons";
+import { useLinkedScope } from "../lib/scope";
 
 type Props = StaticScreenProps<{
   tripId: string;
@@ -35,6 +36,7 @@ type Props = StaticScreenProps<{
 
 export function NewSessionScreen({ route }: Props) {
   const stacks = useStacks();
+  useLinkedScope(route.params);
   return (
     <Screen>
       <TripLoaded tripId={TripId.make(route.params.tripId)} skeleton={<FormScreenSkeleton />}>

@@ -11,62 +11,47 @@ import { parseMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useEffect, useState } from "react";
-import { AppState, Pressable, Text, View } from "react-native";
+import { AppState, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Money } from "../components/Money";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
-export function PersonalLimits({
+/** Your private limits speaking up, when one applies: a loss limit near or reached, a long session. */
+export function LimitNotices({
   group,
   trip,
   local,
-  settings = false,
-  showNotices = true,
 }: {
   group: GroupDetail;
   trip: TripDetail;
   local?: LocalSessionOverride;
-  settings?: boolean;
-  showNotices?: boolean;
 }) {
   const stacks = useStacks();
   return (
     <Loaded query={stacks.limits(trip.trip.id)} skeleton={<></>}>
       {(limits) => (
-        <LimitsContent
-          group={group}
-          trip={trip}
-          limits={limits}
-          {...(local ? { local } : {})}
-          settings={settings}
-          showNotices={showNotices}
-        />
+        <Notices group={group} trip={trip} limits={limits} {...(local ? { local } : {})} />
       )}
     </Loaded>
   );
 }
 
-function LimitsContent({
+function Notices({
   group,
   trip,
   limits,
   local,
-  settings,
-  showNotices,
 }: {
   group: GroupDetail;
   trip: TripDetail;
   limits: UserLimits;
   local?: LocalSessionOverride;
-  settings: boolean;
-  showNotices: boolean;
 }) {
   const [now, setNow] = useState(() => DateTime.nowUnsafe());
   const { pending, sent } = useAllOutboxEntries();
   const sessions = reconcileLimitSessions(trip.sessions, group.myPlayerId, pending, sent);
-  const [editing, setEditing] = useState(false);
   useEffect(() => {
     const timer = setInterval(() => setNow(DateTime.nowUnsafe()), 60_000);
     const subscription = AppState.addEventListener("change", (state) => {
@@ -85,52 +70,38 @@ function LimitsContent({
     now,
     ...(local ? { local } : {}),
   });
+  const unavailable = !sessions && limits.lossLimit !== null;
+  const loss = sessions ? notices.lossLimit : null;
+  if (!unavailable && !loss && !notices.sessionReminder) return null;
   return (
-    <View className="gap-3 px-4">
-      {showNotices && !sessions && limits.lossLimit !== null ? (
-        <Text>Loss limit progress is unavailable until this trip refreshes.</Text>
-      ) : null}
-      {showNotices && sessions && notices.lossLimit ? (
-        <Text accessibilityLiveRegion="polite" className="rounded-xl bg-sunken p-3 text-ink">
-          {notices.lossLimit.level === "reached"
-            ? "You’ve reached your loss limit"
-            : "You’re approaching your loss limit"}
-          : <Money amount={notices.lossLimit.loss} currency={group.group.currency} /> of{" "}
-          <Money amount={notices.lossLimit.limit} currency={group.group.currency} />. Live buy-ins
-          count as money at risk until cashed out.
+    <View className="gap-3">
+      {unavailable ? (
+        <Text className="text-ink">
+          Loss limit progress is unavailable until this trip refreshes.
         </Text>
       ) : null}
-      {showNotices && notices.sessionReminder ? (
+      {loss ? (
+        <Text accessibilityLiveRegion="polite" className="rounded-xl bg-sunken p-3 text-ink">
+          {loss.level === "reached"
+            ? "You’ve reached your loss limit"
+            : "You’re approaching your loss limit"}
+          : <Money amount={loss.loss} currency={group.group.currency} /> of{" "}
+          <Money amount={loss.limit} currency={group.group.currency} />. Live buy-ins count as money
+          at risk until cashed out.
+        </Text>
+      ) : null}
+      {notices.sessionReminder ? (
         <Text accessibilityLiveRegion="polite" className="rounded-xl bg-sunken p-3 text-ink">
           You’ve been playing for {formatPlayedMinutes(notices.sessionReminder.minutesPlayed)}.
           Consider taking a break.
         </Text>
       ) : null}
-      {settings ? (
-        <>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: editing }}
-            onPress={() => setEditing(!editing)}
-            className="min-h-11 justify-center"
-          >
-            <Text className="font-semibold text-ink">Private play limits</Text>
-          </Pressable>
-          {editing ? (
-            <LimitsForm
-              key={`${limits.lossLimit}-${limits.currency}-${limits.sessionReminderMinutes}`}
-              group={group}
-              trip={trip}
-              limits={limits}
-            />
-          ) : null}
-        </>
-      ) : null}
     </View>
   );
 }
 
-function LimitsForm({
+/** Your private play limits for a trip, edited in You. */
+export function PlayLimits({
   group,
   trip,
   limits,
@@ -161,9 +132,9 @@ function LimitsForm({
   };
   return (
     <View className="gap-3">
-      <Text className="text-muted">
-        Only you can see these settings. The loss limit applies to this trip; the session reminder
-        applies to all trips.
+      <Text className="text-sm text-muted">
+        Only you can see these. The loss limit is for {trip.trip.name}; the session reminder is for
+        every trip.
       </Text>
       <TextField
         label={`Loss limit (${currency})`}

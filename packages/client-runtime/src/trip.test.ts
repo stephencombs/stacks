@@ -21,7 +21,9 @@ import {
   recordLine,
   resolveEntry,
   returnLabel,
+  scopeTrips,
   streakLine,
+  tripInScope,
   tripLines,
   unsettledAmount,
 } from "./trip.ts";
@@ -284,4 +286,21 @@ it("leads the race with the gap to the next player, falling back to your result"
 
 it("words a return on buy-ins with its sign", () => {
   expect([0.55, -0.3, 0, 0.004, null].map(returnLabel)).toEqual(["+55%", "-30%", "0%", "0%", "–"]);
+});
+
+it("puts the trip already in scope first, then the newest still going, then the newest", () => {
+  const trip = (n: number, ended: boolean) => ({
+    id: TripId.make(`0192e7a0-0000-7000-8000-00000000003${n}`),
+    endedAt: ended ? local(n, 12) : null,
+  });
+  const [ended, going, older] = [trip(3, true), trip(2, false), trip(1, true)];
+  const trips = [ended, going, older];
+
+  expect(tripInScope(trips, older.id)).toBe(older);
+  expect(tripInScope(trips, null)).toBe(going);
+  expect(tripInScope(trips, TripId.make("0192e7a0-0000-7000-8000-000000000099"))).toBe(going);
+  expect(tripInScope([ended, older], null)).toBe(ended);
+  expect(tripInScope([], null)).toBeUndefined();
+
+  expect(scopeTrips(trips)).toEqual([going, ended, older]);
 });

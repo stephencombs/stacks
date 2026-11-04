@@ -36,7 +36,7 @@ What color is this text?
 
 ## Brand
 
-The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame around four columns in `chip-2`, `chip-1`, `chip-3` and gold, the gold one tallest. It's `BrandMark` on both clients, beside the uppercase Barlow wordmark in the header and on the sign-in screen. The mark's colors come from the tokens, so it follows the theme; the app icon, favicon and touch icon are fixed renders of the dark version.
+The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame around four columns in `chip-2`, `chip-1`, `chip-3` and gold, the gold one tallest. It's `BrandMark` on both clients, beside the uppercase Barlow wordmark at the top of the sidebar and on the sign-in screen. The mark's colors come from the tokens, so it follows the theme; the app icon, favicon and touch icon are fixed renders of the dark version.
 
 ## Type
 
@@ -46,7 +46,7 @@ Web has two faces: Barlow Condensed for the page title, the wordmark and a hero 
 | --------------- | --------------------------------------------------- | ---- | ------ |
 | `type-title`    | The one title on a page (`PageHeader`, `PageTitle`) | 40px | 40px   |
 | `type-headline` | The "Can't sign in yet" screen heading              | none | 36px   |
-| `type-callout`  | Tabs; on mobile, small button labels and captions   | 15px | 15px   |
+| `type-callout`  | On mobile, tabs, small button labels and captions   | 15px | 15px   |
 | `type-label`    | Mono caps on mobile: "Live", the high-limit toggle  | none | 11px   |
 | `type-body`     | Field text, large button labels                     | none | 17px   |
 | `type-footnote` | Field captions, hints, errors                       | none | 13px   |
@@ -89,6 +89,17 @@ Web only. Mobile surfaces are flat: a `surface` on a `canvas` is enough, as in i
 - Dark mode has a ring where light mode has depth, because a shadow doesn't show on a dark ground, plus a faint white top edge on cards and menus, the way light catches something raised. Dark overlays keep one black shadow.
 - Depth on dark comes mostly from the gap between `canvas` and `surface`: a near-black page under clearly lighter cards. Keep that gap if you retune either.
 - Use `border-line` or `divide-line` to separate rows, and a shadow to raise something. Inputs keep a visible edge.
+
+## Layers
+
+Web stacks fixed parts on four steps of Tailwind's scale. Anything else in a page stays at `z-auto`, or uses `isolate` for its own stacking.
+
+| Class  | Use it for                                          |
+| ------ | --------------------------------------------------- |
+| `z-10` | `LiveBar`, floating over content                    |
+| `z-20` | The bottom bar and the sidebar                      |
+| `z-30` | The skip link, above the bars once focused          |
+| `z-40` | `Dialog` and `Menu`, over everything, bars included |
 
 ## Motion
 

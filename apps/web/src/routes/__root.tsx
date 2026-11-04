@@ -1,66 +1,46 @@
-import { ClerkFailed, UserButton, useAuth } from "@clerk/react";
+import { ClerkFailed, useAuth } from "@clerk/react";
 import { themeChoices } from "@stacks/client-runtime/theme";
-import { Link, Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
+import { Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FormError } from "~/components/ui/Field";
-import { cn } from "~/components/ui/cn";
 import { Menu, MenuChoice } from "~/components/ui/Menu";
-import { BrandMark } from "~/components/BrandMark";
 import { Landing } from "~/features/Landing";
-import { LiveBar } from "~/features/LiveBar";
+import { AppShell, Wordmark, You } from "~/features/Shell";
 import { StacksProvider } from "~/lib/stacks";
 import { setTheme, useTheme } from "~/lib/theme";
 
 export const Route = createRootRoute({ component: Root });
 
-/** A trip's pages carry a rail on wide screens; everything else is a reading column. */
-const wideRoute = /^\/trips\/[^/]+(\/(results|settle))?\/?$/;
+/** Opening an invite or claim link happens before you're in the group, so it has no places yet. */
+const invitation = /^\/(join|claim)\//;
 
 function Root() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const { pathname } = useLocation();
-  const wide = wideRoute.test(pathname);
   if (!isLoaded) return <Loading />;
   if (!isSignedIn) return <SignedOut />;
   return (
     <StacksProvider key={userId} userId={userId}>
-      <Frame
-        tools={
-          <div className="flex items-center gap-3">
-            <ThemeMenu />
-            <UserButton />
-          </div>
-        }
-      >
-        <a
-          href="#main-content"
-          className="sr-only rounded-lg bg-surface px-4 py-3 focus:not-sr-only focus:fixed focus:top-2 focus:z-10"
-        >
-          Skip to content
-        </a>
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className={cn(
-            "flex w-full flex-1 flex-col gap-8 pt-2 pb-28",
-            !wide && "lg:mx-auto lg:max-w-2xl",
-          )}
-        >
+      {invitation.test(pathname) ? (
+        <Frame tools={<You layout="bar" />}>
+          <main className="flex w-full flex-1 flex-col gap-8 pt-2 pb-16 lg:mx-auto lg:max-w-2xl">
+            <Outlet />
+          </main>
+        </Frame>
+      ) : (
+        <AppShell>
           <Outlet />
-        </main>
-        <LiveBar />
-      </Frame>
+        </AppShell>
+      )}
     </StacksProvider>
   );
 }
 
-/** The column every page sits in, under the wordmark. */
 /**
- * The column every page sits in, under the wordmark. On a wide screen the header always spans the
- * full width, so the wordmark never moves between pages; a page's own content decides how much of
- * it to use.
+ * The column a page sits in under the wordmark, for everything outside the app's places: signing
+ * in and opening an invitation.
  */
 function Frame({ tools, children }: { tools?: ReactNode; children?: ReactNode }) {
   return (
@@ -71,18 +51,6 @@ function Frame({ tools, children }: { tools?: ReactNode; children?: ReactNode })
       </div>
       {children}
     </div>
-  );
-}
-
-function Wordmark() {
-  return (
-    <Link
-      to="/"
-      className="flex min-h-11 items-center gap-2 font-display text-2xl tracking-wide uppercase"
-    >
-      <BrandMark className="size-7" />
-      Color Up
-    </Link>
   );
 }
 
@@ -112,7 +80,7 @@ function SignedOut() {
   const { pathname } = useLocation();
   return (
     <Frame tools={<ThemeMenu />}>
-      <Landing invited={pathname.startsWith("/join/") || pathname.startsWith("/claim/")} />
+      <Landing invited={invitation.test(pathname)} />
     </Frame>
   );
 }

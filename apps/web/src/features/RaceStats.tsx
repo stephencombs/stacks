@@ -1,7 +1,7 @@
-import type { GroupDetail, PlayerId, SessionId, TripDetail } from "@stacks/contracts";
+import type { GroupDetail, PlayerId, SessionId } from "@stacks/contracts";
 import { around, barTrack, lineScale, spreadLabels } from "@stacks/client-runtime/chart";
 import { formatDay, playerNames } from "@stacks/client-runtime/format";
-import { boardMoney, chipOf, localClock, returnLabel } from "@stacks/client-runtime/trip";
+import { boardMoney, chipOf, returnLabel } from "@stacks/client-runtime/trip";
 import {
   raceLines,
   runningTotals,
@@ -9,7 +9,6 @@ import {
   type RaceMeasure,
   type StatsSession,
 } from "@stacks/shared/stats";
-import { tripNights } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
 
@@ -27,27 +26,6 @@ type RaceSession = StatsSession & {
 };
 /** Where on the axis a stretch of sessions starts, such as a night or a trip. */
 type Mark = { readonly index: number; readonly label: string };
-
-/** A trip's stats, with the trip's nights along the race. */
-export function TripStats({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
-  const nights = tripNights(closed, localClock);
-  const nightOf = new Map(
-    nights.flatMap((night) => night.sessions.map((s) => [s.session.id, night.number])),
-  );
-  return (
-    <RaceStats
-      detail={detail}
-      sessions={closed}
-      marks={nights.map((night) => ({
-        index: closed.indexOf(night.sessions[0]!),
-        label: `D${night.number}`,
-      }))}
-      where={(session) => `Day ${nightOf.get(session.session.id)}`}
-      empty="Stats fill in when the trip's first session closes."
-    />
-  );
-}
 
 /** The race for first, session by session, and one player's stat sheet. */
 export function RaceStats<S extends RaceSession>({
@@ -91,7 +69,7 @@ export function RaceStats<S extends RaceSession>({
         marks={marks}
         where={where}
       />
-      <Sheet
+      <PlayerSheet
         key={player.playerId}
         sessions={closed}
         player={player}
@@ -198,7 +176,7 @@ function Race<S extends RaceSession>({
             </>
           )}
         </h2>
-        <Note>
+        <Note className="tabular-nums">
           After session {at + 1} of {sessions.length} · {where(session)} · {session.venue.name},{" "}
           {formatDay(session.session.startedAt)}
         </Note>
@@ -342,7 +320,8 @@ function Race<S extends RaceSession>({
   );
 }
 
-function Sheet({
+/** One player's numbers over these sessions: how often they won, their best and worst, every result. */
+export function PlayerSheet({
   sessions,
   player,
   rank,
@@ -350,7 +329,7 @@ function Sheet({
   currency,
 }: {
   sessions: ReadonlyArray<RaceSession>;
-  player: Line;
+  player: Pick<Line, "playerId" | "name" | "chip">;
   rank: number;
   of: number;
   currency: GroupDetail["group"]["currency"];
@@ -417,7 +396,7 @@ function Sheet({
       <header className="flex items-center gap-3">
         <Chip chip={player.chip} name={player.name} size={40} />
         <div className="flex min-w-0 flex-col">
-          <Note>
+          <Note className="tabular-nums">
             {player.name} · #{rank} of {of} · {runs.sessions}{" "}
             {runs.sessions === 1 ? "session" : "sessions"}
           </Note>

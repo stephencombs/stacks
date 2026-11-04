@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#030407" />
+    <meta
+      name="description"
+      content="Log buy-ins and cash-outs as you play. Color Up works out everyone's results and who owes whom. You pay each other however you like."
+    />
+    <title>Color Up</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link
+      rel="preload"
+      href="/node_modules/@fontsource/barlow-condensed/files/barlow-condensed-latin-700-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <!-- The canvas color before the stylesheet arrives, so a load never flashes white. -->
+    <style>
+      html {
+        background: #030407;
+        color-scheme: dark;
+      }
+      html[data-theme="light"] {
+        background: #f2f3f6;
+        color-scheme: light;
+      }
+    </style>
+    <!-- Applies the saved theme before first paint, so a light-mode reload never flashes dark.
+         Keep in step with src/lib/theme.ts. -->
+    <script>
+      try {
+        var choice = localStorage.getItem("stacks-theme");
+        if (
+          choice === "light" ||
+          (choice === "system" && matchMedia("(prefers-color-scheme: light)").matches)
+        ) {
+          document.documentElement.dataset.theme = "light";
+          document.querySelector('meta[name="theme-color"]').content = "#f2f3f6";
+        }
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/preview/boot.ts"></script>
+  </body>
+</html>

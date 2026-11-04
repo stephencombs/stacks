@@ -3,7 +3,12 @@
   "ignoreBinaries": ["eas"],
   "workspaces": {
     "apps/web": {
-      "entry": ["src/design/main.tsx"]
+      "entry": [
+        "src/design/main.tsx",
+        "preview/boot.ts",
+        "preview/vite.config.ts",
+        "preview/clerk-stub.tsx"
+      ]
     },
     "apps/mobile": {
       "ignoreDependencies": ["@babel/core", "@react-navigation/elements", "expo-updates", "serve"]
