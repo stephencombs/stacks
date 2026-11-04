@@ -1,0 +1,52 @@
+name: PR preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+      operation:
+        type: choice
+        options: [deploy, delete]
+        default: deploy
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+      NEON_PREVIEW_PARENT_ID: ${{ vars.NEON_PREVIEW_PARENT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      VITE_CLERK_PUBLISHABLE_KEY: pk_test_cmljaC1qYWd1YXItNjczOS5jbGVyay5hY2NvdW50cy5kZXYk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: true
+      - name: Deploy or remove preview
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+          OPERATION: ${{ github.event.action == 'closed' && 'delete' || inputs.operation || 'deploy' }}
+        run: node scripts/preview.mjs "$OPERATION" "$PR_NUMBER"
+      - name: Add preview link to job summary
+        if: github.event.action != 'closed' && inputs.operation != 'delete'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+        run: echo "Preview https://pr-${PR_NUMBER}-colorup.stephen-jcombs.workers.dev" >> "$GITHUB_STEP_SUMMARY"
