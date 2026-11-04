@@ -13,7 +13,7 @@ import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -243,14 +243,20 @@ function useNavigationTheme() {
 
 const STALLED_MS = 10_000;
 
-/** Blank while sign-in starts; if it never does, say so instead of staying blank forever. */
 function Starting() {
   const [stalled, setStalled] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setStalled(true), STALLED_MS);
     return () => clearTimeout(timer);
   }, []);
-  if (!stalled) return <View className="flex-1 bg-canvas" />;
+  if (!stalled)
+    return (
+      <View className="flex-1 items-center justify-center bg-canvas">
+        <Text accessibilityRole="status" className="text-lg text-ink">
+          Opening Color Up…
+        </Text>
+      </View>
+    );
   return (
     <View className="flex-1 justify-center gap-4 bg-canvas px-6">
       <Text accessibilityRole="header" className="type-headline text-ink">
@@ -269,15 +275,42 @@ function SignedOut() {
 }
 
 export default function App() {
-  // Fonts that fail to load fall back to the system's rather than holding the app on a blank screen.
-  const [fontsLoaded, fontsFailed] = useFonts({ BarlowCondensed_700Bold, JetBrainsMono_500Medium });
+  useFonts({ BarlowCondensed_700Bold, JetBrainsMono_500Medium });
   const { theme } = useUniwind();
   return (
     <SafeAreaProvider>
-      <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
-        {fontsLoaded || fontsFailed ? <Root /> : <View className="flex-1 bg-canvas" />}
-        <StatusBar style={theme === "light" ? "dark" : "light"} />
-      </ClerkProvider>
+      <StartupBoundary>
+        <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
+          <Root />
+          <StatusBar style={theme === "light" ? "dark" : "light"} />
+        </ClerkProvider>
+      </StartupBoundary>
     </SafeAreaProvider>
   );
+}
+
+class StartupBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  override render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <View className="flex-1 justify-center gap-4 bg-canvas px-6">
+        <Text accessibilityRole="header" className="type-headline text-ink">
+          Color Up couldn't start
+        </Text>
+        <Text className="text-lg text-muted">Try opening the app again.</Text>
+        <Button
+          label="Try again"
+          variant="primary"
+          size="lg"
+          onPress={() => void reloadAppAsync()}
+        />
+      </View>
+    );
+  }
 }
