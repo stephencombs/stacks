@@ -1,4 +1,4 @@
-import posthog, { type PostHogConfig } from "posthog-js";
+import type { PostHogConfig } from "posthog-js";
 import { sanitizeTelemetry, type TestEvent } from "@stacks/client-runtime/telemetry";
 
 const token = import.meta.env.VITE_POSTHOG_TOKEN;
@@ -29,16 +29,22 @@ export const telemetryOptions = {
   }),
 } satisfies Partial<PostHogConfig>;
 
+let posthog: typeof import("posthog-js").default | undefined;
 if (token && host) {
-  posthog.init(token, { ...telemetryOptions, api_host: host });
+  void import("posthog-js")
+    .then(({ default: client }) => {
+      client.init(token, { ...telemetryOptions, api_host: host });
+      posthog = client;
+    })
+    .catch((error: unknown) => console.error("PostHog initialization failed", error));
 }
 
 export const captureTestEvent = (event: TestEvent) => {
-  if (token && host && posthog.isFeatureEnabled("development-test-events")) posthog.capture(event);
+  if (posthog?.isFeatureEnabled("development-test-events")) posthog.capture(event);
 };
 
 export const captureCaughtError = (error: unknown) => {
-  if (!token || !host) return;
+  if (!posthog) return;
   try {
     posthog.captureException(error);
   } catch {

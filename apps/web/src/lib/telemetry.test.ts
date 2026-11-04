@@ -37,6 +37,7 @@ it("keeps private URLs out of event and feature flag requests", async () => {
     opt_out_useragent_filter: true,
   });
   await new Promise<void>((resolve) => posthog.onFeatureFlags(() => resolve()));
+  window.history.pushState({}, "", "/claim/another-private-code?note=private-note");
   expect(posthog.isFeatureEnabled("development-test-events")).toBe(true);
   posthog.capture("session_start_confirmed", { note: "private-note" });
   await captured;

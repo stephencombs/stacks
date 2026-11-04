@@ -18,7 +18,12 @@ declare module "@tanstack/react-router" {
   }
 }
 
-createRoot(document.getElementById("root")!, { onCaughtError: captureCaughtError }).render(
+createRoot(document.getElementById("root")!, {
+  onCaughtError: (error, info) => {
+    console.error(error, info.componentStack);
+    captureCaughtError(error);
+  },
+}).render(
   <StrictMode>
     <ClerkProvider
       publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}

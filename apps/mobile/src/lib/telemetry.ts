@@ -8,6 +8,7 @@ const posthog =
   token && host
     ? new PostHog(token, {
         host,
+        persistence: "memory",
         captureAppLifecycleEvents: false,
         enableSessionReplay: false,
         disableGeoip: true,
