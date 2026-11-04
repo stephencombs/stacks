@@ -51,7 +51,8 @@
     "production": {
       "ios": {
         "ascAppId": "6830761871",
-        "appleTeamId": "R3CB655R4V"
+        "appleTeamId": "R3CB655R4V",
+        "bundleIdentifier": "com.stephencombs.colorup"
       }
     }
   }

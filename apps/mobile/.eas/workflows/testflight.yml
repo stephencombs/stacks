@@ -20,6 +20,9 @@ jobs:
     name: Submit to TestFlight
     type: submit
     needs: [build_ios]
+    # Unset APP_VARIANT makes app.config.ts the development app, which has no App Store Connect key.
+    env:
+      APP_VARIANT: production
     params:
       build_id: ${{ needs.build_ios.outputs.build_id }}
       profile: production
