@@ -37,6 +37,8 @@ For development telemetry, add `VITE_POSTHOG_TOKEN` and `VITE_POSTHOG_HOST` to `
 
 The `development-test-events` flag controls client confirmations of session starts, entries and closes. These events can repeat after a retry and are not ledger counts. Autocapture, page views and replay are off; exception messages and stacks are removed before sending, so errors show occurrence counts but not the original cause.
 
+Before enabling telemetry, configure the PostHog project to discard client IP addresses and keep console log capture disabled. These project settings protect data sent outside event capture. The local development env files do not configure the deployed development build. New mobile dev clients must be rebuilt for the added Expo modules.
+
 ## Deploy
 
 One Cloudflare Worker serves the API and the built web app. It's the development environment, at <https://colorup.stephen-jcombs.workers.dev>, and signs in through Clerk's development instance. There's no production environment yet. The database is any Postgres behind Cloudflare Hyperdrive (Neon's free plan works).

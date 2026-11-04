@@ -4,7 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./index.css";
-import "./lib/telemetry";
+import { captureCaughtError } from "./lib/telemetry";
 import { markNavigation } from "./features/PageSkeletons";
 import { routeTree } from "./routeTree.gen";
 
@@ -18,7 +18,7 @@ declare module "@tanstack/react-router" {
   }
 }
 
-createRoot(document.getElementById("root")!).render(
+createRoot(document.getElementById("root")!, { onCaughtError: captureCaughtError }).render(
   <StrictMode>
     <ClerkProvider
       publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}

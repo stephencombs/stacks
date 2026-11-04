@@ -16,6 +16,19 @@ it("removes ledger details, URLs, and exception text from telemetry", () => {
     token: "project-token",
     distinct_id: "device-id",
     $app_version: "1.0",
+    $process_person_profile: false,
+    $geoip_disable: true,
+    $exception_list: [{ type: "Error", value: "Unhandled application error" }],
+  });
+});
+
+it("keeps known exception types without forwarding arbitrary error text", () => {
+  expect(
+    sanitizeTelemetry({ $exception_list: [{ type: "TypeError", value: "private" }] }),
+  ).toMatchObject({
+    $exception_list: [{ type: "TypeError", value: "Unhandled application error" }],
+  });
+  expect(sanitizeTelemetry({ $exception_list: [{ type: "private-name" }] })).toMatchObject({
     $exception_list: [{ type: "Error", value: "Unhandled application error" }],
   });
 });

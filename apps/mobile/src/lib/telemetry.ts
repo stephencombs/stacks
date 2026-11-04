@@ -12,6 +12,7 @@ const posthog =
         enableSessionReplay: false,
         disableGeoip: true,
         personProfiles: "never",
+        logs: { beforeSend: () => null },
         errorTracking: {
           autocapture: { uncaughtExceptions: true, unhandledRejections: true, console: false },
           exceptionSteps: { enabled: false },

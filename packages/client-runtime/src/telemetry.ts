@@ -14,9 +14,21 @@ const safeProperties = new Set([
   "$feature_flag_response",
   "$session_id",
 ]);
+const safeErrorTypes = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+  "URIError",
+  "EvalError",
+]);
 
 export function sanitizeTelemetry(properties: Record<string, unknown>) {
-  const safe: Record<string, string | number | boolean | null | Array<Record<string, string>>> = {};
+  const safe: Record<string, string | number | boolean | null | Array<Record<string, string>>> = {
+    $process_person_profile: false,
+    $geoip_disable: true,
+  };
   for (const [key, value] of Object.entries(properties)) {
     if (
       safeProperties.has(key) &&
@@ -29,7 +41,15 @@ export function sanitizeTelemetry(properties: Record<string, unknown>) {
     }
   }
   if ("$exception_list" in properties) {
-    safe.$exception_list = [{ type: "Error", value: "Unhandled application error" }];
+    const exceptions = properties.$exception_list;
+    const first = Array.isArray(exceptions) ? exceptions[0] : null;
+    const type = first && typeof first === "object" ? first.type : null;
+    safe.$exception_list = [
+      {
+        type: typeof type === "string" && safeErrorTypes.has(type) ? type : "Error",
+        value: "Unhandled application error",
+      },
+    ];
   }
   return safe;
 }
