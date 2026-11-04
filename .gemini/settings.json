@@ -2,6 +2,12 @@
   "mcpServers": {
     "posthog": {
       "httpUrl": "https://mcp.posthog.com/mcp?project_id=707944"
+    },
+    "cloudflare": {
+      "httpUrl": "https://mcp.cloudflare.com/mcp"
+    },
+    "Neon": {
+      "httpUrl": "https://mcp.neon.tech/mcp"
     }
   }
 }

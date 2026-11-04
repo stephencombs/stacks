@@ -1,2 +1,8 @@
 [mcp_servers.posthog]
 url = "https://mcp.posthog.com/mcp?project_id=707944"
+
+[mcp_servers.cloudflare]
+url = "https://mcp.cloudflare.com/mcp"
+
+[mcp_servers.Neon]
+url = "https://mcp.neon.tech/mcp"

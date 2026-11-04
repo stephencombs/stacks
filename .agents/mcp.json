@@ -7,6 +7,14 @@
     "posthog": {
       "type": "http",
       "url": "https://mcp.posthog.com/mcp?project_id=707944"
+    },
+    "cloudflare": {
+      "type": "http",
+      "url": "https://mcp.cloudflare.com/mcp"
+    },
+    "Neon": {
+      "type": "http",
+      "url": "https://mcp.neon.tech/mcp"
     }
   }
 }
