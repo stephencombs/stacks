@@ -190,7 +190,8 @@ export function EntrySheet({
               label={`Bust · ${formatMoney(MinorUnits.make(0), currency)}`}
               size="sm"
               haptic
-              onPress={() => submit(MinorUnits.make(0))}
+              // Fills the amount like a preset does: one stray tap shouldn't take a player out.
+              onPress={() => setAmount(amountText(MinorUnits.make(0), currency))}
             />
           )}
         </View>

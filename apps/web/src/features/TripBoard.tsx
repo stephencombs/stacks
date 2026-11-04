@@ -12,7 +12,7 @@ import * as DateTime from "effect/DateTime";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
-import { EmptyState, Section } from "~/components/ui/Page";
+import { EmptyState, Note, Section } from "~/components/ui/Page";
 import { List, Row, RowText } from "~/components/ui/Surface";
 import { Breakdown, byNet } from "./Breakdown";
 import { Chip } from "./Chip";
@@ -63,6 +63,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const awards = tripAwards(closed, localClock);
   const row = useReorder();
   const [picked, setPicked] = useState<PlayerId | null>(null);
+  const sheet = useRef<HTMLElement>(null);
 
   if (standings.length === 0)
     return <EmptyState title="Nothing on the board yet">Close a session to start it.</EmptyState>;
@@ -93,7 +94,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                     {streak ? ` · ${streak}` : ""}
                     {s.moved === 0 ? null : (
                       <span className={s.moved > 0 ? "text-win" : "text-loss"}>
-                        {s.moved > 0 ? ` · up ${s.moved} tonight` : ` · down ${-s.moved} tonight`}
+                        {` · ${s.moved > 0 ? "up" : "down"} ${plural(Math.abs(s.moved), "place")} tonight`}
                       </span>
                     )}
                   </>
@@ -101,14 +102,27 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                 net={s.net}
                 currency={currency}
                 picked={s.playerId === focus.playerId}
-                onPick={() => setPicked(s.playerId)}
+                onPick={() => {
+                  setPicked(s.playerId);
+                  // On a phone their numbers start a screen below; bring them up to meet the tap.
+                  const el = sheet.current;
+                  if (el && el.getBoundingClientRect().top > innerHeight * 0.6)
+                    el.scrollIntoView({
+                      block: "start",
+                      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+                        ? "auto"
+                        : "smooth",
+                    });
+                }}
               />
             );
           })}
         </List>
+        <Note>Pick a player to see their numbers.</Note>
       </Section>
 
       <PlayerSheet
+        ref={sheet}
         key={focus.playerId}
         sessions={closed}
         player={{

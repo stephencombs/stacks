@@ -168,12 +168,8 @@ export function EntryDialog({
           </div>
         ) : null}
         {kind === "cash_out" && !draft.replaces ? (
-          <Button
-            size="sm"
-            onClick={(event) => {
-              if (event.currentTarget.form) record(event.currentTarget.form, MinorUnits.make(0));
-            }}
-          >
+          // Fills the amount like a preset does: one stray tap shouldn't take a player out.
+          <Button size="sm" onClick={() => changeAmount(amountText(MinorUnits.make(0), currency))}>
             Bust · {formatMoney(MinorUnits.make(0), currency)}
           </Button>
         ) : null}

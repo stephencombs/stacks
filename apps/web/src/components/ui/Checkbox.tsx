@@ -11,16 +11,19 @@ const base =
 /** Wrap it in a `<label>`: that's where its accessible name and larger tap target come from. */
 export function Checkbox({
   checked,
+  disabled = false,
   onCheckedChange,
   className,
 }: {
   checked: boolean;
+  disabled?: boolean;
   onCheckedChange: (checked: boolean) => void;
   className?: string;
 }) {
   return (
     <BaseCheckbox.Root
       checked={checked}
+      disabled={disabled}
       onCheckedChange={onCheckedChange}
       className={cn(base, className)}
     >

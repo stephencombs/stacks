@@ -161,7 +161,7 @@ function NewSessionForm({
           <div className="flex items-center gap-1">
             <Button size="sm" variant="ghost" onClick={() => setInviting((open) => !open)}>
               <Link2 className="size-4" aria-hidden />
-              Invite link
+              Invite
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setAddingGuest(true)}>
               <UserPlus className="size-4" aria-hidden />
@@ -197,7 +197,7 @@ function NewSessionForm({
       </Section>
 
       <div className="flex flex-col gap-3">
-        <label className="flex items-center gap-3 text-sm">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 self-start text-sm">
           <Checkbox
             checked={earlier !== null}
             onCheckedChange={(checked) => {

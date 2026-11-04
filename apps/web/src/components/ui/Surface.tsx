@@ -69,13 +69,16 @@ export function RowText({
   title,
   meta,
   struck = false,
+  className,
 }: {
   title: ReactNode;
   meta?: ReactNode;
   struck?: boolean;
+  /** Layout only, such as a `basis-*` that makes a wrapping row's actions drop below the text. */
+  className?: string;
 }) {
   return (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+    <span className={cn("flex min-w-0 flex-1 flex-col gap-0.5", className)}>
       <span className={cn("font-medium wrap-anywhere", struck && "text-muted line-through")}>
         {title}
       </span>

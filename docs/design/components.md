@@ -32,6 +32,8 @@ While a request is in flight, pass `pending`. It shows a spinner and blocks pres
 
 Labels name the outcome: "Void entry", not "Confirm".
 
+A one-tap write, like a rebuy, keeps its button where it was, so a second tap does it again. Taking it back is an Undo somewhere else: a toast on mobile, and on web a bar floating where the `LiveBar` sits. A button that turns into its own undo makes a double-tap cancel itself. A repeat-amount button reads "Rebuy $300", never "+$300": a signed amount means a result.
+
 ## Segmented (web), Choice (mobile)
 
 Pick one of a few options, all in sight. Web `Segmented` lives in its own file, `Segmented.tsx`.
@@ -81,7 +83,7 @@ Don't put a `Surface` inside a `Surface`. Use `bg-sunken` for a well.
 
 ## Hero cards: TripHero, BalanceHero, RaceHero
 
-A place can open on one hero card: the figure that place exists to show, big enough to read across a table. Sessions has `TripHero` (your trip total, your running line, win rate, best session, board place), Settle up `BalanceHero` (your balance), and the Board's This trip `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in gold). The Board's All time opens on the same `TripHero` across every trip ("All time with …"). A live session has `SeatHero` under its table map and `TableStats` tiles: your seat's buy-in, or how you finished, with Rebuy and Cash out one tap away. When you're seated at a live session, Sessions opens on `LiveSessionCard`, above the hero, with "Back to the table" as the screen's primary action.
+A place can open on one hero card: the figure that place exists to show, big enough to read across a table. Sessions has `TripHero` (your trip total, your running line, win rate, best session, board place), Settle up `BalanceHero` (your balance), and the Board's This trip `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in gold). The Board's All time opens on the same `TripHero` across every trip ("All time with …"). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. When you're seated at a live session, Sessions opens on `LiveSessionCard`, above the hero, with "Back to the table" as the screen's primary action.
 
 One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure. A venue name inside a card can take `font-display uppercase` like a page title; nothing else borrows display type.
 
