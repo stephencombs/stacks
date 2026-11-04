@@ -11,6 +11,7 @@ import {
   OutboxProvider,
   LastTripProvider,
   StacksContext,
+  TelemetryContext,
   useAction,
   useOutbox,
   usePending,
@@ -29,6 +30,7 @@ import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
 import { apiUrl, clerkPublishableKey } from "./config";
 import { outboxStorage, wakeOutbox } from "./outbox";
+import { captureTestEvent } from "./telemetry";
 
 /**
  * One API client and atom registry per signed-in user. Remounting it with a new `key` on
@@ -63,16 +65,18 @@ export function StacksProvider({ userId, children }: { userId: string; children:
     };
   });
   return (
-    <StacksContext value={stacks}>
-      <RegistryProvider defaultIdleTTL={CACHE_MS}>
-        <LastTripProvider storage={tripStorage}>
-          <OutboxProvider storage={storage} wake={wakeOutbox}>
-            <RefusalHaptic />
-            {children}
-          </OutboxProvider>
-        </LastTripProvider>
-      </RegistryProvider>
-    </StacksContext>
+    <TelemetryContext value={captureTestEvent}>
+      <StacksContext value={stacks}>
+        <RegistryProvider defaultIdleTTL={CACHE_MS}>
+          <LastTripProvider storage={tripStorage}>
+            <OutboxProvider storage={storage} wake={wakeOutbox}>
+              <RefusalHaptic />
+              {children}
+            </OutboxProvider>
+          </LastTripProvider>
+        </RegistryProvider>
+      </StacksContext>
+    </TelemetryContext>
   );
 }
 

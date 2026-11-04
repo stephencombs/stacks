@@ -33,6 +33,14 @@ In Clerk, add `name` and `picture` claims to the session token (Sessions → Cus
 
 The mobile app needs a dev client build on your simulator or phone the first time: `pnpm --filter @stacks/mobile ios` (or `android`), or an EAS build with `pnpm --filter @stacks/mobile eas:dev`. It finds the API on the machine running Metro; set `EXPO_PUBLIC_API_URL` to point it elsewhere.
 
+For development telemetry, add `VITE_POSTHOG_TOKEN` and `VITE_POSTHOG_HOST` to `apps/web/.env.development.local`, and `EXPO_PUBLIC_POSTHOG_TOKEN` and `EXPO_PUBLIC_POSTHOG_HOST` to `apps/mobile/.env.development.local`. Use the development project's token and ingestion host. Without both values, telemetry is off. Keep production on a separate project.
+
+The `development-test-events` flag controls client confirmations of session starts, entries and closes. These events can repeat after a retry and are not ledger counts. Telemetry is held in memory, so unsent events are lost when the app closes. Autocapture, page views and replay are off; exception messages and stacks are removed before sending, so errors show occurrence counts but not the original cause.
+
+On mobile, unhandled promise rejections stay with React Native's development warning handler and are not sent to PostHog. The web SDK loads its exception tracking code from PostHog when telemetry is configured.
+
+Before enabling telemetry, configure the PostHog project to discard client IP addresses and keep console log capture disabled. These project settings protect data sent outside event capture. The local development env files do not configure the deployed development build. New mobile dev clients must be rebuilt for the added Expo modules.
+
 ## Deploy
 
 One Cloudflare Worker serves the API and the built web app. It's the development environment, at <https://colorup.stephen-jcombs.workers.dev>, and signs in through Clerk's development instance. There's no production environment yet. The database is any Postgres behind Cloudflare Hyperdrive (Neon's free plan works).

@@ -782,7 +782,7 @@ function CloseSheet({
 }) {
   const stacks = useStacks();
   const go = useGo();
-  const close = useAction(stacks.Client.mutation("sessions", "close"));
+  const close = useAction(stacks.Client.mutation("sessions", "close"), "session_close_confirmed");
   const outbox = useOutbox();
   const unsent = usePending(detail.session.id).length;
   const [chips, setChips] = useState<ReadonlyMap<PlayerId, string>>(new Map());

@@ -11,6 +11,7 @@ import {
   LastTripProvider,
   OutboxProvider,
   StacksContext,
+  TelemetryContext,
   useAction,
   useLastTrip,
   useOutbox,
@@ -27,6 +28,7 @@ import { useState, type ReactNode } from "react";
 
 import { FormError } from "~/components/ui/Field";
 import { Skeleton } from "~/components/ui/Surface";
+import { captureTestEvent } from "./telemetry";
 
 /**
  * One API client and atom registry per signed-in user. Remounting it with a new `key` on
@@ -42,15 +44,17 @@ export function StacksProvider({ userId, children }: { userId: string; children:
   const [storage] = useState(() => outboxStorage(userId));
   const [tripStorage] = useState(() => lastTripStorage(userId));
   return (
-    <StacksContext value={stacks}>
-      <RegistryProvider defaultIdleTTL={CACHE_MS}>
-        <LastTripProvider storage={tripStorage}>
-          <OutboxProvider storage={storage} wake={wakeOutbox}>
-            {children}
-          </OutboxProvider>
-        </LastTripProvider>
-      </RegistryProvider>
-    </StacksContext>
+    <TelemetryContext value={captureTestEvent}>
+      <StacksContext value={stacks}>
+        <RegistryProvider defaultIdleTTL={CACHE_MS}>
+          <LastTripProvider storage={tripStorage}>
+            <OutboxProvider storage={storage} wake={wakeOutbox}>
+              {children}
+            </OutboxProvider>
+          </LastTripProvider>
+        </RegistryProvider>
+      </StacksContext>
+    </TelemetryContext>
   );
 }
 
