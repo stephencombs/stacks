@@ -16,8 +16,36 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      e2e_web: ${{ steps.plan.outputs.e2e_web }}
+      e2e_mobile: ${{ steps.plan.outputs.e2e_mobile }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: node scripts/ci-changes.mjs >> "$GITHUB_OUTPUT"
+
   e2e:
     name: Playwright (${{ matrix.app }})
+    needs: changes
+    # A push runs an app's browser tests only when the diff can affect them.
+    # The morning run and a manual run test both.
+    if: >-
+      needs.changes.result == 'success' &&
+      (
+        github.event_name != 'push' ||
+        (matrix.app == 'web' && needs.changes.outputs.e2e_web == 'true') ||
+        (matrix.app == 'mobile' && needs.changes.outputs.e2e_mobile == 'true')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:

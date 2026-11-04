@@ -12,7 +12,7 @@
     "lint": "vp lint --report-unused-disable-directives",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
-    "test": "vp run -r test",
+    "test": "vp test run scripts && vp run -r test",
     "knip": "knip",
     "prepare": "vp config --hooks --no-agent",
     "deploy": "vp run --filter @stacks/web build && vp run --filter @stacks/api deploy"

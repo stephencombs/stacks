@@ -1,7 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { previewUrl, publishPreviewComment } from "./preview-comment.mjs";
 
 const number = process.argv[3];
 if (!/^[1-9]\d*$/.test(number ?? "")) throw new Error("Expected a PR number");
@@ -85,7 +87,7 @@ try {
         caching: { disabled: true },
       });
     }
-    const url = `https://${name}-colorup.stephen-jcombs.workers.dev`;
+    const url = previewUrl(number);
     const config = {
       name: "colorup",
       main: join(process.cwd(), "apps/api/src/worker.ts"),
@@ -137,6 +139,14 @@ try {
     const health = await fetch(`${url}/api/health`);
     if (!health.ok) throw new Error(`Preview health check failed (${health.status})`);
     console.log(`Preview: ${url}`);
+    if (process.env.GITHUB_STEP_SUMMARY)
+      appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Preview ${url}\n`);
+    if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY)
+      await publishPreviewComment({
+        repository: process.env.GITHUB_REPOSITORY,
+        pr: number,
+        token: process.env.GITHUB_TOKEN,
+      });
   } else throw new Error("Expected deploy or delete");
 } finally {
   rmSync(scratch, { recursive: true, force: true });

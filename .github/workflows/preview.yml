@@ -21,8 +21,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Changes
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      preview: ${{ steps.plan.outputs.preview }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: node scripts/ci-changes.mjs >> "$GITHUB_OUTPUT"
+
   preview:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    name: Preview
+    needs: changes
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    # Closing always deletes the preview. A diff that cannot change the worker skips the deploy.
+    if: >-
+      always() &&
+      !cancelled() &&
+      (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      (
+        github.event.action == 'closed' ||
+        github.event_name == 'workflow_dispatch' ||
+        (needs.changes.result == 'success' && needs.changes.outputs.preview == 'true')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -35,7 +68,9 @@ jobs:
       VITE_CLERK_PUBLISHABLE_KEY: pk_test_cmljaC1qYWd1YXItNjczOS5jbGVyay5hY2NvdW50cy5kZXYk
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+      # Deleting a preview only calls Neon and Cloudflare.
+      - if: github.event.action != 'closed' && inputs.operation != 'delete'
+        uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version-file: .node-version
           cache: true
@@ -44,9 +79,5 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
           OPERATION: ${{ github.event.action == 'closed' && 'delete' || inputs.operation || 'deploy' }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/preview.mjs "$OPERATION" "$PR_NUMBER"
-      - name: Add preview link to job summary
-        if: github.event.action != 'closed' && inputs.operation != 'delete'
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
-        run: echo "Preview https://pr-${PR_NUMBER}-colorup.stephen-jcombs.workers.dev" >> "$GITHUB_STEP_SUMMARY"
