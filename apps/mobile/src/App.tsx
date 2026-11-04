@@ -13,7 +13,7 @@ import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { Component, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -288,38 +288,10 @@ export default function App() {
         }
       }
     >
-      <StartupBoundary>
-        <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
-          <Root />
-          <StatusBar style={theme === "light" ? "dark" : "light"} />
-        </ClerkProvider>
-      </StartupBoundary>
+      <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
+        <Root />
+        <StatusBar style={theme === "light" ? "dark" : "light"} />
+      </ClerkProvider>
     </SafeAreaProvider>
   );
-}
-
-class StartupBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  override state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  override render() {
-    if (!this.state.failed) return this.props.children;
-    return (
-      <View className="flex-1 justify-center gap-4 bg-canvas px-6">
-        <Text accessibilityRole="header" className="type-headline text-ink">
-          Color Up couldn't start
-        </Text>
-        <Text className="text-lg text-muted">Try opening the app again.</Text>
-        <Button
-          label="Try again"
-          variant="primary"
-          size="lg"
-          onPress={() => void reloadAppAsync()}
-        />
-      </View>
-    );
-  }
 }
