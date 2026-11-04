@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./telemetry": {
+      "types": "./src/telemetry.ts",
+      "import": "./src/telemetry.ts"
+    },
     "./api": {
       "types": "./src/api.ts",
       "import": "./src/api.ts"

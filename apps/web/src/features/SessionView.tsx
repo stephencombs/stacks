@@ -650,7 +650,7 @@ function CloseSessionDialog({
 }) {
   const stacks = useStacks();
   const navigate = useNavigate();
-  const close = useAction(stacks.Client.mutation("sessions", "close"));
+  const close = useAction(stacks.Client.mutation("sessions", "close"), "session_close_confirmed");
   const outbox = useOutbox();
   const unsent = usePending(detail.session.id).length;
   const [missing, setMissing] = useState(false);

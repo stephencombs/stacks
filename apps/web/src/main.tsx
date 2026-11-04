@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./index.css";
+import "./lib/telemetry";
 import { markNavigation } from "./features/PageSkeletons";
 import { routeTree } from "./routeTree.gen";
 

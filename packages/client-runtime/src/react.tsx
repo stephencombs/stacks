@@ -19,6 +19,9 @@ import { describeError } from "./errors.ts";
 import { shouldRevalidate } from "./freshness.ts";
 import { makeOutbox, type Outbox, type OutboxStorage, type Pending } from "./outbox.ts";
 import { makeLastTripStore, type LastTripStorage } from "./trip.ts";
+import type { TestEvent } from "./telemetry.ts";
+
+export const TelemetryContext = createContext<(event: TestEvent) => void>(() => {});
 
 /** Each app provides its own client, built with its own way of getting the Clerk token. */
 export const StacksContext = createContext<Stacks | null>(null);
@@ -33,7 +36,8 @@ export const useStacks = () => {
  * Runs an API mutation and refreshes what's on screen afterwards. Failures come back as a
  * sentence for the person, never thrown.
  */
-export function useAction<Arg, A, E>(mutation: Atom.AtomResultFn<Arg, A, E>) {
+export function useAction<Arg, A, E>(mutation: Atom.AtomResultFn<Arg, A, E>, event?: TestEvent) {
+  const capture = use(TelemetryContext);
   const run = useAtomSet(mutation, { mode: "promiseExit" });
   const [state, setState] = useState<{ pending: boolean; error: string | null }>({
     pending: false,
@@ -44,6 +48,13 @@ export function useAction<Arg, A, E>(mutation: Atom.AtomResultFn<Arg, A, E>) {
     setState({ pending: true, error: null });
     const exit = await run({ ...arg, reactivityKeys: LEDGER_KEYS } as Arg);
     const error = Exit.isFailure(exit) ? describeError(Cause.squash(exit.cause)) : null;
+    if (Exit.isSuccess(exit) && event) {
+      try {
+        capture(event);
+      } catch {
+        // Telemetry must not change the result of a ledger action.
+      }
+    }
     setState({ pending: false, error });
     return { value: Exit.isSuccess(exit) ? exit.value : null, error };
   };
@@ -75,6 +86,7 @@ export function OutboxProvider({
   children: ReactNode;
 }) {
   const stacks = useStacks();
+  const capture = use(TelemetryContext);
   const add = useAtomSet(stacks.Client.mutation("ledger", "addEntry"), { mode: "promiseExit" });
   const [outbox] = useState(() =>
     makeOutbox(storage, async ({ sessionId, entry }) => {
@@ -83,6 +95,13 @@ export function OutboxProvider({
         payload: entry,
         reactivityKeys: LEDGER_KEYS,
       });
+      if (Exit.isSuccess(exit)) {
+        try {
+          capture("entry_confirmed");
+        } catch {
+          // A confirmed entry must not be retried because telemetry failed.
+        }
+      }
       return { error: Exit.isFailure(exit) ? Cause.squash(exit.cause) : null };
     }),
   );

@@ -1,8 +1,1 @@
-{
-  "mcpServers": {
-    "reui": {
-      "type": "http",
-      "url": "https://mcp.reui.io"
-    }
-  }
-}
+.agents/mcp.json

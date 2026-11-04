@@ -80,7 +80,7 @@ function NewSessionForm({
 }) {
   const stacks = useStacks();
   const navigation = useNavigation();
-  const create = useAction(stacks.Client.mutation("sessions", "create"));
+  const create = useAction(stacks.Client.mutation("sessions", "create"), "session_start_confirmed");
   const [venue, setVenue] = useState<Venue | null>(from?.venue ?? null);
   const [game, setGame] = useState<Game>(from?.session.game ?? "blackjack");
   const [highLimit, setHighLimit] = useState(from?.session.highLimit ?? false);

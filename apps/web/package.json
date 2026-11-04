@@ -23,6 +23,7 @@
     "@tanstack/react-router": "^1.160.2",
     "effect": "catalog:",
     "lucide-react": "^0.564.0",
+    "posthog-js": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwind-merge": "^3.5.0"
