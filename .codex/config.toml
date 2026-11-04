@@ -6,3 +6,6 @@ url = "https://mcp.cloudflare.com/mcp"
 
 [mcp_servers.Neon]
 url = "https://mcp.neon.tech/mcp"
+
+[mcp_servers.expo]
+url = "https://mcp.expo.dev/mcp"

@@ -53,7 +53,7 @@ A change that works on the path you tested and is missing everywhere else is the
 - `docs/internals/navigation.md` decides where content lives and how people move between it. Read it before adding a page, tab, menu or route.
 - `DESIGN.md` is the design system: read it before building UI. `/design.html` on the web dev server shows the shared web parts and their states.
 - `apps/web/e2e` holds the Playwright test of the full loop against the real Clerk development instance (`pnpm --filter @stacks/web test:e2e`). Run it after changing a flow it covers.
-- `apps/mobile`: Expo with a dev client, React Navigation native-stack (static config), Uniwind.
+- `apps/mobile`: Expo with a dev client, React Navigation native-stack (static config), Uniwind. Expo, EAS, and React Native API work follows [Expo](#expo).
 - `packages/contracts`: Effect Schema types and the `StacksApi` definition. No runtime logic.
 - `packages/shared`: pure ledger logic shared by the API and clients: `money`, `results`, `balances`, `settleUp`. Import a subpath; there's no root export.
 - `packages/client-runtime`: client code shared by web and mobile. Import an explicit subpath (`@stacks/client-runtime/api`); there's no root export.
@@ -92,3 +92,39 @@ Most changes need no doc change. Agents can read the code.
 - `PLAN.md` is the product scope and its phases. Don't commit other plans, research notes or agent scratch files; keep working material outside the worktree.
 - Research that leads to a decision lands as the decision, in `docs/internals/`, with a link or two to its strongest sources.
 - A merged PR is the implementation record. Don't keep a second checklist in the repo.
+
+## Expo
+
+`apps/mobile` is the Expo app. The `expo` version in `apps/mobile/package.json` is the SDK it targets. Expo ships breaking changes every SDK, so an API you remember may be renamed, moved, or removed. Before writing code that touches an Expo, EAS, or React Native API:
+
+1. Read that `expo` version.
+2. Fetch the matching docs at `https://docs.expo.dev/versions/v<major>.0.0/` (SDK 58 is `https://docs.expo.dev/versions/v58.0.0/`).
+3. For anything else, fetch https://docs.expo.dev/llms.txt and follow its links. Answer from those pages.
+
+Load the `expo-overview` skill first on Expo or EAS work, then the leaf skill it names. This file wins when a skill disagrees. This app uses React Navigation native-stack (`apps/mobile/src/App.tsx`), `@stacks/client-runtime` for server data, and integer minor units for money. Keep that. `expo-project-structure` is for a new app, and Expo Router is not how this app navigates.
+
+### Commands
+
+Run Expo and EAS from `apps/mobile`. This repo uses pnpm.
+
+```bash
+pnpm exec expo install <package>  # SDK-compatible version. Never add an expo-* or react-native package by hand.
+pnpm exec expo start --dev-client # Metro. From the repo root, `pnpm dev:mobile`.
+pnpm exec expo-doctor
+pnpm exec expo install --fix
+npx eas-cli@latest <command>      # `pnpm eas:dev` and `pnpm eas:preview` use the profiles in eas.json
+```
+
+A library only mobile uses can stay on the version `expo install` writes. A library shared with web goes in the `catalog:` in `pnpm-workspace.yaml`. Lint, format, and test from the repo root, as in Verifying. EAS docs: https://docs.expo.dev/eas/index.md
+
+### Native projects
+
+`ios/` and `android/` under `apps/mobile` are generated (Continuous Native Generation) and gitignored. Never create or edit them by hand. Configure native behavior in `app.config.ts` and config plugins.
+
+Expo Go does not include this app's native modules. After adding a library with native code, ship a new development build: `pnpm exec expo run:ios` or `run:android`, or `pnpm eas:dev`.
+
+### Agents
+
+Expo skills from `expo/skills` live in `.agents/skills`, linked from `.claude/skills` and `.codex/skills`. Claude Code enables the `expo@claude-plugins-official` plugin in `.claude/settings.json`. Each machine installs it once: `claude plugin install expo@claude-plugins-official`. Codex: `codex plugin add expo@openai-curated`, then `codex mcp login expo`.
+
+The Expo MCP server is `https://mcp.expo.dev/mcp`. Sign in with an Expo account before using it. Docs and Expo Services (builds, workflows, updates, TestFlight) work after that. Local simulator screenshots from the server also need the `expo-mcp` dev dependency and `EXPO_UNSTABLE_MCP_SERVER=1` on Metro. Docs: https://docs.expo.dev/mcp.md

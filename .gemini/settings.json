@@ -8,6 +8,9 @@
     },
     "Neon": {
       "httpUrl": "https://mcp.neon.tech/mcp"
+    },
+    "expo": {
+      "httpUrl": "https://mcp.expo.dev/mcp"
     }
   }
 }
