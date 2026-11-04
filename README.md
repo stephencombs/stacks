@@ -39,7 +39,7 @@ The `development-test-events` flag controls client confirmations of session star
 
 On mobile, unhandled promise rejections stay with React Native's development warning handler and are not sent to PostHog. The web SDK loads its exception tracking code from PostHog when telemetry is configured.
 
-Before enabling telemetry, configure the PostHog project to discard client IP addresses and keep console log capture disabled. These project settings protect data sent outside event capture. The local development env files do not configure the deployed development build. New mobile dev clients must be rebuilt for the added Expo modules.
+Before enabling telemetry, configure the PostHog project to discard client IP addresses and keep console log capture disabled. These project settings protect data sent outside event capture. The deployed development web build and mobile preview profile use the development project. A new mobile preview build is required to receive configuration changes. New mobile dev clients must be rebuilt for the added Expo modules.
 
 ## Deploy
 

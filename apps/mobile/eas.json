@@ -23,7 +23,9 @@
         "APP_VARIANT": "preview",
         "EXPO_PUBLIC_API_URL": "https://colorup.stephen-jcombs.workers.dev",
         "EXPO_PUBLIC_WEB_URL": "https://colorup.stephen-jcombs.workers.dev",
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_cmljaC1qYWd1YXItNjczOS5jbGVyay5hY2NvdW50cy5kZXYk"
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_cmljaC1qYWd1YXItNjczOS5jbGVyay5hY2NvdW50cy5kZXYk",
+        "EXPO_PUBLIC_POSTHOG_TOKEN": "phc_tWcwMw9cLg9HgNdb57Ld9yUQENkuadNkkjDoWDAF8KRU",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com"
       },
       "distribution": "internal",
       "channel": "preview"
