@@ -18,8 +18,55 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      check: ${{ steps.plan.outputs.check }}
+      api: ${{ steps.plan.outputs.api }}
+      build: ${{ steps.plan.outputs.build }}
+      typecheck_args: ${{ steps.plan.outputs.typecheck_args }}
+      test_args: ${{ steps.plan.outputs.test_args }}
+    steps:
+      # The planner diffs against the base, so the checkout needs that commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: node scripts/ci-changes.mjs >> "$GITHUB_OUTPUT"
+
   check:
     name: Lint, typecheck, test
+    needs: changes
+    if: needs.changes.outputs.check == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: true
+      - run: vp run fmt:check
+      - run: vp run lint
+      - run: vp run knip
+      - if: needs.changes.outputs.typecheck_args != ''
+        run: vp run ${{ needs.changes.outputs.typecheck_args }} typecheck
+      - run: vp test run scripts/ci-changes.test.ts
+      # API tests run in their own job. They need Postgres, and these don't.
+      - if: needs.changes.outputs.test_args != ''
+        run: vp run ${{ needs.changes.outputs.test_args }} test
+
+  api:
+    name: API tests
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -44,17 +91,15 @@ jobs:
           node-version-file: .node-version
           cache: true
           run-install: true
-      - run: vp run fmt:check
-      - run: vp run lint
-      - run: vp run knip
-      - run: vp run typecheck
-      - run: vp run test
+      - run: vp run --filter @stacks/api test
       - run: vp run --filter @stacks/api db:seed
         env:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 
   build:
     name: Build web, api and mobile
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -71,8 +116,15 @@ jobs:
 
   deploy:
     name: Deploy development
-    needs: [check, build]
-    if: github.event_name == 'push'
+    needs: [changes, check, api, build]
+    if: >-
+      github.event_name == 'push' &&
+      always() &&
+      !cancelled() &&
+      needs.changes.result == 'success' &&
+      needs.check.result == 'success' &&
+      needs.build.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.api.result)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
