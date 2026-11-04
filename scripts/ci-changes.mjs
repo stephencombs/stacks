@@ -3,7 +3,8 @@ import { readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Which CI jobs a diff can affect. An unrecognized path runs every job.
+// Which CI jobs a diff can affect. An unrecognized path runs every check.
+// A preview deploys only when the worker or the web app it serves changed.
 // The mobile bundle workflow keeps its own path filter.
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -108,10 +109,13 @@ export function dependentsOf(name, packages) {
 }
 
 function everything() {
+  const jobs = blank(true);
+  // A preview spends a Neon branch, so a lockfile or an unknown file does not deploy one.
+  jobs.preview = false;
   return {
     all: true,
     packages: new Set(load().map((pkg) => pkg.name)),
-    jobs: blank(true),
+    jobs,
   };
 }
 
@@ -163,7 +167,7 @@ function special(path) {
   if (path === ".github/workflows/ci.yml") return fullCheck();
   if (path === ".github/workflows/e2e.yml") return jobsOnly({ e2eWeb: true, e2eMobile: true });
   if (path === ".github/workflows/preview.yml" || path === "scripts/preview.mjs")
-    return jobsOnly({ check: true, preview: true });
+    return jobsOnly({ check: true });
   if (path === "scripts/ci-changes.mjs" || path === "scripts/ci-changes.test.ts")
     return jobsOnly({ check: true });
   return null;
@@ -193,15 +197,19 @@ function classify(path) {
 export function plan(paths) {
   const jobs = blank(false);
   const packages = new Set();
+  let all = false;
   for (const raw of paths) {
     const path = raw.trim();
     if (path === "") continue;
     const part = classify(path);
-    if (part.all) return part;
+    if (part.all) all = true;
     for (const name of JOB_NAMES) if (part.jobs[name]) jobs[name] = true;
     for (const name of part.packages) packages.add(name);
   }
-  return { all: false, jobs, packages };
+  if (all) {
+    for (const pkg of load()) packages.add(pkg.name);
+  }
+  return { all, jobs, packages };
 }
 
 export function decide({ event, base, diff }) {
@@ -211,7 +219,7 @@ export function decide({ event, base, diff }) {
     return plan(diff());
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
-    console.error("Could not diff the changeset; running every job.");
+    console.error("Could not diff the changeset; running every check.");
     return everything();
   }
 }

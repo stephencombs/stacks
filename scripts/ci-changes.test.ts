@@ -24,6 +24,8 @@ const all = {
   e2e_mobile: "true",
 };
 
+const checks = { ...all, preview: "false" };
+
 function jobs(paths: string[]) {
   const { typecheck_args: _typecheck, test_args: _test, ...flags } = output(plan(paths));
   return flags;
@@ -49,8 +51,8 @@ describe("plan", () => {
     "vite.config.ts",
     "patches/example.patch",
     "mystery/new.ts",
-  ])("%s runs every job", (path) => {
-    expect(jobs([path])).toEqual(all);
+  ])("%s runs every check and does not deploy a preview", (path) => {
+    expect(jobs([path])).toEqual(checks);
     expect(output(plan([path])).typecheck_args).toBe("-r --cache");
   });
 
@@ -96,6 +98,7 @@ describe("plan", () => {
     const shared = output(plan(["packages/shared/src/money.ts"]));
     expect(shared.api).toBe("true");
     expect(shared.build).toBe("true");
+    expect(shared.preview).toBe("true");
     expect(shared.e2e_web).toBe("true");
     expect(shared.e2e_mobile).toBe("true");
     expect(shared.typecheck_args).toContain("--filter @stacks/api");
@@ -135,12 +138,8 @@ describe("plan", () => {
       e2e_web: "true",
       e2e_mobile: "true",
     });
-    expect(jobs([".github/workflows/preview.yml"])).toEqual({
-      ...none,
-      check: "true",
-      preview: "true",
-    });
-    expect(jobs(["scripts/preview.mjs"])).toEqual({ ...none, check: "true", preview: "true" });
+    expect(jobs([".github/workflows/preview.yml"])).toEqual({ ...none, check: "true" });
+    expect(jobs(["scripts/preview.mjs"])).toEqual({ ...none, check: "true" });
     expect(jobs(["scripts/ci-changes.mjs"])).toEqual({ ...none, check: "true" });
   });
 
@@ -152,8 +151,22 @@ describe("plan", () => {
     });
   });
 
-  it("runs every job when any path is unrecognized", () => {
-    expect(jobs(["README.md", "somewhere/new.ts"])).toEqual(all);
+  it("runs every check when any path is unrecognized, without a preview", () => {
+    expect(jobs(["README.md", "somewhere/new.ts"])).toEqual(checks);
+  });
+
+  it("deploys a preview only when the worker or the web app changed", () => {
+    expect(
+      jobs([
+        "package.json",
+        "pnpm-lock.yaml",
+        ".github/workflows/preview.yml",
+        "scripts/preview.mjs",
+        "scripts/ci-changes.mjs",
+      ]).preview,
+    ).toBe("false");
+    expect(jobs(["package.json", "apps/web/src/main.tsx"]).preview).toBe("true");
+    expect(jobs(["pnpm-lock.yaml", "apps/api/src/worker.ts"]).preview).toBe("true");
   });
 
   it("does nothing for an empty diff", () => {
@@ -164,13 +177,13 @@ describe("plan", () => {
 });
 
 describe("decide", () => {
-  it("runs every job for a schedule, a new branch, or a diff it cannot read", () => {
+  it("runs every check for a schedule, a new branch, or a diff it cannot read", () => {
     const boom = () => {
       throw new Error("missing");
     };
     expect(output(decide({ event: "schedule", base: "", diff: boom })).check).toBe("true");
     expect(output(decide({ event: "workflow_dispatch", base: "abc", diff: boom })).preview).toBe(
-      "true",
+      "false",
     );
     expect(output(decide({ event: "push", base: "0".repeat(40), diff: boom })).build).toBe("true");
     expect(output(decide({ event: "push", base: "abc", diff: boom })).api).toBe("true");
