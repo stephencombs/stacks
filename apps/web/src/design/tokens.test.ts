@@ -64,6 +64,17 @@ const tinted = (color: string, ground: string, alpha: number) => {
   return 0.2126 * mix(r, x) + 0.7152 * mix(g, y) + 0.0722 * mix(b, z);
 };
 
+const hex = (color: string) =>
+  `#${linearRgb(color)
+    .map((v) => {
+      const c = Math.min(1, Math.max(0, v));
+      const encoded = c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+      return Math.round(255 * encoded)
+        .toString(16)
+        .padStart(2, "0");
+    })
+    .join("")}`;
+
 const ratio = (one: number, other: number) =>
   (Math.max(one, other) + 0.05) / (Math.min(one, other) + 0.05);
 
@@ -71,6 +82,22 @@ const contrast = (one: string, other: string) => {
   const [hi, lo] = [luminance(one), luminance(other)].sort((a, b) => b - a) as [number, number];
   return (hi + 0.05) / (lo + 0.05);
 };
+
+// The page behind the app, the scrollbar gutter and the phone's status bar are painted before the
+// stylesheet loads, in hex; they must be the canvas, or a strip of another dark shows at the edges.
+it.each(["../../index.html", "../../preview/index.html", "../lib/theme.ts"])(
+  "%s paints the browser chrome in the canvas color",
+  (path) => {
+    const painted = new Set(
+      read(path)
+        .match(/#[0-9a-f]{6}\b/gi)!
+        .map((c) => c.toLowerCase()),
+    );
+    expect(painted).toEqual(
+      new Set([hex(themes.dark["--color-canvas"]!), hex(themes.light["--color-canvas"]!)]),
+    );
+  },
+);
 
 describe("the shared palette", () => {
   it("is the same on web and mobile", () => {

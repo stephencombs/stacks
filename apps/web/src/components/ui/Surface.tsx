@@ -94,7 +94,7 @@ export function Tag({
   return (
     <span
       className={cn(
-        "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium",
+        "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium tabular-nums",
         tone === "live" ? "bg-live/15 text-live" : "bg-sunken text-muted",
       )}
     >

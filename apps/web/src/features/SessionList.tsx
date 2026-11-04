@@ -16,7 +16,12 @@ function SessionRow({ summary, detail }: { summary: SessionSummary; detail: Grou
     <RowLink to="/sessions/$sessionId" params={{ sessionId: session.id }}>
       <RowText
         title={venue.name}
-        meta={`${gameNames[session.game]} · ${live ? "since " : ""}${formatTime(session.startedAt)}`}
+        meta={
+          <span className="tabular-nums">
+            {gameNames[session.game]} · {live ? "since " : ""}
+            {formatTime(session.startedAt)}
+          </span>
+        }
       />
       {live ? <Tag tone="live">Live</Tag> : null}
       {mine && !live ? (
@@ -64,7 +69,9 @@ export function LiveSessionCard({
       <div className="relative flex flex-col gap-4 p-4">
         <div className="flex items-center justify-between gap-3">
           <Tag tone="live">Live · {formatDuration(session.startedAt, DateTime.nowUnsafe())}</Tag>
-          <span className="text-sm text-muted">since {formatTime(session.startedAt)}</span>
+          <span className="text-sm text-muted tabular-nums">
+            since {formatTime(session.startedAt)}
+          </span>
         </div>
         <div className="flex items-end justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1">
@@ -89,6 +96,7 @@ export function LiveSessionCard({
           params={{ sessionId: session.id }}
           variant="primary"
           size="lg"
+          className="pr-4.5"
         >
           Back to the table
           <ArrowRight className="size-4" aria-hidden />

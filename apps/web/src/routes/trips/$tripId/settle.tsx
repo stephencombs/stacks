@@ -156,9 +156,9 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
                 <BalanceBar
                   balance={balanceOf.get(player.id) ?? 0}
                   track={track}
-                  className="w-16 sm:w-28"
+                  className="w-10 sm:w-28"
                 />
-                <span className="min-w-28 text-right whitespace-nowrap font-medium">
+                <span className="min-w-24 text-right whitespace-nowrap font-medium sm:min-w-28">
                   <BalanceLabel
                     amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
                     currency={currency}

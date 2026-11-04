@@ -21,7 +21,8 @@ export function TransferRow({
 }) {
   return (
     <Row className="flex-wrap">
-      <span className="flex min-w-0 flex-1 basis-40 items-center gap-2 font-medium">
+      {/* Sized to the names, so the amount wraps under them before either name is cut short. */}
+      <span className="flex min-w-0 flex-auto items-center gap-2 font-medium">
         <Payer detail={detail} playerId={transfer.from} />
         <ArrowRight className="size-4 shrink-0 text-faint" role="img" aria-label="pays" />
         <Payer detail={detail} playerId={transfer.to} />
@@ -44,7 +45,7 @@ export function TransferRow({
 function Payer({ detail, playerId }: { detail: GroupDetail; playerId: PlayerId }) {
   const name = detail.players.find((player) => player.id === playerId)?.displayName ?? "Someone";
   return (
-    <span className="flex min-w-0 items-center gap-1.5">
+    <span className="flex max-w-1/2 min-w-0 items-center gap-1.5">
       <Chip chip={chipOf(detail, playerId)} name={name} size={22} />
       <span className="truncate">{name}</span>
     </span>
