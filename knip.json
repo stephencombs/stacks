@@ -12,7 +12,7 @@
       ]
     },
     "apps/mobile": {
-      "ignoreDependencies": ["@babel/core", "@react-navigation/elements", "expo-updates", "serve"]
+      "ignoreDependencies": ["@babel/core", "@react-navigation/elements", "serve"]
     }
   }
 }

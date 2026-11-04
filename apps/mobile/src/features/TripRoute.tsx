@@ -1,13 +1,13 @@
 import type { GroupDetail, TripDetail, Venue } from "@stacks/contracts";
 import { boardMoney } from "@stacks/client-runtime/trip";
 import { tripRoute } from "@stacks/shared/trips";
-import Constants from "expo-constants";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { Linking, Platform, Pressable, Text, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { cn } from "../components/ui/cn";
 import { SectionHeading } from "../components/ui/Surface";
+import { googleMapsEnabled } from "../lib/config";
 
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
@@ -43,8 +43,7 @@ const directions = (venue: Venue) => {
 };
 
 /** Android draws Google's map, which needs a key baked into the build; without one, the list stands alone. */
-const canDrawMap =
-  Platform.OS === "ios" || Boolean(Constants.expoConfig?.android?.config?.googleMaps?.apiKey);
+const canDrawMap = Platform.OS === "ios" || (Platform.OS === "android" && googleMapsEnabled);
 
 /**
  * The Board's "By casino": the casinos the trip played, in the order it first reached each, on the

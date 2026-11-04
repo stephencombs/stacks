@@ -14,12 +14,9 @@ export const outboxStorage = (userId: string): OutboxStorage => {
       save: (value) => localStorage.setItem(`stacks-outbox-${userId}`, value),
     };
   const file = new File(Paths.document, `outbox-${userId}.json`);
-  let writing = Promise.resolve();
   return {
     load: () => (file.exists ? file.textSync() : null),
-    save: (value) => {
-      writing = writing.then(() => file.write(value)).catch(() => undefined);
-    },
+    save: (value) => file.writeSync(value),
   };
 };
 

@@ -54,7 +54,7 @@ jobs:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 
   build:
-    name: Build web and api
+    name: Build web, api and mobile
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -67,6 +67,7 @@ jobs:
       # The API bundle includes the built web app, so web builds first.
       - run: vp run --filter @stacks/web build
       - run: vp run --filter @stacks/api build
+      - run: vp run --filter @stacks/mobile build
 
   deploy:
     name: Deploy development
