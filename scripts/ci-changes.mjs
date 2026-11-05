@@ -28,7 +28,7 @@ const SKIP_EXACT = new Set([
   ".gitignore",
   ".mcp.json",
   ".github/dependabot.yml",
-  // These workflows filter themselves. A change to either is not a CI input.
+  // Mobile filters its own paths. TestFlight runs only from a manual dispatch.
   ".github/workflows/mobile.yml",
   ".github/workflows/testflight.yml",
   "docker-compose.yml",

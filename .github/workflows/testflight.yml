@@ -1,22 +1,8 @@
 name: TestFlight
 
+# Manual only. Each run spends one of the Expo account's monthly iOS builds.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - apps/mobile/**
-      - packages/client-runtime/**
-      - packages/contracts/**
-      - packages/shared/**
-      - package.json
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
-      - .pnpmfile.cjs
-      - .node-version
-      - patches/**
-      - .github/workflows/testflight.yml
 
 permissions:
   contents: read
@@ -43,10 +29,4 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)" != "$GITHUB_SHA" ]; then
-            echo "main has moved on; the newer commit's run ships it."
-            exit 0
-          fi
-          npx -y eas-cli@27.4.1 workflow:run .eas/workflows/testflight.yml --non-interactive --wait
+        run: npx -y eas-cli@27.4.1 workflow:run .eas/workflows/testflight.yml --non-interactive --wait
