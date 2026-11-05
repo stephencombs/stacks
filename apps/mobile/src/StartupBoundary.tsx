@@ -1,7 +1,6 @@
 import { reloadAppAsync } from "expo";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Platform, PlatformColor, Pressable, ScrollView, Text, View } from "react-native";
-import { reportStartupError } from "./lib/diagnostics";
 
 // Recovery must render without the app's fonts, theme hooks, or safe-area provider.
 export class StartupBoundary extends Component<
@@ -19,7 +18,9 @@ export class StartupBoundary extends Component<
     const report = new Error(error instanceof Error ? error.message : String(error));
     report.name = error instanceof Error ? error.name : "Error";
     report.stack = details;
-    reportStartupError(report);
+    // Diagnostics pulls in native reporting. Keep that off this module so the
+    // boundary can paint even when that import fails.
+    void import("./lib/diagnostics").then(({ reportStartupError }) => reportStartupError(report));
     this.setState({ message: details });
   }
 

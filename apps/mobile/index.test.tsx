@@ -23,7 +23,9 @@ it("shows a startup error and retry when App fails before its providers mount", 
   vi.doMock("expo", () => ({ registerRootComponent, reloadAppAsync }));
   vi.doMock("./src/polyfills", () => ({}));
   vi.doMock("./global.css", () => ({}));
+  let appLoaded = false;
   vi.doMock("./src/App", () => {
+    appLoaded = true;
     expect(configure).toHaveBeenCalledOnce();
     return {
       default: () => {
@@ -42,11 +44,16 @@ it("shows a startup error and retry when App fails before its providers mount", 
     PlatformColor: (name: string) => name,
   }));
   await import("./index");
+  expect(appLoaded).toBe(false);
   const Startup = registerRootComponent.mock.calls[0]![0];
   const container = document.createElement("div");
   const root = createRoot(container, { onUncaughtError: vi.fn(), onCaughtError: vi.fn() });
   try {
     await act(async () => root.render(createElement(Startup)));
+    expect(container.textContent).toContain("Opening Color Up…");
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
     expect(container.textContent).toContain("Color Up couldn't start");
     expect(container.textContent).toContain("Native font loader failed");
     expect(container.textContent).toContain("Component stack:");
