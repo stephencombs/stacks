@@ -1,5 +1,18 @@
 export type TestEvent = "session_start_confirmed" | "entry_confirmed" | "session_close_confirmed";
 
+const startupStages = [
+  "js_entry",
+  "root_committed",
+  "auth_ready",
+  "navigation_ready",
+  "landing_ready",
+  "query_settled",
+  "initial_url_timeout",
+] as const;
+export type StartupStage = (typeof startupStages)[number];
+const safeStartupStages = new Set<string>(startupStages);
+const safeStartupEnvironments = new Set(["development", "preview", "production"]);
+
 const safeProperties = new Set([
   "token",
   "distinct_id",
@@ -39,6 +52,20 @@ export function sanitizeTelemetry(properties: Record<string, unknown>) {
     ) {
       safe[key] = value;
     }
+  }
+  const { startup_stage, startup_elapsed_ms, startup_environment } = properties;
+  if (typeof startup_stage === "string" && safeStartupStages.has(startup_stage)) {
+    safe.startup_stage = startup_stage;
+  }
+  if (
+    typeof startup_elapsed_ms === "number" &&
+    Number.isSafeInteger(startup_elapsed_ms) &&
+    startup_elapsed_ms >= 0
+  ) {
+    safe.startup_elapsed_ms = startup_elapsed_ms;
+  }
+  if (typeof startup_environment === "string" && safeStartupEnvironments.has(startup_environment)) {
+    safe.startup_environment = startup_environment;
   }
   if ("$exception_list" in properties) {
     const exceptions = properties.$exception_list;

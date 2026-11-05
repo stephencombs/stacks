@@ -9,7 +9,6 @@ import {
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
-import { Observe } from "expo-observe";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
@@ -23,7 +22,7 @@ import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./f
 import { ScopeButton } from "./features/Scope";
 import { YouButton } from "./features/You";
 import { clerkPublishableKey } from "./lib/config";
-import { markStartup } from "./lib/diagnostics";
+import { markStartup, reportStartupError } from "./lib/diagnostics";
 import { useAppFonts } from "./lib/fonts";
 import { getInitialURL } from "./lib/initialUrl";
 import { ScopeProvider, useScopeHasTrip } from "./lib/scope";
@@ -207,8 +206,8 @@ function Root() {
         pending ??
         getInitialURL(
           () => Linking.getInitialURL(),
-          () => Observe.logEvent("startup.initial_url_timeout", { severity: "warn" }),
-          (error) => Observe.reportError(error),
+          () => markStartup("initial_url_timeout"),
+          reportStartupError,
         )
       );
     },

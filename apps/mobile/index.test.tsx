@@ -15,6 +15,10 @@ it("shows a startup error and retry when App fails before its providers mount", 
     ObserveRoot: { wrap: (component: () => ReactNode) => component },
   }));
   vi.doMock("expo-constants", () => ({ default: {} }));
+  vi.doMock("./src/lib/telemetry", () => ({
+    captureStartup: vi.fn(),
+    captureCaughtError: vi.fn(),
+  }));
   vi.stubGlobal("__DEV__", true);
   vi.doMock("expo", () => ({ registerRootComponent, reloadAppAsync }));
   vi.doMock("./src/polyfills", () => ({}));

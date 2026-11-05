@@ -1,24 +1,40 @@
 import { Observe } from "expo-observe";
 import Constants from "expo-constants";
+import type { StartupStage } from "@stacks/client-runtime/telemetry";
 
-Observe.configure({ environment: Constants.expoConfig?.extra?.appVariant ?? "production" });
+const environment: string = Constants.expoConfig?.extra?.appVariant ?? "production";
+Observe.configure({ environment });
 
 const started = Date.now();
-const milestones = new Set<string>();
+const milestones = new Set<StartupStage>();
+// Defer the secondary SDK until early native reporting is installed and JS entry is recorded.
+const telemetry = Promise.resolve()
+  .then(() => import("./telemetry"))
+  .catch((error: unknown) => {
+    Observe.reportError(error);
+    return null;
+  });
 
-export function markStartup(
-  stage:
-    | "js_entry"
-    | "root_committed"
-    | "auth_ready"
-    | "navigation_ready"
-    | "landing_ready"
-    | "query_settled",
-) {
+export function markStartup(stage: StartupStage) {
   if (milestones.has(stage)) return;
   milestones.add(stage);
   // Observe persists events on-device, with the native session and release identifiers.
-  Observe.logEvent(`startup.${stage}`, { attributes: { elapsed_ms: Date.now() - started } });
+  const elapsedMs = Date.now() - started;
+  Observe.logEvent(`startup.${stage}`, {
+    severity: stage === "initial_url_timeout" ? "warn" : "info",
+    attributes: { elapsed_ms: elapsedMs },
+  });
+  void telemetry
+    .then((client) => client?.captureStartup(stage, elapsedMs, environment))
+    .catch((error: unknown) => Observe.reportError(error));
+}
+
+export function reportStartupError(error: unknown) {
+  Observe.reportError(error);
+  const stage = [...milestones].at(-1) ?? "js_entry";
+  void telemetry
+    .then((client) => client?.captureCaughtError(error, stage, environment))
+    .catch((failure: unknown) => Observe.reportError(failure));
 }
 
 markStartup("js_entry");
@@ -35,6 +51,6 @@ if (!__DEV__) {
   const hermes: HermesRejectionTracker | undefined = Reflect.get(globalThis, "HermesInternal");
   hermes?.enablePromiseRejectionTracker?.({
     allRejections: true,
-    onUnhandled: (_id, error) => Observe.reportError(error),
+    onUnhandled: (_id, error) => reportStartupError(error),
   });
 }

@@ -46,11 +46,7 @@ it.each([
   vi.doMock("@clerk/expo/token-cache", () => ({ tokenCache: {} }));
   vi.doMock("expo", () => ({ reloadAppAsync: vi.fn() }));
   const markStartup = vi.fn();
-  vi.doMock("./lib/diagnostics", () => ({ markStartup }));
-  const logEvent = vi.fn();
-  vi.doMock("expo-observe", () => ({
-    Observe: { logEvent, reportError: vi.fn() },
-  }));
+  vi.doMock("./lib/diagnostics", () => ({ markStartup, reportStartupError: vi.fn() }));
   vi.doMock("expo-linking", () => ({
     createURL: () => "stacks://",
     getInitialURL: () => new Promise<string | null>(() => {}),
@@ -143,7 +139,7 @@ it.each([
       const url = linking.getInitialURL();
       await vi.advanceTimersByTimeAsync(1_500);
       await expect(url).resolves.toBeNull();
-      expect(logEvent).toHaveBeenCalledWith("startup.initial_url_timeout", { severity: "warn" });
+      expect(markStartup).toHaveBeenCalledWith("initial_url_timeout");
       onReady();
       expect(markStartup).toHaveBeenCalledWith("navigation_ready");
     } finally {
