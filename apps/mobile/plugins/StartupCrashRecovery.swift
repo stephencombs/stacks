@@ -51,6 +51,7 @@ enum StartupCrashRecovery {
 
 @MainActor
 private final class StartupCrashViewController: UIViewController {
+  private let details = UITextView()
   private let report: String
   private let retry: () -> Void
 
@@ -76,18 +77,21 @@ private final class StartupCrashViewController: UIViewController {
     description.font = .preferredFont(forTextStyle: .body)
     description.adjustsFontForContentSizeCategory = true
     description.numberOfLines = 0
-    let details = UITextView()
+    details.isHidden = true
     details.text = report
     details.isEditable = false
     details.font = .preferredFont(forTextStyle: .footnote)
     details.adjustsFontForContentSizeCategory = true
+    let toggle = UIButton(type: .system)
+    toggle.setTitle("Details", for: .normal)
+    toggle.addTarget(self, action: #selector(toggleDetails), for: .touchUpInside)
     let share = UIButton(type: .system)
     share.setTitle("Share report", for: .normal)
     share.addTarget(self, action: #selector(shareReport), for: .touchUpInside)
     let again = UIButton(type: .system)
     again.setTitle("Try again", for: .normal)
     again.addTarget(self, action: #selector(tryAgain), for: .touchUpInside)
-    let stack = UIStackView(arrangedSubviews: [title, description, details, share, again])
+    let stack = UIStackView(arrangedSubviews: [title, description, toggle, details, share, again])
     stack.axis = .vertical
     stack.spacing = 16
     stack.translatesAutoresizingMaskIntoConstraints = false
@@ -97,9 +101,15 @@ private final class StartupCrashViewController: UIViewController {
       stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
       stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
       stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+      toggle.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
       share.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
       again.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
     ])
+  }
+
+  @objc private func toggleDetails(_ sender: UIButton) {
+    details.isHidden.toggle()
+    sender.setTitle(details.isHidden ? "Details" : "Hide details", for: .normal)
   }
 
   @objc private func shareReport(_ sender: UIButton) {

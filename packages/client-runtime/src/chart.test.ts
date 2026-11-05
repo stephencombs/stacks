@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 
-import { around, barTrack, lineScale, spreadLabels } from "./chart.ts";
+import { around, barTrack, labelWidth, lineScale, placeLabel, spreadLabels } from "./chart.ts";
 
 describe("barTrack", () => {
   it("puts zero where the losses end and scales bars to the full range", () => {
@@ -144,6 +144,14 @@ describe("spreadLabels", () => {
     expect(spreadLabels([100, 100, 20], 14, { min: 0, max: 110 })).toEqual([96, 110, 20]);
   });
 
+  it("shrinks the gap instead of running a crowded label off the edge", () => {
+    const out = spreadLabels([0, 0, 0, 0], 14, { min: 0, max: 20 });
+    const sorted = out.toSorted((a, b) => a - b);
+    expect(sorted[0]).toBe(0);
+    expect(sorted.at(-1)).toBe(20);
+    for (let k = 1; k < sorted.length; k++) expect(sorted[k]! - sorted[k - 1]!).toBeCloseTo(20 / 3);
+  });
+
   it.prop(
     "keeps order and spacing when there's room",
     [
@@ -164,4 +172,22 @@ describe("spreadLabels", () => {
       }
     },
   );
+});
+
+describe("placeLabel", () => {
+  const bounds = { min: 8, max: 390 };
+
+  it("pins a date that starts on the left edge so its first character stays inside", () => {
+    const width = labelWidth("Vegas 2026", 11);
+    expect(width).toBeGreaterThan(60);
+    expect(placeLabel(23, width, bounds)).toEqual({ x: 8, anchor: "start" });
+  });
+
+  it("leaves a label that already fits centered on its point", () => {
+    expect(placeLabel(200, 40, bounds)).toEqual({ x: 200, anchor: "middle" });
+  });
+
+  it("pins a label that runs off the right to the end", () => {
+    expect(placeLabel(380, 40, bounds)).toEqual({ x: 390, anchor: "end" });
+  });
 });

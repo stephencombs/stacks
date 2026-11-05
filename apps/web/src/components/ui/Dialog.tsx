@@ -1,6 +1,8 @@
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+
+import { visualKeyboardOverlap } from "~/lib/keyboardOverlap";
 
 import { cn } from "./cn";
 
@@ -20,6 +22,7 @@ export function Dialog({
   className?: string;
 }) {
   const popup = useRef<HTMLDivElement>(null);
+  const keyboard = useVisualKeyboardOverlap();
   return (
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>
@@ -29,8 +32,9 @@ export function Dialog({
           initialFocus={() => (matchMedia("(pointer: fine)").matches ? true : popup.current)}
           // React bubbles events through portals; a form in here must not submit one around the trigger.
           onSubmit={(event) => event.stopPropagation()}
+          style={{ "--keyboard-overlap": `${keyboard}px` } as CSSProperties}
           className={cn(
-            "fixed inset-x-0 bottom-0 z-40 max-h-[92dvh] overflow-y-auto rounded-t-2xl bg-surface px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-(--elevation-sheet) outline-none",
+            "fixed inset-x-0 bottom-(--keyboard-overlap) z-40 max-h-[calc(92dvh-var(--keyboard-overlap))] overflow-y-auto rounded-t-2xl bg-surface px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-(--elevation-sheet) outline-none",
             // On phones it's a sheet sliding up from the bottom edge; wider screens fade it in centered.
             "transition-[translate,opacity] duration-250 ease-snap data-[ending-style]:duration-200 data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
             "sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:pb-5 sm:duration-200 sm:data-[ending-style]:duration-150",
@@ -60,4 +64,24 @@ export function Dialog({
       </BaseDialog.Portal>
     </BaseDialog.Root>
   );
+}
+
+function useVisualKeyboardOverlap() {
+  const [overlap, setOverlap] = useState(0);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => {
+      const next = visualKeyboardOverlap(window.innerHeight, viewport.height, viewport.offsetTop);
+      setOverlap((current) => (current === next ? current : next));
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
+  }, []);
+  return overlap;
 }

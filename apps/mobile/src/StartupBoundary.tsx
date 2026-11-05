@@ -1,3 +1,4 @@
+import { reportStartupError } from "./lib/diagnostics";
 import { reloadAppAsync } from "expo";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Platform, PlatformColor, Pressable, ScrollView, Text, View } from "react-native";
@@ -5,9 +6,9 @@ import { Platform, PlatformColor, Pressable, ScrollView, Text, View } from "reac
 // Recovery must render without the app's fonts, theme hooks, or safe-area provider.
 export class StartupBoundary extends Component<
   { children: ReactNode },
-  { failed: boolean; message: string }
+  { failed: boolean; message: string; showDetails: boolean }
 > {
-  override state = { failed: false, message: "" };
+  override state = { failed: false, message: "", showDetails: false };
 
   static getDerivedStateFromError(error: unknown) {
     return { failed: true, message: error instanceof Error ? error.message : String(error) };
@@ -18,9 +19,7 @@ export class StartupBoundary extends Component<
     const report = new Error(error instanceof Error ? error.message : String(error));
     report.name = error instanceof Error ? error.name : "Error";
     report.stack = details;
-    // Diagnostics pulls in native reporting. Keep that off this module so the
-    // boundary can paint even when that import fails.
-    void import("./lib/diagnostics").then(({ reportStartupError }) => reportStartupError(report));
+    reportStartupError(report);
     this.setState({ message: details });
   }
 
@@ -41,12 +40,26 @@ export class StartupBoundary extends Component<
         <Text accessibilityRole="header" style={{ color, fontSize: 24, fontWeight: "600" }}>
           Color Up couldn't start
         </Text>
-        <Text style={{ color, fontSize: 17 }}>Send this error with your report:</Text>
-        <ScrollView style={{ flexShrink: 1 }}>
-          <Text selectable style={{ color, fontSize: 15 }}>
-            {this.state.message}
+        <Text style={{ color, fontSize: 17 }}>
+          Please try again. You can include error details when reporting the problem.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: this.state.showDetails }}
+          onPress={() => this.setState(({ showDetails }) => ({ showDetails: !showDetails }))}
+          style={{ minHeight: 44, justifyContent: "center" }}
+        >
+          <Text style={{ color, fontSize: 17 }}>
+            {this.state.showDetails ? "Hide details" : "Details"}
           </Text>
-        </ScrollView>
+        </Pressable>
+        {this.state.showDetails ? (
+          <ScrollView style={{ flexShrink: 1 }}>
+            <Text selectable style={{ color, fontSize: 15 }}>
+              {this.state.message}
+            </Text>
+          </ScrollView>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           onPress={() => void reloadAppAsync()}
