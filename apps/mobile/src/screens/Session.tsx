@@ -21,13 +21,12 @@ import {
 import { newId } from "@stacks/client-runtime/ids";
 import { tableView } from "@stacks/client-runtime/table";
 import { chipOf } from "@stacks/client-runtime/trip";
-import { formatMoney, parseMoney } from "@stacks/shared/money";
+import { decimalSeparator, formatMoney, minorUnitDigits } from "@stacks/shared/money";
 import { playerResults } from "@stacks/shared/results";
 import { LimitNotices } from "../features/PersonalLimits";
 import { seatCount, seatsNow } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import * as DateTime from "effect/DateTime";
-import * as Option from "effect/Option";
 import { useKeepAwake } from "expo-keep-awake";
 import { useState } from "react";
 import * as Haptics from "expo-haptics";
@@ -46,6 +45,8 @@ import { Chip } from "../features/Chip";
 import { Reveal } from "../features/Reveal";
 import { SeatHero } from "../features/SeatHero";
 import { TableMap } from "../features/TableMap";
+import { AmountKeypad } from "../features/AmountKeypad";
+import { applyAmountKey, readCashOut } from "../features/amountKey";
 import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
 import { SessionScreenSkeleton } from "../features/ScreenSkeletons";
 import {
@@ -743,6 +744,42 @@ function HighLimitToggle({ detail }: { detail: SessionDetail }) {
   );
 }
 
+function CashOutField({
+  name,
+  value,
+  selected,
+  invalid,
+  onPress,
+}: {
+  name: string;
+  value: string;
+  selected: boolean;
+  invalid: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <View className="gap-1.5">
+      <Text className="px-1 type-footnote font-medium text-muted">{name}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={name}
+        accessibilityState={{ selected }}
+        accessibilityValue={{ text: value || "0 if they busted" }}
+        onPress={onPress}
+        className={cn(
+          "min-h-12 justify-center rounded-xl border bg-surface px-4 py-3",
+          selected ? "border-accent" : "border-transparent active:bg-fill",
+          invalid && "border-danger",
+        )}
+      >
+        <Text className={cn("font-mono type-body", value ? "text-ink" : "text-muted")}>
+          {value || "0 if they busted"}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function CloseSheet({
   detail,
   playing,
@@ -759,11 +796,18 @@ function CloseSheet({
   const close = useAction(stacks.Client.mutation("sessions", "close"), "session_close_confirmed");
   const outbox = useOutbox();
   const unsent = usePending(detail.session.id).length;
+  const decimal = decimalSeparator();
   const [chips, setChips] = useState<ReadonlyMap<PlayerId, string>>(new Map());
-  const [missing, setMissing] = useState(false);
+  const [focusedId, setFocusedId] = useState<PlayerId | null>(playing[0]?.id ?? null);
+  const [attempted, setAttempted] = useState(false);
   const [closing, setClosing] = useState<"close" | "move" | null>(null);
+  const cashOuts = playing.map((player) => ({
+    player,
+    amount: readCashOut(chips.get(player.id) ?? "", currency),
+  }));
+  const missing = attempted && cashOuts.some(({ amount }) => amount === null);
   const sendClose = async (
-    cashOuts: ReadonlyArray<{ player: { id: PlayerId }; amount: MinorUnits | null }>,
+    amounts: ReadonlyArray<{ player: { id: PlayerId }; amount: MinorUnits | null }>,
   ) => {
     // Anything still waiting to be sent goes first, so the close counts it.
     await outbox.flush();
@@ -772,7 +816,7 @@ function CloseSheet({
     return close.run({
       params: { sessionId: detail.session.id },
       payload: {
-        cashOuts: cashOuts.map(({ player, amount }) => ({
+        cashOuts: amounts.map(({ player, amount }) => ({
           id: EntryId.make(newId()),
           playerId: player.id,
           amount: amount!,
@@ -780,13 +824,14 @@ function CloseSheet({
       },
     });
   };
+  const pressKey = (key: string) => {
+    if (focusedId === null || closing !== null) return;
+    setChips((all) =>
+      new Map(all).set(focusedId, applyAmountKey(all.get(focusedId) ?? "", key, decimal)),
+    );
+  };
   const confirm = async (next: boolean) => {
-    const cashOuts = playing.map((player) => ({
-      player,
-      amount: Option.getOrNull(parseMoney(chips.get(player.id) ?? "", currency)),
-    }));
-    if (cashOuts.some(({ amount }) => amount === null || amount < 0)) return setMissing(true);
-    setMissing(false);
+    if (cashOuts.some(({ amount }) => amount === null)) return setAttempted(true);
     setClosing(next ? "move" : "close");
     const closed = await sendClose(cashOuts).finally(() => setClosing(null));
     if (!closed) return;
@@ -802,6 +847,9 @@ function CloseSheet({
       description="Results lock in and the session stops taking entries. An admin can reopen it."
       footer={
         <>
+          {missing ? (
+            <FormError>Enter what each of them cashed out, 0 if they busted.</FormError>
+          ) : null}
           <Button
             label="Close session"
             variant="primary"
@@ -819,26 +867,31 @@ function CloseSheet({
             onPress={() => void confirm(true)}
           />
           <Button label="Keep playing" variant="ghost" onPress={onClose} />
+          {playing.length > 0 ? (
+            <AmountKeypad
+              onKey={pressKey}
+              bottomLeft={minorUnitDigits(currency) > 0 ? decimal : null}
+            />
+          ) : null}
         </>
       }
     >
       {playing.length > 0 ? (
         <View className="gap-3">
           <Text className="text-sm text-ink">What did everyone still playing leave with?</Text>
-          {playing.map((player) => (
-            <TextField
-              key={player.id}
-              label={player.name}
-              value={chips.get(player.id) ?? ""}
-              onChangeText={(text) => setChips((all) => new Map(all).set(player.id, text))}
-              placeholder="0 if they busted"
-              keyboardType="decimal-pad"
-              inputClassName="font-mono"
-            />
-          ))}
-          {missing ? (
-            <FormError>Enter what each of them cashed out, 0 if they busted.</FormError>
-          ) : null}
+          {playing.map((player) => {
+            const value = chips.get(player.id) ?? "";
+            return (
+              <CashOutField
+                key={player.id}
+                name={player.name}
+                value={value}
+                selected={player.id === focusedId}
+                invalid={missing && readCashOut(value, currency) === null}
+                onPress={() => setFocusedId(player.id)}
+              />
+            );
+          })}
         </View>
       ) : null}
       {unsent > 0 ? (
