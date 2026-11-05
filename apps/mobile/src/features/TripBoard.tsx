@@ -91,7 +91,9 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                     s.playerId === shown?.playerId && "border-l-[3px] border-l-accent",
                   )}
                 >
-                  <Text className="w-6 font-mono text-xl text-accent-text">{s.rank}</Text>
+                  <Text className="min-w-7 text-center font-mono text-xl leading-7 text-accent-text">
+                    {s.rank}
+                  </Text>
                   <Text
                     className={cn("w-6 font-mono text-xs", s.moved > 0 ? "text-win" : "text-loss")}
                   >

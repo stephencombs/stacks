@@ -86,7 +86,8 @@ export const around = (index: number, count: number) =>
 
 /**
  * Label positions for the ends of lines, nudged apart so no two sit closer than `gap`, kept in
- * their original order and inside [min, max] while there's room. Returned in input order.
+ * their original order and inside [min, max]. When the gap cannot fit, it shrinks so every label
+ * stays on the plot instead of running off an edge. Returned in input order.
  */
 export const spreadLabels = (
   ys: ReadonlyArray<number>,
@@ -94,12 +95,39 @@ export const spreadLabels = (
   bounds: { readonly min: number; readonly max: number },
 ) => {
   const order = ys.map((y, i) => ({ y, i })).toSorted((a, b) => a.y - b.y || a.i - b.i);
-  const placed = order.map((o) => o.y);
-  for (let k = 0; k < placed.length; k++)
-    placed[k] = Math.max(placed[k]!, k === 0 ? bounds.min : placed[k - 1]! + gap);
-  for (let k = placed.length - 1; k >= 0; k--)
-    placed[k] = Math.min(placed[k]!, k === placed.length - 1 ? bounds.max : placed[k + 1]! - gap);
-  const out = Array.from({ length: ys.length }, () => 0);
+  const n = order.length;
+  const room = Math.max(0, bounds.max - bounds.min);
+  const step = n <= 1 ? 0 : Math.min(gap, room / (n - 1));
+  const placed = order.map((o) => Math.min(bounds.max, Math.max(bounds.min, o.y)));
+  for (let k = 1; k < n; k++) placed[k] = Math.max(placed[k]!, placed[k - 1]! + step);
+  if (n > 0 && placed[n - 1]! > bounds.max) {
+    placed[n - 1] = bounds.max;
+    for (let k = n - 2; k >= 0; k--) placed[k] = Math.min(placed[k]!, placed[k + 1]! - step);
+  }
+  const out = Array.from({ length: n }, () => bounds.min);
   order.forEach((o, k) => (out[o.i] = placed[k]!));
   return out;
+};
+
+/**
+ * How wide a chart label is, in the same units as `fontSize`. UI text runs wider than half an em;
+ * reserving 0.75em keeps the first character inside the plot when the anchor sits on an edge.
+ */
+export const labelWidth = (text: string, fontSize: number) =>
+  Math.max(fontSize, text.length * fontSize * 0.75);
+
+/**
+ * Where to draw a label of `width` that wants its center on `at`. A label that would cross an
+ * edge is pinned to that edge, anchor on the inside, so the first or last character stays visible.
+ */
+export const placeLabel = (
+  at: number,
+  width: number,
+  bounds: { readonly min: number; readonly max: number },
+): { readonly x: number; readonly anchor: "start" | "middle" | "end" } => {
+  const span = bounds.max - bounds.min;
+  if (!(width > 0) || span <= 0 || width >= span || at - width / 2 < bounds.min)
+    return { x: bounds.min, anchor: "start" };
+  if (at + width / 2 > bounds.max) return { x: bounds.max, anchor: "end" };
+  return { x: at, anchor: "middle" };
 };

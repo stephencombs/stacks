@@ -1,5 +1,12 @@
 import type { GroupDetail, PlayerId, SessionId } from "@stacks/contracts";
-import { around, barTrack, lineScale, spreadLabels } from "@stacks/client-runtime/chart";
+import {
+  around,
+  barTrack,
+  labelWidth,
+  lineScale,
+  placeLabel,
+  spreadLabels,
+} from "@stacks/client-runtime/chart";
 import { formatDay, playerNames } from "@stacks/client-runtime/format";
 import { boardMoney, chipOf, returnLabel } from "@stacks/client-runtime/trip";
 import {
@@ -92,6 +99,10 @@ const PAD = { x: 16, y: 14 };
 /** Room past the furthest point for each line's initial, and below the plot for the day marks. */
 const LABEL = 30;
 const MARKS = 22;
+const MARK_FONT = 12;
+const LETTER = 12;
+/** Clear of the card edge, so a rounded clip can't take the first character. */
+const INSET = 8;
 
 function Race<S extends RaceSession>({
   sessions,
@@ -144,9 +155,10 @@ function Race<S extends RaceSession>({
   const point = at + 1;
   const labels = spreadLabels(
     drawn.map(({ line }) => plot.y(line[point]!)),
-    13,
-    { min: 6, max: HEIGHT - 6 },
+    LETTER + 6,
+    { min: LETTER, max: HEIGHT - LETTER },
   );
+  const edges = { min: INSET, max: Math.max(INSET, width - INSET) };
 
   const scrub = (clientX: number) => {
     const rect = box.current!.getBoundingClientRect();
@@ -204,17 +216,24 @@ function Race<S extends RaceSession>({
                 stroke="var(--color-line-strong)"
                 strokeDasharray="3 4"
               />
-              {marks.map((mark) => (
-                <text
-                  key={mark.index}
-                  x={plot.x(mark.index + 1)}
-                  y={HEIGHT + MARKS - 8}
-                  textAnchor="middle"
-                  className="fill-muted text-xs"
-                >
-                  {mark.label}
-                </text>
-              ))}
+              {marks.map((mark) => {
+                const place = placeLabel(
+                  plot.x(mark.index + 1),
+                  labelWidth(mark.label, MARK_FONT),
+                  edges,
+                );
+                return (
+                  <text
+                    key={mark.index}
+                    x={place.x}
+                    y={HEIGHT + MARKS - 8}
+                    textAnchor={place.anchor}
+                    className="fill-muted text-xs"
+                  >
+                    {mark.label}
+                  </text>
+                );
+              })}
               <line
                 x1={plot.x(point)}
                 x2={plot.x(point)}
@@ -228,6 +247,10 @@ function Race<S extends RaceSession>({
                 const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
                 const now = { x: plot.x(point), y: plot.y(line[point]!) };
                 const off = plot.clipped(line[point]!);
+                const initial =
+                  name.slice(0, 1).toUpperCase() + (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
+                const seatWidth = labelWidth(initial, LETTER);
+                const seat = placeLabel(now.x + 9 + seatWidth / 2, seatWidth, edges);
                 return (
                   <g key={playerId}>
                     <polyline
@@ -252,15 +275,15 @@ function Race<S extends RaceSession>({
                     ) : null}
                     <circle cx={now.x} cy={now.y} r={yours ? 4.5 : 3} fill={color} />
                     <text
-                      x={now.x + 9}
+                      x={seat.x}
                       y={labels[i]}
+                      textAnchor={seat.anchor}
                       dominantBaseline="central"
                       className={
                         yours ? "fill-accent-text text-xs font-semibold" : "fill-muted text-xs"
                       }
                     >
-                      {name.slice(0, 1).toUpperCase()}
-                      {off === 1 ? " ↑" : off === -1 ? " ↓" : ""}
+                      {initial}
                     </text>
                     <title>{`${name}: ${reading(values[at]!)}`}</title>
                   </g>

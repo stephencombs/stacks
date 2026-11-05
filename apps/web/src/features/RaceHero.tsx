@@ -1,5 +1,11 @@
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
-import { around, lineScale, spreadLabels } from "@stacks/client-runtime/chart";
+import {
+  around,
+  labelWidth,
+  lineScale,
+  placeLabel,
+  spreadLabels,
+} from "@stacks/client-runtime/chart";
 import { playerNames } from "@stacks/client-runtime/format";
 import { localClock, raceHeadline } from "@stacks/client-runtime/trip";
 import { runningTotals } from "@stacks/shared/stats";
@@ -14,6 +20,8 @@ const HEIGHT = 128;
 const PAD = { x: 16, y: 12 };
 /** Room past the last point for each line's initial. */
 const LABEL = 30;
+const LETTER = 12;
+const INSET = 8;
 
 /** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in gold. */
 export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
@@ -42,9 +50,10 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
   const drawn = lines.toSorted((a, b) => Number(a.playerId === me) - Number(b.playerId === me));
   const labels = spreadLabels(
     drawn.map(({ line }) => plot.y(line.at(-1)!)),
-    13,
-    { min: 6, max: HEIGHT - 6 },
+    LETTER + 6,
+    { min: LETTER, max: HEIGHT - LETTER },
   );
+  const edges = { min: INSET, max: Math.max(INSET, width - INSET) };
 
   return (
     <Surface className="relative overflow-hidden">
@@ -79,6 +88,11 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
               const end = { x: plot.x(line.length - 1), y: plot.y(line.at(-1)!) };
               const off = plot.clipped(line.at(-1)!);
               const color = yours ? "var(--color-accent)" : "var(--color-muted)";
+              const initial =
+                (names.get(playerId) ?? "?").slice(0, 1).toUpperCase() +
+                (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
+              const seatWidth = labelWidth(initial, LETTER);
+              const seat = placeLabel(end.x + 9 + seatWidth / 2, seatWidth, edges);
               return (
                 <g key={playerId}>
                   <polyline
@@ -95,15 +109,15 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
                   ) : null}
                   <circle cx={end.x} cy={end.y} r={yours ? 4.5 : 3} fill={color} />
                   <text
-                    x={end.x + 9}
+                    x={seat.x}
                     y={labels[i]}
+                    textAnchor={seat.anchor}
                     dominantBaseline="central"
                     className={
                       yours ? "fill-accent-text text-xs font-semibold" : "fill-muted text-xs"
                     }
                   >
-                    {(names.get(playerId) ?? "?").slice(0, 1).toUpperCase()}
-                    {off === 1 ? " ↑" : off === -1 ? " ↓" : ""}
+                    {initial}
                   </text>
                 </g>
               );
