@@ -1,7 +1,6 @@
 import type { StaticScreenProps } from "@react-navigation/native";
 
-import { Screen } from "../components/ui/Screen";
-import { PageTitle } from "../components/ui/Surface";
+import { Screen, screenError } from "../components/ui/Screen";
 import { SettleUpSkeleton } from "../features/ScreenSkeletons";
 import { SettleView } from "../features/SettleUp";
 import { ScopeLoaded, usePlaceAddress } from "../lib/scope";
@@ -13,17 +12,29 @@ type Props = StaticScreenProps<{ tripId?: string } | undefined>;
 export function SettleUpScreen({ route }: Props) {
   usePlaceAddress(route.params, "tripId");
   return (
-    <Screen>
-      <PageTitle>Settle up</PageTitle>
-      <ScopeLoaded skeleton={<SettleUpSkeleton />}>
-        {({ trip }) =>
-          trip ? (
-            <TripLoaded tripId={trip.id} skeleton={<SettleUpSkeleton />}>
-              {(detail, group) => <SettleView detail={group} trip={detail} />}
-            </TripLoaded>
-          ) : null
-        }
-      </ScopeLoaded>
-    </Screen>
+    <ScopeLoaded
+      renderError={screenError}
+      skeleton={
+        <Screen>
+          <SettleUpSkeleton />
+        </Screen>
+      }
+    >
+      {({ trip }) =>
+        trip ? (
+          <TripLoaded
+            renderError={screenError}
+            tripId={trip.id}
+            skeleton={
+              <Screen>
+                <SettleUpSkeleton />
+              </Screen>
+            }
+          >
+            {(detail, group) => <SettleView detail={group} trip={detail} />}
+          </TripLoaded>
+        ) : null
+      }
+    </ScopeLoaded>
   );
 }

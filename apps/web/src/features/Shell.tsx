@@ -120,7 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <main
             id="main-content"
             tabIndex={-1}
-            className="flex w-full flex-1 flex-col gap-8 pt-2 pb-[calc(9rem+env(safe-area-inset-bottom))] lg:pt-10 lg:pb-16"
+            className="flex w-full flex-1 flex-col gap-8 pt-2 pb-[calc(9rem+env(safe-area-inset-bottom))] has-[[data-page-actions]]:pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pt-10 lg:pb-16 lg:has-[[data-page-actions]]:pb-16"
           >
             {children}
           </main>

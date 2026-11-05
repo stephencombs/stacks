@@ -5,7 +5,6 @@ import * as DateTime from "effect/DateTime";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { Button } from "../components/ui/Button";
 import { Glow } from "../components/ui/Glow";
 import { List, Row, Tag } from "../components/ui/Surface";
 
@@ -54,7 +53,6 @@ export function SessionList({
   );
 }
 
-/** Your live session, one tap from the table: where, how long, and what you have in play. */
 export function LiveSessionCard({
   summary,
   detail,
@@ -62,7 +60,6 @@ export function LiveSessionCard({
   summary: SessionSummary;
   detail: GroupDetail;
 }) {
-  const go = useGo();
   const { session, venue, results, playing } = summary;
   const mine = results.find((result) => result.playerId === detail.myPlayerId);
   return (
@@ -93,12 +90,6 @@ export function LiveSessionCard({
             </View>
           ) : null}
         </View>
-        <Button
-          label="Back to the table"
-          variant="primary"
-          size="lg"
-          onPress={() => go.session(session.id)}
-        />
       </View>
     </View>
   );

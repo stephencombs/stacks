@@ -17,9 +17,11 @@ import { applyPayments } from "@stacks/shared/balances";
 import { formatMoney, parseMoney } from "@stacks/shared/money";
 import { settleUp } from "@stacks/shared/settleUp";
 import * as Option from "effect/Option";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 
 import { BalanceLabel, Money } from "~/components/Money";
+import { ActionBar } from "~/components/ui/ActionBar";
+import { LiveBar } from "~/features/LiveBar";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
@@ -174,7 +176,12 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
       <Section
         title="Payment history"
         action={
-          <Button size="sm" variant="ghost" onClick={() => setRecording(true)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="hidden lg:inline-flex"
+            onClick={() => setRecording(true)}
+          >
             Record a payment
           </Button>
         }
@@ -233,6 +240,13 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
         )}
       </Section>
 
+      <ActionBar className="lg:hidden">
+        <LiveBar inline />
+        <Button variant="primary" size="lg" onClick={() => setRecording(true)}>
+          Record a payment
+        </Button>
+      </ActionBar>
+
       {paying ? (
         <RecordPaymentDialog
           onRecord={(payment) => void record(payment)}
@@ -266,6 +280,7 @@ function RecordPaymentDialog({
   onRecord: (payment: Omit<Payment, "id">) => void;
   onClose: () => void;
 }) {
+  const formId = useId();
   const names = playerNames(detail);
   const currency = detail.group.currency;
   const [problem, setProblem] = useState<string | null>(null);
@@ -300,8 +315,16 @@ function RecordPaymentDialog({
           "For money that changed hands outside a session."
         )
       }
+      footer={
+        <div className="flex flex-col gap-2">
+          {problem ? <FormError>{problem}</FormError> : null}
+          <Button type="submit" form={formId} variant="primary" size="lg" className="w-full">
+            Record payment
+          </Button>
+        </div>
+      }
     >
-      <form onSubmit={submit} className="flex flex-col gap-4">
+      <form id={formId} onSubmit={submit} className="flex flex-col gap-4">
         {transfer ? null : (
           <>
             <Field label="Who paid">
@@ -346,12 +369,6 @@ function RecordPaymentDialog({
         <Field label="Note (optional)" hint="Like “Venmo” or “cash at the airport”.">
           {(props) => <Input {...props} name="note" maxLength={280} autoComplete="off" />}
         </Field>
-        <div className="sticky bottom-0 z-10 -mt-4 flex flex-col gap-4 bg-surface pt-4">
-          {problem ? <FormError>{problem}</FormError> : null}
-          <Button type="submit" variant="primary" size="lg">
-            Record payment
-          </Button>
-        </div>
       </form>
     </Dialog>
   );

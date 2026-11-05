@@ -96,7 +96,7 @@ export function LiveSessionCard({
           params={{ sessionId: session.id }}
           variant="primary"
           size="lg"
-          className="pr-4.5"
+          className="hidden pr-4.5 lg:inline-flex"
         >
           Back to the table
           <ArrowRight className="size-4" aria-hidden />

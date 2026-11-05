@@ -19,7 +19,7 @@ import { Pressable, Switch, Text, View } from "react-native";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Choice, FormError } from "../components/ui/Field";
-import { Screen } from "../components/ui/Screen";
+import { Screen, screenError } from "../components/ui/Screen";
 import { List, Row, SectionHeading, Surface } from "../components/ui/Surface";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { VenuePicker } from "../features/VenuePicker";
@@ -38,22 +38,33 @@ export function NewSessionScreen({ route }: Props) {
   const stacks = useStacks();
   useLinkedScope(route.params);
   return (
-    <Screen>
-      <TripLoaded tripId={TripId.make(route.params.tripId)} skeleton={<FormScreenSkeleton />}>
-        {(trip, detail) =>
-          route.params.from ? (
-            <Loaded
-              query={stacks.session(SessionId.make(route.params.from))}
-              skeleton={<FormScreenSkeleton />}
-            >
-              {(from) => <NewSessionForm detail={detail} trip={trip} from={from} />}
-            </Loaded>
-          ) : (
-            <NewSessionForm detail={detail} trip={trip} />
-          )
-        }
-      </TripLoaded>
-    </Screen>
+    <TripLoaded
+      renderError={screenError}
+      tripId={TripId.make(route.params.tripId)}
+      skeleton={
+        <Screen>
+          <FormScreenSkeleton />
+        </Screen>
+      }
+    >
+      {(trip, detail) =>
+        route.params.from ? (
+          <Loaded
+            renderError={screenError}
+            query={stacks.session(SessionId.make(route.params.from))}
+            skeleton={
+              <Screen>
+                <FormScreenSkeleton />
+              </Screen>
+            }
+          >
+            {(from) => <NewSessionForm detail={detail} trip={trip} from={from} />}
+          </Loaded>
+        ) : (
+          <NewSessionForm detail={detail} trip={trip} />
+        )
+      }
+    </TripLoaded>
   );
 }
 
@@ -130,7 +141,20 @@ function NewSessionForm({
   };
 
   return (
-    <>
+    <Screen
+      renderFooter={() => (
+        <>
+          {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
+          <Button
+            label="Start session"
+            variant="primary"
+            size="xl"
+            pending={create.pending}
+            onPress={() => void submit()}
+          />
+        </>
+      )}
+    >
       <View className="gap-2">
         <SectionHeading>Where</SectionHeading>
         <Surface className="p-4">
@@ -188,20 +212,12 @@ function NewSessionForm({
         <Text className="text-sm text-muted">Anyone else can join the session later.</Text>
       </View>
       <Choice label="Started" options={STARTS} value={startedAgo} onChange={setStartedAgo} />
-      {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
-      <Button
-        label="Start session"
-        variant="primary"
-        size="xl"
-        pending={create.pending}
-        onPress={() => void submit()}
-      />
       <AddGuestSheet
         detail={detail}
         open={addingGuest}
         onClose={() => setAddingGuest(false)}
         onAdded={(id) => setPlayerIds((current) => new Set([...current, id]))}
       />
-    </>
+    </Screen>
   );
 }

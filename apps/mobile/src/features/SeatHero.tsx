@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { Button } from "../components/ui/Button";
 import { Glow } from "../components/ui/Glow";
 import { cn } from "../components/ui/cn";
 import { Chip } from "./Chip";
@@ -13,8 +12,7 @@ import { Chip } from "./Chip";
 const FIGURE = "font-display text-5xl leading-[52px]";
 
 /**
- * The seat this session is about, usually yours: what you have in, or how you finished, with the
- * next thing you'd do at the table one tap away.
+ * The seat this session is about, usually yours: what you have in, or how you finished.
  */
 export function SeatHero({
   name,
@@ -24,11 +22,7 @@ export function SeatHero({
   result,
   live,
   out,
-  rebuyAmount,
   currency,
-  onBuyIn,
-  onRebuy,
-  onCashOut,
 }: {
   name: string;
   chip: number;
@@ -37,12 +31,7 @@ export function SeatHero({
   result: PlayerResult | undefined;
   live: boolean;
   out: boolean;
-  /** The last buy-in, repeated by one tap. */
-  rebuyAmount: MinorUnits | undefined;
   currency: CurrencyCode;
-  onBuyIn: () => void;
-  onRebuy: () => void;
-  onCashOut: () => void;
 }) {
   const bought = result !== undefined && result.buyIn > 0;
   const final = result !== undefined && (!live || out);
@@ -80,34 +69,6 @@ export function SeatHero({
           <Text className="mt-2 text-sm text-muted">
             In {formatMoney(result.buyIn, currency)} · Out {formatMoney(result.cashOut, currency)}
           </Text>
-        ) : null}
-        {live && !out ? (
-          <View className="mt-4 flex-row gap-3">
-            {!bought ? (
-              <Button
-                label="Buy in"
-                variant="primary"
-                size="lg"
-                className="flex-1"
-                onPress={onBuyIn}
-              />
-            ) : (
-              <>
-                <Button
-                  label={
-                    rebuyAmount === undefined
-                      ? "Rebuy"
-                      : `Rebuy ${formatMoney(rebuyAmount, currency)}`
-                  }
-                  variant="primary"
-                  size="lg"
-                  className="flex-1"
-                  onPress={rebuyAmount === undefined ? onBuyIn : onRebuy}
-                />
-                <Button label="Cash out" size="lg" className="flex-1" onPress={onCashOut} />
-              </>
-            )}
-          </View>
         ) : null}
       </View>
     </View>

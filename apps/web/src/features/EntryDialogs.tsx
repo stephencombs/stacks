@@ -10,7 +10,7 @@ import { newId } from "@stacks/client-runtime/ids";
 import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
@@ -54,6 +54,7 @@ export function EntryDialog({
   presets: ReadonlyArray<number>;
   onClose: () => void;
 }) {
+  const formId = useId();
   const outbox = useOutbox();
   const currency = detail.group.currency;
   const [kind, setKind] = useState(draft.kind);
@@ -127,8 +128,17 @@ export function EntryDialog({
             ? "For anything the buy-ins and cash-outs missed. Use a minus sign for a loss."
             : undefined
       }
+      footer={
+        <Button type="submit" form={formId} variant="primary" size="lg" className="w-full">
+          {draft.replaces
+            ? "Save correction"
+            : kind === "adjustment"
+              ? "Save adjustment"
+              : `Record ${titles[kind].toLowerCase()}`}
+        </Button>
+      }
     >
-      <form onSubmit={submit} className="flex flex-col gap-4">
+      <form id={formId} onSubmit={submit} className="flex flex-col gap-4">
         {draft.replaces ? null : (
           <RadioCards
             label={<span className="sr-only">What happened</span>}
@@ -209,13 +219,6 @@ export function EntryDialog({
             />
           )}
         </Field>
-        <Button type="submit" variant="primary" size="lg">
-          {draft.replaces
-            ? "Save correction"
-            : kind === "adjustment"
-              ? "Save adjustment"
-              : `Record ${titles[kind].toLowerCase()}`}
-        </Button>
       </form>
     </Dialog>
   );

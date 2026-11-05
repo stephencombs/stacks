@@ -18,6 +18,8 @@ import { Button } from "~/components/ui/Button";
 import { Checkbox } from "~/components/ui/Checkbox";
 import { FormError, Input, RadioCards } from "~/components/ui/Field";
 import { BackLink } from "~/components/ui/Nav";
+import { LiveBar } from "~/features/LiveBar";
+import { ActionBar } from "~/components/ui/ActionBar";
 import { Note, PageHeader, Section } from "~/components/ui/Page";
 import { List, Row, RowText } from "~/components/ui/Surface";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
@@ -226,16 +228,20 @@ function NewSessionForm({
         ) : null}
       </div>
 
-      {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
-      <Button
-        type="submit"
-        variant="primary"
-        size="lg"
-        pending={create.pending}
-        className="w-full sm:w-auto sm:self-start"
-      >
-        Start session
-      </Button>
+      <ActionBar>
+        <LiveBar inline />
+        {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
+
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          pending={create.pending}
+          className="w-full lg:w-auto lg:self-start"
+        >
+          Start session
+        </Button>
+      </ActionBar>
 
       <AddGuestDialog
         detail={detail}

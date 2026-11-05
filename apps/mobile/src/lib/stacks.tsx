@@ -78,10 +78,12 @@ const onWake = (revalidate: () => void) => {
 export function Loaded<A, E>({
   query,
   skeleton,
+  renderError,
   children,
 }: {
   query: Atom.Atom<AsyncResult.AsyncResult<A, E>>;
   skeleton?: ReactNode;
+  renderError?: (message: string) => ReactNode;
   children: (value: A) => ReactNode;
 }) {
   const result = useAtomValue(query);
@@ -96,7 +98,10 @@ export function Loaded<A, E>({
     onFailure: (failure) =>
       Option.match(failure.previousSuccess, {
         onSome: (previous) => children(previous.value),
-        onNone: () => <FormError>{describeError(Cause.squash(failure.cause))}</FormError>,
+        onNone: () => {
+          const message = describeError(Cause.squash(failure.cause));
+          return renderError ? renderError(message) : <FormError>{message}</FormError>;
+        },
       }),
     onSuccess: (success) => children(success.value),
   });
@@ -149,10 +154,12 @@ export function Prefetch<A, E>({ query }: { query: Atom.Atom<AsyncResult.AsyncRe
 export function TripLoaded({
   tripId,
   skeleton,
+  renderError,
   children,
 }: {
   tripId: TripId;
   skeleton: ReactNode;
+  renderError?: (message: string) => ReactNode;
   children: (trip: TripDetail, group: GroupDetail) => ReactNode;
 }) {
   const stacks = useStacks();
@@ -162,9 +169,13 @@ export function TripLoaded({
     <>
       {groupId ? <Prefetch query={stacks.group(groupId)} /> : null}
       <Prefetch query={stacks.limits(tripId)} />
-      <Loaded query={stacks.trip(tripId)} skeleton={skeleton}>
+      <Loaded query={stacks.trip(tripId)} skeleton={skeleton} renderError={renderError}>
         {(trip) => (
-          <Loaded query={stacks.group(trip.trip.groupId)} skeleton={skeleton}>
+          <Loaded
+            query={stacks.group(trip.trip.groupId)}
+            skeleton={skeleton}
+            renderError={renderError}
+          >
             {(group) => (
               <Settled query={stacks.limits(tripId)} skeleton={skeleton}>
                 {children(trip, group)}
