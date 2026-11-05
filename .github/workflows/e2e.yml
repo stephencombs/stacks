@@ -43,15 +43,21 @@ jobs:
       needs.changes.result == 'success' &&
       (
         github.event_name != 'push' ||
-        (matrix.app == 'web' && needs.changes.outputs.e2e_web == 'true') ||
-        (matrix.app == 'mobile' && needs.changes.outputs.e2e_mobile == 'true')
+        needs.changes.outputs.e2e_web == 'true' ||
+        needs.changes.outputs.e2e_mobile == 'true'
       )
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        app: [web, mobile]
+        app: >-
+          ${{ fromJSON(
+            github.event_name != 'push' && '["web", "mobile"]' ||
+            needs.changes.outputs.e2e_web == 'true' &&
+              (needs.changes.outputs.e2e_mobile == 'true' && '["web", "mobile"]' || '["web"]') ||
+            '["mobile"]'
+          ) }}
     services:
       postgres:
         image: postgres:17
