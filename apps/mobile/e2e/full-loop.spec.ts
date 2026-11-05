@@ -107,7 +107,15 @@ test.describe.serial("live mode on a phone", () => {
     await alex.getByRole("checkbox", { name: "Gus" }).click();
     await shoot(alex, "new-session");
     await visible(alex.getByRole("button", { name: "Start session" })).click();
-    await expect(alex.getByText("Live", { exact: true }).filter({ visible: true })).toBeVisible();
+    // The trip underneath stays mounted, and its back-to-table bar also says Live.
+    await expect(
+      visible(
+        alex
+          .getByRole("switch", { name: "High-limit table" })
+          .locator("..")
+          .getByText("Live", { exact: true }),
+      ),
+    ).toBeVisible();
     await at(alex, `/sessions/${id}`);
 
     // Tapping a player opens the keypad; the kind, amount and whose money are all taps.

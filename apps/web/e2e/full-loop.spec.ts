@@ -101,7 +101,8 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("checkbox", { name: /Gus/ }).check();
     await shoot(alex, "new-session");
     await alex.getByRole("button", { name: "Start session" }).click();
-    await expect(alex.getByText("Live", { exact: true })).toBeVisible();
+    // The shell also marks the trip and the sidebar card Live. The session's own tag is in main.
+    await expect(alex.getByRole("main").getByText("Live", { exact: true })).toBeVisible();
 
     // Picking a player opens one dialog for anything that happened to them.
     const record = async (

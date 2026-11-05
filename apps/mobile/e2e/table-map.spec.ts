@@ -63,7 +63,15 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
     await page.getByRole("radio", { name: "Blackjack" }).click();
     await page.getByRole("checkbox", { name: "Gus" }).click();
     await visible(page.getByRole("button", { name: "Start session" })).click();
-    await expect(visible(page.getByText("Live", { exact: true }))).toBeVisible();
+    // The trip underneath stays mounted, and its back-to-table bar also says Live.
+    await expect(
+      visible(
+        page
+          .getByRole("switch", { name: "High-limit table" })
+          .locator("..")
+          .getByText("Live", { exact: true }),
+      ),
+    ).toBeVisible();
 
     const seat = (name: RegExp) => visible(page.getByRole("button", { name }));
     await expect(seat(/^Seat 5, third base, empty$/)).toBeVisible();
