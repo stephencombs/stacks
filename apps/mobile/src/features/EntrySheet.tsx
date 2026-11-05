@@ -2,14 +2,15 @@ import { MinorUnits, PlayerId, type Entry, type GroupDetail } from "@stacks/cont
 import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
 import * as Option from "effect/Option";
 import { useState } from "react";
-import * as Haptics from "expo-haptics";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Choice, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { cn } from "../components/ui/cn";
+import { AmountKeypad } from "./AmountKeypad";
+import { applyAmountKey } from "./amountKey";
 
 export type EntryDraft = {
   readonly kind: "buy_in" | "cash_out" | "adjustment";
@@ -83,10 +84,7 @@ export function EntrySheet({
 
   const press = (key: string) => {
     setAmountError(null);
-    if (key === "back") return setAmount((a) => a.slice(0, -1));
-    if (key === "sign") return setAmount((a) => (a.startsWith("-") ? a.slice(1) : `-${a}`));
-    if (key === decimal && amount.includes(decimal)) return;
-    setAmount((a) => (a === "0" && key !== decimal ? key : a + key));
+    setAmount((current) => applyAmountKey(current, key, decimal));
   };
 
   const submit = (entered = value) => {
@@ -112,14 +110,9 @@ export function EntrySheet({
     onClose();
   };
 
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
   const bottomLeft = kind === "adjustment" ? "sign" : cents ? decimal : null;
   const whoseLabel = kind === "buy_in" ? "Whose money" : "Who has the cash";
   const whose = others.find((other) => other.id === counterparty)?.displayName;
-  const tap = (key: string) => {
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
-    press(key);
-  };
 
   return (
     <Sheet
@@ -196,29 +189,7 @@ export function EntrySheet({
           )}
         </View>
       ) : null}
-      <View className="flex-row flex-wrap">
-        {[...keys, bottomLeft, "0", "back"].map((key) =>
-          key === null ? (
-            <View key="gap" className="h-16 basis-1/3" />
-          ) : (
-            <Pressable
-              key={key}
-              accessibilityRole="button"
-              accessibilityLabel={
-                key === "back" ? "Delete" : key === "sign" ? "Plus or minus" : key
-              }
-              onPress={() => tap(key)}
-              className="h-16 basis-1/3 items-center justify-center rounded-full active:bg-fill"
-            >
-              {key === "back" ? (
-                <Icon name="delete" color="ink" size={24} />
-              ) : (
-                <Text className="text-3xl font-medium text-ink">{key === "sign" ? "±" : key}</Text>
-              )}
-            </Pressable>
-          ),
-        )}
-      </View>
+      <AmountKeypad onKey={press} bottomLeft={bottomLeft} />
       {kind !== "adjustment" && others.length > 0 && choosingWhose ? (
         <Choice
           label={whoseLabel}
