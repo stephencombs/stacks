@@ -104,11 +104,14 @@ export const chipOf = (detail: GroupDetail, playerId: PlayerId) => {
 export const streakLine = (streak: { readonly length: number; readonly winning: boolean }) =>
   streak.length < 2 ? null : `${streak.length} ${streak.winning ? "wins" : "losses"} in a row`;
 
-const ordinals = new Intl.PluralRules("en-US", { type: "ordinal" });
-const suffixes: Record<string, string> = { one: "st", two: "nd", few: "rd", other: "th" };
-
 /** "1st", "2nd", "3rd", "11th": a place on the board. */
-export const ordinal = (n: number) => `${n}${suffixes[ordinals.select(n)] ?? "th"}`;
+export const ordinal = (n: number) => {
+  const rank = Math.abs(n);
+  const lastTwo = rank % 100;
+  const suffix =
+    lastTwo >= 11 && lastTwo <= 13 ? "th" : (["th", "st", "nd", "rd"][rank % 10] ?? "th");
+  return `${n}${suffix}`;
+};
 
 /** The lines under a player's trip total: how far they climbed, and how often they won. */
 export const tripLines = (trip: PlayerTrip<unknown>, currency: CurrencyCode) => ({
