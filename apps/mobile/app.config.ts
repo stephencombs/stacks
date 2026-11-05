@@ -68,7 +68,6 @@ export default (): ExpoConfig => ({
           "Color Up uses your location to list the casinos near you first.",
       },
     ],
-    "./plugins/withSceneDelegate",
     "./plugins/withStartupCrashRecovery",
   ],
   web: { bundler: "metro", output: "single" },

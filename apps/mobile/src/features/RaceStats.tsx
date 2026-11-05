@@ -1,5 +1,12 @@
 import type { GroupDetail, PlayerId, SessionId } from "@stacks/contracts";
-import { around, barTrack, lineScale, spreadLabels } from "@stacks/client-runtime/chart";
+import {
+  around,
+  barTrack,
+  labelWidth,
+  lineScale,
+  placeLabel,
+  spreadLabels,
+} from "@stacks/client-runtime/chart";
 import { formatDay, playerNames } from "@stacks/client-runtime/format";
 import { boardMoney, chipOf, returnLabel } from "@stacks/client-runtime/trip";
 import {
@@ -103,6 +110,10 @@ const PAD = { x: 16, y: 14 };
 /** Room past the furthest point for each line's initial, and below the plot for the day marks. */
 const LABEL = 30;
 const MARKS = 22;
+const MARK_FONT = 11;
+const LETTER = 12;
+/** Clear of the card edge, so a rounded clip can't take the first character. */
+const INSET = 8;
 
 function Race<S extends RaceSession>({
   sessions,
@@ -165,9 +176,10 @@ function Race<S extends RaceSession>({
   const point = at + 1;
   const labels = spreadLabels(
     drawn.map(({ line }) => plot.y(line[point]!)),
-    13,
-    { min: 6, max: HEIGHT - 6 },
+    LETTER + 6,
+    { min: LETTER, max: HEIGHT - LETTER },
   );
+  const edges = { min: INSET, max: Math.max(INSET, width - INSET) };
   const scrub = (locationX: number) =>
     setAt(
       Math.max(
@@ -204,10 +216,17 @@ function Race<S extends RaceSession>({
           {at === last ? latest : `After session ${at + 1} of ${sessions.length}`} ·{" "}
           {where(session)}
         </Text>
-        <Text accessibilityRole="header" className="text-xl font-semibold text-ink">
-          {headline}
-          {lead === null ? null : <Text className="font-mono text-3xl text-win"> {lead}</Text>}
-        </Text>
+        <View
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={lead === null ? headline : `${headline} ${lead}`}
+          className="flex-row flex-wrap items-baseline gap-x-2"
+        >
+          <Text className="text-xl font-semibold text-ink">{headline}</Text>
+          {lead === null ? null : (
+            <Text className="font-mono text-3xl leading-10 text-win">{lead}</Text>
+          )}
+        </View>
         <Text className="text-sm text-muted">
           Session {at + 1}: {session.venue.name}, {formatDay(session.session.startedAt)}
         </Text>
@@ -251,18 +270,25 @@ function Race<S extends RaceSession>({
               stroke={ring}
               strokeDasharray="3 4"
             />
-            {marks.map((mark) => (
-              <SvgText
-                key={mark.index}
-                x={plot.x(mark.index + 1)}
-                y={HEIGHT + MARKS - 8}
-                textAnchor="middle"
-                fill={muted}
-                fontSize={11}
-              >
-                {mark.label}
-              </SvgText>
-            ))}
+            {marks.map((mark) => {
+              const place = placeLabel(
+                plot.x(mark.index + 1),
+                labelWidth(mark.label, MARK_FONT),
+                edges,
+              );
+              return (
+                <SvgText
+                  key={mark.index}
+                  x={place.x}
+                  y={HEIGHT + MARKS - 8}
+                  textAnchor={place.anchor}
+                  fill={muted}
+                  fontSize={MARK_FONT}
+                >
+                  {mark.label}
+                </SvgText>
+              );
+            })}
             <Line
               x1={plot.x(point)}
               x2={plot.x(point)}
@@ -276,6 +302,10 @@ function Race<S extends RaceSession>({
               const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
               const now = { x: plot.x(point), y: plot.y(line[point]!) };
               const off = plot.clipped(line[point]!);
+              const initial =
+                name.slice(0, 1).toUpperCase() + (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
+              const seatWidth = labelWidth(initial, LETTER);
+              const seat = placeLabel(now.x + 9 + seatWidth / 2, seatWidth, edges);
               return (
                 <G key={playerId}>
                   <Polyline
@@ -300,14 +330,14 @@ function Race<S extends RaceSession>({
                   ) : null}
                   <Circle cx={now.x} cy={now.y} r={yours ? 4.5 : 3} fill={color} />
                   <SvgText
-                    x={now.x + 9}
+                    x={seat.x}
                     y={labels[i]! + 4}
-                    fontSize={12}
+                    textAnchor={seat.anchor}
+                    fontSize={LETTER}
                     fontWeight={yours ? "600" : "400"}
                     fill={yours ? accentText : muted}
                   >
-                    {name.slice(0, 1).toUpperCase()}
-                    {off === 1 ? " ↑" : off === -1 ? " ↓" : ""}
+                    {initial}
                   </SvgText>
                 </G>
               );
@@ -331,12 +361,16 @@ function Race<S extends RaceSession>({
               p.playerId === picked && "border-l-[3px] border-l-accent",
             )}
           >
-            <Text className="w-5 font-mono text-lg text-muted">{place + 1}</Text>
+            <Text className="min-w-6 text-center font-mono text-lg leading-7 text-muted">
+              {place + 1}
+            </Text>
             <Chip chip={p.chip} name={p.name} size={26} />
             <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
               {p.name}
             </Text>
-            <Text className={cn("font-mono text-lg", tone(p.now ?? 0))}>{reading(p.now)}</Text>
+            <Text className={cn("font-mono text-lg leading-7", tone(p.now ?? 0))}>
+              {reading(p.now)}
+            </Text>
           </Pressable>
         ))}
       </View>

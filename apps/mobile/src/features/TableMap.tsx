@@ -24,6 +24,7 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  PixelRatio,
   Pressable,
   Text,
   View,
@@ -198,13 +199,20 @@ function ResultTag({
     }).start();
   }, [flip]);
   const bust = busted(out);
+  const label = bust ? "Bust" : formatMoney(out.net, currency, { signDisplay: "exceptZero" });
+  // Yoga measures this against the seat, a few characters wide, so the amount wraps unless the
+  // label has a width of its own. 12 is text-xs; the pill inside still hugs the text.
+  const lane = (label.length * 12 + 32) * PixelRatio.getFontScale();
   return (
     <Animated.View
       pointerEvents="none"
       style={{
         position: "absolute",
         top: "92%",
-        alignSelf: "center",
+        left: "50%",
+        width: lane,
+        marginLeft: -lane / 2,
+        alignItems: "center",
         opacity: flip,
         transform: [
           { perspective: 200 },
@@ -220,13 +228,16 @@ function ResultTag({
               ? "rounded-md bg-win px-2 py-0.5"
               : "rounded-md bg-surface px-2 py-0.5"
         }
+        style={{ flexDirection: "row" }}
       >
         <Text
+          numberOfLines={1}
+          style={{ flexShrink: 0 }}
           className={
             bust || out.net !== 0 ? "font-mono text-xs text-canvas" : "font-mono text-xs text-ink"
           }
         >
-          {bust ? "Bust" : formatMoney(out.net, currency, { signDisplay: "exceptZero" })}
+          {label}
         </Text>
       </View>
     </Animated.View>

@@ -1,20 +1,16 @@
 import { MinorUnits, PlayerId, type Entry, type GroupDetail } from "@stacks/contracts";
 import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
 import * as Option from "effect/Option";
-import { useEffect, useRef, useState } from "react";
-import * as Haptics from "expo-haptics";
-import { Platform, Pressable, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Choice, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { cn } from "../components/ui/cn";
-import { holdBackspace } from "./holdBackspace";
-
-// A click can follow pointer-up as its own event. Remember the press-in delete
-// until that click arrives, so a tap doesn't remove a second character.
-const DELETE_PRESS_SETTLE_MS = 300;
+import { AmountKeypad } from "./AmountKeypad";
+import { applyAmountKey } from "./amountKey";
 
 export type EntryDraft = {
   readonly kind: "buy_in" | "cash_out" | "adjustment";
@@ -83,72 +79,12 @@ export function EntrySheet({
   const [note, setNote] = useState(draft.replaces?.note ?? "");
   const [noting, setNoting] = useState(Boolean(draft.replaces?.note));
   const [amountError, setAmountError] = useState<string | null>(null);
-  const amountRef = useRef(amount);
-  const releaseRepeat = useRef<(() => void) | null>(null);
-  const deletePress = useRef(0);
-  const deletedOnPressIn = useRef(false);
-  const settleDelete = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cents = minorUnitDigits(currency) > 0;
   const value = Option.getOrNull(parseMoney(amount, currency));
 
-  useEffect(
-    () => () => {
-      releaseRepeat.current?.();
-      if (settleDelete.current !== null) clearTimeout(settleDelete.current);
-    },
-    [],
-  );
-
-  const writeAmount = (next: string) => {
-    amountRef.current = next;
-    setAmount(next);
-  };
-
-  const eraseOne = () => {
-    const next = amountRef.current.slice(0, -1);
-    if (next === amountRef.current) return true;
-    writeAmount(next);
-    setAmountError(null);
-    return next.length === 0;
-  };
-
-  const pressDelete = () => {
-    deletePress.current += 1;
-    deletedOnPressIn.current = true;
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
-    releaseRepeat.current?.();
-    releaseRepeat.current = holdBackspace(eraseOne);
-  };
-
-  const releaseDelete = () => {
-    releaseRepeat.current?.();
-    releaseRepeat.current = null;
-    if (settleDelete.current !== null) clearTimeout(settleDelete.current);
-    const seen = deletePress.current;
-    settleDelete.current = setTimeout(() => {
-      settleDelete.current = null;
-      if (deletePress.current === seen) deletedOnPressIn.current = false;
-    }, DELETE_PRESS_SETTLE_MS);
-  };
-
-  // VoiceOver and keyboard activation fire onPress without a press-in.
-  const activateDelete = () => {
-    deletePress.current += 1;
-    if (deletedOnPressIn.current) {
-      deletedOnPressIn.current = false;
-      return;
-    }
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
-    eraseOne();
-  };
-
   const press = (key: string) => {
     setAmountError(null);
-    const current = amountRef.current;
-    if (key === "sign")
-      return writeAmount(current.startsWith("-") ? current.slice(1) : `-${current}`);
-    if (key === decimal && current.includes(decimal)) return;
-    writeAmount(current === "0" && key !== decimal ? key : current + key);
+    setAmount((current) => applyAmountKey(current, key, decimal));
   };
 
   const submit = (entered = value) => {
@@ -174,14 +110,9 @@ export function EntrySheet({
     onClose();
   };
 
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
   const bottomLeft = kind === "adjustment" ? "sign" : cents ? decimal : null;
   const whoseLabel = kind === "buy_in" ? "Whose money" : "Who has the cash";
   const whose = others.find((other) => other.id === counterparty)?.displayName;
-  const tap = (key: string) => {
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
-    press(key);
-  };
 
   return (
     <Sheet
@@ -244,7 +175,7 @@ export function EntrySheet({
                 key={preset}
                 label={formatMoney(MinorUnits.make(preset), currency)}
                 size="sm"
-                onPress={() => writeAmount(amountText(MinorUnits.make(preset), currency))}
+                onPress={() => setAmount(amountText(MinorUnits.make(preset), currency))}
               />
             ))
           ) : (
@@ -253,38 +184,12 @@ export function EntrySheet({
               size="sm"
               haptic
               // Fills the amount like a preset does: one stray tap shouldn't take a player out.
-              onPress={() => writeAmount(amountText(MinorUnits.make(0), currency))}
+              onPress={() => setAmount(amountText(MinorUnits.make(0), currency))}
             />
           )}
         </View>
       ) : null}
-      <View className="flex-row flex-wrap">
-        {[...keys, bottomLeft, "0", "back"].map((key) =>
-          key === null ? (
-            <View key="gap" className="h-16 basis-1/3" />
-          ) : (
-            <Pressable
-              key={key}
-              accessibilityRole="button"
-              accessibilityLabel={
-                key === "back" ? "Delete" : key === "sign" ? "Plus or minus" : key
-              }
-              // The sheet scrolls; a stolen press would stop a held delete.
-              cancelable={key === "back" ? false : undefined}
-              onPressIn={key === "back" ? pressDelete : undefined}
-              onPressOut={key === "back" ? releaseDelete : undefined}
-              onPress={key === "back" ? activateDelete : () => tap(key)}
-              className="h-16 basis-1/3 items-center justify-center rounded-full active:bg-fill"
-            >
-              {key === "back" ? (
-                <Icon name="delete" color="ink" size={24} />
-              ) : (
-                <Text className="text-3xl font-medium text-ink">{key === "sign" ? "±" : key}</Text>
-              )}
-            </Pressable>
-          ),
-        )}
-      </View>
+      <AmountKeypad onKey={press} bottomLeft={bottomLeft} />
       {kind !== "adjustment" && others.length > 0 && choosingWhose ? (
         <Choice
           label={whoseLabel}
