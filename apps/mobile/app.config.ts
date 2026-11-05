@@ -69,6 +69,7 @@ export default (): ExpoConfig => ({
       },
     ],
     "./plugins/withSceneDelegate",
+    "./plugins/withStartupCrashRecovery",
   ],
   web: { bundler: "metro", output: "single" },
   extra: {
