@@ -15,6 +15,11 @@ const VARIANTS: Record<AppVariant, { name: string; scheme: string; id: string }>
 const variant = (process.env.APP_VARIANT ?? "development") as AppVariant;
 const { name, scheme, id } = VARIANTS[variant] ?? VARIANTS.development;
 
+const displayFont =
+  "./node_modules/@expo-google-fonts/barlow-condensed/700Bold/BarlowCondensed_700Bold.ttf";
+const monoFont =
+  "./node_modules/@expo-google-fonts/jetbrains-mono/500Medium/JetBrainsMono_500Medium.ttf";
+
 export default (): ExpoConfig => ({
   name,
   slug: "stacks",
@@ -37,7 +42,24 @@ export default (): ExpoConfig => ({
   plugins: [
     "@clerk/expo",
     "expo-secure-store",
-    "expo-font",
+    [
+      "expo-font",
+      {
+        ios: { fonts: [displayFont, monoFont] },
+        android: {
+          fonts: [
+            {
+              fontFamily: "BarlowCondensed-Bold",
+              fontDefinitions: [{ path: displayFont, weight: 700 }],
+            },
+            {
+              fontFamily: "JetBrainsMono-Medium",
+              fontDefinitions: [{ path: monoFont, weight: 500 }],
+            },
+          ],
+        },
+      },
+    ],
     "expo-web-browser",
     [
       "expo-location",

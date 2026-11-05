@@ -2,9 +2,9 @@
 @import "uniwind";
 
 @theme {
-  /* Loaded with expo-font in App.tsx under these names. Native fonts come one weight to a family. */
-  --font-display: "BarlowCondensed_700Bold";
-  --font-mono: "JetBrainsMono_500Medium";
+  /* Match the iOS PostScript names; Android embeds each weight under the same family. */
+  --font-display: "BarlowCondensed-Bold";
+  --font-mono: "JetBrainsMono-Medium";
 }
 
 /* Keep in step with apps/web/src/index.css; its src/design/tokens.test.ts fails when they drift. Dark

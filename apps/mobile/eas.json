@@ -1,10 +1,12 @@
 {
   "cli": {
-    "version": ">= 18.4.0",
+    "version": ">= 22.0.0",
     "appVersionSource": "remote"
   },
   "build": {
     "development": {
+      "uploadSourceMaps": true,
+      "ios": { "image": "macos-tahoe-26.6-xcode-27.1" },
       "env": {
         "APP_VARIANT": "development"
       },
@@ -19,6 +21,8 @@
       }
     },
     "preview": {
+      "uploadSourceMaps": true,
+      "ios": { "image": "macos-tahoe-26.6-xcode-27.1" },
       "env": {
         "APP_VARIANT": "preview",
         "EXPO_PUBLIC_API_URL": "https://colorup.stephen-jcombs.workers.dev",
@@ -37,6 +41,8 @@
       }
     },
     "production": {
+      "uploadSourceMaps": true,
+      "ios": { "image": "macos-tahoe-26.6-xcode-27.1" },
       "env": {
         "APP_VARIANT": "production",
         "EXPO_PUBLIC_API_URL": "https://colorup.stephen-jcombs.workers.dev",

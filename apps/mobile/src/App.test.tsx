@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vite-plus/test";
 
 it.each([
-  { label: "unavailable", metrics: null, insets: "0,0,0,0" },
+  { label: "unavailable", metrics: null, insets: "0,0,0,0", signedIn: false },
+  { label: "unavailable after sign-in", metrics: null, insets: "0,0,0,0", signedIn: true },
   {
     label: "available",
     metrics: {
@@ -11,8 +12,9 @@ it.each([
       insets: { top: 62, right: 0, bottom: 34, left: 0 },
     },
     insets: "62,0,34,0",
+    signedIn: false,
   },
-])("starts without native inset events ($label)", async ({ metrics, insets }) => {
+])("starts without native inset events ($label)", async ({ metrics, insets, signedIn }) => {
   vi.resetModules();
   const Container = ({ children }: { children: ReactNode }) => createElement("div", null, children);
   const window = { width: 440, height: 956, scale: 3, fontScale: 1 };
@@ -39,27 +41,38 @@ it.each([
   }
   vi.doMock("@clerk/expo", () => ({
     ClerkProvider: AuthProvider,
-    useAuth: () => ({ isLoaded: false, isSignedIn: false }),
+    useAuth: () => ({ isLoaded: signedIn, isSignedIn: signedIn, userId: "test-user" }),
   }));
   vi.doMock("@clerk/expo/token-cache", () => ({ tokenCache: {} }));
-  vi.doMock("expo-font", () => ({ useFonts: () => [false, null] }));
-  vi.doMock("@expo-google-fonts/barlow-condensed/700Bold", () => ({
-    BarlowCondensed_700Bold: 1,
-  }));
-  vi.doMock("@expo-google-fonts/jetbrains-mono/500Medium", () => ({
-    JetBrainsMono_500Medium: 2,
-  }));
   vi.doMock("expo", () => ({ reloadAppAsync: vi.fn() }));
-  vi.doMock("expo-linking", () => ({ createURL: () => "stacks://" }));
+  const markStartup = vi.fn();
+  vi.doMock("./lib/diagnostics", () => ({ markStartup }));
+  const logEvent = vi.fn();
+  vi.doMock("expo-observe", () => ({
+    Observe: { logEvent, reportError: vi.fn() },
+  }));
+  vi.doMock("expo-linking", () => ({
+    createURL: () => "stacks://",
+    getInitialURL: () => new Promise<string | null>(() => {}),
+  }));
   vi.doMock("expo-status-bar", () => ({ StatusBar: () => null }));
   vi.doMock("uniwind", () => ({
     useUniwind: () => ({ theme: "dark" }),
     useCSSVariable: () => ["black", "white", "gray", "gold", "red"],
   }));
+  const navigation = vi.fn(
+    ({
+      fallback,
+    }: {
+      fallback: ReactNode;
+      linking: { getInitialURL: () => Promise<string | null> };
+      onReady: () => void;
+    }) => fallback,
+  );
   vi.doMock("@react-navigation/native", () => ({
     DarkTheme: { colors: {}, fonts: {} },
     DefaultTheme: { colors: {}, fonts: {} },
-    createStaticNavigation: () => Container,
+    createStaticNavigation: () => navigation,
   }));
   vi.doMock("@react-navigation/native-stack", () => ({ createNativeStackNavigator: vi.fn() }));
   vi.doMock("./features/PlaceTabs", () => ({
@@ -123,4 +136,18 @@ it.each([
   const markup = renderToStaticMarkup(createElement(App));
   expect(markup).toContain("Opening Color Up");
   expect(markup).toContain(`data-insets="${insets}"`);
+  if (signedIn) {
+    const { linking, onReady } = navigation.mock.calls[0]![0];
+    vi.useFakeTimers();
+    try {
+      const url = linking.getInitialURL();
+      await vi.advanceTimersByTimeAsync(1_500);
+      await expect(url).resolves.toBeNull();
+      expect(logEvent).toHaveBeenCalledWith("startup.initial_url_timeout", { severity: "warn" });
+      onReady();
+      expect(markStartup).toHaveBeenCalledWith("navigation_ready");
+    } finally {
+      vi.useRealTimers();
+    }
+  }
 });
