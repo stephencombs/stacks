@@ -346,10 +346,12 @@ function RecordPaymentDialog({
         <Field label="Note (optional)" hint="Like “Venmo” or “cash at the airport”.">
           {(props) => <Input {...props} name="note" maxLength={280} autoComplete="off" />}
         </Field>
-        {problem ? <FormError>{problem}</FormError> : null}
-        <Button type="submit" variant="primary" size="lg">
-          Record payment
-        </Button>
+        <div className="sticky bottom-0 z-10 -mt-4 flex flex-col gap-4 bg-surface pt-4">
+          {problem ? <FormError>{problem}</FormError> : null}
+          <Button type="submit" variant="primary" size="lg">
+            Record payment
+          </Button>
+        </div>
       </form>
     </Dialog>
   );
