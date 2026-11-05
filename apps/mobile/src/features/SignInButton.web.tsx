@@ -18,6 +18,7 @@ export function SignInButton({
       label={label}
       variant={variant}
       size="lg"
+      className="w-full"
       onPress={() => (mode === "sign-up" ? clerk.openSignUp() : clerk.openSignIn())}
     />
   );
