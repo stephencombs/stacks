@@ -1,6 +1,7 @@
 import { reloadAppAsync } from "expo";
-import { Component, type ReactNode } from "react";
-import { Platform, PlatformColor, Pressable, Text, View } from "react-native";
+import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Platform, PlatformColor, Pressable, ScrollView, Text, View } from "react-native";
+import { reportStartupError } from "./lib/diagnostics";
 
 // Recovery must render without the app's fonts, theme hooks, or safe-area provider.
 export class StartupBoundary extends Component<
@@ -11,6 +12,15 @@ export class StartupBoundary extends Component<
 
   static getDerivedStateFromError(error: unknown) {
     return { failed: true, message: error instanceof Error ? error.message : String(error) };
+  }
+
+  override componentDidCatch(error: unknown, info: ErrorInfo) {
+    const details = `${error instanceof Error ? (error.stack ?? error.message) : String(error)}${info.componentStack ? `\nComponent stack:\n${info.componentStack}` : ""}`;
+    const report = new Error(error instanceof Error ? error.message : String(error));
+    report.name = error instanceof Error ? error.name : "Error";
+    report.stack = details;
+    reportStartupError(report);
+    this.setState({ message: details });
   }
 
   override render() {
@@ -31,9 +41,11 @@ export class StartupBoundary extends Component<
           Color Up couldn't start
         </Text>
         <Text style={{ color, fontSize: 17 }}>Send this error with your report:</Text>
-        <Text selectable style={{ color, fontSize: 15 }}>
-          {this.state.message}
-        </Text>
+        <ScrollView style={{ flexShrink: 1 }}>
+          <Text selectable style={{ color, fontSize: 15 }}>
+            {this.state.message}
+          </Text>
+        </ScrollView>
         <Pressable
           accessibilityRole="button"
           onPress={() => void reloadAppAsync()}

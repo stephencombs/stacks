@@ -28,6 +28,7 @@ import { AppState, Platform } from "react-native";
 import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
 import { apiUrl, clerkPublishableKey } from "./config";
+import { markStartup } from "./diagnostics";
 import { outboxStorage, wakeOutbox } from "./outbox";
 import { captureTestEvent } from "./telemetry";
 import { lastTripStorage } from "./tripStorage";
@@ -85,6 +86,10 @@ export function Loaded<A, E>({
 }) {
   const result = useAtomValue(query);
   useRevalidate(query, result, onWake);
+  const settled = !AsyncResult.isInitial(result);
+  useEffect(() => {
+    if (settled) markStartup("query_settled");
+  }, [settled]);
   return AsyncResult.match(result, {
     onInitial: () => skeleton ?? <Skeleton className="h-32" />,
     // A failed refresh keeps showing what was there before.

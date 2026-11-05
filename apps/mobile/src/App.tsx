@@ -1,7 +1,5 @@
 import { ClerkProvider, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
-import { BarlowCondensed_700Bold } from "@expo-google-fonts/barlow-condensed/700Bold";
-import { JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono/500Medium";
 import {
   DarkTheme,
   DefaultTheme,
@@ -11,9 +9,8 @@ import {
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
-import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -25,6 +22,9 @@ import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./f
 import { ScopeButton } from "./features/Scope";
 import { YouButton } from "./features/You";
 import { clerkPublishableKey } from "./lib/config";
+import { markStartup, reportStartupError } from "./lib/diagnostics";
+import { useAppFonts } from "./lib/fonts";
+import { getInitialURL } from "./lib/initialUrl";
 import { ScopeProvider, useScopeHasTrip } from "./lib/scope";
 import { Prefetch, StacksProvider, useLastTrip, useStacks } from "./lib/stacks";
 import "./lib/theme";
@@ -184,6 +184,10 @@ function Root() {
   const theme = useNavigationTheme();
   const pendingLink = useRef<string | null>(null);
   useEffect(() => {
+    if (isLoaded) markStartup("auth_ready");
+    if (isLoaded && !isSignedIn) markStartup("landing_ready");
+  }, [isLoaded, isSignedIn]);
+  useEffect(() => {
     if (isSignedIn) return;
     const subscription = Linking.addEventListener("url", ({ url }) => {
       if (/\/(join|claim)\//.test(url)) pendingLink.current = url;
@@ -196,9 +200,16 @@ function Root() {
     // A link straight to a session or an invite still has the places to go back to.
     config: { initialRouteName: "Places" as const },
     getInitialURL: async () => {
-      const url = pendingLink.current ?? (await Linking.getInitialURL());
+      const pending = pendingLink.current;
       pendingLink.current = null;
-      return url;
+      return (
+        pending ??
+        getInitialURL(
+          () => Linking.getInitialURL(),
+          () => markStartup("initial_url_timeout"),
+          reportStartupError,
+        )
+      );
     },
   };
   if (!isLoaded) return <Starting />;
@@ -206,7 +217,12 @@ function Root() {
   return (
     <StacksProvider key={userId} userId={userId}>
       <ScopeProvider>
-        <Navigation linking={linking} theme={theme} />
+        <Navigation
+          linking={linking}
+          theme={theme}
+          fallback={<Opening />}
+          onReady={() => markStartup("navigation_ready")}
+        />
       </ScopeProvider>
     </StacksProvider>
   );
@@ -236,7 +252,7 @@ function useNavigationTheme() {
     },
     fonts: {
       ...base.fonts,
-      bold: { fontFamily: "BarlowCondensed_700Bold", fontWeight: "normal" as const },
+      bold: { fontFamily: "BarlowCondensed-Bold", fontWeight: "normal" as const },
     },
   };
 }
@@ -249,14 +265,7 @@ function Starting() {
     const timer = setTimeout(() => setStalled(true), STALLED_MS);
     return () => clearTimeout(timer);
   }, []);
-  if (!stalled)
-    return (
-      <View className="flex-1 items-center justify-center bg-canvas">
-        <Text accessibilityRole="status" className="text-lg text-ink">
-          Opening Color Up…
-        </Text>
-      </View>
-    );
+  if (!stalled) return <Opening />;
   return (
     <View className="flex-1 justify-center gap-4 bg-canvas px-6">
       <Text accessibilityRole="header" className="type-headline text-ink">
@@ -270,12 +279,23 @@ function Starting() {
   );
 }
 
+function Opening() {
+  return (
+    <View className="flex-1 items-center justify-center bg-canvas">
+      <Text accessibilityRole="status" className="text-lg text-ink">
+        Opening Color Up…
+      </Text>
+    </View>
+  );
+}
+
 function SignedOut() {
   return <Landing />;
 }
 
 export default function App() {
-  useFonts({ BarlowCondensed_700Bold, JetBrainsMono_500Medium });
+  useAppFonts();
+  useLayoutEffect(() => markStartup("root_committed"), []);
   const { theme } = useUniwind();
   const { width, height } = useWindowDimensions();
   return (
