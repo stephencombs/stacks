@@ -2,7 +2,7 @@ import { MinorUnits, PlayerId, type Entry, type GroupDetail } from "@stacks/cont
 import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
 import * as Option from "effect/Option";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Choice, TextField } from "../components/ui/Field";
@@ -27,6 +27,69 @@ export type EntryInput = {
   readonly note: string | null;
   readonly replacesEntryId: Entry["id"] | null;
 };
+
+/** A checked row is `min-h-12`. Past this the menu scrolls instead of covering the header. */
+const whoseRowHeight = 48;
+const whoseMenuMaxHeight = 320;
+
+function WhoseMenu({
+  label,
+  options,
+  value,
+  anchorHeight,
+  onClose,
+  onChange,
+}: {
+  label: string;
+  options: ReadonlyArray<{ readonly value: string; readonly label: string }>;
+  value: string;
+  /** Height of the row that opened the menu, so the list sits just above it. */
+  anchorHeight: number;
+  onClose: () => void;
+  onChange: (value: string) => void;
+}) {
+  const scrolls = options.length * whoseRowHeight > whoseMenuMaxHeight;
+  return (
+    // Out of the sheet's scroll flow: an in-flow list pushes the keypad up.
+    <View
+      accessibilityViewIsModal
+      pointerEvents="box-none"
+      style={[StyleSheet.absoluteFill, { bottom: anchorHeight }]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Close ${label}`}
+        onPress={onClose}
+        style={StyleSheet.absoluteFill}
+      />
+      <View
+        style={{
+          position: "absolute",
+          zIndex: 1,
+          left: 0,
+          right: 0,
+          bottom: 8,
+          maxHeight: whoseMenuMaxHeight,
+          ...(scrolls ? { height: whoseMenuMaxHeight } : null),
+        }}
+        className="overflow-hidden rounded-xl border border-line-strong bg-surface"
+      >
+        {scrolls ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+          >
+            <Choice label={label} labelHidden options={options} value={value} onChange={onChange} />
+          </ScrollView>
+        ) : (
+          <Choice label={label} labelHidden options={options} value={value} onChange={onChange} />
+        )}
+      </View>
+    </View>
+  );
+}
 
 const titles = { buy_in: "Buy in", cash_out: "Cash out", adjustment: "Adjust" } as const;
 const kinds = [
@@ -76,6 +139,7 @@ export function EntrySheet({
   );
   const [counterparty, setCounterparty] = useState<string>(draft.replaces?.counterpartyId ?? "");
   const [choosingWhose, setChoosingWhose] = useState(false);
+  const [whoseAnchor, setWhoseAnchor] = useState(0);
   const [note, setNote] = useState(draft.replaces?.note ?? "");
   const [noting, setNoting] = useState(Boolean(draft.replaces?.note));
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -113,6 +177,14 @@ export function EntrySheet({
   const bottomLeft = kind === "adjustment" ? "sign" : cents ? decimal : null;
   const whoseLabel = kind === "buy_in" ? "Whose money" : "Who has the cash";
   const whose = others.find((other) => other.id === counterparty)?.displayName;
+  const showWhose = kind !== "adjustment" && others.length > 0;
+  const whoseOptions = [
+    {
+      value: "",
+      label: kind === "buy_in" ? `${player?.displayName}'s own` : `${player?.displayName}`,
+    },
+    ...others.map((other) => ({ value: other.id, label: other.displayName })),
+  ];
 
   return (
     <Sheet
@@ -140,109 +212,126 @@ export function EntrySheet({
         />
       }
     >
-      {draft.replaces ? null : (
-        <Choice label="What happened" labelHidden options={kinds} value={kind} onChange={setKind} />
-      )}
-      <View
-        accessible
-        accessibilityLabel="Amount"
-        accessibilityValue={{ text: amount || "none" }}
-        className="items-center gap-2 py-3"
-      >
-        <Text
-          adjustsFontSizeToFit
-          numberOfLines={1}
-          style={{ lineHeight: 72 }}
-          className={cn("font-mono text-6xl", amount ? "text-ink" : "text-faint")}
+      <View className="gap-5">
+        {draft.replaces ? null : (
+          <Choice
+            label="What happened"
+            labelHidden
+            options={kinds}
+            value={kind}
+            onChange={(next) => {
+              setKind(next);
+              setChoosingWhose(false);
+            }}
+          />
+        )}
+        <View
+          accessible
+          accessibilityLabel="Amount"
+          accessibilityValue={{ text: amount || "none" }}
+          className="items-center gap-2 py-3"
         >
-          {value === null
-            ? amount || formatMoney(MinorUnits.make(0), currency)
-            : formatMoney(value, currency, {
-                signDisplay: kind === "adjustment" ? "exceptZero" : "auto",
-              })}
-        </Text>
-        {amountError ? (
-          <Text accessibilityLiveRegion="polite" className="text-center type-footnote text-danger">
-            {amountError}
+          <Text
+            adjustsFontSizeToFit
+            numberOfLines={1}
+            style={{ lineHeight: 72 }}
+            className={cn("font-mono text-6xl", amount ? "text-ink" : "text-faint")}
+          >
+            {value === null
+              ? amount || formatMoney(MinorUnits.make(0), currency)
+              : formatMoney(value, currency, {
+                  signDisplay: kind === "adjustment" ? "exceptZero" : "auto",
+                })}
           </Text>
-        ) : null}
-      </View>
-      {(kind === "buy_in" && presets.length > 0) || (kind === "cash_out" && !draft.replaces) ? (
-        <View className="flex-row justify-center gap-2">
-          {kind === "buy_in" ? (
-            presets.map((preset) => (
+          {amountError ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              className="text-center type-footnote text-danger"
+            >
+              {amountError}
+            </Text>
+          ) : null}
+        </View>
+        {(kind === "buy_in" && presets.length > 0) || (kind === "cash_out" && !draft.replaces) ? (
+          <View className="flex-row justify-center gap-2">
+            {kind === "buy_in" ? (
+              presets.map((preset) => (
+                <Button
+                  key={preset}
+                  label={formatMoney(MinorUnits.make(preset), currency)}
+                  size="sm"
+                  onPress={() => setAmount(amountText(MinorUnits.make(preset), currency))}
+                />
+              ))
+            ) : (
               <Button
-                key={preset}
-                label={formatMoney(MinorUnits.make(preset), currency)}
+                label={`Bust · ${formatMoney(MinorUnits.make(0), currency)}`}
                 size="sm"
-                onPress={() => setAmount(amountText(MinorUnits.make(preset), currency))}
+                haptic
+                // Fills the amount like a preset does: one stray tap shouldn't take a player out.
+                onPress={() => setAmount(amountText(MinorUnits.make(0), currency))}
               />
-            ))
-          ) : (
-            <Button
-              label={`Bust · ${formatMoney(MinorUnits.make(0), currency)}`}
-              size="sm"
-              haptic
-              // Fills the amount like a preset does: one stray tap shouldn't take a player out.
-              onPress={() => setAmount(amountText(MinorUnits.make(0), currency))}
-            />
+            )}
+          </View>
+        ) : null}
+        <AmountKeypad onKey={press} bottomLeft={bottomLeft} />
+        {noting ? (
+          <TextField label="Note" value={note} onChangeText={setNote} maxLength={280} />
+        ) : null}
+        <View
+          onLayout={(event) => setWhoseAnchor(event.nativeEvent.layout.height)}
+          className="overflow-hidden rounded-xl bg-surface"
+        >
+          {showWhose ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: choosingWhose }}
+              accessibilityLabel={`${whoseLabel}: ${whose ?? "their own"}. Change`}
+              onPress={() => setChoosingWhose((open) => !open)}
+              className={cn(
+                "min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken",
+                choosingWhose && "bg-sunken",
+              )}
+            >
+              <Text className="type-body text-ink">{whoseLabel}</Text>
+              <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
+                {whose ?? (kind === "buy_in" ? "Their own" : "They do")}
+              </Text>
+              <Icon name="chevron-right" color="faint" size={16} />
+            </Pressable>
+          ) : null}
+          {noting ? null : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add a note"
+              onPress={() => {
+                setNoting(true);
+                setChoosingWhose(false);
+              }}
+              className={cn(
+                "min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken",
+                showWhose && "border-t border-line",
+              )}
+            >
+              <Text className="flex-1 type-body text-ink">Note</Text>
+              <Text className="type-body text-muted">Add</Text>
+              <Icon name="chevron-right" color="faint" size={16} />
+            </Pressable>
           )}
         </View>
-      ) : null}
-      <AmountKeypad onKey={press} bottomLeft={bottomLeft} />
-      {kind !== "adjustment" && others.length > 0 && choosingWhose ? (
-        <Choice
-          label={whoseLabel}
-          options={[
-            {
-              value: "",
-              label: kind === "buy_in" ? `${player?.displayName}'s own` : `${player?.displayName}`,
-            },
-            ...others.map((other) => ({ value: other.id, label: other.displayName })),
-          ]}
-          value={counterparty}
-          onChange={(next) => {
-            setCounterparty(next);
-            setChoosingWhose(false);
-          }}
-        />
-      ) : null}
-      {noting ? (
-        <TextField label="Note" value={note} onChangeText={setNote} maxLength={280} />
-      ) : null}
-      <View className="overflow-hidden rounded-xl bg-surface">
-        {kind !== "adjustment" && others.length > 0 && !choosingWhose ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${whoseLabel}: ${whose ?? "their own"}. Change`}
-            onPress={() => setChoosingWhose(true)}
-            className="min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken"
-          >
-            <Text className="type-body text-ink">{whoseLabel}</Text>
-            <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
-              {whose ?? (kind === "buy_in" ? "Their own" : "They do")}
-            </Text>
-            <Icon name="chevron-right" color="faint" size={16} />
-          </Pressable>
+        {showWhose && choosingWhose && whoseAnchor > 0 ? (
+          <WhoseMenu
+            label={whoseLabel}
+            options={whoseOptions}
+            value={counterparty}
+            anchorHeight={whoseAnchor}
+            onClose={() => setChoosingWhose(false)}
+            onChange={(next) => {
+              setCounterparty(next);
+              setChoosingWhose(false);
+            }}
+          />
         ) : null}
-        {noting ? null : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Add a note"
-            onPress={() => setNoting(true)}
-            className={cn(
-              "min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken",
-              kind !== "adjustment" &&
-                others.length > 0 &&
-                !choosingWhose &&
-                "border-t border-line",
-            )}
-          >
-            <Text className="flex-1 type-body text-ink">Note</Text>
-            <Text className="type-body text-muted">Add</Text>
-            <Icon name="chevron-right" color="faint" size={16} />
-          </Pressable>
-        )}
       </View>
     </Sheet>
   );

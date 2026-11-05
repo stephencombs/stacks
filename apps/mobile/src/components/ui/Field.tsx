@@ -128,7 +128,7 @@ export function Choice<A extends string>({
     );
   return (
     <View className="gap-1.5" accessibilityRole="radiogroup" accessibilityLabel={label}>
-      <FieldLabel>{label}</FieldLabel>
+      {labelHidden ? null : <FieldLabel>{label}</FieldLabel>}
       <View className="overflow-hidden rounded-xl bg-surface">
         {options.map((option, index) => {
           const selected = option.value === value;
