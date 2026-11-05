@@ -45,9 +45,12 @@ test.describe.serial("seats at a blackjack table", () => {
     await page.getByRole("button", { name: "Add venue" }).click();
     await page.getByText("Blackjack", { exact: true }).click();
     await page.getByRole("checkbox", { name: /Gus/ }).check();
-    await page.route(/\/frame-5-\d+\.webp/, (route) => route.abort());
+    // Those frames are also Vite "?url" imports. Aborting the scripts fails the session route.
+    await page.route(/\/frame-5-\d+\.webp/, (route) =>
+      route.request().resourceType() === "image" ? route.abort() : route.continue(),
+    );
     await page.getByRole("button", { name: "Start session" }).click();
-    await expect(page.getByText("Live", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("Live", { exact: true })).toBeVisible();
     await expect(page.getByText("Couldn't load the table artwork.")).toBeVisible();
     await page.unroute(/\/frame-5-\d+\.webp/);
     await page.getByRole("button", { name: "Retry table artwork" }).click();
