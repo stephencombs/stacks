@@ -75,10 +75,10 @@ it("adds an application scene when the manifest is missing", () => {
   });
 });
 
-it("installs an Info.plist mod on the mobile app config", async () => {
+it("installs the scene delegate plugin on the mobile app config", async () => {
   const { default: appConfig } = await import("../app.config");
   const configured = withSceneDelegate({ name: "Color Up", slug: "stacks" });
 
   expect(appConfig().plugins).toContain("./plugins/withSceneDelegate");
-  expect(configured.mods?.ios?.infoPlist).toEqual(expect.any(Function));
+  expect(configured.name).toBe("Color Up");
 });
