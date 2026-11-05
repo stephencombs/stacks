@@ -28,7 +28,13 @@ export function SignInButton({
   };
   return (
     <View className="gap-2">
-      <Button label={label} variant={variant} size="lg" onPress={() => void start()} />
+      <Button
+        label={label}
+        variant={variant}
+        size="lg"
+        className="w-full"
+        onPress={() => void start()}
+      />
       {problem ? <FormError>{problem}</FormError> : null}
     </View>
   );
