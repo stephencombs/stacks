@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./visits": {
+      "types": "./src/visits.ts",
+      "import": "./src/visits.ts"
+    },
+    "./pairBalances": {
+      "types": "./src/pairBalances.ts",
+      "import": "./src/pairBalances.ts"
+    },
     "./money": {
       "types": "./src/money.ts",
       "import": "./src/money.ts"
