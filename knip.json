@@ -1,11 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreBinaries": [
-    "eas"
-  ],
-  "ignore": [
-    ".agents/skills/**"
-  ],
+  "ignoreBinaries": ["eas"],
+  "ignore": [".agents/skills/**"],
   "workspaces": {
     "apps/web": {
       "entry": [
@@ -18,11 +14,7 @@
       ]
     },
     "apps/mobile": {
-      "ignoreDependencies": [
-        "@babel/core",
-        "@react-navigation/elements",
-        "serve"
-      ]
+      "ignoreDependencies": ["@babel/core", "@react-navigation/elements", "serve"]
     }
   }
 }

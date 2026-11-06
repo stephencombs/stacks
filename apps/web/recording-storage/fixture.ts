@@ -11,3 +11,5 @@ declare global {
   }
 }
 window.recordingStorageFixture = fixture;
+
+export { makeRecordingStore } from "@stacks/client-runtime/recording";

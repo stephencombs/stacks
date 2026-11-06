@@ -67,6 +67,7 @@ vi.mock("expo-sqlite", () => ({
 
 import { openSQLiteRecordingStorage } from "./recordingStorageSqlite";
 import { openRecordingStorage } from "./recordingStorage";
+import { makeRecordingStore } from "@stacks/client-runtime/recording";
 
 beforeEach(() => {
   driver.directory = mkdtempSync(join(tmpdir(), "color-up-sqlite-"));
@@ -233,4 +234,43 @@ it("never loses a concurrent native write; lock failures remain visible and stal
   });
   await first.close();
   await second.close();
+});
+
+it("runs private recording through real SQLite across reopen and a rolled-back finish", async () => {
+  const open = async () => {
+    const store = makeRecordingStore(await openRecordingStorage("runtime"));
+    await store.ready;
+    return store;
+  };
+  let store = await open();
+  const identity = store.getSnapshot().state!.self;
+  await store.execute(store.prepare({ type: "start", buyIn: 20000 }));
+  await store.close();
+  store = await open();
+  const visitId = store.getSnapshot().state!.visits[0]!.id;
+  await store.execute(store.prepare({ type: "add", visitId, kind: "buy_in", amount: 10000 }));
+  await store.close();
+  store = await open();
+  await store.execute(store.prepare({ type: "add", visitId, kind: "cash_out", amount: 10000 }));
+  await store.close();
+  store = await open();
+  const finish = store.prepare({ type: "finish", visitId, amount: 25000 });
+  const before = store.getSnapshot();
+  driver.failAfterWrite = true;
+  await expect(store.execute(finish)).rejects.toMatchObject({ reason: "write" });
+  expect(store.getSnapshot().state).toEqual(before.state);
+  driver.failAfterWrite = false;
+  await store.close();
+  store = await open();
+  expect(store.review(visitId).summary.finalResult).toBeNull();
+  const receipt = await store.execute(finish);
+  await store.close();
+  store = await open();
+  expect(store.review(visitId).summary).toMatchObject({
+    totals: { buyIn: 30000, cashOut: 35000 },
+    finalResult: 5000,
+  });
+  expect(store.getSnapshot()).toMatchObject({ publication: "private", state: { self: identity } });
+  expect(store.getSnapshot().state!.receipts.at(-1)).toEqual(receipt);
+  await store.close();
 });

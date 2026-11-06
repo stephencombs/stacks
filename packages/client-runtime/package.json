@@ -79,6 +79,10 @@
     "./recordingStorageIndexedDB": {
       "types": "./src/recordingStorageIndexedDB.ts",
       "import": "./src/recordingStorageIndexedDB.ts"
+    },
+    "./recording": {
+      "types": "./src/recording.ts",
+      "import": "./src/recording.ts"
     }
   },
   "scripts": {
