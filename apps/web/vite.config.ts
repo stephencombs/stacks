@@ -12,8 +12,8 @@ export default defineConfig({
   resolve: {
     alias: { "~": NodeURL.fileURLToPath(new URL("./src", import.meta.url)) },
   },
-  // e2e/ runs under Playwright (`pnpm test:e2e`), not vitest.
-  test: { exclude: ["e2e/**", "node_modules/**"] },
+  // Any e2e/ directory runs under Playwright, not vitest. A bare `e2e/**` misses nested suites.
+  test: { exclude: ["**/e2e/**", "node_modules/**"] },
   server: {
     port: 5173,
     // Dev is single-origin: the browser calls /api and Vite forwards it to the worker.
