@@ -47,7 +47,7 @@ test("the production shell installs and reopens a deep link with the network dis
   const navigation = await reopened.goto("/play/offline-shell-check");
   expect(navigation?.fromServiceWorker()).toBe(true);
   expect(await navigation?.text()).toContain('<div id="root"></div>');
-  await expect(reopened).toHaveTitle("Color Up");
+  await expect(reopened.getByText("This session isn't on this device")).toBeVisible();
   await reopened.waitForLoadState("load");
   expect(responses.some((response) => response.url.endsWith(".js"))).toBe(true);
   expect(responses.every((response) => response.fromWorker && response.ok)).toBe(true);

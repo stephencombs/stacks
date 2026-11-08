@@ -1,8 +1,14 @@
 # Navigation
 
-Color Up keeps one trip in focus. The group and trip you're in are context, shown as a labeled
-scope button at the top of every screen. Under it, four places answer the questions people open
-the app with:
+Color Up opens on **your play**: `/` on web and the first screen on mobile. It lists sessions in
+play first, then finished ones with their results, and offers Start session and Add past session.
+A personal session lives at `/play/:visitId` (mobile `play/:visitId`), with Rebuy and Cash out
+while it's live. Both are on this device and need no account, group, trip or network: they never
+wait for sign-in, and sign-in failing or not being configured leaves them working.
+
+Groups and trips are a second, account-backed area, reached from **Groups** in the header. Inside
+it, the group and trip you're in are context, shown as a labeled scope button at the top of every
+screen. Under it, four places answer the questions people open a trip with:
 
 | Place         | Question                     | Holds                                                                     |
 | ------------- | ---------------------------- | ------------------------------------------------------------------------- |
@@ -11,11 +17,21 @@ the app with:
 | **Settle up** | Who owes whom?               | Suggested payments, balances, backing, payment history                    |
 | **Group**     | Who's in it, and what trips? | Trips, People (members, guests, invites), Settings (payment apps, export) |
 
-Anything that's only about you (play limits, appearance, account, sign out) sits behind your
-avatar, in **You**, on every screen. Phones and narrow web windows draw the four places as a bottom
-bar; wide web windows draw them as a left sidebar. The places are the same on both.
+Anything that's only about you (play limits, appearance, account, sign out) sits behind **You**.
+Phones and narrow web windows draw the four places as a bottom bar; wide web windows draw them as
+a left sidebar. The places are the same on both. The wordmark goes back to your play.
 
-## Why this shape
+## Why your play comes first
+
+Recording your own session is the job people open the app for, and it can't depend on anything
+that may be missing at a casino table: a signal, a working sign-in, or a group someone else set
+up. Groups and trips stay one tap away rather than being the way in. Personal addresses carry no
+query string, because the offline web shell only serves queryless navigations.
+
+Personal sessions are a different record from a group's `/sessions/:id`: that address names a
+whole shared table, so it keeps resolving its original record and is never read as a visit.
+
+## Why groups use scope
 
 Almost everyone belongs to one group and plays one trip at a time, and both change every few
 months. Earlier versions gave the group and the trip a row of tabs each, styled alike, and put the
@@ -31,7 +47,8 @@ scorecard), and the platform guidance that tab bars hold peer places, never acti
 
 ## Rules
 
-1. **Every screen says where you are.** The scope button and a page title are always visible.
+1. **Every screen says where you are.** A page title is always visible, and inside groups and
+   trips so is the scope button.
    Nothing is reachable only through an unlabeled menu, and the back slot only ever goes back.
 2. **One row of navigation per screen.** A segmented control inside a place may change the scope
    of the same data (This trip / All time). It may not switch to different content; that's a new
@@ -48,8 +65,7 @@ scorecard), and the platform guidance that tab bars hold peer places, never acti
 
 The scope is a trip, and its group comes with it. A page that names a trip or a session sets the
 scope to that trip. A group page keeps the scope if it's already in that group; otherwise it picks
-the group's live or most recent trip. The last trip in scope is remembered per device, and opening
-the app lands on its Sessions.
+the group's live or most recent trip. The last trip in scope is remembered per device.
 
 A group with no trips has nothing for Sessions, Board or Settle up to show, so only Group is
 offered until the first trip starts.
@@ -68,7 +84,8 @@ the Board is one tap away mid-session.
 
 ## Addresses
 
-Web and mobile share addresses: `/trips/:id` (Sessions), `/trips/:id/board` (`?scope=all` for All
+Web and mobile share addresses: `/` (your play), `/play/:visitId` (a personal session),
+`/groups` (your groups), `/trips/:id` (Sessions), `/trips/:id/board` (`?scope=all` for All
 time), `/trips/:id/settle`, `/sessions/:id`, `/groups/:id` (the hub), `/groups/:id/people` and
 `/groups/:id/settings`. Old addresses keep working: a trip's `/results` goes to its Board and a
 group's `/stats` to the Board's All time. A group's `/settings` used to mix people and settings; it

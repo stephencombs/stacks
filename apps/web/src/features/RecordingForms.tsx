@@ -1,0 +1,592 @@
+import { Game, MinorUnits, type PlayEntry, type VisitId } from "@stacks/contracts";
+import { gameNames } from "@stacks/client-runtime/format";
+import type { RecordingInput, RecordingReceipt } from "@stacks/client-runtime/recording";
+import { useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
+import {
+  amountInputText,
+  localDateText,
+  parsePastSessionTimes,
+  parseRecordingAmount,
+  RECORDING_CURRENCY,
+  type RecordingVisitView,
+} from "@stacks/client-runtime/recordingView";
+import { formatMoney } from "@stacks/shared/money";
+import { useState, type FormEvent, type ReactNode } from "react";
+
+import { Money } from "~/components/Money";
+import { Button } from "~/components/ui/Button";
+import { Checkbox } from "~/components/ui/Checkbox";
+import { Dialog } from "~/components/ui/Dialog";
+import { Field, FormError, Input, RadioCards, Select } from "~/components/ui/Field";
+import { Note } from "~/components/ui/Page";
+
+const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
+
+/** An amount field's text and its error, which shows on submit and clears as it's fixed. */
+function useAmount(initial: string, minimum: 0 | 1) {
+  const [text, setText] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  return {
+    text,
+    error,
+    set: (next: string) => {
+      setText(next);
+      if (error) setError(parseRecordingAmount(next, minimum).error);
+    },
+    /** The amount, or null after showing why it can't be saved. */
+    read: () => {
+      const parsed = parseRecordingAmount(text, minimum);
+      setError(parsed.error);
+      return parsed.error === null ? parsed.amount : null;
+    },
+  };
+}
+
+function AmountField({
+  label,
+  amount,
+  hint,
+  first = false,
+}: {
+  label: string;
+  amount: ReturnType<typeof useAmount>;
+  hint?: ReactNode;
+  /** The form's first field: a mouse or keyboard starts typing here, a touch screen waits for a tap. */
+  first?: boolean;
+}) {
+  return (
+    <Field label={label} hint={hint} error={amount.error}>
+      {(props) => (
+        <Input
+          {...props}
+          value={amount.text}
+          onChange={(event) => amount.set(event.target.value)}
+          inputMode="decimal"
+          autoComplete="off"
+          enterKeyHint="done"
+          autoFocus={first && matchMedia("(pointer: fine)").matches}
+          className="text-2xl tabular-nums"
+        />
+      )}
+    </Field>
+  );
+}
+
+function ReasonField({
+  label,
+  value,
+  error,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  error: string | null;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field label={label} error={error}>
+      {(props) => (
+        <Input
+          {...props}
+          value={value}
+          maxLength={280}
+          autoComplete="off"
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+    </Field>
+  );
+}
+
+/**
+ * A recording form in a dialog. It closes only once the device has saved, and while saving it
+ * can't be dismissed. A failed save keeps everything typed, and submitting again retries it.
+ */
+function RecordingDialog({
+  title,
+  description,
+  submitLabel,
+  submitVariant = "primary",
+  cancelLabel,
+  save,
+  onSubmit,
+  onClose,
+  children,
+}: {
+  title: string;
+  description?: ReactNode;
+  submitLabel: string;
+  submitVariant?: "primary" | "danger";
+  cancelLabel?: string;
+  save: ReturnType<typeof useRecordingSubmit>;
+  onSubmit: () => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    onSubmit();
+  };
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !save.pending) onClose();
+      }}
+      title={title}
+      description={description}
+    >
+      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+        {children}
+        {save.error ? (
+          <FormError>{save.error} What you entered is still here. Try again.</FormError>
+        ) : null}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {cancelLabel ? (
+            <Button size="lg" disabled={save.pending} onClick={onClose}>
+              {cancelLabel}
+            </Button>
+          ) : null}
+          <Button type="submit" variant={submitVariant} size="lg" pending={save.pending}>
+            {submitLabel}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+const games = Game.literals.map((game) => ({ value: game, label: gameNames[game] }));
+
+function DetailsFields({
+  game,
+  highLimit,
+  onGame,
+  onHighLimit,
+}: {
+  game: Game | "";
+  highLimit: boolean;
+  onGame: (game: Game | "") => void;
+  onHighLimit: (highLimit: boolean) => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-1.5 text-sm font-medium text-muted">Details (optional)</legend>
+      <Field label="Game">
+        {(props) => (
+          <Select
+            {...props}
+            value={game}
+            onChange={(event) => onGame(event.target.value as Game | "")}
+          >
+            <option value="">Not set</option>
+            {games.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        )}
+      </Field>
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
+        <Checkbox checked={highLimit} onCheckedChange={onHighLimit} />
+        High limit
+      </label>
+    </fieldset>
+  );
+}
+
+const startedVisit = (receipt: RecordingReceipt) => receipt.command.visitId;
+
+export function StartDialog({
+  onClose,
+  onStarted,
+}: {
+  onClose: () => void;
+  onStarted: (visitId: VisitId) => void;
+}) {
+  const save = useRecordingSubmit();
+  const buyIn = useAmount("", 1);
+  const [game, setGame] = useState<Game | "">("");
+  const [highLimit, setHighLimit] = useState(false);
+  return (
+    <RecordingDialog
+      title="Start session"
+      description="Your first buy-in starts it, timed from now."
+      submitLabel="Start session"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const amount = buyIn.read();
+        if (amount === null) return;
+        const receipt = await save.submit({
+          type: "start",
+          buyIn: amount,
+          ...(game ? { game } : {}),
+          highLimit,
+        });
+        if (receipt) onStarted(startedVisit(receipt));
+      }}
+    >
+      <AmountField label="Buy-in" amount={buyIn} first />
+      <DetailsFields
+        game={game}
+        highLimit={highLimit}
+        onGame={setGame}
+        onHighLimit={setHighLimit}
+      />
+    </RecordingDialog>
+  );
+}
+
+export function PastSessionDialog({
+  onClose,
+  onAdded,
+}: {
+  onClose: () => void;
+  onAdded: (visitId: VisitId) => void;
+}) {
+  const save = useRecordingSubmit();
+  const buyIn = useAmount("", 1);
+  const cashOut = useAmount("", 0);
+  const [times, setTimes] = useState({ date: localDateText(), start: "", finish: "" });
+  const [timeError, setTimeError] = useState<{ field: string; error: string } | null>(null);
+  const [game, setGame] = useState<Game | "">("");
+  const [highLimit, setHighLimit] = useState(false);
+  const setTime = (field: keyof typeof times) => (value: string) => {
+    const next = { ...times, [field]: value };
+    setTimes(next);
+    if (timeError) {
+      const parsed = parsePastSessionTimes(next);
+      setTimeError(parsed.error === null ? null : parsed);
+    }
+  };
+  const timeField = (field: keyof typeof times, label: string, type: "date" | "time") => (
+    <Field label={label} error={timeError?.field === field ? timeError.error : null}>
+      {(props) => (
+        <Input
+          {...props}
+          type={type}
+          value={times[field]}
+          onChange={(event) => setTime(field)(event.target.value)}
+        />
+      )}
+    </Field>
+  );
+  return (
+    <RecordingDialog
+      title="Add past session"
+      description="Totals for a session you've already finished. Rebuys don't need listing."
+      submitLabel="Add session"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const totalIn = buyIn.read();
+        const totalOut = cashOut.read();
+        const parsed = parsePastSessionTimes(times);
+        setTimeError(parsed.error === null ? null : parsed);
+        if (totalIn === null || totalOut === null || parsed.error !== null) return;
+        const receipt = await save.submit({
+          type: "record_completed",
+          buyIn: totalIn,
+          cashOut: totalOut,
+          startedAt: parsed.startedAt,
+          finishedAt: parsed.finishedAt,
+          ...(game ? { game } : {}),
+          highLimit,
+        });
+        if (receipt) onAdded(startedVisit(receipt));
+      }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <AmountField label="Total in" amount={buyIn} first />
+        <AmountField label="Total out" amount={cashOut} />
+      </div>
+      {timeField("date", "Date", "date")}
+      <div className="grid grid-cols-2 gap-3">
+        {timeField("start", "Started", "time")}
+        {timeField("finish", "Finished", "time")}
+      </div>
+      <DetailsFields
+        game={game}
+        highLimit={highLimit}
+        onGame={setGame}
+        onHighLimit={setHighLimit}
+      />
+    </RecordingDialog>
+  );
+}
+
+type Saved = (entryId: PlayEntry["id"], input: RecordingInput) => void;
+
+export function RebuyDialog({
+  visit,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onSaved: Saved;
+}) {
+  const save = useRecordingSubmit();
+  const amount = useAmount("", 1);
+  return (
+    <RecordingDialog
+      title="Rebuy"
+      submitLabel="Record rebuy"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const value = amount.read();
+        if (value === null) return;
+        const input = {
+          type: "add",
+          visitId: visit.visit.id,
+          kind: "buy_in",
+          amount: value,
+        } as const;
+        const receipt = await save.submit(input);
+        if (receipt?.command.type === "add") onSaved(receipt.command.entryId, input);
+      }}
+    >
+      <AmountField label="Amount" amount={amount} first />
+      {visit.presets.length > 0 ? (
+        <div className="flex gap-2" role="group" aria-label="Recent amounts">
+          {visit.presets.map((preset) => (
+            <Button
+              key={preset}
+              className="flex-1 tabular-nums"
+              onClick={() => amount.set(amountInputText(preset))}
+            >
+              {money(preset)}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+    </RecordingDialog>
+  );
+}
+
+const afterOptions = [
+  { value: "keep", label: "Keep playing" },
+  { value: "finish", label: "Finish playing" },
+] as const;
+
+export function CashOutDialog({
+  visit,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onSaved: Saved;
+}) {
+  const save = useRecordingSubmit();
+  const amount = useAmount("", 0);
+  const [after, setAfter] = useState<"keep" | "finish">("keep");
+  const previous = visit.totals.cashOut;
+  return (
+    <RecordingDialog
+      title="Cash out"
+      submitLabel={after === "finish" ? "Cash out and finish" : "Record cash-out"}
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const value = amount.read();
+        if (value === null) return;
+        const input =
+          after === "finish"
+            ? ({ type: "finish", visitId: visit.visit.id, amount: value } as const)
+            : ({ type: "add", visitId: visit.visit.id, kind: "cash_out", amount: value } as const);
+        const receipt = await save.submit(input);
+        if (receipt?.command.type === "add" || receipt?.command.type === "finish")
+          onSaved(receipt.command.entryId, input);
+      }}
+    >
+      <AmountField
+        label="Amount"
+        amount={amount}
+        first
+        hint={
+          previous > 0 ? (
+            <>
+              Just this cash-out. Earlier ones total{" "}
+              <Money amount={previous} currency={RECORDING_CURRENCY} />.
+            </>
+          ) : undefined
+        }
+      />
+      <Button className="self-start" onClick={() => amount.set(amountInputText(0))}>
+        {previous > 0 ? "Nothing more" : "Nothing to cash out"} · {money(0)}
+      </Button>
+      <RadioCards
+        label="After this cash-out"
+        options={afterOptions}
+        value={after}
+        onChange={setAfter}
+        className="grid-cols-2"
+      />
+      {after === "finish" ? (
+        <Note>
+          Finishing ends your play in this session and works out its final result. Coming back later
+          starts a new session.
+        </Note>
+      ) : null}
+    </RecordingDialog>
+  );
+}
+
+const kindName = (entry: PlayEntry) => (entry.kind === "buy_in" ? "buy-in" : "cash-out");
+
+export function CorrectDialog({
+  visit,
+  entry,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  entry: PlayEntry;
+  onClose: () => void;
+  onSaved: Saved;
+}) {
+  const save = useRecordingSubmit();
+  const amount = useAmount(amountInputText(entry.amount), entry.kind === "buy_in" ? 1 : 0);
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState<string | null>(null);
+  return (
+    <RecordingDialog
+      title={`Correct ${kindName(entry)}`}
+      description="The original stays in the history, voided, and this one replaces it."
+      submitLabel="Save correction"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const value = amount.read();
+        const why = reason.trim();
+        setReasonError(why ? null : "Say what was wrong with it.");
+        if (value === null || !why) return;
+        const input = {
+          type: "correct",
+          visitId: visit.visit.id,
+          entryId: entry.id,
+          reason: why,
+          replacement: { amount: value },
+        } as const;
+        const receipt = await save.submit(input);
+        if (receipt?.command.type === "correct" && receipt.command.replacement)
+          onSaved(receipt.command.replacement.id, input);
+      }}
+    >
+      <AmountField label="Correct amount" amount={amount} first />
+      <ReasonField
+        label="What was wrong"
+        value={reason}
+        error={reasonError}
+        onChange={(value) => {
+          setReason(value);
+          if (reasonError && value.trim()) setReasonError(null);
+        }}
+      />
+      {visit.visit.finishedAt !== null ? (
+        <Note>The session stays finished; its final result is worked out again.</Note>
+      ) : null}
+    </RecordingDialog>
+  );
+}
+
+export function VoidDialog({
+  visit,
+  entry,
+  onClose,
+  onVoided,
+}: {
+  visit: RecordingVisitView;
+  entry: PlayEntry;
+  onClose: () => void;
+  onVoided: () => void;
+}) {
+  const save = useRecordingSubmit();
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState<string | null>(null);
+  return (
+    <RecordingDialog
+      title="Void this entry?"
+      description={`The ${money(entry.amount)} ${kindName(entry)} stays in the history, crossed out, and stops counting toward this session.`}
+      submitLabel="Void entry"
+      submitVariant="danger"
+      cancelLabel="Keep entry"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const why = reason.trim();
+        setReasonError(why ? null : "Say why it's being voided.");
+        if (!why) return;
+        const receipt = await save.submit({
+          type: "correct",
+          visitId: visit.visit.id,
+          entryId: entry.id,
+          reason: why,
+          replacement: null,
+        });
+        if (receipt) onVoided();
+      }}
+    >
+      <ReasonField
+        label="Why"
+        value={reason}
+        error={reasonError}
+        onChange={(value) => {
+          setReason(value);
+          if (reasonError && value.trim()) setReasonError(null);
+        }}
+      />
+    </RecordingDialog>
+  );
+}
+
+export function ReopenDialog({
+  visit,
+  onClose,
+  onReopened,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onReopened: () => void;
+}) {
+  const save = useRecordingSubmit();
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState<string | null>(null);
+  return (
+    <RecordingDialog
+      title="Fix an accidental finish?"
+      description="Only if you never stopped playing. The session goes back to live, and the finish stays in its history. If you left and came back, start a new session instead."
+      submitLabel="Reopen session"
+      cancelLabel="Keep finished"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const why = reason.trim();
+        setReasonError(why ? null : "Say what happened.");
+        if (!why) return;
+        const receipt = await save.submit({ type: "reopen", visitId: visit.visit.id, reason: why });
+        if (receipt) onReopened();
+      }}
+    >
+      <ReasonField
+        label="What happened"
+        value={reason}
+        error={reasonError}
+        onChange={(value) => {
+          setReason(value);
+          if (reasonError && value.trim()) setReasonError(null);
+        }}
+      />
+      {visit.finalCashOut ? (
+        <Note>
+          Your <Money amount={visit.finalCashOut.amount} currency={RECORDING_CURRENCY} /> final
+          cash-out stays recorded. Correct or void it afterwards if it didn't happen.
+        </Note>
+      ) : null}
+    </RecordingDialog>
+  );
+}

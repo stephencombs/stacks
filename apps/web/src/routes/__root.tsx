@@ -1,13 +1,16 @@
-import { ClerkFailed, useAuth } from "@clerk/react";
+import { ClerkFailed } from "@clerk/react";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { ButtonLink } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuChoice } from "~/components/ui/Menu";
+import { Note } from "~/components/ui/Page";
 import { Landing } from "~/features/Landing";
 import { AppShell, Wordmark, You } from "~/features/Shell";
+import { useAccount } from "~/lib/account";
 import { StacksProvider } from "~/lib/stacks";
 import { setTheme, useTheme } from "~/lib/theme";
 
@@ -16,13 +19,24 @@ export const Route = createRootRoute({ component: Root });
 /** Opening an invite or claim link happens before you're in the group, so it has no places yet. */
 const invitation = /^\/(join|claim)\//;
 
+/** Your own play: it lives on this device, so it never waits for sign-in or the network. */
+const personal = (pathname: string) => pathname === "/" || pathname.startsWith("/play/");
+
 function Root() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
   const { pathname } = useLocation();
-  if (!isLoaded) return <Loading />;
-  if (!isSignedIn) return <SignedOut />;
+  if (personal(pathname)) return <Outlet />;
+  return <Accounts />;
+}
+
+/** Groups, trips and their sessions belong to an account, so they need one signed in. */
+function Accounts() {
+  const account = useAccount();
+  const { pathname } = useLocation();
+  if (!account.available) return <NoSignIn />;
+  if (!account.isLoaded) return <Loading />;
+  if (!account.isSignedIn || !account.userId) return <SignedOut />;
   return (
-    <StacksProvider key={userId} userId={userId}>
+    <StacksProvider key={account.userId} userId={account.userId}>
       {invitation.test(pathname) ? (
         <Frame tools={<You layout="bar" />}>
           <main className="flex w-full flex-1 flex-col gap-8 pt-2 pb-16 lg:mx-auto lg:max-w-2xl">
@@ -64,14 +78,39 @@ function ThemeMenu() {
   );
 }
 
+function BackToYourPlay() {
+  return (
+    <ButtonLink to="/" className="self-start">
+      Back to your play
+    </ButtonLink>
+  );
+}
+
 function Loading() {
   return (
     <Frame>
       <ClerkFailed>
-        <main className="pt-16">
-          <FormError>Couldn't load sign-in. Check your connection and reload the page.</FormError>
+        <main className="flex flex-col gap-4 pt-16">
+          <FormError>
+            Couldn't load sign-in. Check your connection and reload the page. Your sessions on this
+            device still work.
+          </FormError>
+          <BackToYourPlay />
         </main>
       </ClerkFailed>
+    </Frame>
+  );
+}
+
+function NoSignIn() {
+  return (
+    <Frame tools={<ThemeMenu />}>
+      <main className="flex flex-col gap-4 pt-16">
+        <Note>
+          Groups and trips need sign-in, and this copy of Color Up doesn't have it set up.
+        </Note>
+        <BackToYourPlay />
+      </main>
     </Frame>
   );
 }
