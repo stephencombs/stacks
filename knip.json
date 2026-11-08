@@ -1,7 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreBinaries": ["eas"],
-  "ignore": [".agents/skills/**"],
+  "ignoreBinaries": [
+    "eas"
+  ],
+  "ignore": [
+    ".agents/skills/**"
+  ],
   "workspaces": {
     "apps/web": {
       "entry": [
@@ -10,11 +14,17 @@
         "preview/vite.config.ts",
         "preview/clerk-stub.tsx",
         "recording-storage/playwright.config.ts",
-        "recording-storage/vite.config.ts"
+        "recording-storage/vite.config.ts",
+        "offline/worker.js",
+        "offline/playwright.config.ts"
       ]
     },
     "apps/mobile": {
-      "ignoreDependencies": ["@babel/core", "@react-navigation/elements", "serve"]
+      "ignoreDependencies": [
+        "@babel/core",
+        "@react-navigation/elements",
+        "serve"
+      ]
     }
   }
 }
