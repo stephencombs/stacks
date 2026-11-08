@@ -27,6 +27,7 @@ export function Sheet({
   title,
   description,
   footer,
+  busy = false,
   children,
 }: {
   open: boolean;
@@ -35,6 +36,8 @@ export function Sheet({
   description?: string;
   /** The sheet's main action, kept above the keyboard and the home indicator. */
   footer?: ReactNode;
+  /** While a save is in flight, neither the close button nor Android's back closes it. */
+  busy?: boolean;
   children?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -79,7 +82,7 @@ export function Sheet({
       visible={open}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={busy ? () => {} : onClose}
     >
       <View
         className="flex-1 bg-canvas"
@@ -109,6 +112,8 @@ export function Sheet({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close"
+              accessibilityState={{ disabled: busy }}
+              disabled={busy}
               onPress={onClose}
               hitSlop={8}
               className="size-11 items-center justify-center"
