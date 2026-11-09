@@ -124,7 +124,12 @@ const server = () => {
           entries: ledger.entries,
         }
       : { identity: null, commands: [], tables: [], visits: [], entries: [] };
-  return { push, history, refuse: (id: string) => refuse.add(id) };
+  return {
+    push,
+    history,
+    refuse: (id: string) => refuse.add(id),
+    allow: (id: string) => refuse.delete(id),
+  };
 };
 
 const transportFor = (remote: ReturnType<typeof server>): RecordingTransport => ({
@@ -320,6 +325,112 @@ describe("rejections", () => {
       store.transform((s) => recordRejectedAgain(s, cashOut.operationId)),
     ).rejects.toThrow("This visit has finished");
     expect(state(store).sync?.rejected).toHaveLength(2);
+  });
+
+  it("never refuses what the server accepted, and converges on the server's ledger", async () => {
+    const store = await open();
+    const remote = server();
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const visitId = state(store).visits[0]!.id;
+    await pushAll(store, remote);
+    // Another device signed in to the same account adds to the visit first.
+    const elsewhere = prepareRecordingCommand(state(store), {
+      type: "add",
+      visitId,
+      kind: "buy_in",
+      amount: 5000,
+      occurredAt: at(10),
+    });
+    remote.push({
+      identity: { playerId: state(store).self.id, actorId: state(store).actor.id },
+      commands: [elsewhere],
+    });
+    // This device's first rebuy now conflicts; its second expects the revision the server is at.
+    const first = await save(store, {
+      type: "add",
+      visitId,
+      kind: "buy_in",
+      amount: 10000,
+      occurredAt: at(11),
+    });
+    const second = await save(store, {
+      type: "add",
+      visitId,
+      kind: "cash_out",
+      amount: 7000,
+      occurredAt: at(12),
+    });
+    await pushAll(store, remote);
+    const afterPush = state(store);
+    expect(afterPush.sync?.rejected.map((item) => item.command.operationId)).toEqual([
+      first.command.operationId,
+    ]);
+
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    const merged = state(store);
+    const server_ = remote.history();
+    expect(merged.entries.map((entry) => entry.id).toSorted()).toEqual(
+      server_.entries.map((entry) => entry.id).toSorted(),
+    );
+    expect(merged.receipts.map((receipt) => receipt.command.operationId)).toContain(
+      second.command.operationId,
+    );
+    expect(pendingRecordingCommands(merged)).toEqual([]);
+    expect(merged.sync?.rejected.map((item) => item.command.operationId)).toEqual([
+      first.command.operationId,
+    ]);
+  });
+
+  it("drops a refusal once the server holds that operation", async () => {
+    const { store, remote, rebuy } = await rejectedSetup();
+    remote.allow(rebuy.operationId);
+    remote.push({
+      identity: { playerId: state(store).self.id, actorId: state(store).actor.id },
+      commands: [rebuy],
+    });
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    expect(state(store).sync?.rejected.map((item) => item.command.operationId)).not.toContain(
+      rebuy.operationId,
+    );
+  });
+
+  it("records a refused start again together with the play that depended on it", async () => {
+    const store = await open();
+    const remote = server();
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    const opened = await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const visitId = state(store).visits[0]!.id;
+    const buyIn = state(store).entries[0]!.id;
+    await save(store, { type: "add", visitId, kind: "buy_in", amount: 10000, occurredAt: at(11) });
+    await save(store, {
+      type: "correct",
+      visitId,
+      entryId: buyIn,
+      reason: "Typo",
+      replacement: { amount: 25000 },
+    });
+    await save(store, { type: "finish", visitId, amount: 40000, finishedAt: at(12) });
+    remote.refuse(opened.command.operationId);
+    await pushAll(store, remote);
+    expect(state(store).sync?.rejected).toHaveLength(4);
+    expect(state(store).visits).toEqual([]);
+
+    await store.transform((s) => recordRejectedAgain(s, opened.command.operationId));
+    const again = state(store);
+    expect(again.sync?.rejected).toEqual([]);
+    expect(pendingRecordingCommands(again).map((c) => c.type)).toEqual([
+      "start",
+      "add",
+      "correct",
+      "finish",
+    ]);
+    const summary = visitSummary(again.visits[0]!, again.entries);
+    expect(summary.totals).toEqual({ buyIn: 35000, cashOut: 40000, adjustment: 0 });
+    expect(summary.finalResult).toBe(5000);
+    await pushAll(store, remote);
+    expect(state(store).sync?.rejected).toEqual([]);
+    expect(remote.history().entries).toHaveLength(again.entries.length);
   });
 });
 

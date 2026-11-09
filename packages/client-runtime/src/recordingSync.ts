@@ -120,7 +120,10 @@ export const mergeRecordingHistory = (
       userId,
       synced: history.commands.map((command) => command.operationId),
       rejected: [
-        ...(state.sync?.rejected ?? []).map((item) => ({ ...item, command: own(item.command) })),
+        // A refusal the server now holds was settled elsewhere; the server's copy wins.
+        ...(state.sync?.rejected ?? [])
+          .filter((item) => !remote.has(item.command.operationId))
+          .map((item) => ({ ...item, command: own(item.command) })),
         ...reused,
         ...merged.failed,
       ],
@@ -128,7 +131,12 @@ export const mergeRecordingHistory = (
   };
 };
 
-/** Marks what the server accepted, and moves what it refused, with what depended on it, aside. */
+/**
+ * Marks what the server accepted, and moves what it refused, with what depended on it locally,
+ * aside. A command the server accepted is never refused here, even if it no longer applies on
+ * this device: another device changed the visit, so it leaves the ledger until the next pull
+ * brings the server's version back.
+ */
 export const applyPushResults = (
   state: RecordingState,
   results: ReadonlyArray<RecordingCommandResult>,
@@ -157,13 +165,18 @@ export const applyPushResults = (
       ? [{ command, reason: result.reason, message: result.message }]
       : [];
   });
+  const onServer = new Set(synced);
   const dropped = new Set(rebuilt.failed.map((item) => item.command.operationId));
   return {
     ...rebuilt.state,
     sync: {
       ...sync,
       synced: synced.filter((id) => !dropped.has(id)),
-      rejected: [...sync.rejected, ...rejected, ...rebuilt.failed],
+      rejected: [
+        ...sync.rejected,
+        ...rejected,
+        ...rebuilt.failed.filter((item) => !onServer.has(item.command.operationId)),
+      ],
     },
   };
 };
@@ -171,8 +184,12 @@ export const applyPushResults = (
 const optional = <K extends string, V>(key: K, value: V | null) =>
   (value === null ? {} : { [key]: value }) as { [P in K]?: V };
 
-/** What the person recorded, to record again against the ledger as it is now. */
-const inputOf = (command: RecordingCommand): RecordingInput => {
+/**
+ * What the person recorded, to record again against the ledger as it is now. `ids` maps the
+ * visit and entries of a start recorded again to their new IDs.
+ */
+const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): RecordingInput => {
+  const visitId = (ids.get(command.visitId) ?? command.visitId) as typeof command.visitId;
   switch (command.type) {
     case "start":
     case "record_completed": {
@@ -196,7 +213,7 @@ const inputOf = (command: RecordingCommand): RecordingInput => {
     case "add":
       return {
         type: "add",
-        visitId: command.visitId,
+        visitId,
         kind: command.kind,
         amount: command.amount,
         occurredAt: command.occurredAt,
@@ -205,15 +222,15 @@ const inputOf = (command: RecordingCommand): RecordingInput => {
     case "finish":
       return {
         type: "finish",
-        visitId: command.visitId,
+        visitId,
         amount: command.amount,
         finishedAt: command.finishedAt,
       };
     case "correct":
       return {
         type: "correct",
-        visitId: command.visitId,
-        entryId: command.entryId,
+        visitId,
+        entryId: (ids.get(command.entryId) ?? command.entryId) as typeof command.entryId,
         reason: command.reason,
         replacement: command.replacement && {
           amount: command.replacement.amount,
@@ -222,7 +239,7 @@ const inputOf = (command: RecordingCommand): RecordingInput => {
         },
       };
     case "reopen":
-      return { type: "reopen", visitId: command.visitId, reason: command.reason };
+      return { type: "reopen", visitId, reason: command.reason };
   }
 };
 
@@ -246,13 +263,42 @@ const withoutRejection = (state: RecordingState, operationId: RecordingOperation
 export const discardRejected = (state: RecordingState, operationId: RecordingOperationId) =>
   withoutRejection(state, operationId).state;
 
+/** The entries a command creates, in a stable order, so a recorded-again copy can be matched. */
+const createdEntries = (command: RecordingCommand) =>
+  command.type === "start"
+    ? [command.buyInId]
+    : command.type === "record_completed"
+      ? [command.buyInId, command.cashOutId]
+      : command.type === "add" || command.type === "finish"
+        ? [command.entryId]
+        : command.type === "correct" && command.replacement
+          ? [command.replacement.id]
+          : [];
+
 /**
- * Records a refused change again as a new command against the ledger as it is now. Throws the
- * rule it breaks, if it still breaks one, and keeps the refusal.
+ * Records a refused change again as a new command against the ledger as it is now. A refused
+ * start brings the refused play that depended on it along, moved to the new visit, so offline
+ * rebuys aren't lost. Throws the rule a change still breaks, and keeps every refusal.
  */
 export const recordRejectedAgain = (state: RecordingState, operationId: RecordingOperationId) => {
-  const { rejection, state: next } = withoutRejection(state, operationId);
-  return applyRecordingCommand(next, prepareRecordingCommand(next, inputOf(rejection.command)));
+  const { rejection } = withoutRejection(state, operationId);
+  const chain =
+    rejection.command.type === "start" || rejection.command.type === "record_completed"
+      ? state.sync!.rejected.filter(
+          (item) => item === rejection || item.command.visitId === rejection.command.visitId,
+        )
+      : [rejection];
+  const ids = new Map<string, string>();
+  let next = state;
+  for (const item of chain) {
+    next = withoutRejection(next, item.command.operationId).state;
+    const command = prepareRecordingCommand(next, inputOf(item.command, ids));
+    ids.set(item.command.visitId, command.visitId);
+    const before = createdEntries(item.command);
+    createdEntries(command).forEach((id, index) => ids.set(before[index]!, id));
+    next = applyRecordingCommand(next, command);
+  }
+  return next;
 };
 
 export type RecordingSyncStatus = {
@@ -287,12 +333,12 @@ export const makeRecordingSync = (
 
   const round = Effect.gen(function* () {
     setStatus({ phase: "syncing", error: null });
-    if (pull) {
-      const history = yield* transport.history;
-      yield* transform((state) => mergeRecordingHistory(state, userId, history));
-      pull = false;
-    }
     for (;;) {
+      if (pull) {
+        const history = yield* transport.history;
+        yield* transform((state) => mergeRecordingHistory(state, userId, history));
+        pull = false;
+      }
       const state = store.getSnapshot().state;
       if (!state) return yield* Effect.fail(new RecordingError("load", "Recording isn't loaded."));
       const commands = pendingRecordingCommands(state).slice(0, BATCH);
@@ -308,6 +354,8 @@ export const makeRecordingSync = (
           ),
         );
       yield* transform((current) => applyPushResults(current, response.results));
+      // A refusal can mean another device changed the visit: converge on the server's ledger.
+      if (response.results.some((result) => result.status === "rejected")) pull = true;
     }
     setStatus({ phase: "idle", error: null });
   });
