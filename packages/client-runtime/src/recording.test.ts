@@ -687,3 +687,67 @@ it("competing corrections leave exactly one replacement and a reviewable conflic
   await a.close();
   await b.close();
 });
+
+describe("correcting one entry", () => {
+  it("voids only the corrected buy-in and keeps the others live", async () => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(start(store));
+    const id = visitId(store);
+    await save(store, {
+      type: "add",
+      visitId: id,
+      kind: "buy_in",
+      amount: 5000,
+      occurredAt: at(11),
+    });
+    const [first, second] = store.getSnapshot().state!.entries;
+    await save(store, {
+      type: "correct",
+      visitId: id,
+      entryId: second!.id,
+      reason: "wrong amount",
+      replacement: { amount: 7000 },
+    });
+    for (const current of [store, (store = await reload(store, db))]) {
+      const { summary, entries } = current.review(id);
+      expect(summary.totals.buyIn).toBe(27000);
+      expect(entries.find((entry) => entry.id === first!.id)!.voidedAt).toBeNull();
+      expect(entries.find((entry) => entry.id === second!.id)!.voidedAt).not.toBeNull();
+      expect(entries.filter((entry) => entry.voidedAt === null)).toHaveLength(2);
+    }
+    await save(store, {
+      type: "correct",
+      visitId: id,
+      entryId: first!.id,
+      reason: "never bought in",
+      replacement: null,
+    });
+    expect(store.review(id).summary.totals.buyIn).toBe(7000);
+    await store.close();
+  });
+
+  it("rejects a replacement or finish outside the visit window before saving", async () => {
+    const db = memory();
+    const store = await open(db);
+    await store.execute(start(store));
+    const id = visitId(store);
+    const [buyIn] = store.getSnapshot().state!.entries;
+    const before = db.document;
+    await expect(
+      save(store, {
+        type: "correct",
+        visitId: id,
+        entryId: buyIn!.id,
+        reason: "wrong time",
+        replacement: { amount: 20000, occurredAt: at(9) },
+      }),
+    ).rejects.toThrow("Fact outside visit times.");
+    await expect(
+      save(store, { type: "finish", visitId: id, amount: 0, finishedAt: at(9) }),
+    ).rejects.toThrow("Schema validation failed");
+    expect(db.document).toEqual(before);
+    expect(store.review(id).entries).toHaveLength(1);
+    await store.close();
+  });
+});
