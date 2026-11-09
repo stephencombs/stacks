@@ -101,7 +101,7 @@ Players at very different stakes would flatten each other, so:
 
 ## Navigation: AppShell, ScopeButton, PlaceLink (web)
 
-Where content lives is decided in [docs/internals/navigation.md](../internals/navigation.md). On web, every signed-in page except an invite or claim link sits in `AppShell` (`features/Shell.tsx`), which draws it from two parts in `ui/Nav.tsx`:
+Where content lives is decided in [docs/internals/navigation.md](../internals/navigation.md). Your play and personal sessions sit in `PersonalFrame` (`features/Personal.tsx`): the wordmark, Groups and You, with no places and nothing read from an account. Their main actions go in its `Dock`, pinned above the home indicator on a phone and in the page's flow from `sm` up, and their save state is `SaveStatus`, which only ever says "Saved on this device" after the device has it. On web, every group and trip page except an invite or claim link sits in `AppShell` (`features/Shell.tsx`), which draws it from two parts in `ui/Nav.tsx`:
 
 - **`ScopeButton`** says where you are: the trip in scope, its group small above it, and a chevron. It's a real button, outlined like a secondary one, and opens the scope sheet (trips, New trip, the group, your other groups). A group with no trips shows its name alone.
 - **`PlaceLink`** is one of the four places, Sessions, Board, Settle up and Group, with a lucide icon. `layout="bar"` stacks icon over label in the bottom bar; `layout="side"` is a sidebar row. The current place is gold. A group with no trips offers only Group.

@@ -58,6 +58,11 @@ const accountCopy = {
   body: "Create an account, or sign in if you already have one. Color Up never moves money.",
 };
 
+const invitedCopy = {
+  title: "You've been invited to a group.",
+  body: "Sign in or create an account to see who invited you and join their ledger.",
+};
+
 const tripLabel =
   "An example trip card: up $275 after three sessions and two nights, first on the board.";
 
@@ -101,8 +106,19 @@ function StepBody({ children }: { children: string }) {
   );
 }
 
-/** Signed-out onboarding. One step fills the frame, then the account screen. Nothing scrolls. */
-export function Landing() {
+/**
+ * Signed-out onboarding. One step fills the frame, then the account screen. Nothing scrolls. An
+ * invitation opens straight on the account screen.
+ */
+export function Landing({
+  invited = false,
+  onRecord,
+}: {
+  invited?: boolean;
+  /** Leaves for your own play, which needs no account. */
+  onRecord?: () => void;
+}) {
+  const copy = invited ? invitedCopy : accountCopy;
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const frame = Math.min(width, FRAME);
@@ -110,9 +126,9 @@ export function Landing() {
   const [translateX] = useState(() => new Animated.Value(0));
   const indexRef = useRef(0);
   const dragging = useRef(false);
-  const accountRef = useRef(false);
+  const accountRef = useRef(invited);
   const [index, setIndex] = useState(0);
-  const [account, setAccount] = useState(false);
+  const [account, setAccount] = useState(invited);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [bodyHeight, setBodyHeight] = useState(0);
   const [pageHeight, setPageHeight] = useState(0);
@@ -187,7 +203,7 @@ export function Landing() {
     setAccount(true);
     shift(-frame);
     if (Platform.OS !== "web") void Haptics.selectionAsync();
-    AccessibilityInfo.announceForAccessibility(accountCopy.title);
+    AccessibilityInfo.announceForAccessibility(copy.title);
   };
 
   const show = (next: number) => {
@@ -364,18 +380,27 @@ export function Landing() {
                 </View>
                 <View
                   style={{ width: frame, height: bodyHeight }}
-                  accessibilityLabel={accountCopy.title}
+                  accessibilityLabel={copy.title}
                   accessibilityElementsHidden={!account}
                   importantForAccessibility={account ? "auto" : "no-hide-descendants"}
                   pointerEvents={account ? "auto" : "none"}
                 >
                   <View className="flex-1 justify-end gap-3 px-6 pb-2">
-                    <DisplayTitle compact={compact}>{accountCopy.title}</DisplayTitle>
-                    <StepBody>{accountCopy.body}</StepBody>
+                    <DisplayTitle compact={compact}>{copy.title}</DisplayTitle>
+                    <StepBody>{copy.body}</StepBody>
                   </View>
                   <View className="gap-3 px-6" style={{ paddingBottom: insets.bottom + 16 }}>
                     <SignInButton mode="sign-up" label="Create an account" variant="primary" />
                     <SignInButton mode="sign-in" label="Sign in" variant="secondary" />
+                    {onRecord ? (
+                      <Button
+                        label="Record without an account"
+                        variant="ghost"
+                        size="lg"
+                        className="w-full"
+                        onPress={onRecord}
+                      />
+                    ) : null}
                   </View>
                 </View>
               </Animated.View>

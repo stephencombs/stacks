@@ -1,9 +1,12 @@
-import { ClerkProvider } from "@clerk/react";
+import { RecordingProvider } from "@stacks/client-runtime/recordingReact";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./index.css";
+import "./lib/offlineShell";
+import { AccountProvider } from "./lib/account";
+import { recordingStore } from "./lib/recording";
 import { captureCaughtError } from "./lib/telemetry";
 import { markNavigation } from "./features/PageSkeletons";
 import { routeTree } from "./routeTree.gen";
@@ -25,29 +28,10 @@ createRoot(document.getElementById("root")!, {
   },
 }).render(
   <StrictMode>
-    <ClerkProvider
-      publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
-      afterSignOutUrl="/"
-      appearance={{
-        // The palette's variables switch with the theme, so Clerk follows it too.
-        variables: {
-          colorPrimary: "var(--color-accent)",
-          colorPrimaryForeground: "var(--color-accent-ink)",
-          colorBackground: "var(--color-surface)",
-          colorForeground: "var(--color-ink)",
-          colorMutedForeground: "var(--color-muted)",
-          colorNeutral: "var(--color-ink)",
-          colorInput: "var(--color-surface)",
-          colorInputForeground: "var(--color-ink)",
-          colorDanger: "var(--color-danger)",
-          borderRadius: "0.625rem",
-          fontFamily: "ui-sans-serif, system-ui, sans-serif",
-        },
-        // Padding grows the avatar's hit area to 44px without changing how it looks.
-        elements: { userButtonTrigger: "-m-2 p-2" },
-      }}
-    >
-      <RouterProvider router={router} />
-    </ClerkProvider>
+    <RecordingProvider store={recordingStore}>
+      <AccountProvider>
+        <RouterProvider router={router} />
+      </AccountProvider>
+    </RecordingProvider>
   </StrictMode>,
 );

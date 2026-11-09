@@ -75,7 +75,7 @@ function LeaveSheet({ detail, onClose }: { detail: GroupDetail; onClose: () => v
   const confirm = async () => {
     if (await leave.run({ params: { groupId: detail.group.id } })) {
       onClose();
-      navigation.navigate("Groups");
+      navigation.navigate("Account", { screen: "Groups" });
     }
   };
   return (

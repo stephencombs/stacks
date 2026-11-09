@@ -1,189 +1,143 @@
-# Stacks: plan
+# Color Up product scope
 
-Stacks is a casino-session ledger for groups of friends. Members log buy-ins and cash-outs during a session. The app works out each person's result and keeps a running tally of who owes whom when someone covers another person's buy-in or collects their chips. It ships as a web app and a native iOS/Android app on one shared core, and the repo is laid out like [T3Code](https://github.com/pingdotgg/t3code).
+Color Up records casino play for an individual player first. A player can start a session without signing in, choosing a Trip or joining a Group. Shared tables, Trips and Groups organize that same play and financial history.
 
-## Product scope
+This baseline was agreed in the product interview on 6 November 2026. It describes the target behavior. The existing implementation still uses a Group- and Trip-bound ledger and must migrate without losing history.
 
-### v1: what we build
+## Recording and reviewing play
 
-- **Accounts.** Sign in with Clerk (email, Google, Apple) on web and mobile.
-- **Groups.** A group is one shared ledger with a fixed currency. You can create one, invite people with a link or code, and give members the owner, admin or member role. Members can leave, and admins can remove them.
-- **Guest players.** Anyone can add a friend who hasn't signed up as a guest, with just a name. Guests play, owe and are owed like anyone else. Each guest gets a claim link; when they sign up through it, their history becomes theirs.
-- **Sessions.** A session is one trip or sitting: a venue (a casino, or online), a game, a start and end time, and the people who played. A session is either _live_ or _closed_. An admin can reopen a closed session, so closing isn't permanent.
-- **Entries.** An entry is a buy-in, a rebuy, a cash-out or an adjustment for one player. Each entry also records whose money paid for it (a buy-in) or who received it (a cash-out). That's how debts appear without anyone typing them in.
-- **Balances and settle up.** Each member gets a net balance. "Settle up" shows the fewest payments that clear every balance, and a payment, once recorded, becomes a settlement entry.
-- **Venues.** Everyone picks from one shared catalog of casinos and online casinos, so "Bellagio" means the same place in every group. You can add a casino that's missing, and it's usable right away. Home games are the exception: "Mike's garage" stays private to the group that added it.
-- **History and stats.** Results over time for you and for the group, broken down by game, venue and member, with session counts and hours played.
-- **Live session mode on mobile.** A screen you can use one-handed at the table: big buttons for "Rebuy $X" and "Cash out", haptic feedback, and the screen stays awake.
-- **Responsible-play basics.** Optional personal loss limits and session-length reminders. Stats always show losses plainly, not just wins.
-- **Export.** CSV export for each group.
-- **Data ownership.** Never cap history or put access to a member's own data behind a paywall.
+A personal session is one player's visit to one table: buy in, play with any rebuys, then finish. Moving tables or returning after finishing starts another personal session, even at the same venue and game. Carrying $450 between tables records $450 out of the first and $450 into the second.
 
-### Not in v1 (on purpose)
+A shared table view brings players' personal sessions together. If a player finishes, leaves and returns while friends continue, their return is a new session in their history. Their friends keep recording uninterrupted in the same shared view. There is no table-number field.
 
-- Moving real money. Settlements are records only. Moving money would make the app a payment processor, with licensing and app store consequences.
-- Sports betting, DFS, and bets between people.
-- Pooled or staked play, where several people split one buy-in by share. This is the most likely v2 feature, and the entry model below leaves room for it.
-- Multiple currencies inside one group.
-- Poker tournament details. A tournament is logged like any other session: the entry fee is a buy-in and any prize is a cash-out. Finishing place, field size and re-entries can come later.
-- Offline writes. Reads are cached, and writes need a connection. The IDs are generated on the client, so we can add an offline queue later without changing the schema.
+Starting your own live session requires only an initial buy-in. Start time defaults to now. Game and venue can be added immediately or later. Seat tracking and high-limit tracking are optional. USD is the only currency initially.
 
-### How debts arise
+Partial cash-outs do not end play. Recording a cash-out offers "Keep playing" or "Finish playing." Finishing ends that player's participation, while other players may continue. A zero cash-out records finishing with nothing returned. Mistaken completion must be reversible without treating a genuine return visit as the same session.
 
-| Event                                                  | Recorded as                                   | Debt effect                          |
-| ------------------------------------------------------ | --------------------------------------------- | ------------------------------------ |
-| Bea covers Alex's $100 buy-in                          | `buy_in` 100, player Alex, counterparty Bea   | Alex owes Bea $100                   |
-| Alex cashes out $300 and Bea holds the cash            | `cash_out` 300, player Alex, counterparty Bea | Bea owes Alex $300                   |
-| Alex pays Bea back $100                                | `settlement` 100, from Alex, to Bea           | Alex's debt to Bea goes down by $100 |
-| An entry with no counterparty (the player's own money) | —                                             | Affects results only                 |
+During play, show total in and total out with final win/loss pending. After finishing, the result is cash-outs plus result adjustments minus buy-ins. Do not present an initial buy-in as a finalized loss. Do not track chip inventories, chip-count snapshots or cash-versus-chips holdings; entries record dollar amounts.
 
-A player's session result is the sum of their cash-outs and adjustments minus the sum of their buy-ins. That number is separate from debts: you can win at the table and still owe a friend.
+Support recording live and adding completed sessions afterward. A completed session can use total buy-ins and cash-outs without reconstructing every rebuy.
 
-## Architecture
+Recording works offline. Buy-ins, cash-outs and corrections save on the device immediately, survive relaunch, and show their sync state. Shared changes sync when connectivity returns. Server rejections remain visible and recoverable rather than silently discarding recorded activity.
 
-This follows T3Code: Effect end to end, typed contracts shared over the wire, and client logic shared between web and mobile. T3Code is built around a local server; Stacks swaps that for a cloud API shaped like T3Code's `infra/relay` (Cloudflare Worker, Postgres, Clerk, deployed with alchemy).
+The personal home screen prioritizes recording and review. During play, the active session and its recording actions come first. Between sessions, "Start session" comes first, followed by recent sessions and personal results. Balances, Trips and Groups remain easy to reach and secondary.
 
-```
-apps/
-  api/        Cloudflare Worker: Effect HttpApi, Clerk JWT auth, Postgres
-  web/        React 19 + Vite + TanStack Router + Tailwind v4 + Base UI
-  mobile/     Expo + React Navigation native-stack + Uniwind + Clerk Expo
-packages/
-  contracts/       Effect Schema domain types and the RpcGroup definitions. No runtime logic.
-  shared/          Pure logic with subpath exports: money, results, balances, settle-up, time
-  client-runtime/  Typed API client (AtomHttpApi), auth token wiring, atoms, optimistic mutations (web + mobile)
-docs/
-  internals/  Decisions and constraints only (T3Code's doc rules)
-```
+History supports breakdowns over time, by game, venue, high-limit status and blackjack seat. Seat changes stay within a session and retain their history. Only sessions played entirely in one known seat contribute to that seat's result comparisons. Sessions with changes appear as "Multiple seats"; do not assign their whole result to the longest-held seat.
 
-### Request flow
+## Players, accounts and guests
 
-1. A client calls an endpoint of the `StacksApi` defined in `@stacks/contracts` (Effect `HttpApi`, as T3Code's relay does), using `@stacks/client-runtime` and sending a Clerk session token.
-2. In `apps/api`, the handler decodes the input and calls **one service method**. It then maps errors. Transports stay thin.
-3. The service checks group membership and role, then writes in a single transaction. Ledger rows are only ever inserted: an edit voids the old entry and inserts a new one, so the audit trail stays complete.
-4. Reads come back as projections the client can use directly: group summary, session detail, balances. Balances and results are computed with the same `@stacks/shared` functions the client uses, so optimistic UI and the server always agree.
+A player has a persistent identity independent of accounts, Groups and Trips. A display name is a label, not proof of identity. In later sessions, explicitly choose a saved player or create a different person. Never combine players merely because their names match.
 
-### Key decisions
+Recording sessions, sharing a table directly and joining as a guest do not require sign-in. Guests can access their own player record through a personal invite and contribute only their own data. An ordinary invitation must not let someone impersonate another player at the table.
 
-- **Money is stored as integer minor units** (`bigint` in the database, a branded `Money` schema in contracts). Never floats. The group's currency sets the formatting.
-- **Client-generated UUIDv7 IDs** on every create. This makes mutations idempotent: retrying is safe, optimistic rows reconcile by ID, and an offline queue can be added later.
-- **The database is plain relational with an append-only ledger. No event sourcing.** T3Code needs event sourcing for agent orchestration. A ledger only needs immutable entries plus voids.
-- **Realtime is phase 2.** Run one Durable Object per group that pushes "invalidate" messages over a WebSocket. Until then, clients refetch on focus and after their own mutations. This is plenty for v1.
-- **The API is the only writer.** The server enforces permissions, and clients only hide controls they can't use (T3Code's `permissionAtom` pattern).
+Signing up preserves the existing identity and history and adds account backup and sync. Claiming history does not copy financial entries into a second history. Separately created guest identities stay separate until ownership of both is verified and they are explicitly linked.
 
-## Data model (Postgres)
+Creating a Group or shared Trip requires an account so it has a recoverable owner. Private Trips can remain on the device without an account. An appointed recorder must have an account; the person who starts recording does not need one.
 
-```
-users            id (clerk user id), display_name, avatar_url, created_at
-groups           id, name, currency (ISO 4217), created_by, created_at, archived_at
-memberships      group_id, user_id, role (owner|admin|member), joined_at, left_at
-invites          id, group_id, code, created_by, expires_at, max_uses, uses, revoked_at
-venues           id, name, kind (casino|online|home), city, region, country (ISO 3166),
-                 lat, lng, source (osm|curated|user), source_ref, verified_at,
-                 merged_into_id, group_id (set only for home venues), created_by, created_at
-sessions         id, group_id, venue_id, game (slots|blackjack|roulette|craps|baccarat|
-                 poker_cash|poker_tourney|other), status (live|closed),
-                 started_at, ended_at, notes, created_by, closed_by, reopened_at
-players          id, group_id, display_name, user_id (null for a guest), claim_code,
-                 claimed_at, created_by, created_at
-session_players  session_id, player_id, joined_at
-entries          id, group_id, session_id (null for settlements), kind
-                 (buy_in|cash_out|adjustment|settlement), player_id, counterparty_id
-                 (both players.id),
-                 amount_minor (bigint, > 0), occurred_at, note,
-                 created_by, created_at, voided_at, voided_by, void_reason,
-                 replaces_entry_id
-user_limits      user_id, loss_limit_minor, period (day|week|month), session_reminder_min
-```
+## Sharing and permissions
 
-Rules (enforced in the service, with the shape enforced by DB constraints too):
+Shared table participants can see the whole table's entries and results. Ordinary participants can record and correct only their own play. The person who started the table recording can record and correct for everyone, including after guests join.
 
-- A session can't close while any player has buy-ins and no cash-out. They can cash out $0 to record a bust.
-- The creator of an entry, its player, or a group admin can void it. Voided entries stay visible in the session history, struck through.
-- Buy-ins and cash-outs are positive. An adjustment is a signed, non-zero correction to one player's result and never has a counterparty. A counterparty is always someone other than the player; the player's own money has no counterparty.
-- A settlement's `player_id` is the payer and its `counterparty_id` is the payee. Both must be players in the group.
-- Every ledger reference points at `players`, never at `users`. A member's player row is created when they join, and claiming a guest just sets `user_id` on the guest's row, so no history has to move. Someone who joins and then claims a guest ends up with the guest's row; their empty auto-created row is removed.
-- Casino and online venues have no `group_id` and belong to the shared catalog. A home venue always has a `group_id`, and only that group can see or pick it.
-- A venue a user adds is usable everywhere at once and shows as unverified until we review it. Duplicates get merged: the duplicate's `merged_into_id` points at the venue that stays, and the duplicate's sessions are moved to it. Moving a session's venue is not a ledger change, so it doesn't need a void.
-- The catalog only names places. Stats for a venue are always computed inside one group; nothing shows how other groups did at a venue.
-- Someone who leaves a group keeps their history and balances. They can't leave while their balance isn't zero (admins can override this).
+The starter can appoint account-holding players to record and correct for everyone and can revoke that permission. Appointed recorders do not gain authority to share the table or to record unrelated payments between other people. Only the starter controls table sharing. A player leaving and returning does not transfer that authority.
 
-## Shared logic (`packages/shared`)
+Adding a table to a shared Trip or Group exposes its whole-table entries and results to members. It does not expose unrelated sessions, debts or personal history. Sharing grants visibility; permissions to record for other players remain separately assigned.
 
-These are pure functions with thorough unit tests, and they're the first code written:
+Removing a shared table revokes access for people whose only access came through that collection. Direct participants and people with another valid access path retain access. Visibility changes preserve the underlying records and financial obligations. Moving covered play out of a backed Trip is a financial correction, described below.
 
-- `money`: parse, format and add amounts in a currency, with no float math anywhere.
-- `results`: each player's result for a session, each member's result over a range, and breakdowns by game and venue.
-- `balances`: net balance per member, built from non-voided entries.
-- `settleUp`: transfers that clear those balances. Debtors and creditors are paired from largest to smallest, so n players never need more than n − 1 transfers. Finding the true minimum is NP-hard and not worth it for a friend group. Property tests check that every transfer list zeroes every balance.
+The API enforces permissions. Hiding a client control is not authorization. Global player identities must not become a way to discover private sessions or balances.
 
-## Clients
+## Financial records and balances
 
-### Screens (on both web and mobile)
+Results describe play. Balances describe what one player owes another. Covering another player's buy-in, receiving their cash-out and recording a repayment all work without a Trip or Group.
 
-1. **Groups:** your groups, each with your balance in it, and a banner for any live session.
-2. **Group home:** the live session card, member balances, recent sessions, and a "Settle up" button.
-3. **Session:** players, each one's buy-ins and cash-outs and running result, the entry timeline (with voids shown), and close or reopen.
-4. **New session:** pick a venue (your group's recent venues first, then nearby ones if you allow location, then search across the catalog, with "Add a venue" when nothing matches), a game and the players.
-5. **Live mode (mobile):** fast entry with preset amounts, plus "who paid?" and "who's holding?" pickers that default to the player themself.
-6. **Settle up:** the suggested transfers, with "Mark paid" to record each one.
-7. **Stats:** results over time, and breakdowns by game, venue and member.
-8. **Settings:** profile, limits, reminders, invite management, export.
+Examples:
 
-### Web (`apps/web`)
+- Bea covers Alex's $100 buy-in: Alex owes Bea $100.
+- Bea receives Alex's $300 cash-out: Bea owes Alex $300.
+- Alex repays Bea $50: their running balance changes by $50.
+- A player's own buy-in or cash-out changes their result without creating a counterparty debt.
 
-- Vite, React 19, TanStack Router (file routes), and Tailwind v4 with OKLCH tokens.
-- Base UI primitives wrapped in `components/ui` that own their look (the T3Code rule: pick a variant, don't restyle with `className`). New components are copied from shadcn/ui's Base UI versions (coss ui if shadcn lacks one) and adapted to our tokens; no `shadcn init`.
-- `@clerk/react` for auth, and `@effect/atom-react` for the atoms from client-runtime.
-- Deploy to Vercel (as T3Code does) or Cloudflare Pages.
+Entries affect balances immediately without requiring counterparty confirmation. Either person involved can record, correct or void a repayment. Partial repayments are supported. Both can see the original record, corrections and who made them.
 
-### Mobile (`apps/mobile`)
+Ledger entries are the financial source of truth. Balances are derived from non-voided records, not manually maintained balance fields on players, Trips or Groups. Preserve who owes whom. A zero overall net must not erase distinct obligations to different people or automatically reroute them through unrelated players.
 
-- Expo with a dev client, React Navigation native-stack (T3Code doesn't use expo-router), and Uniwind so mobile shares Tailwind tokens with web.
-- `@clerk/expo` with `expo-secure-store` for tokens, plus `expo-haptics`, `expo-keep-awake`, `expo-location` (only when the venue picker asks for nearby places) and `@legendapp/list` for the long entry lists.
-- EAS builds with three profiles: `development`, `preview` and `production`, all driven by `APP_VARIANT` the way T3Code's `app.config.ts` does it.
-- Later: a home screen widget and an iOS Live Activity for a live session.
+All money uses integer minor units. Corrections void the original entry and add a replacement; history remains visible. Store each financial fact once, even if several collections display it. A payment recorded from a Trip screen is still one payment between its players.
 
-## Tooling (copied from T3Code)
+Trip and Group reports derive from the underlying activity and its provenance. They cannot be reconstructed from a player's final global net. Repayments update the running player-to-player balance without automatic allocation to a Trip.
 
-- pnpm workspace with a dependency `catalog:` so every package uses the same versions. Take T3Code's current catalog as the starting point (Effect 4, React 19, Tailwind 4, Clerk).
-- `vite-plus` (`vp`) for dev, build, test (Vitest), lint (oxlint) and format. `@tsc-rs/typescript` for fast typechecking, and `knip` to catch unused code and dependencies.
-- Root scripts: `dev`, `dev:web`, `dev:api`, `typecheck`, `lint`, `fmt`, `test`, and `check:changed`.
-- `AGENTS.md`/`CLAUDE.md` adapted from T3Code's: glossary (group, session, entry, settlement, balance, result), "hit every surface" (web + mobile + API + contracts), taste rules, and test rules (`it.effect` with `TestClock`, no sleeps).
-- GitHub Actions: lint, typecheck and test on every PR; the mobile bundle only when its inputs change. Each push to `main` migrates and deploys the development environment through wrangler; production gets its own deploy once it exists. Pushes to `main` also run the Playwright suites, and they run nightly too. EAS preview builds stay manual. No per-PR preview stages while there is one deployed database.
-- A local dev database: Postgres in Docker (or a Neon branch), plain SQL migrations run by Effect's `PgMigrator` (no Drizzle: one schema language, and no release-candidate ORM to pin), and a seed script that builds a realistic group of 4 people, 30 sessions and some settlements. The venue catalog has its own import script (see phase 2). An empty database is a bad test.
+For example, Alex owes $100 from Vegas and $50 from another session, then repays $80. The running balance is $70 owed. Vegas still reports $100 of debt generated by its activity, clearly distinguished from an amount still outstanding. Access to a collection does not reveal the players' unrelated overall balances.
 
-## Delivery phases
+## Trips and Groups
 
-| Phase       | Deliverable                                                                                                                                                               | Done when                                                                          |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| 0. Scaffold | Monorepo, catalog, vp config, tsconfig base, CI, AGENTS.md, empty apps that boot                                                                                          | `pnpm dev` runs web, api and Expo. CI is green                                     |
-| 1. Core     | `contracts` schemas and `shared` ledger logic                                                                                                                             | Unit and property tests cover money, results, balances and settle-up               |
-| 2. API      | DB schema and migrations, Clerk auth, services and endpoints for groups, invites, venues, sessions, entries and settlements, the venue catalog import, plus a seed script | Integration tests run against a real Postgres. The preview stage deploys           |
-| 3. Web      | client-runtime and every v1 screen on the web                                                                                                                             | A full flow works on web: create a group, invite someone, run a session, settle up |
-| 4. Mobile   | The same screens on Expo, plus live mode                                                                                                                                  | The same flow works on iOS and Android dev clients. EAS preview build exists       |
-| 5. Polish   | Stats, limits and reminders, CSV export, empty and error states, `emil-prep-for-prod` pass                                                                                | Ready for TestFlight and a Play internal track                                     |
-| 6. Next     | Realtime with a Durable Object, offline write queue, pooled play, widgets and Live Activity                                                                               | —                                                                                  |
+A Trip is an optional collection of play. It can be private or shared and does not require a Group. A Group is a reusable roster with shared tables and optional Trips. Neither creates another player identity or independent debt ledger.
 
-Phase 3 status: every v1 screen works on the web, and a Playwright test runs the full loop against the real Clerk development instance. Entries refresh after each write rather than updating optimistically; live mode on mobile (phase 4) is where instant updates matter most.
+A shared table belongs to zero or one Trip. Trip membership applies to the table as a unit, including all players' recorded visits and separate return visits. Personal sessions inherit that association; they do not have conflicting independent Trip assignments. Personal history still shows each visit separately.
 
-Phase 2 status: the API, schema, auth, catalog import and seed are built and tested against Postgres. Deploying (alchemy, Cloudflare, Hyperdrive and a hosted Postgres) waits for accounts and keys. `user_limits` arrives with limits in phase 5.
+A Group may show a table directly or through its Trip. Both refer to the same records and must not double-count play or money. Ordinary collection changes preserve the sessions, entries and underlying balances; collection totals reflect the changed membership.
 
-## Seats and the table map
+## Whole-Trip backing
 
-Decided after prototyping the map with a scripted night and settling on the felt table.
+Backing is an agreement for one player to fund another player's play for a Trip. It covers all of the backed player's sessions in that Trip. Coverage cannot select individual sessions or start or end partway through the Trip.
 
-- **What's tracked.** Blackjack only for now, at tables of 5, 6 or 7 seats (5 unless someone picks another under the map), numbered from the dealer's left: seat 1 is first base, the last seat third base. `tableSizes` in `packages/shared/seats` lists the games with seats; poker, baccarat and slots machines can join it later. A table can only shrink once nobody's in the seats it would lose.
-- **Data.** `seatings` rows are never edited: a move is a new row, standing up is a row with no seat, and a session's latest row per player is where they sit now. Anyone in the group can seat people while the session is live; one player per seat, enforced under a lock on the session. Seat changes go straight to the API (the outbox still only queues entries).
-- **Stats.** A player's session counts for the seat they held longest (`mainSeats`), so moving for luck doesn't rewrite where the session was played. Group stats show results by blackjack seat.
-- **The map.** Each table size is pre-rendered in Blender (Cycles) along the same camera path, overhead to the rail, by `tools/table-art`; chips are rendered every 6°, with where each touches the felt. A rail layer is drawn over the chips at the low angles, where the rail hides part of them. Web draws it on a canvas; the phone stacks every other frame and blends them with native-driver `Animated`, so no image ever changes source mid-move.
-- **The camera follows the session.** An empty table is seen arriving at the rail; once someone sits it rests at a player's-eye view. Sitting down and buying in don't move it: chips drop onto the seat and the stack. A cash-out pushes in on the seat while the stack racks back and the result flips up; a bust sweeps the stack to the dealer; three times the buy-in or more is a big hit, with a crane up and a light sweep. Closing goes overhead with everyone's result. The camera waits while a sheet is open, a newer change interrupts the current shot, and Reduce Motion cuts instead of moving. `makeDirector` in `packages/client-runtime/table` plays this for both apps.
-- **Chips in play** are stacked in casino denominations ($5, $25, $100, $500, $1,000): the biggest chip that still makes a stack of three, at most ten chips.
+The backer funds all covered play. Mixed player-and-backer funding is outside this baseline. The backer bears losses up to the amount funded; the player does not owe replacement money out of pocket for lost backing.
 
-## Risks and open questions
+Choose the profit split per agreement and keep it fixed for the Trip. Additional funding is allowed, with each amount recorded under the same agreement. It increases the backer's amount at risk without changing the split.
 
-- **App store review.** Apple and Google allow tracking apps that don't involve real-money wagering, but expect a 17+ age rating, and the listing copy must not suggest the app takes bets. Don't link out to casinos or sportsbooks.
-- **Data sensitivity.** Gambling records are personal. Members see only their own groups, and every query is scoped by membership. Add account deletion (the App Store requires it): delete the profile and anonymize the user's ledger rows, so other members' balances still add up.
-- **Disputed entries.** v1 lets the creator, the player or an admin void an entry. If that turns out to be too loose, add a "player must confirm entries made for them" setting.
-- **Seeding the venue catalog.** Import land-based casinos from OpenStreetMap (`amenity=casino`), and hand-curate a short list of online casinos. OSM data is under the ODbL, which requires credit to OpenStreetMap and makes the catalog itself share-alike if we ever publish it. That's fine for an in-app list, but the app needs an attribution line. Re-running the import updates venues by `source_ref` and never deletes one that sessions use.
-- **Moderation.** User-added venues show up for everyone, so names need a length limit and basic filtering. Reviewing, verifying and merging venues needs a small admin tool; until it exists, a script can do it.
+Return remaining funded money to the backer and divide net profit according to the agreement. With $500 funded and a 50/50 split, a $200 profit gives the backer $600 and the player $100. A $200 loss returns $300 to the backer, who absorbs the loss. The split in this example is illustrative.
+
+The Trip defines which play contributes. The underlying session entries determine the playing results; the agreement determines the allocation. Funding and repayments are not winnings. Amounts owed under the agreement belong to the player ledger, with no duplicate capital or payout debt in a separate Trip ledger.
+
+Moving a table out of a backed Trip changes financial coverage. Treat it as an explicit financial correction, with history and recalculated amounts visible to both players. A visibility-only change preserves the agreement and amounts owed. Coverage corrections preserve the original play and payment records.
+
+## Existing supporting scope
+
+Keep the venue catalog, optional personal loss limits and session-length reminders, export and access to a player's own history. Adapt their ownership and visibility to the player model. Stats show losses plainly. History and access to personal records are never capped or paywalled.
+
+Color Up records payments; it never moves money. Sports betting, DFS, bets between people, multiple currencies, mixed backing funds and pooled multi-backer play are outside this baseline. Tournament-specific finishing positions and field sizes remain later work; an entry fee and prize can be recorded as buy-in and cash-out.
+
+## Architecture constraints
+
+Keep the existing monorepo and shared core:
+
+- `packages/contracts` defines wire schemas and the Effect `HttpApi`.
+- `packages/shared` owns pure money, results, balances and backing calculations.
+- `packages/client-runtime` owns shared client state, persistence and synchronization behavior.
+- `apps/api` owns authoritative shared writes and permission checks in thin handlers and feature services.
+- `apps/web` uses React, TanStack Router, Tailwind and the existing component system.
+- `apps/mobile` uses Expo, React Navigation native-stack and Uniwind. Do not migrate it to Expo Router.
+
+Local recording must work before an account or network is available. Synchronization sends pending operations to the API, which validates access before accepting authoritative shared changes. Stable client-generated IDs make retries idempotent. Persistence failures and rejected writes must be visible.
+
+Keep the relational database and immutable ledger with voids and replacements. Do not introduce a general event-sourcing framework. Separate identity, financial provenance, collection membership and access. New schema details belong in contracts and migrations once their implementation is settled.
+
+Migration preserves existing IDs, monetary amounts, void/replacement history, claimed identities and access boundaries. Do not infer that two guests are the same person from their names. Do not convert existing recorded payments into duplicates or lose counterparty relationships. Old closed records may not contain enough information to reconstruct historical partial finishes or separate visits; preserve provenance rather than inventing facts.
+
+Keep historical table/player participation distinct from native visits when the old data cannot establish visit boundaries. Existing net-based settle-up may have routed payments through third parties. Preserve those payment facts and use a read-only preflight to identify histories needing reconciliation before the global financial cutover. Do not invent debt reassignment or balancing payments. Legacy windowed or overlapping stakes likewise remain explicitly legacy until reconciled.
+
+## Delivery sequence
+
+### 1. Model and migration foundations
+
+Reconcile contracts, pure ledger calculations and database relationships with the baseline. Establish the distinction between a player visit and a shared table, independent player identity, optional collections and player-to-player repayments. Specify and test how existing data migrates before changing production storage.
+
+### 2. Independent recording and review
+
+Implement the real signed-out solo flow on web and mobile using shared client-runtime behavior. Starting, rebuying, partial cash-outs, finishing, corrections and reviewing history work offline and survive relaunch.
+
+The first milestone is $200 in, a $100 rebuy, $100 out while continuing, then a final $250 out. Review shows $300 in, $350 out and a finalized $50 gain. No account, Trip or Group is needed. Before finishing, final win/loss remains pending.
+
+### 3. Shared tables and player relationships
+
+Add direct sharing, dependable guest identity, own-data contribution, starter and recorder permissions, returning players, repayments and account claims. Test authorization from the server side, including access revocation and unrelated private activity.
+
+### 4. Optional collections
+
+Adapt Trips and Groups to organize the same records, with table-level Trip membership and reports derived from accessible activity. Verify that overlapping display paths do not double-count records and membership changes do not silently change player obligations.
+
+### 5. Whole-Trip backing
+
+Adapt agreements, funding additions, profit splits, loss allocation and coverage corrections to the player ledger. Test outcomes and corrections without double-counting funding, playing results or repayments.
+
+### 6. Verification and release readiness
+
+Run the scoped formatting, lint, unused-code, type and test checks required by `AGENTS.md`. Money calculations need unit and property tests; API behavior and migrations need a real seeded Postgres database. Verify the complete recording loop in the actual web and mobile apps, including offline persistence, sync failures, guest permissions, corrections and review. Use the existing authenticated end-to-end flow where it still applies.

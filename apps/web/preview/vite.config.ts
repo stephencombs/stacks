@@ -15,6 +15,8 @@ export default defineConfig({
       { find: "~", replacement: web + "src" },
     ],
   },
+  // The stub stands in for Clerk, so the app treats sign-in as configured.
+  define: { "import.meta.env.VITE_CLERK_PUBLISHABLE_KEY": JSON.stringify("pk_preview") },
   // PREVIEW_PORT lets two worktrees preview at once.
   server: { port: Number(process.env.PREVIEW_PORT ?? 5199), strictPort: true },
 });

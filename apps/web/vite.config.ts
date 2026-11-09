@@ -4,11 +4,17 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import * as NodeURL from "node:url";
 import { defineConfig } from "vite-plus";
+import { offlineAppShell } from "./offline/build";
 
 const apiOrigin = process.env.STACKS_API_ORIGIN ?? "http://localhost:8787";
 
 export default defineConfig({
-  plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), tailwindcss()],
+  plugins: [
+    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    react(),
+    tailwindcss(),
+    offlineAppShell(),
+  ],
   resolve: {
     alias: { "~": NodeURL.fileURLToPath(new URL("./src", import.meta.url)) },
   },

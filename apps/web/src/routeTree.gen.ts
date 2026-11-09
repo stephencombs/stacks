@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClaimCodeRouteImport } from './routes/claim/$code'
 import { Route as GroupsIndexRouteImport } from './routes/groups/index'
 import { Route as JoinCodeRouteImport } from './routes/join/$code'
+import { Route as PlayVisitIdRouteImport } from './routes/play/$visitId'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions/$sessionId'
 import { Route as GroupsGroupIdIndexRouteImport } from './routes/groups/$groupId/index'
 import { Route as GroupsGroupIdPeopleRouteImport } from './routes/groups/$groupId/people'
@@ -43,6 +44,11 @@ const GroupsIndexRoute = GroupsIndexRouteImport.update({
 const JoinCodeRoute = JoinCodeRouteImport.update({
   id: '/join/$code',
   path: '/join/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayVisitIdRoute = PlayVisitIdRouteImport.update({
+  id: '/play/$visitId',
+  path: '/play/$visitId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/claim/$code': typeof ClaimCodeRoute
   '/join/$code': typeof JoinCodeRoute
+  '/play/$visitId': typeof PlayVisitIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/groups/': typeof GroupsIndexRoute
   '/groups/$groupId/people': typeof GroupsGroupIdPeopleRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/claim/$code': typeof ClaimCodeRoute
   '/join/$code': typeof JoinCodeRoute
+  '/play/$visitId': typeof PlayVisitIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/groups': typeof GroupsIndexRoute
   '/groups/$groupId/people': typeof GroupsGroupIdPeopleRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/claim/$code': typeof ClaimCodeRoute
   '/join/$code': typeof JoinCodeRoute
+  '/play/$visitId': typeof PlayVisitIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/groups/': typeof GroupsIndexRoute
   '/groups/$groupId/people': typeof GroupsGroupIdPeopleRoute
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/'
     | '/claim/$code'
     | '/join/$code'
+    | '/play/$visitId'
     | '/sessions/$sessionId'
     | '/groups/'
     | '/groups/$groupId/people'
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/'
     | '/claim/$code'
     | '/join/$code'
+    | '/play/$visitId'
     | '/sessions/$sessionId'
     | '/groups'
     | '/groups/$groupId/people'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/'
     | '/claim/$code'
     | '/join/$code'
+    | '/play/$visitId'
     | '/sessions/$sessionId'
     | '/groups/'
     | '/groups/$groupId/people'
@@ -211,6 +223,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClaimCodeRoute: typeof ClaimCodeRoute
   JoinCodeRoute: typeof JoinCodeRoute
+  PlayVisitIdRoute: typeof PlayVisitIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   GroupsIndexRoute: typeof GroupsIndexRoute
   GroupsGroupIdPeopleRoute: typeof GroupsGroupIdPeopleRoute
@@ -253,6 +266,13 @@ declare module '@tanstack/react-router' {
       path: '/join/$code'
       fullPath: '/join/$code'
       preLoaderRoute: typeof JoinCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/play/$visitId': {
+      id: '/play/$visitId'
+      path: '/play/$visitId'
+      fullPath: '/play/$visitId'
+      preLoaderRoute: typeof PlayVisitIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sessions/$sessionId': {
@@ -339,6 +359,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClaimCodeRoute: ClaimCodeRoute,
   JoinCodeRoute: JoinCodeRoute,
+  PlayVisitIdRoute: PlayVisitIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   GroupsIndexRoute: GroupsIndexRoute,
   GroupsGroupIdPeopleRoute: GroupsGroupIdPeopleRoute,

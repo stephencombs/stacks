@@ -83,6 +83,14 @@
     "./recording": {
       "types": "./src/recording.ts",
       "import": "./src/recording.ts"
+    },
+    "./recordingView": {
+      "types": "./src/recordingView.ts",
+      "import": "./src/recordingView.ts"
+    },
+    "./recordingReact": {
+      "types": "./src/recordingReact.tsx",
+      "import": "./src/recordingReact.tsx"
     }
   },
   "scripts": {

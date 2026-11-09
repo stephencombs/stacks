@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "web": "expo start --web",
     "test:e2e": "expo export --platform web --output-dir dist-web && playwright test",
+    "test:solo": "playwright test --config solo/playwright.config.ts",
     "ios:device": "expo run:ios --device"
   },
   "dependencies": {
