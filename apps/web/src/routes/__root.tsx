@@ -1,6 +1,6 @@
 import { ClerkFailed } from "@clerk/react";
 import { themeChoices } from "@stacks/client-runtime/theme";
-import { Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
+import { Outlet, createRootRoute, useLocation, useRouterState } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -23,7 +23,11 @@ const invitation = /^\/(join|claim)\//;
 const personal = (pathname: string) => pathname === "/" || pathname.startsWith("/play/");
 
 function Root() {
-  const { pathname } = useLocation();
+  // Decide from the page being drawn, not the address: while a navigation is pending the router
+  // still renders the previous page, which needs the providers it had.
+  const pathname = useRouterState({
+    select: (state) => state.matches.at(-1)?.pathname ?? state.location.pathname,
+  });
   // Your play keeps this same element signed in or out, so sign-in never remounts it.
   return <SignedInProvider>{personal(pathname) ? <Outlet /> : <Accounts />}</SignedInProvider>;
 }
