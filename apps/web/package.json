@@ -10,7 +10,8 @@
     "preview": "vp preview",
     "test": "vp test run --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:recording-storage": "playwright test --config recording-storage/playwright.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

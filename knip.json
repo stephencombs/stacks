@@ -9,7 +9,6 @@
         "preview/boot.ts",
         "preview/vite.config.ts",
         "preview/clerk-stub.tsx",
-        "recording-storage/playwright.config.ts",
         "recording-storage/vite.config.ts",
         "offline/worker.js",
         "offline/playwright.config.ts"
