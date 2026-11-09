@@ -124,22 +124,15 @@ test("corrects, voids and fixes an accidental finish, and the audit survives rel
   await dock(page, "Fix accidental finish").click();
   await dialog(page).getByRole("button", { name: "Reopen session" }).click();
   await expect(dialog(page).getByText("Say what happened.")).toBeVisible();
-  await expect(dialog(page).getByText("Your $0 final cash-out stays recorded.")).toBeVisible();
+  await expect(
+    dialog(page).getByText("Your $0 final cash-out will be voided, since you never cashed out."),
+  ).toBeVisible();
   await dialog(page).getByLabel("What happened").fill("Tapped finish by mistake");
   await dialog(page).getByRole("button", { name: "Reopen session" }).click();
   await expect(dialog(page)).toBeHidden();
   await expectLive(page, "$200", "$0");
-  await expect(page.getByText("Reopened after an accidental finish.")).toBeVisible();
   await expect(page.getByText("Reopened: Tapped finish by mistake")).toBeVisible();
   await expect(page.getByText("Finished playing")).toBeVisible();
-
-  await page.getByRole("button", { name: "Review cash-out" }).click();
-  await expect(dialog(page).getByRole("heading", { name: "Final cash-out" })).toBeVisible();
-  await dialog(page).getByRole("button", { name: "Void entry" }).click();
-  await dialog(page).getByLabel("Why").fill("Still playing");
-  await dialog(page).getByRole("button", { name: "Void entry" }).click();
-  await expect(dialog(page)).toBeHidden();
-  await expect(page.getByText("Reopened after an accidental finish.")).toBeHidden();
 
   await page.getByRole("button", { name: /^Buy-in, \$200/ }).click();
   await dialog(page).getByRole("button", { name: "Correct amount" }).click();

@@ -584,7 +584,7 @@ export function ReopenDialog({
       {visit.finalCashOut ? (
         <Note>
           Your <Money amount={visit.finalCashOut.amount} currency={RECORDING_CURRENCY} /> final
-          cash-out stays recorded. Correct or void it afterwards if it didn't happen.
+          cash-out will be voided, since you never cashed out.
         </Note>
       ) : null}
     </RecordingDialog>

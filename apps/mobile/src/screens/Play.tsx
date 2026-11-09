@@ -203,19 +203,6 @@ function Visit({ visitId }: { visitId: VisitId }) {
           />
         </View>
       ) : null}
-      {live && visit.finalCashOut && visit.events.at(-1)?.type === "reopened" ? (
-        <Surface className="gap-3 p-4">
-          <Text className="text-sm text-muted">
-            Reopened after an accidental finish. Your {money(visit.finalCashOut.amount)} final
-            cash-out still counts. Correct or void it if it didn't happen.
-          </Text>
-          <Button
-            label="Review cash-out"
-            className="self-start"
-            onPress={() => setOpen({ type: "inspect", entryId: visit.finalCashOut!.id })}
-          />
-        </Surface>
-      ) : null}
       <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
       {open?.type === "rebuy" ? (
         <RebuySheet visit={visit} onClose={close} onSaved={recorded} />

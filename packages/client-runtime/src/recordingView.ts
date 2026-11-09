@@ -80,7 +80,7 @@ export type RecordingVisitView = RecordedVisit & {
   readonly replacedBy: ReadonlyMap<EntryId, EntryId>;
   /** Cash-outs saved by a finish, and their corrections, voided or not. */
   readonly finishCashOuts: ReadonlySet<EntryId>;
-  /** The cash-out saved with the latest finish, while it still counts. */
+  /** The cash-out saved with the latest finish, until a correction or reopen voids it. */
   readonly finalCashOut: PlayEntry | null;
   /** Buy-in amounts to offer, most likely first. */
   readonly presets: ReadonlyArray<number>;

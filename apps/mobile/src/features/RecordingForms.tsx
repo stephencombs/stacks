@@ -694,7 +694,7 @@ export function ReopenSheet({
             currency={RECORDING_CURRENCY}
             className="type-footnote text-muted"
           />{" "}
-          final cash-out stays recorded. Correct or void it afterwards if it didn't happen.
+          final cash-out will be voided, since you never cashed out.
         </Text>
       ) : null}
     </RecordingSheet>

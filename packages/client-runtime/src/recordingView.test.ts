@@ -90,20 +90,22 @@ describe("recordingHome", () => {
 });
 
 describe("recordingVisit", () => {
-  it("keeps the final cash-out and the finish audit through an accidental-finish reopen", async () => {
+  it("voids the final cash-out and keeps the finish audit through an accidental-finish reopen", async () => {
     const { store } = await open();
     await save(store, { type: "start", buyIn: 20000, startedAt: at(9) });
     const visitId = state(store).visits[0]!.id;
     await save(store, { type: "finish", visitId, amount: 25000, finishedAt: at(11) });
     const finished = recordingVisit(state(store), visitId)!;
     expect(finished.finalResult).toBe(5000);
-    expect(finished.finalCashOut?.amount).toBe(25000);
+    const finalCashOutId = finished.finalCashOut!.id;
 
     await save(store, { type: "reopen", visitId, reason: "Still playing" });
     const reopened = recordingVisit(state(store), visitId)!;
     expect(reopened.finalResult).toBeNull();
-    expect(reopened.totals.cashOut).toBe(25000);
-    expect(reopened.finalCashOut?.amount).toBe(25000);
+    expect(reopened.totals.cashOut).toBe(0);
+    expect(reopened.finalCashOut).toBeNull();
+    expect(reopened.finishCashOuts.has(finalCashOutId)).toBe(true);
+    expect(reopened.entries).toHaveLength(2);
     expect(reopened.events).toEqual([
       { type: "finished", at: at(11) },
       {
@@ -113,19 +115,6 @@ describe("recordingVisit", () => {
         finishedAt: at(11),
       },
     ]);
-
-    await save(store, {
-      type: "correct",
-      visitId,
-      entryId: reopened.finalCashOut!.id,
-      reason: "Never cashed out",
-      replacement: null,
-    });
-    const corrected = recordingVisit(state(store), visitId)!;
-    expect(corrected.finalCashOut).toBeNull();
-    expect(corrected.finishCashOuts.has(reopened.finalCashOut!.id)).toBe(true);
-    expect(corrected.entries).toHaveLength(2);
-    expect(corrected.totals.cashOut).toBe(0);
   });
 
   it("links a corrected entry to its replacement and offers its amounts again", async () => {

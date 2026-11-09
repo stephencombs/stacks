@@ -167,23 +167,15 @@ test("corrects, voids and fixes an accidental finish, and the audit survives rel
   await button(page, "Fix accidental finish").click();
   await button(sheet(page), "Reopen session").click();
   await expect(text(sheet(page), "Say what happened.")).toBeVisible();
-  await expect(text(sheet(page), /^Your \$0 final cash-out stays recorded\./)).toBeVisible();
+  await expect(
+    text(sheet(page), /^Your \$0 final cash-out will be voided, since you never cashed out\./),
+  ).toBeVisible();
   await sheet(page).getByLabel("What happened").fill("Tapped finish by mistake");
   await button(sheet(page), "Reopen session").click();
   await expect(sheet(page)).toHaveCount(0);
   await expectLive(page, "$200", "$0");
-  await expect(text(page, /^Reopened after an accidental finish\./)).toBeVisible();
   await expect(text(page, "Reopened: Tapped finish by mistake")).toBeVisible();
   await expect(text(page, "Finished playing")).toBeVisible();
-
-  await button(page, "Review cash-out").click();
-  await expect(visible(sheet(page).getByRole("heading", { name: "Final cash-out" }))).toBeVisible();
-  await button(sheet(page), "Void entry").click();
-  await sheet(page).getByLabel("Why").fill("Still playing");
-  await button(sheet(page), "Void entry").click();
-  await expect(sheet(page)).toHaveCount(0);
-  await expect(text(page, "Entry voided. It stays in the history.")).toBeVisible();
-  await expect(text(page, /^Reopened after an accidental finish\./)).toHaveCount(0);
 
   await button(page, /^Buy-in, \$200/).click();
   await button(sheet(page), "Correct amount").click();
