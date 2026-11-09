@@ -158,6 +158,10 @@ describe("parseRecordingAmount", () => {
     ["12.345", 0, "Use whole cents, like 12.50."],
     ["99999999999999999999", 0, "That amount is too large."],
     ["abc", 0, "Enter an amount like $200."],
+    ["1e3", 0, "Enter an amount like $200."],
+    ["12abc", 0, "Enter an amount like $200."],
+    ["1 2", 0, "Enter an amount like $200."],
+    ["1.5k", 0, "Enter an amount like $200."],
   ] as const)("rejects %j", (text, minimum, error) => {
     expect(parseRecordingAmount(text, minimum)).toEqual({ error });
   });

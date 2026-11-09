@@ -151,6 +151,13 @@ export const parseRecordingAmount = (
 ): { readonly amount: MinorUnits; readonly error: null } | { readonly error: string } => {
   const trimmed = text.trim();
   if (trimmed === "") return { error: "Enter an amount." };
+  // parseMoney drops characters it doesn't know, so "1e3" would read as 13.
+  const known = new Set(`-${money(-123456789)}${decimalSeparator()}`.replace(/\d/g, ""));
+  if (
+    [...trimmed].some((char) => !/[\d\s]/.test(char) && !known.has(char)) ||
+    /\d\s+\d/.test(trimmed)
+  )
+    return { error: `Enter an amount like ${money(20000)}.` };
   const parsed = Option.getOrNull(parseMoney(trimmed, RECORDING_CURRENCY));
   if (parsed === null) {
     const decimal = escape(decimalSeparator());

@@ -25,13 +25,14 @@ function worker(source = renderAppShell(entries)) {
   const stored = new Map<string, Map<string, Response>>();
   const fetch = vi.fn(async (request: Request) => {
     const path = new URL(request.url).pathname;
-    const mime = path.endsWith(".html")
-      ? "text/html"
-      : path.endsWith(".js")
-        ? "text/javascript"
-        : path.endsWith(".css")
-          ? "text/css"
-          : "font/woff2";
+    const mime =
+      path === "/" || path.endsWith(".html")
+        ? "text/html"
+        : path.endsWith(".js")
+          ? "text/javascript"
+          : path.endsWith(".css")
+            ? "text/css"
+            : "font/woff2";
     return new Response(path, { headers: { "content-type": mime } });
   });
   const caches = {
@@ -114,9 +115,8 @@ it("installs anonymously, serves only admitted static requests, and never stores
     expect(request.integrity).toMatch(/^sha256-/);
   }
   shell.fetch.mockClear();
-  expect(await (await shell.request("/play/new-route", { mode: "navigate" }))?.text()).toBe(
-    "/index.html",
-  );
+  // The shell is fetched from "/", the path hosts serve index.html at without a redirect.
+  expect(await (await shell.request("/play/new-route", { mode: "navigate" }))?.text()).toBe("/");
   expect(await (await shell.request("/assets/new-route-hash.js"))?.text()).toBe(
     "/assets/new-route-hash.js",
   );

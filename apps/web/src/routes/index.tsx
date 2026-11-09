@@ -31,8 +31,11 @@ function Home() {
     focus.restore();
   };
   const [showAll, setShowAll] = useState(false);
-  const open = (visitId: VisitId) =>
+  // Close first, so the dialog can't submit again while the route changes.
+  const open = (visitId: VisitId) => {
+    setDialog(null);
     void navigate({ to: "/play/$visitId", params: { visitId } }).then(focusMain);
+  };
   const playing = (home?.active.length ?? 0) > 0;
   return (
     <PersonalFrame onClickCapture={focus.capture}>

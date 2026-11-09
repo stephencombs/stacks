@@ -10,8 +10,10 @@ self.addEventListener("install", (event) => {
       const cache = await caches.open(shell.cacheName);
       try {
         for (const path of shell.assets) {
+          // Workers static assets redirect /index.html to /, so the shell is fetched from /.
+          const source = path === "/index.html" ? "/" : path;
           const response = await fetch(
-            new Request(new URL(path, self.location.origin), {
+            new Request(new URL(source, self.location.origin), {
               cache: "reload",
               credentials: "omit",
               redirect: "error",

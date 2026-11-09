@@ -98,3 +98,25 @@ test("a first-ever offline visit has no shell available", async ({ browser, base
     await context.close();
   }
 });
+
+// Workers static assets answer /index.html with a redirect to /, so install must not ask for it.
+test("the shell installs when the host redirects /index.html to /", async ({ page, context }) => {
+  await context.route("**/index.html", (route) =>
+    route.fulfill({ status: 307, headers: { location: "/" } }),
+  );
+  const installationFailure = page
+    .waitForEvent("console", {
+      predicate: (message) =>
+        message.text().includes("offline app shell. Reopening offline may fail."),
+    })
+    .then((message) => {
+      throw new Error(message.text());
+    });
+  await page.goto("/");
+  await Promise.race([page.evaluate(() => navigator.serviceWorker.ready), installationFailure]);
+  const cached = await page.evaluate(async () => {
+    const name = (await caches.keys()).find((key) => key.startsWith("color-up-shell-"))!;
+    return (await (await caches.open(name)).keys()).map((entry) => new URL(entry.url).pathname);
+  });
+  expect(cached).toContain("/index.html");
+});
