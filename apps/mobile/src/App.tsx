@@ -30,7 +30,7 @@ import { useAppFonts } from "./lib/fonts";
 import { getInitialURL } from "./lib/initialUrl";
 import { recordingStore } from "./lib/recording";
 import { ScopeProvider, useScopeHasTrip } from "./lib/scope";
-import { Prefetch, StacksProvider, useLastTrip, useStacks } from "./lib/stacks";
+import { Prefetch, SignedInProvider, StacksProvider, useLastTrip, useStacks } from "./lib/stacks";
 import "./lib/theme";
 import { BoardScreen } from "./screens/Board";
 import { HomeScreen } from "./screens/Home";
@@ -229,13 +229,16 @@ const linking = {
 
 function Root() {
   const theme = useNavigationTheme();
+  // The navigation keeps this same place signed in or out, so sign-in never resets it.
   return (
-    <Navigation
-      linking={linking}
-      theme={theme}
-      fallback={<Opening />}
-      onReady={() => markStartup("navigation_ready")}
-    />
+    <SignedInProvider>
+      <Navigation
+        linking={linking}
+        theme={theme}
+        fallback={<Opening />}
+        onReady={() => markStartup("navigation_ready")}
+      />
+    </SignedInProvider>
   );
 }
 
@@ -251,7 +254,7 @@ function AccountGate({ state, children }: { state: NavigationState; children: Re
   if (!account.isSignedIn || !account.userId)
     return <SignedOut invited={route === "Join" || route === "Claim"} />;
   return (
-    <StacksProvider key={account.userId} userId={account.userId}>
+    <StacksProvider key={account.userId}>
       <ScopeProvider>{children}</ScopeProvider>
     </StacksProvider>
   );

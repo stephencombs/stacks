@@ -11,7 +11,7 @@ import { Note } from "~/components/ui/Page";
 import { Landing } from "~/features/Landing";
 import { AppShell, Wordmark, You } from "~/features/Shell";
 import { useAccount } from "~/lib/account";
-import { StacksProvider } from "~/lib/stacks";
+import { SignedInProvider, StacksProvider } from "~/lib/stacks";
 import { setTheme, useTheme } from "~/lib/theme";
 
 export const Route = createRootRoute({ component: Root });
@@ -24,8 +24,8 @@ const personal = (pathname: string) => pathname === "/" || pathname.startsWith("
 
 function Root() {
   const { pathname } = useLocation();
-  if (personal(pathname)) return <Outlet />;
-  return <Accounts />;
+  // Your play keeps this same element signed in or out, so sign-in never remounts it.
+  return <SignedInProvider>{personal(pathname) ? <Outlet /> : <Accounts />}</SignedInProvider>;
 }
 
 /** Groups, trips and their sessions belong to an account, so they need one signed in. */
@@ -36,7 +36,7 @@ function Accounts() {
   if (!account.isLoaded) return <Loading />;
   if (!account.isSignedIn || !account.userId) return <SignedOut />;
   return (
-    <StacksProvider key={account.userId} userId={account.userId}>
+    <StacksProvider key={account.userId}>
       {invitation.test(pathname) ? (
         <Frame tools={<You layout="bar" />}>
           <main className="flex w-full flex-1 flex-col gap-8 pt-2 pb-16 lg:mx-auto lg:max-w-2xl">

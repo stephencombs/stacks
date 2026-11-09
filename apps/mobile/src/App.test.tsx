@@ -1,5 +1,8 @@
 // @vitest-environment happy-dom
-import { act, createElement, type ComponentType, type ReactNode } from "react";
+import { makeOutbox } from "@stacks/client-runtime/outbox";
+import { EntryId, MinorUnits, PlayerId, SessionId } from "@stacks/contracts";
+import * as DateTime from "effect/DateTime";
+import { act, createElement, useEffect, type ComponentType, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
@@ -23,9 +26,10 @@ const SIGNED_IN = { isLoaded: true, isSignedIn: true, userId: "user-1" };
 /** The app with its native edges stubbed: Clerk, navigation, storage and the screens themselves. */
 async function load({
   key = "test",
-  auth = SIGNED_OUT,
+  auth: initialAuth = SIGNED_OUT,
   metrics = null,
 }: { key?: string; auth?: Auth; metrics?: Metrics } = {}) {
+  let auth = initialAuth;
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const Container = ({ children }: { children?: ReactNode }) =>
@@ -37,6 +41,8 @@ async function load({
     Dimensions: { get: () => window },
     useWindowDimensions: () => window,
     StyleSheet: { create: (styles: object) => styles },
+    AppState: { addEventListener: () => ({ remove: () => {} }) },
+    Platform: { OS: "ios" },
   }));
   vi.doMock("react-native-safe-area-context/lib/module/NativeSafeAreaProvider", () => ({
     NativeSafeAreaProvider: Container,
@@ -52,12 +58,29 @@ async function load({
     ClerkProvider: ({ children }: { children: ReactNode }) =>
       createElement("div", { "data-clerk": "mounted" }, children),
     useAuth: () => auth,
+    getClerkInstance: () => ({ session: { getToken: async () => "token" } }),
   }));
   vi.doMock("@clerk/expo/token-cache", () => ({ tokenCache: {} }));
   vi.doMock("expo", () => ({ reloadAppAsync: vi.fn() }));
   const markStartup = vi.fn();
   vi.doMock("./lib/diagnostics", () => ({ markStartup, reportStartupError: vi.fn() }));
-  vi.doMock("./lib/config", () => ({ clerkPublishableKey: key }));
+  vi.doMock("./lib/config", () => ({ clerkPublishableKey: key, apiUrl: "http://api.test" }));
+  vi.doMock("./lib/telemetry", () => ({ captureTestEvent: vi.fn() }));
+  vi.doMock("expo-haptics", () => ({
+    notificationAsync: vi.fn(),
+    NotificationFeedbackType: { Error: "error" },
+  }));
+  // The browser run's storage: the outbox in localStorage, as on web.
+  vi.doMock("./lib/outbox", () => ({
+    outboxStorage: (userId: string) => ({
+      load: () => localStorage.getItem(`stacks-outbox-${userId}`),
+      save: (value: string) => localStorage.setItem(`stacks-outbox-${userId}`, value),
+    }),
+    wakeOutbox: () => () => {},
+  }));
+  vi.doMock("./lib/tripStorage", () => ({
+    lastTripStorage: () => ({ load: () => null, save: () => {} }),
+  }));
   vi.doMock("./lib/theme", () => ({}));
   vi.doMock("./lib/fonts", () => ({ useAppFonts: () => {} }));
   // Real recording hooks over a store whose storage never opens, as on a slow first launch.
@@ -91,6 +114,7 @@ async function load({
     onReady: () => void;
   };
   const navigation = vi.fn((_props: NavigationProps) => null as ReactNode);
+  let navigationMounts = 0;
   vi.doMock("@react-navigation/native", () => ({
     DarkTheme: { colors: {}, fonts: {} },
     DefaultTheme: { colors: {}, fonts: {} },
@@ -100,6 +124,7 @@ async function load({
     createStaticNavigation: ({ config }: { config: StackConfig }) =>
       function Navigation(props: NavigationProps) {
         navigation(props);
+        useEffect(() => void navigationMounts++, []);
         const { top, right, bottom, left } = useSafeAreaInsets();
         const first = config.screens[config.initialRouteName]!.screen as ComponentType;
         return createElement(
@@ -129,15 +154,10 @@ async function load({
     Landing: ({ invited }: { invited: boolean }) =>
       createElement("section", null, invited ? "Sign in to join" : "Sign in"),
   }));
-  vi.doMock("./lib/stacks", () => ({
-    StacksProvider: ({ userId, children }: { userId: string; children: ReactNode }) =>
-      createElement("div", { "data-user": userId }, children),
-    Prefetch: Container,
-    useLastTrip: vi.fn(),
-    useStacks: vi.fn(),
-  }));
   for (const [module, names] of Object.entries({
+    "./components/ui/Field": ["FormError"],
     "./components/ui/Screen": ["TabBarHeight"],
+    "./components/ui/Surface": ["Skeleton"],
     "./features/Personal": ["PersonalNav"],
     "./features/Scope": ["ScopeButton"],
     "./features/You": ["YouButton"],
@@ -158,13 +178,22 @@ async function load({
 
   const { default: App } = await import("./App");
   const { AccountProvider } = await import("./lib/account");
+  const { SignedInProvider } = await import("./lib/stacks");
+  const view = { root: null as ReturnType<typeof createRoot> | null, element: null as ReactNode };
   const render = async (element: ReactNode) => {
     const host = document.createElement("div");
     const root = createRoot(host);
     await act(async () => root.render(element));
     roots.push(root);
+    Object.assign(view, { root, element });
     return host;
   };
+  /** Sign-in changing under the last render, as Clerk finishing or signing someone in would. */
+  const authChanges = (next: Auth) =>
+    act(async () => {
+      auth = next;
+      view.root!.render(view.element);
+    });
   const root = stacks.find((stack) => "Home" in stack.screens)!;
   const account = stacks.find((stack) => "Places" in stack.screens)!;
   /** The account area's gate with `route` in front, inside the app's sign-in. */
@@ -174,20 +203,81 @@ async function load({
         AccountProvider,
         null,
         createElement(
-          account.layout!,
-          { state: { index: 0, routes: [{ name: route }] } },
-          "Places",
+          SignedInProvider,
+          null,
+          createElement(
+            account.layout!,
+            { state: { index: 0, routes: [{ name: route }] } },
+            "Places",
+          ),
         ),
       ),
     );
-  return { App, render, gate, root, account, navigation, markStartup, dispatch };
+  return {
+    App,
+    render,
+    authChanges,
+    gate,
+    root,
+    account,
+    navigation,
+    navigationMounts: () => navigationMounts,
+    markStartup,
+    dispatch,
+  };
 }
 
 const roots: ReturnType<typeof createRoot>[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) act(() => root.unmount());
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+  localStorage.clear();
 });
+
+/** A buy-in logged on a group session with no signal, still waiting in user-1's outbox. */
+function queueBuyIn() {
+  const sessionId = SessionId.make("0192e7a0-0000-7000-8000-000000000001");
+  const outbox = makeOutbox(
+    {
+      load: () => localStorage.getItem("stacks-outbox-user-1"),
+      save: (value) => localStorage.setItem("stacks-outbox-user-1", value),
+    },
+    async () => ({ error: new Error("fetch failed") }),
+  );
+  void outbox.add(sessionId, {
+    id: EntryId.make("0192e7a0-0000-7000-8000-000000000003"),
+    kind: "buy_in",
+    playerId: PlayerId.make("0192e7a0-0000-7000-8000-000000000002"),
+    counterpartyId: null,
+    amount: MinorUnits.make(50000),
+    occurredAt: DateTime.makeUnsafe(Date.UTC(2026, 9, 24, 2)),
+    note: null,
+    replacesEntryId: null,
+  });
+  return `/api/sessions/${sessionId}/entries`;
+}
+
+/** No signal: every request fails, and each attempt is announced as it happens. */
+function offline() {
+  const sent: string[] = [];
+  let announce = () => {};
+  const attempt = () =>
+    new Promise<void>((resolve) => {
+      announce = resolve;
+    });
+  let next = attempt();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      sent.push(new URL(input instanceof Request ? input.url : input).pathname);
+      announce();
+      next = attempt();
+      throw new TypeError("Network request failed");
+    }),
+  );
+  return { sent, attempted: () => next };
+}
 
 it.each([
   { label: "while sign-in loads", key: "test", auth: { isLoaded: false } },
@@ -274,6 +364,37 @@ it("explains groups need sign-in when this build has none", async () => {
 it("opens account screens for whoever is signed in", async () => {
   const app = await load({ auth: SIGNED_IN });
   const host = await app.gate();
-  expect(host.querySelector("[data-user]")?.getAttribute("data-user")).toBe("user-1");
   expect(host.textContent).toBe("Places");
+});
+
+it("keeps your play and its navigation in place when sign-in finishes", async () => {
+  const app = await load({ auth: { isLoaded: false } });
+  const network = offline();
+  const host = await app.render(createElement(app.App));
+  const page = host.querySelector("main");
+  expect(page?.textContent).toBe("Your play: loading");
+
+  await app.authChanges(SIGNED_IN);
+  expect(host.querySelector("main")).toBe(page);
+  expect(app.navigationMounts()).toBe(1);
+  // Nothing was waiting to send, so being signed in on your play asks nothing of the API.
+  expect(network.sent).toEqual([]);
+});
+
+it("keeps retrying a signed-in buy-in that's waiting for signal while you're on your play", async () => {
+  const entries = queueBuyIn();
+  const app = await load({ auth: SIGNED_IN });
+  const network = offline();
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+
+  const first = network.attempted();
+  const host = await app.render(createElement(app.App));
+  expect(host.textContent).toBe("Your play: loading");
+  await act(() => first);
+  expect(network.sent).toEqual([entries]);
+
+  const second = network.attempted();
+  await act(async () => vi.advanceTimersByTime(15_000));
+  await act(() => second);
+  expect(network.sent).toEqual([entries, entries]);
 });
