@@ -399,6 +399,15 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       yield* alex.sessions.reopen({ params: { sessionId } });
       yield* alex.ledger.voidEntry({ params: { entryId: fixed.id }, payload: { reason: "Again" } });
       const late = yield* settle(alex, group.tripId, alexId, beaId, 100);
+      // An open session blocks the import until it closes again.
+      const open = yield* Effect.flip(
+        LegacyMigration.importLegacy({ scope: scope(group.group.id), dryRun: false }),
+      );
+      expect(open).toMatchObject({ _tag: "LegacyBlocked", issues: [{ kind: "live_session" }] });
+      yield* alex.sessions.close({
+        params: { sessionId },
+        payload: { endedAt: DateTime.makeUnsafe("2099-01-01T00:00:00Z") },
+      });
       expect(
         yield* LegacyMigration.importLegacy({ scope: scope(group.group.id), dryRun: false }),
       ).toEqual({ ...nothingNew, visits: 4, entries: 1, repayments: 1 });
@@ -448,7 +457,9 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       `;
       const before = yield* importedRows;
       const report = yield* LegacyMigration.preflight(scope(group.group.id));
-      expect(report.blocking).toEqual([]);
+      expect(report.blocking.map((issue) => [issue.kind, issue.subjectId])).toEqual([
+        ["live_session", sessionId],
+      ]);
       const flagged = report.reconcile.map((issue) => [issue.kind, issue.subjectId]);
       expect(flagged).toEqual(
         expect.arrayContaining([
@@ -464,7 +475,7 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       expect(flagged.filter(([, id]) => id === ended.id)).toHaveLength(1);
       expect(yield* importedRows).toEqual(before);
 
-      // Blockers: a non-USD group, and a correction that replaces a live entry.
+      // A non-USD group is left out, live session and all; a broken correction blocks.
       const yen = ids.group();
       yield* alex.groups.create({
         payload: { id: yen, name: "Tokyo", currency: CurrencyCode.make("JPY"), displayName: "A" },
@@ -488,6 +499,9 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       const blocked = yield* LegacyMigration.preflight([group.group.id, yen]);
       expect(blocked.blocking.map((issue) => [issue.kind, issue.subjectId])).toEqual([
         ["broken_correction", broken],
+        ["live_session", sessionId],
+      ]);
+      expect(blocked.excluded.map((issue) => [issue.kind, issue.subjectId])).toEqual([
         ["non_usd_group", yen],
       ]);
       const refused = yield* Effect.flip(
@@ -495,6 +509,47 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       );
       expect(refused._tag).toBe("LegacyBlocked");
       expect(yield* importedRows).toEqual(before);
+    }),
+  );
+
+  it.effect("leaves non-USD groups on the legacy ledger", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { alex } = yield* users("alex");
+      const usdGroup = yield* groupWith(alex);
+      const yen = ids.group();
+      yield* alex.groups.create({
+        payload: { id: yen, name: "Tokyo", currency: CurrencyCode.make("JPY"), displayName: "A" },
+      });
+      const tokyo = yield* alex.trips.create({
+        params: { groupId: yen },
+        payload: { id: ids.trip(), name: "Tokyo" },
+      });
+      const tokyoGroup = yield* alex.groups.get({ params: { groupId: yen } });
+      for (const [tripId, playerId] of [
+        [usdGroup.tripId, usdGroup.myPlayerId],
+        [tokyo.id, tokyoGroup.myPlayerId],
+      ] as const) {
+        const sessionId = yield* startSession(alex, tripId, [playerId]);
+        yield* entry(alex, sessionId, "buy_in", playerId, 10000);
+        yield* entry(alex, sessionId, "cash_out", playerId, 5000);
+        yield* alex.sessions.close({ params: { sessionId }, payload: {} });
+      }
+
+      const report = yield* LegacyMigration.preflight([usdGroup.group.id, yen]);
+      expect(report.blocking).toEqual([]);
+      expect(report.excluded.map((issue) => [issue.kind, issue.subjectId])).toEqual([
+        ["non_usd_group", yen],
+      ]);
+      expect(
+        yield* LegacyMigration.importLegacy({ scope: [usdGroup.group.id, yen], dryRun: false }),
+      ).toEqual({ dryRun: false, identities: 1, visits: 1, entries: 2, repayments: 0 });
+      yield* expectFaithful(usdGroup.group.id);
+      const [left] = yield* sql<{ count: string }>`
+        select count(*) from personal_visits v join sessions s on s.id = v.legacy_session_id
+        where s.group_id = ${yen}
+      `;
+      expect(Number(left!.count)).toBe(0);
     }),
   );
 
@@ -564,25 +619,27 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
               added.id,
             );
         }
-        // Close the first session, cashing out anyone still in for nothing.
-        const playing = yield* sql<{ playerId: PlayerId }>`
-          select distinct player_id from entries e
-          where session_id = ${sessions[0]} and kind = 'buy_in' and voided_at is null
-            and not exists (
-              select 1 from entries c where c.session_id = e.session_id
-                and c.player_id = e.player_id and c.kind = 'cash_out' and c.voided_at is null
-            )
-        `;
-        yield* alex.sessions.close({
-          params: { sessionId: sessions[0] },
-          payload: {
-            cashOuts: playing.map(({ playerId }) => ({
-              id: ids.entry(),
-              playerId,
-              amount: usd(0),
-            })),
-          },
-        });
+        // Close both sessions, cashing out anyone still in for nothing.
+        for (const sessionId of sessions) {
+          const playing = yield* sql<{ playerId: PlayerId }>`
+            select distinct player_id from entries e
+            where session_id = ${sessionId} and kind = 'buy_in' and voided_at is null
+              and not exists (
+                select 1 from entries c where c.session_id = e.session_id
+                  and c.player_id = e.player_id and c.kind = 'cash_out' and c.voided_at is null
+              )
+          `;
+          yield* alex.sessions.close({
+            params: { sessionId },
+            payload: {
+              cashOuts: playing.map(({ playerId }) => ({
+                id: ids.entry(),
+                playerId,
+                amount: usd(0),
+              })),
+            },
+          });
+        }
 
         yield* LegacyMigration.importLegacy({ scope: [groupId], dryRun: false });
         yield* expectFaithful(groupId);

@@ -6,9 +6,11 @@ import { GroupId } from "@stacks/contracts";
 
 import * as Access from "./Access.ts";
 
-/** Problems that stop the import: the new model can't hold the data as it is. */
-const blocking = ["non_usd_group", "broken_correction", "invalid_audit", "unsafe_amount"] as const;
-/** Facts the import keeps as they are, which need a person's call before the financial cutover. */
+/** Problems that stop the import: data the new model can't hold, or that may still change. */
+const blocking = ["live_session", "broken_correction", "invalid_audit", "unsafe_amount"] as const;
+/** Groups the import leaves on the legacy ledger until it supports their currency. */
+const excluded = ["non_usd_group"] as const;
+/** Facts the import keeps as they are, flagged for the people involved. */
 const reconcile = [
   "routed_settlement",
   "windowed_stake",
@@ -17,7 +19,7 @@ const reconcile = [
 ] as const;
 
 export const LegacyIssue = Schema.Struct({
-  kind: Schema.Literals([...blocking, ...reconcile]),
+  kind: Schema.Literals([...blocking, ...excluded, ...reconcile]),
   groupId: GroupId,
   /** The entry, trip, stake, player or group the issue is about. */
   subjectId: Schema.String,
@@ -45,6 +47,13 @@ class DryRun extends Data.TaggedError("DryRun")<{ readonly report: ImportReport 
 
 const MAX_SAFE = "9007199254740991";
 
+/** Only USD groups move; the rest stay on the legacy ledger. */
+const migrating = (sql: SqlClient.SqlClient, scope: LegacyScope) => (column: string) =>
+  sql`${sql.literal(column)} in (
+    select id from groups
+    where currency = 'USD' and ${scope ? sql.in("id", scope) : sql.literal("true")}
+  )`;
+
 // A UUIDv8 from the session and player, so every run names a participation the same way.
 const participationId = (session: string, player: string) => {
   const hash = `md5('legacy-visit:' || ${session} || ':' || ${player})`;
@@ -53,14 +62,19 @@ const participationId = (session: string, player: string) => {
 
 const findIssues = Effect.fn("LegacyMigration.findIssues")(function* (scope: LegacyScope) {
   const sql = yield* SqlClient.SqlClient;
-  const within = (column: string) => (scope ? sql.in(column, scope) : sql.literal("true"));
+  const within = migrating(sql, scope);
   return yield* sql`
     select 'non_usd_group' as kind, g.id as group_id, g.id::text as subject_id,
-      'Records money in ' || g.currency || '; the new model holds USD only.' as detail
+      'Records money in ' || g.currency || '; it stays on the legacy ledger.' as detail
     from groups g
-    where g.currency <> 'USD' and ${within("g.id")}
+    where g.currency <> 'USD' and ${scope ? sql.in("g.id", scope) : sql.literal("true")}
       and (exists (select 1 from entries e where e.group_id = g.id)
         or exists (select 1 from stakes k where k.group_id = g.id))
+
+    union all
+    select 'live_session', s.group_id, s.id::text, 'Still open; close it before the cutover.'
+    from sessions s
+    where s.status = 'live' and ${within("s.group_id")}
 
     union all
     select 'broken_correction', e.group_id, e.id::text,
@@ -164,6 +178,8 @@ const findIssues = Effect.fn("LegacyMigration.findIssues")(function* (scope: Leg
 
 const isBlocking = (issue: LegacyIssue) =>
   (blocking as ReadonlyArray<LegacyIssue["kind"]>).includes(issue.kind);
+const isExcluded = (issue: LegacyIssue) =>
+  (excluded as ReadonlyArray<LegacyIssue["kind"]>).includes(issue.kind);
 
 /**
  * Read-only report of legacy histories to fix or decide before the cutover. The transaction is
@@ -177,7 +193,11 @@ export const preflight = Effect.fn("LegacyMigration.preflight")(function* (scope
       return yield* findIssues(scope);
     }),
   );
-  return { blocking: issues.filter(isBlocking), reconcile: issues.filter((i) => !isBlocking(i)) };
+  return {
+    blocking: issues.filter(isBlocking),
+    excluded: issues.filter(isExcluded),
+    reconcile: issues.filter((issue) => !isBlocking(issue) && !isExcluded(issue)),
+  };
 });
 
 /**
@@ -190,8 +210,7 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
   readonly dryRun: boolean;
 }) {
   const sql = yield* SqlClient.SqlClient;
-  const within = (column: string) =>
-    options.scope ? sql.in(column, options.scope) : sql.literal("true");
+  const within = migrating(sql, options.scope);
   const work = Effect.gen(function* () {
     yield* sql`set transaction isolation level repeatable read`;
     const blockers = (yield* findIssues(options.scope)).filter(isBlocking);
