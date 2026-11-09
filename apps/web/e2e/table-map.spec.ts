@@ -70,6 +70,9 @@ test.describe.serial("seats at a blackjack table", () => {
     const pickSize = async (seats: number) => {
       await size.click();
       await page.getByRole("menuitemradio", { name: `${seats} seats` }).click();
+      // A choice stays open for another pick, like the theme menu.
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("menu")).toBeHidden();
     };
     // The other sizes are preloaded, so the table itself swaps at once too.
     await pickSize(6);

@@ -118,9 +118,7 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
     await expect(seat(/^Seat 7, third base, Alex, \+\$800$/)).toBeVisible();
 
     await visible(page.getByRole("button", { name: "Close session" })).click();
-    await visible(page.getByRole("button", { name: "Close session" }))
-      .last()
-      .click();
+    await visible(page.getByRole("dialog").getByRole("button", { name: "Close session" })).click();
     await expect(visible(page.getByText("Closed", { exact: true }))).toBeVisible();
     await shoot(page, "table-closed");
   });

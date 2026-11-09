@@ -185,9 +185,7 @@ test.describe.serial("live mode on a phone", () => {
     await backToTable();
 
     await visible(alex.getByRole("button", { name: "Close session" })).click();
-    await visible(alex.getByRole("button", { name: "Close session" }))
-      .last()
-      .click();
+    await visible(alex.getByRole("dialog").getByRole("button", { name: "Close session" })).click();
     await expect(
       alex
         .getByText("Enter what each of them cashed out, 0 if they busted.")
@@ -201,8 +199,8 @@ test.describe.serial("live mode on a phone", () => {
     await visible(alex.getByRole("button", { name: /^Bea, / })).click();
     await visible(alex.getByRole("button", { name: "Bust · $0" })).click();
     await visible(alex.getByRole("button", { name: "Record cash out" })).click();
-    await expect(alex.getByText("+$170").filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("-$200").filter({ visible: true })).toBeVisible();
+    await expect(visible(alex.getByRole("button", { name: /^Alex, / }))).toContainText("+$170");
+    await expect(visible(alex.getByRole("button", { name: /^Bea, / }))).toContainText("-$200");
     await shoot(alex, "session-live");
 
     // Away from the table it's still one tap back.
@@ -211,9 +209,7 @@ test.describe.serial("live mode on a phone", () => {
     await expect(visible(alex.getByRole("button", { name: "Close session" }))).toBeVisible();
 
     await visible(alex.getByRole("button", { name: "Close session" })).click();
-    await visible(alex.getByRole("button", { name: "Close session" }))
-      .last()
-      .click();
+    await visible(alex.getByRole("dialog").getByRole("button", { name: "Close session" })).click();
     // The closed table stays on screen with everyone's result, beside the way to the next one.
     await expect(alex.getByText("Closed", { exact: true }).filter({ visible: true })).toBeVisible();
     await expect(
