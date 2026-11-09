@@ -12,6 +12,7 @@ import highLimit from "./0009_high_limit.ts";
 import paymentHandles from "./0010_payment_handles.ts";
 import userLimits from "./0011_user_limits.ts";
 import personalRecording from "./0012_personal_recording.ts";
+import legacyImport from "./0013_legacy_import.ts";
 
 export const migrations = Migrator.fromRecord({
   "0001_init": init,
@@ -26,4 +27,5 @@ export const migrations = Migrator.fromRecord({
   "0010_payment_handles": paymentHandles,
   "0011_user_limits": userLimits,
   "0012_personal_recording": personalRecording,
+  "0013_legacy_import": legacyImport,
 });
