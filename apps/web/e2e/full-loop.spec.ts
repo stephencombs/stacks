@@ -48,6 +48,8 @@ test.describe.serial("a group's first night out", () => {
 
     // Alex starts a group.
     await signIn(alex, alexUser!.emailAddress);
+    // Signing in lands on personal Home; groups sit behind Groups in the header.
+    await alex.getByRole("link", { name: "Groups", exact: true }).click();
     await expect(alex.getByRole("heading", { name: "Your groups" })).toBeVisible();
     await alex.getByRole("button", { name: "New group" }).click();
     await alex.getByLabel("Group name").fill("Vegas crew");

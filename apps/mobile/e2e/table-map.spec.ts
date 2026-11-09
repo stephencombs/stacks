@@ -40,6 +40,7 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
     const page = await hermesLike(await browser.newContext(test.info().project.use)).newPage();
     const visible = (locator: Locator) => locator.filter({ visible: true });
     await signIn(page, users[0]!.emailAddress);
+    await visible(page.getByRole("button", { name: "Groups", exact: true })).click();
     await visible(page.getByRole("button", { name: "New group" })).click();
     await page.getByLabel("Group name").fill("Table crew");
     await visible(page.getByRole("button", { name: "Create group" })).click();
