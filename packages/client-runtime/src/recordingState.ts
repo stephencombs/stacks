@@ -41,6 +41,21 @@ const requireValid: (condition: unknown, message: string) => asserts condition =
   if (!condition) throw new RecordingError("invalid", message);
 };
 const ms = DateTime.toEpochMillis;
+// The live cash-out that last finished the visit, following corrections to its replacement.
+const finalCashOut = (current: EntryId | null, command: RecordingCommand) => {
+  switch (command.type) {
+    case "record_completed":
+      return command.cashOutId;
+    case "finish":
+      return command.entryId;
+    case "correct":
+      return command.entryId === current ? (command.replacement?.id ?? null) : current;
+    case "reopen":
+      return null;
+    default:
+      return current;
+  }
+};
 const unique = (records: ReadonlyArray<{ readonly id: string }>) =>
   new Set(records.map((record) => record.id)).size === records.length;
 
@@ -101,6 +116,7 @@ const validateRecordingState = (state: RecordingState) => {
   const createdEntries = new Set<EntryId>();
   const voids = new Set<EntryId>();
   const lifecycle = new Map<Visit["id"], { revision: number; finishedAt: DateTime.Utc | null }>();
+  const finals = new Map<Visit["id"], EntryId | null>();
   const createdTables = new Set<Table["id"]>();
   const verifyEntry = (
     command: RecordingCommand,
@@ -192,6 +208,20 @@ const validateRecordingState = (state: RecordingState) => {
       } else if (command.type === "reopen") {
         requireValid(previous.finishedAt !== null, "Receipt reopens a live visit.");
         previous.finishedAt = null;
+        const final = finals.get(visit.id);
+        if (final) {
+          const voided = entries.get(final);
+          requireValid(
+            voided &&
+              !voids.has(final) &&
+              voided.voidedAt !== null &&
+              ms(voided.voidedAt) === ms(command.preparedAt) &&
+              voided.voidedBy === command.actorId &&
+              voided.voidReason === command.reason,
+            reopenNotVoided,
+          );
+          voids.add(final);
+        }
       } else {
         const original = entries.get(command.entryId);
         requireValid(
@@ -220,6 +250,7 @@ const validateRecordingState = (state: RecordingState) => {
           );
       }
     }
+    finals.set(visit.id, finalCashOut(finals.get(visit.id) ?? null, command));
   }
   requireValid(
     createdEntries.size === entries.size &&
@@ -249,9 +280,36 @@ const validateRecordingState = (state: RecordingState) => {
 const codec = Schema.toCodecJson(RecordingState);
 export const encodeRecordingState = (state: RecordingState) =>
   JSON.stringify(Schema.encodeSync(codec)(validateRecordingState(state)));
+const reopenNotVoided = "Reopen did not void the final cash-out.";
+// A document saved before reopen voided the final cash-out holds a reopen receipt whose
+// cash-out is still live. Replaying its commands is deterministic: only the voids may differ.
+const upgradeLegacyReopen = (state: RecordingState) => {
+  const replayed = state.receipts.reduce(
+    (current, receipt) => applyRecordingCommand(current, receipt.command),
+    { ...state, tables: [], visits: [], entries: [], receipts: [] } as RecordingState,
+  );
+  const live = (entries: RecordingState["entries"]) =>
+    JSON.stringify(
+      entries.map((entry) => ({ ...entry, voidedAt: null, voidedBy: null, voidReason: null })),
+    );
+  requireValid(
+    JSON.stringify({ ...replayed, entries: [] }) === JSON.stringify({ ...state, entries: [] }) &&
+      live(replayed.entries) === live(state.entries),
+    "Recording history differs from its command receipts.",
+  );
+  return validateRecordingState(replayed);
+};
+const validateOrUpgrade = (state: RecordingState) => {
+  try {
+    return validateRecordingState(state);
+  } catch (cause) {
+    if (!(cause instanceof RecordingError) || cause.message !== reopenNotVoided) throw cause;
+    return upgradeLegacyReopen(state);
+  }
+};
 export const decodeRecordingState = (payload: string, revision: number) => {
   try {
-    const state = validateRecordingState(
+    const state = validateOrUpgrade(
       Schema.decodeUnknownSync(codec)(JSON.parse(payload), { onExcessProperty: "error" }),
     );
     requireValid(revision === state.receipts.length + 1, "Document and receipt revisions differ.");
@@ -362,6 +420,21 @@ export const applyRecordingCommand = (
     } else if (command.type === "reopen") {
       requireValid(visit.finishedAt !== null, "Visit is already live.");
       finishedAt = null;
+      const final = state.receipts.reduce<EntryId | null>(
+        (current, receipt) =>
+          receipt.command.visitId === visit.id ? finalCashOut(current, receipt.command) : current,
+        null,
+      );
+      entries = entries.map((entry) =>
+        entry.id === final
+          ? PlayEntry.make({
+              ...entry,
+              voidedAt: command.preparedAt,
+              voidedBy: command.actorId,
+              voidReason: command.reason,
+            })
+          : entry,
+      );
     } else {
       const original = entries.find((entry) => entry.id === command.entryId);
       requireValid(

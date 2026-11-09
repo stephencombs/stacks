@@ -213,9 +213,12 @@ it("preserves original facts, replacement chains, void reasons and finish/reopen
   });
   store = await reload(store, db);
   expect(store.review(id).summary.finalResult).toBe(-20000);
+  const livePlaceholder = store.getSnapshot().state!.entries.at(-1)!;
+  expect(livePlaceholder.voidedAt).not.toBeNull();
   await save(store, { type: "reopen", visitId: id, reason: "finished accidentally" });
   store = await reload(store, db);
   expect(store.review(id).summary.finalResult).toBeNull();
+  expect(store.review(id).entries.at(-1)).toEqual(livePlaceholder);
   expect(store.getSnapshot().state!.receipts.at(-1)!.command).toMatchObject({
     type: "reopen",
     reason: "finished accidentally",
@@ -224,6 +227,149 @@ it("preserves original facts, replacement chains, void reasons and finish/reopen
     store.getSnapshot().state!.receipts.some((receipt) => receipt.command.type === "finish"),
   ).toBe(true);
   await store.close();
+});
+
+describe("reopening a finished visit", () => {
+  const finished = async (db: ReturnType<typeof memory>, amount = 25000) => {
+    const store = await open(db);
+    await store.execute(start(store));
+    const id = visitId(store);
+    await save(store, { type: "finish", visitId: id, amount, finishedAt: at(13) });
+    return { store, id, cashOut: store.getSnapshot().state!.entries.at(-1)! };
+  };
+  const entry = (store: RecordingStore, id: string) =>
+    store.getSnapshot().state!.entries.find((item) => item.id === id)!;
+
+  it("voids the final cash-out so finishing again does not count it twice", async () => {
+    const db = memory();
+    let { store, id, cashOut } = await finished(db);
+    const reopened = await save(store, {
+      type: "reopen",
+      visitId: id,
+      reason: "finished accidentally",
+    });
+    expect(entry(store, cashOut.id)).toMatchObject({
+      voidedAt: reopened.command.preparedAt,
+      voidedBy: store.getSnapshot().state!.actor.id,
+      voidReason: "finished accidentally",
+    });
+    expect(store.review(id).summary).toMatchObject({ totals: { cashOut: 0 }, finalResult: null });
+    await save(store, { type: "finish", visitId: id, amount: 25000, finishedAt: at(14) });
+    expect(store.review(id).summary.finalResult).toBe(5000);
+    store = await reload(store, db);
+    expect(store.review(id).summary).toMatchObject({
+      totals: { buyIn: 20000, cashOut: 25000 },
+      finalResult: 5000,
+    });
+    await store.close();
+  });
+
+  it("voids the live replacement when the final cash-out was corrected", async () => {
+    const db = memory();
+    let { store, id, cashOut } = await finished(db);
+    await save(store, {
+      type: "correct",
+      visitId: id,
+      entryId: cashOut.id,
+      reason: "counted again",
+      replacement: { amount: 24000 },
+    });
+    const replacement = store.getSnapshot().state!.entries.at(-1)!;
+    await save(store, { type: "reopen", visitId: id, reason: "finished accidentally" });
+    expect(entry(store, replacement.id)).toMatchObject({ voidReason: "finished accidentally" });
+    expect(entry(store, cashOut.id).voidReason).toBe("counted again");
+    store = await reload(store, db);
+    await save(store, { type: "finish", visitId: id, amount: 24000, finishedAt: at(14) });
+    expect(store.review(id).summary.finalResult).toBe(4000);
+    await store.close();
+  });
+
+  it("only reopens when the final cash-out was already voided by hand", async () => {
+    const db = memory();
+    let { store, id, cashOut } = await finished(db);
+    await save(store, {
+      type: "correct",
+      visitId: id,
+      entryId: cashOut.id,
+      reason: "wrong visit",
+      replacement: null,
+    });
+    const receipts = store.getSnapshot().state!.receipts.length;
+    await save(store, { type: "reopen", visitId: id, reason: "finished accidentally" });
+    expect(
+      store.getSnapshot().state!.entries.filter((item) => item.voidedAt !== null),
+    ).toHaveLength(1);
+    expect(entry(store, cashOut.id).voidReason).toBe("wrong visit");
+    expect(store.getSnapshot().state!.receipts).toHaveLength(receipts + 1);
+    store = await reload(store, db);
+    await save(store, { type: "finish", visitId: id, amount: 25000, finishedAt: at(14) });
+    expect(store.review(id).summary.finalResult).toBe(5000);
+    await store.close();
+  });
+
+  it("voids a zero final cash-out too", async () => {
+    const db = memory();
+    let { store, id, cashOut } = await finished(db, 0);
+    await save(store, { type: "reopen", visitId: id, reason: "finished accidentally" });
+    expect(entry(store, cashOut.id).voidedAt).not.toBeNull();
+    store = await reload(store, db);
+    await save(store, { type: "finish", visitId: id, amount: 25000, finishedAt: at(14) });
+    expect(store.review(id).summary.finalResult).toBe(5000);
+    await store.close();
+  });
+
+  it("voids only the latest finish across repeated reopen cycles", async () => {
+    const db = memory();
+    let { store, id } = await finished(db);
+    await save(store, { type: "reopen", visitId: id, reason: "first" });
+    await save(store, { type: "finish", visitId: id, amount: 30000, finishedAt: at(14) });
+    await save(store, { type: "reopen", visitId: id, reason: "second" });
+    store = await reload(store, db);
+    expect(
+      store
+        .getSnapshot()
+        .state!.entries.filter((item) => item.voidedAt !== null)
+        .map((item) => [item.amount, item.voidReason]),
+    ).toEqual([
+      [25000, "first"],
+      [30000, "second"],
+    ]);
+    await save(store, { type: "finish", visitId: id, amount: 22000, finishedAt: at(15) });
+    expect(store.review(id).summary.finalResult).toBe(2000);
+    await store.close();
+  });
+
+  it("completed past recordings reopen with their cash-out voided", async () => {
+    const db = memory();
+    let store = await open(db);
+    await save(store, {
+      type: "record_completed",
+      buyIn: 30000,
+      cashOut: 35000,
+      startedAt: at(10),
+      finishedAt: at(13),
+    });
+    const id = visitId(store);
+    await save(store, { type: "reopen", visitId: id, reason: "wrong totals" });
+    store = await reload(store, db);
+    expect(store.review(id).summary).toMatchObject({ totals: { cashOut: 0 }, finalResult: null });
+    await store.close();
+  });
+
+  it("loads documents saved before reopen voided the final cash-out", async () => {
+    const db = memory();
+    const { store, id } = await finished(db);
+    await save(store, { type: "reopen", visitId: id, reason: "finished accidentally" });
+    await store.close();
+    const state = JSON.parse(db.document.payload!);
+    const cashOut = state.entries.at(-1);
+    cashOut.voidedAt = cashOut.voidedBy = cashOut.voidReason = null;
+    db.document = { revision: db.document.revision, payload: JSON.stringify(state) };
+    const loaded = await open(db);
+    expect(loaded.review(id).summary).toMatchObject({ totals: { cashOut: 0 }, finalResult: null });
+    expect(loaded.getSnapshot().state!.entries.at(-1)!.voidReason).toBe("finished accidentally");
+    await loaded.close();
+  });
 });
 
 it("supports zero final cash-out and requires a new visit for a genuine return", async () => {
