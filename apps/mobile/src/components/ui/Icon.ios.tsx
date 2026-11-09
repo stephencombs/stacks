@@ -12,6 +12,9 @@ const symbols: Record<IconName, SFSymbol> = {
   "arrow-right": "arrow.right",
   close: "xmark",
   delete: "delete.left",
+  "cloud-check": "checkmark.icloud",
+  "cloud-upload": "icloud.and.arrow.up",
+  "cloud-off": "icloud.slash",
 };
 
 export function Icon({

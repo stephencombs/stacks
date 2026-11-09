@@ -178,7 +178,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
         >
           {visitTitle(visit.table)}
         </Title>
-        <SaveStatus status={status} error={error} onRetry={retryLoad} />
+        <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
       </View>
       <VisitHero visit={visit} />
       {saved ? (

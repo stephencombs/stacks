@@ -112,7 +112,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
             : `${formatDay(start)} · ${formatTime(start)} to ${formatTime(visit.visit.finishedAt!)}`
         }
       >
-        <SaveStatus status={status} error={error} onRetry={retryLoad} />
+        <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
       </PageHeader>
       <VisitHero visit={visit} />
       {saved ? (

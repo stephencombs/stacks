@@ -305,6 +305,7 @@ const check = <S extends Schema.Top>(schema: S, value: unknown) => {
   return Schema.encodeSync(json)(Schema.decodeUnknownSync(json)(value));
 };
 export const routes: Record<string, unknown> = {
+  "/api/recording": { identity: null, commands: [], tables: [], visits: [], entries: [] },
   "/api/groups": check(Schema.Array(GroupListItem), groupList),
   [`/api/groups/${ids.group}`]: check(GroupDetail, groupDetail),
   [`/api/groups/${ids.group}/stats`]: check(GroupStats, stats),

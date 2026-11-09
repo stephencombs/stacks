@@ -1,13 +1,16 @@
 import { useClerk, useUser } from "@clerk/expo";
 import { useNavigation } from "@react-navigation/native";
+import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
+import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import { themeChoices } from "@stacks/client-runtime/theme";
+import type { VisitId } from "@stacks/contracts";
 import { useState, type ReactNode } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "../components/ui/Button";
 import { Choice } from "../components/ui/Field";
-import { Icon } from "../components/ui/Icon";
+import { Icon, type IconName } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
@@ -53,16 +56,71 @@ type Status = "loading" | "saved" | "saving" | "save_failed" | "load_failed" | "
 
 /**
  * Whether what's on screen is saved, in words. Only a finished write to this device reads as
- * saved; nothing here claims a backup or a sync.
+ * saved, and only the account's confirmation reads as synced. Changes the account refused
+ * follow, each with a way to record it again or let it go. Pass `visitId` on a session.
  */
 export function SaveStatus({
   status,
   error,
   onRetry,
+  visitId,
 }: {
   status: Status;
   error: string | null;
   onRetry: () => void;
+  visitId?: VisitId;
+}) {
+  const sync = useRecordingSync(visitId);
+  if (status !== "saved" || (sync.rejected.length === 0 && sync.error === null))
+    return <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />;
+  return (
+    <View className="gap-2">
+      <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />
+      {sync.rejected.map((item) => (
+        <View
+          key={item.operationId}
+          accessibilityRole="alert"
+          className="gap-3 rounded-lg bg-sunken px-3 py-2.5"
+        >
+          <View className="min-w-0 flex-row gap-2">
+            <Icon name="alert" color="danger" size={16} />
+            <Text selectable className="flex-1 text-sm text-danger">
+              {item.sentence}
+            </Text>
+          </View>
+          <View className="flex-row justify-end gap-2">
+            <Button label="Discard" size="sm" onPress={() => void sync.discard(item.operationId)} />
+            <Button
+              label="Record again"
+              size="sm"
+              onPress={() => void sync.recordAgain(item.operationId)}
+            />
+          </View>
+        </View>
+      ))}
+      {sync.error ? <Text className="text-sm text-danger">{sync.error}</Text> : null}
+    </View>
+  );
+}
+
+const syncIcons: Record<RecordingSyncLine["kind"], IconName> = {
+  device: "check",
+  syncing: "cloud-upload",
+  waiting: "cloud-upload",
+  synced: "cloud-check",
+  blocked: "cloud-off",
+};
+
+function SaveLine({
+  status,
+  error,
+  onRetry,
+  sync,
+}: {
+  status: Status;
+  error: string | null;
+  onRetry: () => void;
+  sync: RecordingSyncLine;
 }) {
   if (status === "load_failed")
     return (
@@ -79,7 +137,7 @@ export function SaveStatus({
         <Button label="Try again" size="sm" onPress={onRetry} />
       </View>
     );
-  const busy = status === "loading" || status === "saving";
+  const busy = status === "loading" || status === "saving" || sync.kind === "syncing";
   const failed = status === "save_failed";
   const text =
     status === "loading"
@@ -88,13 +146,17 @@ export function SaveStatus({
         ? "Saving…"
         : failed
           ? "Last change not saved"
-          : "Saved on this device";
+          : sync.text;
   return (
     <View accessibilityLiveRegion="polite" className="min-h-5 flex-row items-center gap-1.5">
       {busy ? (
         <ActivityIndicator size="small" colorClassName="accent-muted" />
       ) : (
-        <Icon name={failed ? "alert" : "check"} color={failed ? "danger" : "muted"} size={14} />
+        <Icon
+          name={failed ? "alert" : syncIcons[sync.kind]}
+          color={failed ? "danger" : "muted"}
+          size={14}
+        />
       )}
       <Text className={cn("text-sm", failed ? "text-danger" : "text-muted")}>{text}</Text>
     </View>

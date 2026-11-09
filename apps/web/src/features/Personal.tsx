@@ -1,7 +1,18 @@
 import { ClerkFailed, SignInButton, SignUpButton, useClerk, useUser } from "@clerk/react";
+import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
+import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import { themeChoices } from "@stacks/client-runtime/theme";
+import type { VisitId } from "@stacks/contracts";
 import { Link } from "@tanstack/react-router";
-import { CircleAlert, HardDrive, LoaderCircle, Users } from "lucide-react";
+import {
+  CircleAlert,
+  CloudCheck,
+  CloudOff,
+  CloudUpload,
+  HardDrive,
+  LoaderCircle,
+  Users,
+} from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import { Button } from "~/components/ui/Button";
@@ -115,16 +126,69 @@ export function Dock({ children }: { children: ReactNode }) {
 
 /**
  * Whether what's on screen is saved, in words. Only a finished write to this device's storage
- * reads as saved; nothing here claims a backup or a sync.
+ * reads as saved, and only the account's confirmation reads as synced. Changes the account
+ * refused follow, each with a way to record it again or let it go. Pass `visitId` on a session.
  */
 export function SaveStatus({
   status,
   error,
   onRetry,
+  visitId,
 }: {
   status: "loading" | "saved" | "saving" | "save_failed" | "load_failed" | "closed";
   error: string | null;
   onRetry: () => void;
+  visitId?: VisitId;
+}) {
+  const sync = useRecordingSync(visitId);
+  if (status !== "saved" || (sync.rejected.length === 0 && sync.error === null))
+    return <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />;
+  return (
+    <>
+      <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />
+      {sync.rejected.map((item) => (
+        <div
+          key={item.operationId}
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-sunken px-3 py-2.5"
+        >
+          <p className="flex items-start gap-2 text-sm text-danger">
+            <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            {item.sentence}
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => void sync.discard(item.operationId)}>
+              Discard
+            </Button>
+            <Button size="sm" onClick={() => void sync.recordAgain(item.operationId)}>
+              Record again
+            </Button>
+          </div>
+        </div>
+      ))}
+      {sync.error ? <p className="text-sm text-danger">{sync.error}</p> : null}
+    </>
+  );
+}
+
+const syncIcons: Record<RecordingSyncLine["kind"], ReactNode> = {
+  device: <HardDrive className="size-4" aria-hidden />,
+  syncing: <LoaderCircle className="size-4 animate-spin" aria-hidden />,
+  waiting: <CloudUpload className="size-4" aria-hidden />,
+  synced: <CloudCheck className="size-4" aria-hidden />,
+  blocked: <CloudOff className="size-4" aria-hidden />,
+};
+
+function SaveLine({
+  status,
+  error,
+  onRetry,
+  sync,
+}: {
+  status: "loading" | "saved" | "saving" | "save_failed" | "load_failed" | "closed";
+  error: string | null;
+  onRetry: () => void;
+  sync: RecordingSyncLine;
 }) {
   if (status === "load_failed")
     return (
@@ -148,7 +212,7 @@ export function SaveStatus({
         ? [<LoaderCircle key="icon" className="size-4 animate-spin" aria-hidden />, "Saving…"]
         : status === "save_failed"
           ? [<CircleAlert key="icon" className="size-4" aria-hidden />, "Last change not saved"]
-          : [<HardDrive key="icon" className="size-4" aria-hidden />, "Saved on this device"];
+          : [syncIcons[sync.kind], sync.text];
   return (
     <p
       role="status"

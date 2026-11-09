@@ -8,7 +8,7 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
-import { act, useEffect, useSyncExternalStore } from "react";
+import { act, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
@@ -38,6 +38,11 @@ const account = vi.hoisted(() => {
 });
 
 vi.mock("@clerk/react", () => import("../preview/clerk-stub"));
+// These tests watch the group outbox's requests; personal recording sync has its own tests.
+vi.mock("@stacks/client-runtime/recordingReact", async (original) => ({
+  ...(await original<typeof import("@stacks/client-runtime/recordingReact")>()),
+  RecordingSyncRoot: ({ children }: { children: ReactNode }) => children,
+}));
 vi.mock("~/lib/account", () => ({
   useAccount: () => useSyncExternalStore(account.subscribe, account.get),
 }));
@@ -130,7 +135,7 @@ it("shows your play while sign-in loads, and keeps it in place once you're signe
   await act(async () => account.set(SIGNED_IN));
   expect(host.querySelector("main")).toBe(page);
   expect(mounts).toBe(1);
-  // Nothing was waiting to send, so being signed in on your play asks nothing of the API.
+  // Nothing was waiting in the outbox, so being signed in on your play sends it nothing.
   expect(network.sent).toEqual([]);
 });
 

@@ -61,6 +61,13 @@ async function load({
     getClerkInstance: () => ({ session: { getToken: async () => "token" } }),
   }));
   vi.doMock("@clerk/expo/token-cache", () => ({ tokenCache: {} }));
+  // These tests watch the group outbox's requests; personal recording sync has its own tests.
+  vi.doMock("@stacks/client-runtime/recordingReact", async () => ({
+    ...(await vi.importActual<typeof import("@stacks/client-runtime/recordingReact")>(
+      "@stacks/client-runtime/recordingReact",
+    )),
+    RecordingSyncRoot: ({ children }: { children: ReactNode }) => children,
+  }));
   vi.doMock("expo", () => ({ reloadAppAsync: vi.fn() }));
   const markStartup = vi.fn();
   vi.doMock("./lib/diagnostics", () => ({ markStartup, reportStartupError: vi.fn() }));
