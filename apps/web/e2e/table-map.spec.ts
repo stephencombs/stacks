@@ -144,6 +144,7 @@ test.describe.serial("seats at a blackjack table", () => {
     // Gus busts; Alex cashes out big. Each leaves a result on the felt.
     await page.getByRole("button", { name: /^Gus, / }).click();
     await page.getByRole("button", { name: "Bust · $0" }).click();
+    await page.getByRole("button", { name: "Record cash out" }).click();
     await expect(seat(/^Seat 5, Gus, busted$/)).toBeVisible();
     // Alex is still playing when the table closes: the close takes his cash-out with it, in one
     // request rather than one per player.

@@ -58,7 +58,7 @@ test.describe.serial("live mode on a phone", () => {
     await signIn(alex, alexUser!.emailAddress);
     // Signing in lands on personal Home; groups sit behind Groups in the header.
     await visible(alex.getByRole("button", { name: "Groups", exact: true })).click();
-    await expect(alex.getByText("Your groups").filter({ visible: true })).toBeVisible();
+    await expect(visible(alex.getByRole("heading", { name: "Your groups" })).first()).toBeVisible();
     await visible(alex.getByRole("button", { name: "New group" })).click();
     await alex.getByLabel("Group name").fill("Vegas crew");
     await expect(alex.getByLabel("Your name in this group")).toHaveValue("Alex");
@@ -193,9 +193,10 @@ test.describe.serial("live mode on a phone", () => {
 
     await record("Cash out", "Alex", "320");
     await record("Cash out", "Gus", "220", "Alex");
-    // Bea busted: one tap, no keypad.
+    // Bea busted: Bust fills $0, so no keypad.
     await visible(alex.getByRole("button", { name: /^Bea, / })).click();
     await visible(alex.getByRole("button", { name: "Bust · $0" })).click();
+    await visible(alex.getByRole("button", { name: "Record cash out" })).click();
     await expect(alex.getByText("+$170").filter({ visible: true })).toBeVisible();
     await expect(alex.getByText("-$200").filter({ visible: true })).toBeVisible();
     await shoot(alex, "session-live");

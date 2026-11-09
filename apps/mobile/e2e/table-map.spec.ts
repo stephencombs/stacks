@@ -112,6 +112,7 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
 
     await visible(page.getByRole("button", { name: /^Gus, / })).click();
     await visible(page.getByRole("button", { name: "Bust · $0" })).click();
+    await visible(page.getByRole("button", { name: "Record cash out" })).click();
     await expect(seat(/^Seat 5, Gus, busted$/)).toBeVisible();
     await record("Cash out", "Alex", "1100");
     await expect(seat(/^Seat 7, third base, Alex, \+\$800$/)).toBeVisible();

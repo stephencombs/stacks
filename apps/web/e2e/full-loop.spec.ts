@@ -168,9 +168,10 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("button", { name: "Keep playing" }).click();
 
     await record("Cash out", "Alex", "320");
-    // Bea busted: one press, no amount to type.
+    // Bea busted: Bust fills $0, so no amount to type.
     await alex.getByRole("button", { name: /^Bea, / }).click();
     await alex.getByRole("button", { name: "Bust · $0" }).click();
+    await alex.getByRole("button", { name: "Record cash out" }).click();
     await record("Cash out", "Gus", "120", "Alex");
     await expect(gus).toContainText("+$20");
     await shoot(alex, "session-live");
