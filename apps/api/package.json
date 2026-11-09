@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "node scripts/migrate.ts",
     "db:seed": "node scripts/seed.ts",
+    "legacy:preflight": "node scripts/legacy-migration.ts preflight",
+    "legacy:import": "node scripts/legacy-migration.ts import",
     "venues:import": "node scripts/import-venues.ts",
     "deploy": "wrangler deploy --env development"
   },
