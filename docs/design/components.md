@@ -148,7 +148,15 @@ Every amount goes through `Money`, the hero figures included, except the compact
 
 A player's identity: `chip` comes from `chipOf(group, playerId)`. Pair it with the player's name. Size 28 in web rows, 30 in mobile rows, and smaller in dense lists and awards.
 
+## Page actions
+
+On phones, keep a live session's Buy in / Rebuy and Cash out above the places, labeled with the player they affect. Desktop keeps these in the seat card. Keep Undo separate and above the buttons so a second tap still rebuys.
+
+A long form's submit action stays visible: use `ActionBar` on web and `Screen`'s `renderFooter` on mobile. Keep the live-session return link above the submit action when it appears on the same screen.
+
 ## Dialog (web), Sheet (mobile)
+
+Keep a form's submit action and submission errors in `footer`, outside the scrolling fields. Secondary outcomes stay in the body so the keyboard leaves room for inputs. A web submit button in the footer links to its form with the `form` attribute.
 
 A focused task or a confirmation. The title says what's being decided, and a confirmation names the outcome on its button. Keep the safe choice beside it: "Keep it" and "Void entry".
 

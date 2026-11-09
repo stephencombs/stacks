@@ -19,12 +19,13 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 
 import { BalanceLabel, Money } from "../components/Money";
+import { Screen } from "../components/ui/Screen";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Glow } from "../components/ui/Glow";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
+import { EmptyState, List, PageTitle, Row, SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { BackingSection } from "./Backing";
 import { Chip } from "./Chip";
@@ -104,7 +105,17 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
   };
 
   return (
-    <>
+    <Screen
+      renderFooter={() => (
+        <Button
+          label="Record a payment"
+          variant="primary"
+          size="lg"
+          onPress={() => setPaying("custom")}
+        />
+      )}
+    >
+      <PageTitle>Settle up</PageTitle>
       <View className="gap-2">
         <SectionHeading
           action={
@@ -179,7 +190,6 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
             ))}
         </List>
       </View>
-      <Button label="Record a payment" onPress={() => setPaying("custom")} />
 
       <BackingSection detail={detail} trip={trip} />
 
@@ -239,7 +249,7 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
         />
       ) : null}
       {voiding ? <VoidPaymentSheet entry={voiding} onClose={() => setVoiding(null)} /> : null}
-    </>
+    </Screen>
   );
 }
 

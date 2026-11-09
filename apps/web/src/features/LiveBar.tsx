@@ -11,12 +11,13 @@ import { useStacks } from "~/lib/stacks";
  * The table you're seated at, floating just above the bottom bar on narrow screens, so a live
  * session never goes missing. Wide screens carry it in the sidebar instead.
  */
-export function LiveBar() {
+export function LiveBar({ inline = false }: { inline?: boolean }) {
   const stacks = useStacks();
   const { pathname } = useLocation();
   const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
   const seat = groups.flatMap((item) => (item.mySession ? [item.mySession] : []))[0];
   if (!seat) return null;
+  if (!inline && /^\/trips\/[^/]+\/(sessions\/new|settle)\/?$/.test(pathname)) return null;
   // The session itself, and its trip's Sessions, where the live card comes first, already show it.
   if (
     pathname === `/sessions/${seat.id}` ||
@@ -24,7 +25,13 @@ export function LiveBar() {
   )
     return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:hidden">
+    <div
+      className={
+        inline
+          ? "lg:hidden"
+          : "pointer-events-none fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:hidden"
+      }
+    >
       <Link
         to="/sessions/$sessionId"
         params={{ sessionId: seat.id }}

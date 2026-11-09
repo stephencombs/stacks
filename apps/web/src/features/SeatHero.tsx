@@ -76,7 +76,7 @@ export function SeatHero({
         </div>
         {line ? <p className="mt-2 text-sm text-muted">{line}</p> : null}
         {live && !out ? (
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 hidden grid-cols-2 gap-3 lg:grid">
             {!bought ? (
               <Button variant="primary" size="lg" onClick={onBuyIn} className="col-span-2">
                 Buy in

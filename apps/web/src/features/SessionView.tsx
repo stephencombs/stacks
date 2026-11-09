@@ -12,9 +12,10 @@ import { useNavigate } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { UserPlus } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
+import { ActionBar } from "~/components/ui/ActionBar";
 import { Button, ButtonLink } from "~/components/ui/Button";
 import { Checkbox } from "~/components/ui/Checkbox";
 import { Dialog } from "~/components/ui/Dialog";
@@ -189,6 +190,14 @@ export function SessionView({
   const notes = session.notes ? (
     <p className="max-w-[65ch] text-sm text-pretty whitespace-pre-line">{session.notes}</p>
   ) : null;
+
+  const heroBought = heroPlayerId !== undefined && (resultOf.get(heroPlayerId)?.buyIn ?? 0) > 0;
+  const heroRebuyAmount = heroPlayerId === undefined ? undefined : lastBuyIn(heroPlayerId)?.amount;
+  const heroBuyInLabel = !heroBought
+    ? "Buy in"
+    : heroRebuyAmount === undefined
+      ? "Rebuy"
+      : `Rebuy ${formatMoney(heroRebuyAmount, currency)}`;
 
   return (
     <>
@@ -474,17 +483,65 @@ export function SessionView({
       {live ? null : <ReopenSession detail={detail} group={group} />}
 
       {live ? (
-        <UndoBar
-          rebought={rebought}
-          name={rebought ? (names.get(rebought.playerId) ?? "Player") : ""}
-          currency={currency}
-          onUndo={(last) => {
-            setRebought(null);
-            void undo(last.id);
-          }}
-        />
+        <div
+          className={heroPlayerId && !cashedOut.has(heroPlayerId) ? "hidden lg:block" : undefined}
+        >
+          <UndoBar
+            rebought={rebought}
+            name={rebought ? (names.get(rebought.playerId) ?? "Player") : ""}
+            currency={currency}
+            onUndo={(last) => {
+              setRebought(null);
+              void undo(last.id);
+            }}
+          />
+        </div>
       ) : null}
 
+      {live && heroPlayerId && !cashedOut.has(heroPlayerId) ? (
+        <ActionBar className="lg:hidden">
+          <UndoBar
+            inline
+            rebought={rebought}
+            name={rebought ? (names.get(rebought.playerId) ?? "Player") : ""}
+            currency={currency}
+            onUndo={(last) => {
+              setRebought(null);
+              void undo(last.id);
+            }}
+          />
+          <p className="mb-2 text-sm text-muted">
+            {names.get(heroPlayerId) ?? "Player"}
+            {heroPlayerId === group.myPlayerId ? " · you" : ""}
+          </p>
+          <div
+            role="group"
+            aria-label={`Session actions for ${names.get(heroPlayerId) ?? "Player"}`}
+            className="grid grid-cols-2 gap-3"
+          >
+            <Button
+              variant="primary"
+              size="lg"
+              className={heroBought ? undefined : "col-span-2"}
+              onClick={() => {
+                const last = lastBuyIn(heroPlayerId);
+                if (last) rebuy(heroPlayerId, last.amount);
+                else setDraft({ kind: "buy_in", playerId: heroPlayerId });
+              }}
+            >
+              {heroBuyInLabel}
+            </Button>
+            {heroBought ? (
+              <Button
+                size="lg"
+                onClick={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
+              >
+                Cash out
+              </Button>
+            ) : null}
+          </div>
+        </ActionBar>
+      ) : null}
       {draft ? (
         <EntryDialog
           key={`${draft.kind}:${draft.playerId}:${draft.replaces?.id ?? ""}`}
@@ -524,11 +581,13 @@ type Rebought = { readonly id: EntryId; readonly playerId: PlayerId; readonly am
  * stays mounted so a screen reader hears each rebuy land.
  */
 function UndoBar({
+  inline = false,
   rebought,
   name,
   currency,
   onUndo,
 }: {
+  inline?: boolean;
   rebought: Rebought | null;
   name: string;
   currency: CurrencyCode;
@@ -537,7 +596,11 @@ function UndoBar({
   return (
     <div
       role="status"
-      className="pointer-events-none fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:bottom-0 lg:pr-10 lg:pb-6 lg:pl-70"
+      className={
+        inline
+          ? "pointer-events-none pb-2"
+          : "pointer-events-none fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:bottom-0 lg:pr-10 lg:pb-6 lg:pl-70"
+      }
     >
       {rebought ? (
         <div
@@ -684,6 +747,7 @@ function CloseSessionDialog({
   const close = useAction(stacks.Client.mutation("sessions", "close"), "session_close_confirmed");
   const outbox = useOutbox();
   const unsent = usePending(detail.session.id).length;
+  const formId = useId();
   const [missing, setMissing] = useState(false);
   const [closing, setClosing] = useState<"close" | "move" | null>(null);
   const sendClose = async (
@@ -729,8 +793,27 @@ function CloseSessionDialog({
       onOpenChange={onOpenChange}
       title="Close this session?"
       description="Results lock in and the session stops taking entries. An admin can reopen it."
+      footer={
+        <div className="flex flex-col gap-2">
+          {missing ? (
+            <FormError>Enter what each of them cashed out, 0 if they busted.</FormError>
+          ) : null}
+          {close.error ? <FormError>{close.error}</FormError> : null}
+          <Button
+            type="submit"
+            form={formId}
+            variant="primary"
+            size="lg"
+            disabled={closing !== null}
+            pending={closing === "close"}
+          >
+            Close session
+          </Button>
+        </div>
+      }
     >
       <form
+        id={formId}
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
@@ -754,9 +837,6 @@ function CloseSessionDialog({
                 )}
               </Field>
             ))}
-            {missing ? (
-              <FormError>Enter what each of them cashed out, 0 if they busted.</FormError>
-            ) : null}
           </div>
         ) : null}
         {unsent > 0 ? (
@@ -765,23 +845,14 @@ function CloseSessionDialog({
             Closing sends {unsent === 1 ? "it" : "them"} first.
           </Note>
         ) : null}
-        {close.error ? <FormError>{close.error}</FormError> : null}
-        {/* Three outcomes don't fit a row on a phone, so they stack, the one most people want first. */}
+
         <div className="flex flex-col gap-2">
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            disabled={closing !== null}
-            pending={closing === "close"}
-          >
-            Close session
-          </Button>
           {/* Not a submit button: Enter in a cash-out field must close, not move tables. */}
           <Button
             size="lg"
             disabled={closing !== null}
             pending={closing === "move"}
+            form={formId}
             onClick={(event) => void confirm(event.currentTarget.form!, true)}
             title="Close and start another session with the same players"
           >

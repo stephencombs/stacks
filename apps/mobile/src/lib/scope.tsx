@@ -120,15 +120,17 @@ export function usePlaceAddress(
 /** Renders the scope once your groups have loaded; nothing if you're in none. */
 export function ScopeLoaded({
   skeleton,
+  renderError,
   children,
 }: {
   skeleton: ReactNode;
+  renderError?: (message: string) => ReactNode;
   children: (scope: Scope) => ReactNode;
 }) {
   const stacks = useStacks();
   const { scope } = useScope();
   return (
-    <Loaded query={stacks.groups} skeleton={skeleton}>
+    <Loaded query={stacks.groups} skeleton={skeleton} renderError={renderError}>
       {() => (scope ? children(scope) : null)}
     </Loaded>
   );

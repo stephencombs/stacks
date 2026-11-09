@@ -35,10 +35,10 @@ import { Platform, Pressable, Text, View } from "react-native";
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
-import { Screen } from "../components/ui/Screen";
+import { Screen, screenError } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
 import { List, PageTitle, Row, SectionHeading, Tag } from "../components/ui/Surface";
-import { useToast } from "../components/ui/Toast";
+import type { Toast } from "../components/ui/Toast";
 import { cn } from "../components/ui/cn";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { Chip } from "../features/Chip";
@@ -67,38 +67,54 @@ type Props = StaticScreenProps<{ sessionId: string }>;
 export function SessionScreen({ route }: Props) {
   const stacks = useStacks();
   return (
-    <Screen shows={{ session: SessionId.make(route.params.sessionId) }}>
-      <Loaded
-        query={stacks.session(SessionId.make(route.params.sessionId))}
-        skeleton={<SessionScreenSkeleton />}
-      >
-        {(session) => (
-          // The screen also shows the trip's limits, so it waits for those too rather than
-          // shifting, asking for everything at once.
-          <>
-            <Prefetch query={stacks.trip(session.session.tripId)} />
-            <Prefetch query={stacks.limits(session.session.tripId)} />
-            <Prefetch query={stacks.group(session.session.groupId)} />
+    <Loaded
+      renderError={screenError}
+      query={stacks.session(SessionId.make(route.params.sessionId))}
+      skeleton={
+        <Screen>
+          <SessionScreenSkeleton />
+        </Screen>
+      }
+    >
+      {(session) => (
+        // The screen also shows the trip's limits, so it waits for those too rather than
+        // shifting, asking for everything at once.
+        <>
+          <Prefetch query={stacks.trip(session.session.tripId)} />
+          <Prefetch query={stacks.limits(session.session.tripId)} />
+          <Prefetch query={stacks.group(session.session.groupId)} />
+          <Settled
+            query={stacks.trip(session.session.tripId)}
+            skeleton={
+              <Screen>
+                <SessionScreenSkeleton />
+              </Screen>
+            }
+          >
             <Settled
-              query={stacks.trip(session.session.tripId)}
-              skeleton={<SessionScreenSkeleton />}
+              query={stacks.limits(session.session.tripId)}
+              skeleton={
+                <Screen>
+                  <SessionScreenSkeleton />
+                </Screen>
+              }
             >
-              <Settled
-                query={stacks.limits(session.session.tripId)}
-                skeleton={<SessionScreenSkeleton />}
+              <Loaded
+                renderError={screenError}
+                query={stacks.group(session.session.groupId)}
+                skeleton={
+                  <Screen>
+                    <SessionScreenSkeleton />
+                  </Screen>
+                }
               >
-                <Loaded
-                  query={stacks.group(session.session.groupId)}
-                  skeleton={<SessionScreenSkeleton />}
-                >
-                  {(group) => <SessionView detail={session} group={group} />}
-                </Loaded>
-              </Settled>
+                {(group) => <SessionView detail={session} group={group} />}
+              </Loaded>
             </Settled>
-          </>
-        )}
-      </Loaded>
-    </Screen>
+          </Settled>
+        </>
+      )}
+    </Loaded>
   );
 }
 
@@ -116,7 +132,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   const live = session.status === "live";
   const currency = group.group.currency;
   const names = playerNames(group);
-  const toast = useToast();
   const voidEntry = useAction(stacks.Client.mutation("ledger", "voidEntry"));
   const outbox = useOutbox();
   const { pending: queued, sent } = useUnsaved(session.id, detail.entries);
@@ -170,7 +185,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
     return id;
   };
 
-  const undo = async (id: EntryId) => {
+  const undo = async (id: EntryId, toast: (toast: Toast) => void) => {
     setUndone((all) => new Set(all).add(id));
     // An entry the server never got just leaves the outbox; one it has gets voided.
     await outbox.flush();
@@ -189,7 +204,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   };
 
   // Rebuy stays where it is, so a second tap rebuys again; the toast is where to take one back.
-  const rebuy = (playerId: PlayerId, amount: Entry["amount"]) => {
+  const rebuy = (playerId: PlayerId, amount: Entry["amount"], toast: (toast: Toast) => void) => {
     const id = record({
       kind: "buy_in",
       playerId,
@@ -200,7 +215,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
     });
     toast({
       message: `${names.get(playerId) ?? "Player"} bought in ${formatMoney(amount, currency)}`,
-      action: { label: "Undo", onPress: () => void undo(id) },
+      action: { label: "Undo", onPress: () => void undo(id, toast) },
     });
   };
   // While playing you come first; once closed, the table reads like a receipt, best result first.
@@ -235,390 +250,450 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
       DateTime.toEpochMillis(b.entry.occurredAt) - DateTime.toEpochMillis(a.entry.occurredAt),
   );
 
+  const heroBought = heroPlayerId !== undefined && (results.get(heroPlayerId)?.buyIn ?? 0) > 0;
+  const heroRebuyAmount = heroPlayerId === undefined ? undefined : lastBuyIn(heroPlayerId)?.amount;
+  const heroBuyInLabel = !heroBought
+    ? "Buy in"
+    : heroRebuyAmount === undefined
+      ? "Rebuy"
+      : `Rebuy ${formatMoney(heroRebuyAmount, currency)}`;
+
   return (
-    <>
-      {live ? <KeepAwake /> : null}
-      <Loaded query={stacks.trip(session.tripId)} skeleton={<></>}>
-        {(trip) => (
-          <LimitNotices
-            group={group}
-            trip={trip}
-            local={{
-              sessionId: session.id,
-              status: session.status,
-              myJoinedAt: detail.myJoinedAt ?? null,
-              playing:
-                detail.playerIds.includes(group.myPlayerId) && !cashedOut.has(group.myPlayerId),
-              net: results.get(group.myPlayerId)?.net ?? MinorUnits.make(0),
-            }}
-          />
-        )}
-      </Loaded>
-      <View className="gap-3">
-        <PageTitle context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
-          {venue.name}
-        </PageTitle>
-        <View className="flex-row items-center gap-2">
-          {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
-          <HighLimitToggle detail={detail} />
-          <Text className="flex-1 text-sm text-muted">
-            {formatTime(session.startedAt)}
-            {/* Imported sessions end when they start: no length was recorded. */}
-            {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
-              ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
-              : ""}
-          </Text>
-        </View>
-        {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
-      </View>
-
-      {heroPlayerId ? (
-        <SeatHero
-          name={names.get(heroPlayerId) ?? "Player"}
-          chip={chipOf(group, heroPlayerId)}
-          seat={seatsNow(detail.seatings).get(heroPlayerId)}
-          you={heroPlayerId === group.myPlayerId}
-          result={results.get(heroPlayerId)}
-          live={live}
-          out={cashedOut.has(heroPlayerId)}
-          rebuyAmount={lastBuyIn(heroPlayerId)?.amount}
-          currency={currency}
-          onBuyIn={() => setDraft({ kind: "buy_in", playerId: heroPlayerId })}
-          onRebuy={() => {
-            const last = lastBuyIn(heroPlayerId);
-            if (last) rebuy(heroPlayerId, last.amount);
-          }}
-          onCashOut={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
-        />
-      ) : null}
-      {seatCount(session) ? (
-        <TableMap
-          detail={detail}
-          seats={seatCount(session)!}
-          view={tableView({
-            closed: !live,
-            seats: seatsNow(detail.seatings),
-            results,
-            cashedOut,
-          })}
-          currency={currency}
-          names={names}
-          chipOf={(playerId) => chipOf(group, playerId)}
-        />
-      ) : null}
-      <TicketStub
-        players={detail.playerIds.length}
-        results={[...results.values()]}
-        currency={currency}
-      />
-
-      <View className="gap-3">
-        <SectionHeading
-          action={
-            live ? (
-              <Button
-                label="Add player"
-                size="sm"
-                variant="ghost"
-                onPress={() => setAddingPlayer(true)}
-              />
-            ) : undefined
-          }
-        >
-          At the table
-        </SectionHeading>
-        <List>
-          {seats.map((playerId, rank) => {
-            const result = results.get(playerId);
-            const name = names.get(playerId) ?? "Player";
-            const lastRebuy = lastBuyIn(playerId);
-            const out = cashedOut.has(playerId);
-            const bought = result !== undefined && result.buyIn > 0;
-            // A closed session's results are final, cash-out or not.
-            const final = result !== undefined && (!live || out);
-            const status = final
-              ? formatMoney(result.net, currency, { signDisplay: "exceptZero" })
-              : bought
-                ? `in ${formatMoney(result.buyIn, currency)}, playing`
-                : "no buy-in yet";
-            return (
-              <View
-                key={playerId}
-                className="flex-row items-center gap-3 border-t border-line pr-3"
-              >
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${name}, ${status}`}
-                  accessibilityHint={live ? "Record a buy-in, cash-out or adjustment" : undefined}
-                  disabled={!live}
-                  onPress={() =>
-                    setDraft({ kind: bought && !out ? "cash_out" : "buy_in", playerId })
-                  }
-                  className="min-h-16 flex-1 flex-row items-center gap-3 py-3 pl-4 active:bg-sunken"
-                >
-                  <Chip chip={chipOf(group, playerId)} name={name} size={30} />
-                  <View className="flex-1 gap-0.5">
-                    <Text numberOfLines={1} className="text-base font-medium text-ink">
-                      {name}
-                      {playerId === group.myPlayerId ? (
-                        <Text className="font-sans text-sm tracking-normal text-muted normal-case">
-                          {" "}
-                          you
-                        </Text>
-                      ) : null}
-                    </Text>
-                    <Text className="text-sm text-muted tabular-nums">
-                      {result && result.buyIn === 0 && result.cashOut === 0 ? null : result ? (
-                        <>
-                          In{" "}
-                          <Money amount={result.buyIn} currency={currency} className="text-muted" />{" "}
-                          · Out{" "}
-                          <Money
-                            amount={result.cashOut}
-                            currency={currency}
-                            className="text-muted"
-                          />
-                        </>
-                      ) : (
-                        "No buy-ins yet"
-                      )}
-                    </Text>
-                  </View>
-                  {final ? (
-                    <Reveal
-                      key={live ? "live" : "closed"}
-                      animate={live ? !settledAtOpen.has(playerId) : !closedAtOpen}
-                      delay={live ? 0 : rank * 90}
-                    >
-                      <Money
-                        amount={result.net}
-                        currency={currency}
-                        tone="result"
-                        className="text-xl"
-                      />
-                    </Reveal>
-                  ) : null}
-                </Pressable>
-                {!live || out ? null : lastRebuy ? (
+    <Screen
+      shows={{ session: session.id }}
+      renderFooter={
+        live && heroPlayerId && !cashedOut.has(heroPlayerId)
+          ? (toast) => (
+              <>
+                <Text className="text-sm text-muted">
+                  {names.get(heroPlayerId) ?? "Player"}
+                  {heroPlayerId === group.myPlayerId ? " · you" : ""}
+                </Text>
+                <View className="flex-row gap-3">
                   <Button
-                    label={`Rebuy ${formatMoney(lastRebuy.amount, currency)}`}
-                    accessibilityLabel={`Rebuy ${formatMoney(lastRebuy.amount, currency)} for ${name}`}
-                    variant="tint"
-                    size="sm"
-                    className="min-w-20"
                     haptic
-                    onPress={() => rebuy(playerId, lastRebuy.amount)}
+                    label={heroBuyInLabel}
+                    accessibilityLabel={`${heroBuyInLabel} for ${names.get(heroPlayerId) ?? "Player"}`}
+                    variant="primary"
+                    size="lg"
+                    className="flex-1"
+                    onPress={() => {
+                      const last = lastBuyIn(heroPlayerId);
+                      if (last) rebuy(heroPlayerId, last.amount, toast);
+                      else setDraft({ kind: "buy_in", playerId: heroPlayerId });
+                    }}
                   />
-                ) : (
-                  <Button
-                    label="Buy in"
-                    accessibilityLabel={`Buy in for ${name}`}
-                    size="sm"
-                    className="min-w-20"
-                    onPress={() => setDraft({ kind: "buy_in", playerId })}
-                  />
-                )}
-              </View>
-            );
-          })}
-        </List>
-        {live ? (
-          <Text className="text-sm text-muted">
-            Tap a player to cash them out or record anything else.
-          </Text>
-        ) : null}
-      </View>
+                  {heroBought ? (
+                    <Button
+                      label="Cash out"
+                      accessibilityLabel={`Cash out for ${names.get(heroPlayerId) ?? "Player"}`}
+                      size="lg"
+                      className="flex-1"
+                      onPress={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
+                    />
+                  ) : null}
+                </View>
+              </>
+            )
+          : undefined
+      }
+    >
+      {(toast) => (
+        <>
+          {live ? <KeepAwake /> : null}
+          <Loaded query={stacks.trip(session.tripId)} skeleton={<></>}>
+            {(trip) => (
+              <LimitNotices
+                group={group}
+                trip={trip}
+                local={{
+                  sessionId: session.id,
+                  status: session.status,
+                  myJoinedAt: detail.myJoinedAt ?? null,
+                  playing:
+                    detail.playerIds.includes(group.myPlayerId) && !cashedOut.has(group.myPlayerId),
+                  net: results.get(group.myPlayerId)?.net ?? MinorUnits.make(0),
+                }}
+              />
+            )}
+          </Loaded>
+          <View className="gap-3">
+            <PageTitle context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
+              {venue.name}
+            </PageTitle>
+            <View className="flex-row items-center gap-2">
+              {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
+              <HighLimitToggle detail={detail} />
+              <Text className="flex-1 text-sm text-muted">
+                {formatTime(session.startedAt)}
+                {/* Imported sessions end when they start: no length was recorded. */}
+                {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
+                  ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
+                  : ""}
+              </Text>
+            </View>
+            {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
+          </View>
 
-      {!live ? (
-        <View className="flex-row gap-2">
-          {group.trips.some((trip) => trip.id === session.tripId && trip.endedAt === null) ? (
-            <Button
-              label="Start another session"
-              className="flex-1"
-              onPress={() => go.newSession(session.tripId, session.id)}
+          {heroPlayerId ? (
+            <SeatHero
+              name={names.get(heroPlayerId) ?? "Player"}
+              chip={chipOf(group, heroPlayerId)}
+              seat={seatsNow(detail.seatings).get(heroPlayerId)}
+              you={heroPlayerId === group.myPlayerId}
+              result={results.get(heroPlayerId)}
+              live={live}
+              out={cashedOut.has(heroPlayerId)}
+              currency={currency}
             />
           ) : null}
-          <Button
-            label="See the board"
-            className="flex-1"
-            onPress={() => go.trip(session.tripId, "Board")}
+          {seatCount(session) ? (
+            <TableMap
+              detail={detail}
+              seats={seatCount(session)!}
+              view={tableView({
+                closed: !live,
+                seats: seatsNow(detail.seatings),
+                results,
+                cashedOut,
+              })}
+              currency={currency}
+              names={names}
+              chipOf={(playerId) => chipOf(group, playerId)}
+            />
+          ) : null}
+          <TicketStub
+            players={detail.playerIds.length}
+            results={[...results.values()]}
+            currency={currency}
           />
-        </View>
-      ) : null}
-      <View className="gap-2">
-        <SectionHeading>History</SectionHeading>
-        {history.length === 0 ? (
-          <Text className="text-sm text-muted">
-            Buy-ins and cash-outs show up here as you record them.
-          </Text>
-        ) : (
-          <List>
-            {history.map((item) => {
-              const { entry, saving } = item;
-              const locallyUndone = undone.has(entry.id);
-              const voided = locallyUndone || (!item.saving && item.entry.voidedAt !== null);
-              const voidReason = locallyUndone
-                ? "Undone"
-                : item.saving
-                  ? null
-                  : item.entry.voidReason;
-              const voidedById = item.saving ? null : item.entry.voidedBy;
-              const voidedBy = locallyUndone
-                ? (names.get(group.myPlayerId) ?? null)
-                : voidedById
-                  ? (group.players.find((player) => player.userId === voidedById)?.displayName ??
-                    null)
-                  : null;
-              const counterparty = entry.counterpartyId ? names.get(entry.counterpartyId) : null;
-              const actionable = live && !item.saving && !voided && canVoid(item.entry);
-              const content = (
-                <>
-                  <Text numberOfLines={1} className="w-20 font-mono text-xs text-muted">
-                    {formatTime(entry.occurredAt)}
-                  </Text>
-                  <View className="flex-1 gap-0.5">
-                    <Text
-                      className={cn("text-base", voided ? "text-muted line-through" : "text-ink")}
-                    >
-                      {names.get(entry.playerId)}{" "}
-                      {entry.kind === "cash_out" && entry.amount === 0 ? (
-                        "busted"
-                      ) : (
-                        <>
-                          {verbs[entry.kind]}{" "}
-                          <Money
-                            amount={entry.amount}
-                            currency={currency}
-                            tone={entry.kind === "adjustment" ? "result" : "plain"}
-                            className={cn("font-medium", voided && "text-muted")}
-                          />
-                        </>
-                      )}
-                    </Text>
-                    {counterparty || entry.note || voided || saving ? (
-                      <Text className="text-sm text-muted">
-                        {[
-                          counterparty && entry.kind === "buy_in" ? `${counterparty} paid` : null,
-                          counterparty && entry.kind === "cash_out"
-                            ? `${counterparty} has the cash`
-                            : null,
-                          entry.note,
-                          item.saving
-                            ? (item.entry.failed ?? "Saved on this phone, sending")
-                            : null,
-                          voided
-                            ? `${voidedBy ? `Voided by ${voidedBy}` : "Voided"}${voidReason ? `: ${voidReason}` : ""}`
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </Text>
-                    ) : null}
-                  </View>
-                  {entry.replacesEntryId ? <Tag>Corrected</Tag> : null}
-                </>
-              );
-              if (item.saving && item.entry.failed !== null) {
-                const reason = item.entry.failed;
-                return (
-                  <Pressable
-                    key={entry.id}
-                    accessibilityRole="button"
-                    accessibilityHint="Try saving it again or discard it"
-                    onPress={() => setRefused({ id: entry.id, reason })}
-                    className="flex-row items-center gap-3 border-t border-line bg-danger/10 px-4 py-3 active:bg-sunken"
-                  >
-                    {content}
-                  </Pressable>
-                );
+
+          <View className="gap-3">
+            <SectionHeading
+              action={
+                live ? (
+                  <Button
+                    label="Add player"
+                    size="sm"
+                    variant="ghost"
+                    onPress={() => setAddingPlayer(true)}
+                  />
+                ) : undefined
               }
-              return actionable && !item.saving ? (
-                <Pressable
-                  key={entry.id}
-                  accessibilityRole="button"
-                  accessibilityHint="Correct or void this entry"
-                  onPress={() => setSelected(item.entry)}
-                  className="flex-row items-center gap-3 border-t border-line px-4 py-3 active:bg-sunken"
-                >
-                  {content}
-                </Pressable>
-              ) : (
-                <Row key={entry.id}>{content}</Row>
-              );
-            })}
-          </List>
-        )}
-      </View>
+            >
+              At the table
+            </SectionHeading>
+            <List>
+              {seats.map((playerId, rank) => {
+                const result = results.get(playerId);
+                const name = names.get(playerId) ?? "Player";
+                const lastRebuy = lastBuyIn(playerId);
+                const out = cashedOut.has(playerId);
+                const bought = result !== undefined && result.buyIn > 0;
+                // A closed session's results are final, cash-out or not.
+                const final = result !== undefined && (!live || out);
+                const status = final
+                  ? formatMoney(result.net, currency, { signDisplay: "exceptZero" })
+                  : bought
+                    ? `in ${formatMoney(result.buyIn, currency)}, playing`
+                    : "no buy-in yet";
+                return (
+                  <View
+                    key={playerId}
+                    className="flex-row items-center gap-3 border-t border-line pr-3"
+                  >
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${name}, ${status}`}
+                      accessibilityHint={
+                        live ? "Record a buy-in, cash-out or adjustment" : undefined
+                      }
+                      disabled={!live}
+                      onPress={() =>
+                        setDraft({ kind: bought && !out ? "cash_out" : "buy_in", playerId })
+                      }
+                      className="min-h-16 flex-1 flex-row items-center gap-3 py-3 pl-4 active:bg-sunken"
+                    >
+                      <Chip chip={chipOf(group, playerId)} name={name} size={30} />
+                      <View className="flex-1 gap-0.5">
+                        <Text numberOfLines={1} className="text-base font-medium text-ink">
+                          {name}
+                          {playerId === group.myPlayerId ? (
+                            <Text className="font-sans text-sm tracking-normal text-muted normal-case">
+                              {" "}
+                              you
+                            </Text>
+                          ) : null}
+                        </Text>
+                        <Text className="text-sm text-muted tabular-nums">
+                          {result && result.buyIn === 0 && result.cashOut === 0 ? null : result ? (
+                            <>
+                              In{" "}
+                              <Money
+                                amount={result.buyIn}
+                                currency={currency}
+                                className="text-muted"
+                              />{" "}
+                              · Out{" "}
+                              <Money
+                                amount={result.cashOut}
+                                currency={currency}
+                                className="text-muted"
+                              />
+                            </>
+                          ) : (
+                            "No buy-ins yet"
+                          )}
+                        </Text>
+                      </View>
+                      {final ? (
+                        <Reveal
+                          key={live ? "live" : "closed"}
+                          animate={live ? !settledAtOpen.has(playerId) : !closedAtOpen}
+                          delay={live ? 0 : rank * 90}
+                        >
+                          <Money
+                            amount={result.net}
+                            currency={currency}
+                            tone="result"
+                            className="text-xl"
+                          />
+                        </Reveal>
+                      ) : null}
+                    </Pressable>
+                    {!live || out || playerId === heroPlayerId ? null : lastRebuy ? (
+                      <Button
+                        label={`Rebuy ${formatMoney(lastRebuy.amount, currency)}`}
+                        accessibilityLabel={`Rebuy ${formatMoney(lastRebuy.amount, currency)} for ${name}`}
+                        variant="tint"
+                        size="sm"
+                        className="min-w-20"
+                        haptic
+                        onPress={() => rebuy(playerId, lastRebuy.amount, toast)}
+                      />
+                    ) : (
+                      <Button
+                        label="Buy in"
+                        accessibilityLabel={`Buy in for ${name}`}
+                        size="sm"
+                        className="min-w-20"
+                        onPress={() => setDraft({ kind: "buy_in", playerId })}
+                      />
+                    )}
+                  </View>
+                );
+              })}
+            </List>
+            {live ? (
+              <Text className="text-sm text-muted">
+                Tap a player to cash them out or record anything else.
+              </Text>
+            ) : null}
+          </View>
 
-      <StatusActions detail={detail} group={group} onClose={() => setClosing(true)} />
+          {!live ? (
+            <View className="flex-row gap-2">
+              {group.trips.some((trip) => trip.id === session.tripId && trip.endedAt === null) ? (
+                <Button
+                  label="Start another session"
+                  className="flex-1"
+                  onPress={() => go.newSession(session.tripId, session.id)}
+                />
+              ) : null}
+              <Button
+                label="See the board"
+                className="flex-1"
+                onPress={() => go.trip(session.tripId, "Board")}
+              />
+            </View>
+          ) : null}
+          <View className="gap-2">
+            <SectionHeading>History</SectionHeading>
+            {history.length === 0 ? (
+              <Text className="text-sm text-muted">
+                Buy-ins and cash-outs show up here as you record them.
+              </Text>
+            ) : (
+              <List>
+                {history.map((item) => {
+                  const { entry, saving } = item;
+                  const locallyUndone = undone.has(entry.id);
+                  const voided = locallyUndone || (!item.saving && item.entry.voidedAt !== null);
+                  const voidReason = locallyUndone
+                    ? "Undone"
+                    : item.saving
+                      ? null
+                      : item.entry.voidReason;
+                  const voidedById = item.saving ? null : item.entry.voidedBy;
+                  const voidedBy = locallyUndone
+                    ? (names.get(group.myPlayerId) ?? null)
+                    : voidedById
+                      ? (group.players.find((player) => player.userId === voidedById)
+                          ?.displayName ?? null)
+                      : null;
+                  const counterparty = entry.counterpartyId
+                    ? names.get(entry.counterpartyId)
+                    : null;
+                  const actionable = live && !item.saving && !voided && canVoid(item.entry);
+                  const content = (
+                    <>
+                      <Text numberOfLines={1} className="w-20 font-mono text-xs text-muted">
+                        {formatTime(entry.occurredAt)}
+                      </Text>
+                      <View className="flex-1 gap-0.5">
+                        <Text
+                          className={cn(
+                            "text-base",
+                            voided ? "text-muted line-through" : "text-ink",
+                          )}
+                        >
+                          {names.get(entry.playerId)}{" "}
+                          {entry.kind === "cash_out" && entry.amount === 0 ? (
+                            "busted"
+                          ) : (
+                            <>
+                              {verbs[entry.kind]}{" "}
+                              <Money
+                                amount={entry.amount}
+                                currency={currency}
+                                tone={entry.kind === "adjustment" ? "result" : "plain"}
+                                className={cn("font-medium", voided && "text-muted")}
+                              />
+                            </>
+                          )}
+                        </Text>
+                        {counterparty || entry.note || voided || saving ? (
+                          <Text className="text-sm text-muted">
+                            {[
+                              counterparty && entry.kind === "buy_in"
+                                ? `${counterparty} paid`
+                                : null,
+                              counterparty && entry.kind === "cash_out"
+                                ? `${counterparty} has the cash`
+                                : null,
+                              entry.note,
+                              item.saving
+                                ? (item.entry.failed ?? "Saved on this phone, sending")
+                                : null,
+                              voided
+                                ? `${voidedBy ? `Voided by ${voidedBy}` : "Voided"}${voidReason ? `: ${voidReason}` : ""}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </Text>
+                        ) : null}
+                      </View>
+                      {entry.replacesEntryId ? <Tag>Corrected</Tag> : null}
+                    </>
+                  );
+                  if (item.saving && item.entry.failed !== null) {
+                    const reason = item.entry.failed;
+                    return (
+                      <Pressable
+                        key={entry.id}
+                        accessibilityRole="button"
+                        accessibilityHint="Try saving it again or discard it"
+                        onPress={() => setRefused({ id: entry.id, reason })}
+                        className="flex-row items-center gap-3 border-t border-line bg-danger/10 px-4 py-3 active:bg-sunken"
+                      >
+                        {content}
+                      </Pressable>
+                    );
+                  }
+                  return actionable && !item.saving ? (
+                    <Pressable
+                      key={entry.id}
+                      accessibilityRole="button"
+                      accessibilityHint="Correct or void this entry"
+                      onPress={() => setSelected(item.entry)}
+                      className="flex-row items-center gap-3 border-t border-line px-4 py-3 active:bg-sunken"
+                    >
+                      {content}
+                    </Pressable>
+                  ) : (
+                    <Row key={entry.id}>{content}</Row>
+                  );
+                })}
+              </List>
+            )}
+          </View>
 
-      {draft ? (
-        <EntrySheet
-          detail={group}
-          draft={draft}
-          presets={buyInPresets(counted, draft.playerId)}
-          onSubmit={(input) => {
-            record(input);
-            if (input.kind === "cash_out") succeed();
-          }}
-          onClose={() => setDraft(null)}
-        />
-      ) : null}
-      {selected ? (
-        <EntryActionsSheet
-          entry={selected}
-          onClose={() => setSelected(null)}
-          onCorrect={() => {
-            setSelected(null);
-            if (selected.kind !== "settlement")
-              setDraft({ kind: selected.kind, playerId: selected.playerId, replaces: selected });
-          }}
-        />
-      ) : null}
-      {refused ? (
-        <Sheet
-          open
-          onClose={() => setRefused(null)}
-          title="This didn't save"
-          description={refused.reason}
-          footer={
-            <>
-              <Button
-                label="Try again"
-                variant="primary"
-                size="lg"
-                onPress={() => {
-                  void outbox.retry(refused.id);
-                  setRefused(null);
-                }}
-              />
-              <Button
-                label="Discard it"
-                variant="danger"
-                size="lg"
-                onPress={() => {
-                  outbox.discard(refused.id);
-                  setRefused(null);
-                }}
-              />
-            </>
-          }
-        />
-      ) : null}
-      {closing ? (
-        <CloseSheet
-          detail={detail}
-          playing={seats
-            .filter((id) => (results.get(id)?.buyIn ?? 0) > 0 && !cashedOut.has(id))
-            .map((id) => ({ id, name: names.get(id) ?? "Player" }))}
-          currency={currency}
-          onClose={() => setClosing(false)}
-        />
-      ) : null}
-      {addingPlayer ? (
-        <AddPlayerSheet detail={detail} group={group} onClose={() => setAddingPlayer(false)} />
-      ) : null}
-    </>
+          <StatusActions detail={detail} group={group} onClose={() => setClosing(true)} />
+
+          {draft ? (
+            <EntrySheet
+              detail={group}
+              draft={draft}
+              presets={buyInPresets(counted, draft.playerId)}
+              onSubmit={(input) => {
+                record(input);
+                if (input.kind === "cash_out") succeed();
+              }}
+              onClose={() => setDraft(null)}
+            />
+          ) : null}
+          {selected ? (
+            <EntryActionsSheet
+              entry={selected}
+              onClose={() => setSelected(null)}
+              onCorrect={() => {
+                setSelected(null);
+                if (selected.kind !== "settlement")
+                  setDraft({
+                    kind: selected.kind,
+                    playerId: selected.playerId,
+                    replaces: selected,
+                  });
+              }}
+            />
+          ) : null}
+          {refused ? (
+            <Sheet
+              open
+              onClose={() => setRefused(null)}
+              title="This didn't save"
+              description={refused.reason}
+              footer={
+                <>
+                  <Button
+                    label="Try again"
+                    variant="primary"
+                    size="lg"
+                    onPress={() => {
+                      void outbox.retry(refused.id);
+                      setRefused(null);
+                    }}
+                  />
+                  <Button
+                    label="Discard it"
+                    variant="danger"
+                    size="lg"
+                    onPress={() => {
+                      outbox.discard(refused.id);
+                      setRefused(null);
+                    }}
+                  />
+                </>
+              }
+            />
+          ) : null}
+          {closing ? (
+            <CloseSheet
+              detail={detail}
+              playing={seats
+                .filter((id) => (results.get(id)?.buyIn ?? 0) > 0 && !cashedOut.has(id))
+                .map((id) => ({ id, name: names.get(id) ?? "Player" }))}
+              currency={currency}
+              onClose={() => setClosing(false)}
+            />
+          ) : null}
+          {addingPlayer ? (
+            <AddPlayerSheet detail={detail} group={group} onClose={() => setAddingPlayer(false)} />
+          ) : null}
+        </>
+      )}
+    </Screen>
   );
 }
 
@@ -850,6 +925,7 @@ function CloseSheet({
           {missing ? (
             <FormError>Enter what each of them cashed out, 0 if they busted.</FormError>
           ) : null}
+          {close.error ? <FormError>{close.error}</FormError> : null}
           <Button
             label="Close session"
             variant="primary"
@@ -858,15 +934,7 @@ function CloseSheet({
             pending={closing === "close"}
             onPress={() => void confirm(false)}
           />
-          <Button
-            label="Close and move tables"
-            accessibilityLabel="Close and start another session with the same players"
-            size="lg"
-            disabled={closing !== null}
-            pending={closing === "move"}
-            onPress={() => void confirm(true)}
-          />
-          <Button label="Keep playing" variant="ghost" onPress={onClose} />
+
           {playing.length > 0 ? (
             <AmountKeypad
               onKey={pressKey}
@@ -900,7 +968,16 @@ function CloseSheet({
           Close once they have, so nothing is left out.
         </FormError>
       ) : null}
-      {close.error ? <FormError>{close.error}</FormError> : null}
+
+      <Button
+        label="Close and move tables"
+        accessibilityLabel="Close and start another session with the same players"
+        size="lg"
+        disabled={closing !== null}
+        pending={closing === "move"}
+        onPress={() => void confirm(true)}
+      />
+      <Button label="Keep playing" variant="ghost" onPress={onClose} />
     </Sheet>
   );
 }

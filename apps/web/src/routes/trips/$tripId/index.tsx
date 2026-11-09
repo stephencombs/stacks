@@ -4,6 +4,7 @@ import { localClock, nightLabel } from "@stacks/client-runtime/trip";
 import { tripNights } from "@stacks/shared/trips";
 import { Plus } from "lucide-react";
 
+import { ActionBar } from "~/components/ui/ActionBar";
 import { Money } from "~/components/Money";
 import { ButtonLink } from "~/components/ui/Button";
 import { EmptyState, Section } from "~/components/ui/Page";
@@ -42,6 +43,8 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
         to="/trips/$tripId/sessions/new"
         params={{ tripId: trip.trip.id }}
         variant={mine ? "secondary" : "primary"}
+        className="w-full lg:w-auto"
+        size="lg"
       >
         <Plus className="size-4" aria-hidden />
         Start a session
@@ -50,7 +53,12 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
 
   return (
     <>
-      <TripHeader group={group} trip={trip} place="sessions" action={startSession} />
+      <TripHeader
+        group={group}
+        trip={trip}
+        place="sessions"
+        action={<div className="hidden lg:block">{startSession}</div>}
+      />
       <TripLayout rail={<TripRail group={group} trip={trip} />}>
         <LimitNotices group={group} trip={trip} />
         {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}
@@ -96,6 +104,22 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
           </EmptyState>
         ) : null}
       </TripLayout>
+      {startSession ? (
+        <ActionBar className="lg:hidden">
+          {mine ? (
+            <ButtonLink
+              to="/sessions/$sessionId"
+              params={{ sessionId: mine.session.id }}
+              variant="primary"
+              size="lg"
+              className="w-full"
+            >
+              Back to your table
+            </ButtonLink>
+          ) : null}
+          {startSession}
+        </ActionBar>
+      ) : null}
     </>
   );
 }
