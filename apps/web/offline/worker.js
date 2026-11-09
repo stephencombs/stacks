@@ -39,7 +39,14 @@ self.addEventListener("install", (event) => {
       }
     })(),
   );
-  // Let existing tabs finish with their version; no skipWaiting or forced reload.
+  // Let existing tabs finish with their version; a page switches only when its person agrees.
+});
+
+// Only same-origin pages can message a service worker, so no origin check is needed.
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 self.addEventListener("activate", (event) => {
