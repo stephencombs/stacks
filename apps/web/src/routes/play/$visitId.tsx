@@ -18,7 +18,7 @@ import { Money } from "~/components/Money";
 import { Button, ButtonLink } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { BackLink } from "~/components/ui/Nav";
-import { EmptyState, Note, PageHeader, Section } from "~/components/ui/Page";
+import { EmptyState, PageHeader, Section } from "~/components/ui/Page";
 import { Glow, List, Row, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
 import { Dock, focusMain, PersonalFrame, SaveStatus, useDialogFocus } from "~/features/Personal";
 import {
