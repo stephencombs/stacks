@@ -12,6 +12,15 @@ export type PlayerId = typeof PlayerId.Type;
 export const SessionId = Uuid.pipe(Schema.brand("SessionId"));
 export type SessionId = typeof SessionId.Type;
 
+export const TableId = Uuid.pipe(Schema.brand("TableId"));
+export type TableId = typeof TableId.Type;
+
+export const VisitId = Uuid.pipe(Schema.brand("VisitId"));
+export type VisitId = typeof VisitId.Type;
+
+export const ActorId = Uuid.pipe(Schema.brand("ActorId"));
+export type ActorId = typeof ActorId.Type;
+
 export const EntryId = Uuid.pipe(Schema.brand("EntryId"));
 export type EntryId = typeof EntryId.Type;
 

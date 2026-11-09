@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import { useNavigation } from "@react-navigation/native";
+import { StackActions, useNavigation } from "@react-navigation/native";
 import { scopeTrips, tripDates, unsettledAmount } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useState } from "react";
@@ -168,10 +168,17 @@ function ScopeSheet({ scope, onClose }: { scope: Scope; onClose: () => void }) {
         </View>
       ) : null}
       <List>
-        <Row onPress={then(() => navigation.navigate("Groups"))}>
+        <Row onPress={then(() => navigation.navigate("Account", { screen: "Groups" }))}>
           <View className="flex-1 gap-0.5">
             <Text className="text-base font-medium text-ink">All groups</Text>
             <Text className="text-sm text-muted">Start a new group</Text>
+          </View>
+          <Icon name="chevron-right" color="faint" size={18} />
+        </Row>
+        <Row onPress={then(() => navigation.dispatch(StackActions.popTo("Home")))}>
+          <View className="flex-1 gap-0.5">
+            <Text className="text-base font-medium text-ink">Your play</Text>
+            <Text className="text-sm text-muted">Sessions saved on this device</Text>
           </View>
           <Icon name="chevron-right" color="faint" size={18} />
         </Row>

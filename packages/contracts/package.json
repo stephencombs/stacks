@@ -7,6 +7,22 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./players": {
+      "types": "./src/players.ts",
+      "import": "./src/players.ts"
+    },
+    "./recording": {
+      "types": "./src/recording.ts",
+      "import": "./src/recording.ts"
+    },
+    "./relationships": {
+      "types": "./src/relationships.ts",
+      "import": "./src/relationships.ts"
+    },
+    "./recordingCommands": {
+      "types": "./src/recordingCommands.ts",
+      "import": "./src/recordingCommands.ts"
     }
   },
   "scripts": {

@@ -405,16 +405,6 @@ export function GroupPageSkeleton({ on }: { on: "hub" | "people" | "settings" })
   );
 }
 
-/** Your groups loading. */
-export function GroupsSkeleton() {
-  return (
-    <SkeletonPage label="Loading your groups">
-      <HeaderSkeleton title="w-56 sm:w-72" action />
-      <RowsSkeleton rows={3} trailing={false} />
-    </SkeletonPage>
-  );
-}
-
 /** Fields at the height of real ones, each with its label. */
 export function FieldsSkeleton({ fields }: { fields: number }) {
   return (

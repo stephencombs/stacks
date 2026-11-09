@@ -1,0 +1,484 @@
+import { Actor, PlayEntry, PlayerIdentity, Table, Visit, type EntryId } from "@stacks/contracts";
+import { RecordingCommand } from "@stacks/contracts/recordingCommands";
+import { visitSummary } from "@stacks/shared/visits";
+import * as DateTime from "effect/DateTime";
+import * as Schema from "effect/Schema";
+
+export const RecordingReceipt = Schema.Struct({
+  command: RecordingCommand,
+  revision: Schema.Int.check(Schema.isGreaterThan(1)),
+});
+export type RecordingReceipt = typeof RecordingReceipt.Type;
+
+export const RecordingState = Schema.Struct({
+  version: Schema.Literal(1),
+  self: PlayerIdentity,
+  actor: Actor,
+  tables: Schema.Array(Table),
+  visits: Schema.Array(Visit),
+  entries: Schema.Array(PlayEntry),
+  receipts: Schema.Array(RecordingReceipt),
+});
+export type RecordingState = typeof RecordingState.Type;
+
+export class RecordingError extends Error {
+  override readonly name = "RecordingError";
+  readonly reason: "invalid" | "conflict" | "operation_reused" | "load" | "closed";
+  constructor(
+    reason: "invalid" | "conflict" | "operation_reused" | "load" | "closed",
+    message: string,
+    cause?: unknown,
+  ) {
+    super(message, { cause });
+    this.reason = reason;
+  }
+}
+
+const requireValid: (condition: unknown, message: string) => asserts condition = (
+  condition,
+  message,
+) => {
+  if (!condition) throw new RecordingError("invalid", message);
+};
+const ms = DateTime.toEpochMillis;
+// The live cash-out that last finished the visit, following corrections to its replacement.
+const finalCashOut = (current: EntryId | null, command: RecordingCommand) => {
+  switch (command.type) {
+    case "record_completed":
+      return command.cashOutId;
+    case "finish":
+      return command.entryId;
+    case "correct":
+      return command.entryId === current ? (command.replacement?.id ?? null) : current;
+    case "reopen":
+      return null;
+    default:
+      return current;
+  }
+};
+const unique = (records: ReadonlyArray<{ readonly id: string }>) =>
+  new Set(records.map((record) => record.id)).size === records.length;
+
+const validateRecordingState = (state: RecordingState) => {
+  requireValid(state.actor.userId === null, "Private recording has a local actor.");
+  requireValid(
+    unique(state.tables) && unique(state.visits) && unique(state.entries),
+    "Duplicate record ID.",
+  );
+  const tables = new Map(state.tables.map((table) => [table.id, table]));
+  const visits = new Map(state.visits.map((visit) => [visit.id, visit]));
+  const entries = new Map(state.entries.map((entry) => [entry.id, entry]));
+  for (const table of state.tables) {
+    requireValid(
+      table.tripId === null && table.starterActorId === state.actor.id,
+      "Foreign table ownership.",
+    );
+    requireValid(
+      state.visits.some((visit) => visit.tableId === table.id),
+      "Table has no visit.",
+    );
+  }
+  for (const visit of state.visits) {
+    requireValid(
+      tables.has(visit.tableId) && visit.playerId === state.self.id,
+      "Foreign visit ownership.",
+    );
+    const summary = visitSummary(visit, state.entries);
+    const result =
+      BigInt(summary.totals.cashOut) +
+      BigInt(summary.totals.adjustment) -
+      BigInt(summary.totals.buyIn);
+    requireValid(
+      result >= BigInt(Number.MIN_SAFE_INTEGER) && result <= BigInt(Number.MAX_SAFE_INTEGER),
+      "Result overflow.",
+    );
+  }
+  for (const entry of state.entries) {
+    const visit = visits.get(entry.visitId);
+    requireValid(
+      visit && entry.createdBy === state.actor.id && entry.counterpartyId === null,
+      "Foreign fact ownership.",
+    );
+    requireValid(
+      entry.voidedBy === null || entry.voidedBy === state.actor.id,
+      "Foreign void actor.",
+    );
+    requireValid(
+      ms(entry.occurredAt) >= ms(visit.startedAt) &&
+        (entry.voidedAt !== null ||
+          visit.finishedAt === null ||
+          ms(entry.occurredAt) <= ms(visit.finishedAt)),
+      "Fact outside visit times.",
+    );
+  }
+
+  const operations = new Set<string>();
+  const createdEntries = new Set<EntryId>();
+  const voids = new Set<EntryId>();
+  const lifecycle = new Map<Visit["id"], { revision: number; finishedAt: DateTime.Utc | null }>();
+  const finals = new Map<Visit["id"], EntryId | null>();
+  const createdTables = new Set<Table["id"]>();
+  const verifyEntry = (
+    command: RecordingCommand,
+    id: EntryId,
+    kind: PlayEntry["kind"],
+    amount: number,
+    occurredAt: DateTime.Utc,
+    note: string | null = null,
+    replacesEntryId: EntryId | null = null,
+  ) => {
+    const entry = entries.get(id);
+    requireValid(entry && !createdEntries.has(id), "Receipt fact is missing or duplicated.");
+    requireValid(
+      entry.visitId === command.visitId &&
+        entry.kind === kind &&
+        entry.amount === amount &&
+        ms(entry.occurredAt) === ms(occurredAt) &&
+        entry.note === note &&
+        entry.replacesEntryId === replacesEntryId &&
+        ms(entry.createdAt) === ms(command.preparedAt),
+      "Fact differs from its command receipt.",
+    );
+    createdEntries.add(id);
+  };
+  for (const [index, receipt] of state.receipts.entries()) {
+    const command = receipt.command;
+    requireValid(
+      !operations.has(command.operationId) &&
+        receipt.revision === index + 2 &&
+        command.actorId === state.actor.id,
+      "Invalid command receipt.",
+    );
+    operations.add(command.operationId);
+    const visit = visits.get(command.visitId);
+    requireValid(visit, "Receipt references a missing visit.");
+    if (command.type === "start" || command.type === "record_completed") {
+      const table = tables.get(command.tableId);
+      requireValid(
+        table && !createdTables.has(table.id) && !lifecycle.has(visit.id),
+        "Duplicate or missing start records.",
+      );
+      requireValid(
+        visit.tableId === table.id &&
+          ms(visit.startedAt) === ms(command.startedAt) &&
+          table.game === command.game &&
+          table.venueId === command.venueId &&
+          table.highLimit === command.highLimit,
+        "Start records differ from the receipt.",
+      );
+      createdTables.add(table.id);
+      verifyEntry(command, command.buyInId, "buy_in", command.buyIn, command.startedAt);
+      if (command.type === "record_completed") {
+        requireValid(
+          ms(command.finishedAt) >= ms(command.startedAt),
+          "Completed receipt finishes before start.",
+        );
+        verifyEntry(command, command.cashOutId, "cash_out", command.cashOut, command.finishedAt);
+      }
+      lifecycle.set(visit.id, {
+        revision: 0,
+        finishedAt: command.type === "start" ? null : command.finishedAt,
+      });
+    } else {
+      const previous = lifecycle.get(visit.id);
+      requireValid(
+        previous && previous.revision === command.expectedRevision,
+        "Invalid visit revision history.",
+      );
+      previous.revision += 1;
+      if (command.type === "add" || command.type === "finish") {
+        requireValid(previous.finishedAt === null, "Receipt adds play after finish.");
+        if (command.type === "add")
+          verifyEntry(
+            command,
+            command.entryId,
+            command.kind,
+            command.amount,
+            command.occurredAt,
+            command.note,
+          );
+        else {
+          verifyEntry(command, command.entryId, "cash_out", command.amount, command.finishedAt);
+          requireValid(
+            ms(command.finishedAt) >= ms(visit.startedAt),
+            "Finish receipt precedes start.",
+          );
+          previous.finishedAt = command.finishedAt;
+        }
+      } else if (command.type === "reopen") {
+        requireValid(previous.finishedAt !== null, "Receipt reopens a live visit.");
+        previous.finishedAt = null;
+        const final = finals.get(visit.id);
+        if (final) {
+          const voided = entries.get(final);
+          requireValid(
+            voided &&
+              !voids.has(final) &&
+              voided.voidedAt !== null &&
+              ms(voided.voidedAt) === ms(command.preparedAt) &&
+              voided.voidedBy === command.actorId &&
+              voided.voidReason === command.reason,
+            reopenNotVoided,
+          );
+          voids.add(final);
+        }
+      } else {
+        const original = entries.get(command.entryId);
+        requireValid(
+          original &&
+            original.visitId === visit.id &&
+            createdEntries.has(original.id) &&
+            !voids.has(original.id),
+          "Invalid correction history.",
+        );
+        requireValid(
+          original.voidedAt !== null &&
+            ms(original.voidedAt) === ms(command.preparedAt) &&
+            original.voidReason === command.reason,
+          "Void differs from its command receipt.",
+        );
+        voids.add(original.id);
+        if (command.replacement)
+          verifyEntry(
+            command,
+            command.replacement.id,
+            original.kind,
+            command.replacement.amount,
+            command.replacement.occurredAt,
+            command.replacement.note,
+            original.id,
+          );
+      }
+    }
+    finals.set(visit.id, finalCashOut(finals.get(visit.id) ?? null, command));
+  }
+  requireValid(
+    createdEntries.size === entries.size &&
+      createdTables.size === tables.size &&
+      lifecycle.size === visits.size,
+    "Records have missing command receipts.",
+  );
+  for (const entry of state.entries)
+    requireValid(
+      (entry.voidedAt !== null) === voids.has(entry.id),
+      "Void has no correction receipt.",
+    );
+  for (const visit of state.visits) {
+    const history = lifecycle.get(visit.id);
+    requireValid(
+      history &&
+        history.revision === visit.revision &&
+        (history.finishedAt === null
+          ? visit.finishedAt === null
+          : visit.finishedAt !== null && ms(history.finishedAt) === ms(visit.finishedAt)),
+      "Visit differs from its lifecycle receipts.",
+    );
+  }
+  return state;
+};
+
+const codec = Schema.toCodecJson(RecordingState);
+export const encodeRecordingState = (state: RecordingState) =>
+  JSON.stringify(Schema.encodeSync(codec)(validateRecordingState(state)));
+const reopenNotVoided = "Reopen did not void the final cash-out.";
+// A document saved before reopen voided the final cash-out holds a reopen receipt whose
+// cash-out is still live. Replaying its commands is deterministic: only the voids may differ.
+const upgradeLegacyReopen = (state: RecordingState) => {
+  const replayed = state.receipts.reduce(
+    (current, receipt) => applyRecordingCommand(current, receipt.command),
+    { ...state, tables: [], visits: [], entries: [], receipts: [] } as RecordingState,
+  );
+  const live = (entries: RecordingState["entries"]) =>
+    JSON.stringify(
+      entries.map((entry) => ({ ...entry, voidedAt: null, voidedBy: null, voidReason: null })),
+    );
+  requireValid(
+    JSON.stringify({ ...replayed, entries: [] }) === JSON.stringify({ ...state, entries: [] }) &&
+      live(replayed.entries) === live(state.entries),
+    "Recording history differs from its command receipts.",
+  );
+  return validateRecordingState(replayed);
+};
+const validateOrUpgrade = (state: RecordingState) => {
+  try {
+    return validateRecordingState(state);
+  } catch (cause) {
+    if (!(cause instanceof RecordingError) || cause.message !== reopenNotVoided) throw cause;
+    return upgradeLegacyReopen(state);
+  }
+};
+export const decodeRecordingState = (payload: string, revision: number) => {
+  try {
+    const state = validateOrUpgrade(
+      Schema.decodeUnknownSync(codec)(JSON.parse(payload), { onExcessProperty: "error" }),
+    );
+    requireValid(revision === state.receipts.length + 1, "Document and receipt revisions differ.");
+    return state;
+  } catch (cause) {
+    throw new RecordingError(
+      "load",
+      "Recording history is damaged or uses an unsupported version.",
+      cause,
+    );
+  }
+};
+
+export const applyRecordingCommand = (
+  state: RecordingState,
+  command: RecordingCommand,
+): RecordingState => {
+  requireValid(command.actorId === state.actor.id, "Command has a foreign local actor.");
+  const tables = [...state.tables];
+  let visits = [...state.visits];
+  let entries = [...state.entries];
+  const append = (
+    id: EntryId,
+    visitId: Visit["id"],
+    kind: PlayEntry["kind"],
+    amount: PlayEntry["amount"],
+    occurredAt: DateTime.Utc,
+    note: string | null = null,
+    replacesEntryId: EntryId | null = null,
+  ) => {
+    requireValid(!entries.some((entry) => entry.id === id), "Entry ID is already used.");
+    entries.push(
+      PlayEntry.make({
+        id,
+        visitId,
+        kind,
+        amount,
+        occurredAt,
+        note,
+        replacesEntryId,
+        currency: "USD",
+        counterpartyId: null,
+        createdBy: command.actorId,
+        createdAt: command.preparedAt,
+        voidedAt: null,
+        voidedBy: null,
+        voidReason: null,
+      }),
+    );
+  };
+  if (command.type === "start" || command.type === "record_completed") {
+    requireValid(
+      !visits.some((visit) => visit.id === command.visitId) &&
+        !tables.some((table) => table.id === command.tableId),
+      "Start IDs are already used.",
+    );
+    tables.push(
+      Table.make({
+        id: command.tableId,
+        tripId: null,
+        game: command.game,
+        venueId: command.venueId,
+        highLimit: command.highLimit,
+        starterActorId: command.actorId,
+      }),
+    );
+    visits.push(
+      Visit.make({
+        id: command.visitId,
+        tableId: command.tableId,
+        playerId: state.self.id,
+        startedAt: command.startedAt,
+        finishedAt: command.type === "start" ? null : command.finishedAt,
+        revision: 0,
+      }),
+    );
+    append(command.buyInId, command.visitId, "buy_in", command.buyIn, command.startedAt);
+    if (command.type === "record_completed")
+      append(command.cashOutId, command.visitId, "cash_out", command.cashOut, command.finishedAt);
+  } else {
+    const visit = visits.find((visit) => visit.id === command.visitId);
+    requireValid(visit, "Visit does not exist.");
+    if (visit.revision !== command.expectedRevision)
+      throw new RecordingError(
+        "conflict",
+        "Visit changed. Review it before preparing another command.",
+      );
+    requireValid(visit.revision < Number.MAX_SAFE_INTEGER, "Visit revision overflow.");
+    let finishedAt = visit.finishedAt;
+    if (command.type === "add" || command.type === "finish") {
+      requireValid(
+        visit.finishedAt === null,
+        "This visit has finished. Start a new visit when returning.",
+      );
+      if (command.type === "add")
+        append(
+          command.entryId,
+          visit.id,
+          command.kind,
+          command.amount,
+          command.occurredAt,
+          command.note,
+        );
+      else {
+        finishedAt = command.finishedAt;
+        append(command.entryId, visit.id, "cash_out", command.amount, command.finishedAt);
+      }
+    } else if (command.type === "reopen") {
+      requireValid(visit.finishedAt !== null, "Visit is already live.");
+      finishedAt = null;
+      const final = state.receipts.reduce<EntryId | null>(
+        (current, receipt) =>
+          receipt.command.visitId === visit.id ? finalCashOut(current, receipt.command) : current,
+        null,
+      );
+      entries = entries.map((entry) =>
+        entry.id === final
+          ? PlayEntry.make({
+              ...entry,
+              voidedAt: command.preparedAt,
+              voidedBy: command.actorId,
+              voidReason: command.reason,
+            })
+          : entry,
+      );
+    } else {
+      const original = entries.find((entry) => entry.id === command.entryId);
+      requireValid(
+        original && original.visitId === visit.id && original.voidedAt === null,
+        "Correction target is missing or already voided.",
+      );
+      requireValid(
+        ms(command.preparedAt) >= ms(original.createdAt),
+        "Correction predates the original audit.",
+      );
+      entries = entries.map((entry) =>
+        entry.id === original.id
+          ? PlayEntry.make({
+              ...entry,
+              voidedAt: command.preparedAt,
+              voidedBy: command.actorId,
+              voidReason: command.reason,
+            })
+          : entry,
+      );
+      if (command.replacement !== null) {
+        const replacement = command.replacement;
+        append(
+          replacement.id,
+          visit.id,
+          original.kind,
+          replacement.amount,
+          replacement.occurredAt,
+          replacement.note,
+          original.id,
+        );
+      }
+    }
+    visits = visits.map((item) =>
+      item.id === visit.id
+        ? Visit.make({ ...visit, finishedAt, revision: visit.revision + 1 })
+        : item,
+    );
+  }
+  return {
+    ...state,
+    tables,
+    visits,
+    entries,
+    receipts: [...state.receipts, { command, revision: state.receipts.length + 2 }],
+  };
+};

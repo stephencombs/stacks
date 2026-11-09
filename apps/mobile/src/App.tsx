@@ -1,16 +1,18 @@
-import { ClerkProvider, useAuth } from "@clerk/expo";
-import { tokenCache } from "@clerk/expo/token-cache";
 import {
   DarkTheme,
   DefaultTheme,
+  StackActions,
   createStaticNavigation,
+  useNavigation,
+  type NavigationState,
   type StaticParamList,
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { RecordingProvider } from "@stacks/client-runtime/recordingReact";
 import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -18,23 +20,27 @@ import { useCSSVariable, useUniwind } from "uniwind";
 import { Button } from "./components/ui/Button";
 import { TabBarHeight } from "./components/ui/Screen";
 import { Landing } from "./features/Landing";
+import { PersonalNav } from "./features/Personal";
 import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./features/PlaceTabs";
 import { ScopeButton } from "./features/Scope";
 import { YouButton } from "./features/You";
-import { clerkPublishableKey } from "./lib/config";
+import { AccountProvider, useAccount } from "./lib/account";
 import { markStartup, reportStartupError } from "./lib/diagnostics";
 import { useAppFonts } from "./lib/fonts";
 import { getInitialURL } from "./lib/initialUrl";
+import { recordingStore } from "./lib/recording";
 import { ScopeProvider, useScopeHasTrip } from "./lib/scope";
-import { Prefetch, StacksProvider, useLastTrip, useStacks } from "./lib/stacks";
+import { Prefetch, SignedInProvider, StacksProvider, useLastTrip, useStacks } from "./lib/stacks";
 import "./lib/theme";
 import { BoardScreen } from "./screens/Board";
+import { HomeScreen } from "./screens/Home";
 import { ClaimScreen, JoinScreen } from "./screens/Invites";
 import { GroupScreen } from "./screens/Group";
 import { GroupSettingsScreen } from "./screens/GroupSettings";
 import { GroupsScreen, NoGroups } from "./screens/Groups";
 import { NewSessionScreen } from "./screens/NewSession";
 import { PeopleScreen } from "./screens/People";
+import { PlayScreen } from "./screens/Play";
 import { SessionScreen } from "./screens/Session";
 import { SessionsScreen } from "./screens/Sessions";
 import { SettleUpScreen } from "./screens/SettleUp";
@@ -157,9 +163,14 @@ const Places = createPlaceTabs({
   },
 });
 
-const RootStack = createNativeStackNavigator({
+/**
+ * Groups, trips and their sessions belong to an account. One gate in front of them all: they wait
+ * for sign-in, and share one API client and cache for whoever is signed in.
+ */
+const AccountStack = createNativeStackNavigator({
   initialRouteName: "Places",
   screenOptions: stackOptions,
+  layout: ({ state, children }) => <AccountGate state={state}>{children}</AccountGate>,
   screens: {
     Places: { screen: Places, options: { headerShown: false } },
     Groups: { screen: GroupsScreen, options: { title: "Your groups" }, linking: "groups" },
@@ -172,6 +183,29 @@ const RootStack = createNativeStackNavigator({
   },
 });
 
+/** Your own play opens first and lives on this device, so it never waits for sign-in. */
+const RootStack = createNativeStackNavigator({
+  initialRouteName: "Home",
+  screenOptions: {
+    title: "",
+    headerTransparent: false,
+    headerShadowVisible: false,
+    headerBackButtonDisplayMode: "minimal",
+    headerRight: () => <PersonalNav />,
+    headerRightBackgroundVisible: false,
+  },
+  screens: {
+    Home: { screen: HomeScreen, linking: "" },
+    Play: { screen: PlayScreen, linking: "play/:visitId" },
+    Account: {
+      screen: AccountStack,
+      options: { headerShown: false },
+      // A link straight to a session or an invite still has the places to go back to.
+      linking: { initialRouteName: "Places" },
+    },
+  },
+});
+
 declare global {
   namespace ReactNavigation {
     interface RootParamList extends StaticParamList<typeof RootStack> {}
@@ -179,52 +213,61 @@ declare global {
 }
 
 const Navigation = createStaticNavigation(RootStack);
+
+const linking = {
+  enabled: "auto" as const,
+  prefixes: [Linking.createURL("/")],
+  // Back from any link lands on your play.
+  config: { initialRouteName: "Home" as const },
+  getInitialURL: () =>
+    getInitialURL(
+      () => Linking.getInitialURL(),
+      () => markStartup("initial_url_timeout"),
+      reportStartupError,
+    ),
+};
+
 function Root() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
   const theme = useNavigationTheme();
-  const pendingLink = useRef<string | null>(null);
-  useEffect(() => {
-    if (isLoaded) markStartup("auth_ready");
-    if (isLoaded && !isSignedIn) markStartup("landing_ready");
-  }, [isLoaded, isSignedIn]);
-  useEffect(() => {
-    if (isSignedIn) return;
-    const subscription = Linking.addEventListener("url", ({ url }) => {
-      if (/\/(join|claim)\//.test(url)) pendingLink.current = url;
-    });
-    return () => subscription.remove();
-  }, [isSignedIn]);
-  const linking = {
-    enabled: "auto" as const,
-    prefixes: [Linking.createURL("/")],
-    // A link straight to a session or an invite still has the places to go back to.
-    config: { initialRouteName: "Places" as const },
-    getInitialURL: async () => {
-      const pending = pendingLink.current;
-      pendingLink.current = null;
-      return (
-        pending ??
-        getInitialURL(
-          () => Linking.getInitialURL(),
-          () => markStartup("initial_url_timeout"),
-          reportStartupError,
-        )
-      );
-    },
-  };
-  if (!isLoaded) return <Starting />;
-  if (!isSignedIn) return <SignedOut />;
+  // The navigation keeps this same place signed in or out, so sign-in never resets it.
   return (
-    <StacksProvider key={userId} userId={userId}>
-      <ScopeProvider>
-        <Navigation
-          linking={linking}
-          theme={theme}
-          fallback={<Opening />}
-          onReady={() => markStartup("navigation_ready")}
-        />
-      </ScopeProvider>
+    <SignedInProvider>
+      <Navigation
+        linking={linking}
+        theme={theme}
+        fallback={<Opening />}
+        onReady={() => markStartup("navigation_ready")}
+      />
+    </SignedInProvider>
+  );
+}
+
+/**
+ * Account screens once someone is signed in. Until then, the reason they wait, and a way back to
+ * your play. An invite or claim link keeps its place, so it opens once sign-in finishes.
+ */
+function AccountGate({ state, children }: { state: NavigationState; children: ReactNode }) {
+  const account = useAccount();
+  const route = state.routes[state.index]?.name;
+  if (!account.available) return <NoSignIn />;
+  if (!account.isLoaded) return <Starting />;
+  if (!account.isSignedIn || !account.userId)
+    return <SignedOut invited={route === "Join" || route === "Claim"} />;
+  return (
+    <StacksProvider key={account.userId}>
+      <ScopeProvider>{children}</ScopeProvider>
     </StacksProvider>
+  );
+}
+
+function BackToYourPlay() {
+  const navigation = useNavigation();
+  return (
+    <Button
+      label="Back to your play"
+      size="lg"
+      onPress={() => navigation.dispatch(StackActions.popTo("Home"))}
+    />
   );
 }
 
@@ -272,9 +315,25 @@ function Starting() {
         Can't sign in yet
       </Text>
       <Text className="text-lg text-muted">
-        Color Up couldn't reach its sign-in service. Check your connection, then try again.
+        Color Up couldn't reach its sign-in service. Check your connection, then try again. Your
+        sessions on this device still work.
       </Text>
       <Button label="Try again" variant="primary" size="lg" onPress={() => void reloadAppAsync()} />
+      <BackToYourPlay />
+    </View>
+  );
+}
+
+function NoSignIn() {
+  return (
+    <View className="flex-1 justify-center gap-4 bg-canvas px-6">
+      <Text accessibilityRole="header" className="type-headline text-ink">
+        Groups and trips
+      </Text>
+      <Text className="text-lg text-muted">
+        Groups and trips need sign-in, and this copy of Color Up doesn't have it set up.
+      </Text>
+      <BackToYourPlay />
     </View>
   );
 }
@@ -289,8 +348,12 @@ function Opening() {
   );
 }
 
-function SignedOut() {
-  return <Landing />;
+function SignedOut({ invited }: { invited: boolean }) {
+  const navigation = useNavigation();
+  useEffect(() => markStartup("landing_ready"), []);
+  return (
+    <Landing invited={invited} onRecord={() => navigation.dispatch(StackActions.popTo("Home"))} />
+  );
 }
 
 export default function App() {
@@ -308,10 +371,12 @@ export default function App() {
         }
       }
     >
-      <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
-        <Root />
-        <StatusBar style={theme === "light" ? "dark" : "light"} />
-      </ClerkProvider>
+      <RecordingProvider store={recordingStore}>
+        <AccountProvider>
+          <Root />
+          <StatusBar style={theme === "light" ? "dark" : "light"} />
+        </AccountProvider>
+      </RecordingProvider>
     </SafeAreaProvider>
   );
 }
