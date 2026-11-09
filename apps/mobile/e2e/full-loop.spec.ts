@@ -179,7 +179,7 @@ test.describe.serial("live mode on a phone", () => {
       visible(alex.getByRole("button", { name: /^Back to your table at Wynn test/ })).click();
     await place(alex, "Board").click();
     await expect(
-      alex.getByText("Close a session to put it on the board.").filter({ visible: true }),
+      alex.getByText("Close a session to put it on the board.").filter({ visible: true }).first(),
     ).toBeVisible();
     await shoot(alex, "board-live");
     await backToTable();

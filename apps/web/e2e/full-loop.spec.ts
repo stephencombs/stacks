@@ -200,9 +200,10 @@ test.describe.serial("a group's first night out", () => {
     const board = alex.getByRole("list", { name: "Standings" });
     await expect(board.getByRole("listitem").first()).toContainText("+$170");
     await expect(alex.getByRole("heading", { name: "Awards" })).toBeVisible();
-    await expect(alex.getByText("Alex · #1 of 3 · 1 session")).toBeVisible();
+    const numbers = (name: string) => alex.getByRole("region", { name: `${name}'s numbers` });
+    await expect(numbers("Alex")).toContainText("#1 of 3 · 1 session");
     await board.getByRole("button", { name: /Bea/ }).click();
-    await expect(alex.getByText("Bea · #3 of 3 · 1 session")).toBeVisible();
+    await expect(numbers("Bea")).toContainText("#3 of 3 · 1 session");
     // The trip's numbers: one table where some won and some lost, so no team run yet.
     await expect(alex.getByText("0W · 0L · 1 mixed")).toBeVisible();
     await expect(alex.getByText("Largest drawdown")).toBeVisible();
