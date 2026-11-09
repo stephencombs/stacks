@@ -4,7 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import "./index.css";
-import "./lib/offlineShell";
+import { ShellUpdate } from "./features/ShellUpdate";
 import { AccountProvider } from "./lib/account";
 import { recordingStore } from "./lib/recording";
 import { captureCaughtError } from "./lib/telemetry";
@@ -31,6 +31,7 @@ createRoot(document.getElementById("root")!, {
     <RecordingProvider store={recordingStore}>
       <AccountProvider>
         <RouterProvider router={router} />
+        <ShellUpdate />
       </AccountProvider>
     </RecordingProvider>
   </StrictMode>,

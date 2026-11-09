@@ -15,6 +15,8 @@ const entries = [
 ];
 
 type WorkerEvent = {
+  origin?: string;
+  data?: unknown;
   request?: Pick<Request, "url" | "method" | "headers" | "mode">;
   waitUntil?: (promise: Promise<unknown>) => void;
   respondWith?: (promise: Promise<Response>) => void;
@@ -85,7 +87,12 @@ function worker(source = renderAppShell(entries)) {
     });
     return result;
   }
-  return { manifest, stored, caches, fetch, lifecycle, request, skipWaiting, claim };
+  function message(data: unknown, origin = "https://color-up.test") {
+    let result: Promise<unknown> | undefined;
+    handlers.get("message")!({ origin, data, waitUntil: (promise) => (result = promise) });
+    return result;
+  }
+  return { manifest, stored, caches, fetch, lifecycle, request, message, skipWaiting, claim };
 }
 
 it("versions only the complete emitted shell, including new lazy routes, deterministically", () => {
@@ -182,6 +189,23 @@ it("activates without taking over tabs and removes only previous owned cache ver
     "color-up-other-data",
   ]);
   expect(shell.skipWaiting).not.toHaveBeenCalled();
+  expect(shell.claim).not.toHaveBeenCalled();
+});
+
+it("skips waiting only when a same-origin page asks, and never claims tabs", async () => {
+  const shell = worker();
+  for (const [data, origin] of [
+    [undefined, undefined],
+    ["SKIP_WAITING", undefined],
+    [{ type: "CLAIM" }, undefined],
+    [{ type: "SKIP_WAITING" }, "https://other.test"],
+  ] as const) {
+    expect(shell.message(data, origin)).toBeUndefined();
+  }
+  expect(shell.skipWaiting).not.toHaveBeenCalled();
+  shell.skipWaiting.mockResolvedValue(undefined);
+  await shell.message({ type: "SKIP_WAITING" });
+  expect(shell.skipWaiting).toHaveBeenCalledOnce();
   expect(shell.claim).not.toHaveBeenCalled();
 });
 

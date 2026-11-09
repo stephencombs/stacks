@@ -39,7 +39,13 @@ self.addEventListener("install", (event) => {
       }
     })(),
   );
-  // Let existing tabs finish with their version; no skipWaiting or forced reload.
+  // Let existing tabs finish with their version; a page switches only when its person agrees.
+});
+
+self.addEventListener("message", (event) => {
+  if (event.origin === self.location.origin && event.data?.type === "SKIP_WAITING") {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 self.addEventListener("activate", (event) => {
