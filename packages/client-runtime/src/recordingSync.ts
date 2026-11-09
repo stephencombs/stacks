@@ -1,4 +1,4 @@
-import type { UserId } from "@stacks/contracts";
+import type { PlayEntry, UserId } from "@stacks/contracts";
 import {
   RecordingCommand,
   RecordingOperationId,
@@ -7,6 +7,7 @@ import {
   type RecordingCommandResult,
   type RecordingHistory,
 } from "@stacks/contracts/recordingCommands";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
@@ -128,23 +129,13 @@ export const mergeRecordingHistory = (
   };
 };
 
-/** The amount of each entry a command creates, in `createdEntryIds` order. */
-const createdAmounts = (command: RecordingCommand): ReadonlyArray<number> =>
-  command.type === "start"
-    ? [command.buyIn]
-    : command.type === "record_completed"
-      ? [command.buyIn, command.cashOut]
-      : command.type === "add" || command.type === "finish"
-        ? [command.amount]
-        : command.type === "correct" && command.replacement
-          ? [command.replacement.amount]
-          : [];
+const ms = (time: DateTime.Utc) => DateTime.toEpochMillis(time);
 
 /**
  * Whether the account already has what a refused command recorded: this very operation, or the
- * same entries under another one (a restored backup, another device's copy). Then the refusal is
+ * same facts under another one (a restored backup, another device's copy). Then the refusal is
  * settled, and recording it again would count the money twice. An operation the server holds
- * with different content stays refused.
+ * with different content stays refused, as does anything whose facts differ in any way.
  */
 const settled = (
   command: RecordingCommand,
@@ -153,17 +144,71 @@ const settled = (
 ) => {
   const held = remote.get(command.operationId);
   if (held) return commandText(held) === commandText(command);
-  const amounts = createdAmounts(command);
-  const ids = createdEntryIds(command);
-  return (
-    ids.length > 0 &&
-    ids.every((id, index) =>
-      ledger.entries.some(
-        (entry) =>
-          entry.id === id && entry.visitId === command.visitId && entry.amount === amounts[index],
-      ),
-    )
-  );
+  const visit = ledger.visits.find((item) => item.id === command.visitId);
+  if (!visit) return false;
+  const entry = (
+    id: string,
+    kind: PlayEntry["kind"],
+    amount: number,
+    occurredAt: DateTime.Utc,
+    note: string | null = null,
+  ) =>
+    ledger.entries.some(
+      (item) =>
+        item.id === id &&
+        item.visitId === visit.id &&
+        item.kind === kind &&
+        item.amount === amount &&
+        ms(item.occurredAt) === ms(occurredAt) &&
+        item.note === note,
+    );
+  const finishedAt = (at: DateTime.Utc) =>
+    visit.finishedAt !== null && ms(visit.finishedAt) === ms(at);
+  switch (command.type) {
+    case "start":
+    case "record_completed": {
+      const table = ledger.tables.find((item) => item.id === visit.tableId);
+      return (
+        table !== undefined &&
+        table.id === command.tableId &&
+        table.game === command.game &&
+        table.venueId === command.venueId &&
+        table.highLimit === command.highLimit &&
+        ms(visit.startedAt) === ms(command.startedAt) &&
+        entry(command.buyInId, "buy_in", command.buyIn, command.startedAt) &&
+        (command.type === "start" ||
+          (entry(command.cashOutId, "cash_out", command.cashOut, command.finishedAt) &&
+            finishedAt(command.finishedAt)))
+      );
+    }
+    case "add":
+      return entry(command.entryId, command.kind, command.amount, command.occurredAt, command.note);
+    case "finish":
+      return (
+        entry(command.entryId, "cash_out", command.amount, command.finishedAt) &&
+        finishedAt(command.finishedAt)
+      );
+    case "correct": {
+      const original = ledger.entries.find(
+        (item) => item.id === command.entryId && item.visitId === visit.id,
+      );
+      return (
+        original !== undefined &&
+        original.voidedAt !== null &&
+        original.voidReason === command.reason &&
+        (command.replacement === null ||
+          entry(
+            command.replacement.id,
+            original.kind,
+            command.replacement.amount,
+            command.replacement.occurredAt,
+            command.replacement.note,
+          ))
+      );
+    }
+    case "reopen":
+      return false;
+  }
 };
 
 /**

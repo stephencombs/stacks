@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { ActorId, MinorUnits, PlayerId, UserId } from "@stacks/contracts";
+import { ActorId, MinorUnits, PlayerId, TableId, UserId } from "@stacks/contracts";
 import {
   RecordingCommand,
   RecordingOperationId,
@@ -441,6 +441,60 @@ describe("rejections", () => {
     expect(state(store).sync?.rejected).toEqual([]);
     expect(state(store).visits).toHaveLength(1);
     expect(pendingRecordingCommands(state(store))).toEqual([]);
+  });
+
+  it("won't save a reused refusal for an operation that is still pending", async () => {
+    const store = await open();
+    await store.transform((s) => mergeRecordingHistory(s, alex, server().history()));
+    const opened = await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    await expect(
+      store.transform((s) => ({
+        ...s,
+        sync: {
+          ...s.sync!,
+          rejected: [{ command: opened.command, reason: "operation_reused", message: "" }],
+        },
+      })),
+    ).rejects.toThrow("A rejected command is still in the ledger.");
+  });
+
+  it("settles a refusal only when every fact the command set matches", async () => {
+    const differences: ReadonlyArray<
+      (command: Extract<RecordingCommand, { type: "record_completed" }>) => RecordingCommand
+    > = [
+      (c) => RecordingCommand.make({ ...c, finishedAt: at(14) }),
+      (c) => RecordingCommand.make({ ...c, startedAt: at(9) }),
+      (c) => RecordingCommand.make({ ...c, game: "craps" }),
+      (c) => RecordingCommand.make({ ...c, highLimit: true }),
+      (c) => RecordingCommand.make({ ...c, tableId: TableId.make(crypto.randomUUID()) }),
+    ];
+    for (const differ of differences) {
+      const store = await open();
+      const remote = server();
+      await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+      const past = await save(store, {
+        type: "record_completed",
+        buyIn: 20000,
+        cashOut: 25000,
+        startedAt: at(10),
+        finishedAt: at(12),
+        game: "blackjack",
+      });
+      const command = past.command as Extract<RecordingCommand, { type: "record_completed" }>;
+      const identity = { playerId: state(store).self.id, actorId: state(store).actor.id };
+      remote.push({
+        identity,
+        commands: [
+          RecordingCommand.make({
+            ...differ(command),
+            operationId: RecordingOperationId.make(crypto.randomUUID()),
+          }),
+        ],
+      });
+      await pushAll(store, remote);
+      await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+      expect(state(store).sync?.rejected).toHaveLength(1);
+    }
   });
 
   it("records a refused start again together with the play that depended on it", async () => {
