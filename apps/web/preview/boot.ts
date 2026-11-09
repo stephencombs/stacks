@@ -12,7 +12,21 @@ window.fetch = async (input, init) => {
     location.href,
   );
   if (!url.pathname.startsWith("/api/")) return realFetch(input, init);
-  const body = routes[url.pathname];
+  // Recording pushes are accepted, or refused with ?sync=refuse to show what a refusal looks like.
+  const body =
+    url.pathname === "/api/recording/commands"
+      ? {
+          results: (
+            (await new Response(
+              input instanceof Request ? input.clone().body : init?.body,
+            ).json()) as { commands: { operationId: string }[] }
+          ).commands.map(({ operationId }) =>
+            params.get("sync") === "refuse"
+              ? { operationId, status: "rejected", reason: "conflict", message: "" }
+              : { operationId, status: "accepted" },
+          ),
+        }
+      : routes[url.pathname];
   // Stagger dependent queries a little, like a real network.
   await new Promise((r) =>
     setTimeout(r, delay + (url.pathname.endsWith("/limits") ? delay / 2 : 0)),

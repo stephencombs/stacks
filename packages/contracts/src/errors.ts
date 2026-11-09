@@ -63,6 +63,7 @@ export const ConflictReason = Schema.Literals([
   "trip_ended",
   "trip_open",
   "last_owner",
+  "recording_identity",
 ]);
 export type ConflictReason = typeof ConflictReason.Type;
 

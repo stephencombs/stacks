@@ -1,8 +1,9 @@
 import * as Schema from "effect/Schema";
 
-import { ActorId, EntryId, TableId, VenueId, VisitId } from "./ids.ts";
+import { ActorId, EntryId, PlayerId, TableId, VenueId, VisitId } from "./ids.ts";
 import { Game } from "./ledger.ts";
 import { MinorUnits } from "./money.ts";
+import { PlayEntry, Table, Visit } from "./recording.ts";
 
 export const RecordingOperationId = Schema.String.check(Schema.isUUID()).pipe(
   Schema.brand("RecordingOperationId"),
@@ -74,3 +75,46 @@ export const RecordingCommand = Schema.Union([
   Schema.Struct({ type: Schema.Literal("reopen"), ...existing, reason: Schema.NonEmptyString }),
 ]);
 export type RecordingCommand = typeof RecordingCommand.Type;
+
+/** The account's one player and actor for personal recording. Every device adopts them. */
+export const RecordingIdentity = Schema.Struct({ playerId: PlayerId, actorId: ActorId });
+export type RecordingIdentity = typeof RecordingIdentity.Type;
+
+export const RecordingRejectionReason = Schema.Literals([
+  "invalid",
+  "conflict",
+  "operation_reused",
+]);
+export type RecordingRejectionReason = typeof RecordingRejectionReason.Type;
+
+export const PushRecordingRequest = Schema.Struct({
+  identity: RecordingIdentity,
+  commands: Schema.Array(RecordingCommand).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+});
+export type PushRecordingRequest = typeof PushRecordingRequest.Type;
+
+export const RecordingCommandResult = Schema.Union([
+  Schema.Struct({ operationId: RecordingOperationId, status: Schema.Literal("accepted") }),
+  Schema.Struct({
+    operationId: RecordingOperationId,
+    status: Schema.Literal("rejected"),
+    reason: RecordingRejectionReason,
+    message: Schema.String,
+  }),
+]);
+export type RecordingCommandResult = typeof RecordingCommandResult.Type;
+
+export const PushRecordingResponse = Schema.Struct({
+  results: Schema.Array(RecordingCommandResult),
+});
+export type PushRecordingResponse = typeof PushRecordingResponse.Type;
+
+/** Everything the account recorded. `commands` are in the order the server applied them. */
+export const RecordingHistory = Schema.Struct({
+  identity: Schema.NullOr(RecordingIdentity),
+  commands: Schema.Array(RecordingCommand),
+  tables: Schema.Array(Table),
+  visits: Schema.Array(Visit),
+  entries: Schema.Array(PlayEntry),
+});
+export type RecordingHistory = typeof RecordingHistory.Type;

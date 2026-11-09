@@ -5,7 +5,8 @@ import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import type * as Atom from "effect/reactivity/Atom";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { makeStacksClient } from "@stacks/client-runtime/api";
+import { makeRecordingTransport, makeStacksClient } from "@stacks/client-runtime/api";
+import { RecordingSyncRoot } from "@stacks/client-runtime/recordingReact";
 import { describeError } from "@stacks/client-runtime/errors";
 import {
   SignedInRoot,
@@ -44,19 +45,24 @@ export function SignedInProvider({ children }: { children: ReactNode }) {
   return (
     <SignedInRoot userId={userId} make={signIn} wake={wakeOutbox}>
       <RefusalHaptic />
-      {children}
+      <RecordingSyncRoot userId={userId} connect={connectRecording} wake={wakeOutbox}>
+        {children}
+      </RecordingSyncRoot>
     </SignedInRoot>
   );
 }
 
+const api = {
+  baseUrl: apiUrl,
+  getToken: async () =>
+    (await getClerkInstance({ publishableKey: clerkPublishableKey }).session?.getToken()) ?? null,
+};
+
+const connectRecording = () => makeRecordingTransport(api);
+
 const signIn = (userId: string) =>
   makeSignedIn({
-    stacks: makeStacksClient({
-      baseUrl: apiUrl,
-      getToken: async () =>
-        (await getClerkInstance({ publishableKey: clerkPublishableKey }).session?.getToken()) ??
-        null,
-    }),
+    stacks: makeStacksClient(api),
     outbox: outboxStorage(userId),
     lastTrip: lastTripStorage(userId),
     capture: captureTestEvent,

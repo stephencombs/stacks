@@ -1,6 +1,10 @@
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import { RecordingCommand } from "@stacks/contracts/recordingCommands";
 import {
+  ActorId,
+  TableId,
+  VisitId,
   EntryId,
   EntryKind,
   Game,
@@ -151,4 +155,41 @@ export const UserLimitsRow = Schema.Struct({
   lossLimit: Schema.NullOr(Amount),
   currency: CurrencyCode,
   sessionReminderMinutes: Schema.NullOr(Schema.Literals([120, 180, 240])),
+});
+
+export const RecordingIdentityRow = Schema.Struct({
+  playerId: PlayerId,
+  actorId: ActorId,
+  displayName: Schema.NonEmptyString,
+});
+
+export const PersonalVisitRow = Schema.Struct({
+  id: VisitId,
+  tableId: TableId,
+  game: Schema.NullOr(Game),
+  venueId: Schema.NullOr(VenueId),
+  highLimit: Schema.Boolean,
+  startedAt: Timestamp,
+  finishedAt: Schema.NullOr(Timestamp),
+  revision: Schema.Int,
+});
+
+export const PersonalEntryRow = Schema.Struct({
+  id: EntryId,
+  visitId: VisitId,
+  kind: Schema.Literals(["buy_in", "cash_out", "adjustment"]),
+  amount: Amount,
+  occurredAt: Timestamp,
+  note: Schema.NullOr(Schema.String),
+  createdBy: ActorId,
+  createdAt: Timestamp,
+  voidedAt: Schema.NullOr(Timestamp),
+  voidedBy: Schema.NullOr(ActorId),
+  voidReason: Schema.NullOr(Schema.String),
+  replacesEntryId: Schema.NullOr(EntryId),
+});
+
+export const PersonalOperationRow = Schema.Struct({
+  playerId: PlayerId,
+  command: Schema.toCodecJson(RecordingCommand),
 });

@@ -4,6 +4,9 @@ import {
   ChevronDown,
   ChevronRight,
   CircleAlert,
+  CloudCheck,
+  CloudOff,
+  CloudUpload,
   Delete,
   Ellipsis,
   X,
@@ -19,6 +22,9 @@ const icons = {
   "arrow-right": ArrowRight,
   close: X,
   delete: Delete,
+  "cloud-check": CloudCheck,
+  "cloud-upload": CloudUpload,
+  "cloud-off": CloudOff,
 };
 
 export type IconName = keyof typeof icons;

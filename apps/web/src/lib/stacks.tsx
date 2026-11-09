@@ -4,7 +4,8 @@ import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import type * as Atom from "effect/reactivity/Atom";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { makeStacksClient } from "@stacks/client-runtime/api";
+import { makeRecordingTransport, makeStacksClient } from "@stacks/client-runtime/api";
+import { RecordingSyncRoot } from "@stacks/client-runtime/recordingReact";
 import { describeError } from "@stacks/client-runtime/errors";
 import type { OutboxStorage } from "@stacks/client-runtime/outbox";
 import {
@@ -39,17 +40,20 @@ export function SignedInProvider({ children }: { children: ReactNode }) {
   const userId = (account.available && account.isSignedIn && account.userId) || null;
   return (
     <SignedInRoot userId={userId} make={signIn} wake={wakeOutbox}>
-      {children}
+      <RecordingSyncRoot userId={userId} connect={connectRecording} wake={wakeOutbox}>
+        {children}
+      </RecordingSyncRoot>
     </SignedInRoot>
   );
 }
 
+const api = { baseUrl: import.meta.env.VITE_API_URL ?? "", getToken: () => getToken() };
+
+const connectRecording = () => makeRecordingTransport(api);
+
 const signIn = (userId: string) =>
   makeSignedIn({
-    stacks: makeStacksClient({
-      baseUrl: import.meta.env.VITE_API_URL ?? "",
-      getToken: () => getToken(),
-    }),
+    stacks: makeStacksClient(api),
     outbox: outboxStorage(userId),
     lastTrip: lastTripStorage(userId),
     capture: captureTestEvent,
