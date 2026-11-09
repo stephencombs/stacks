@@ -7,3 +7,5 @@ need no doc change; follow the [documentation rules](../AGENTS.md#documentation)
 - [Design system](../DESIGN.md): [foundations](./design/foundations.md) and
   [components](./design/components.md)
 - [Navigation](./internals/navigation.md): where content lives and how people move between it
+- [Legacy migration](./internals/legacy-migration.md): how the Group-bound ledger maps to the player
+  model, and what the preflight flags
