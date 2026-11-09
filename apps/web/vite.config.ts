@@ -4,16 +4,22 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import * as NodeURL from "node:url";
 import { defineConfig } from "vite-plus";
+import { offlineAppShell } from "./offline/build";
 
 const apiOrigin = process.env.STACKS_API_ORIGIN ?? "http://localhost:8787";
 
 export default defineConfig({
-  plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), tailwindcss()],
+  plugins: [
+    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    react(),
+    tailwindcss(),
+    offlineAppShell(),
+  ],
   resolve: {
     alias: { "~": NodeURL.fileURLToPath(new URL("./src", import.meta.url)) },
   },
-  // e2e/ runs under Playwright (`pnpm test:e2e`), not vitest.
-  test: { exclude: ["e2e/**", "node_modules/**"] },
+  // Any e2e/ directory runs under Playwright, not vitest. A bare `e2e/**` misses nested suites.
+  test: { exclude: ["**/e2e/**", "node_modules/**"] },
   server: {
     port: 5173,
     // Dev is single-origin: the browser calls /api and Vite forwards it to the worker.

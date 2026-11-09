@@ -1,7 +1,7 @@
 import { SignInButton, SignUpButton } from "@clerk/react";
 import { sampleTrip } from "@stacks/client-runtime/sample";
 
-import { Button } from "~/components/ui/Button";
+import { Button, ButtonLink } from "~/components/ui/Button";
 import { TripHero } from "./TripHero";
 
 const steps = [
@@ -30,6 +30,9 @@ function Ctas() {
       <SignInButton mode="modal">
         <Button size="lg">Sign in</Button>
       </SignInButton>
+      <ButtonLink to="/" variant="ghost" size="lg">
+        Record without an account
+      </ButtonLink>
     </div>
   );
 }

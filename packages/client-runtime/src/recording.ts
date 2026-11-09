@@ -1,0 +1,373 @@
+import {
+  ActorId,
+  EntryId,
+  MinorUnits,
+  PlayerId,
+  TableId,
+  VisitId,
+  type Game,
+  type VenueId,
+} from "@stacks/contracts";
+import { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
+import { projectVisit } from "@stacks/shared/visits";
+import * as DateTime from "effect/DateTime";
+import * as Schema from "effect/Schema";
+
+import { newId } from "./ids.ts";
+import {
+  applyRecordingCommand,
+  decodeRecordingState,
+  encodeRecordingState,
+  RecordingError,
+  type RecordingReceipt,
+  type RecordingState,
+} from "./recordingState.ts";
+import { RecordingStorageConflict, type RecordingStorage } from "./recordingStorage.ts";
+
+export { RecordingError } from "./recordingState.ts";
+export type { RecordingReceipt, RecordingState } from "./recordingState.ts";
+
+type StartInput = {
+  readonly buyIn: number;
+  readonly startedAt?: DateTime.Utc;
+  readonly game?: Game;
+  readonly venueId?: VenueId;
+  readonly highLimit?: boolean;
+};
+export type RecordingInput =
+  | ({ readonly type: "start" } & StartInput)
+  | ({
+      readonly type: "record_completed";
+      readonly cashOut: number;
+      readonly startedAt: DateTime.Utc;
+      readonly finishedAt: DateTime.Utc;
+    } & StartInput)
+  | {
+      readonly type: "add";
+      readonly visitId: VisitId;
+      readonly kind: "buy_in" | "cash_out";
+      readonly amount: number;
+      readonly occurredAt?: DateTime.Utc;
+      readonly note?: string;
+    }
+  | {
+      readonly type: "finish";
+      readonly visitId: VisitId;
+      readonly amount: number;
+      readonly finishedAt?: DateTime.Utc;
+    }
+  | {
+      readonly type: "correct";
+      readonly visitId: VisitId;
+      readonly entryId: EntryId;
+      readonly reason: string;
+      readonly replacement: {
+        readonly amount: number;
+        readonly occurredAt?: DateTime.Utc;
+        readonly note?: string;
+      } | null;
+    }
+  | { readonly type: "reopen"; readonly visitId: VisitId; readonly reason: string };
+
+export type RecordingSnapshot = {
+  readonly state: RecordingState | null;
+  readonly revision: number;
+  readonly publication: "private";
+  readonly status: "loading" | "saved" | "saving" | "save_failed" | "load_failed" | "closed";
+  readonly error: unknown | null;
+  readonly failedCommand: RecordingCommand | null;
+};
+
+const commandCodec = Schema.toCodecJson(RecordingCommand);
+const commandText = (command: RecordingCommand) =>
+  JSON.stringify(Schema.encodeSync(commandCodec)(command));
+
+export const prepareRecordingCommand = (
+  state: RecordingState,
+  input: RecordingInput,
+): RecordingCommand => {
+  const preparedAt = DateTime.makeUnsafe(Date.now());
+  const common = {
+    operationId: RecordingOperationId.make(newId()),
+    actorId: state.actor.id,
+    preparedAt,
+  };
+  if (input.type === "start" || input.type === "record_completed") {
+    const start = {
+      ...common,
+      tableId: TableId.make(newId()),
+      visitId: VisitId.make(newId()),
+      buyInId: EntryId.make(newId()),
+      buyIn: MinorUnits.make(input.buyIn),
+      startedAt: input.startedAt ?? preparedAt,
+      game: input.game ?? null,
+      venueId: input.venueId ?? null,
+      highLimit: input.highLimit ?? false,
+    };
+    return RecordingCommand.make(
+      input.type === "start"
+        ? { type: "start", ...start }
+        : {
+            type: "record_completed",
+            ...start,
+            cashOutId: EntryId.make(newId()),
+            cashOut: MinorUnits.make(input.cashOut),
+            finishedAt: input.finishedAt,
+          },
+    );
+  }
+  const visit = state.visits.find((visit) => visit.id === input.visitId);
+  if (!visit) throw new RecordingError("invalid", "Visit does not exist.");
+  const existing = { ...common, visitId: visit.id, expectedRevision: visit.revision };
+  switch (input.type) {
+    case "add":
+      return RecordingCommand.make({
+        ...existing,
+        type: "add",
+        entryId: EntryId.make(newId()),
+        kind: input.kind,
+        amount: MinorUnits.make(input.amount),
+        occurredAt: input.occurredAt ?? preparedAt,
+        note: input.note ?? null,
+      });
+    case "finish":
+      return RecordingCommand.make({
+        ...existing,
+        type: "finish",
+        entryId: EntryId.make(newId()),
+        amount: MinorUnits.make(input.amount),
+        finishedAt: input.finishedAt ?? preparedAt,
+      });
+    case "correct": {
+      const original = state.entries.find(
+        (entry) => entry.id === input.entryId && entry.visitId === visit.id,
+      );
+      if (!original) throw new RecordingError("invalid", "Correction target does not exist.");
+      return RecordingCommand.make({
+        ...existing,
+        type: "correct",
+        entryId: input.entryId,
+        reason: input.reason,
+        replacement:
+          input.replacement === null
+            ? null
+            : {
+                id: EntryId.make(newId()),
+                amount: MinorUnits.make(input.replacement.amount),
+                occurredAt: input.replacement.occurredAt ?? original.occurredAt,
+                note: input.replacement.note ?? original.note,
+              },
+      });
+    }
+    case "reopen":
+      return RecordingCommand.make({ ...existing, type: "reopen", reason: input.reason });
+  }
+};
+
+const freezeState = (state: RecordingState): RecordingState => {
+  for (const records of [state.tables, state.visits, state.entries, state.receipts]) {
+    for (const record of records) Object.freeze(record);
+    Object.freeze(records);
+  }
+  for (const receipt of state.receipts) {
+    if (receipt.command.type === "correct" && receipt.command.replacement)
+      Object.freeze(receipt.command.replacement);
+    Object.freeze(receipt.command);
+  }
+  Object.freeze(state.self);
+  Object.freeze(state.actor);
+  return Object.freeze(state);
+};
+
+/** Owns the supplied adapter; close the store to release it. No auth or transport is involved. */
+export const makeRecordingStore = (storage: RecordingStorage) => {
+  let snapshot: RecordingSnapshot = Object.freeze({
+    state: null,
+    revision: 0,
+    publication: "private",
+    status: "loading",
+    error: null,
+    failedCommand: null,
+  });
+  let closed = false;
+  let loadFailed = false;
+  let closePromise: Promise<void> | undefined;
+  let queue: Promise<unknown> = Promise.resolve();
+  const listeners = new Set<() => void>();
+  const update = (values: Partial<RecordingSnapshot>) => {
+    snapshot = Object.freeze({ ...snapshot, ...values });
+    for (const listener of listeners) {
+      // Subscribers cannot change the outcome of an acknowledged durable transaction.
+      try {
+        listener();
+      } catch {
+        /* A view owns its subscriber errors. */
+      }
+    }
+  };
+  const serialize = <A>(operation: () => Promise<A>): Promise<A> => {
+    if (closed) return Promise.reject(new RecordingError("closed", "Recording store is closed."));
+    const result = queue.then(operation);
+    queue = result.catch(() => undefined);
+    return result;
+  };
+  const load = async () => {
+    const document = await storage.load();
+    if (document.payload === undefined) {
+      if (snapshot.state !== null)
+        throw new RecordingError("load", "Saved recording history disappeared.");
+      const state: RecordingState = {
+        version: 1,
+        self: { id: PlayerId.make(newId()), displayName: "You" },
+        actor: { id: ActorId.make(newId()), userId: null },
+        tables: [],
+        visits: [],
+        entries: [],
+        receipts: [],
+      };
+      try {
+        const revision = await storage.commit(0, encodeRecordingState(state));
+        update({
+          state: freezeState(state),
+          revision,
+          status: loadFailed ? "load_failed" : "saved",
+          error: loadFailed ? snapshot.error : null,
+        });
+      } catch (error) {
+        if (!(error instanceof RecordingStorageConflict)) throw error;
+        const winner = await storage.load();
+        if (winner.payload === undefined) throw error;
+        update({
+          state: freezeState(decodeRecordingState(winner.payload, winner.revision)),
+          revision: winner.revision,
+          status: loadFailed ? "load_failed" : "saved",
+          error: loadFailed ? snapshot.error : null,
+        });
+      }
+    } else {
+      const state = freezeState(decodeRecordingState(document.payload, document.revision));
+      if (
+        snapshot.state &&
+        (state.self.id !== snapshot.state.self.id ||
+          state.actor.id !== snapshot.state.actor.id ||
+          document.revision < snapshot.revision)
+      )
+        throw new RecordingError("load", "Recording identity or revision changed unexpectedly.");
+      update({
+        state,
+        revision: document.revision,
+        status: loadFailed ? "load_failed" : "saved",
+        error: loadFailed ? snapshot.error : null,
+      });
+    }
+  };
+  const refresh = () =>
+    serialize(async () => {
+      try {
+        loadFailed = false;
+        await load();
+      } catch (error) {
+        loadFailed = true;
+        update({ status: "load_failed", error });
+        throw error;
+      }
+    });
+  const unsubscribe = storage.subscribe((change) => {
+    if (closed) return;
+    if (change.type === "error") {
+      loadFailed = true;
+      update({ status: "load_failed", error: change.error });
+    } else if (change.revision > snapshot.revision) void refresh().catch(() => undefined);
+  });
+  const ready = refresh();
+  const execute = (prepared: RecordingCommand) => {
+    // Copy/validate now, so a caller cannot mutate queued or failed work.
+    const command = Schema.decodeUnknownSync(commandCodec)(JSON.parse(commandText(prepared)), {
+      onExcessProperty: "error",
+    });
+    Object.freeze(command);
+    if (command.type === "correct" && command.replacement) Object.freeze(command.replacement);
+    return serialize(async (): Promise<RecordingReceipt> => {
+      try {
+        const state = snapshot.state;
+        if (state === null || loadFailed)
+          throw new RecordingError("load", "Load recording history before saving.");
+        const receipt = state.receipts.find(
+          (receipt) => receipt.command.operationId === command.operationId,
+        );
+        if (receipt) {
+          if (commandText(receipt.command) !== commandText(command))
+            throw new RecordingError(
+              "operation_reused",
+              "This operation ID was already saved with different content.",
+            );
+          update({ status: "saved", error: null, failedCommand: null });
+          return receipt;
+        }
+        const committed = applyRecordingCommand(state, command);
+        const saved = committed.receipts[committed.receipts.length - 1]!;
+        const payload = encodeRecordingState(committed);
+        update({ status: "saving", error: null, failedCommand: null });
+        const revision = await storage.commit(snapshot.revision, payload);
+        update({
+          state: freezeState(committed),
+          revision,
+          status: loadFailed ? "load_failed" : "saved",
+          error: loadFailed ? snapshot.error : null,
+          failedCommand: null,
+        });
+        return saved;
+      } catch (error) {
+        update({
+          status: loadFailed ? "load_failed" : "save_failed",
+          error,
+          failedCommand: command,
+        });
+        throw error;
+      }
+    });
+  };
+  return {
+    ready,
+    getSnapshot: () => snapshot,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+    prepare: (input: RecordingInput) => {
+      if (closed) throw new RecordingError("closed", "Recording store is closed.");
+      if (snapshot.state === null || loadFailed)
+        throw new RecordingError("load", "Load recording history before preparing a command.");
+      return prepareRecordingCommand(snapshot.state, input);
+    },
+    execute,
+    retry: () => {
+      if (!snapshot.failedCommand)
+        return Promise.reject(
+          new RecordingError("invalid", "There is no failed command to retry."),
+        );
+      return execute(snapshot.failedCommand);
+    },
+    refresh,
+    review: (visitId: VisitId) => {
+      const state = snapshot.state;
+      const visit = state?.visits.find((visit) => visit.id === visitId);
+      if (!state || !visit) throw new RecordingError("invalid", "Visit does not exist.");
+      return projectVisit(visit, state.entries);
+    },
+    close: () =>
+      (closePromise ??= (() => {
+        closed = true;
+        unsubscribe();
+        return queue.then(async () => {
+          try {
+            await storage.close();
+          } finally {
+            update({ status: "closed" });
+            listeners.clear();
+          }
+        });
+      })()),
+  };
+};
+export type RecordingStore = ReturnType<typeof makeRecordingStore>;

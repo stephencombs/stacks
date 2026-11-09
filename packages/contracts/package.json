@@ -19,6 +19,10 @@
     "./relationships": {
       "types": "./src/relationships.ts",
       "import": "./src/relationships.ts"
+    },
+    "./recordingCommands": {
+      "types": "./src/recordingCommands.ts",
+      "import": "./src/recordingCommands.ts"
     }
   },
   "scripts": {

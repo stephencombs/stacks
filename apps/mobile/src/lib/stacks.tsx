@@ -1,6 +1,6 @@
 import type { GroupDetail, TripDetail, TripId } from "@stacks/contracts";
 import { getClerkInstance } from "@clerk/expo";
-import { RegistryProvider, useAtomValue } from "@effect/atom-react";
+import { useAtomValue } from "@effect/atom-react";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import type * as Atom from "effect/reactivity/Atom";
@@ -8,10 +8,10 @@ import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { makeStacksClient } from "@stacks/client-runtime/api";
 import { describeError } from "@stacks/client-runtime/errors";
 import {
-  OutboxProvider,
-  LastTripProvider,
-  StacksContext,
+  SignedInRoot,
+  SignedInScope,
   TelemetryContext,
+  makeSignedIn,
   useAction,
   useOutbox,
   usePending,
@@ -19,14 +19,15 @@ import {
   useStacks,
   useLastTrip,
   useRevalidate,
+  useSignedInOutbox,
 } from "@stacks/client-runtime/react";
-import { CACHE_MS } from "@stacks/client-runtime/freshness";
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 
 import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
+import { useAccount } from "./account";
 import { apiUrl, clerkPublishableKey } from "./config";
 import { markStartup } from "./diagnostics";
 import { outboxStorage, wakeOutbox } from "./outbox";
@@ -34,32 +35,38 @@ import { captureTestEvent } from "./telemetry";
 import { lastTripStorage } from "./tripStorage";
 
 /**
- * One API client and atom registry per signed-in user. Remounting it with a new `key` on
- * sign-in drops every cached query from the previous user.
+ * Around the navigation: whoever is signed in keeps one API client, query cache and outbox while
+ * they move between their own play and their groups. Signed out, it holds nothing.
  */
-export function StacksProvider({ userId, children }: { userId: string; children: ReactNode }) {
-  const [stacks] = useState(() =>
-    makeStacksClient({
+export function SignedInProvider({ children }: { children: ReactNode }) {
+  const account = useAccount();
+  const userId = (account.available && account.isSignedIn && account.userId) || null;
+  return (
+    <SignedInRoot userId={userId} make={signIn} wake={wakeOutbox}>
+      <RefusalHaptic />
+      {children}
+    </SignedInRoot>
+  );
+}
+
+const signIn = (userId: string) =>
+  makeSignedIn({
+    stacks: makeStacksClient({
       baseUrl: apiUrl,
       getToken: async () =>
         (await getClerkInstance({ publishableKey: clerkPublishableKey }).session?.getToken()) ??
         null,
     }),
-  );
-  const [storage] = useState(() => outboxStorage(userId));
-  const [tripStorage] = useState(() => lastTripStorage(userId));
+    outbox: outboxStorage(userId),
+    lastTrip: lastTripStorage(userId),
+    capture: captureTestEvent,
+  });
+
+/** Account screens: the signed-in user's client and cache, under a `key` per user. */
+export function StacksProvider({ children }: { children: ReactNode }) {
   return (
     <TelemetryContext value={captureTestEvent}>
-      <StacksContext value={stacks}>
-        <RegistryProvider defaultIdleTTL={CACHE_MS}>
-          <LastTripProvider storage={tripStorage}>
-            <OutboxProvider storage={storage} wake={wakeOutbox}>
-              <RefusalHaptic />
-              {children}
-            </OutboxProvider>
-          </LastTripProvider>
-        </RegistryProvider>
-      </StacksContext>
+      <SignedInScope>{children}</SignedInScope>
     </TelemetryContext>
   );
 }
@@ -104,11 +111,11 @@ export function Loaded<A, E>({
 
 /** A buzz the moment the server refuses something logged here, so it's noticed in a pocket. */
 function RefusalHaptic() {
-  const outbox = useOutbox();
+  const outbox = useSignedInOutbox();
   const refused = useRef(new Set<string>());
   useEffect(
     () =>
-      outbox.subscribe(() => {
+      outbox?.subscribe(() => {
         const now = outbox.pending().filter((p) => p.failed !== null);
         if (now.some((p) => !refused.current.has(p.entry.id)) && Platform.OS !== "web")
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

@@ -23,11 +23,14 @@ export function List({ children }: { children: ReactNode }) {
 export function Row({
   children,
   onPress,
+  accessibilityLabel,
   accessibilityHint,
   className,
 }: {
   children: ReactNode;
   onPress?: () => void;
+  /** Replaces what's read out, for a row whose parts read better as one sentence. */
+  accessibilityLabel?: string;
   accessibilityHint?: string;
   className?: string;
 }) {
@@ -35,6 +38,7 @@ export function Row({
   return onPress ? (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       onPress={onPress}
       className={cn(classes, "active:bg-sunken")}
