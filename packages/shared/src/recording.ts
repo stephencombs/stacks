@@ -54,6 +54,18 @@ export const finalCashOut = (current: EntryId | null, command: RecordingCommand)
       return current;
   }
 };
+/** The entries a command creates, in a stable order. */
+export const createdEntryIds = (command: RecordingCommand): ReadonlyArray<EntryId> =>
+  command.type === "start"
+    ? [command.buyInId]
+    : command.type === "record_completed"
+      ? [command.buyInId, command.cashOutId]
+      : command.type === "add" || command.type === "finish"
+        ? [command.entryId]
+        : command.type === "correct" && command.replacement
+          ? [command.replacement.id]
+          : [];
+
 export const applyRecordingCommand = <S extends RecordingLedger>(
   state: S,
   command: RecordingCommand,

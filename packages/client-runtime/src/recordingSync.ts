@@ -12,7 +12,7 @@ import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 
-import { applyRecordingCommand, RecordingError } from "@stacks/shared/recording";
+import { applyRecordingCommand, createdEntryIds, RecordingError } from "@stacks/shared/recording";
 
 import { prepareRecordingCommand, type RecordingInput, type RecordingStore } from "./recording.ts";
 import type { RecordingRejection, RecordingState } from "./recordingState.ts";
@@ -120,15 +120,50 @@ export const mergeRecordingHistory = (
       userId,
       synced: history.commands.map((command) => command.operationId),
       rejected: [
-        // A refusal the server now holds was settled elsewhere; the server's copy wins.
-        ...(state.sync?.rejected ?? [])
-          .filter((item) => !remote.has(item.command.operationId))
-          .map((item) => ({ ...item, command: own(item.command) })),
+        ...(state.sync?.rejected ?? []).map((item) => ({ ...item, command: own(item.command) })),
         ...reused,
         ...merged.failed,
-      ],
+      ].filter((item) => !settled(item.command, remote, merged.state)),
     },
   };
+};
+
+/** The amount of each entry a command creates, in `createdEntryIds` order. */
+const createdAmounts = (command: RecordingCommand): ReadonlyArray<number> =>
+  command.type === "start"
+    ? [command.buyIn]
+    : command.type === "record_completed"
+      ? [command.buyIn, command.cashOut]
+      : command.type === "add" || command.type === "finish"
+        ? [command.amount]
+        : command.type === "correct" && command.replacement
+          ? [command.replacement.amount]
+          : [];
+
+/**
+ * Whether the account already has what a refused command recorded: this very operation, or the
+ * same entries under another one (a restored backup, another device's copy). Then the refusal is
+ * settled, and recording it again would count the money twice. An operation the server holds
+ * with different content stays refused.
+ */
+const settled = (
+  command: RecordingCommand,
+  remote: ReadonlyMap<string, RecordingCommand>,
+  ledger: RecordingState,
+) => {
+  const held = remote.get(command.operationId);
+  if (held) return commandText(held) === commandText(command);
+  const amounts = createdAmounts(command);
+  const ids = createdEntryIds(command);
+  return (
+    ids.length > 0 &&
+    ids.every((id, index) =>
+      ledger.entries.some(
+        (entry) =>
+          entry.id === id && entry.visitId === command.visitId && entry.amount === amounts[index],
+      ),
+    )
+  );
 };
 
 /**
@@ -263,18 +298,6 @@ const withoutRejection = (state: RecordingState, operationId: RecordingOperation
 export const discardRejected = (state: RecordingState, operationId: RecordingOperationId) =>
   withoutRejection(state, operationId).state;
 
-/** The entries a command creates, in a stable order, so a recorded-again copy can be matched. */
-const createdEntries = (command: RecordingCommand) =>
-  command.type === "start"
-    ? [command.buyInId]
-    : command.type === "record_completed"
-      ? [command.buyInId, command.cashOutId]
-      : command.type === "add" || command.type === "finish"
-        ? [command.entryId]
-        : command.type === "correct" && command.replacement
-          ? [command.replacement.id]
-          : [];
-
 /**
  * Records a refused change again as a new command against the ledger as it is now. A refused
  * start brings the refused play that depended on it along, moved to the new visit, so offline
@@ -294,8 +317,8 @@ export const recordRejectedAgain = (state: RecordingState, operationId: Recordin
     next = withoutRejection(next, item.command.operationId).state;
     const command = prepareRecordingCommand(next, inputOf(item.command, ids));
     ids.set(item.command.visitId, command.visitId);
-    const before = createdEntries(item.command);
-    createdEntries(command).forEach((id, index) => ids.set(before[index]!, id));
+    const before = createdEntryIds(item.command);
+    createdEntryIds(command).forEach((id, index) => ids.set(before[index]!, id));
     next = applyRecordingCommand(next, command);
   }
   return next;

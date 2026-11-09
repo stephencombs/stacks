@@ -214,7 +214,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       });
       expect(
         results.map((result) => (result.status === "rejected" ? result.reason : "ok")),
-      ).toEqual(["invalid", "operation_reused", "invalid"]);
+      ).toEqual(["invalid", "operation_reused", "conflict"]);
       expect((yield* bea.recording.history()).visits).toEqual([]);
       expect((yield* alex.recording.history()).entries).toHaveLength(1);
     }),
@@ -296,6 +296,41 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       const statuses = responses.map((response) => response.results[0]!.status);
       expect(statuses.filter((status) => status === "accepted")).toHaveLength(1);
       expect(statuses.filter((status) => status === "rejected")).toHaveLength(5);
+      for (const response of responses)
+        for (const result of response.results)
+          if (result.status === "rejected")
+            expect(result).toMatchObject({
+              reason: "conflict",
+              message: "This session is already recorded.",
+            });
+    }),
+  );
+
+  it.effect("calls reused IDs a conflict a pull resolves, naming what was reused", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const identity = device();
+      const opened = start(identity);
+      const rebuy = add(identity, opened.visitId, 0, 10000);
+      yield* alex.recording.push({ payload: { identity, commands: [opened, rebuy] } });
+      // The same facts from a restored backup, under new operation IDs.
+      const copy = (command: RecordingCommand) =>
+        RecordingCommand.make({ ...command, operationId: RecordingOperationId.make(uuid()) });
+      const later = add(identity, opened.visitId, 1, 500);
+      const { results } = yield* alex.recording.push({
+        payload: {
+          identity,
+          commands: [copy(opened), RecordingCommand.make({ ...later, entryId: rebuy.entryId })],
+        },
+      });
+      expect(results).toMatchObject([
+        { status: "rejected", reason: "conflict", message: "This session is already recorded." },
+        {
+          status: "rejected",
+          reason: "conflict",
+          message: "An entry with this ID is already recorded.",
+        },
+      ]);
     }),
   );
 });

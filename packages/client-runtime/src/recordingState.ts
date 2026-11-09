@@ -286,7 +286,10 @@ const validateRecordingState = (state: RecordingState) => {
     const rejected = new Set(state.sync.rejected.map((item) => item.command.operationId));
     requireValid(
       rejected.size === state.sync.rejected.length &&
-        [...rejected].every((id) => !operations.has(id)) &&
+        // A reused operation ID refers to the account's different command, which may be here.
+        state.sync.rejected.every(
+          (item) => item.reason === "operation_reused" || !operations.has(item.command.operationId),
+        ) &&
         state.sync.rejected.every((item) => item.command.actorId === state.actor.id),
       "A rejected command is still in the ledger.",
     );

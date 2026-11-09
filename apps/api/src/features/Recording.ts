@@ -13,6 +13,7 @@ import {
 } from "@stacks/contracts/recordingCommands";
 import {
   applyRecordingCommand,
+  createdEntryIds,
   RecordingError,
   type RecordingLedger,
 } from "@stacks/shared/recording";
@@ -31,6 +32,17 @@ class Rejected extends Data.TaggedError("Rejected")<{
 }> {}
 
 type Identity = typeof RecordingIdentityRow.Type;
+
+// Reused IDs are a conflict: when they hold the same facts (a restored backup, another device's
+// copy), the device's next pull finds them and settles the refusal instead of recording again.
+const sessionRecorded = {
+  reason: "conflict",
+  message: "This session is already recorded.",
+} as const;
+const entryRecorded = {
+  reason: "conflict",
+  message: "An entry with this ID is already recorded.",
+} as const;
 
 const commandJson = Schema.encodeSync(Schema.toCodecJson(RecordingCommand));
 const commandText = (command: RecordingCommand) => JSON.stringify(commandJson(command));
@@ -92,8 +104,7 @@ const loadVisit = Effect.fn("Recording.loadVisit")(function* (
     const taken = yield* sql`
       select 1 from personal_visits where id = ${command.visitId} or table_id = ${command.tableId}
     `;
-    if (taken.length > 0)
-      return yield* new Rejected({ reason: "invalid", message: "Start IDs are already used." });
+    if (taken.length > 0) return yield* new Rejected(sessionRecorded);
     return ledger([], [], []);
   }
   const rows = yield* sql`
@@ -125,14 +136,6 @@ const save = Effect.fn("Recording.save")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   const known = new Map(before.entries.map((entry) => [entry.id, entry]));
-  const added = after.entries.filter((entry) => !known.has(entry.id));
-  if (added.length > 0) {
-    const taken = yield* sql`
-      select 1 from personal_entries where id in ${sql.in(added.map((entry) => entry.id))}
-    `;
-    if (taken.length > 0)
-      return yield* new Rejected({ reason: "invalid", message: "Entry ID is already used." });
-  }
   const visit = after.visits[0]!;
   if (before.visits.length === 0) {
     const table = after.tables[0]!;
@@ -207,6 +210,11 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
       });
     }
     const before = yield* loadVisit(owner, command);
+    const created = createdEntryIds(command);
+    if (created.length > 0) {
+      const taken = yield* sql`select 1 from personal_entries where id in ${sql.in(created)}`;
+      if (taken.length > 0) return yield* new Rejected(entryRecorded);
+    }
     const after = yield* Effect.try({
       try: () => applyRecordingCommand(before, command),
       catch: (error) => error,
@@ -224,7 +232,11 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
     // A concurrent push can claim the same IDs between the check and the insert.
     Effect.mapError((error) =>
       error._tag === "SqlError" && error.reason._tag === "UniqueViolation"
-        ? new Rejected({ reason: "invalid", message: "Start IDs are already used." })
+        ? new Rejected(
+            error.reason.constraint.startsWith("personal_entries")
+              ? entryRecorded
+              : sessionRecorded,
+          )
         : error,
     ),
     Effect.map((): RecordingCommandResult => ({

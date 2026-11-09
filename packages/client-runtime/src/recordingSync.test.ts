@@ -1,10 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import { ActorId, PlayerId, UserId } from "@stacks/contracts";
-import type {
-  PushRecordingRequest,
-  RecordingCommandResult,
-  RecordingHistory,
-  RecordingIdentity,
+import { ActorId, MinorUnits, PlayerId, UserId } from "@stacks/contracts";
+import {
+  RecordingCommand,
+  RecordingOperationId,
+  type PushRecordingRequest,
+  type RecordingCommandResult,
+  type RecordingHistory,
+  type RecordingIdentity,
 } from "@stacks/contracts/recordingCommands";
 import {
   applyRecordingCommand,
@@ -393,6 +395,52 @@ describe("rejections", () => {
     expect(state(store).sync?.rejected.map((item) => item.command.operationId)).not.toContain(
       rebuy.operationId,
     );
+  });
+
+  it("keeps a refusal for an operation the server holds with different content", async () => {
+    const store = await open();
+    const remote = server();
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    const opened = await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const identity = { playerId: state(store).self.id, actorId: state(store).actor.id };
+    remote.push({
+      identity,
+      commands: [
+        RecordingCommand.make({
+          ...(opened.command as Extract<RecordingCommand, { type: "start" }>),
+          buyIn: MinorUnits.make(1),
+        }),
+      ],
+    });
+    await pushAll(store, remote);
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    expect(state(store).sync?.rejected).toMatchObject([
+      { command: { operationId: opened.command.operationId }, reason: "operation_reused" },
+    ]);
+  });
+
+  it("settles a refusal when the account already holds the same facts", async () => {
+    const store = await open();
+    const remote = server();
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    const opened = await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const identity = { playerId: state(store).self.id, actorId: state(store).actor.id };
+    // A restored backup put the same session on the account under another operation ID.
+    remote.push({
+      identity,
+      commands: [
+        RecordingCommand.make({
+          ...opened.command,
+          operationId: RecordingOperationId.make(crypto.randomUUID()),
+        }),
+      ],
+    });
+    await pushAll(store, remote);
+    expect(state(store).sync?.rejected).toHaveLength(1);
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    expect(state(store).sync?.rejected).toEqual([]);
+    expect(state(store).visits).toHaveLength(1);
+    expect(pendingRecordingCommands(state(store))).toEqual([]);
   });
 
   it("records a refused start again together with the play that depended on it", async () => {
