@@ -1,14 +1,44 @@
-import { Actor, PlayEntry, PlayerIdentity, Table, Visit, type EntryId } from "@stacks/contracts";
-import { RecordingCommand } from "@stacks/contracts/recordingCommands";
+import {
+  Actor,
+  PlayEntry,
+  PlayerIdentity,
+  Table,
+  UserId,
+  Visit,
+  type EntryId,
+} from "@stacks/contracts";
+import {
+  RecordingCommand,
+  RecordingOperationId,
+  RecordingRejectionReason,
+} from "@stacks/contracts/recordingCommands";
+import {
+  applyRecordingCommand,
+  finalCashOut,
+  RecordingError,
+  RecordingReceipt,
+} from "@stacks/shared/recording";
 import { visitSummary } from "@stacks/shared/visits";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
-export const RecordingReceipt = Schema.Struct({
+export { applyRecordingCommand, RecordingError, RecordingReceipt } from "@stacks/shared/recording";
+
+/** A command the server refused, kept out of the ledger until it's recorded again or discarded. */
+export const RecordingRejection = Schema.Struct({
   command: RecordingCommand,
-  revision: Schema.Int.check(Schema.isGreaterThan(1)),
+  reason: RecordingRejectionReason,
+  message: Schema.String,
 });
-export type RecordingReceipt = typeof RecordingReceipt.Type;
+export type RecordingRejection = typeof RecordingRejection.Type;
+
+/** Present once an account has claimed this device's history. Receipts not `synced` are pending. */
+export const RecordingSync = Schema.Struct({
+  userId: UserId,
+  synced: Schema.Array(RecordingOperationId),
+  rejected: Schema.Array(RecordingRejection),
+});
+export type RecordingSync = typeof RecordingSync.Type;
 
 export const RecordingState = Schema.Struct({
   version: Schema.Literal(1),
@@ -18,21 +48,9 @@ export const RecordingState = Schema.Struct({
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
   receipts: Schema.Array(RecordingReceipt),
+  sync: Schema.optionalKey(RecordingSync),
 });
 export type RecordingState = typeof RecordingState.Type;
-
-export class RecordingError extends Error {
-  override readonly name = "RecordingError";
-  readonly reason: "invalid" | "conflict" | "operation_reused" | "load" | "closed";
-  constructor(
-    reason: "invalid" | "conflict" | "operation_reused" | "load" | "closed",
-    message: string,
-    cause?: unknown,
-  ) {
-    super(message, { cause });
-    this.reason = reason;
-  }
-}
 
 const requireValid: (condition: unknown, message: string) => asserts condition = (
   condition,
@@ -41,21 +59,6 @@ const requireValid: (condition: unknown, message: string) => asserts condition =
   if (!condition) throw new RecordingError("invalid", message);
 };
 const ms = DateTime.toEpochMillis;
-// The live cash-out that last finished the visit, following corrections to its replacement.
-const finalCashOut = (current: EntryId | null, command: RecordingCommand) => {
-  switch (command.type) {
-    case "record_completed":
-      return command.cashOutId;
-    case "finish":
-      return command.entryId;
-    case "correct":
-      return command.entryId === current ? (command.replacement?.id ?? null) : current;
-    case "reopen":
-      return null;
-    default:
-      return current;
-  }
-};
 const unique = (records: ReadonlyArray<{ readonly id: string }>) =>
   new Set(records.map((record) => record.id)).size === records.length;
 
@@ -274,6 +277,21 @@ const validateRecordingState = (state: RecordingState) => {
       "Visit differs from its lifecycle receipts.",
     );
   }
+  if (state.sync) {
+    const synced = new Set(state.sync.synced);
+    requireValid(
+      synced.size === state.sync.synced.length &&
+        state.sync.synced.every((id) => operations.has(id)),
+      "Sync marks an unknown command.",
+    );
+    const rejected = new Set(state.sync.rejected.map((item) => item.command.operationId));
+    requireValid(
+      rejected.size === state.sync.rejected.length &&
+        [...rejected].every((id) => !operations.has(id)) &&
+        state.sync.rejected.every((item) => item.command.actorId === state.actor.id),
+      "A rejected command is still in the ledger.",
+    );
+  }
   return state;
 };
 
@@ -312,7 +330,12 @@ export const decodeRecordingState = (payload: string, revision: number) => {
     const state = validateOrUpgrade(
       Schema.decodeUnknownSync(codec)(JSON.parse(payload), { onExcessProperty: "error" }),
     );
-    requireValid(revision === state.receipts.length + 1, "Document and receipt revisions differ.");
+    // Until an account links it, every commit adds exactly one receipt. Sync then commits
+    // bookkeeping, merges and discards that don't.
+    requireValid(
+      state.sync !== undefined || revision === state.receipts.length + 1,
+      "Document and receipt revisions differ.",
+    );
     return state;
   } catch (cause) {
     throw new RecordingError(
@@ -321,164 +344,4 @@ export const decodeRecordingState = (payload: string, revision: number) => {
       cause,
     );
   }
-};
-
-export const applyRecordingCommand = (
-  state: RecordingState,
-  command: RecordingCommand,
-): RecordingState => {
-  requireValid(command.actorId === state.actor.id, "Command has a foreign local actor.");
-  const tables = [...state.tables];
-  let visits = [...state.visits];
-  let entries = [...state.entries];
-  const append = (
-    id: EntryId,
-    visitId: Visit["id"],
-    kind: PlayEntry["kind"],
-    amount: PlayEntry["amount"],
-    occurredAt: DateTime.Utc,
-    note: string | null = null,
-    replacesEntryId: EntryId | null = null,
-  ) => {
-    requireValid(!entries.some((entry) => entry.id === id), "Entry ID is already used.");
-    entries.push(
-      PlayEntry.make({
-        id,
-        visitId,
-        kind,
-        amount,
-        occurredAt,
-        note,
-        replacesEntryId,
-        currency: "USD",
-        counterpartyId: null,
-        createdBy: command.actorId,
-        createdAt: command.preparedAt,
-        voidedAt: null,
-        voidedBy: null,
-        voidReason: null,
-      }),
-    );
-  };
-  if (command.type === "start" || command.type === "record_completed") {
-    requireValid(
-      !visits.some((visit) => visit.id === command.visitId) &&
-        !tables.some((table) => table.id === command.tableId),
-      "Start IDs are already used.",
-    );
-    tables.push(
-      Table.make({
-        id: command.tableId,
-        tripId: null,
-        game: command.game,
-        venueId: command.venueId,
-        highLimit: command.highLimit,
-        starterActorId: command.actorId,
-      }),
-    );
-    visits.push(
-      Visit.make({
-        id: command.visitId,
-        tableId: command.tableId,
-        playerId: state.self.id,
-        startedAt: command.startedAt,
-        finishedAt: command.type === "start" ? null : command.finishedAt,
-        revision: 0,
-      }),
-    );
-    append(command.buyInId, command.visitId, "buy_in", command.buyIn, command.startedAt);
-    if (command.type === "record_completed")
-      append(command.cashOutId, command.visitId, "cash_out", command.cashOut, command.finishedAt);
-  } else {
-    const visit = visits.find((visit) => visit.id === command.visitId);
-    requireValid(visit, "Visit does not exist.");
-    if (visit.revision !== command.expectedRevision)
-      throw new RecordingError(
-        "conflict",
-        "Visit changed. Review it before preparing another command.",
-      );
-    requireValid(visit.revision < Number.MAX_SAFE_INTEGER, "Visit revision overflow.");
-    let finishedAt = visit.finishedAt;
-    if (command.type === "add" || command.type === "finish") {
-      requireValid(
-        visit.finishedAt === null,
-        "This visit has finished. Start a new visit when returning.",
-      );
-      if (command.type === "add")
-        append(
-          command.entryId,
-          visit.id,
-          command.kind,
-          command.amount,
-          command.occurredAt,
-          command.note,
-        );
-      else {
-        finishedAt = command.finishedAt;
-        append(command.entryId, visit.id, "cash_out", command.amount, command.finishedAt);
-      }
-    } else if (command.type === "reopen") {
-      requireValid(visit.finishedAt !== null, "Visit is already live.");
-      finishedAt = null;
-      const final = state.receipts.reduce<EntryId | null>(
-        (current, receipt) =>
-          receipt.command.visitId === visit.id ? finalCashOut(current, receipt.command) : current,
-        null,
-      );
-      entries = entries.map((entry) =>
-        entry.id === final
-          ? PlayEntry.make({
-              ...entry,
-              voidedAt: command.preparedAt,
-              voidedBy: command.actorId,
-              voidReason: command.reason,
-            })
-          : entry,
-      );
-    } else {
-      const original = entries.find((entry) => entry.id === command.entryId);
-      requireValid(
-        original && original.visitId === visit.id && original.voidedAt === null,
-        "Correction target is missing or already voided.",
-      );
-      requireValid(
-        ms(command.preparedAt) >= ms(original.createdAt),
-        "Correction predates the original audit.",
-      );
-      entries = entries.map((entry) =>
-        entry.id === original.id
-          ? PlayEntry.make({
-              ...entry,
-              voidedAt: command.preparedAt,
-              voidedBy: command.actorId,
-              voidReason: command.reason,
-            })
-          : entry,
-      );
-      if (command.replacement !== null) {
-        const replacement = command.replacement;
-        append(
-          replacement.id,
-          visit.id,
-          original.kind,
-          replacement.amount,
-          replacement.occurredAt,
-          replacement.note,
-          original.id,
-        );
-      }
-    }
-    visits = visits.map((item) =>
-      item.id === visit.id
-        ? Visit.make({ ...visit, finishedAt, revision: visit.revision + 1 })
-        : item,
-    );
-  }
-  return {
-    ...state,
-    tables,
-    visits,
-    entries,
-    receipts: [...state.receipts, { command, revision: state.receipts.length + 2 }],
-  };
 };

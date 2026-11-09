@@ -9,6 +9,7 @@ import * as Guests from "../features/Guests.ts";
 import * as Invites from "../features/Invites.ts";
 import * as Ledger from "../features/Ledger.ts";
 import * as Limits from "../features/Limits.ts";
+import * as Recording from "../features/Recording.ts";
 import * as Sessions from "../features/Sessions.ts";
 import * as Stakes from "../features/Stakes.ts";
 import * as Trips from "../features/Trips.ts";
@@ -116,6 +117,24 @@ const limits = HttpApiBuilder.group(StacksApi, "limits", (handlers) =>
     .handle("update", ({ params, payload }) => serve(Limits.update(params.tripId, payload))),
 );
 
+const recording = HttpApiBuilder.group(StacksApi, "recording", (handlers) =>
+  handlers
+    .handle("history", () => serve(Recording.history()))
+    .handle("push", ({ payload }) => serve(Recording.push(payload))),
+);
+
 export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openapi.json" }).pipe(
-  Layer.provide([health, groups, invites, guests, venues, sessions, ledger, stakes, trips, limits]),
+  Layer.provide([
+    health,
+    groups,
+    invites,
+    guests,
+    venues,
+    sessions,
+    ledger,
+    stakes,
+    trips,
+    limits,
+    recording,
+  ]),
 );

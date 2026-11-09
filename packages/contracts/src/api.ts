@@ -23,6 +23,11 @@ import {
 import { Entry, Game, Seat, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import {
+  PushRecordingRequest,
+  PushRecordingResponse,
+  RecordingHistory,
+} from "./recordingCommands.ts";
+import {
   ClaimPreview,
   GroupDetail,
   GroupListItem,
@@ -557,6 +562,25 @@ const LimitsGroup = HttpApiGroup.make("limits")
   )
   .middleware(Authentication);
 
+const RecordingGroup = HttpApiGroup.make("recording")
+  .add(
+    HttpApiEndpoint.get("history", "/recording", { success: RecordingHistory }).annotate(
+      OpenApi.Summary,
+      "The signed-in account's personal visits, entries and applied commands",
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("push", "/recording/commands", {
+      payload: PushRecordingRequest,
+      success: PushRecordingResponse,
+      error: Conflict,
+    }).annotate(
+      OpenApi.Summary,
+      "Applies commands in order; a retried operation with the same content is a no-op",
+    ),
+  )
+  .middleware(Authentication);
+
 export class StacksApi extends HttpApi.make("stacks")
   .add(HealthGroup)
   .add(GroupsGroup)
@@ -568,4 +592,5 @@ export class StacksApi extends HttpApi.make("stacks")
   .add(StakesGroup)
   .add(TripsGroup)
   .add(LimitsGroup)
+  .add(RecordingGroup)
   .prefix("/api") {}

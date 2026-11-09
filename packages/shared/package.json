@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./recording": {
+      "types": "./src/recording.ts",
+      "import": "./src/recording.ts"
+    },
     "./visits": {
       "types": "./src/visits.ts",
       "import": "./src/visits.ts"
