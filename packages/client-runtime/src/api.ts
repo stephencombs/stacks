@@ -2,9 +2,12 @@ import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
 import type { GroupId, SessionId, TripId } from "@stacks/contracts";
 import { StacksApi } from "@stacks/contracts";
+
+import type { RecordingTransport } from "./recordingSync.ts";
 
 /**
  * Every query carries this key and every mutation invalidates it, so a write refreshes whatever
@@ -19,16 +22,34 @@ export interface StacksClientOptions {
   readonly getToken: () => Promise<string | null>;
 }
 
+const withToken = (getToken: StacksClientOptions["getToken"]) =>
+  HttpClient.mapRequestEffect((request) =>
+    Effect.map(Effect.promise(getToken), (token) =>
+      token ? HttpClientRequest.bearerToken(request, token) : request,
+    ),
+  );
+
+/** Personal recording sync talks to the API outside the query cache: it owns its retries. */
+export const makeRecordingTransport = ({
+  baseUrl,
+  getToken,
+}: StacksClientOptions): RecordingTransport => {
+  const client = HttpApiClient.make(StacksApi, {
+    baseUrl,
+    transformClient: withToken(getToken),
+  }).pipe(Effect.provide(FetchHttpClient.layer));
+  return {
+    history: Effect.flatMap(client, (api) => api.recording.history()),
+    push: (payload) => Effect.flatMap(client, (api) => api.recording.push({ payload })),
+  };
+};
+
 export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => {
   class StacksClient extends AtomHttpApi.Service<StacksClient>()("@stacks/StacksClient", {
     api: StacksApi,
     httpClient: FetchHttpClient.layer,
     baseUrl,
-    transformClient: HttpClient.mapRequestEffect((request) =>
-      Effect.map(Effect.promise(getToken), (token) =>
-        token ? HttpClientRequest.bearerToken(request, token) : request,
-      ),
-    ),
+    transformClient: withToken(getToken),
   }) {}
 
   const keys = { reactivityKeys: LEDGER_KEYS };

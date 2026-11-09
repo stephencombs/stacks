@@ -246,10 +246,13 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
       }
     } else {
       const state = freezeState(decodeRecordingState(document.payload, document.revision));
+      const previous = snapshot.state;
+      // Another screen may have adopted the account's identity before anything synced.
+      const adopted = state.sync !== undefined && (previous?.sync?.synced.length ?? 0) === 0;
       if (
-        snapshot.state &&
-        (state.self.id !== snapshot.state.self.id ||
-          state.actor.id !== snapshot.state.actor.id ||
+        previous &&
+        (((state.self.id !== previous.self.id || state.actor.id !== previous.actor.id) &&
+          !adopted) ||
           document.revision < snapshot.revision)
       )
         throw new RecordingError("load", "Recording identity or revision changed unexpectedly.");
@@ -349,6 +352,22 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
       return execute(snapshot.failedCommand);
     },
     refresh,
+    /**
+     * Saves a whole-ledger change, such as sync bookkeeping, in turn with commands. `change` sees
+     * the latest saved state; returning it unchanged saves nothing.
+     */
+    transform: (change: (state: RecordingState) => RecordingState) =>
+      serialize(async () => {
+        const state = snapshot.state;
+        if (state === null || loadFailed)
+          throw new RecordingError("load", "Load recording history before saving.");
+        const next = change(state);
+        const payload = encodeRecordingState(next);
+        if (next === state || payload === encodeRecordingState(state)) return state;
+        const revision = await storage.commit(snapshot.revision, payload);
+        update({ state: freezeState(next), revision });
+        return next;
+      }),
     review: (visitId: VisitId) => {
       const state = snapshot.state;
       const visit = state?.visits.find((visit) => visit.id === visitId);

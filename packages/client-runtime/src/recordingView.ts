@@ -14,8 +14,11 @@ import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 
 import { gameNames } from "./format.ts";
-import { RecordingError, type RecordingState } from "./recordingState.ts";
+import type { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
+
+import { RecordingError, type RecordingRejection, type RecordingState } from "./recordingState.ts";
 import { RecordingStorageConflict, RecordingStorageError } from "./recordingStorage.ts";
+import { pendingRecordingCommands, type RecordingSyncStatus } from "./recordingSync.ts";
 
 /**
  * The one private ledger on this device. It never changes with sign-in, so signing in or out
@@ -258,3 +261,85 @@ export const parsePastSessionTimes = (
 /** Today as a date field holds it: "2026-11-07", in local time. */
 export const localDateText = (now = new Date()) =>
   `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+const changes = (count: number) => (count === 1 ? "1 change" : `${count} changes`);
+
+/** What a refused change was, and why the account refused it. */
+export const describeRecordingRejection = ({ command, reason }: RecordingRejection) => {
+  const what =
+    command.type === "start"
+      ? `Starting a session with ${money(command.buyIn)}`
+      : command.type === "record_completed"
+        ? `A past session with ${money(command.buyIn)} in and ${money(command.cashOut)} out`
+        : command.type === "add"
+          ? `A ${money(command.amount)} ${command.kind === "buy_in" ? "buy-in" : "cash-out"}`
+          : command.type === "finish"
+            ? `Finishing with ${money(command.amount)}`
+            : command.type === "correct"
+              ? "A correction"
+              : "Reopening a session";
+  const why =
+    reason === "conflict"
+      ? "The session changed on another device."
+      : reason === "operation_reused"
+        ? "Your account already has it with different details."
+        : "It doesn't fit the session as your account has it.";
+  return `${what} didn't sync. ${why}`;
+};
+
+export type RecordingSyncLine = {
+  readonly kind: "device" | "syncing" | "waiting" | "synced" | "blocked";
+  readonly text: string;
+};
+
+export type RecordingSyncView = {
+  readonly line: RecordingSyncLine;
+  /** Refused changes, oldest first: each needs recording again or discarding. */
+  readonly rejected: ReadonlyArray<{
+    readonly operationId: RecordingOperationId;
+    readonly sentence: string;
+  }>;
+};
+
+/**
+ * The quiet line on a recording screen, and the refusals to resolve. Signed out, everything stays
+ * on the device. Pass a visit to count only its changes.
+ */
+export const recordingSyncView = (
+  state: RecordingState | null,
+  sync: RecordingSyncStatus | null,
+  visitId?: VisitId,
+): RecordingSyncView => {
+  const mine = (command: RecordingCommand) => visitId === undefined || command.visitId === visitId;
+  const rejected = (state?.sync?.rejected ?? [])
+    .filter((item) => mine(item.command))
+    .map((item) => ({
+      operationId: item.command.operationId,
+      sentence: describeRecordingRejection(item),
+    }));
+  if (state === null || sync === null)
+    return { line: { kind: "device", text: "Saved on this device" }, rejected };
+  if (sync.phase === "blocked")
+    return {
+      line: {
+        kind: "blocked",
+        text: "Saved on this device. These sessions belong to another account, so they don't sync to this one.",
+      },
+      rejected: [],
+    };
+  const pending = pendingRecordingCommands(state).filter(mine).length;
+  if (state.sync !== undefined && pending === 0)
+    return { line: { kind: "synced", text: "Synced to your account" }, rejected };
+  if (sync.phase === "syncing") return { line: { kind: "syncing", text: "Syncing…" }, rejected };
+  const waiting = pending > 0 ? changes(pending) : "Your sessions";
+  return {
+    line: {
+      kind: "waiting",
+      text:
+        sync.phase === "retrying"
+          ? `Saved on this device. ${waiting} will sync once Color Up can be reached.`
+          : `Saved on this device. ${waiting} waiting to sync.`,
+    },
+    rejected,
+  };
+};

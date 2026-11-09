@@ -33,12 +33,11 @@ export const RecordingRejection = Schema.Struct({
 export type RecordingRejection = typeof RecordingRejection.Type;
 
 /** Present once an account has claimed this device's history. Receipts not `synced` are pending. */
-export const RecordingSync = Schema.Struct({
+const RecordingSync = Schema.Struct({
   userId: UserId,
   synced: Schema.Array(RecordingOperationId),
   rejected: Schema.Array(RecordingRejection),
 });
-export type RecordingSync = typeof RecordingSync.Type;
 
 export const RecordingState = Schema.Struct({
   version: Schema.Literal(1),
