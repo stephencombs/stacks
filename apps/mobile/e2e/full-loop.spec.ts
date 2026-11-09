@@ -156,14 +156,18 @@ test.describe.serial("live mode on a phone", () => {
     await alex.context().setOffline(false);
     await expect(waiting).toHaveCount(0);
     // One tap repeats Gus's last buy-in.
-    await visible(alex.getByRole("button", { name: "Rebuy for Gus", exact: true })).click();
+    const rebuyGus = visible(alex.getByRole("button", { name: "Rebuy $100 for Gus", exact: true }));
+    await rebuyGus.click();
     await expect(
       alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),
     ).toBeVisible();
-    // A mistaken rebuy is undone from the same spot it was tapped.
-    await visible(alex.getByRole("button", { name: "Rebuy for Gus", exact: true })).click();
+    // A second tap rebuys again; the toast takes a mistaken one back.
+    await rebuyGus.click();
+    await expect(
+      alex.getByText("In $300 · Out $0").filter({ visible: true }).first(),
+    ).toBeVisible();
     await shoot(alex, "rebuy-undo");
-    await visible(alex.getByRole("button", { name: "Undo rebuy for Gus" })).click();
+    await visible(alex.getByRole("button", { name: "Undo", exact: true })).click();
     await expect(alex.getByText("Voided by Alex: Undone").filter({ visible: true })).toBeVisible();
     await expect(
       alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),

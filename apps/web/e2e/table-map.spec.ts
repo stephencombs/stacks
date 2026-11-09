@@ -56,9 +56,9 @@ test.describe.serial("seats at a blackjack table", () => {
     await page.unroute(/\/frame-5-\d+\.webp/);
     await page.getByRole("button", { name: "Retry table artwork" }).click();
     // Anyone can mark the table high limit.
-    const highLimit = page.getByRole("button", { name: "High limit" });
+    const highLimit = page.getByRole("checkbox", { name: "High limit" });
     await highLimit.click();
-    await expect(highLimit).toHaveAttribute("aria-pressed", "true");
+    await expect(highLimit).toBeChecked();
 
     // An empty table, five seats unless someone picks another size: every seat is open.
     const seat = (name: RegExp) => page.getByRole("button", { name });

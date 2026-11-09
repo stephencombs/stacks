@@ -146,11 +146,15 @@ test.describe.serial("a group's first night out", () => {
     await expect(sending).toBeVisible();
     await alex.context().setOffline(false);
     await expect(sending).toHaveCount(0);
-    // One press repeats a player's last buy-in, and the same spot undoes it.
+    // One press repeats a player's last buy-in, and the bar that confirms it undoes it.
     const gus = alex.getByRole("button", { name: /^Gus, / });
-    await alex.getByRole("button", { name: "Rebuy for Gus", exact: true }).click();
+    await alex.getByRole("button", { name: "Rebuy $100 for Gus", exact: true }).click();
     await expect(gus).toContainText("In $200");
-    await alex.getByRole("button", { name: "Undo rebuy for Gus" }).click();
+    await alex
+      .getByRole("status")
+      .filter({ hasText: "Gus bought in" })
+      .getByRole("button", { name: "Undo", exact: true })
+      .click();
     await expect(alex.getByText("Voided by Alex: Undone")).toBeVisible();
     await expect(gus).toContainText("In $100");
     // The places stay in reach at the table, and the table stays in reach from every place.
