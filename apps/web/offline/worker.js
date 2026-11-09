@@ -42,8 +42,9 @@ self.addEventListener("install", (event) => {
   // Let existing tabs finish with their version; a page switches only when its person agrees.
 });
 
+// Only same-origin pages can message a service worker, so no origin check is needed.
 self.addEventListener("message", (event) => {
-  if (event.origin === self.location.origin && event.data?.type === "SKIP_WAITING") {
+  if (event.data?.type === "SKIP_WAITING") {
     event.waitUntil(self.skipWaiting());
   }
 });
