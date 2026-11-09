@@ -72,6 +72,14 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     replacesEntryId: EntryId | null = null,
   ) => {
     requireValid(!entries.some((entry) => entry.id === id), "Entry ID is already used.");
+    requireValid(
+      kind === "buy_in" ? amount > 0 : kind === "cash_out" ? amount >= 0 : amount !== 0,
+      kind === "buy_in"
+        ? "A buy-in must be more than zero."
+        : kind === "cash_out"
+          ? "A cash-out can't be negative."
+          : "An adjustment can't be zero.",
+    );
     entries.push(
       PlayEntry.make({
         id,

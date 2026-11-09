@@ -221,6 +221,12 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
     yield* save(owner, before, after);
   });
   return yield* sql.withTransaction(apply).pipe(
+    // A concurrent push can claim the same IDs between the check and the insert.
+    Effect.mapError((error) =>
+      error._tag === "SqlError" && error.reason._tag === "UniqueViolation"
+        ? new Rejected({ reason: "invalid", message: "Start IDs are already used." })
+        : error,
+    ),
     Effect.map((): RecordingCommandResult => ({
       operationId: command.operationId,
       status: "accepted",

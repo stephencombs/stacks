@@ -243,4 +243,59 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       expect(yield* alex.groups.list()).toEqual([]);
     }),
   );
+
+  it.effect("refuses amounts below what each kind of entry allows", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const identity = device();
+      const opened = start(identity);
+      yield* alex.recording.push({ payload: { identity, commands: [opened] } });
+      const zeroBuyIn = add(identity, opened.visitId, 0, 0);
+      const negativeCashOut = add(identity, opened.visitId, 0, -500, "cash_out");
+      const negativeReplacement = RecordingCommand.make({
+        type: "correct",
+        operationId: RecordingOperationId.make(uuid()),
+        actorId: identity.actorId,
+        preparedAt: at(20),
+        visitId: opened.visitId,
+        expectedRevision: 0,
+        entryId: opened.buyInId,
+        reason: "Typo",
+        replacement: { id: EntryId.make(uuid()), amount: usd(-100), occurredAt: at(0), note: null },
+      });
+      const { results } = yield* alex.recording.push({
+        payload: { identity, commands: [zeroBuyIn, negativeCashOut, negativeReplacement] },
+      });
+      expect(results.map((result) => result.status === "rejected" && result.reason)).toEqual([
+        "invalid",
+        "invalid",
+        "invalid",
+      ]);
+      expect((yield* alex.recording.history()).entries).toHaveLength(1);
+    }),
+  );
+
+  it.effect("answers concurrent starts of one visit without a server error", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const identity = device();
+      const first = start(identity);
+      yield* alex.recording.push({ payload: { identity, commands: [start(identity)] } });
+      const twins = Array.from({ length: 6 }, () =>
+        RecordingCommand.make({
+          ...start(identity),
+          visitId: first.visitId,
+          tableId: first.tableId,
+        }),
+      );
+      const responses = yield* Effect.forEach(
+        twins,
+        (command) => alex.recording.push({ payload: { identity, commands: [command] } }),
+        { concurrency: "unbounded" },
+      );
+      const statuses = responses.map((response) => response.results[0]!.status);
+      expect(statuses.filter((status) => status === "accepted")).toHaveLength(1);
+      expect(statuses.filter((status) => status === "rejected")).toHaveLength(5);
+    }),
+  );
 });
