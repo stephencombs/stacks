@@ -22,3 +22,9 @@ it("refetches once when several screens ask at the same moment", () => {
   expect(shouldRevalidate(loaded(STALE_MS), at, at - 10)).toBe(false);
   expect(shouldRevalidate(loaded(STALE_MS), at, at - DEDUPE_MS)).toBe(true);
 });
+
+it("refetches data loaded before the last ledger write, however fresh", () => {
+  expect(shouldRevalidate(loaded(10), at, undefined, at - 5)).toBe(true);
+  expect(shouldRevalidate(loaded(10), at, undefined, at - 20)).toBe(false);
+  expect(shouldRevalidate(loaded(10), at, at - 1, at - 5)).toBe(false);
+});

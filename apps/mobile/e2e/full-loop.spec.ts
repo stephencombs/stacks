@@ -56,7 +56,9 @@ test.describe.serial("live mode on a phone", () => {
       visible(page.getByRole("button", { name, exact: true }));
 
     await signIn(alex, alexUser!.emailAddress);
-    await expect(alex.getByText("Your groups").filter({ visible: true })).toBeVisible();
+    // Signing in lands on personal Home; groups sit behind Groups in the header.
+    await visible(alex.getByRole("button", { name: "Groups", exact: true })).click();
+    await expect(visible(alex.getByRole("heading", { name: "Your groups" })).first()).toBeVisible();
     await visible(alex.getByRole("button", { name: "New group" })).click();
     await alex.getByLabel("Group name").fill("Vegas crew");
     await expect(alex.getByLabel("Your name in this group")).toHaveValue("Alex");
@@ -154,14 +156,18 @@ test.describe.serial("live mode on a phone", () => {
     await alex.context().setOffline(false);
     await expect(waiting).toHaveCount(0);
     // One tap repeats Gus's last buy-in.
-    await visible(alex.getByRole("button", { name: "Rebuy for Gus", exact: true })).click();
+    const rebuyGus = visible(alex.getByRole("button", { name: "Rebuy $100 for Gus", exact: true }));
+    await rebuyGus.click();
     await expect(
       alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),
     ).toBeVisible();
-    // A mistaken rebuy is undone from the same spot it was tapped.
-    await visible(alex.getByRole("button", { name: "Rebuy for Gus", exact: true })).click();
+    // A second tap rebuys again; the toast takes a mistaken one back.
+    await rebuyGus.click();
+    await expect(
+      alex.getByText("In $300 · Out $0").filter({ visible: true }).first(),
+    ).toBeVisible();
     await shoot(alex, "rebuy-undo");
-    await visible(alex.getByRole("button", { name: "Undo rebuy for Gus" })).click();
+    await visible(alex.getByRole("button", { name: "Undo", exact: true })).click();
     await expect(alex.getByText("Voided by Alex: Undone").filter({ visible: true })).toBeVisible();
     await expect(
       alex.getByText("In $200 · Out $0").filter({ visible: true }).first(),
@@ -173,15 +179,13 @@ test.describe.serial("live mode on a phone", () => {
       visible(alex.getByRole("button", { name: /^Back to your table at Wynn test/ })).click();
     await place(alex, "Board").click();
     await expect(
-      alex.getByText("Close a session to put it on the board.").filter({ visible: true }),
+      alex.getByText("Close a session to put it on the board.").filter({ visible: true }).first(),
     ).toBeVisible();
     await shoot(alex, "board-live");
     await backToTable();
 
     await visible(alex.getByRole("button", { name: "Close session" })).click();
-    await visible(alex.getByRole("button", { name: "Close session" }))
-      .last()
-      .click();
+    await visible(alex.getByRole("dialog").getByRole("button", { name: "Close session" })).click();
     await expect(
       alex
         .getByText("Enter what each of them cashed out, 0 if they busted.")
@@ -191,11 +195,12 @@ test.describe.serial("live mode on a phone", () => {
 
     await record("Cash out", "Alex", "320");
     await record("Cash out", "Gus", "220", "Alex");
-    // Bea busted: one tap, no keypad.
+    // Bea busted: Bust fills $0, so no keypad.
     await visible(alex.getByRole("button", { name: /^Bea, / })).click();
     await visible(alex.getByRole("button", { name: "Bust · $0" })).click();
-    await expect(alex.getByText("+$170").filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("-$200").filter({ visible: true })).toBeVisible();
+    await visible(alex.getByRole("button", { name: "Record cash out" })).click();
+    await expect(visible(alex.getByRole("button", { name: /^Alex, / }))).toContainText("+$170");
+    await expect(visible(alex.getByRole("button", { name: /^Bea, / }))).toContainText("-$200");
     await shoot(alex, "session-live");
 
     // Away from the table it's still one tap back.
@@ -204,9 +209,7 @@ test.describe.serial("live mode on a phone", () => {
     await expect(visible(alex.getByRole("button", { name: "Close session" }))).toBeVisible();
 
     await visible(alex.getByRole("button", { name: "Close session" })).click();
-    await visible(alex.getByRole("button", { name: "Close session" }))
-      .last()
-      .click();
+    await visible(alex.getByRole("dialog").getByRole("button", { name: "Close session" })).click();
     // The closed table stays on screen with everyone's result, beside the way to the next one.
     await expect(alex.getByText("Closed", { exact: true }).filter({ visible: true })).toBeVisible();
     await expect(

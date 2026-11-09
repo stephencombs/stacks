@@ -27,6 +27,7 @@ test.describe.serial("seats at a blackjack table", () => {
       await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true })
     ).newPage();
     await signIn(page, users[0]!.emailAddress);
+    await page.getByRole("link", { name: "Groups", exact: true }).click();
     await page.getByRole("button", { name: "New group" }).click();
     await page.getByLabel("Group name").fill("Table crew");
     await page.getByRole("button", { name: "Create group" }).click();
@@ -55,9 +56,9 @@ test.describe.serial("seats at a blackjack table", () => {
     await page.unroute(/\/frame-5-\d+\.webp/);
     await page.getByRole("button", { name: "Retry table artwork" }).click();
     // Anyone can mark the table high limit.
-    const highLimit = page.getByRole("button", { name: "High limit" });
+    const highLimit = page.getByRole("checkbox", { name: "High limit" });
     await highLimit.click();
-    await expect(highLimit).toHaveAttribute("aria-pressed", "true");
+    await expect(highLimit).toBeChecked();
 
     // An empty table, five seats unless someone picks another size: every seat is open.
     const seat = (name: RegExp) => page.getByRole("button", { name });
@@ -65,18 +66,21 @@ test.describe.serial("seats at a blackjack table", () => {
     await shoot(page, "table-empty");
 
     // The table comes in 5, 6 or 7 seats; the last is always third base.
-    const size = page.getByRole("group", { name: "Table size" });
+    const size = page.getByRole("button", { name: /^Table size: / });
+    const pickSize = async (seats: number) => {
+      await size.click();
+      await page.getByRole("menuitemradio", { name: `${seats} seats` }).click();
+      // A choice stays open for another pick, like the theme menu.
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("menu")).toBeHidden();
+    };
     // The other sizes are preloaded, so the table itself swaps at once too.
-    await size.getByRole("button", { name: "6 seats" }).click();
+    await pickSize(6);
     await expect(seat(/^Seat 6, third base, empty$/)).toBeVisible({ timeout: 300 });
     await expect(seat(/^Seat 7/)).toHaveCount(0);
     // The pick shows at once, before the server answers.
-    await size.getByRole("button", { name: "7 seats" }).click();
-    await expect(size.getByRole("button", { name: "7 seats" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-      { timeout: 200 },
-    );
+    await pickSize(7);
+    await expect(size).toHaveAccessibleName("Table size: 7 seats", { timeout: 200 });
     await expect(seat(/^Seat 7, third base, empty$/)).toBeVisible();
 
     const sit = async (seatName: RegExp, player: string) => {
@@ -93,8 +97,8 @@ test.describe.serial("seats at a blackjack table", () => {
     await expect(seat(/^Seat 4, Gus$/)).toBeVisible();
 
     // Quick picks: the answer to the first can't undo the second while it's on its way.
-    await size.getByRole("button", { name: "6 seats" }).click();
-    await size.getByRole("button", { name: "7 seats" }).click();
+    await pickSize(6);
+    await pickSize(7);
     const picks = await page.evaluate(
       () =>
         new Promise<string[]>((resolve) => {
@@ -102,8 +106,8 @@ test.describe.serial("seats at a blackjack table", () => {
           const t0 = performance.now();
           const tick = () => {
             seen.push(
-              document.querySelector('[aria-label="Table size"] [aria-pressed="true"]')
-                ?.textContent ?? "",
+              document.querySelector('[aria-label^="Table size: "]')?.getAttribute("aria-label") ??
+                "",
             );
             if (performance.now() - t0 < 2000) setTimeout(tick, 20);
             else resolve(seen);
@@ -111,10 +115,10 @@ test.describe.serial("seats at a blackjack table", () => {
           tick();
         }),
     );
-    expect(new Set(picks)).toEqual(new Set(["7 seats"]));
+    expect(new Set(picks)).toEqual(new Set(["Table size: 7 seats"]));
 
     // A table can't shrink out from under someone.
-    await size.getByRole("button", { name: "5 seats" }).click();
+    await pickSize(5);
     await expect(page.getByText("Move whoever's in seat 7 first.")).toBeVisible();
 
     // Gus moves down a seat; the old one opens up.
@@ -143,6 +147,7 @@ test.describe.serial("seats at a blackjack table", () => {
     // Gus busts; Alex cashes out big. Each leaves a result on the felt.
     await page.getByRole("button", { name: /^Gus, / }).click();
     await page.getByRole("button", { name: "Bust · $0" }).click();
+    await page.getByRole("button", { name: "Record cash out" }).click();
     await expect(seat(/^Seat 5, Gus, busted$/)).toBeVisible();
     // Alex is still playing when the table closes: the close takes his cash-out with it, in one
     // request rather than one per player.

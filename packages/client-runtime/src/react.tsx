@@ -51,6 +51,7 @@ export function useAction<Arg, A, E>(mutation: Atom.AtomResultFn<Arg, A, E>, eve
     setState({ pending: true, error: null });
     const exit = await run({ ...arg, reactivityKeys: LEDGER_KEYS } as Arg);
     const error = Exit.isFailure(exit) ? describeError(Cause.squash(exit.cause)) : null;
+    if (Exit.isSuccess(exit)) ledgerChanged();
     if (Exit.isSuccess(exit) && event) {
       try {
         capture(event);
@@ -106,6 +107,7 @@ export const makeSignedIn = ({
           AtomRegistry.getResult(registry, addEntry, { suspendOnWaiting: true }),
         );
         if (Exit.isSuccess(exit)) {
+          ledgerChanged();
           try {
             capture("entry_confirmed");
           } catch {
@@ -265,6 +267,11 @@ export const useRememberTrip = (tripId: TripId) => {
 
 /** When each query last refetched in the background, so screens sharing one ask only once. */
 const lastRevalidated = new WeakMap<object, number>();
+/** When this client last wrote to the ledger. */
+let ledgerChangedAt = 0;
+const ledgerChanged = () => {
+  ledgerChangedAt = Date.now();
+};
 
 /**
  * Keeps a shown query fresh without ever blanking it: when the screen mounts, and whenever
@@ -279,7 +286,7 @@ export function useRevalidate<A, E>(
   const refresh = useAtomRefresh(query);
   const revalidate = useEffectEvent(() => {
     const now = Date.now();
-    if (!shouldRevalidate(result, now, lastRevalidated.get(query))) return;
+    if (!shouldRevalidate(result, now, lastRevalidated.get(query), ledgerChangedAt)) return;
     lastRevalidated.set(query, now);
     refresh();
   });

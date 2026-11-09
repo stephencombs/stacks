@@ -82,12 +82,15 @@ export const useScopeHasTrip = () => {
 export function useLinkedScope(
   link: { tripId?: string | undefined; groupId?: string | undefined } | undefined,
 ) {
-  const { setTrip, setGroup } = useScope();
+  const { scope, setTrip, setGroup } = useScope();
   const tripId = link?.tripId;
   const groupId = link?.groupId;
   const apply = useEffectEvent((trip: string | undefined, group: string | undefined) => {
-    if (trip) setTrip(TripId.make(trip));
-    else if (group) setGroup(GroupId.make(group));
+    // An address that names what's already shown is the place following the scope, not a link.
+    // While a new trip waits for the groups list, that's the stand-in, which mustn't stick.
+    if (trip) {
+      if (trip !== scope?.trip?.id) setTrip(TripId.make(trip));
+    } else if (group && group !== scope?.item.group.id) setGroup(GroupId.make(group));
   });
   useLayoutEffect(() => apply(tripId, groupId), [tripId, groupId]);
 }

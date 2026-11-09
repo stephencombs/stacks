@@ -48,6 +48,8 @@ test.describe.serial("a group's first night out", () => {
 
     // Alex starts a group.
     await signIn(alex, alexUser!.emailAddress);
+    // Signing in lands on personal Home; groups sit behind Groups in the header.
+    await alex.getByRole("link", { name: "Groups", exact: true }).click();
     await expect(alex.getByRole("heading", { name: "Your groups" })).toBeVisible();
     await alex.getByRole("button", { name: "New group" }).click();
     await alex.getByLabel("Group name").fill("Vegas crew");
@@ -144,11 +146,15 @@ test.describe.serial("a group's first night out", () => {
     await expect(sending).toBeVisible();
     await alex.context().setOffline(false);
     await expect(sending).toHaveCount(0);
-    // One press repeats a player's last buy-in, and the same spot undoes it.
+    // One press repeats a player's last buy-in, and the bar that confirms it undoes it.
     const gus = alex.getByRole("button", { name: /^Gus, / });
-    await alex.getByRole("button", { name: "Rebuy for Gus", exact: true }).click();
+    await alex.getByRole("button", { name: "Rebuy $100 for Gus", exact: true }).click();
     await expect(gus).toContainText("In $200");
-    await alex.getByRole("button", { name: "Undo rebuy for Gus" }).click();
+    await alex
+      .getByRole("status")
+      .filter({ hasText: "Gus bought in" })
+      .getByRole("button", { name: "Undo", exact: true })
+      .click();
     await expect(alex.getByText("Voided by Alex: Undone")).toBeVisible();
     await expect(gus).toContainText("In $100");
     // The places stay in reach at the table, and the table stays in reach from every place.
@@ -166,9 +172,10 @@ test.describe.serial("a group's first night out", () => {
     await alex.getByRole("button", { name: "Keep playing" }).click();
 
     await record("Cash out", "Alex", "320");
-    // Bea busted: one press, no amount to type.
+    // Bea busted: Bust fills $0, so no amount to type.
     await alex.getByRole("button", { name: /^Bea, / }).click();
     await alex.getByRole("button", { name: "Bust · $0" }).click();
+    await alex.getByRole("button", { name: "Record cash out" }).click();
     await record("Cash out", "Gus", "120", "Alex");
     await expect(gus).toContainText("+$20");
     await shoot(alex, "session-live");
@@ -193,9 +200,10 @@ test.describe.serial("a group's first night out", () => {
     const board = alex.getByRole("list", { name: "Standings" });
     await expect(board.getByRole("listitem").first()).toContainText("+$170");
     await expect(alex.getByRole("heading", { name: "Awards" })).toBeVisible();
-    await expect(alex.getByText("Alex · #1 of 3 · 1 session")).toBeVisible();
+    const numbers = (name: string) => alex.getByRole("region", { name: `${name}'s numbers` });
+    await expect(numbers("Alex")).toContainText("#1 of 3 · 1 session");
     await board.getByRole("button", { name: /Bea/ }).click();
-    await expect(alex.getByText("Bea · #3 of 3 · 1 session")).toBeVisible();
+    await expect(numbers("Bea")).toContainText("#3 of 3 · 1 session");
     // The trip's numbers: one table where some won and some lost, so no team run yet.
     await expect(alex.getByText("0W · 0L · 1 mixed")).toBeVisible();
     await expect(alex.getByText("Largest drawdown")).toBeVisible();
@@ -207,7 +215,8 @@ test.describe.serial("a group's first night out", () => {
 
     // Alex owes Bea $50 for the buy-in and Gus $120 for the cash he kept.
     await place("Settle up").click();
-    await expect(alex.getByText("You owe $170")).toBeVisible();
+    await expect(alex.getByRole("heading", { name: "You owe" })).toBeVisible();
+    await expect(alex.getByText("2 payments square you up")).toBeVisible();
     await expect(alex.getByText("Owes $170")).toBeVisible();
     await expect(alex.getByText("Owed $50")).toBeVisible();
     await expect(alex.getByText("Owed $120")).toBeVisible();
@@ -268,9 +277,9 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex).toHaveURL(/scope=all/);
     await expect(alex.getByRole("cell", { name: "Craps" })).toBeVisible();
     await expect(alex.getByRole("heading", { name: /leads by \$150/ })).toBeVisible();
-    await expect(alex.getByText("Alex · #1 of 3 · 1 session")).toBeVisible();
+    await expect(numbers("Alex")).toContainText("#1 of 3 · 1 session");
     await alex.getByRole("button", { name: /Bea/ }).click();
-    await expect(alex.getByText("Bea · #3 of 3 · 1 session")).toBeVisible();
+    await expect(numbers("Bea")).toContainText("#3 of 3 · 1 session");
 
     // On a phone, the standings pick a player with a tap.
     const phone = await browser.newContext({
@@ -282,7 +291,9 @@ test.describe.serial("a group's first night out", () => {
     const phonePage = await phone.newPage();
     await phonePage.goto(alex.url());
     await phonePage.getByRole("button", { name: /Bea/ }).tap();
-    await expect(phonePage.getByText("Bea · #3 of 3 · 1 session")).toBeVisible();
+    await expect(phonePage.getByRole("region", { name: "Bea's numbers" })).toContainText(
+      "#3 of 3 · 1 session",
+    );
     await phone.close();
     await shoot(alex, "stats");
   });

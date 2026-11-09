@@ -40,6 +40,7 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
     const page = await hermesLike(await browser.newContext(test.info().project.use)).newPage();
     const visible = (locator: Locator) => locator.filter({ visible: true });
     await signIn(page, users[0]!.emailAddress);
+    await visible(page.getByRole("button", { name: "Groups", exact: true })).click();
     await visible(page.getByRole("button", { name: "New group" })).click();
     await page.getByLabel("Group name").fill("Table crew");
     await visible(page.getByRole("button", { name: "Create group" })).click();
@@ -111,14 +112,13 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
 
     await visible(page.getByRole("button", { name: /^Gus, / })).click();
     await visible(page.getByRole("button", { name: "Bust · $0" })).click();
+    await visible(page.getByRole("button", { name: "Record cash out" })).click();
     await expect(seat(/^Seat 5, Gus, busted$/)).toBeVisible();
     await record("Cash out", "Alex", "1100");
     await expect(seat(/^Seat 7, third base, Alex, \+\$800$/)).toBeVisible();
 
     await visible(page.getByRole("button", { name: "Close session" })).click();
-    await visible(page.getByRole("button", { name: "Close session" }))
-      .last()
-      .click();
+    await visible(page.getByRole("dialog").getByRole("button", { name: "Close session" })).click();
     await expect(visible(page.getByText("Closed", { exact: true }))).toBeVisible();
     await shoot(page, "table-closed");
   });
