@@ -26,6 +26,7 @@ import {
   CashOutSheet,
   CorrectSheet,
   RebuySheet,
+  SitDownSheet,
   ReopenSheet,
   StartSheet,
   VoidSheet,
@@ -84,7 +85,7 @@ function Missing() {
 }
 
 type Open =
-  | { readonly type: "rebuy" | "cash_out" | "reopen" | "start" }
+  | { readonly type: "rebuy" | "cash_out" | "reopen" | "start" | "return" }
   | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId };
 
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
@@ -128,6 +129,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const start = visit.visit.startedAt;
   const player = table?.visits.find((item) => item.visit.id === visitId);
   const own = player?.isSelf ?? true;
+  // Back at the table: a new visit for whoever this was, once they aren't playing here.
+  const canReturn =
+    !live &&
+    !!table &&
+    player !== undefined &&
+    !table.visits.some(
+      (item) => item.player.id === player.player.id && item.visit.finishedAt === null,
+    );
   return (
     <PersonalScreen
       dock={
@@ -151,13 +160,25 @@ function Visit({ visitId }: { visitId: VisitId }) {
               onPress={() => setOpen({ type: "cash_out" })}
             />
           </View>
-        ) : !own ? (
-          <Button
-            key="reopen"
-            label="Fix accidental finish"
-            size="lg"
-            onPress={() => setOpen({ type: "reopen" })}
-          />
+        ) : !own || table?.role === "participant" ? (
+          <>
+            {canReturn ? (
+              <Button
+                key="return"
+                label="Back at the table"
+                variant="primary"
+                size="lg"
+                onPress={() => setOpen({ type: "return" })}
+              />
+            ) : null}
+            <Button
+              key="reopen"
+              label="Fix accidental finish"
+              variant={canReturn ? "ghost" : "secondary"}
+              size="lg"
+              onPress={() => setOpen({ type: "reopen" })}
+            />
+          </>
         ) : (
           <>
             <Button
@@ -228,6 +249,17 @@ function Visit({ visitId }: { visitId: VisitId }) {
           onReopened={() => {
             close();
             setSaved(null);
+          }}
+        />
+      ) : open?.type === "return" && player ? (
+        <SitDownSheet
+          tableId={visit.visit.tableId}
+          player={player.player}
+          onClose={close}
+          onSeated={(next) => {
+            close();
+            setSaved(null);
+            navigation.dispatch(StackActions.replace("Play", { visitId: next }));
           }}
         />
       ) : open?.type === "start" ? (

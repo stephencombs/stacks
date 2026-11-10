@@ -1,9 +1,12 @@
-import type { PlayEntry, TableId, UserId } from "@stacks/contracts";
+import { PlayerId, type PlayEntry, type TableId, type UserId } from "@stacks/contracts";
 import {
   RecordingCommand,
   RecordingOperationId,
   type ActorCredential,
+  type JoinedTable,
+  type JoinTableRequest,
   type ShareLink,
+  type TableView,
   type PushRecordingRequest,
   type PushRecordingResponse,
   type RecordingCommandResult,
@@ -17,8 +20,9 @@ import * as Schema from "effect/Schema";
 
 import { applyRecordingCommand, createdEntryIds, RecordingError } from "@stacks/shared/recording";
 
+import { newId } from "./ids.ts";
 import { prepareRecordingCommand, type RecordingInput, type RecordingStore } from "./recording.ts";
-import type { RecordingRejection, RecordingState } from "./recordingState.ts";
+import { recordingBase, type RecordingRejection, type RecordingState } from "./recordingState.ts";
 
 /**
  * The API as sync uses it. Given an actor credential, a call proves the device's actor instead of
@@ -40,6 +44,15 @@ export interface RecordingTransport {
     tableId: TableId,
     actor: ActorCredential | null,
   ) => Effect.Effect<void, unknown>;
+  readonly table: (
+    tableId: TableId,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<TableView, unknown>;
+  readonly join: (
+    token: string,
+    request: JoinTableRequest,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<JoinedTable, unknown>;
 }
 
 /** Whether the server has the table, so it can be shared. */
@@ -111,13 +124,24 @@ const rejectionOf = (command: RecordingCommand, error: unknown): RecordingReject
   };
 };
 
-/** Applies commands in order onto `state`, setting aside the ones the rules now refuse. */
-const replay = (state: RecordingState, commands: ReadonlyArray<RecordingCommand>) => {
+/**
+ * Applies commands in order onto `state`, setting aside the ones the rules now refuse. Commands
+ * the server already accepted (`onServer`) apply as it accepted them, whichever actor made them.
+ */
+const replay = (
+  state: RecordingState,
+  commands: ReadonlyArray<RecordingCommand>,
+  onServer: ReadonlySet<string> = new Set(),
+) => {
   const failed: RecordingRejection[] = [];
   let current = state;
   for (const command of commands) {
     try {
-      current = applyRecordingCommand(current, command);
+      current = applyRecordingCommand(
+        current,
+        command,
+        onServer.has(command.operationId) ? null : undefined,
+      );
     } catch (error) {
       failed.push(rejectionOf(command, error));
     }
@@ -125,14 +149,21 @@ const replay = (state: RecordingState, commands: ReadonlyArray<RecordingCommand>
   return { state: current, failed };
 };
 
-const empty = (state: RecordingState): RecordingState => ({
-  ...state,
-  players: [state.self],
-  tables: [],
-  visits: [],
-  entries: [],
-  receipts: [],
-});
+/** Adds a table this device joined, as the player it joined as. Joining again changes nothing. */
+export const addJoinedTable = (state: RecordingState, joined: JoinedTable): RecordingState =>
+  state.participants.some((item) => item.playerId === joined.player.id)
+    ? state
+    : {
+        ...state,
+        players: [...state.players, joined.player],
+        participants: [
+          ...state.participants,
+          { tableId: joined.table.id, playerId: joined.player.id },
+        ],
+        tables: state.tables.some((table) => table.id === joined.table.id)
+          ? state.tables
+          : [...state.tables, joined.table],
+      };
 
 /** Saved commands the server hasn't confirmed, oldest first. */
 export const pendingRecordingCommands = (state: RecordingState) => {
@@ -175,12 +206,27 @@ export const mergeRecordingHistory = (
     .filter((c) => remote.has(c.operationId))
     .filter((c) => commandText(remote.get(c.operationId)!) !== commandText(c))
     .map((command) => rejectionOf(command, new RecordingError("operation_reused", "")));
-  const base = empty({
+  const self = identity ? { ...state.self, id: identity.playerId } : state.self;
+  // Who joined which tables comes from the server, with the tables this device joined.
+  const base: RecordingState = {
     ...state,
-    self: identity ? { ...state.self, id: identity.playerId } : state.self,
+    self,
     actor: { id: actorId, userId: null },
-  });
-  const synced = replay(base, history.commands);
+    players: [self, ...history.participants.map((item) => item.player)],
+    participants: history.participants.map((item) => ({
+      tableId: item.tableId,
+      playerId: item.player.id,
+    })),
+    tables: history.tables.filter((table) => table.starterPlayerId !== self.id),
+    visits: [],
+    entries: [],
+    receipts: [],
+  };
+  const synced = replay(
+    base,
+    history.commands,
+    new Set(history.commands.map((command) => command.operationId)),
+  );
   if (synced.failed.length > 0)
     throw new RecordingError("load", "The synced history doesn't follow the recording rules.");
   const merged = replay(
@@ -315,8 +361,9 @@ export const applyPushResults = (
   if (refused.size === 0) return { ...state, sync: { ...sync, synced } };
   const commands = state.receipts.map((receipt) => receipt.command);
   const rebuilt = replay(
-    empty(state),
+    recordingBase(state),
     commands.filter((c) => !refused.has(c.operationId)),
+    new Set(synced),
   );
   const rejected = commands.flatMap((command) => {
     const result = refused.get(command.operationId);
@@ -609,6 +656,41 @@ export const makeRecordingSync = (
     share: (tableId: TableId) => sharing(tableId, transport.share),
     /** Stops the table's link working. */
     unshare: (tableId: TableId) => sharing(tableId, transport.unshare),
+    /** The whole table as the server has it, for a table this device started or joined. */
+    table: async (tableId: TableId) => {
+      const state = store.getSnapshot().state;
+      if (!state) throw new RecordingError("load", "Recording isn't loaded.");
+      const actor = userId === null ? await actorCredential(keys, state.actor.id) : null;
+      return Effect.runPromise(transport.table(tableId, actor));
+    },
+    /**
+     * Joins a shared table as a new player named `displayName`, which needs the network once.
+     * After that, the player's own play records on this device and syncs like any other.
+     */
+    join: async (token: string, displayName: string) => {
+      const name = displayName.trim();
+      if (name === "") throw new RecordingError("invalid", "Enter your name.");
+      if (name.length > 60) throw new RecordingError("invalid", "Keep your name to 60 characters.");
+      await store.transform((state) =>
+        state.sync ? state : { ...state, sync: { userId: null, synced: [], rejected: [] } },
+      );
+      const state = store.getSnapshot().state!;
+      const actor = userId === null ? await actorCredential(keys, state.actor.id) : null;
+      if (actor) await Effect.runPromise(transport.registerActor(actor));
+      const joined = await Effect.runPromise(
+        transport.join(
+          token,
+          {
+            identity: { playerId: state.self.id, actorId: state.actor.id },
+            player: { id: PlayerId.make(newId()), displayName: name },
+          },
+          actor,
+        ),
+      );
+      await store.transform((current) => addJoinedTable(current, joined));
+      signal?.("wake");
+      return joined;
+    },
     discard: (operationId: RecordingOperationId) =>
       store.transform((state) => discardRejected(state, operationId)),
     recordAgain: async (operationId: RecordingOperationId) => {

@@ -66,6 +66,7 @@ export const ConflictReason = Schema.Literals([
   "last_owner",
   "recording_identity",
   "actor_taken",
+  "table_starter",
 ]);
 export type ConflictReason = typeof ConflictReason.Type;
 

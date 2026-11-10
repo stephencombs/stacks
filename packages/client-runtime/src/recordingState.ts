@@ -1,8 +1,10 @@
 import {
   Actor,
   PlayEntry,
+  PlayerId,
   PlayerIdentity,
   Table,
+  TableId,
   UserId,
   Visit,
   type EntryId,
@@ -23,6 +25,13 @@ import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
 export { applyRecordingCommand, RecordingError, RecordingReceipt } from "@stacks/shared/recording";
+
+/**
+ * Applies a receipt as it was recorded: this device's own commands under its rules, and another
+ * actor's, which only ever come from the server, as the server accepted them.
+ */
+const applyReceipt = <S extends RecordingState>(state: S, command: RecordingCommand) =>
+  applyRecordingCommand(state, command, command.actorId === state.actor.id ? undefined : null);
 
 /** A command the server refused, kept out of the ledger until it's recorded again or discarded. */
 export const RecordingRejection = Schema.Struct({
@@ -46,8 +55,13 @@ export const RecordingState = Schema.Struct({
   version: Schema.Literal(2),
   self: PlayerIdentity,
   actor: Actor,
-  /** Everyone this device records for: `self` and the players it added at its tables. */
+  /**
+   * Everyone this device records for: `self`, the players it added at its tables, and the
+   * `participants`: who joined its tables, and who it joined others' tables as.
+   */
   players: Schema.Array(PlayerIdentity),
+  participants: Schema.Array(Schema.Struct({ tableId: TableId, playerId: PlayerId })),
+  /** The tables it started, and the ones it joined. */
   tables: Schema.Array(Table),
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
@@ -66,6 +80,22 @@ const ms = DateTime.toEpochMillis;
 const unique = (records: ReadonlyArray<{ readonly id: string }>) =>
   new Set(records.map((record) => record.id)).size === records.length;
 
+/**
+ * The ledger before any command: the device's own player, who joined which tables, and the tables
+ * it joined. Commands rebuild everything else.
+ */
+export const recordingBase = (state: RecordingState): RecordingState => {
+  const joined = new Set(state.participants.map((item) => item.playerId));
+  return {
+    ...state,
+    players: state.players.filter((player) => player.id === state.self.id || joined.has(player.id)),
+    tables: state.tables.filter((table) => table.starterPlayerId !== state.self.id),
+    visits: [],
+    entries: [],
+    receipts: [],
+  };
+};
+
 const validateRecordingState = (state: RecordingState) => {
   requireValid(state.actor.userId === null, "Private recording has a local actor.");
   requireValid(
@@ -80,16 +110,31 @@ const validateRecordingState = (state: RecordingState) => {
   const tables = new Map(state.tables.map((table) => [table.id, table]));
   const visits = new Map(state.visits.map((visit) => [visit.id, visit]));
   const entries = new Map(state.entries.map((entry) => [entry.id, entry]));
+  const participants = new Set(state.participants.map((item) => item.playerId));
+  requireValid(
+    participants.size === state.participants.length &&
+      !participants.has(state.self.id) &&
+      state.participants.every((item) => tables.has(item.tableId) && players.has(item.playerId)),
+    "Invalid table participant.",
+  );
+  // A table someone else started is here because this device joined it.
+  const joined = new Set<Table["id"]>();
   for (const table of state.tables) {
-    requireValid(
-      table.tripId === null && table.starterPlayerId === state.self.id,
-      "Foreign table ownership.",
-    );
-    requireValid(
-      state.visits.some((visit) => visit.tableId === table.id),
-      "Table has no visit.",
-    );
+    requireValid(table.tripId === null, "Foreign table ownership.");
+    if (table.starterPlayerId === state.self.id)
+      requireValid(
+        state.visits.some((visit) => visit.tableId === table.id),
+        "Table has no visit.",
+      );
+    else {
+      requireValid(
+        state.participants.some((item) => item.tableId === table.id),
+        "Foreign table ownership.",
+      );
+      joined.add(table.id);
+    }
   }
+  const synced = new Set(state.sync?.synced);
   for (const visit of state.visits) {
     requireValid(
       tables.has(visit.tableId) && players.has(visit.playerId),
@@ -107,14 +152,7 @@ const validateRecordingState = (state: RecordingState) => {
   }
   for (const entry of state.entries) {
     const visit = visits.get(entry.visitId);
-    requireValid(
-      visit && entry.createdBy === state.actor.id && entry.counterpartyId === null,
-      "Foreign fact ownership.",
-    );
-    requireValid(
-      entry.voidedBy === null || entry.voidedBy === state.actor.id,
-      "Foreign void actor.",
-    );
+    requireValid(visit && entry.counterpartyId === null, "Foreign fact ownership.");
     requireValid(
       ms(entry.occurredAt) >= ms(visit.startedAt) &&
         (entry.voidedAt !== null ||
@@ -149,6 +187,7 @@ const validateRecordingState = (state: RecordingState) => {
         ms(entry.occurredAt) === ms(occurredAt) &&
         entry.note === note &&
         entry.replacesEntryId === replacesEntryId &&
+        entry.createdBy === command.actorId &&
         ms(entry.createdAt) === ms(command.preparedAt),
       "Fact differs from its command receipt.",
     );
@@ -156,10 +195,11 @@ const validateRecordingState = (state: RecordingState) => {
   };
   for (const [index, receipt] of state.receipts.entries()) {
     const command = receipt.command;
+    // Another actor's command (the starter's, or a joiner's) comes only from the server.
     requireValid(
       !operations.has(command.operationId) &&
         receipt.revision === index + 2 &&
-        command.actorId === state.actor.id,
+        (command.actorId === state.actor.id || synced.has(command.operationId)),
       "Invalid command receipt.",
     );
     operations.add(command.operationId);
@@ -168,13 +208,14 @@ const validateRecordingState = (state: RecordingState) => {
     if (command.type === "join_table") {
       const table = tables.get(command.tableId);
       requireValid(
-        table && createdTables.has(table.id) && !lifecycle.has(visit.id),
+        table && (createdTables.has(table.id) || joined.has(table.id)) && !lifecycle.has(visit.id),
         "Duplicate or missing join records.",
       );
       if (command.newPlayer) {
         requireValid(
           command.newPlayer.id === command.playerId &&
             !createdPlayers.has(command.playerId) &&
+            !participants.has(command.playerId) &&
             players.get(command.playerId)?.displayName === command.newPlayer.displayName,
           "Player differs from the receipt that added them.",
         );
@@ -271,6 +312,7 @@ const validateRecordingState = (state: RecordingState) => {
         requireValid(
           original.voidedAt !== null &&
             ms(original.voidedAt) === ms(command.preparedAt) &&
+            original.voidedBy === command.actorId &&
             original.voidReason === command.reason,
           "Void differs from its command receipt.",
         );
@@ -291,8 +333,8 @@ const validateRecordingState = (state: RecordingState) => {
   }
   requireValid(
     createdEntries.size === entries.size &&
-      createdPlayers.size === players.size - 1 &&
-      createdTables.size === tables.size &&
+      createdPlayers.size + participants.size === players.size - 1 &&
+      createdTables.size + joined.size === tables.size &&
       lifecycle.size === visits.size,
     "Records have missing command receipts.",
   );
@@ -313,7 +355,6 @@ const validateRecordingState = (state: RecordingState) => {
     );
   }
   if (state.sync) {
-    const synced = new Set(state.sync.synced);
     requireValid(
       synced.size === state.sync.synced.length &&
         state.sync.synced.every((id) => operations.has(id)),
@@ -344,15 +385,8 @@ const reopenNotVoided = "Reopen did not void the final cash-out.";
 // cash-out is still live. Replaying its commands is deterministic: only the voids may differ.
 const upgradeLegacyReopen = (state: RecordingState) => {
   const replayed = state.receipts.reduce(
-    (current, receipt) => applyRecordingCommand(current, receipt.command),
-    {
-      ...state,
-      players: [state.self],
-      tables: [],
-      visits: [],
-      entries: [],
-      receipts: [],
-    } as RecordingState,
+    (current, receipt) => applyReceipt(current, receipt.command),
+    recordingBase(state),
   );
   const live = (entries: RecordingState["entries"]) =>
     JSON.stringify(
@@ -381,6 +415,12 @@ type VersionOne = {
   readonly receipts: ReadonlyArray<{ readonly command: Command }>;
   readonly sync?: { readonly rejected: ReadonlyArray<{ readonly command: Command }> };
 };
+// Documents from before joining had no participants.
+const withParticipants = (document: unknown) =>
+  typeof document === "object" && document !== null && !("participants" in document)
+    ? { ...document, participants: [] }
+    : document;
+
 // Version 1 held one player, so its tables and starts were all its own.
 const fromVersionOne = (document: unknown) => {
   if ((document as { version?: unknown } | null)?.version !== 1) return document;
@@ -410,7 +450,7 @@ const fromVersionOne = (document: unknown) => {
 export const decodeRecordingState = (payload: string, revision: number) => {
   try {
     const state = validateOrUpgrade(
-      Schema.decodeUnknownSync(codec)(fromVersionOne(JSON.parse(payload)), {
+      Schema.decodeUnknownSync(codec)(withParticipants(fromVersionOne(JSON.parse(payload))), {
         onExcessProperty: "error",
       }),
     );

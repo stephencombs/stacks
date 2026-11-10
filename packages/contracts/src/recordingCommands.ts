@@ -133,30 +133,54 @@ export const ActorCredential = Schema.Struct({
 });
 export type ActorCredential = typeof ActorCredential.Type;
 
+/** A player who joined a table through its link. */
+export const TableParticipant = Schema.Struct({ tableId: TableId, player: PlayerIdentity });
+export type TableParticipant = typeof TableParticipant.Type;
+
 /**
- * Everything at the tables this account or device started. `commands` are in the order the
- * server applied them.
+ * Everything at the tables this account or device started, and its own play at the tables it
+ * joined. `participants` are who joined the tables it started, and who it joined others' as.
+ * `commands` are in the order the server applied them, whoever made them.
  */
 export const RecordingHistory = Schema.Struct({
   identity: Schema.NullOr(RecordingIdentity),
   commands: Schema.Array(RecordingCommand),
   tables: Schema.Array(Table),
+  participants: Schema.Array(TableParticipant),
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
 });
 export type RecordingHistory = typeof RecordingHistory.Type;
 
 /**
- * One table as its starter, or anyone with its share link, sees it: each visit's totals, never its
- * entries, whose audit fields name actors.
+ * One table as its starter, a player who joined it, or anyone with its share link sees it: each
+ * visit's totals, never its entries, whose audit fields name actors. `viewerPlayerId` is the
+ * viewer's own player there, if they have one.
  */
 export const TableView = Schema.Struct({
   table: Table,
   players: Schema.Array(PlayerIdentity),
   visits: Schema.Array(VisitSummary),
-  viewerRole: Schema.Literals(["starter", "viewer"]),
+  viewerRole: Schema.Literals(["starter", "participant", "viewer"]),
+  viewerPlayerId: Schema.NullOr(PlayerId),
 });
 export type TableView = typeof TableView.Type;
 
 export const ShareLink = Schema.Struct({ token: Schema.String });
 export type ShareLink = typeof ShareLink.Type;
+
+/**
+ * Joins a table through its link as a new player bound to the recorder. `identity` is the
+ * recorder's own, as in a push. Joining again returns the player it joined as before.
+ */
+export const JoinTableRequest = Schema.Struct({
+  identity: RecordingIdentity,
+  player: Schema.Struct({
+    id: PlayerId,
+    displayName: Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(60)),
+  }),
+});
+export type JoinTableRequest = typeof JoinTableRequest.Type;
+
+export const JoinedTable = Schema.Struct({ table: Table, player: PlayerIdentity });
+export type JoinedTable = typeof JoinedTable.Type;

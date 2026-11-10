@@ -9,9 +9,18 @@ wait for sign-in, and sign-in failing or not being configured leaves them workin
 A personal session is one player's visit to a table. Its page lists everyone at the table, and
 whoever started the table adds players (someone new by name, or a player saved on this device) and
 records for each of them on that player's own `/play/:visitId`. There is no separate table page to
-record from: a table is reached through any visit at it. The starter's Share sheet makes a
-read-only link, `/t/:token`, which opens on the web with no account and shows that one table and
-nothing else. Mobile sends the web address, since the link must work for people without the app.
+record from: a table is reached through any visit at it. The starter's Share sheet makes a link,
+`/t/:token`, which opens on the web with no account and shows that one table and nothing else.
+
+The same page offers **Join this table**. It asks only for a name and always creates a new player
+on this device, so a link can never be used to record as someone already there. Joining needs the
+network once; the buy-in that follows, and everything after it, records offline on the joiner's
+own `/play/:visitId`, which lists "You" plus the others (fetched from the server, so only online).
+A participant's controls act only on their own visits; the starter's act on everyone's. When a
+visit finishes, **Back at the table** starts a new visit for the same player at the same table.
+Revoking the link stops new joins; people who joined keep their table through their play.
+Mobile sends the web address, since the link must work for people without the app, and has no
+`/t/:token` deep link yet: joining happens on the web, and mobile shows joined tables it syncs.
 
 Groups and trips are a second, account-backed area, reached from **Groups** in the header. Inside
 it, the group and trip you're in are context, shown as a labeled scope button at the top of every

@@ -176,6 +176,8 @@ export const PlayerIdentityRow = Schema.Struct({
   displayName: Schema.NonEmptyString,
 });
 
+export const ParticipantRow = Schema.Struct({ ...PlayerIdentityRow.fields, tableId: TableId });
+
 export const PersonalVisitRow = Schema.Struct({
   id: VisitId,
   tableId: TableId,

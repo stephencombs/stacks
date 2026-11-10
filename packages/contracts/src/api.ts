@@ -25,6 +25,8 @@ import { Entry, Game, Seat, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import {
   ActorCredential,
+  JoinedTable,
+  JoinTableRequest,
   PushRecordingRequest,
   PushRecordingResponse,
   RecordingHistory,
@@ -568,7 +570,7 @@ const LimitsGroup = HttpApiGroup.make("limits")
 
 const tableParams = Schema.Struct({ tableId: TableId });
 
-/** An account's session or a device actor's credential. Tables it didn't start are 404s. */
+/** An account's session or a device actor's credential. Tables it isn't at are 404s. */
 const RecordingGroup = HttpApiGroup.make("recording")
   .add(
     HttpApiEndpoint.get("history", "/recording", {
@@ -609,6 +611,17 @@ const RecordingGroup = HttpApiGroup.make("recording")
       success: HttpApiSchema.NoContent,
       error: [NotFound, Unauthorized],
     }),
+  )
+  .add(
+    HttpApiEndpoint.post("join", "/shared/:token/join", {
+      params: Schema.Struct({ token: Schema.String }),
+      payload: JoinTableRequest,
+      success: JoinedTable,
+      error: [Conflict, NotFound, Unauthorized],
+    }).annotate(
+      OpenApi.Summary,
+      "Joins the linked table as a new player who records only their own play",
+    ),
   )
   .middleware(RecordingAuthentication);
 

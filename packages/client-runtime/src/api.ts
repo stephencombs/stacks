@@ -60,6 +60,10 @@ export const makeRecordingTransport = ({
       Effect.flatMap(client(actor), (api) => api.recording.share({ params: { tableId } })),
     unshare: (tableId, actor) =>
       Effect.flatMap(client(actor), (api) => api.recording.unshare({ params: { tableId } })),
+    table: (tableId, actor) =>
+      Effect.flatMap(client(actor), (api) => api.recording.table({ params: { tableId } })),
+    join: (token, payload, actor) =>
+      Effect.flatMap(client(actor), (api) => api.recording.join({ params: { token }, payload })),
   };
 };
 

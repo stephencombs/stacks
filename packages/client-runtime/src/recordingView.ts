@@ -9,6 +9,7 @@ import {
   type VisitSummary,
 } from "@stacks/contracts";
 import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
+import { ownPlayers } from "@stacks/shared/recording";
 import { buyInPresets } from "@stacks/shared/table";
 import { projectVisit, visitSummary } from "@stacks/shared/visits";
 import * as DateTime from "effect/DateTime";
@@ -52,7 +53,8 @@ const tableOf = (state: RecordingState, tableId: Table["id"]) =>
 
 export const recordingHome = (state: RecordingState): RecordingHome => {
   // Other players' visits at your tables are theirs; they show on the table, not in your play.
-  const own = state.visits.filter((visit) => visit.playerId === state.self.id);
+  const mine = new Set(ownPlayers(state));
+  const own = state.visits.filter((visit) => mine.has(visit.playerId));
   const visits = own.map((visit) => ({
     ...visitSummary(visit, state.entries),
     table: tableOf(state, visit.tableId),
@@ -71,11 +73,15 @@ export const recordingHome = (state: RecordingState): RecordingHome => {
 
 export type RecordingTableView = {
   readonly table: Table;
-  /** Every visit at the table: still playing first, then by when they started. */
+  /** `starter` records for everyone here; `participant` joined through the link, for itself. */
+  readonly role: "starter" | "participant";
+  /** The player this device is at this table, and their visit in play, if any. */
+  readonly you: { readonly player: PlayerIdentity; readonly playing: VisitId | null };
+  /** Every visit on this device at the table: still playing first, then by when they started. */
   readonly visits: ReadonlyArray<
     VisitSummary & { readonly player: PlayerIdentity; readonly isSelf: boolean }
   >;
-  /** Players who can join now: saved players without a visit in play here. */
+  /** Players the starter can add now: saved players without a visit in play here. */
   readonly addable: ReadonlyArray<PlayerIdentity>;
 };
 
@@ -87,12 +93,16 @@ export const recordingTable = (
   const table = state.tables.find((item) => item.id === tableId);
   if (!table) return null;
   const players = new Map(state.players.map((player) => [player.id, player]));
+  const starter = table.starterPlayerId === state.self.id;
+  const you = starter
+    ? state.self
+    : players.get(state.participants.find((item) => item.tableId === tableId)!.playerId)!;
   const visits = state.visits
     .filter((visit) => visit.tableId === tableId)
     .map((visit) => ({
       ...visitSummary(visit, state.entries),
       player: players.get(visit.playerId)!,
-      isSelf: visit.playerId === state.self.id,
+      isSelf: visit.playerId === you.id,
     }))
     .toSorted(
       (a, b) =>
@@ -102,10 +112,27 @@ export const recordingTable = (
   const playing = new Set(
     visits.filter((item) => item.visit.finishedAt === null).map((item) => item.player.id),
   );
+  const joined = new Set(state.participants.map((item) => item.playerId));
   return {
     table,
+    role: starter ? "starter" : "participant",
+    you: {
+      player: you,
+      playing:
+        visits.find((item) => item.player.id === you.id && item.visit.finishedAt === null)?.visit
+          .id ?? null,
+    },
     visits,
-    addable: state.players.filter((player) => !playing.has(player.id)),
+    addable: starter
+      ? state.players.filter(
+          (player) =>
+            !playing.has(player.id) &&
+            (!joined.has(player.id) ||
+              state.participants.some(
+                (item) => item.playerId === player.id && item.tableId === tableId,
+              )),
+        )
+      : [],
   };
 };
 
@@ -316,7 +343,9 @@ export const describeRecordingRejection = ({ command, reason }: RecordingRejecti
       : command.type === "record_completed"
         ? `A past session with ${money(command.buyIn)} in and ${money(command.cashOut)} out`
         : command.type === "join_table"
-          ? `Adding ${command.newPlayer?.displayName ?? "a player"} with ${money(command.buyIn)}`
+          ? command.newPlayer
+            ? `Adding ${command.newPlayer.displayName} with ${money(command.buyIn)}`
+            : `Sitting down with ${money(command.buyIn)}`
           : command.type === "add"
             ? `A ${money(command.amount)} ${command.kind === "buy_in" ? "buy-in" : "cash-out"}`
             : command.type === "finish"
@@ -330,7 +359,7 @@ export const describeRecordingRejection = ({ command, reason }: RecordingRejecti
       : reason === "operation_reused"
         ? "Your account already has it with different details."
         : reason === "forbidden"
-          ? "Only the player who started the table can record there."
+          ? "At a table you joined, you can record only your own play."
           : "It doesn't fit the session as your account has it.";
   return `${what} didn't sync. ${why}`;
 };

@@ -26,6 +26,7 @@ import {
   CorrectDialog,
   RebuyDialog,
   ReopenDialog,
+  SitDownDialog,
   StartDialog,
   VoidDialog,
 } from "~/features/RecordingForms";
@@ -56,7 +57,7 @@ function Missing() {
 }
 
 type Open =
-  | { readonly type: "rebuy" | "cash_out" | "reopen" | "start" }
+  | { readonly type: "rebuy" | "cash_out" | "reopen" | "start" | "return" }
   | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId };
 
 const money = (amount: number) => formatMoney(amount as PlayEntry["amount"], RECORDING_CURRENCY);
@@ -104,6 +105,20 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const start = visit.visit.startedAt;
   const player = table?.visits.find((item) => item.visit.id === visitId);
   const own = player?.isSelf ?? true;
+  // Back at the table: a new visit for whoever this was, once they aren't playing here.
+  const canReturn =
+    !live &&
+    table !== undefined &&
+    table !== null &&
+    player !== undefined &&
+    !table.visits.some(
+      (item) => item.player.id === player.player.id && item.visit.finishedAt === null,
+    );
+  const seated = (next: VisitId) => {
+    close();
+    setSaved(null);
+    void navigate({ to: "/play/$visitId", params: { visitId: next } }).then(focusMain);
+  };
   return (
     <div className="contents" onClickCapture={focus.capture}>
       <PageHeader
@@ -164,10 +179,27 @@ function Visit({ visitId }: { visitId: VisitId }) {
               Cash out
             </Button>
           </>
-        ) : !own ? (
-          <Button key="reopen" size="lg" onClick={() => setOpen({ type: "reopen" })}>
-            Fix accidental finish
-          </Button>
+        ) : !own || table?.role === "participant" ? (
+          <>
+            {canReturn ? (
+              <Button
+                key="return"
+                variant="primary"
+                size="lg"
+                onClick={() => setOpen({ type: "return" })}
+              >
+                Back at the table
+              </Button>
+            ) : null}
+            <Button
+              key="reopen"
+              variant={canReturn ? "ghost" : "secondary"}
+              size="lg"
+              onClick={() => setOpen({ type: "reopen" })}
+            >
+              Fix accidental finish
+            </Button>
+          </>
         ) : (
           <>
             <Button
@@ -201,6 +233,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
             close();
             setSaved(null);
           }}
+        />
+      ) : open?.type === "return" && player ? (
+        <SitDownDialog
+          tableId={visit.visit.tableId}
+          player={player.player}
+          returning
+          onClose={close}
+          onSeated={seated}
         />
       ) : open?.type === "start" ? (
         <StartDialog
