@@ -35,6 +35,7 @@ export class NotFound extends Schema.TaggedError<NotFound>()(
       "entry",
       "stake",
       "trip",
+      "table",
     ]),
   },
   { httpApiStatus: 404 },
@@ -64,6 +65,7 @@ export const ConflictReason = Schema.Literals([
   "trip_open",
   "last_owner",
   "recording_identity",
+  "actor_taken",
 ]);
 export type ConflictReason = typeof ConflictReason.Type;
 

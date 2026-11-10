@@ -1,4 +1,12 @@
-import { Actor, PlayEntry, PlayerIdentity, Table, Visit, type EntryId } from "@stacks/contracts";
+import {
+  Actor,
+  PlayEntry,
+  PlayerIdentity,
+  Table,
+  Visit,
+  type EntryId,
+  type PlayerId,
+} from "@stacks/contracts";
 import { RecordingCommand } from "@stacks/contracts/recordingCommands";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
@@ -9,24 +17,41 @@ export const RecordingReceipt = Schema.Struct({
 });
 export type RecordingReceipt = typeof RecordingReceipt.Type;
 
-/** One player's recording as one actor applies commands to it, on a device or on the server. */
+/**
+ * The tables one actor records at, as it applies commands to them, on a device or on the server.
+ * `players` are the ones it may start visits for: `self` and the players it added.
+ */
 export interface RecordingLedger {
   readonly self: PlayerIdentity;
   readonly actor: Actor;
+  readonly players: ReadonlyArray<PlayerIdentity>;
   readonly tables: ReadonlyArray<Table>;
   readonly visits: ReadonlyArray<Visit>;
   readonly entries: ReadonlyArray<PlayEntry>;
   readonly receipts: ReadonlyArray<RecordingReceipt>;
 }
 
+type RecordingErrorReason =
+  | "invalid"
+  | "conflict"
+  | "operation_reused"
+  | "forbidden"
+  | "load"
+  | "closed";
+
+/**
+ * Whether an actor holding `actorPlayers` may write at a table. For now only the table's starter
+ * records, for everyone at it.
+ */
+export const authorize = (
+  table: Pick<Table, "starterPlayerId">,
+  actorPlayers: ReadonlyArray<PlayerId>,
+) => actorPlayers.includes(table.starterPlayerId);
+
 export class RecordingError extends Error {
   override readonly name = "RecordingError";
-  readonly reason: "invalid" | "conflict" | "operation_reused" | "load" | "closed";
-  constructor(
-    reason: "invalid" | "conflict" | "operation_reused" | "load" | "closed",
-    message: string,
-    cause?: unknown,
-  ) {
+  readonly reason: RecordingErrorReason;
+  constructor(reason: RecordingErrorReason, message: string, cause?: unknown) {
     super(message, { cause });
     this.reason = reason;
   }
@@ -56,7 +81,7 @@ export const finalCashOut = (current: EntryId | null, command: RecordingCommand)
 };
 /** The entries a command creates, in a stable order. */
 export const createdEntryIds = (command: RecordingCommand): ReadonlyArray<EntryId> =>
-  command.type === "start"
+  command.type === "start" || command.type === "join_table"
     ? [command.buyInId]
     : command.type === "record_completed"
       ? [command.buyInId, command.cashOutId]
@@ -66,12 +91,22 @@ export const createdEntryIds = (command: RecordingCommand): ReadonlyArray<EntryI
           ? [command.replacement.id]
           : [];
 
+/**
+ * Applies one command. `actorPlayers` are the players bound to the command's actor: on a device,
+ * its own player; on the server, what the database binds to the authenticated actor.
+ */
 export const applyRecordingCommand = <S extends RecordingLedger>(
   state: S,
   command: RecordingCommand,
+  actorPlayers: ReadonlyArray<PlayerId> = [state.self.id],
 ): S => {
   requireValid(command.actorId === state.actor.id, "Command has a foreign local actor.");
+  const forbid = (table: Pick<Table, "starterPlayerId">) => {
+    if (!authorize(table, actorPlayers))
+      throw new RecordingError("forbidden", "Only the player who started this table records here.");
+  };
   const tables = [...state.tables];
+  const players = [...state.players];
   let visits = [...state.visits];
   let entries = [...state.entries];
   const append = (
@@ -111,29 +146,65 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       }),
     );
   };
-  if (command.type === "start" || command.type === "record_completed") {
-    requireValid(
-      !visits.some((visit) => visit.id === command.visitId) &&
-        !tables.some((table) => table.id === command.tableId),
-      "Start IDs are already used.",
+  const openAt = (tableId: Table["id"], playerId: PlayerId) =>
+    visits.some(
+      (visit) =>
+        visit.tableId === tableId && visit.playerId === playerId && visit.finishedAt === null,
     );
-    tables.push(
-      Table.make({
-        id: command.tableId,
-        tripId: null,
-        game: command.game,
-        venueId: command.venueId,
-        highLimit: command.highLimit,
-        starterActorId: command.actorId,
-      }),
-    );
+  if (
+    command.type === "start" ||
+    command.type === "record_completed" ||
+    command.type === "join_table"
+  ) {
+    if (command.type === "join_table") {
+      const table = tables.find((table) => table.id === command.tableId);
+      requireValid(table, "Table does not exist.");
+      forbid(table);
+      if (command.newPlayer) {
+        requireValid(
+          command.newPlayer.id === command.playerId &&
+            !players.some((player) => player.id === command.playerId),
+          "Player ID is already used.",
+        );
+        players.push(PlayerIdentity.make(command.newPlayer));
+      }
+      requireValid(
+        players.some((player) => player.id === command.playerId),
+        "Add the player before recording their play.",
+      );
+      requireValid(
+        !visits.some((visit) => visit.id === command.visitId),
+        "Start IDs are already used.",
+      );
+      requireValid(
+        !openAt(table.id, command.playerId),
+        "This player is already playing at this table.",
+      );
+    } else {
+      forbid({ starterPlayerId: command.playerId });
+      requireValid(
+        !visits.some((visit) => visit.id === command.visitId) &&
+          !tables.some((table) => table.id === command.tableId),
+        "Start IDs are already used.",
+      );
+      tables.push(
+        Table.make({
+          id: command.tableId,
+          tripId: null,
+          game: command.game,
+          venueId: command.venueId,
+          highLimit: command.highLimit,
+          starterPlayerId: command.playerId,
+        }),
+      );
+    }
     visits.push(
       Visit.make({
         id: command.visitId,
         tableId: command.tableId,
-        playerId: state.self.id,
+        playerId: command.playerId,
         startedAt: command.startedAt,
-        finishedAt: command.type === "start" ? null : command.finishedAt,
+        finishedAt: command.type === "record_completed" ? command.finishedAt : null,
         revision: 0,
       }),
     );
@@ -143,6 +214,9 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
   } else {
     const visit = visits.find((visit) => visit.id === command.visitId);
     requireValid(visit, "Visit does not exist.");
+    const table = tables.find((table) => table.id === visit.tableId);
+    requireValid(table, "Table does not exist.");
+    forbid(table);
     if (visit.revision !== command.expectedRevision)
       throw new RecordingError(
         "conflict",
@@ -170,6 +244,10 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       }
     } else if (command.type === "reopen") {
       requireValid(visit.finishedAt !== null, "Visit is already live.");
+      requireValid(
+        !openAt(visit.tableId, visit.playerId),
+        "This player is playing at this table again. Correct that visit instead.",
+      );
       finishedAt = null;
       const final = state.receipts.reduce<EntryId | null>(
         (current, receipt) =>
@@ -227,6 +305,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
   }
   return {
     ...state,
+    players,
     tables,
     visits,
     entries,

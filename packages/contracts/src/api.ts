@@ -6,8 +6,8 @@ import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
 import * as OpenApi from "effect/http-api/OpenApi";
 
-import { Authentication } from "./auth.ts";
-import { Conflict, Forbidden, InvalidRequest, NotFound } from "./errors.ts";
+import { Authentication, RecordingAuthentication } from "./auth.ts";
+import { Conflict, Forbidden, InvalidRequest, NotFound, Unauthorized } from "./errors.ts";
 import {
   EntryId,
   GroupId,
@@ -16,6 +16,7 @@ import {
   SeatingId,
   SessionId,
   StakeId,
+  TableId,
   TripId,
   UserId,
   VenueId,
@@ -23,9 +24,12 @@ import {
 import { Entry, Game, Seat, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import {
+  ActorCredential,
   PushRecordingRequest,
   PushRecordingResponse,
   RecordingHistory,
+  ShareLink,
+  TableView,
 } from "./recordingCommands.ts";
 import {
   ClaimPreview,
@@ -562,22 +566,77 @@ const LimitsGroup = HttpApiGroup.make("limits")
   )
   .middleware(Authentication);
 
+const tableParams = Schema.Struct({ tableId: TableId });
+
+/** An account's session or a device actor's credential. Tables it didn't start are 404s. */
 const RecordingGroup = HttpApiGroup.make("recording")
   .add(
-    HttpApiEndpoint.get("history", "/recording", { success: RecordingHistory }).annotate(
+    HttpApiEndpoint.get("history", "/recording", {
+      success: RecordingHistory,
+      error: Unauthorized,
+    }).annotate(
       OpenApi.Summary,
-      "The signed-in account's personal visits, entries and applied commands",
+      "The visits, entries and applied commands at the tables this recorder started",
     ),
   )
   .add(
     HttpApiEndpoint.post("push", "/recording/commands", {
       payload: PushRecordingRequest,
       success: PushRecordingResponse,
-      error: Conflict,
+      error: [Conflict, Unauthorized],
     }).annotate(
       OpenApi.Summary,
       "Applies commands in order; a retried operation with the same content is a no-op",
     ),
+  )
+  .add(
+    HttpApiEndpoint.get("table", "/tables/:tableId", {
+      params: tableParams,
+      success: TableView,
+      error: [NotFound, Unauthorized],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("share", "/tables/:tableId/share", {
+      params: tableParams,
+      success: ShareLink,
+      error: [NotFound, Unauthorized],
+    }).annotate(OpenApi.Summary, "A new read-only link; any earlier link stops working"),
+  )
+  .add(
+    HttpApiEndpoint.delete("unshare", "/tables/:tableId/share", {
+      params: tableParams,
+      success: HttpApiSchema.NoContent,
+      error: [NotFound, Unauthorized],
+    }),
+  )
+  .middleware(RecordingAuthentication);
+
+/** Device actors register themselves, and share links are read without signing in. */
+const PublicRecordingGroup = HttpApiGroup.make("publicRecording")
+  .add(
+    HttpApiEndpoint.post("registerActor", "/actors", {
+      payload: ActorCredential,
+      success: HttpApiSchema.NoContent,
+      error: Conflict,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("shared", "/shared/:token", {
+      params: Schema.Struct({ token: Schema.String }),
+      success: TableView,
+      error: NotFound,
+    }),
+  );
+
+/** Signing in on a device that already synced as its actor keeps that player as the account's. */
+const ClaimGroup = HttpApiGroup.make("claim")
+  .add(
+    HttpApiEndpoint.post("claimActor", "/recording/claim", {
+      payload: ActorCredential,
+      success: HttpApiSchema.NoContent,
+      error: [Conflict, Unauthorized],
+    }),
   )
   .middleware(Authentication);
 
@@ -593,4 +652,6 @@ export class StacksApi extends HttpApi.make("stacks")
   .add(TripsGroup)
   .add(LimitsGroup)
   .add(RecordingGroup)
+  .add(PublicRecordingGroup)
+  .add(ClaimGroup)
   .prefix("/api") {}

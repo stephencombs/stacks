@@ -29,6 +29,7 @@ import { AppState, Platform } from "react-native";
 import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
 import { useAccount } from "./account";
+import { actorKeys } from "./actorKeys";
 import { apiUrl, clerkPublishableKey } from "./config";
 import { markStartup } from "./diagnostics";
 import { outboxStorage, wakeOutbox } from "./outbox";
@@ -45,7 +46,12 @@ export function SignedInProvider({ children }: { children: ReactNode }) {
   return (
     <SignedInRoot userId={userId} make={signIn} wake={wakeOutbox}>
       <RefusalHaptic />
-      <RecordingSyncRoot userId={userId} connect={connectRecording} wake={wakeOutbox}>
+      <RecordingSyncRoot
+        userId={userId}
+        connect={connectRecording}
+        keys={actorKeys}
+        wake={wakeOutbox}
+      >
         {children}
       </RecordingSyncRoot>
     </SignedInRoot>

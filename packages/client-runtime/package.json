@@ -76,6 +76,10 @@
       "types": "./src/recordingStorage.ts",
       "import": "./src/recordingStorage.ts"
     },
+    "./actorKeysIndexedDB": {
+      "types": "./src/actorKeysIndexedDB.ts",
+      "import": "./src/actorKeysIndexedDB.ts"
+    },
     "./recordingStorageIndexedDB": {
       "types": "./src/recordingStorageIndexedDB.ts",
       "import": "./src/recordingStorageIndexedDB.ts"

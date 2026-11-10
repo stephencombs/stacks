@@ -6,6 +6,13 @@ A personal session lives at `/play/:visitId` (mobile `play/:visitId`), with Rebu
 while it's live. Both are on this device and need no account, group, trip or network: they never
 wait for sign-in, and sign-in failing or not being configured leaves them working.
 
+A personal session is one player's visit to a table. Its page lists everyone at the table, and
+whoever started the table adds players (someone new by name, or a player saved on this device) and
+records for each of them on that player's own `/play/:visitId`. There is no separate table page to
+record from: a table is reached through any visit at it. The starter's Share sheet makes a
+read-only link, `/t/:token`, which opens on the web with no account and shows that one table and
+nothing else. Mobile sends the web address, since the link must work for people without the app.
+
 Groups and trips are a second, account-backed area, reached from **Groups** in the header. Inside
 it, the group and trip you're in are context, shown as a labeled scope button at the top of every
 screen. Under it, four places answer the questions people open a trip with:
@@ -84,7 +91,8 @@ the Board is one tap away mid-session.
 
 ## Addresses
 
-Web and mobile share addresses: `/` (your play), `/play/:visitId` (a personal session),
+Web and mobile share addresses: `/` (your play), `/play/:visitId` (a personal session), `/t/:token`
+(a shared table, web only),
 `/groups` (your groups), `/trips/:id` (Sessions), `/trips/:id/board` (`?scope=all` for All
 time), `/trips/:id/settle`, `/sessions/:id`, `/groups/:id` (the hub), `/groups/:id/people` and
 `/groups/:id/settings`. Old addresses keep working: a trip's `/results` goes to its Board and a

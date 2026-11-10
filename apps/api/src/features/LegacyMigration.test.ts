@@ -133,7 +133,7 @@ const importedLedger = Effect.fn("test.importedLedger")(function* (groupId: Grou
       game: null,
       venueId: null,
       highLimit: false,
-      starterActorId: ActorId.make(crypto.randomUUID()),
+      starterPlayerId: PlayerId.make(crypto.randomUUID()),
     }),
   );
   const visits = visitRows.map((row) =>
@@ -252,7 +252,14 @@ const expectFaithful = Effect.fn("test.expectFaithful")(function* (groupId: Grou
   return { legacy, imported };
 });
 
-const nothingNew = { dryRun: false, identities: 0, visits: 0, entries: 0, repayments: 0 };
+const nothingNew = {
+  dryRun: false,
+  identities: 0,
+  tables: 0,
+  visits: 0,
+  entries: 0,
+  repayments: 0,
+};
 
 const startSession = Effect.fn("test.startSession")(function* (
   client: Client,
@@ -345,7 +352,14 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
         scope: scope(group.group.id),
         dryRun: true,
       });
-      expect(dry).toEqual({ dryRun: true, identities: 3, visits: 4, entries: 10, repayments: 1 });
+      expect(dry).toEqual({
+        dryRun: true,
+        identities: 3,
+        tables: 1,
+        visits: 4,
+        entries: 10,
+        repayments: 1,
+      });
       const [untouched] = yield* sql<{ count: string }>`
         select count(*) from personal_visits where legacy_session_id = ${sessionId}
       `;
@@ -543,7 +557,7 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       ]);
       expect(
         yield* LegacyMigration.importLegacy({ scope: [usdGroup.group.id, yen], dryRun: false }),
-      ).toEqual({ dryRun: false, identities: 1, visits: 1, entries: 2, repayments: 0 });
+      ).toEqual({ dryRun: false, identities: 1, tables: 1, visits: 1, entries: 2, repayments: 0 });
       yield* expectFaithful(usdGroup.group.id);
       const [left] = yield* sql<{ count: string }>`
         select count(*) from personal_visits v join sessions s on s.id = v.legacy_session_id

@@ -13,8 +13,9 @@ import paymentHandles from "./0010_payment_handles.ts";
 import userLimits from "./0011_user_limits.ts";
 import personalRecording from "./0012_personal_recording.ts";
 import legacyImport from "./0013_legacy_import.ts";
+import sharedTables from "./0014_shared_tables.ts";
 
-export const migrations = Migrator.fromRecord({
+export const records = {
   "0001_init": init,
   "0002_zero_cash_out": zeroCashOut,
   "0003_stakes": stakes,
@@ -28,4 +29,7 @@ export const migrations = Migrator.fromRecord({
   "0011_user_limits": userLimits,
   "0012_personal_recording": personalRecording,
   "0013_legacy_import": legacyImport,
-});
+  "0014_shared_tables": sharedTables,
+};
+
+export const migrations = Migrator.fromRecord(records);

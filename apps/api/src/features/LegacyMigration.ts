@@ -38,6 +38,7 @@ interface ImportReport {
   readonly dryRun: boolean;
   /** Rows inserted or brought up to date; all zero when a rerun finds nothing new. */
   readonly identities: number;
+  readonly tables: number;
   readonly visits: number;
   readonly entries: number;
   readonly repayments: number;
@@ -231,26 +232,45 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
           )
         )
       on conflict do nothing
+      returning id, recording_actor_id
+    `;
+    for (const identity of identities)
+      yield* sql`
+        with actor as (
+          insert into recording_actors (id, kind) values (${identity.recordingActorId}, 'account')
+        )
+        insert into player_actors (player_id, actor_id)
+        values (${identity.id}, ${identity.recordingActorId})
+      `;
+
+    const participations = sql.literal(`(
+      select session_id, player_id from session_players
+      union
+      select session_id, player_id from entries where session_id is not null
+    )`);
+    // The session's table has no starter, so nobody records at it again.
+    const tables = yield* sql`
+      insert into tables (id, starter_player_id, game, venue_id, high_limit, legacy_session_id)
+      select s.id, null, s.game, s.venue_id, s.high_limit, s.id
+      from sessions s
+      where ${within("s.group_id")}
+        and exists (select 1 from ${participations} part where part.session_id = s.id)
+      on conflict (id) do update
+        set game = excluded.game, venue_id = excluded.venue_id, high_limit = excluded.high_limit
+        where (tables.game, tables.venue_id, tables.high_limit) is distinct from
+          (excluded.game, excluded.venue_id, excluded.high_limit)
       returning id
     `;
-
     const visits = yield* sql`
-      insert into personal_visits (id, player_id, table_id, game, venue_id, high_limit,
-        started_at, finished_at, revision, legacy_session_id)
+      insert into personal_visits (id, player_id, table_id, started_at, finished_at, revision,
+        legacy_session_id)
       select ${sql.literal(participationId("s.id", "part.player_id"))}, part.player_id, s.id,
-        s.game, s.venue_id, s.high_limit, s.started_at, s.ended_at, 0, s.id
-      from (
-        select session_id, player_id from session_players
-        union
-        select session_id, player_id from entries where session_id is not null
-      ) part join sessions s on s.id = part.session_id
+        s.started_at, s.ended_at, 0, s.id
+      from ${participations} part join sessions s on s.id = part.session_id
       where ${within("s.group_id")}
       on conflict (legacy_session_id, player_id) do update
-        set finished_at = excluded.finished_at, game = excluded.game,
-          venue_id = excluded.venue_id, high_limit = excluded.high_limit
-        where (personal_visits.finished_at, personal_visits.game, personal_visits.venue_id,
-          personal_visits.high_limit) is distinct from
-          (excluded.finished_at, excluded.game, excluded.venue_id, excluded.high_limit)
+        set finished_at = excluded.finished_at
+        where personal_visits.finished_at is distinct from excluded.finished_at
       returning id
     `;
 
@@ -298,6 +318,7 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
     const report: ImportReport = {
       dryRun: options.dryRun,
       identities: identities.length,
+      tables: tables.length,
       visits: visits.length,
       entries: entries.length,
       repayments: repayments.length,

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { formatDay, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
-import { useRecordingVisit } from "@stacks/client-runtime/recordingReact";
+import { useRecordingTable, useRecordingVisit } from "@stacks/client-runtime/recordingReact";
 import {
   RECORDING_CURRENCY,
   visitTitle,
@@ -29,6 +29,7 @@ import {
   StartDialog,
   VoidDialog,
 } from "~/features/RecordingForms";
+import { TableSection } from "~/features/SharedTable";
 
 export const Route = createFileRoute("/play/$visitId")({ component: VisitPage });
 
@@ -67,6 +68,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const [saved, setSaved] = useState<{ entryId: EntryId; text: string } | null>(null);
   const savedButton = useRef<HTMLButtonElement>(null);
   const focus = useDialogFocus(() => savedButton.current);
+  const table = useRecordingTable(visit?.visit.tableId ?? null);
   if (visit === null) return <Missing />;
   if (visit === undefined)
     return (
@@ -100,11 +102,17 @@ function Visit({ visitId }: { visitId: VisitId }) {
     });
   };
   const start = visit.visit.startedAt;
+  const player = table?.visits.find((item) => item.visit.id === visitId);
+  const own = player?.isSelf ?? true;
   return (
     <div className="contents" onClickCapture={focus.capture}>
       <PageHeader
         back={back}
-        title={visitTitle(visit.table)}
+        title={
+          own
+            ? visitTitle(visit.table)
+            : `${player!.player.displayName} · ${visitTitle(visit.table)}`
+        }
         tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Finished"}</Tag>}
         context={
           live
@@ -132,6 +140,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
           </Button>
         </div>
       ) : null}
+      <TableSection
+        tableId={visit.visit.tableId}
+        visitId={visitId}
+        onAdded={(next) => {
+          setSaved(null);
+          void navigate({ to: "/play/$visitId", params: { visitId: next } }).then(focusMain);
+        }}
+      />
       <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
       <Dock>
         {live ? (
@@ -148,6 +164,10 @@ function Visit({ visitId }: { visitId: VisitId }) {
               Cash out
             </Button>
           </>
+        ) : !own ? (
+          <Button key="reopen" size="lg" onClick={() => setOpen({ type: "reopen" })}>
+            Fix accidental finish
+          </Button>
         ) : (
           <>
             <Button

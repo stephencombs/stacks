@@ -3,6 +3,7 @@ import {
   MinorUnits,
   type EntryId,
   type PlayEntry,
+  type PlayerIdentity,
   type Table,
   type VisitId,
   type VisitSummary,
@@ -50,7 +51,9 @@ const tableOf = (state: RecordingState, tableId: Table["id"]) =>
   state.tables.find((table) => table.id === tableId)!;
 
 export const recordingHome = (state: RecordingState): RecordingHome => {
-  const visits = state.visits.map((visit) => ({
+  // Other players' visits at your tables are theirs; they show on the table, not in your play.
+  const own = state.visits.filter((visit) => visit.playerId === state.self.id);
+  const visits = own.map((visit) => ({
     ...visitSummary(visit, state.entries),
     table: tableOf(state, visit.tableId),
   }));
@@ -64,6 +67,46 @@ export const recordingHome = (state: RecordingState): RecordingHome => {
   for (const item of finished) total += BigInt(item.finalResult!);
   // MinorUnits refuses an unsafe integer, so an overflowing total fails loudly.
   return { active, finished, finishedResult: MinorUnits.make(Number(total)) };
+};
+
+export type RecordingTableView = {
+  readonly table: Table;
+  /** Every visit at the table: still playing first, then by when they started. */
+  readonly visits: ReadonlyArray<
+    VisitSummary & { readonly player: PlayerIdentity; readonly isSelf: boolean }
+  >;
+  /** Players who can join now: saved players without a visit in play here. */
+  readonly addable: ReadonlyArray<PlayerIdentity>;
+};
+
+/** The table a visit is at, with everyone recorded there. */
+export const recordingTable = (
+  state: RecordingState,
+  tableId: Table["id"],
+): RecordingTableView | null => {
+  const table = state.tables.find((item) => item.id === tableId);
+  if (!table) return null;
+  const players = new Map(state.players.map((player) => [player.id, player]));
+  const visits = state.visits
+    .filter((visit) => visit.tableId === tableId)
+    .map((visit) => ({
+      ...visitSummary(visit, state.entries),
+      player: players.get(visit.playerId)!,
+      isSelf: visit.playerId === state.self.id,
+    }))
+    .toSorted(
+      (a, b) =>
+        Number(a.visit.finishedAt !== null) - Number(b.visit.finishedAt !== null) ||
+        ms(a.visit.startedAt) - ms(b.visit.startedAt),
+    );
+  const playing = new Set(
+    visits.filter((item) => item.visit.finishedAt === null).map((item) => item.player.id),
+  );
+  return {
+    table,
+    visits,
+    addable: state.players.filter((player) => !playing.has(player.id)),
+  };
 };
 
 export type RecordingEvent =
@@ -192,7 +235,7 @@ export const describeRecordingError = (error: unknown): string => {
     if (error.reason === "conflict")
       return "This session changed on another screen. Check it, then try again.";
     if (error.reason === "load") return "Couldn't open the sessions saved on this device.";
-    if (error.reason === "invalid") return error.message;
+    if (error.reason === "invalid" || error.reason === "forbidden") return error.message;
     if (error.reason === "operation_reused")
       return "This was already saved with different details. Start it again.";
     return "Recording is closed. Reload the page.";
@@ -214,7 +257,8 @@ export const canRetryRecording = (error: unknown) =>
     error instanceof RecordingError &&
     (error.reason === "conflict" ||
       error.reason === "operation_reused" ||
-      error.reason === "invalid")
+      error.reason === "invalid" ||
+      error.reason === "forbidden")
   );
 
 const localTime = (date: string, time: string) => {
@@ -271,19 +315,23 @@ export const describeRecordingRejection = ({ command, reason }: RecordingRejecti
       ? `Starting a session with ${money(command.buyIn)}`
       : command.type === "record_completed"
         ? `A past session with ${money(command.buyIn)} in and ${money(command.cashOut)} out`
-        : command.type === "add"
-          ? `A ${money(command.amount)} ${command.kind === "buy_in" ? "buy-in" : "cash-out"}`
-          : command.type === "finish"
-            ? `Finishing with ${money(command.amount)}`
-            : command.type === "correct"
-              ? "A correction"
-              : "Reopening a session";
+        : command.type === "join_table"
+          ? `Adding ${command.newPlayer?.displayName ?? "a player"} with ${money(command.buyIn)}`
+          : command.type === "add"
+            ? `A ${money(command.amount)} ${command.kind === "buy_in" ? "buy-in" : "cash-out"}`
+            : command.type === "finish"
+              ? `Finishing with ${money(command.amount)}`
+              : command.type === "correct"
+                ? "A correction"
+                : "Reopening a session";
   const why =
     reason === "conflict"
       ? "The session changed on another device."
       : reason === "operation_reused"
         ? "Your account already has it with different details."
-        : "It doesn't fit the session as your account has it.";
+        : reason === "forbidden"
+          ? "Only the player who started the table can record there."
+          : "It doesn't fit the session as your account has it.";
   return `${what} didn't sync. ${why}`;
 };
 
@@ -329,7 +377,13 @@ export const recordingSyncView = (
     };
   const pending = pendingRecordingCommands(state).filter(mine).length;
   if (state.sync !== undefined && pending === 0)
-    return { line: { kind: "synced", text: "Synced to your account" }, rejected };
+    return {
+      line: {
+        kind: "synced",
+        text: state.sync.userId === null ? "Synced from this device" : "Synced to your account",
+      },
+      rejected,
+    };
   if (sync.phase === "syncing") return { line: { kind: "syncing", text: "Syncing…" }, rejected };
   const waiting = pending > 0 ? changes(pending) : "Your sessions";
   return {

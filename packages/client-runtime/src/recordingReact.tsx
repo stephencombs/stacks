@@ -1,4 +1,4 @@
-import { UserId, type VisitId } from "@stacks/contracts";
+import { UserId, type TableId, type VisitId } from "@stacks/contracts";
 import type { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -13,20 +13,30 @@ import {
   type ReactNode,
 } from "react";
 
+import { describeError } from "./errors.ts";
 import {
   makeRecordingStore,
+  RecordingError,
   type RecordingInput,
   type RecordingReceipt,
   type RecordingStore,
 } from "./recording.ts";
 import type { RecordingStorage, RecordingStorageChange } from "./recordingStorage.ts";
-import { makeRecordingSync, type RecordingSync, type RecordingTransport } from "./recordingSync.ts";
+import {
+  makeRecordingSync,
+  syncsAsDevice,
+  tableSynced,
+  type ActorKeyStorage,
+  type RecordingSync,
+  type RecordingTransport,
+} from "./recordingSync.ts";
 import {
   canRetryRecording,
   describeRecordingError,
   PRIVATE_RECORDING_NAMESPACE,
   recordingHome,
   recordingSyncView,
+  recordingTable,
   recordingVisit,
 } from "./recordingView.ts";
 
@@ -157,30 +167,32 @@ const RecordingSyncContext = createContext<RecordingSync | null>(null);
 /**
  * While someone is signed in, syncs the device ledger to their account: it uploads what was
  * recorded signed out, restores what other devices synced, and keeps pushing new saves. Signed
- * out, it does nothing and recording stays on the device. `connect` and `wake` must be stable,
- * module-level functions; `wake` lets the platform say "try now", such as the network returning.
+ * out, solo play stays on the device; a table with other players at it syncs as the device's own
+ * actor, whose secret `keys` holds. `connect`, `keys` and `wake` must be stable, module-level
+ * values; `wake` lets the platform say "try now", such as the network returning.
  */
 export function RecordingSyncRoot({
   userId,
   connect,
+  keys,
   wake,
   children,
 }: {
   userId: string | null;
-  connect: (userId: UserId) => RecordingTransport;
+  connect: () => RecordingTransport;
+  keys: ActorKeyStorage;
   wake: (now: () => void) => () => void;
   children: ReactNode;
 }) {
   const store = useRecordingStore();
   const hold = (id: string | null) => ({
     userId: id,
-    sync: id ? makeRecordingSync(store, UserId.make(id), connect(UserId.make(id))) : null,
+    sync: makeRecordingSync(store, id === null ? null : UserId.make(id), connect(), keys),
   });
   const [held, setHeld] = useState(() => hold(userId));
   if (held.userId !== userId) setHeld(hold(userId));
   const sync = held.sync;
   useEffect(() => {
-    if (!sync) return;
     const fiber = Effect.runFork(sync.run);
     const stopWaking = wake(sync.wake);
     return () => {
@@ -203,9 +215,12 @@ export const useRecordingSync = (visitId?: VisitId) => {
   const sync = use(RecordingSyncContext);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const status = useSyncExternalStore(sync?.subscribe ?? noSubscription, sync?.getStatus ?? idle);
+  // Signed out, solo play never leaves the device, so there's nothing to report.
+  const deviceOnly =
+    sync?.userId === null && snapshot.state !== null && !syncsAsDevice(snapshot.state);
   const view = useMemo(
-    () => recordingSyncView(snapshot.state, status, visitId),
-    [snapshot.state, status, visitId],
+    () => recordingSyncView(snapshot.state, deviceOnly ? null : status, visitId),
+    [snapshot.state, status, visitId, deviceOnly],
   );
   const [error, setError] = useState<string | null>(null);
   const resolve =
@@ -255,3 +270,53 @@ export const useRecordingSubmit = () => {
   };
   return { ...state, submit, clearError: () => setState((s) => ({ ...s, error: null })) };
 };
+
+/** A table and everyone recorded at it. `table` is undefined while loading, null if missing. */
+export const useRecordingTable = (tableId: TableId | null) => {
+  const { state } = useSnapshot();
+  return useMemo(
+    () => (state && tableId ? recordingTable(state, tableId) : undefined),
+    [state, tableId],
+  );
+};
+
+/**
+ * The starter's share link for a table: `share` makes a new one (an earlier one stops working),
+ * `revoke` stops it. A signed-out device's table syncs first; `ready` says it has.
+ */
+export const useTableSharing = (tableId: TableId) => {
+  const store = useRecordingStore();
+  const sync = use(RecordingSyncContext);
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const [state, setState] = useState<{
+    token: string | null;
+    pending: boolean;
+    error: string | null;
+  }>({ token: null, pending: false, error: null });
+  const ready = snapshot.state !== null && tableSynced(snapshot.state, tableId);
+  const run = async (action: () => Promise<string | null>) => {
+    if (!sync) return;
+    setState((s) => ({ ...s, pending: true, error: null }));
+    try {
+      const token = await action();
+      setState({ token, pending: false, error: null });
+    } catch (error) {
+      const message =
+        error instanceof RecordingError ? describeRecordingError(error) : describeError(error);
+      setState((s) => ({ ...s, pending: false, error: message }));
+    }
+  };
+  return {
+    ...state,
+    ready,
+    /** Starts syncing this device's tables; sharing needs the table on the server. */
+    prepare: () => sync?.enable(),
+    share: () => run(async () => (await sync!.share(tableId)).token),
+    revoke: () =>
+      run(async () => {
+        await sync!.unshare(tableId);
+        return null;
+      }),
+  };
+};
+export type { ActorKeyStorage } from "./recordingSync.ts";

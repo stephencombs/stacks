@@ -555,7 +555,7 @@ describe("persisted document validation", () => {
     const document = db.document;
     if (document.payload === undefined) throw new Error("missing test history");
     const value = JSON.parse(document.payload);
-    if (damage === "version") value.version = 2;
+    if (damage === "version") value.version = 3;
     if (damage === "ownership") value.visits[0].playerId = value.actor.id;
     if (damage === "replacement") value.entries[0].replacesEntryId = value.actor.id;
     if (damage === "timestamp") value.entries[0].occurredAt = "2026-11-05T00:00:00.000Z";

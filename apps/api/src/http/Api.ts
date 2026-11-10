@@ -120,7 +120,20 @@ const limits = HttpApiBuilder.group(StacksApi, "limits", (handlers) =>
 const recording = HttpApiBuilder.group(StacksApi, "recording", (handlers) =>
   handlers
     .handle("history", () => serve(Recording.history()))
-    .handle("push", ({ payload }) => serve(Recording.push(payload))),
+    .handle("push", ({ payload }) => serve(Recording.push(payload)))
+    .handle("table", ({ params }) => serve(Recording.table(params.tableId)))
+    .handle("share", ({ params }) => serve(Recording.share(params.tableId)))
+    .handle("unshare", ({ params }) => serve(Recording.unshare(params.tableId))),
+);
+
+const publicRecording = HttpApiBuilder.group(StacksApi, "publicRecording", (handlers) =>
+  handlers
+    .handle("registerActor", ({ payload }) => serve(Recording.registerActor(payload)))
+    .handle("shared", ({ params }) => serve(Recording.shared(params.token))),
+);
+
+const claim = HttpApiBuilder.group(StacksApi, "claim", (handlers) =>
+  handlers.handle("claimActor", ({ payload }) => serve(Recording.claimActor(payload))),
 );
 
 export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openapi.json" }).pipe(
@@ -136,5 +149,7 @@ export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openap
     trips,
     limits,
     recording,
+    publicRecording,
+    claim,
   ]),
 );

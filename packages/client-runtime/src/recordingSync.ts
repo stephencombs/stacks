@@ -1,7 +1,9 @@
-import type { PlayEntry, UserId } from "@stacks/contracts";
+import type { PlayEntry, TableId, UserId } from "@stacks/contracts";
 import {
   RecordingCommand,
   RecordingOperationId,
+  type ActorCredential,
+  type ShareLink,
   type PushRecordingRequest,
   type PushRecordingResponse,
   type RecordingCommandResult,
@@ -18,10 +20,70 @@ import { applyRecordingCommand, createdEntryIds, RecordingError } from "@stacks/
 import { prepareRecordingCommand, type RecordingInput, type RecordingStore } from "./recording.ts";
 import type { RecordingRejection, RecordingState } from "./recordingState.ts";
 
+/**
+ * The API as sync uses it. Given an actor credential, a call proves the device's actor instead of
+ * sending the account's session.
+ */
 export interface RecordingTransport {
-  readonly history: Effect.Effect<RecordingHistory, unknown>;
-  readonly push: (request: PushRecordingRequest) => Effect.Effect<PushRecordingResponse, unknown>;
+  readonly history: (actor: ActorCredential | null) => Effect.Effect<RecordingHistory, unknown>;
+  readonly push: (
+    request: PushRecordingRequest,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<PushRecordingResponse, unknown>;
+  readonly registerActor: (actor: ActorCredential) => Effect.Effect<void, unknown>;
+  readonly claimActor: (actor: ActorCredential) => Effect.Effect<void, unknown>;
+  readonly share: (
+    tableId: TableId,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<ShareLink, unknown>;
+  readonly unshare: (
+    tableId: TableId,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<void, unknown>;
 }
+
+/** Whether the server has the table, so it can be shared. */
+export const tableSynced = (state: RecordingState, tableId: TableId) => {
+  const synced = new Set(state.sync?.synced);
+  return state.receipts.some(
+    ({ command }) =>
+      (command.type === "start" || command.type === "record_completed") &&
+      command.tableId === tableId &&
+      synced.has(command.operationId),
+  );
+};
+
+/** Where a platform keeps the device actor's secret: never in the ledger, never synced. */
+export interface ActorKeyStorage {
+  readonly load: () => Promise<ActorCredential | null>;
+  readonly save: (credential: ActorCredential) => Promise<void>;
+}
+
+const newSecret = () =>
+  Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+
+/** The saved credential for `actorId`, or a new one, saved before it's used. */
+const actorCredential = async (
+  keys: ActorKeyStorage,
+  actorId: ActorCredential["actorId"],
+): Promise<ActorCredential> => {
+  const saved = await keys.load();
+  if (saved?.actorId === actorId) return saved;
+  const credential = { actorId, secret: newSecret() };
+  await keys.save(credential);
+  return credential;
+};
+
+/**
+ * Whether a signed-out device syncs as its own actor: once it has, or once a table of its has
+ * someone else at it. Solo play stays on the device until an account takes it.
+ */
+export const syncsAsDevice = (state: RecordingState) =>
+  state.sync === undefined
+    ? state.visits.some((visit) => visit.playerId !== state.self.id)
+    : state.sync.userId === null;
 
 /** This device's history belongs to another account, so nothing syncs while this one is in. */
 export class RecordingSyncBlocked extends Error {
@@ -65,6 +127,7 @@ const replay = (state: RecordingState, commands: ReadonlyArray<RecordingCommand>
 
 const empty = (state: RecordingState): RecordingState => ({
   ...state,
+  players: [state.self],
   tables: [],
   visits: [],
   entries: [],
@@ -84,10 +147,12 @@ export const pendingRecordingCommands = (state: RecordingState) => {
  */
 export const mergeRecordingHistory = (
   state: RecordingState,
-  userId: UserId,
+  userId: UserId | null,
   history: RecordingHistory,
 ): RecordingState => {
-  if (state.sync && state.sync.userId !== userId) throw new RecordingSyncBlocked();
+  // A device that synced as its actor has had that player claimed by the account by now.
+  if (state.sync && state.sync.userId !== null && state.sync.userId !== userId)
+    throw new RecordingSyncBlocked();
   const identity = history.identity;
   const adopt =
     identity !== null &&
@@ -95,8 +160,15 @@ export const mergeRecordingHistory = (
   if (adopt && (state.sync?.synced.length ?? 0) > 0)
     throw new RecordingError("load", "This device already synced as a different player.");
   const actorId = identity?.actorId ?? state.actor.id;
+  const playerId = identity?.playerId ?? state.self.id;
   const own = (command: RecordingCommand) =>
-    adopt ? RecordingCommand.make({ ...command, actorId }) : command;
+    adopt
+      ? RecordingCommand.make(
+          "playerId" in command && command.playerId === state.self.id
+            ? { ...command, actorId, playerId }
+            : { ...command, actorId },
+        )
+      : command;
   const remote = new Map(history.commands.map((command) => [command.operationId, command]));
   const local = state.receipts.map((receipt) => own(receipt.command));
   const reused = local
@@ -181,6 +253,13 @@ const settled = (
             finishedAt(command.finishedAt)))
       );
     }
+    case "join_table":
+      return (
+        visit.tableId === command.tableId &&
+        visit.playerId === command.playerId &&
+        ms(visit.startedAt) === ms(command.startedAt) &&
+        entry(command.buyInId, "buy_in", command.buyIn, command.startedAt)
+      );
     case "add":
       return entry(command.entryId, command.kind, command.amount, command.occurredAt, command.note);
     case "finish":
@@ -290,6 +369,15 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
             finishedAt: command.finishedAt,
           };
     }
+    case "join_table":
+      return {
+        type: "join_table",
+        tableId: (ids.get(command.tableId) ?? command.tableId) as typeof command.tableId,
+        playerId: command.playerId,
+        buyIn: command.buyIn,
+        startedAt: command.startedAt,
+        ...optional("displayName", command.newPlayer?.displayName ?? null),
+      };
     case "add":
       return {
         type: "add",
@@ -362,6 +450,8 @@ export const recordRejectedAgain = (state: RecordingState, operationId: Recordin
     next = withoutRejection(next, item.command.operationId).state;
     const command = prepareRecordingCommand(next, inputOf(item.command, ids));
     ids.set(item.command.visitId, command.visitId);
+    if ("tableId" in item.command && "tableId" in command)
+      ids.set(item.command.tableId, command.tableId);
     const before = createdEntryIds(item.command);
     createdEntryIds(command).forEach((id, index) => ids.set(before[index]!, id));
     next = applyRecordingCommand(next, command);
@@ -378,14 +468,16 @@ export type RecordingSyncStatus = {
 const MAX_DELAY = Duration.minutes(5);
 
 /**
- * Syncs one account's share of the device ledger: pulls once, then pushes whatever is pending,
- * and again whenever something new is saved or `wake` says the network may be back. Failures
- * back off from one second to five minutes; a wake cuts the wait short.
+ * Syncs the device ledger to an account, or signed out (`userId` null) as the device's own actor:
+ * pulls once, then pushes whatever is pending, and again whenever something new is saved or
+ * `wake` says the network may be back. Failures back off from one second to five minutes; a wake
+ * cuts the wait short.
  */
 export const makeRecordingSync = (
   store: RecordingStore,
-  userId: UserId,
+  userId: UserId | null,
   transport: RecordingTransport,
+  keys: ActorKeyStorage,
 ) => {
   let status: RecordingSyncStatus = { phase: "idle", error: null };
   const listeners = new Set<() => void>();
@@ -399,11 +491,33 @@ export const makeRecordingSync = (
   const transform = (change: (state: RecordingState) => RecordingState) =>
     Effect.tryPromise({ try: () => store.transform(change), catch: (error) => error });
 
+  const active = (state: RecordingState | null) =>
+    state !== null && (userId !== null || syncsAsDevice(state));
+  const credential = (state: RecordingState) =>
+    Effect.tryPromise({ try: () => actorCredential(keys, state.actor.id), catch: (e) => e });
+  let prepared = false;
+
   const round = Effect.gen(function* () {
+    const loaded = store.getSnapshot().state;
+    if (!active(loaded)) return setStatus({ phase: "idle", error: null });
     setStatus({ phase: "syncing", error: null });
+    const actor = userId === null ? yield* credential(loaded!) : null;
+    if (!prepared) {
+      if (actor) yield* transport.registerActor(actor);
+      // The device synced as its actor before this sign-in: the account takes that player.
+      else if (loaded!.sync?.userId === null)
+        yield* transport
+          .claimActor(yield* credential(loaded!))
+          .pipe(
+            Effect.mapError((error) =>
+              isIdentityConflict(error) ? new RecordingSyncBlocked() : error,
+            ),
+          );
+      prepared = true;
+    }
     for (;;) {
       if (pull) {
-        const history = yield* transport.history;
+        const history = yield* transport.history(actor);
         yield* transform((state) => mergeRecordingHistory(state, userId, history));
         pull = false;
       }
@@ -412,7 +526,7 @@ export const makeRecordingSync = (
       const commands = pendingRecordingCommands(state).slice(0, BATCH);
       if (commands.length === 0) break;
       const response = yield* transport
-        .push({ identity: { playerId: state.self.id, actorId: state.actor.id }, commands })
+        .push({ identity: { playerId: state.self.id, actorId: state.actor.id }, commands }, actor)
         .pipe(
           Effect.tapError((error) =>
             Effect.sync(() => {
@@ -433,7 +547,7 @@ export const makeRecordingSync = (
     signal = (reason) => Queue.offerUnsafe(wakes, reason);
     const unsubscribe = store.subscribe(() => {
       const state = store.getSnapshot().state;
-      if (state?.sync && pendingRecordingCommands(state).length > 0) signal?.("change");
+      if (state && active(state) && pendingRecordingCommands(state).length > 0) signal?.("change");
     });
     yield* Effect.addFinalizer(() => Effect.sync(unsubscribe));
     let attempt = 0;
@@ -462,7 +576,19 @@ export const makeRecordingSync = (
     }
   }).pipe(Effect.scoped, Effect.ensuring(Effect.sync(() => (signal = null))));
 
+  const sharing = async <A>(
+    tableId: TableId,
+    call: (tableId: TableId, actor: ActorCredential | null) => Effect.Effect<A, unknown>,
+  ) => {
+    const state = store.getSnapshot().state;
+    if (!state || !tableSynced(state, tableId))
+      throw new RecordingError("invalid", "This table hasn't synced yet. Try again once it has.");
+    const actor = userId === null ? await actorCredential(keys, state.actor.id) : null;
+    return Effect.runPromise(call(tableId, actor));
+  };
+
   return {
+    userId,
     /** Runs until interrupted. Fork it while this account is signed in. */
     run,
     /** The network or the app came back: pull and push now instead of after the backoff. */
@@ -472,6 +598,17 @@ export const makeRecordingSync = (
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
+    /** Starts syncing a signed-out device's tables, so one can be shared. */
+    enable: async () => {
+      await store.transform((state) =>
+        state.sync ? state : { ...state, sync: { userId: null, synced: [], rejected: [] } },
+      );
+      signal?.("wake");
+    },
+    /** A new read-only link for a table this device started; any earlier link stops working. */
+    share: (tableId: TableId) => sharing(tableId, transport.share),
+    /** Stops the table's link working. */
+    unshare: (tableId: TableId) => sharing(tableId, transport.unshare),
     discard: (operationId: RecordingOperationId) =>
       store.transform((state) => discardRejected(state, operationId)),
     recordAgain: async (operationId: RecordingOperationId) => {

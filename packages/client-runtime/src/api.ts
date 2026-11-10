@@ -5,6 +5,7 @@ import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
 import type { GroupId, SessionId, TripId } from "@stacks/contracts";
+import type { ActorCredential } from "@stacks/contracts/recordingCommands";
 import { StacksApi } from "@stacks/contracts";
 
 import type { RecordingTransport } from "./recordingSync.ts";
@@ -29,20 +30,48 @@ const withToken = (getToken: StacksClientOptions["getToken"]) =>
     ),
   );
 
-/** Personal recording sync talks to the API outside the query cache: it owns its retries. */
+const withActor = (actor: ActorCredential) =>
+  HttpClient.mapRequest((request) =>
+    HttpClientRequest.setHeader(request, "authorization", `Actor ${actor.actorId}.${actor.secret}`),
+  );
+
+/**
+ * Personal recording sync talks to the API outside the query cache: it owns its retries. Each
+ * call proves the device actor when given one, and sends the account's session otherwise.
+ */
 export const makeRecordingTransport = ({
   baseUrl,
   getToken,
 }: StacksClientOptions): RecordingTransport => {
-  const client = HttpApiClient.make(StacksApi, {
-    baseUrl,
-    transformClient: withToken(getToken),
-  }).pipe(Effect.provide(FetchHttpClient.layer));
+  const client = (actor: ActorCredential | null) =>
+    HttpApiClient.make(StacksApi, {
+      baseUrl,
+      transformClient: actor ? withActor(actor) : withToken(getToken),
+    }).pipe(Effect.provide(FetchHttpClient.layer));
   return {
-    history: Effect.flatMap(client, (api) => api.recording.history()),
-    push: (payload) => Effect.flatMap(client, (api) => api.recording.push({ payload })),
+    history: (actor) => Effect.flatMap(client(actor), (api) => api.recording.history()),
+    push: (payload, actor) =>
+      Effect.flatMap(client(actor), (api) => api.recording.push({ payload })),
+    registerActor: (payload) =>
+      Effect.flatMap(client(payload), (api) => api.publicRecording.registerActor({ payload })),
+    claimActor: (payload) =>
+      Effect.flatMap(client(null), (api) => api.claim.claimActor({ payload })),
+    share: (tableId, actor) =>
+      Effect.flatMap(client(actor), (api) => api.recording.share({ params: { tableId } })),
+    unshare: (tableId, actor) =>
+      Effect.flatMap(client(actor), (api) => api.recording.unshare({ params: { tableId } })),
   };
 };
+
+/** A table's read-only view through its share link. Needs no account or device actor. */
+export const fetchSharedTable = (
+  { baseUrl }: Pick<StacksClientOptions, "baseUrl">,
+  token: string,
+) =>
+  HttpApiClient.make(StacksApi, { baseUrl }).pipe(
+    Effect.flatMap((api) => api.publicRecording.shared({ params: { token } })),
+    Effect.provide(FetchHttpClient.layer),
+  );
 
 export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => {
   class StacksClient extends AtomHttpApi.Service<StacksClient>()("@stacks/StacksClient", {

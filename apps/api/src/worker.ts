@@ -20,7 +20,7 @@ const layerWorkerPlatform = Layer.mergeAll(
 
 const { handler } = HttpRouter.toWebHandler(
   Layer.mergeAll(Api.layer, HttpRouter.cors()).pipe(
-    Layer.provide([Clerk.layer, layerWorkerPlatform]),
+    Layer.provide([Clerk.layer, Clerk.layerRecording, layerWorkerPlatform]),
   ),
 );
 

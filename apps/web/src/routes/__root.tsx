@@ -20,7 +20,8 @@ export const Route = createRootRoute({ component: Root });
 const invitation = /^\/(join|claim)\//;
 
 /** Your own play: it lives on this device, so it never waits for sign-in or the network. */
-const personal = (pathname: string) => pathname === "/" || pathname.startsWith("/play/");
+const personal = (pathname: string) =>
+  pathname === "/" || pathname.startsWith("/play/") || pathname.startsWith("/t/");
 
 function Root() {
   // Decide from the page being drawn, not the address: while a navigation is pending the router

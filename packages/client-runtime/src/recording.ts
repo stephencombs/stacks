@@ -43,6 +43,15 @@ export type RecordingInput =
       readonly finishedAt: DateTime.Utc;
     } & StartInput)
   | {
+      /** A saved player by `playerId`, or a new one by `displayName`. */
+      readonly type: "join_table";
+      readonly tableId: TableId;
+      readonly playerId?: PlayerId;
+      readonly displayName?: string;
+      readonly buyIn: number;
+      readonly startedAt?: DateTime.Utc;
+    }
+  | {
       readonly type: "add";
       readonly visitId: VisitId;
       readonly kind: "buy_in" | "cash_out";
@@ -98,6 +107,7 @@ export const prepareRecordingCommand = (
       tableId: TableId.make(newId()),
       visitId: VisitId.make(newId()),
       buyInId: EntryId.make(newId()),
+      playerId: state.self.id,
       buyIn: MinorUnits.make(input.buyIn),
       startedAt: input.startedAt ?? preparedAt,
       game: input.game ?? null,
@@ -115,6 +125,26 @@ export const prepareRecordingCommand = (
             finishedAt: input.finishedAt,
           },
     );
+  }
+  if (input.type === "join_table") {
+    const saved = state.players.some((player) => player.id === input.playerId);
+    const displayName = input.displayName?.trim() ?? "";
+    if (!saved && displayName === "")
+      throw new RecordingError("invalid", "Enter the player's name.");
+    if (!saved && displayName.length > 60)
+      throw new RecordingError("invalid", "Keep the name to 60 characters.");
+    const playerId = input.playerId ?? PlayerId.make(newId());
+    return RecordingCommand.make({
+      ...common,
+      type: "join_table",
+      tableId: input.tableId,
+      visitId: VisitId.make(newId()),
+      playerId,
+      buyInId: EntryId.make(newId()),
+      buyIn: MinorUnits.make(input.buyIn),
+      startedAt: input.startedAt ?? preparedAt,
+      ...(saved ? {} : { newPlayer: { id: playerId, displayName } }),
+    });
   }
   const visit = state.visits.find((visit) => visit.id === input.visitId);
   if (!visit) throw new RecordingError("invalid", "Visit does not exist.");
@@ -165,13 +195,21 @@ export const prepareRecordingCommand = (
 };
 
 const freezeState = (state: RecordingState): RecordingState => {
-  for (const records of [state.tables, state.visits, state.entries, state.receipts]) {
+  for (const records of [
+    state.players,
+    state.tables,
+    state.visits,
+    state.entries,
+    state.receipts,
+  ]) {
     for (const record of records) Object.freeze(record);
     Object.freeze(records);
   }
   for (const receipt of state.receipts) {
     if (receipt.command.type === "correct" && receipt.command.replacement)
       Object.freeze(receipt.command.replacement);
+    if (receipt.command.type === "join_table" && receipt.command.newPlayer)
+      Object.freeze(receipt.command.newPlayer);
     Object.freeze(receipt.command);
   }
   Object.freeze(state.self);
@@ -216,10 +254,12 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
     if (document.payload === undefined) {
       if (snapshot.state !== null)
         throw new RecordingError("load", "Saved recording history disappeared.");
+      const self = { id: PlayerId.make(newId()), displayName: "You" };
       const state: RecordingState = {
-        version: 1,
-        self: { id: PlayerId.make(newId()), displayName: "You" },
+        version: 2,
+        self,
         actor: { id: ActorId.make(newId()), userId: null },
+        players: [self],
         tables: [],
         visits: [],
         entries: [],

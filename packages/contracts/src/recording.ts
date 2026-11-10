@@ -11,7 +11,8 @@ export const Table = Schema.Struct({
   game: Schema.NullOr(Game),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
-  starterActorId: ActorId,
+  /** Whoever holds this player records and corrects for everyone at the table. */
+  starterPlayerId: PlayerId,
 });
 export type Table = typeof Table.Type;
 

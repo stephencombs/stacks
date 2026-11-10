@@ -24,7 +24,7 @@ export const table: Table = {
   game: null,
   venueId: null,
   highLimit: false,
-  starterActorId: ACTOR,
+  starterPlayerId: ALEX,
 };
 export const visit: Visit = {
   id: VisitId.make("0192e7a0-0000-7000-8000-0000000000b1"),
