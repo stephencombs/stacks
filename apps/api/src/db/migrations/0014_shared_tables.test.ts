@@ -41,10 +41,7 @@ it.layer(Layer.mergeAll(Database.layer(TEST_DATABASE_URL), NodeServices.layer), 
         const sql = yield* SqlClient.SqlClient;
         yield* PgMigrator.run({ loader: Migrator.fromRecord(before) });
 
-        const [user, player, actor, visit, table, entry, operation] = Array.from(
-          { length: 7 },
-          uuid,
-        );
+        const [player, actor, visit, table, entry, operation] = Array.from({ length: 6 }, uuid);
         const [group, venue, trip, session, guest, participation] = Array.from({ length: 6 }, uuid);
         yield* sql`insert into users (id, display_name) values ('user_ana', 'Ana')`;
         yield* sql`
