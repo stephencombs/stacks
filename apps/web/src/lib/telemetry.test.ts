@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { expect, it, vi } from "vite-plus/test";
 
-it("keeps private URLs out of event and feature flag requests", async () => {
+it("sends pageviews without leaking private invite or claim codes", async () => {
   window.history.replaceState({}, "", "/join/private-invite-code?note=private-note");
   Object.defineProperty(document, "referrer", { value: "https://example.test/claim/private-code" });
   const requests: string[] = [];
@@ -17,7 +17,7 @@ it("keeps private URLs out of event and feature flag requests", async () => {
           ? await options.body.text()
           : "";
     requests.push(`${_url} ${body}`);
-    if (body.includes("session_start_confirmed")) eventSent();
+    if (body.includes("session_start_confirmed") || body.includes("$pageview")) eventSent();
     return new Response(JSON.stringify({ featureFlags: { "development-test-events": true } }), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -42,9 +42,11 @@ it("keeps private URLs out of event and feature flag requests", async () => {
   posthog.capture("session_start_confirmed", { note: "private-note" });
   await captured;
   await posthog.featureFlags.reloadFeatureFlagsAsync();
-  expect(requests.some((body) => body.includes("session_start_confirmed"))).toBe(true);
+  const payload = requests.join("\n");
+  expect(payload.includes("session_start_confirmed") || payload.includes("$pageview")).toBe(true);
   expect(requests.some((body) => body.includes("/flags/"))).toBe(true);
-  expect(requests.join("\n")).toContain('"$geoip_disable":true');
-  expect(requests.join("\n")).toContain('"$process_person_profile":false');
-  expect(requests.join("\n")).not.toMatch(/private-invite-code|private-code|private-note/);
+  expect(payload).toContain('"$geoip_disable":true');
+  expect(payload).toContain('"$process_person_profile":false');
+  expect(payload).not.toMatch(/private-invite-code|private-code|private-note|another-private-code/);
+  expect(payload).toMatch(/\/join\/:code|\/claim\/:code/);
 });

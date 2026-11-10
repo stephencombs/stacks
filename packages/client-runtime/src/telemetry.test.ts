@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { sanitizeTelemetry } from "./telemetry.ts";
+import { sanitizeTelemetry, scrubTelemetryUrl } from "./telemetry.ts";
 
 it("keeps startup stages and timings without opening arbitrary telemetry fields", () => {
   expect(
@@ -9,7 +9,7 @@ it("keeps startup stages and timings without opening arbitrary telemetry fields"
       startup_environment: "production",
       $app_build: "10",
       note: "private ledger note",
-      $current_url: "stacks://join/private-code",
+      amount: 5000,
     }),
   ).toEqual({
     startup_stage: "navigation_ready",
@@ -41,13 +41,16 @@ it.each([NaN, Infinity, -1, "private note", 1.5])(
   },
 );
 
-it("removes ledger details, URLs, and exception text from telemetry", () => {
+it("keeps scrubbed page URLs and drops ledger details and exception text", () => {
   expect(
     sanitizeTelemetry({
       token: "project-token",
       distinct_id: "device-id",
       $app_version: "1.0",
-      $current_url: "https://example.com/join/private-code",
+      $current_url: "https://example.com/join/private-code?note=private-note",
+      $pathname: "/join/private-code",
+      $referrer: "https://example.test/claim/private-code",
+      $utm_source: "newsletter",
       amount: 5000,
       note: "private note",
       $exception_list: [{ type: "Error", value: "private note", stacktrace: "private-code" }],
@@ -56,10 +59,20 @@ it("removes ledger details, URLs, and exception text from telemetry", () => {
     token: "project-token",
     distinct_id: "device-id",
     $app_version: "1.0",
+    $current_url: "https://example.com/join/:code",
+    $pathname: "/join/:code",
+    $referrer: "https://example.test/claim/:code",
+    $utm_source: "newsletter",
     $process_person_profile: false,
     $geoip_disable: true,
     $exception_list: [{ type: "Error", value: "Unhandled application error" }],
   });
+});
+
+it("redacts invite, claim, and share path secrets", () => {
+  expect(scrubTelemetryUrl("/invite/secret-token?x=1")).toBe("/invite/:code");
+  expect(scrubTelemetryUrl("/t/share-token#hash")).toBe("/t/:code");
+  expect(scrubTelemetryUrl("https://colorup.app/groups/abc")).toBe("https://colorup.app/groups/abc");
 });
 
 it("keeps known exception types without forwarding arbitrary error text", () => {
