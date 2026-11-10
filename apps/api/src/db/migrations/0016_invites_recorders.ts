@@ -10,6 +10,7 @@ export default Effect.gen(function* () {
   yield* sql`
     alter table player_actors
       add column revoked_at timestamptz,
+      add column invited_by_actor uuid references recording_actors (id),
       drop constraint player_actors_bound_via_check,
       add constraint player_actors_bound_via_check
         check (bound_via in ('self', 'join', 'invite')),

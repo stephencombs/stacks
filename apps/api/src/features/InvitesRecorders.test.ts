@@ -200,8 +200,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("invites and recorders", (it)
           .invitePlayer({ params: { playerId: seated.playerId } })
           .pipe(Effect.flip),
       ).toMatchObject({ _tag: "NotFound" });
-      // The laptop still records as Bea.
-      expect(yield* laptop.push(rebuy(laptop.identity, seated.visitId, 1))).toEqual(["accepted"]);
+      // The laptop Bea invited goes with her.
+      expect(yield* laptop.push(rebuy(laptop.identity, seated.visitId, 1))).toEqual(["forbidden"]);
     }),
   );
 
@@ -480,6 +480,85 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("invites and recorders", (it)
         reason: "invite_used_up",
       });
       expect(yield* sql`select 1 from players where id = ${stray.identity.playerId}`).toEqual([]);
+    }),
+  );
+
+  it.effect("revokes everything a revoked device invited, however far it reached", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { starter, seated, invite } = yield* invitedTable();
+      const params = { params: { playerId: seated.playerId } };
+      const phone = yield* device();
+      yield* phone.redeem(invite.token);
+      const laptop = yield* device();
+      yield* laptop.redeem((yield* phone.client.recording.invitePlayer(params)).token);
+      const tablet = yield* device();
+      yield* tablet.redeem((yield* laptop.client.recording.invitePlayer(params)).token);
+      const pending = yield* tablet.client.recording.invitePlayer(params);
+      // Someone the starter invited directly is untouched.
+      const other = yield* device();
+      yield* other.redeem((yield* starter.client.recording.invitePlayer(params)).token);
+
+      yield* starter.client.recording.revokeBinding({
+        params: { playerId: seated.playerId, actorId: phone.identity.actorId },
+      });
+      for (const revoked of [phone, laptop, tablet])
+        expect(yield* revoked.push(rebuy(revoked.identity, seated.visitId))).toEqual(["forbidden"]);
+      expect(yield* other.push(rebuy(other.identity, seated.visitId))).toEqual(["accepted"]);
+      const [row] = yield* sql<{ revokedAt: Date | null }>`
+        select revoked_at from player_invites where id = ${pending.id}
+      `;
+      expect(row?.revokedAt).not.toBeNull();
+    }),
+  );
+
+  it.effect("caps the devices recording as one player", () =>
+    Effect.gen(function* () {
+      const { starter, seated } = yield* invitedTable();
+      const params = { params: { playerId: seated.playerId } };
+      for (let index = 0; index < 5; index++) {
+        const next = yield* device();
+        yield* next.redeem((yield* starter.client.recording.invitePlayer(params)).token);
+      }
+      const sixth = yield* device();
+      const link = yield* starter.client.recording.invitePlayer(params);
+      expect(yield* sixth.redeem(link.token).pipe(Effect.flip)).toMatchObject({
+        _tag: "Conflict",
+        reason: "too_many_devices",
+      });
+    }),
+  );
+
+  it.effect("never leaves a device bound when its issuer is revoked as it redeems", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      for (let round = 0; round < 5; round++) {
+        const { starter, seated, invite } = yield* invitedTable();
+        const bea = yield* device();
+        yield* bea.redeem(invite.token);
+        const link = yield* bea.client.recording.invitePlayer({
+          params: { playerId: seated.playerId },
+        });
+        const thief = yield* device();
+        // Register the thief's identity first so both requests only touch the invite.
+        yield* thief.push(rebuy(thief.identity, seated.visitId)).pipe(Effect.ignore);
+        yield* Effect.all(
+          [
+            thief.redeem(link.token).pipe(Effect.ignore),
+            starter.client.recording.revokeBinding({
+              params: { playerId: seated.playerId, actorId: bea.identity.actorId },
+            }),
+          ],
+          { concurrency: "unbounded" },
+        );
+        expect(
+          yield* sql`
+            select 1 from player_actors
+            where player_id = ${seated.playerId} and revoked_at is null
+              and actor_id in (${bea.identity.actorId}, ${thief.identity.actorId})
+          `,
+        ).toEqual([]);
+      }
     }),
   );
 });

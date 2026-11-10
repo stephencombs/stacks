@@ -21,6 +21,16 @@ import { PlayerIdentityRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
 import { digest, establish, principal, randomToken } from "./Recording.ts";
 
+/** The most devices, besides an actor's own, that may record as one player at once. */
+const MAX_DEVICES = 5;
+
+/**
+ * Revoking and redeeming both lock the player first, then its invites and bindings, so they
+ * serialize on the player instead of racing or deadlocking.
+ */
+const lockPlayer = (sql: SqlClient.SqlClient, playerId: PlayerId) =>
+  sql`select 1 from players where id = ${playerId} for update`;
+
 /** The tables a player is at: where they play, or joined through the link. */
 const tablesOf = (sql: SqlClient.SqlClient, playerId: PlayerId) => sql`(
   select table_id from personal_visits where player_id = ${playerId}
@@ -135,16 +145,26 @@ export const revokeBinding = Effect.fn("PlayerInvites.revokeBinding")(function* 
   if (!starter && actorId !== self.actorId) return yield* new Forbidden({ reason: "starter_only" });
   yield* sql.withTransaction(
     Effect.gen(function* () {
-      const revoked = yield* sql`
+      yield* lockPlayer(sql, playerId);
+      // The device, and every device it invited as this player, however many hops away.
+      const revoked = yield* sql<{ actorId: ActorId }>`
+        with recursive chain (actor_id) as (
+          select actor_id from player_actors
+          where player_id = ${playerId} and actor_id = ${actorId} and bound_via <> 'self'
+            and revoked_at is null
+          union
+          select pa.actor_id from player_actors pa join chain c on pa.invited_by_actor = c.actor_id
+          where pa.player_id = ${playerId} and pa.bound_via <> 'self' and pa.revoked_at is null
+        )
         update player_actors set revoked_at = now()
-        where player_id = ${playerId} and actor_id = ${actorId} and bound_via <> 'self'
-          and revoked_at is null
+        where player_id = ${playerId} and actor_id in (select actor_id from chain)
         returning actor_id
       `;
       if (revoked.length === 0) return yield* new NotFound({ resource: "player" });
       yield* sql`
         update player_invites set revoked_at = now()
-        where player_id = ${playerId} and issued_by_actor = ${actorId}
+        where player_id = ${playerId}
+          and issued_by_actor in ${sql.in(revoked.map((row) => row.actorId))}
           and redeemed_at is null and revoked_at is null
       `;
     }),
@@ -222,6 +242,7 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
   const { self, actorPlayers } = yield* establish(request.identity);
   return yield* sql.withTransaction(
     Effect.gen(function* () {
+      yield* lockPlayer(sql, found.playerId);
       const [row] = yield* sql<InviteRow>`
         select id, player_id, issued_by_actor, redeemed_at, revoked_at from player_invites
         where id = ${found.id} for update
@@ -241,10 +262,18 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
           and id in ${tablesOf(sql, invite.playerId)}
       `;
       if (starts.length > 0) return yield* new Conflict({ reason: "table_starter" });
+      const [bound] = yield* sql<{ count: number }>`
+        select count(*)::int as count from player_actors
+        where player_id = ${invite.playerId} and bound_via <> 'self' and revoked_at is null
+          and actor_id <> ${self.actorId}
+      `;
+      if ((bound?.count ?? 0) >= MAX_DEVICES)
+        return yield* new Conflict({ reason: "too_many_devices" });
       yield* sql`
-        insert into player_actors (player_id, actor_id, bound_via)
-        values (${invite.playerId}, ${self.actorId}, 'invite')
-        on conflict (player_id, actor_id) do update set revoked_at = null, bound_via = 'invite'
+        insert into player_actors (player_id, actor_id, bound_via, invited_by_actor)
+        values (${invite.playerId}, ${self.actorId}, 'invite', ${invite.issuedByActor})
+        on conflict (player_id, actor_id) do update
+          set revoked_at = null, bound_via = 'invite', invited_by_actor = excluded.invited_by_actor
       `;
       yield* sql`update player_invites set redeemed_at = now() where id = ${invite.id}`;
       const [player] = yield* sql`

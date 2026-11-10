@@ -68,6 +68,7 @@ export const ConflictReason = Schema.Literals([
   "recording_identity",
   "actor_taken",
   "table_starter",
+  "too_many_devices",
 ]);
 export type ConflictReason = typeof ConflictReason.Type;
 
