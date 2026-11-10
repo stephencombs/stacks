@@ -204,7 +204,8 @@ function DetailsFields({
   );
 }
 
-const startedVisit = (receipt: RecordingReceipt) => receipt.command.visitId;
+const startedVisit = (receipt: RecordingReceipt) =>
+  "visitId" in receipt.command ? receipt.command.visitId : null;
 
 export function StartDialog({
   onClose,
@@ -233,7 +234,8 @@ export function StartDialog({
           ...(game ? { game } : {}),
           highLimit,
         });
-        if (receipt) onStarted(startedVisit(receipt));
+        const visitId = receipt && startedVisit(receipt);
+        if (visitId) onStarted(visitId);
       }}
     >
       <AmountField label="Buy-in" amount={buyIn} first />
@@ -303,7 +305,8 @@ export function PastSessionDialog({
           ...(game ? { game } : {}),
           highLimit,
         });
-        if (receipt) onAdded(startedVisit(receipt));
+        const visitId = receipt && startedVisit(receipt);
+        if (visitId) onAdded(visitId);
       }}
     >
       <div className="grid grid-cols-2 gap-3">
@@ -712,7 +715,7 @@ export function SitDownDialog({
           playerId: player.id,
           buyIn: value,
         });
-        if (receipt) onSeated(receipt.command.visitId);
+        if (receipt?.command.type === "join_table") onSeated(receipt.command.visitId);
       }}
     >
       <AmountField label="Buy-in" amount={amount} first />

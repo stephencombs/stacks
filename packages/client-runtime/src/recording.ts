@@ -76,7 +76,9 @@ export type RecordingInput =
         readonly note?: string;
       } | null;
     }
-  | { readonly type: "reopen"; readonly visitId: VisitId; readonly reason: string };
+  | { readonly type: "reopen"; readonly visitId: VisitId; readonly reason: string }
+  | { readonly type: "appoint_recorder"; readonly tableId: TableId; readonly playerId: PlayerId }
+  | { readonly type: "revoke_recorder"; readonly tableId: TableId; readonly playerId: PlayerId };
 
 export type RecordingSnapshot = {
   readonly state: RecordingState | null;
@@ -146,6 +148,13 @@ export const prepareRecordingCommand = (
       ...(saved ? {} : { newPlayer: { id: playerId, displayName } }),
     });
   }
+  if (input.type === "appoint_recorder" || input.type === "revoke_recorder")
+    return RecordingCommand.make({
+      ...common,
+      type: input.type,
+      tableId: input.tableId,
+      playerId: input.playerId,
+    });
   const visit = state.visits.find((visit) => visit.id === input.visitId);
   if (!visit) throw new RecordingError("invalid", "Visit does not exist.");
   const existing = { ...common, visitId: visit.id, expectedRevision: visit.revision };
@@ -198,6 +207,7 @@ const freezeState = (state: RecordingState): RecordingState => {
   for (const records of [
     state.players,
     state.participants,
+    state.recorders,
     state.tables,
     state.visits,
     state.entries,
@@ -262,6 +272,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         actor: { id: ActorId.make(newId()), userId: null },
         players: [self],
         participants: [],
+        recorders: [],
         tables: [],
         visits: [],
         entries: [],

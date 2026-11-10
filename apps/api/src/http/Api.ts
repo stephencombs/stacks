@@ -9,6 +9,7 @@ import * as Guests from "../features/Guests.ts";
 import * as Invites from "../features/Invites.ts";
 import * as Ledger from "../features/Ledger.ts";
 import * as Limits from "../features/Limits.ts";
+import * as PlayerInvites from "../features/PlayerInvites.ts";
 import * as Recording from "../features/Recording.ts";
 import * as Sessions from "../features/Sessions.ts";
 import * as Stakes from "../features/Stakes.ts";
@@ -124,13 +125,23 @@ const recording = HttpApiBuilder.group(StacksApi, "recording", (handlers) =>
     .handle("table", ({ params }) => serve(Recording.table(params.tableId)))
     .handle("share", ({ params }) => serve(Recording.share(params.tableId)))
     .handle("unshare", ({ params }) => serve(Recording.unshare(params.tableId)))
-    .handle("join", ({ params, payload }) => serve(Recording.join(params.token, payload))),
+    .handle("join", ({ params, payload }) => serve(Recording.join(params.token, payload)))
+    .handle("invitePlayer", ({ params }) => serve(PlayerInvites.issue(params.playerId)))
+    .handle("playerAccess", ({ params }) => serve(PlayerInvites.access(params.playerId)))
+    .handle("revokeBinding", ({ params }) =>
+      serve(PlayerInvites.revokeBinding(params.playerId, params.actorId)),
+    )
+    .handle("revokeInvite", ({ params }) => serve(PlayerInvites.revoke(params.inviteId)))
+    .handle("redeemInvite", ({ params, payload }) =>
+      serve(PlayerInvites.redeem(params.token, payload)),
+    ),
 );
 
 const publicRecording = HttpApiBuilder.group(StacksApi, "publicRecording", (handlers) =>
   handlers
     .handle("registerActor", ({ payload }) => serve(Recording.registerActor(payload)))
-    .handle("shared", ({ params }) => serve(Recording.shared(params.token))),
+    .handle("shared", ({ params }) => serve(Recording.shared(params.token)))
+    .handle("previewInvite", ({ params }) => serve(PlayerInvites.preview(params.token))),
 );
 
 const claim = HttpApiBuilder.group(StacksApi, "claim", (handlers) =>

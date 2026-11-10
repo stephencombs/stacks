@@ -9,10 +9,12 @@ import * as OpenApi from "effect/http-api/OpenApi";
 import { Authentication, RecordingAuthentication } from "./auth.ts";
 import { Conflict, Forbidden, InvalidRequest, NotFound, Unauthorized } from "./errors.ts";
 import {
+  ActorId,
   EntryId,
   GroupId,
   InviteId,
   PlayerId,
+  PlayerInviteId,
   SeatingId,
   SessionId,
   StakeId,
@@ -23,11 +25,16 @@ import {
 } from "./ids.ts";
 import { Entry, Game, Seat, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
+import { PlayerIdentity } from "./players.ts";
 import {
   ActorCredential,
   JoinedTable,
   JoinTableRequest,
+  PlayerAccess,
+  PlayerInviteLink,
+  PlayerInvitePreview,
   PushRecordingRequest,
+  RedeemInviteRequest,
   PushRecordingResponse,
   RecordingHistory,
   ShareLink,
@@ -569,6 +576,7 @@ const LimitsGroup = HttpApiGroup.make("limits")
   .middleware(Authentication);
 
 const tableParams = Schema.Struct({ tableId: TableId });
+const playerParams = Schema.Struct({ playerId: PlayerId });
 
 /** An account's session or a device actor's credential. Tables it isn't at are 404s. */
 const RecordingGroup = HttpApiGroup.make("recording")
@@ -602,14 +610,14 @@ const RecordingGroup = HttpApiGroup.make("recording")
     HttpApiEndpoint.post("share", "/tables/:tableId/share", {
       params: tableParams,
       success: ShareLink,
-      error: [NotFound, Unauthorized],
+      error: [Forbidden, NotFound, Unauthorized],
     }).annotate(OpenApi.Summary, "A new read-only link; any earlier link stops working"),
   )
   .add(
     HttpApiEndpoint.delete("unshare", "/tables/:tableId/share", {
       params: tableParams,
       success: HttpApiSchema.NoContent,
-      error: [NotFound, Unauthorized],
+      error: [Forbidden, NotFound, Unauthorized],
     }),
   )
   .add(
@@ -622,6 +630,45 @@ const RecordingGroup = HttpApiGroup.make("recording")
       OpenApi.Summary,
       "Joins the linked table as a new player who records only their own play",
     ),
+  )
+  .add(
+    HttpApiEndpoint.post("invitePlayer", "/players/:playerId/invites", {
+      params: playerParams,
+      success: PlayerInviteLink,
+      error: [Forbidden, NotFound, Unauthorized],
+    }).annotate(
+      OpenApi.Summary,
+      "A single-use link that lets another device record as this player; earlier ones stop working",
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("playerAccess", "/players/:playerId/access", {
+      params: playerParams,
+      success: PlayerAccess,
+      error: [Forbidden, NotFound, Unauthorized],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.delete("revokeBinding", "/players/:playerId/actors/:actorId", {
+      params: Schema.Struct({ playerId: PlayerId, actorId: ActorId }),
+      success: HttpApiSchema.NoContent,
+      error: [Forbidden, NotFound, Unauthorized],
+    }).annotate(OpenApi.Summary, "Stops a device recording as this player"),
+  )
+  .add(
+    HttpApiEndpoint.delete("revokeInvite", "/player-invites/:inviteId", {
+      params: Schema.Struct({ inviteId: PlayerInviteId }),
+      success: HttpApiSchema.NoContent,
+      error: [Forbidden, NotFound, Unauthorized],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("redeemInvite", "/invites/:token/redeem", {
+      params: Schema.Struct({ token: Schema.String }),
+      payload: RedeemInviteRequest,
+      success: PlayerIdentity,
+      error: [Conflict, NotFound, Unauthorized],
+    }).annotate(OpenApi.Summary, "Records as the invited player from now on"),
   )
   .middleware(RecordingAuthentication);
 
@@ -639,6 +686,13 @@ const PublicRecordingGroup = HttpApiGroup.make("publicRecording")
       params: Schema.Struct({ token: Schema.String }),
       success: TableView,
       error: NotFound,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("previewInvite", "/invites/:token", {
+      params: Schema.Struct({ token: Schema.String }),
+      success: PlayerInvitePreview,
+      error: [Conflict, NotFound],
     }),
   );
 

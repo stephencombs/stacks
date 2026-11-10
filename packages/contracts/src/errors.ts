@@ -17,6 +17,7 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()(
       "not_your_stake",
       "not_your_trip",
       "not_your_player",
+      "starter_only",
     ]),
   },
   { httpApiStatus: 403 },

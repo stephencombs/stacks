@@ -10,9 +10,11 @@ import {
   type EntryId,
 } from "@stacks/contracts";
 import {
+  isTableCommand,
   RecordingCommand,
   RecordingOperationId,
   RecordingRejectionReason,
+  type VisitCommand,
 } from "@stacks/contracts/recordingCommands";
 import {
   applyRecordingCommand,
@@ -51,17 +53,22 @@ const RecordingSync = Schema.Struct({
   rejected: Schema.Array(RecordingRejection),
 });
 
+const AtTable = Schema.Struct({ tableId: TableId, playerId: PlayerId });
+
 export const RecordingState = Schema.Struct({
   version: Schema.Literal(2),
   self: PlayerIdentity,
   actor: Actor,
   /**
-   * Everyone this device records for: `self`, the players it added at its tables, and the
-   * `participants`: who joined its tables, and who it joined others' tables as.
+   * Everyone whose play this device holds: `self`, the players it added at its tables, the
+   * `participants` (who joined its tables, and who it is at others'), and anyone else at the
+   * tables it records for.
    */
   players: Schema.Array(PlayerIdentity),
-  participants: Schema.Array(Schema.Struct({ tableId: TableId, playerId: PlayerId })),
-  /** The tables it started, and the ones it joined. */
+  participants: Schema.Array(AtTable),
+  /** Who records for everyone at a table, as the starter's appointments left it. */
+  recorders: Schema.Array(AtTable),
+  /** The tables it started, and the ones it is at. */
   tables: Schema.Array(Table),
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
@@ -80,15 +87,22 @@ const ms = DateTime.toEpochMillis;
 const unique = (records: ReadonlyArray<{ readonly id: string }>) =>
   new Set(records.map((record) => record.id)).size === records.length;
 
+const added = (command: RecordingCommand) =>
+  command.type === "join_table" ? command.newPlayer?.id : undefined;
+
 /**
- * The ledger before any command: the device's own player, who joined which tables, and the tables
- * it joined. Commands rebuild everything else.
+ * The ledger before any command: the device's own player, who is at which tables, and the tables
+ * others started. Commands rebuild everything else, including the players they added.
  */
 export const recordingBase = (state: RecordingState): RecordingState => {
   const joined = new Set(state.participants.map((item) => item.playerId));
+  const created = new Set(state.receipts.map((receipt) => added(receipt.command)));
   return {
     ...state,
-    players: state.players.filter((player) => player.id === state.self.id || joined.has(player.id)),
+    players: state.players.filter(
+      (player) => player.id === state.self.id || joined.has(player.id) || !created.has(player.id),
+    ),
+    recorders: [],
     tables: state.tables.filter((table) => table.starterPlayerId !== state.self.id),
     visits: [],
     entries: [],
@@ -112,7 +126,8 @@ const validateRecordingState = (state: RecordingState) => {
   const entries = new Map(state.entries.map((entry) => [entry.id, entry]));
   const participants = new Set(state.participants.map((item) => item.playerId));
   requireValid(
-    participants.size === state.participants.length &&
+    new Set(state.participants.map((item) => `${item.tableId}:${item.playerId}`)).size ===
+      state.participants.length &&
       !participants.has(state.self.id) &&
       state.participants.every((item) => tables.has(item.tableId) && players.has(item.playerId)),
     "Invalid table participant.",
@@ -169,8 +184,9 @@ const validateRecordingState = (state: RecordingState) => {
   const finals = new Map<Visit["id"], EntryId | null>();
   const createdTables = new Set<Table["id"]>();
   const createdPlayers = new Set<PlayerIdentity["id"]>();
+  const recorders = new Set<string>();
   const verifyEntry = (
-    command: RecordingCommand,
+    command: VisitCommand,
     id: EntryId,
     kind: PlayEntry["kind"],
     amount: number,
@@ -203,6 +219,17 @@ const validateRecordingState = (state: RecordingState) => {
       "Invalid command receipt.",
     );
     operations.add(command.operationId);
+    if (isTableCommand(command)) {
+      const key = `${command.tableId}:${command.playerId}`;
+      requireValid(
+        tables.has(command.tableId) &&
+          (command.type === "appoint_recorder" ? !recorders.has(key) : recorders.has(key)),
+        "Invalid recorder history.",
+      );
+      if (command.type === "appoint_recorder") recorders.add(key);
+      else recorders.delete(key);
+      continue;
+    }
     const visit = visits.get(command.visitId);
     requireValid(visit, "Receipt references a missing visit.");
     if (command.type === "join_table") {
@@ -215,7 +242,6 @@ const validateRecordingState = (state: RecordingState) => {
         requireValid(
           command.newPlayer.id === command.playerId &&
             !createdPlayers.has(command.playerId) &&
-            !participants.has(command.playerId) &&
             players.get(command.playerId)?.displayName === command.newPlayer.displayName,
           "Player differs from the receipt that added them.",
         );
@@ -333,8 +359,7 @@ const validateRecordingState = (state: RecordingState) => {
   }
   requireValid(
     createdEntries.size === entries.size &&
-      createdPlayers.size + participants.size === players.size - 1 &&
-      createdTables.size + joined.size === tables.size &&
+      new Set([...createdTables, ...joined]).size === tables.size &&
       lifecycle.size === visits.size,
     "Records have missing command receipts.",
   );
@@ -354,6 +379,11 @@ const validateRecordingState = (state: RecordingState) => {
       "Visit differs from its lifecycle receipts.",
     );
   }
+  requireValid(
+    recorders.size === state.recorders.length &&
+      state.recorders.every((item) => recorders.has(`${item.tableId}:${item.playerId}`)),
+    "Recorders differ from their receipts.",
+  );
   if (state.sync) {
     requireValid(
       synced.size === state.sync.synced.length &&
@@ -415,10 +445,10 @@ type VersionOne = {
   readonly receipts: ReadonlyArray<{ readonly command: Command }>;
   readonly sync?: { readonly rejected: ReadonlyArray<{ readonly command: Command }> };
 };
-// Documents from before joining had no participants.
+// Documents from before joining had no participants, and from before appointing no recorders.
 const withParticipants = (document: unknown) =>
-  typeof document === "object" && document !== null && !("participants" in document)
-    ? { ...document, participants: [] }
+  typeof document === "object" && document !== null
+    ? { participants: [], recorders: [], ...document }
     : document;
 
 // Version 1 held one player, so its tables and starts were all its own.

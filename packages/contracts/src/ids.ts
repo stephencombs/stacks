@@ -33,6 +33,9 @@ export type SeatingId = typeof SeatingId.Type;
 export const TripId = Uuid.pipe(Schema.brand("TripId"));
 export type TripId = typeof TripId.Type;
 
+export const PlayerInviteId = Uuid.pipe(Schema.brand("PlayerInviteId"));
+export type PlayerInviteId = typeof PlayerInviteId.Type;
+
 export const VenueId = Uuid.pipe(Schema.brand("VenueId"));
 export type VenueId = typeof VenueId.Type;
 

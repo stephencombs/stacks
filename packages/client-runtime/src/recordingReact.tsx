@@ -1,6 +1,8 @@
-import { UserId, type TableId, type VisitId } from "@stacks/contracts";
+import { UserId, type ActorId, type PlayerId, type TableId, type VisitId } from "@stacks/contracts";
 import type {
   JoinedTable,
+  PlayerAccess,
+  PlayerInviteLink,
   RecordingCommand,
   RecordingOperationId,
   TableView,
@@ -378,4 +380,90 @@ export const useServerTable = (tableId: TableId | null) => {
   }, [sync, tableId]);
   return view?.id === tableId ? view.view : undefined;
 };
+/**
+ * Hands a player to another device: a single-use invite link (a new one cancels the last), and
+ * the devices already recording as them, each of which can be stopped. Needs the network.
+ */
+export const usePlayerInvite = (playerId: PlayerId) => {
+  const sync = use(RecordingSyncContext);
+  const [state, setState] = useState<{
+    link: PlayerInviteLink | null;
+    access: PlayerAccess | null;
+    pending: boolean;
+    error: string | null;
+  }>({ link: null, access: null, pending: false, error: null });
+  useEffect(() => {
+    if (!sync) return;
+    let current = true;
+    sync.playerAccess(playerId).then(
+      (access) => current && setState((s) => ({ ...s, access })),
+      (error: unknown) => current && setState((s) => ({ ...s, error: describeInviteError(error) })),
+    );
+    return () => {
+      current = false;
+    };
+  }, [sync, playerId]);
+  const run = async (action: () => Promise<PlayerInviteLink | null>) => {
+    if (!sync) return;
+    setState((s) => ({ ...s, pending: true, error: null }));
+    try {
+      const link = await action();
+      const access = await sync.playerAccess(playerId);
+      setState({ link, access, pending: false, error: null });
+    } catch (error) {
+      setState((s) => ({ ...s, pending: false, error: describeInviteError(error) }));
+    }
+  };
+  return {
+    ...state,
+    issue: () => run(() => sync!.invitePlayer(playerId)),
+    /** Cancels the open link, if there is one. */
+    cancel: () =>
+      run(async () => {
+        const open = state.link?.id ?? state.access?.invite?.id;
+        if (open) await sync!.revokeInvite(open);
+        return null;
+      }),
+    stopDevice: (actorId: ActorId) =>
+      run(async () => {
+        await sync!.revokeBinding(playerId, actorId);
+        return state.link;
+      }),
+  };
+};
+
+/**
+ * Takes up a personal invite: from then on this device records as the player it names, and their
+ * tables come with the next sync. Needs the network once.
+ */
+export const useRedeemInvite = (token: string) => {
+  const sync = use(RecordingSyncContext);
+  const [state, setState] = useState<{ pending: boolean; error: string | null }>({
+    pending: false,
+    error: null,
+  });
+  const redeem = async () => {
+    if (!sync) return null;
+    setState({ pending: true, error: null });
+    try {
+      const player = await sync.redeem(token);
+      setState({ pending: false, error: null });
+      return player;
+    } catch (error) {
+      setState({ pending: false, error: describeInviteError(error) });
+      return null;
+    }
+  };
+  return { ...state, redeem };
+};
+
+const describeInviteError = (error: unknown) => {
+  if (error instanceof RecordingError) return describeRecordingError(error);
+  const tag = typeof error === "object" && error !== null && "_tag" in error ? error._tag : null;
+  if (tag === "NotFound") return "This invite doesn't work. Ask whoever sent it for a new one.";
+  if (tag === "Conflict" || tag === "Forbidden" || tag === "Unauthorized")
+    return describeError(error);
+  return "This needs a connection. Try again once you're online.";
+};
+
 export type { ActorKeyStorage } from "./recordingSync.ts";

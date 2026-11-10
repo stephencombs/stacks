@@ -1,5 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
-import { ActorId, EntryId, MinorUnits, PlayerId, TableId, UserId } from "@stacks/contracts";
+import {
+  ActorId,
+  EntryId,
+  MinorUnits,
+  PlayerId,
+  TableId,
+  UserId,
+  type PlayerIdentity,
+} from "@stacks/contracts";
 import {
   RecordingCommand,
   RecordingOperationId,
@@ -83,6 +91,7 @@ const server = () => {
       actor: { id: request.identity.actorId, userId: alex },
       players: [{ id: request.identity.playerId, displayName: "You" }],
       participants: [],
+      recorders: [],
       tables: [],
       visits: [],
       entries: [],
@@ -130,10 +139,19 @@ const server = () => {
           commands: ledger.receipts.map((receipt) => receipt.command),
           tables: ledger.tables,
           participants: [],
+          players: [],
           visits: ledger.visits,
           entries: ledger.entries,
         }
-      : { identity: null, commands: [], tables: [], participants: [], visits: [], entries: [] };
+      : {
+          identity: null,
+          commands: [],
+          tables: [],
+          participants: [],
+          players: [],
+          visits: [],
+          entries: [],
+        };
   return {
     push,
     history,
@@ -152,6 +170,11 @@ const transportFor = (remote: ReturnType<typeof server>): RecordingTransport => 
   unshare: unused,
   table: unused,
   join: unused,
+  invitePlayer: unused,
+  playerAccess: unused,
+  revokeBinding: unused,
+  revokeInvite: unused,
+  redeemInvite: unused,
 });
 
 /** An actor key store in memory. */
@@ -171,6 +194,7 @@ const otherDevice = (identity: RecordingIdentity) => {
     actor: { id: identity.actorId, userId: null },
     players: [{ id: identity.playerId, displayName: "You" }],
     participants: [],
+    recorders: [],
     tables: [],
     visits: [],
     entries: [],
@@ -760,6 +784,7 @@ describe("shared tables", () => {
       commands: [sat, correction],
       tables: [table],
       participants: [{ tableId: table.id, player }],
+      players: [],
       visits: [],
       entries: [],
     };
@@ -777,6 +802,7 @@ describe("shared tables", () => {
         commands: [...own, sat, correction],
         tables: [table],
         participants: [{ tableId: table.id, player }],
+        players: [],
         visits: [],
         entries: [],
       }),
@@ -786,6 +812,135 @@ describe("shared tables", () => {
     expect(view.visits.map((item) => item.player.displayName)).toEqual(["You", "Bea", "Cal"]);
     // The starter keeps authority over the joiner's visit.
     await save(starter.store, { type: "finish", visitId: sat.visitId, amount: 0 });
+  });
+
+  /** The starter's table as the server sends it to someone else at it. */
+  const historyFor = (
+    starter: RecordingStore,
+    device: RecordingStore,
+    participant: PlayerIdentity,
+    extra: ReadonlyArray<RecordingCommand> = [],
+  ): RecordingHistory => {
+    const ledger = state(starter);
+    return {
+      identity: { playerId: state(device).self.id, actorId: state(device).actor.id },
+      commands: [...ledger.receipts.map((receipt) => receipt.command), ...extra],
+      tables: ledger.tables,
+      participants: [{ tableId: ledger.tables[0]!.id, player: participant }],
+      players: ledger.players
+        .filter((player) => player.id !== participant.id)
+        .map((player) =>
+          player.id === ledger.self.id ? { ...player, displayName: "Starter" } : player,
+        ),
+      visits: [],
+      entries: [],
+    };
+  };
+
+  it("records for everyone as an appointed recorder, and sets aside what it queued once revoked", async () => {
+    const starter = await withGuest();
+    const table = state(starter.store).tables[0]!;
+    const starterVisit = state(starter.store).visits[0]!;
+    const dee = { id: PlayerId.make(crypto.randomUUID()), displayName: "Dee" };
+    const device = await open();
+    const appoint = RecordingCommand.make({
+      type: "appoint_recorder",
+      operationId: RecordingOperationId.make(crypto.randomUUID()),
+      actorId: state(starter.store).actor.id,
+      preparedAt: DateTime.makeUnsafe(Date.now()),
+      tableId: table.id,
+      playerId: dee.id,
+    });
+    await device.transform((s) =>
+      mergeRecordingHistory(
+        { ...s, sync: { userId: null, synced: [], rejected: [] } },
+        null,
+        historyFor(starter.store, device, dee, [appoint]),
+      ),
+    );
+    const view = recordingTable(state(device), table.id)!;
+    expect(view.role).toBe("recorder");
+    expect(view.you.player).toEqual(dee);
+    expect(view.recorders).toEqual([dee]);
+    expect(view.visits.map((item) => item.player.displayName)).toEqual(["Starter", "Bea"]);
+    // A recorder's own play is still only its own.
+    expect(recordingHome(state(device)).active).toEqual([]);
+
+    // Offline: Dee records the starter's rebuy, which the starter revoked before it synced.
+    await save(device, { type: "add", visitId: starterVisit.id, kind: "buy_in", amount: 500 });
+    const queued = pendingRecordingCommands(state(device))[0]!;
+    // A recorder can't appoint or share: only the starter can.
+    expect(() =>
+      device.prepare({ type: "revoke_recorder", tableId: table.id, playerId: dee.id }),
+    ).not.toThrow();
+    await expect(
+      save(device, { type: "revoke_recorder", tableId: table.id, playerId: dee.id }),
+    ).rejects.toMatchObject({ reason: "forbidden" });
+
+    await device.transform((s) =>
+      applyPushResults(s, [
+        {
+          operationId: queued.operationId,
+          status: "rejected",
+          reason: "forbidden",
+          message: "You can record only your own play at this table.",
+        },
+      ]),
+    );
+    expect(state(device).visits.find((v) => v.id === starterVisit.id)?.revision).toBe(0);
+    expect(recordingSyncView(state(device), null).rejected).toEqual([
+      {
+        operationId: queued.operationId,
+        sentence: "A $5 buy-in didn't sync. At this table you can record only your own play.",
+      },
+    ]);
+    await device.transform((s) => discardRejected(s, queued.operationId));
+    expect(state(device).sync?.rejected).toEqual([]);
+
+    // The next pull: the starter's revocation, and Dee is an ordinary participant again.
+    const revoke = RecordingCommand.make({
+      type: "revoke_recorder",
+      operationId: RecordingOperationId.make(crypto.randomUUID()),
+      actorId: appoint.actorId,
+      preparedAt: appoint.preparedAt,
+      tableId: table.id,
+      playerId: dee.id,
+    });
+    await device.transform((s) =>
+      mergeRecordingHistory(s, null, historyFor(starter.store, device, dee, [appoint, revoke])),
+    );
+    expect(recordingTable(state(device), table.id)?.role).toBe("participant");
+    expect(() =>
+      applyRecordingCommand(
+        state(device),
+        device.prepare({ type: "add", visitId: starterVisit.id, kind: "buy_in", amount: 500 }),
+      ),
+    ).toThrow(expect.objectContaining({ reason: "forbidden" }));
+  });
+
+  it("records as the player a personal invite named, and nobody else", async () => {
+    const starter = await withGuest();
+    const table = state(starter.store).tables[0]!;
+    const [starterVisit, beaVisit] = state(starter.store).visits;
+    const bea = state(starter.store).players.find((player) => player.displayName === "Bea")!;
+    const device = await open();
+    await device.transform((s) =>
+      mergeRecordingHistory(
+        { ...s, sync: { userId: null, synced: [], rejected: [] } },
+        null,
+        historyFor(starter.store, device, bea),
+      ),
+    );
+    const view = recordingTable(state(device), table.id)!;
+    expect(view.role).toBe("participant");
+    expect(view.you).toEqual({ player: bea, playing: beaVisit!.id });
+    expect(recordingHome(state(device)).active.map((item) => item.visit.id)).toEqual([
+      beaVisit!.id,
+    ]);
+    await save(device, { type: "add", visitId: beaVisit!.id, kind: "buy_in", amount: 500 });
+    await expect(
+      save(device, { type: "add", visitId: starterVisit!.id, kind: "buy_in", amount: 500 }),
+    ).rejects.toMatchObject({ reason: "forbidden" });
   });
 
   it("opens a version 1 document as the same ledger", async () => {

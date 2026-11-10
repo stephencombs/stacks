@@ -1,127 +1,20 @@
 import { expect, it } from "@effect/vitest";
-import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
-import { ActorId, EntryId, PlayerId, TableId, VisitId } from "@stacks/contracts";
+import { PlayerId } from "@stacks/contracts";
+import { RecordingCommand } from "@stacks/contracts/recordingCommands";
+
 import {
-  RecordingCommand,
-  RecordingOperationId,
-  type RecordingIdentity,
-} from "@stacks/contracts/recordingCommands";
-
-import { usd } from "../testing/fixtures.ts";
+  correct,
+  device,
+  finish,
+  rebuy,
+  sharedTable,
+  sitDown,
+  start,
+  uuid,
+} from "../testing/recording.ts";
 import { TestApi } from "../testing/TestApi.ts";
-
-const uuid = () => crypto.randomUUID();
-const at = (minutes: number) => DateTime.makeUnsafe(Date.UTC(2026, 10, 7, 20, minutes));
-const secret = () =>
-  Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-
-const device = Effect.fn("test.device")(function* () {
-  const api = yield* TestApi;
-  const identity: RecordingIdentity = {
-    playerId: PlayerId.make(uuid()),
-    actorId: ActorId.make(uuid()),
-  };
-  const credential = { actorId: identity.actorId, secret: secret() };
-  yield* (yield* api.asActor(null)).publicRecording.registerActor({ payload: credential });
-  const client = yield* api.asActor(credential);
-  const push = (...commands: ReadonlyArray<RecordingCommand>) =>
-    client.recording
-      .push({ payload: { identity, commands: [commands[0]!, ...commands.slice(1)] } })
-      .pipe(
-        Effect.map(({ results }) =>
-          results.map((result) => (result.status === "rejected" ? result.reason : result.status)),
-        ),
-      );
-  const join = (token: string, player = { id: PlayerId.make(uuid()), displayName: "Bea" }) =>
-    client.recording.join({ params: { token }, payload: { identity, player } });
-  return { identity, client, push, join };
-});
-
-const common = (identity: RecordingIdentity, minutes = 0) => ({
-  operationId: RecordingOperationId.make(uuid()),
-  actorId: identity.actorId,
-  preparedAt: at(minutes),
-});
-
-const start = (identity: RecordingIdentity) =>
-  RecordingCommand.make({
-    type: "start",
-    ...common(identity),
-    tableId: TableId.make(uuid()),
-    visitId: VisitId.make(uuid()),
-    playerId: identity.playerId,
-    buyInId: EntryId.make(uuid()),
-    buyIn: usd(20000),
-    startedAt: at(0),
-    game: "blackjack",
-    venueId: null,
-    highLimit: false,
-  }) as Extract<RecordingCommand, { type: "start" }>;
-
-const sitDown = (identity: RecordingIdentity, tableId: TableId, playerId: PlayerId, minutes = 5) =>
-  RecordingCommand.make({
-    type: "join_table",
-    ...common(identity, minutes),
-    tableId,
-    visitId: VisitId.make(uuid()),
-    playerId,
-    buyInId: EntryId.make(uuid()),
-    buyIn: usd(10000),
-    startedAt: at(minutes),
-  }) as Extract<RecordingCommand, { type: "join_table" }>;
-
-const rebuy = (identity: RecordingIdentity, visitId: VisitId, expectedRevision = 0) =>
-  RecordingCommand.make({
-    type: "add",
-    ...common(identity, 10),
-    visitId,
-    expectedRevision,
-    entryId: EntryId.make(uuid()),
-    kind: "buy_in",
-    amount: usd(5000),
-    occurredAt: at(10),
-    note: null,
-  });
-
-const finish = (identity: RecordingIdentity, visitId: VisitId, expectedRevision = 0) =>
-  RecordingCommand.make({
-    type: "finish",
-    ...common(identity, 20),
-    visitId,
-    expectedRevision,
-    entryId: EntryId.make(uuid()),
-    amount: usd(12000),
-    finishedAt: at(20),
-  });
-
-const correct = (
-  identity: RecordingIdentity,
-  visitId: VisitId,
-  entryId: EntryId,
-  expectedRevision = 0,
-) =>
-  RecordingCommand.make({
-    type: "correct",
-    ...common(identity, 30),
-    visitId,
-    expectedRevision,
-    entryId,
-    reason: "Wrong amount",
-    replacement: { id: EntryId.make(uuid()), amount: usd(9000), occurredAt: at(5), note: null },
-  });
-
-/** A starter's open, shared table. */
-const sharedTable = Effect.fn("test.sharedTable")(function* () {
-  const starter = yield* device();
-  const opened = start(starter.identity);
-  expect(yield* starter.push(opened)).toEqual(["accepted"]);
-  const { token } = yield* starter.client.recording.share({ params: { tableId: opened.tableId } });
-  return { starter, opened, token };
-});
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
   it.effect("lets a joiner record their own play, and refuses anyone else's", () =>

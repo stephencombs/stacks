@@ -8,7 +8,7 @@ import {
   type PlayerId,
   type TableId,
 } from "@stacks/contracts";
-import { RecordingCommand } from "@stacks/contracts/recordingCommands";
+import { isTableCommand, RecordingCommand } from "@stacks/contracts/recordingCommands";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
@@ -18,7 +18,7 @@ export const RecordingReceipt = Schema.Struct({
 });
 export type RecordingReceipt = typeof RecordingReceipt.Type;
 
-/** A player who joined a table through its link. Each join is a new player, at one table. */
+/** A player at a table: who joined it through its link or an invite, or who records for it. */
 export interface Participant {
   readonly tableId: TableId;
   readonly playerId: PlayerId;
@@ -34,6 +34,8 @@ export interface RecordingLedger {
   readonly actor: Actor;
   readonly players: ReadonlyArray<PlayerIdentity>;
   readonly participants: ReadonlyArray<Participant>;
+  /** The players the starters appointed to record for everyone at their tables. */
+  readonly recorders: ReadonlyArray<Participant>;
   readonly tables: ReadonlyArray<Table>;
   readonly visits: ReadonlyArray<Visit>;
   readonly entries: ReadonlyArray<PlayEntry>;
@@ -48,19 +50,23 @@ type RecordingErrorReason =
   | "load"
   | "closed";
 
+const at = (items: ReadonlyArray<Participant>, tableId: TableId, playerId: PlayerId) =>
+  items.some((item) => item.tableId === tableId && item.playerId === playerId);
+
 /**
- * Whether an actor holding `actorPlayers` may write `playerId`'s play at a table. Its starter
- * records for everyone; a player who joined it records only their own play.
+ * Whether an actor holding `actorPlayers` may write `playerId`'s play at a table. Its starter and
+ * the recorders it appointed record for everyone; a player who joined it records only their own.
  */
 export const authorize = (
   table: Pick<Table, "id" | "starterPlayerId">,
   actorPlayers: ReadonlyArray<PlayerId>,
   playerId: PlayerId,
   participants: ReadonlyArray<Participant>,
+  recorders: ReadonlyArray<Participant>,
 ) =>
   actorPlayers.includes(table.starterPlayerId) ||
-  (actorPlayers.includes(playerId) &&
-    participants.some((item) => item.tableId === table.id && item.playerId === playerId));
+  actorPlayers.some((player) => at(recorders, table.id, player)) ||
+  (actorPlayers.includes(playerId) && at(participants, table.id, playerId));
 
 /** The players a device records as: its own, and the ones it joined other tables as. */
 export const ownPlayers = (state: RecordingLedger): ReadonlyArray<PlayerId> => [
@@ -132,9 +138,37 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     "Command has a foreign local actor.",
   );
   const forbid = (table: Pick<Table, "id" | "starterPlayerId">, playerId: PlayerId) => {
-    if (actorPlayers !== null && !authorize(table, actorPlayers, playerId, state.participants))
+    if (
+      actorPlayers !== null &&
+      !authorize(table, actorPlayers, playerId, state.participants, state.recorders)
+    )
       throw new RecordingError("forbidden", "You can record only your own play at this table.");
   };
+  const receipts = [...state.receipts, { command, revision: state.receipts.length + 2 }];
+  if (isTableCommand(command)) {
+    const table = state.tables.find((table) => table.id === command.tableId);
+    requireValid(table, "Table does not exist.");
+    // Only the server knows who has an account and every way a player came to the table.
+    if (actorPlayers !== null && !actorPlayers.includes(table.starterPlayerId))
+      throw new RecordingError("forbidden", "Only the player who started this table can do that.");
+    const appointed = at(state.recorders, table.id, command.playerId);
+    requireValid(
+      command.type === "appoint_recorder" ? !appointed : appointed,
+      command.type === "appoint_recorder"
+        ? "This player already records for the table."
+        : "This player doesn't record for the table.",
+    );
+    return {
+      ...state,
+      recorders:
+        command.type === "appoint_recorder"
+          ? [...state.recorders, { tableId: table.id, playerId: command.playerId }]
+          : state.recorders.filter(
+              (item) => item.tableId !== table.id || item.playerId !== command.playerId,
+            ),
+      receipts,
+    };
+  }
   const tables = [...state.tables];
   const players = [...state.players];
   let visits = [...state.visits];
@@ -190,7 +224,10 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       const table = tables.find((table) => table.id === command.tableId);
       requireValid(table, "Table does not exist.");
       forbid(table, command.playerId);
-      if (command.newPlayer) {
+      // A player the server already holds came with the history, as someone at the table.
+      const known =
+        actorPlayers === null && players.some((player) => player.id === command.playerId);
+      if (command.newPlayer && !known) {
         requireValid(
           command.newPlayer.id === command.playerId &&
             !players.some((player) => player.id === command.playerId),
@@ -213,21 +250,24 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     } else {
       if (actorPlayers !== null && command.playerId !== state.self.id)
         throw new RecordingError("forbidden", "Start a table as yourself.");
+      // A table someone else started came with the history; its start only adds their visit.
+      const known = actorPlayers === null && tables.some((table) => table.id === command.tableId);
       requireValid(
         !visits.some((visit) => visit.id === command.visitId) &&
-          !tables.some((table) => table.id === command.tableId),
+          (known || !tables.some((table) => table.id === command.tableId)),
         "Start IDs are already used.",
       );
-      tables.push(
-        Table.make({
-          id: command.tableId,
-          tripId: null,
-          game: command.game,
-          venueId: command.venueId,
-          highLimit: command.highLimit,
-          starterPlayerId: command.playerId,
-        }),
-      );
+      if (!known)
+        tables.push(
+          Table.make({
+            id: command.tableId,
+            tripId: null,
+            game: command.game,
+            venueId: command.venueId,
+            highLimit: command.highLimit,
+            starterPlayerId: command.playerId,
+          }),
+        );
     }
     visits.push(
       Visit.make({
@@ -282,7 +322,9 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       finishedAt = null;
       const final = state.receipts.reduce<EntryId | null>(
         (current, receipt) =>
-          receipt.command.visitId === visit.id ? finalCashOut(current, receipt.command) : current,
+          "visitId" in receipt.command && receipt.command.visitId === visit.id
+            ? finalCashOut(current, receipt.command)
+            : current,
         null,
       );
       entries = entries.map((entry) =>
@@ -340,6 +382,6 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     tables,
     visits,
     entries,
-    receipts: [...state.receipts, { command, revision: state.receipts.length + 2 }],
+    receipts,
   };
 };

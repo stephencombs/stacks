@@ -343,6 +343,9 @@ const sharedTable = {
   ],
   viewerRole: "viewer",
   viewerPlayerId: null,
+  recorders: [],
+  appointable: [],
+  shared: false,
 };
 /** Joining the shared table through its link, as Cal. */
 const joinedAs = { id: shared(12), displayName: "Cal" };
@@ -358,6 +361,7 @@ export const routes: Record<string, unknown> = {
     commands: [],
     tables: [],
     participants: [],
+    players: [],
     visits: [],
     entries: [],
   },
