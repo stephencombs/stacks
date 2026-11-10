@@ -155,4 +155,66 @@ it.layer(Layer.mergeAll(Database.layer(TEST_DATABASE_URL), NodeServices.layer), 
       }).pipe(Effect.provide(context));
     }),
   );
+
+  /** One account with one visit and its operations, as 0013 left them. */
+  const seedVisit = Effect.fn("test.seedVisit")(function* (
+    operations: ReadonlyArray<{ readonly visitId: string; readonly command: object }>,
+  ) {
+    const sql = yield* SqlClient.SqlClient;
+    const [player, actor, visit, table] = Array.from({ length: 4 }, uuid);
+    yield* sql`insert into users (id, display_name) values ('user_ana', 'Ana')`;
+    yield* sql`
+      insert into players (id, group_id, display_name, user_id, created_by, recording_actor_id)
+      values (${player}, null, 'Ana', 'user_ana', 'user_ana', ${actor})
+    `;
+    yield* sql`
+      insert into personal_visits (id, player_id, table_id, game, venue_id, high_limit, started_at,
+        finished_at, revision)
+      values (${visit}, ${player}, ${table}, null, null, false, '2026-11-01T20:00:00Z', null, 1)
+    `;
+    const ids = operations.map(() => uuid());
+    for (const [index, operation] of operations.entries())
+      yield* sql`
+        insert into personal_operations (id, player_id, visit_id, command)
+        values (${ids[index]!}, ${player}, ${operation.visitId === "own" ? visit : operation.visitId},
+          ${JSON.stringify(operation.command)}::jsonb)
+      `;
+    return { player, actor, visit, ids };
+  });
+
+  it.effect("takes an operation's actor from its player when the command has none", () =>
+    Effect.gen(function* () {
+      const context = yield* scratchDatabase;
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        yield* PgMigrator.run({ loader: Migrator.fromRecord(before) });
+        const seeded = yield* seedVisit([{ visitId: "own", command: { type: "reopen" } }]);
+        yield* PgMigrator.run({ loader: Migrator.fromRecord(records) });
+        expect(yield* sql`select actor_id from personal_operations`).toEqual([
+          { actorId: seeded.actor },
+        ]);
+        expect(yield* sql`select id, kind from recording_actors`).toEqual([
+          { id: seeded.actor, kind: "account" },
+        ]);
+      }).pipe(Effect.provide(context));
+    }),
+  );
+
+  it.effect("stops, naming them, at operations whose visit is missing", () =>
+    Effect.gen(function* () {
+      const context = yield* scratchDatabase;
+      yield* Effect.gen(function* () {
+        yield* PgMigrator.run({ loader: Migrator.fromRecord(before) });
+        const seeded = yield* seedVisit([
+          { visitId: uuid(), command: { type: "add", actorId: uuid() } },
+        ]);
+        const exit = yield* PgMigrator.run({ loader: Migrator.fromRecord(records) }).pipe(
+          Effect.exit,
+        );
+        expect(String(exit)).toContain(
+          `personal_operations without a visit or actor: ${seeded.ids[0]}`,
+        );
+      }).pipe(Effect.provide(context));
+    }),
+  );
 });

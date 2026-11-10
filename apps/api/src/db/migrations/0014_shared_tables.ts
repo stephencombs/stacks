@@ -8,20 +8,38 @@ import * as SqlClient from "effect/sql/SqlClient";
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
-  // The server keeps a hash of a device actor's secret, never the secret.
+  // Every actor, in one namespace, so an ID can't be both an account's and a device's. A device
+  // actor proves itself with a secret, whose hash the server keeps; an account actor has none and
+  // is reached only through the account's session. Actor IDs are public (they sign entries).
   yield* sql`
     create table recording_actors (
       id uuid primary key,
-      secret_hash text not null,
-      created_at timestamptz not null default now()
+      kind text not null check (kind in ('account', 'device')),
+      secret_hash text,
+      created_at timestamptz not null default now(),
+      unique (id, kind),
+      check ((kind = 'device') = (secret_hash is not null))
     )
   `;
-  // Who an actor records as. An account's actor is its personal player's `recording_actor_id`,
-  // which has no secret, so this doesn't reference recording_actors.
+  yield* sql`
+    insert into recording_actors (id, kind)
+    select recording_actor_id, 'account' from players where recording_actor_id is not null
+  `;
+  // A personal player's actor must be an account actor. Deferred, so a player and its actor can
+  // be created in either order inside one transaction.
+  yield* sql`
+    alter table players
+      add column recording_actor_kind text
+        generated always as (case when recording_actor_id is not null then 'account' end) stored,
+      add constraint players_account_actor
+        foreign key (recording_actor_id, recording_actor_kind)
+        references recording_actors (id, kind) deferrable initially deferred
+  `;
+  // Who an actor records as.
   yield* sql`
     create table player_actors (
       player_id uuid not null references players (id),
-      actor_id uuid not null,
+      actor_id uuid not null references recording_actors (id) deferrable initially deferred,
       primary key (player_id, actor_id)
     )
   `;
@@ -87,12 +105,26 @@ export default Effect.gen(function* () {
   yield* sql`alter table personal_operations add column actor_id uuid`;
   yield* sql`
     update personal_operations o
-    set table_id = v.table_id, actor_id = (o.command ->> 'actorId')::uuid,
+    set table_id = v.table_id,
+      actor_id = coalesce((o.command ->> 'actorId')::uuid, p.recording_actor_id),
       command = case when o.command ->> 'type' in ('start', 'record_completed')
         then o.command || jsonb_build_object('playerId', v.player_id) else o.command end
-    from personal_visits v
-    where v.id = o.visit_id
+    from personal_visits v, players p
+    where v.id = o.visit_id and p.id = o.player_id
   `;
+  // An operation is written with its visit in one transaction, so none should lack one. Stop with
+  // the rows named rather than guess a table for them.
+  const orphans = yield* sql<{ id: string }>`
+    select id from personal_operations where table_id is null or actor_id is null order by seq
+  `;
+  if (orphans.length > 0)
+    return yield* Effect.die(
+      new Error(
+        `0014_shared_tables: personal_operations without a visit or actor: ${orphans
+          .map((row) => row.id)
+          .join(", ")}`,
+      ),
+    );
   yield* sql`
     alter table personal_operations
       alter column table_id set not null,

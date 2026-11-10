@@ -105,7 +105,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
         "Bea",
         "Starter",
       ]);
-      expect(view.entries.filter((entry) => entry.visitId === guest.visitId)).toHaveLength(2);
+      expect(view.visits.find((item) => item.visit.id === guest.visitId)?.totals.buyIn).toBe(15000);
 
       // A saved player can join again once their visit is over, never twice at once.
       const { newPlayer: _, ...rest } = guest;
@@ -209,11 +209,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       const view = yield* anonymous.publicRecording.shared({ params: { token: first.token } });
       expect(view.viewerRole).toBe("viewer");
       expect(view.table.id).toBe(shown.tableId);
-      expect(new Set(view.visits.map((visit) => visit.tableId))).toEqual(new Set([shown.tableId]));
-      expect(view.visits).toHaveLength(2);
-      expect(view.entries.map((entry) => entry.id).toSorted()).toEqual(
-        [shown.buyInId, guest.buyInId].toSorted(),
+      expect(new Set(view.visits.map((item) => item.visit.tableId))).toEqual(
+        new Set([shown.tableId]),
       );
+      expect(view.visits.map((item) => item.totals.buyIn).toSorted()).toEqual([10000, 20000]);
+      expect(JSON.stringify(view)).not.toContain(starter.identity.actorId);
 
       const second = yield* starter.client.recording.share({ params: { tableId: shown.tableId } });
       const stale = yield* anonymous.publicRecording
@@ -276,10 +276,68 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       // A second account can't take the same player, and a wrong secret proves nothing.
       yield* bea.claim.claimActor({ payload: starter.credential });
       expect((yield* bea.recording.history()).identity).toBeNull();
+      // The claimed actor is the account's now: its old secret no longer signs anything.
+      expect(yield* starter.client.recording.history().pipe(Effect.flip)).toMatchObject({
+        _tag: "Unauthorized",
+      });
+      const other = yield* device();
       const wrong = yield* bea.claim
-        .claimActor({ payload: { ...starter.credential, secret: secret() } })
+        .claimActor({ payload: { ...other.credential, secret: secret() } })
         .pipe(Effect.flip);
       expect(wrong).toMatchObject({ _tag: "Unauthorized" });
+    }),
+  );
+
+  it.effect("won't let a device register an account's actor learned from a share link", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const { alex } = yield* users("alex");
+      const identity: RecordingIdentity = {
+        playerId: PlayerId.make(uuid()),
+        actorId: ActorId.make(uuid()),
+      };
+      const opened = start(identity);
+      yield* alex.recording.push({ payload: { identity, commands: [opened] } });
+      const { token } = yield* alex.recording.share({ params: { tableId: opened.tableId } });
+      const anonymous = yield* api.asActor(null);
+      const view = yield* anonymous.publicRecording.shared({ params: { token } });
+      expect(JSON.stringify(view)).not.toContain(identity.actorId);
+
+      const stolen = { actorId: identity.actorId, secret: secret() };
+      const taken = yield* anonymous.publicRecording
+        .registerActor({ payload: stolen })
+        .pipe(Effect.flip);
+      expect(taken).toMatchObject({ _tag: "Conflict", reason: "actor_taken" });
+      const attacker = yield* api.asActor(stolen);
+      expect(yield* attacker.recording.history().pipe(Effect.flip)).toMatchObject({
+        _tag: "Unauthorized",
+      });
+    }),
+  );
+
+  it.effect("won't let an account take a device's actor as its own", () =>
+    Effect.gen(function* () {
+      const starter = yield* device();
+      const opened = start(starter.identity);
+      yield* starter.client.recording.push({
+        payload: { identity: starter.identity, commands: [opened] },
+      });
+      const { bea } = yield* users("bea");
+      const borrowed = { playerId: PlayerId.make(uuid()), actorId: starter.identity.actorId };
+      const refused = yield* bea.recording
+        .push({ payload: { identity: borrowed, commands: [buyIn(borrowed, opened.visitId)] } })
+        .pipe(Effect.flip);
+      expect(refused).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
+      expect((yield* bea.recording.history()).identity).toBeNull();
+
+      // Even an actor that registered and never pushed stays the device's.
+      const fresh = yield* device();
+      const unbound = { playerId: PlayerId.make(uuid()), actorId: fresh.identity.actorId };
+      const again = yield* bea.recording
+        .push({ payload: { identity: unbound, commands: [start(unbound)] } })
+        .pipe(Effect.flip);
+      expect(again).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
+      expect((yield* starter.client.recording.history()).identity).toEqual(starter.identity);
     }),
   );
 });

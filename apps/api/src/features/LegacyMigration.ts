@@ -236,6 +236,9 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
     `;
     for (const identity of identities)
       yield* sql`
+        with actor as (
+          insert into recording_actors (id, kind) values (${identity.recordingActorId}, 'account')
+        )
         insert into player_actors (player_id, actor_id)
         values (${identity.id}, ${identity.recordingActorId})
       `;

@@ -5,7 +5,6 @@ import { RECORDING_CURRENCY, visitTitle } from "@stacks/client-runtime/recording
 import type { MinorUnits } from "@stacks/contracts";
 import type { TableView } from "@stacks/contracts/recordingCommands";
 import { formatMoney } from "@stacks/shared/money";
-import { visitSummary } from "@stacks/shared/visits";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { useEffect, useState } from "react";
@@ -60,8 +59,8 @@ function SharedTablePage() {
 
 function SharedTable({ view }: { view: TableView }) {
   const names = new Map(view.players.map((player) => [player.id, player.displayName]));
-  const visits = view.visits.map((visit) => visitSummary(visit, view.entries));
-  const first = view.visits[0];
+  const visits = view.visits;
+  const first = visits[0]?.visit;
   const live = visits.some((item) => item.finalResult === null);
   return (
     <>

@@ -4,7 +4,7 @@ import { ActorId, EntryId, PlayerId, TableId, VenueId, VisitId } from "./ids.ts"
 import { Game } from "./ledger.ts";
 import { MinorUnits } from "./money.ts";
 import { PlayerIdentity } from "./players.ts";
-import { PlayEntry, Table, Visit } from "./recording.ts";
+import { PlayEntry, Table, Visit, VisitSummary } from "./recording.ts";
 
 export const RecordingOperationId = Schema.String.check(Schema.isUUID()).pipe(
   Schema.brand("RecordingOperationId"),
@@ -146,12 +146,14 @@ export const RecordingHistory = Schema.Struct({
 });
 export type RecordingHistory = typeof RecordingHistory.Type;
 
-/** One table as its starter, or anyone with its share link, sees it. */
+/**
+ * One table as its starter, or anyone with its share link, sees it: each visit's totals, never its
+ * entries, whose audit fields name actors.
+ */
 export const TableView = Schema.Struct({
   table: Table,
   players: Schema.Array(PlayerIdentity),
-  visits: Schema.Array(Visit),
-  entries: Schema.Array(PlayEntry),
+  visits: Schema.Array(VisitSummary),
   viewerRole: Schema.Literals(["starter", "viewer"]),
 });
 export type TableView = typeof TableView.Type;

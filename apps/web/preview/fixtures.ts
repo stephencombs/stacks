@@ -301,22 +301,6 @@ const invites = [
 ];
 
 const shared = (n: number) => `0192e7a0-0000-7000-8000-0000000009${n.toString().padStart(2, "0")}`;
-const sharedEntry = (n: number, visit: number, kind: string, amount: number, minute: number) => ({
-  id: shared(n),
-  visitId: shared(visit),
-  kind,
-  counterpartyId: null,
-  amount,
-  currency: "USD",
-  occurredAt: `2026-11-07T21:${minute}:00.000Z`,
-  note: null,
-  createdBy: shared(99),
-  createdAt: `2026-11-07T21:${minute}:00.000Z`,
-  voidedAt: null,
-  voidedBy: null,
-  voidReason: null,
-  replacesEntryId: null,
-});
 /** A table its starter shared, as the read-only link shows it. */
 const sharedTable = {
   table: {
@@ -333,27 +317,29 @@ const sharedTable = {
   ],
   visits: [
     {
-      id: shared(20),
-      tableId: shared(1),
-      playerId: shared(10),
-      startedAt: "2026-11-07T21:00:00.000Z",
-      finishedAt: null,
-      revision: 1,
+      visit: {
+        id: shared(20),
+        tableId: shared(1),
+        playerId: shared(10),
+        startedAt: "2026-11-07T21:00:00.000Z",
+        finishedAt: null,
+        revision: 1,
+      },
+      totals: { buyIn: 30000, cashOut: 0, adjustment: 0 },
+      finalResult: null,
     },
     {
-      id: shared(21),
-      tableId: shared(1),
-      playerId: shared(11),
-      startedAt: "2026-11-07T21:10:00.000Z",
-      finishedAt: "2026-11-07T21:50:00.000Z",
-      revision: 1,
+      visit: {
+        id: shared(21),
+        tableId: shared(1),
+        playerId: shared(11),
+        startedAt: "2026-11-07T21:10:00.000Z",
+        finishedAt: "2026-11-07T21:50:00.000Z",
+        revision: 1,
+      },
+      totals: { buyIn: 10000, cashOut: 16500, adjustment: 0 },
+      finalResult: 6500,
     },
-  ],
-  entries: [
-    sharedEntry(30, 20, "buy_in", 20000, 10),
-    sharedEntry(31, 20, "buy_in", 10000, 30),
-    sharedEntry(32, 21, "buy_in", 10000, 10),
-    sharedEntry(33, 21, "cash_out", 16500, 50),
   ],
   viewerRole: "viewer",
 };

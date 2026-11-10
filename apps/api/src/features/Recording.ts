@@ -33,6 +33,7 @@ import {
   RecordingError,
   type RecordingLedger,
 } from "@stacks/shared/recording";
+import { visitSummary } from "@stacks/shared/visits";
 
 import {
   PersonalEntryRow,
@@ -108,7 +109,7 @@ const verifiedActor = Effect.fn("Recording.verifiedActor")(function* (
   const id = Option.getOrNull(Schema.decodeUnknownOption(ActorId)(actorId));
   if (id === null) return yield* new Unauthorized();
   const [row] = yield* sql<{ secretHash: string }>`
-    select secret_hash from recording_actors where id = ${id}
+    select secret_hash from recording_actors where id = ${id} and kind = 'device'
   `;
   if (!row || row.secretHash !== (yield* digest(secret))) return yield* new Unauthorized();
   return id;
@@ -409,6 +410,15 @@ export const push = Effect.fn("Recording.push")(function* (request: PushRecordin
   if (recorder._tag === "Account") {
     const user = recorder.user;
     yield* Access.ensureUser().pipe(Effect.provideService(CurrentUser, user));
+    // One actor namespace: an ID a device registered is never an account's. The players foreign
+    // key enforces the same, so a race can't slip past this check.
+    yield* sql`
+      insert into recording_actors (id, kind) values (${actorId}, 'account') on conflict do nothing
+    `;
+    const [actor] = yield* sql<{ kind: string }>`
+      select kind from recording_actors where id = ${actorId}
+    `;
+    if (actor?.kind !== "account") return yield* new Conflict({ reason: "recording_identity" });
     yield* sql`
       insert into players (id, group_id, display_name, user_id, created_by, recording_actor_id)
       values (${playerId}, null, ${user.displayName.slice(0, 60) || "You"},
@@ -488,13 +498,11 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
   const entries = yield* sql`
     select e.* from personal_entries e join personal_visits v on v.id = e.visit_id
     where v.table_id = ${row.id}
-    order by e.created_at, e.id
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalEntryRow)));
   const view: TableView = {
     table: tableOf(row, row.starterPlayerId),
     players: players.map((player) => PlayerIdentity.make(player)),
-    visits: visits.map(visitOf),
-    entries: entries.map(entryOf),
+    visits: visits.map((visit) => visitSummary(visitOf(visit), entries.map(entryOf))),
     viewerRole,
   };
   return view;
@@ -548,11 +556,13 @@ export const registerActor = Effect.fn("Recording.registerActor")(function* (
   const sql = yield* SqlClient.SqlClient;
   const hash = yield* digest(credential.secret);
   yield* sql`
-    insert into recording_actors (id, secret_hash) values (${credential.actorId}, ${hash})
+    insert into recording_actors (id, kind, secret_hash)
+    values (${credential.actorId}, 'device', ${hash})
     on conflict do nothing
   `;
-  const [row] = yield* sql<{ secretHash: string }>`
-    select secret_hash from recording_actors where id = ${credential.actorId}
+  // An account's actor is public (it signs entries), so it can never be registered here.
+  const [row] = yield* sql<{ secretHash: string | null }>`
+    select secret_hash from recording_actors where id = ${credential.actorId} and kind = 'device'
   `;
   if (row?.secretHash !== hash) return yield* new Conflict({ reason: "actor_taken" });
 });
@@ -567,7 +577,7 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (
   const sql = yield* SqlClient.SqlClient;
   const user = yield* CurrentUser;
   const [actor] = yield* sql<{ secretHash: string }>`
-    select secret_hash from recording_actors where id = ${credential.actorId}
+    select secret_hash from recording_actors where id = ${credential.actorId} and kind = 'device'
   `;
   if (!actor) return;
   if (actor.secretHash !== (yield* digest(credential.secret))) return yield* new Unauthorized();
@@ -581,6 +591,11 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (
   const own = yield* personalIdentity(user.userId);
   if (own) return yield* new Conflict({ reason: "recording_identity" });
   yield* Access.ensureUser();
+  // The actor becomes the account's: from now on the account's session records as it.
+  yield* sql`
+    update recording_actors set kind = 'account', secret_hash = null
+    where id = ${credential.actorId}
+  `;
   yield* sql`
     update players
     set user_id = ${user.userId}, recording_actor_id = ${credential.actorId},
