@@ -197,6 +197,7 @@ export const prepareRecordingCommand = (
 const freezeState = (state: RecordingState): RecordingState => {
   for (const records of [
     state.players,
+    state.participants,
     state.tables,
     state.visits,
     state.entries,
@@ -260,6 +261,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         self,
         actor: { id: ActorId.make(newId()), userId: null },
         players: [self],
+        participants: [],
         tables: [],
         visits: [],
         entries: [],
