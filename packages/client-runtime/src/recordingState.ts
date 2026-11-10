@@ -32,17 +32,22 @@ export const RecordingRejection = Schema.Struct({
 });
 export type RecordingRejection = typeof RecordingRejection.Type;
 
-/** Present once an account has claimed this device's history. Receipts not `synced` are pending. */
+/**
+ * Present once this device's history syncs: to an account, or, signed out, as the device's own
+ * actor (`userId` null). Receipts not `synced` are pending.
+ */
 const RecordingSync = Schema.Struct({
-  userId: UserId,
+  userId: Schema.NullOr(UserId),
   synced: Schema.Array(RecordingOperationId),
   rejected: Schema.Array(RecordingRejection),
 });
 
 export const RecordingState = Schema.Struct({
-  version: Schema.Literal(1),
+  version: Schema.Literal(2),
   self: PlayerIdentity,
   actor: Actor,
+  /** Everyone this device records for: `self` and the players it added at its tables. */
+  players: Schema.Array(PlayerIdentity),
   tables: Schema.Array(Table),
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
@@ -64,15 +69,20 @@ const unique = (records: ReadonlyArray<{ readonly id: string }>) =>
 const validateRecordingState = (state: RecordingState) => {
   requireValid(state.actor.userId === null, "Private recording has a local actor.");
   requireValid(
-    unique(state.tables) && unique(state.visits) && unique(state.entries),
+    unique(state.players) && unique(state.tables) && unique(state.visits) && unique(state.entries),
     "Duplicate record ID.",
+  );
+  const players = new Map(state.players.map((player) => [player.id, player]));
+  requireValid(
+    players.get(state.self.id)?.displayName === state.self.displayName,
+    "The device's own player is missing.",
   );
   const tables = new Map(state.tables.map((table) => [table.id, table]));
   const visits = new Map(state.visits.map((visit) => [visit.id, visit]));
   const entries = new Map(state.entries.map((entry) => [entry.id, entry]));
   for (const table of state.tables) {
     requireValid(
-      table.tripId === null && table.starterActorId === state.actor.id,
+      table.tripId === null && table.starterPlayerId === state.self.id,
       "Foreign table ownership.",
     );
     requireValid(
@@ -82,7 +92,7 @@ const validateRecordingState = (state: RecordingState) => {
   }
   for (const visit of state.visits) {
     requireValid(
-      tables.has(visit.tableId) && visit.playerId === state.self.id,
+      tables.has(visit.tableId) && players.has(visit.playerId),
       "Foreign visit ownership.",
     );
     const summary = visitSummary(visit, state.entries);
@@ -120,6 +130,7 @@ const validateRecordingState = (state: RecordingState) => {
   const lifecycle = new Map<Visit["id"], { revision: number; finishedAt: DateTime.Utc | null }>();
   const finals = new Map<Visit["id"], EntryId | null>();
   const createdTables = new Set<Table["id"]>();
+  const createdPlayers = new Set<PlayerIdentity["id"]>();
   const verifyEntry = (
     command: RecordingCommand,
     id: EntryId,
@@ -154,7 +165,30 @@ const validateRecordingState = (state: RecordingState) => {
     operations.add(command.operationId);
     const visit = visits.get(command.visitId);
     requireValid(visit, "Receipt references a missing visit.");
-    if (command.type === "start" || command.type === "record_completed") {
+    if (command.type === "join_table") {
+      const table = tables.get(command.tableId);
+      requireValid(
+        table && createdTables.has(table.id) && !lifecycle.has(visit.id),
+        "Duplicate or missing join records.",
+      );
+      if (command.newPlayer) {
+        requireValid(
+          command.newPlayer.id === command.playerId &&
+            !createdPlayers.has(command.playerId) &&
+            players.get(command.playerId)?.displayName === command.newPlayer.displayName,
+          "Player differs from the receipt that added them.",
+        );
+        createdPlayers.add(command.playerId);
+      }
+      requireValid(
+        visit.tableId === table.id &&
+          visit.playerId === command.playerId &&
+          ms(visit.startedAt) === ms(command.startedAt),
+        "Join records differ from the receipt.",
+      );
+      verifyEntry(command, command.buyInId, "buy_in", command.buyIn, command.startedAt);
+      lifecycle.set(visit.id, { revision: 0, finishedAt: null });
+    } else if (command.type === "start" || command.type === "record_completed") {
       const table = tables.get(command.tableId);
       requireValid(
         table && !createdTables.has(table.id) && !lifecycle.has(visit.id),
@@ -162,6 +196,7 @@ const validateRecordingState = (state: RecordingState) => {
       );
       requireValid(
         visit.tableId === table.id &&
+          visit.playerId === command.playerId &&
           ms(visit.startedAt) === ms(command.startedAt) &&
           table.game === command.game &&
           table.venueId === command.venueId &&
@@ -256,6 +291,7 @@ const validateRecordingState = (state: RecordingState) => {
   }
   requireValid(
     createdEntries.size === entries.size &&
+      createdPlayers.size === players.size - 1 &&
       createdTables.size === tables.size &&
       lifecycle.size === visits.size,
     "Records have missing command receipts.",
@@ -309,7 +345,14 @@ const reopenNotVoided = "Reopen did not void the final cash-out.";
 const upgradeLegacyReopen = (state: RecordingState) => {
   const replayed = state.receipts.reduce(
     (current, receipt) => applyRecordingCommand(current, receipt.command),
-    { ...state, tables: [], visits: [], entries: [], receipts: [] } as RecordingState,
+    {
+      ...state,
+      players: [state.self],
+      tables: [],
+      visits: [],
+      entries: [],
+      receipts: [],
+    } as RecordingState,
   );
   const live = (entries: RecordingState["entries"]) =>
     JSON.stringify(
@@ -330,10 +373,46 @@ const validateOrUpgrade = (state: RecordingState) => {
     return upgradeLegacyReopen(state);
   }
 };
+type Command = { readonly type: string };
+type VersionOne = {
+  readonly version: 1;
+  readonly self: { readonly id: string };
+  readonly tables: ReadonlyArray<{ readonly starterActorId: string }>;
+  readonly receipts: ReadonlyArray<{ readonly command: Command }>;
+  readonly sync?: { readonly rejected: ReadonlyArray<{ readonly command: Command }> };
+};
+// Version 1 held one player, so its tables and starts were all its own.
+const fromVersionOne = (document: unknown) => {
+  if ((document as { version?: unknown } | null)?.version !== 1) return document;
+  const v1 = document as VersionOne;
+  const named = (command: Command) =>
+    command.type === "start" || command.type === "record_completed"
+      ? { ...command, playerId: v1.self.id }
+      : command;
+  return {
+    ...v1,
+    version: 2,
+    players: [v1.self],
+    tables: v1.tables.map(({ starterActorId: _, ...table }) => ({
+      ...table,
+      starterPlayerId: v1.self.id,
+    })),
+    receipts: v1.receipts.map((receipt) => ({ ...receipt, command: named(receipt.command) })),
+    ...(v1.sync && {
+      sync: {
+        ...v1.sync,
+        rejected: v1.sync.rejected.map((item) => ({ ...item, command: named(item.command) })),
+      },
+    }),
+  };
+};
+
 export const decodeRecordingState = (payload: string, revision: number) => {
   try {
     const state = validateOrUpgrade(
-      Schema.decodeUnknownSync(codec)(JSON.parse(payload), { onExcessProperty: "error" }),
+      Schema.decodeUnknownSync(codec)(fromVersionOne(JSON.parse(payload)), {
+        onExcessProperty: "error",
+      }),
     );
     // Until an account links it, every commit adds exactly one receipt. Sync then commits
     // bookkeeping, merges and discards that don't.

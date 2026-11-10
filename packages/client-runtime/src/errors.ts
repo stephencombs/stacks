@@ -26,6 +26,7 @@ const conflictMessages: Record<ConflictReason, string> = {
   balance_not_settled: "Settle up first: you can't leave while you owe or are owed.",
   last_owner: "Make someone else the owner or remove everyone else first.",
   recording_identity: "Your sessions on another device synced first. Trying again.",
+  actor_taken: "This device's ID is already in use. Reinstall to get a new one.",
   stake_voided: "That stake was voided.",
   stake_ended: "That stake has already ended. Reopen it first.",
   stake_open: "That stake is still open.",
