@@ -4,8 +4,8 @@ Notes here hold decisions, constraints and traps that the code alone doesn't exp
 need no doc change; follow the [documentation rules](../AGENTS.md#documentation) before adding one.
 
 - [Product scope and delivery](../PLAN.md)
-- [Design system](../DESIGN.md): [foundations](./design/foundations.md) and
-  [components](./design/components.md)
+- [Design system](../DESIGN.md): [foundations](./design/foundations.md),
+  [components](./design/components.md), and [mobile redesign plan](./design/mobile-redesign.md)
 - [Navigation](./internals/navigation.md): where content lives and how people move between it
 - [Legacy migration](./internals/legacy-migration.md): how the Group-bound ledger maps to the player
   model, and what the preflight flags

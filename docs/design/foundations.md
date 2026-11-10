@@ -40,43 +40,47 @@ The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame
 
 ## Type
 
-Web has two faces: Barlow Condensed for the page title, the wordmark and a hero card's figure, and the system sans for everything else, other money included, with `tabular-nums` on any changing number. Mobile adds JetBrains Mono for amounts and board captions.
+Web has two faces: Barlow Condensed for the page title, the wordmark and a hero card's figure, and the system sans for everything else, other money included, with `tabular-nums` on any changing number. Mobile uses tight-tracked **sentence case** system sans for screen titles (`type-title`), card headings (`type-heading`) and section labels (`type-section`), reserving large tabular display/mono figures (`type-hero`, `type-number`) for numeric readouts inside cards.
 
-| Role            | Use it for                                          | Web  | Mobile |
-| --------------- | --------------------------------------------------- | ---- | ------ |
-| `type-title`    | The one title on a page (`PageHeader`, `PageTitle`) | 40px | 40px   |
-| `type-headline` | The "Can't sign in yet" screen heading              | none | 36px   |
-| `type-callout`  | On mobile, tabs, small button labels and captions   | 15px | 15px   |
-| `type-label`    | Mono caps on mobile: "Live", the high-limit toggle  | none | 11px   |
-| `type-body`     | Field text, large button labels                     | none | 17px   |
-| `type-footnote` | Field captions, hints, errors                       | none | 13px   |
+| Role            | Use it for                                                        | Web  | Mobile                     |
+| --------------- | ----------------------------------------------------------------- | ---- | -------------------------- |
+| `type-hero`     | Primary figure inside a hero card (`$196.13*`, `+$1,420`, `87%`)  | none | 36px–40px (`tabular-nums`) |
+| `type-title`    | The one title on a page (`PageHeader`, `TopBar` / `PageTitle`)    | 40px | 28px (sentence case, bold) |
+| `type-headline` | The "Can't sign in yet" or onboarding screen heading              | none | 32px (sentence case, bold) |
+| `type-heading`  | Card title (`Cursor Models`, session row title)                   | none | 17px (sentence case, 600)  |
+| `type-body`     | Field text (`>=16px` floor), large button and settings row labels | none | 17px                       |
+| `type-callout`  | On mobile, segmented tabs, pill labels and captions               | 15px | 15px                       |
+| `type-section`  | Grouped list header (`Connections`, `Providers`, `Unsent`)        | none | 13px (sentence case, 500)  |
+| `type-footnote` | Field captions, secondary row metadata (`64.9% of cost`), errors  | none | 13px                       |
+| `type-label`    | Compact status or card kicker (`Raw token cost`, `BETA`)          | none | 12px (sentence case, 500)  |
 
-Everything else is Tailwind's scale. Section headings are `text-lg font-semibold`, names and row titles `font-medium` at the inherited size, secondary text `text-sm`, and tags `text-xs font-medium`.
+Everything else is Tailwind's scale. Section headings are `text-lg font-semibold` on web and `type-section text-muted` on mobile, names and row titles `font-medium` (`font-semibold` for primary feed rows on mobile) at the inherited size, secondary text `text-sm`, and tags `text-xs font-medium`.
 
 Amounts are `Money` with a weight or size beside it, such as `font-semibold` in a row. Never give `Money` a `type-*` role.
 
 - Don't add `text-*` sizes, `leading-*` or `tracking-*` beside a `type-*` role, because they fight over the same properties. Color is fine, and mobile needs it: `type-title text-ink`.
 - New roles are `@utility type-*` in both CSS files, not `--text-*` tokens. `cn` runs tailwind-merge, which reads an unknown `text-foo` as a color and drops it when `text-ink` sits beside it. A test fails if web defines a role mobile doesn't.
-- Web inputs stay at 16px or larger, because iOS Safari zooms the page into anything smaller.
-- `text-[10px]` appears only on the HOT badge in mobile `TripBoard`. 11px is the floor for new UI.
-- Keep source strings in sentence case and let `type-*` or `uppercase` do the shouting.
+- Inputs stay at 16px or larger (`type-body` on mobile), because iOS zooms or clips smaller input text.
+- `text-[10px]` appears only on compact static tags (`BETA`, `HOT`). 11px is the floor for general UI.
+- Keep source strings in **sentence case**. On mobile, titles (`Usage`, `Settings`), section headers (`Unsent`, `Snoozed`, `Settled (16)`), and card kickers (`Raw token cost`, `Processed tokens`) stay in sentence case with tight **tracking** (`-0.025em` on titles) rather than uppercase shouting.
 - Reading text stops at `max-w-[65ch]`.
 
 ## Radius
 
-| Class          | Use it for                                    |
-| -------------- | --------------------------------------------- |
-| `rounded-md`   | Tags, a selected segment                      |
-| `rounded-lg`   | Web buttons and inputs, menu items, skeletons |
-| `rounded-xl`   | Cards, menus, mobile fields                   |
-| `rounded-2xl`  | Dialogs and sheets                            |
-| `rounded-full` | Chips, status dots, mobile buttons            |
+| Class          | Use it for                                                                                                                                                                     |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `rounded-md`   | Static tags (`BETA`), web selected segment, quota progress bars (`24px` h)                                                                                                     |
+| `rounded-lg`   | Web buttons and inputs, menu items, skeletons, mobile row avatar `Chip`                                                                                                        |
+| `rounded-xl`   | Web cards and menus, mobile sunken wells inside a `rounded-2xl` `Surface`                                                                                                      |
+| `rounded-2xl`  | Mobile `Surface` cards (`20px`), grouped settings lists, hero cards, web dialogs                                                                                               |
+| `rounded-3xl`  | Mobile bottom sheets (`rounded-t-3xl`)                                                                                                                                         |
+| `rounded-full` | Floating capsule tab bar, active tab thumb, pill segmented controls (`Choice`), horizontal filter pills (`FilterPill`), circular top-bar `IconButton` (`44×44px`), status dots |
 
-Nested radii subtract: inner radius is outer radius minus padding. `Menu` is `rounded-xl` with `p-1` around `rounded-lg` (12 − 4 = 8). Never copy the parent's radius onto a child.
+Nested radii are concentric (`innerRadius = outerRadius - padding`): `Menu` is `rounded-xl` with `p-1` around `rounded-lg` (12 − 4 = 8); the mobile floating tab bar and `Choice` segmented control are `rounded-full` tracks with `p-1` / `p-1.5` around a `rounded-full` active thumb. Never copy a non-pill parent's radius onto a child without subtracting padding.
 
 ## Elevation
 
-Web only. Mobile surfaces are flat: a `surface` on a `canvas` is enough, as in iOS grouped lists.
+On mobile, hierarchy comes from a **tinted neutral** `bg-canvas` (`oklch` lightness separation with low **chroma**) under pure `bg-surface` `rounded-2xl` cards and `0.5px` (`StyleSheet.hairlineWidth`) **alpha** dividers (`border-line`), with no decorative radial `Glow` blobs behind hero cards. Floating chrome (the capsule bottom bar, `LiveBar`, and top-bar `IconButton` circles) pairs `bg-surface` with a `1px` `border-line` edge and a whisper-quiet ambient shadow.
 
 | Token                          | Use it for                                |
 | ------------------------------ | ----------------------------------------- |
@@ -88,7 +92,7 @@ Web only. Mobile surfaces are flat: a `surface` on a `canvas` is enough, as in i
 - Write the parentheses form. The tokens sit outside `@theme` so they can flip, and Tailwind inlines `--shadow-*` values, which would freeze them to one theme.
 - Dark mode has a ring where light mode has depth, because a shadow doesn't show on a dark ground, plus a faint white top edge on cards and menus, the way light catches something raised. Dark overlays keep one black shadow.
 - Depth on dark comes mostly from the gap between `canvas` and `surface`: a near-black page under clearly lighter cards. Keep that gap if you retune either.
-- Use `border-line` or `divide-line` to separate rows, and a shadow to raise something. Inputs keep a visible edge.
+- Use `border-line` or `divide-line` (`0.5px` hairline on mobile retina) to separate rows, and surface contrast to raise a card. Inputs keep a visible edge.
 
 ## Layers
 
@@ -107,7 +111,7 @@ Motion says what just happened. If it doesn't, cut it. Web uses CSS transitions 
 
 | What                                 | Enter | Exit  | Easing                    |
 | ------------------------------------ | ----- | ----- | ------------------------- |
-| Hover, press, color                  | 150ms | 150ms | default                   |
+| Hover, press (`scale(0.97)`), color  | 120ms | 150ms | **ease-out**              |
 | Menu                                 | 150ms | 100ms | `ease-snap`               |
 | Centered dialog                      | 200ms | 150ms | `ease-snap`               |
 | Bottom sheet                         | 250ms | 200ms | `ease-snap`               |
@@ -115,6 +119,8 @@ Motion says what just happened. If it doesn't, cut it. Web uses CSS transitions 
 | Board rows reordering (`useReorder`) | 450ms | none  | in-out                    |
 
 - Animate only `transform`, `opacity`, colors, and `box-shadow` on a control's own hover or focus. Name the properties: `transition-[scale,opacity]`, never `transition-all`.
+- On mobile, every interactive surface (`Button`, `IconButton`, `FilterPill`, floating tab items, pressable `Card` and `Row`) gives immediate tactile press feedback (`scale(0.97)` on `onPressIn` with **ease-out**, springing back on release) paired with selection/impact haptics where appropriate.
+- Signal active selection on tabs and segmented controls with surface (`bg-surface` / `bg-fill`) and color (`text-ink` / `text-felt`) plus **filled vs. outlined** icon swaps—never by changing font weight alone in a way that reflows layout.
 - Paired parts share timing: a dialog and its backdrop use the same duration and easing.
 - Menus scale from their trigger with `origin-[var(--transform-origin)]`.
 - `index.css` cuts all CSS motion under `prefers-reduced-motion`, and transitions stop while the theme switches. JavaScript-driven motion (`TableMap`, the board's `useReorder`) checks the preference itself.
