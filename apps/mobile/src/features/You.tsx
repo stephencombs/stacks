@@ -11,7 +11,7 @@ import { Pressable, Text, View } from "react-native";
 import { Button } from "../components/ui/Button";
 import { Choice } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
-import { SectionHeading, Skeleton } from "../components/ui/Surface";
+import { Card, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { useScope } from "../lib/scope";
 import { Loaded, TripLoaded, useStacks } from "../lib/stacks";
 import { setTheme, useTheme } from "../lib/theme";
@@ -33,7 +33,7 @@ export function YouButton() {
         accessibilityHint="Your play limits, appearance and account"
         onPress={() => setOpen(true)}
         hitSlop={6}
-        className="size-11 items-center justify-center rounded-full active:opacity-70"
+        className="size-11 items-center justify-center rounded-full border border-line bg-surface active:scale-[0.95]"
       >
         {scope ? (
           <MyChip item={scope.item} name={name} size={32} />
@@ -68,7 +68,7 @@ function YouSheet({ name, onClose }: { name: string; onClose: () => void }) {
       title="You"
       footer={<Button label="Sign out" variant="danger" onPress={() => void signOut()} />}
     >
-      <View className="flex-row items-center gap-3">
+      <Card className="flex-row items-center gap-3 p-4">
         {scope ? (
           <MyChip item={scope.item} name={name} size={46} />
         ) : (
@@ -84,7 +84,7 @@ function YouSheet({ name, onClose }: { name: string; onClose: () => void }) {
             </Text>
           ) : null}
         </View>
-      </View>
+      </Card>
       <View className="gap-2">
         <SectionHeading>Play limits</SectionHeading>
         {scope?.trip ? (

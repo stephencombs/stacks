@@ -16,7 +16,6 @@ import Svg, { Circle, G, Line, Polyline, Text as SvgText } from "react-native-sv
 import { useCSSVariable } from "uniwind";
 
 import { Money } from "../components/Money";
-import { Glow } from "../components/ui/Glow";
 import { cn } from "../components/ui/cn";
 
 const HEIGHT = 128;
@@ -65,10 +64,9 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
   const edges = { min: INSET, max: Math.max(INSET, width - INSET) };
 
   return (
-    <View className="overflow-hidden rounded-xl bg-surface">
-      <Glow tone={head.tone} />
-      <View className="px-4 pt-4">
-        <Text accessibilityRole="header" className="text-sm font-medium text-muted">
+    <View className="overflow-hidden rounded-2xl border border-line bg-surface">
+      <View className="px-5 pt-5">
+        <Text accessibilityRole="header" className="type-label text-muted">
           {head.label}
         </Text>
         <Money
@@ -79,10 +77,10 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
           className={cn(
             head.tone === "win" && "text-win",
             head.tone === "loss" && "text-loss",
-            "mt-2 font-display text-6xl leading-[64px]",
+            "mt-1.5 type-hero",
           )}
         />
-        {head.line ? <Text className="mt-1.5 text-sm text-muted">{head.line}</Text> : null}
+        {head.line ? <Text className="mt-1 type-footnote text-muted">{head.line}</Text> : null}
       </View>
       <View
         accessibilityElementsHidden

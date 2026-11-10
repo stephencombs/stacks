@@ -16,6 +16,7 @@ import { AppState, Text, View } from "react-native";
 import { Button } from "../components/ui/Button";
 import { Money } from "../components/Money";
 import { Choice, FormError, TextField } from "../components/ui/Field";
+import { QuotaCard } from "../components/ui/Surface";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 
 /** Your private limits speaking up, when one applies: a loss limit near or reached, a long session. */
@@ -80,23 +81,47 @@ function Notices({
           Loss limit progress is unavailable until this trip refreshes.
         </Text>
       ) : null}
-      {loss ? (
-        <Text accessibilityLiveRegion="polite" className="rounded-xl bg-sunken p-3 text-ink">
-          {loss.level === "reached"
-            ? "You’ve reached your loss limit"
-            : "You’re approaching your loss limit"}
-          : <Money amount={loss.loss} currency={group.group.currency} /> of{" "}
-          <Money amount={loss.limit} currency={group.group.currency} />. Live buy-ins count as money
-          at risk until cashed out.
-        </Text>
-      ) : null}
+      {loss ? <LossCard loss={loss} currency={group.group.currency} /> : null}
       {notices.sessionReminder ? (
-        <Text accessibilityLiveRegion="polite" className="rounded-xl bg-sunken p-3 text-ink">
-          You’ve been playing for {formatPlayedMinutes(notices.sessionReminder.minutesPlayed)}.
-          Consider taking a break.
-        </Text>
+        <View className="rounded-2xl border border-line bg-surface p-4">
+          <Text accessibilityLiveRegion="polite" className="type-callout text-ink">
+            You’ve been playing for {formatPlayedMinutes(notices.sessionReminder.minutesPlayed)}.
+            Consider taking a break.
+          </Text>
+        </View>
       ) : null}
     </View>
+  );
+}
+
+type LossNotice = NonNullable<ReturnType<typeof evaluateLimits>["lossLimit"]>;
+
+function LossCard({
+  loss,
+  currency,
+}: {
+  loss: LossNotice;
+  currency: GroupDetail["group"]["currency"];
+}) {
+  const remaining = Math.max(0, loss.limit - loss.loss);
+  const remainingShare = loss.limit > 0 ? remaining / loss.limit : 0;
+  const reached = loss.level === "reached";
+  return (
+    <QuotaCard
+      title="Trip loss limit"
+      status={reached ? "Limit reached" : "Approaching limit"}
+      figure={<Text className="type-hero text-ink">{Math.round(remainingShare * 100)}% left</Text>}
+      remainingShare={remainingShare}
+      tone={reached ? "danger" : "loss"}
+      footer={
+        <Text accessibilityLiveRegion="polite" className="type-footnote text-ink">
+          {reached ? "You’ve reached your loss limit" : "You’re approaching your loss limit"}:{" "}
+          <Money amount={loss.loss} currency={currency} /> of{" "}
+          <Money amount={loss.limit} currency={currency} />. Live buy-ins count as money at risk
+          until cashed out.
+        </Text>
+      }
+    />
   );
 }
 

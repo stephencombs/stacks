@@ -132,7 +132,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
         </View>
       ))}
       {trip.sessions.length === 0 ? (
-        <EmptyState title="No sessions on this trip yet">
+        <EmptyState centered title="No sessions on this trip yet">
           {going
             ? "Start one when you sit down at a table. Everyone's buy-ins and cash-outs go on it."
             : "Nothing was played on this trip."}

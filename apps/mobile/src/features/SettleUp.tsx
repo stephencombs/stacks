@@ -23,7 +23,6 @@ import { Screen } from "../components/ui/Screen";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
-import { Glow } from "../components/ui/Glow";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, PageTitle, Row, SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
@@ -128,20 +127,19 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
         >
           You
         </SectionHeading>
-        <View className="overflow-hidden rounded-xl bg-surface">
-          <Glow tone={head.tone} />
-          <View className="p-4">
-            <Text className="text-sm font-medium text-muted">{head.label}</Text>
+        <View className="overflow-hidden rounded-2xl border border-line bg-surface">
+          <View className="p-5">
+            <Text className="type-label text-muted">{head.label}</Text>
             <Money
               amount={MinorUnits.make(Math.abs(myBalance))}
               currency={currency}
               fit
               className={cn(
-                "mt-2 font-display text-6xl leading-[64px]",
+                "mt-1.5 type-hero",
                 myBalance > 0 ? "text-win" : myBalance < 0 ? "text-loss" : "text-muted",
               )}
             />
-            {head.line ? <Text className="mt-1.5 text-sm text-muted">{head.line}</Text> : null}
+            {head.line ? <Text className="mt-1 type-footnote text-muted">{head.line}</Text> : null}
           </View>
           {mine.map(transferRow)}
         </View>
@@ -149,7 +147,7 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
       </View>
 
       {transfers.length === 0 ? (
-        <EmptyState title="Everyone's square">
+        <EmptyState title="Everyone's square" centered>
           Nobody owes anybody on this trip. Debts show up here when someone covers a buy-in or holds
           someone else's cash.
         </EmptyState>

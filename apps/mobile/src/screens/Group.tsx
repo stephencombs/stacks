@@ -10,7 +10,13 @@ import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Screen } from "../components/ui/Screen";
-import { List, PageTitle, Row, SectionHeading } from "../components/ui/Surface";
+import {
+  List,
+  PageTitle,
+  SectionHeading,
+  SettingsGroup,
+  SettingsRow,
+} from "../components/ui/Surface";
 import { Chip } from "../features/Chip";
 import { GroupSkeleton } from "../features/ScreenSkeletons";
 import { TripsSection } from "../features/Trips";
@@ -72,27 +78,25 @@ function GroupHub({ detail }: { detail: GroupDetail }) {
               </View>
             ))}
           </View>
-          <Row accessibilityHint="Opens the group's people" onPress={() => go.people(groupId)}>
-            <View className="flex-1 gap-0.5">
-              <Text className="text-base font-medium text-ink">Members and guests</Text>
-              <Text className="text-sm text-muted">Roles, invite links, guest claims</Text>
-            </View>
-            <Icon name="chevron-right" color="faint" size={18} />
-          </Row>
+          <SettingsRow
+            icon={<Icon name="group" color="ink" size={16} />}
+            title="Members and guests"
+            subtitle="Roles, invite links, guest claims"
+            value={people.length}
+            accessibilityHint="Opens the group's people"
+            onPress={() => go.people(groupId)}
+          />
         </List>
       </View>
-      <View className="gap-2">
-        <SectionHeading>Settings</SectionHeading>
-        <List>
-          <Row accessibilityHint="Opens the group's settings" onPress={() => go.settings(groupId)}>
-            <View className="flex-1 gap-0.5">
-              <Text className="text-base font-medium text-ink">Group settings</Text>
-              <Text className="text-sm text-muted">Your payment apps, the ledger, leaving</Text>
-            </View>
-            <Icon name="chevron-right" color="faint" size={18} />
-          </Row>
-        </List>
-      </View>
+      <SettingsGroup title="Settings">
+        <SettingsRow
+          icon={<Icon name="settings" color="ink" size={16} />}
+          title="Group settings"
+          subtitle="Your payment apps, the ledger, leaving"
+          accessibilityHint="Opens the group's settings"
+          onPress={() => go.settings(groupId)}
+        />
+      </SettingsGroup>
     </>
   );
 }

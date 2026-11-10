@@ -11,9 +11,10 @@ import {
 } from "@stacks/client-runtime/trip";
 import { tripAwards, tripNights, tripStandings, tripStats } from "@stacks/shared/trips";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { cn } from "../components/ui/cn";
+import { Badge, Card, List, ProportionalBarRow, SectionHeading } from "../components/ui/Surface";
 import { Chip } from "./Chip";
 import { RaceHero } from "./RaceHero";
 import { PlayerSheet } from "./RaceStats";
@@ -39,6 +40,8 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const played = standings.some((s) => s.playerId === detail.myPlayerId);
   const [picked, setPicked] = useState(played ? detail.myPlayerId : standings[0]?.playerId);
   const shown = standings.find((s) => s.playerId === picked) ?? standings[0];
+  const maxAbsNet =
+    standings.length > 0 ? Math.max(1, ...standings.map((s) => Math.abs(s.net))) : 1;
 
   return (
     <>
@@ -61,68 +64,55 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
       </View>
 
       <View className="gap-2">
-        <View className="flex-row justify-between">
-          <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
-            Standings
-          </Text>
-          <Text className={cn(label, "text-muted")}>
-            {closed.length} {closed.length === 1 ? "session" : "sessions"}
-          </Text>
-        </View>
+        <SectionHeading count={`${closed.length} ${closed.length === 1 ? "session" : "sessions"}`}>
+          Standings
+        </SectionHeading>
         {standings.length === 0 ? (
-          <Text className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
+          <Text className="rounded-2xl border border-line bg-surface p-4 type-callout text-muted">
             Close a session to put it on the board.
           </Text>
         ) : (
-          <View className="overflow-hidden rounded-xl border border-line bg-surface">
-            {standings.map((s, index) => {
+          <List>
+            {standings.map((s) => {
               const you = s.playerId === detail.myPlayerId;
+              const streak = streakLine(s.streak);
               return (
-                <Pressable
+                <ProportionalBarRow
                   key={s.playerId}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: s.playerId === shown?.playerId }}
+                  leading={
+                    <View className="flex-row items-center gap-1.5">
+                      <Text className="min-w-6 text-center type-number text-accent-text">
+                        {s.rank}
+                      </Text>
+                      <Text
+                        className={cn(
+                          "min-w-5 type-footnote",
+                          s.moved > 0 ? "text-win" : s.moved < 0 ? "text-loss" : "text-muted",
+                        )}
+                      >
+                        {s.moved === 0 ? "" : `${s.moved > 0 ? "▲" : "▼"}${Math.abs(s.moved)}`}
+                      </Text>
+                      <Chip chip={chipOf(detail, s.playerId)} name={name(s.playerId)} size={28} />
+                      {s.hot ? <Badge tone="accent">Hot</Badge> : null}
+                    </View>
+                  }
+                  title={name(s.playerId)}
+                  subtitle={`${s.sessions} ${s.sessions === 1 ? "session" : "sessions"}${you ? " · You" : ""}${streak ? ` · ${streak}` : ""}`}
+                  right={
+                    <Text className={cn("type-number", tone(s.net))}>
+                      {boardMoney(s.net, currency)}
+                    </Text>
+                  }
+                  share={Math.abs(s.net) / maxAbsNet}
+                  tone={s.net > 0 ? "win" : s.net < 0 ? "loss" : "muted"}
+                  selected={s.playerId === shown?.playerId}
                   accessibilityLabel={`${s.rank}. ${name(s.playerId)}${you ? ", you" : ""}: ${boardMoney(s.net, currency)} over ${s.sessions} sessions${s.hot ? ", on a heater" : ""}`}
                   accessibilityHint="Shows their stats"
                   onPress={() => setPicked(s.playerId)}
-                  className={cn(
-                    "flex-row items-center gap-2.5 px-3 py-3 active:bg-sunken",
-                    index > 0 && "border-t border-line",
-                    s.playerId === shown?.playerId && "border-l-[3px] border-l-accent",
-                  )}
-                >
-                  <Text className="min-w-7 text-center font-mono text-xl leading-7 text-accent-text">
-                    {s.rank}
-                  </Text>
-                  <Text
-                    className={cn("w-6 font-mono text-xs", s.moved > 0 ? "text-win" : "text-loss")}
-                  >
-                    {s.moved === 0 ? "" : `${s.moved > 0 ? "▲" : "▼"}${Math.abs(s.moved)}`}
-                  </Text>
-                  <Chip chip={chipOf(detail, s.playerId)} name={name(s.playerId)} size={30} />
-                  <View className="flex-1">
-                    <View className="flex-row items-center gap-2">
-                      <Text numberOfLines={1} className="shrink text-base font-medium text-ink">
-                        {name(s.playerId)}
-                      </Text>
-                      {s.hot ? (
-                        <Text className="rounded-sm bg-accent px-1 font-mono text-[10px] text-accent-ink">
-                          HOT
-                        </Text>
-                      ) : null}
-                    </View>
-                    <Text className="font-mono text-xs text-muted">
-                      {s.sessions} SESS{you ? " · YOU" : ""}
-                      {streakLine(s.streak) ? ` · ${streakLine(s.streak)!.toUpperCase()}` : ""}
-                    </Text>
-                  </View>
-                  <Text className={cn("font-mono", "text-lg", tone(s.net))}>
-                    {boardMoney(s.net, currency)}
-                  </Text>
-                </Pressable>
+                />
               );
             })}
-          </View>
+          </List>
         )}
       </View>
 
@@ -147,15 +137,13 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 
       {awards.length > 0 ? (
         <View className="gap-2">
-          <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
-            Awards
-          </Text>
+          <SectionHeading>Awards</SectionHeading>
           <View className="flex-row flex-wrap gap-2">
             {awards.map((award) => (
               <View
                 key={award.key}
                 accessible
-                className="grow basis-[48%] gap-2 rounded-xl border border-line bg-surface p-3"
+                className="grow basis-[48%] gap-2 rounded-2xl border border-line bg-surface p-3"
               >
                 <Text className={cn(label, "text-muted")}>{awardTitles[award.key]}</Text>
                 <View className="flex-row items-center gap-2">
@@ -246,15 +234,16 @@ function TripNumbers({ detail, trip }: { detail: GroupDetail; trip: TripDetail }
   return (
     <>
       <View className="gap-2">
-        <View className="flex-row items-baseline justify-between">
-          <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
-            As a team
-          </Text>
-          <Text className={cn(label, "text-muted")}>
-            {`${stats.record.wins}W · ${stats.record.losses}L · ${stats.record.mixed} mixed`}
-          </Text>
-        </View>
-        <View accessible className="gap-3 rounded-xl border border-line bg-surface p-4">
+        <SectionHeading
+          action={
+            <Text className="type-footnote text-muted">
+              {`${stats.record.wins}W · ${stats.record.losses}L · ${stats.record.mixed} mixed`}
+            </Text>
+          }
+        >
+          As a team
+        </SectionHeading>
+        <Card className="gap-3">
           <Text
             className={cn(
               "text-lg font-semibold",
@@ -277,23 +266,21 @@ function TripNumbers({ detail, trip }: { detail: GroupDetail; trip: TripDetail }
               </View>
             ))}
           </View>
-          <Text className="text-xs text-muted">
+          <Text className="type-footnote text-muted">
             A team win is a table where everyone who played won; a team loss, where everyone lost.
             Anything else is mixed and ends a run.
           </Text>
-        </View>
+        </Card>
       </View>
 
       <View className="gap-2">
-        <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
-          The numbers
-        </Text>
+        <SectionHeading>The numbers</SectionHeading>
         <View className="flex-row flex-wrap gap-2">
           {tiles.map((tile) => (
             <View
               key={tile.label}
               accessible
-              className="basis-[48%] grow gap-1 rounded-xl border border-line bg-surface p-3"
+              className="basis-[48%] grow gap-1 rounded-2xl border border-line bg-surface p-3"
             >
               <Text className={cn(label, "text-muted")}>{tile.label}</Text>
               <Text className={cn("font-mono text-lg", tone(tile.tone))}>{tile.value}</Text>

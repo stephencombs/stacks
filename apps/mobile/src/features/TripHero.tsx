@@ -8,7 +8,6 @@ import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from
 import { useCSSVariable } from "uniwind";
 
 import { Money } from "../components/Money";
-import { Glow } from "../components/ui/Glow";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const HEIGHT = 96;
@@ -47,14 +46,13 @@ export function TripHero({
   const end = { x: plot.x(mine.line.length - 1), y: plot.y(mine.line.at(-1)!) };
 
   return (
-    <View onLayout={onLayout} className="overflow-hidden rounded-xl bg-surface">
-      <Glow tone={tone} />
-      <View className="px-4 pt-4">
+    <View onLayout={onLayout} className="overflow-hidden rounded-2xl border border-line bg-surface">
+      <View className="px-5 pt-5">
         <View className="flex-row items-baseline justify-between">
-          <Text accessibilityRole="header" className="text-sm font-medium text-muted">
+          <Text accessibilityRole="header" className="type-label text-muted">
             {label}
           </Text>
-          <Text className="text-sm text-muted">
+          <Text className="type-footnote text-muted">
             {plural(mine.played, "session")} ·{" "}
             {span ?? plural(tripNights(closed, localClock).length, "night")}
           </Text>
@@ -64,9 +62,9 @@ export function TripHero({
           currency={currency}
           tone="result"
           fit
-          className="mt-2 font-display text-6xl leading-[64px]"
+          className="mt-1.5 type-hero"
         />
-        {lines.climb ? <Text className="mt-1.5 text-sm text-muted">{lines.climb}</Text> : null}
+        {lines.climb ? <Text className="mt-1 type-footnote text-muted">{lines.climb}</Text> : null}
       </View>
       <View
         accessibilityElementsHidden
@@ -110,7 +108,7 @@ export function TripHero({
       </View>
       <View className="flex-row border-t border-line">
         <Tile label="Win rate">
-          <Text className="font-mono text-lg text-ink">{lines.winRate}</Text>
+          <Text className="type-number text-ink">{lines.winRate}</Text>
         </Tile>
         <Tile label="Best" divided>
           {mine.best ? (
@@ -118,16 +116,16 @@ export function TripHero({
               amount={MinorUnits.make(mine.best.net)}
               currency={currency}
               tone="result"
-              className="text-lg"
+              className="type-number"
             />
           ) : (
-            <Text className="font-mono text-lg text-ink">–</Text>
+            <Text className="type-number text-ink">–</Text>
           )}
         </Tile>
         <Tile label="Board" divided>
-          <Text className="font-mono text-lg text-ink">
+          <Text className="type-number text-ink">
             {rank === undefined ? "–" : ordinal(rank)}
-            <Text className="text-sm text-muted"> of {standings.length}</Text>
+            <Text className="type-footnote text-muted"> of {standings.length}</Text>
           </Text>
         </Tile>
       </View>
@@ -149,7 +147,7 @@ function Tile({
       accessible
       className={divided ? "grow gap-0.5 border-l border-line px-4 py-3" : "grow gap-0.5 px-4 py-3"}
     >
-      <Text className="text-sm text-muted">{label}</Text>
+      <Text className="type-label text-muted">{label}</Text>
       {children}
     </View>
   );

@@ -10,7 +10,7 @@ import { seatLabel } from "@stacks/client-runtime/table";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
+import { EmptyState, List, ProportionalBarRow, SectionHeading } from "../components/ui/Surface";
 import { Loaded, Prefetch, useStacks } from "../lib/stacks";
 import { RaceStats } from "./RaceStats";
 import { AllTimeSkeleton } from "./ScreenSkeletons";
@@ -40,7 +40,7 @@ const tableNet = (results: ReadonlyArray<PlayerResult>) =>
 function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }) {
   if (stats.sessionCount === 0) {
     return (
-      <EmptyState title="No finished sessions yet">
+      <EmptyState title="No finished sessions yet" centered>
         Stats count closed sessions, so close one to see how everyone's doing.
       </EmptyState>
     );
@@ -86,43 +86,65 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       <View className="gap-2">
         <SectionHeading>By game</SectionHeading>
         <List>
-          {byNet(stats.byGame).map((row) => (
-            <Row key={row.key}>
-              <Text className="flex-1 text-base text-ink">
-                {gameNames[row.key]}{" "}
-                <Text className="text-sm text-muted">· {row.sessionCount}</Text>
-              </Text>
-              <Money amount={tableNet(row.results)} currency={currency} tone="result" />
-            </Row>
-          ))}
+          {byNet(stats.byGame).map((row) => {
+            const net = tableNet(row.results);
+            const share = row.sessionCount / Math.max(1, stats.sessionCount);
+            return (
+              <ProportionalBarRow
+                key={row.key}
+                title={gameNames[row.key]}
+                right={
+                  <Money amount={net} currency={currency} tone="result" className="type-number" />
+                }
+                share={share}
+                tone={net > 0 ? "win" : net < 0 ? "loss" : "accent"}
+                subtitle={`${Math.round(share * 100)}% of sessions · ${row.sessionCount} ${row.sessionCount === 1 ? "session" : "sessions"}`}
+              />
+            );
+          })}
         </List>
       </View>
       <View className="gap-2">
         <SectionHeading>By casino</SectionHeading>
         <List>
-          {byNet(stats.byVenue).map((row) => (
-            <Row key={row.key.id}>
-              <Text numberOfLines={1} className="flex-1 text-base text-ink">
-                {row.key.name} <Text className="text-sm text-muted">· {row.sessionCount}</Text>
-              </Text>
-              <Money amount={tableNet(row.results)} currency={currency} tone="result" />
-            </Row>
-          ))}
+          {byNet(stats.byVenue).map((row) => {
+            const net = tableNet(row.results);
+            const share = row.sessionCount / Math.max(1, stats.sessionCount);
+            return (
+              <ProportionalBarRow
+                key={row.key.id}
+                title={row.key.name}
+                right={
+                  <Money amount={net} currency={currency} tone="result" className="type-number" />
+                }
+                share={share}
+                tone={net > 0 ? "win" : net < 0 ? "loss" : "accent"}
+                subtitle={`${Math.round(share * 100)}% of sessions · ${row.sessionCount} ${row.sessionCount === 1 ? "session" : "sessions"}`}
+              />
+            );
+          })}
         </List>
       </View>
       {stats.bySeat.length > 0 ? (
         <View className="gap-2">
           <SectionHeading>By blackjack seat</SectionHeading>
           <List>
-            {stats.bySeat.map((row) => (
-              <Row key={row.key}>
-                <Text className="flex-1 text-base text-ink">
-                  {seatLabel(row.key)}{" "}
-                  <Text className="text-sm text-muted">· {row.sessionCount}</Text>
-                </Text>
-                <Money amount={tableNet(row.results)} currency={currency} tone="result" />
-              </Row>
-            ))}
+            {stats.bySeat.map((row) => {
+              const net = tableNet(row.results);
+              const share = row.sessionCount / Math.max(1, stats.sessionCount);
+              return (
+                <ProportionalBarRow
+                  key={row.key}
+                  title={seatLabel(row.key)}
+                  right={
+                    <Money amount={net} currency={currency} tone="result" className="type-number" />
+                  }
+                  share={share}
+                  tone={net > 0 ? "win" : net < 0 ? "loss" : "accent"}
+                  subtitle={`${Math.round(share * 100)}% of sessions · ${row.sessionCount} ${row.sessionCount === 1 ? "session" : "sessions"}`}
+                />
+              );
+            })}
           </List>
         </View>
       ) : null}
