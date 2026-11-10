@@ -64,8 +64,32 @@ export const makeRecordingTransport = ({
       Effect.flatMap(client(actor), (api) => api.recording.table({ params: { tableId } })),
     join: (token, payload, actor) =>
       Effect.flatMap(client(actor), (api) => api.recording.join({ params: { token }, payload })),
+    invitePlayer: (playerId, actor) =>
+      Effect.flatMap(client(actor), (api) => api.recording.invitePlayer({ params: { playerId } })),
+    playerAccess: (playerId, actor) =>
+      Effect.flatMap(client(actor), (api) => api.recording.playerAccess({ params: { playerId } })),
+    revokeBinding: (playerId, actorId, actor) =>
+      Effect.flatMap(client(actor), (api) =>
+        api.recording.revokeBinding({ params: { playerId, actorId } }),
+      ),
+    revokeInvite: (inviteId, actor) =>
+      Effect.flatMap(client(actor), (api) => api.recording.revokeInvite({ params: { inviteId } })),
+    redeemInvite: (token, payload, actor) =>
+      Effect.flatMap(client(actor), (api) =>
+        api.recording.redeemInvite({ params: { token }, payload }),
+      ),
   };
 };
+
+/** Whose play a personal invite records. Needs no account or device actor. */
+export const fetchInvitePreview = (
+  { baseUrl }: Pick<StacksClientOptions, "baseUrl">,
+  token: string,
+) =>
+  HttpApiClient.make(StacksApi, { baseUrl }).pipe(
+    Effect.flatMap((api) => api.publicRecording.previewInvite({ params: { token } })),
+    Effect.provide(FetchHttpClient.layer),
+  );
 
 /** A table's read-only view through its share link. Needs no account or device actor. */
 export const fetchSharedTable = (

@@ -9,6 +9,55 @@ const realFetch = window.fetch.bind(window);
 // What this preview session pushed and joined, so the next pull returns it like the server would.
 const pushed: unknown[] = [];
 let joined: { table: unknown; player: unknown } | null = null;
+type Pushed = {
+  type: string;
+  tableId?: string;
+  playerId?: string;
+  newPlayer?: { id: string; displayName: string };
+};
+// The starter's own tables, invites and recorders, made up from what this session pushed. Every
+// player added here counts as having an account, so the Recorders list has someone in it.
+const starterAnswer = (pathname: string) => {
+  const commands = pushed as Pushed[];
+  const added = commands.flatMap((command) => (command.newPlayer ? [command.newPlayer] : []));
+  const table = pathname.match(/^\/api\/tables\/([^/]+)$/)?.[1];
+  if (table) {
+    const start = commands.find((command) => command.tableId === table && command.type === "start");
+    if (!start) return undefined;
+    const recorders = new Set<string>();
+    for (const command of commands)
+      if (command.tableId === table && command.playerId)
+        if (command.type === "appoint_recorder") recorders.add(command.playerId);
+        else if (command.type === "revoke_recorder") recorders.delete(command.playerId);
+    return {
+      table: {
+        id: table,
+        tripId: null,
+        game: null,
+        venueId: null,
+        highLimit: false,
+        starterPlayerId: start.playerId,
+      },
+      players: added,
+      visits: [],
+      viewerRole: "starter",
+      viewerPlayerId: start.playerId,
+      recorders: [...recorders],
+      appointable: added.map((player) => player.id),
+      shared: true,
+    };
+  }
+  const player = pathname.match(/^\/api\/players\/([^/]+)\/(invites|access)$/);
+  if (player?.[2] === "invites")
+    return { id: "0192e7a0-0000-7000-8000-000000000990", token: "preview-invite" };
+  if (player)
+    return {
+      player: added.find((item) => item.id === player[1]) ?? { id: player[1], displayName: "Bea" },
+      invite: null,
+      devices: [],
+    };
+  return undefined;
+};
 window.fetch = async (input, init) => {
   const url = new URL(
     typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
@@ -47,7 +96,7 @@ window.fetch = async (input, init) => {
           }
         : url.pathname.endsWith("/join") && routes[url.pathname]
           ? (joined = routes[url.pathname] as typeof joined)
-          : routes[url.pathname];
+          : (routes[url.pathname] ?? starterAnswer(url.pathname));
   // Stagger dependent queries a little, like a real network.
   await new Promise((r) =>
     setTimeout(r, delay + (url.pathname.endsWith("/limits") ? delay / 2 : 0)),

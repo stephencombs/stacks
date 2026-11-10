@@ -22,6 +22,16 @@ Revoking the link stops new joins; people who joined keep their table through th
 Mobile sends the web address, since the link must work for people without the app, and has no
 `/t/:token` deep link yet: joining happens on the web, and mobile shows joined tables it syncs.
 
+A table link only ever makes a new player. To record as a player already at the table (someone
+the starter added by name, or the same guest on a second phone), the starter opens **Table
+settings** from the table and picks **Invite this player**, or a device already recording as that
+player makes one from its own table. The link, `/invite/:token`, opens on the web, says whose play
+it records and works once; taking it up binds this device to that player, who then records only
+their own play. The same sheet lists the devices recording as the player and stops any of them.
+Table settings is the starter's alone: it also appoints **Recorders**, players with an account who
+record for everyone (and, like the starter, see the whole table on their device), and holds
+**Stop sharing**. A recorder never sees Share or Table settings.
+
 Groups and trips are a second, account-backed area, reached from **Groups** in the header. Inside
 it, the group and trip you're in are context, shown as a labeled scope button at the top of every
 screen. Under it, four places answer the questions people open a trip with:
@@ -101,7 +111,7 @@ the Board is one tap away mid-session.
 ## Addresses
 
 Web and mobile share addresses: `/` (your play), `/play/:visitId` (a personal session), `/t/:token`
-(a shared table, web only),
+(a shared table, web only), `/invite/:token` (a personal invite, web only),
 `/groups` (your groups), `/trips/:id` (Sessions), `/trips/:id/board` (`?scope=all` for All
 time), `/trips/:id/settle`, `/sessions/:id`, `/groups/:id` (the hub), `/groups/:id/people` and
 `/groups/:id/settings`. Old addresses keep working: a trip's `/results` goes to its Board and a

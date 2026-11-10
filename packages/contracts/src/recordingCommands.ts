@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import { ActorId, EntryId, PlayerId, TableId, VenueId, VisitId } from "./ids.ts";
+import { ActorId, EntryId, PlayerId, PlayerInviteId, TableId, VenueId, VisitId } from "./ids.ts";
 import { Game } from "./ledger.ts";
 import { MinorUnits } from "./money.ts";
 import { PlayerIdentity } from "./players.ts";
@@ -36,6 +36,7 @@ const start = {
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
 };
+const recorder = { ...common, tableId: TableId, playerId: PlayerId };
 export const RecordingReplacement = Schema.Struct({
   id: EntryId,
   amount: MinorUnits,
@@ -89,8 +90,19 @@ export const RecordingCommand = Schema.Union([
     replacement: Schema.NullOr(RecordingReplacement),
   }),
   Schema.Struct({ type: Schema.Literal("reopen"), ...existing, reason: Schema.NonEmptyString }),
+  // The starter lets a player at the table record for everyone, or stops them. These belong to
+  // the table, not a visit, and are ordered with its play.
+  Schema.Struct({ type: Schema.Literal("appoint_recorder"), ...recorder }),
+  Schema.Struct({ type: Schema.Literal("revoke_recorder"), ...recorder }),
 ]);
 export type RecordingCommand = typeof RecordingCommand.Type;
+export type TableCommand = Extract<
+  RecordingCommand,
+  { type: "appoint_recorder" | "revoke_recorder" }
+>;
+export type VisitCommand = Exclude<RecordingCommand, TableCommand>;
+export const isTableCommand = (command: RecordingCommand): command is TableCommand =>
+  command.type === "appoint_recorder" || command.type === "revoke_recorder";
 
 /** The player and actor a device records as. An account's are the same on every device. */
 export const RecordingIdentity = Schema.Struct({ playerId: PlayerId, actorId: ActorId });
@@ -138,15 +150,17 @@ export const TableParticipant = Schema.Struct({ tableId: TableId, player: Player
 export type TableParticipant = typeof TableParticipant.Type;
 
 /**
- * Everything at the tables this account or device started, and its own play at the tables it
- * joined. `participants` are who joined the tables it started, and who it joined others' as.
- * `commands` are in the order the server applied them, whoever made them.
+ * Everything at the tables this account or device started or records at, and its own play at
+ * the tables it joined. `participants` are who joined those tables, and who it plays as at
+ * others'. `players` are anyone else whose play it sees. `commands` are in the order the server
+ * applied them, whoever made them.
  */
 export const RecordingHistory = Schema.Struct({
   identity: Schema.NullOr(RecordingIdentity),
   commands: Schema.Array(RecordingCommand),
   tables: Schema.Array(Table),
   participants: Schema.Array(TableParticipant),
+  players: Schema.Array(PlayerIdentity),
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
 });
@@ -155,14 +169,18 @@ export type RecordingHistory = typeof RecordingHistory.Type;
 /**
  * One table as its starter, a player who joined it, or anyone with its share link sees it: each
  * visit's totals, never its entries, whose audit fields name actors. `viewerPlayerId` is the
- * viewer's own player there, if they have one.
+ * viewer's own player there, if they have one. `recorders` record for everyone. Only the starter
+ * sees `appointable`, the players with accounts, and whether the table is `shared`.
  */
 export const TableView = Schema.Struct({
   table: Table,
   players: Schema.Array(PlayerIdentity),
   visits: Schema.Array(VisitSummary),
-  viewerRole: Schema.Literals(["starter", "participant", "viewer"]),
+  viewerRole: Schema.Literals(["starter", "recorder", "participant", "viewer"]),
   viewerPlayerId: Schema.NullOr(PlayerId),
+  recorders: Schema.Array(PlayerId),
+  appointable: Schema.Array(PlayerId),
+  shared: Schema.Boolean,
 });
 export type TableView = typeof TableView.Type;
 
@@ -184,3 +202,31 @@ export type JoinTableRequest = typeof JoinTableRequest.Type;
 
 export const JoinedTable = Schema.Struct({ table: Table, player: PlayerIdentity });
 export type JoinedTable = typeof JoinedTable.Type;
+
+/** A personal invite's link. Only its hash is kept; issuing another revokes this one. */
+export const PlayerInviteLink = Schema.Struct({ id: PlayerInviteId, token: Schema.String });
+export type PlayerInviteLink = typeof PlayerInviteLink.Type;
+
+/** What an invite link shows before it's used: whose play it records, and who sent it. */
+export const PlayerInvitePreview = Schema.Struct({
+  player: PlayerIdentity,
+  invitedBy: Schema.String,
+});
+export type PlayerInvitePreview = typeof PlayerInvitePreview.Type;
+
+/** Redeems a personal invite as the recorder's own actor. `identity` is as in a push. */
+export const RedeemInviteRequest = Schema.Struct({ identity: RecordingIdentity });
+export type RedeemInviteRequest = typeof RedeemInviteRequest.Type;
+
+/**
+ * Who else records as a player: the open invite, if any, and the actors bound to them through a
+ * link or an invite. An actor's own player is never listed; it can't be revoked.
+ */
+export const PlayerAccess = Schema.Struct({
+  player: PlayerIdentity,
+  invite: Schema.NullOr(Schema.Struct({ id: PlayerInviteId, createdAt: Schema.DateTimeUtc })),
+  devices: Schema.Array(
+    Schema.Struct({ actorId: ActorId, boundVia: Schema.Literals(["join", "invite"]) }),
+  ),
+});
+export type PlayerAccess = typeof PlayerAccess.Type;

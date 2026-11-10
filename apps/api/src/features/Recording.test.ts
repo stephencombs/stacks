@@ -197,6 +197,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
         commands: [],
         tables: [],
         participants: [],
+        players: [],
         visits: [],
         entries: [],
       });

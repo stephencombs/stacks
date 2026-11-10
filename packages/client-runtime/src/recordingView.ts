@@ -73,16 +73,24 @@ export const recordingHome = (state: RecordingState): RecordingHome => {
 
 export type RecordingTableView = {
   readonly table: Table;
-  /** `starter` records for everyone here; `participant` joined through the link, for itself. */
-  readonly role: "starter" | "participant";
+  /**
+   * `starter` records for everyone here, and so does a `recorder` it appointed; a `participant`
+   * records for itself.
+   */
+  readonly role: "starter" | "recorder" | "participant";
   /** The player this device is at this table, and their visit in play, if any. */
   readonly you: { readonly player: PlayerIdentity; readonly playing: VisitId | null };
   /** Every visit on this device at the table: still playing first, then by when they started. */
   readonly visits: ReadonlyArray<
     VisitSummary & { readonly player: PlayerIdentity; readonly isSelf: boolean }
   >;
-  /** Players the starter can add now: saved players without a visit in play here. */
+  /**
+   * Players this device can add now, without a visit in play here: the starter's saved players,
+   * or, for a recorder, the players already at the table.
+   */
   readonly addable: ReadonlyArray<PlayerIdentity>;
+  /** The players the starter appointed to record for everyone here. */
+  readonly recorders: ReadonlyArray<PlayerIdentity>;
 };
 
 /** The table a visit is at, with everyone recorded there. */
@@ -94,9 +102,11 @@ export const recordingTable = (
   if (!table) return null;
   const players = new Map(state.players.map((player) => [player.id, player]));
   const starter = table.starterPlayerId === state.self.id;
-  const you = starter
-    ? state.self
-    : players.get(state.participants.find((item) => item.tableId === tableId)!.playerId)!;
+  const here = state.participants.filter((item) => item.tableId === tableId);
+  const recorders = state.recorders.filter((item) => item.tableId === tableId);
+  const recording = here.find((item) => recorders.some((r) => r.playerId === item.playerId));
+  const you = starter ? state.self : players.get((recording ?? here[0]!).playerId)!;
+  const role = starter ? "starter" : recording ? "recorder" : "participant";
   const visits = state.visits
     .filter((visit) => visit.tableId === tableId)
     .map((visit) => ({
@@ -113,9 +123,13 @@ export const recordingTable = (
     visits.filter((item) => item.visit.finishedAt === null).map((item) => item.player.id),
   );
   const joined = new Set(state.participants.map((item) => item.playerId));
+  const seated = new Set([
+    ...visits.map((item) => item.player.id),
+    ...here.map((item) => item.playerId),
+  ]);
   return {
     table,
-    role: starter ? "starter" : "participant",
+    role,
     you: {
       player: you,
       playing:
@@ -132,7 +146,10 @@ export const recordingTable = (
                 (item) => item.playerId === player.id && item.tableId === tableId,
               )),
         )
-      : [],
+      : role === "recorder"
+        ? state.players.filter((player) => seated.has(player.id) && !playing.has(player.id))
+        : [],
+    recorders: recorders.flatMap((item) => players.get(item.playerId) ?? []),
   };
 };
 
@@ -170,7 +187,7 @@ export const recordingVisit = (
   let finalCashOutId: EntryId | null = null;
   const finishCashOuts = new Set<EntryId>();
   for (const { command } of state.receipts) {
-    if (command.visitId !== visitId) continue;
+    if (!("visitId" in command) || command.visitId !== visitId) continue;
     if (command.type === "finish") {
       events.push({ type: "finished", at: command.finishedAt });
       finalCashOutId = command.entryId;
@@ -352,14 +369,18 @@ export const describeRecordingRejection = ({ command, reason }: RecordingRejecti
               ? `Finishing with ${money(command.amount)}`
               : command.type === "correct"
                 ? "A correction"
-                : "Reopening a session";
+                : command.type === "reopen"
+                  ? "Reopening a session"
+                  : command.type === "appoint_recorder"
+                    ? "Letting a player record for everyone"
+                    : "Stopping a recorder";
   const why =
     reason === "conflict"
       ? "The session changed on another device."
       : reason === "operation_reused"
         ? "Your account already has it with different details."
         : reason === "forbidden"
-          ? "At a table you joined, you can record only your own play."
+          ? "At this table you can record only your own play."
           : "It doesn't fit the session as your account has it.";
   return `${what} didn't sync. ${why}`;
 };
@@ -387,7 +408,8 @@ export const recordingSyncView = (
   sync: RecordingSyncStatus | null,
   visitId?: VisitId,
 ): RecordingSyncView => {
-  const mine = (command: RecordingCommand) => visitId === undefined || command.visitId === visitId;
+  const mine = (command: RecordingCommand) =>
+    visitId === undefined || ("visitId" in command && command.visitId === visitId);
   const rejected = (state?.sync?.rejected ?? [])
     .filter((item) => mine(item.command))
     .map((item) => ({

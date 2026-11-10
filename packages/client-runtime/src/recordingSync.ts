@@ -1,10 +1,22 @@
-import { PlayerId, type PlayEntry, type TableId, type UserId } from "@stacks/contracts";
 import {
+  PlayerId,
+  type ActorId,
+  type PlayEntry,
+  type PlayerIdentity,
+  type PlayerInviteId,
+  type TableId,
+  type UserId,
+} from "@stacks/contracts";
+import {
+  isTableCommand,
   RecordingCommand,
   RecordingOperationId,
   type ActorCredential,
   type JoinedTable,
   type JoinTableRequest,
+  type PlayerAccess,
+  type PlayerInviteLink,
+  type RedeemInviteRequest,
   type ShareLink,
   type TableView,
   type PushRecordingRequest,
@@ -53,6 +65,28 @@ export interface RecordingTransport {
     request: JoinTableRequest,
     actor: ActorCredential | null,
   ) => Effect.Effect<JoinedTable, unknown>;
+  readonly invitePlayer: (
+    playerId: PlayerId,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<PlayerInviteLink, unknown>;
+  readonly playerAccess: (
+    playerId: PlayerId,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<PlayerAccess, unknown>;
+  readonly revokeBinding: (
+    playerId: PlayerId,
+    actorId: ActorId,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<void, unknown>;
+  readonly revokeInvite: (
+    inviteId: PlayerInviteId,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<void, unknown>;
+  readonly redeemInvite: (
+    token: string,
+    request: RedeemInviteRequest,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<PlayerIdentity, unknown>;
 }
 
 /** Whether the server has the table, so it can be shared. */
@@ -212,11 +246,18 @@ export const mergeRecordingHistory = (
     ...state,
     self,
     actor: { id: actorId, userId: null },
-    players: [self, ...history.participants.map((item) => item.player)],
+    players: [
+      ...new Map(
+        [self, ...history.participants.map((item) => item.player), ...history.players].map(
+          (player) => [player.id, player],
+        ),
+      ).values(),
+    ],
     participants: history.participants.map((item) => ({
       tableId: item.tableId,
       playerId: item.player.id,
     })),
+    recorders: [],
     tables: history.tables.filter((table) => table.starterPlayerId !== self.id),
     visits: [],
     entries: [],
@@ -262,6 +303,7 @@ const settled = (
 ) => {
   const held = remote.get(command.operationId);
   if (held) return commandText(held) === commandText(command);
+  if (isTableCommand(command)) return false;
   const visit = ledger.visits.find((item) => item.id === command.visitId);
   if (!visit) return false;
   const entry = (
@@ -395,6 +437,8 @@ const optional = <K extends string, V>(key: K, value: V | null) =>
  * visit and entries of a start recorded again to their new IDs.
  */
 const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): RecordingInput => {
+  if (isTableCommand(command))
+    return { type: command.type, tableId: command.tableId, playerId: command.playerId };
   const visitId = (ids.get(command.visitId) ?? command.visitId) as typeof command.visitId;
   switch (command.type) {
     case "start":
@@ -485,10 +529,13 @@ export const discardRejected = (state: RecordingState, operationId: RecordingOpe
  */
 export const recordRejectedAgain = (state: RecordingState, operationId: RecordingOperationId) => {
   const { rejection } = withoutRejection(state, operationId);
+  const refused = rejection.command;
   const chain =
-    rejection.command.type === "start" || rejection.command.type === "record_completed"
+    refused.type === "start" || refused.type === "record_completed"
       ? state.sync!.rejected.filter(
-          (item) => item === rejection || item.command.visitId === rejection.command.visitId,
+          (item) =>
+            item === rejection ||
+            ("visitId" in item.command && item.command.visitId === refused.visitId),
         )
       : [rejection];
   const ids = new Map<string, string>();
@@ -496,7 +543,8 @@ export const recordRejectedAgain = (state: RecordingState, operationId: Recordin
   for (const item of chain) {
     next = withoutRejection(next, item.command.operationId).state;
     const command = prepareRecordingCommand(next, inputOf(item.command, ids));
-    ids.set(item.command.visitId, command.visitId);
+    if ("visitId" in item.command && "visitId" in command)
+      ids.set(item.command.visitId, command.visitId);
     if ("tableId" in item.command && "tableId" in command)
       ids.set(item.command.tableId, command.tableId);
     const before = createdEntryIds(item.command);
@@ -623,6 +671,15 @@ export const makeRecordingSync = (
     }
   }).pipe(Effect.scoped, Effect.ensuring(Effect.sync(() => (signal = null))));
 
+  const online = async <A>(
+    call: (actor: ActorCredential | null) => Effect.Effect<A, unknown>,
+  ): Promise<A> => {
+    const state = store.getSnapshot().state;
+    if (!state) throw new RecordingError("load", "Recording isn't loaded.");
+    const actor = userId === null ? await actorCredential(keys, state.actor.id) : null;
+    return Effect.runPromise(call(actor));
+  };
+
   const sharing = async <A>(
     tableId: TableId,
     call: (tableId: TableId, actor: ActorCredential | null) => Effect.Effect<A, unknown>,
@@ -657,11 +714,38 @@ export const makeRecordingSync = (
     /** Stops the table's link working. */
     unshare: (tableId: TableId) => sharing(tableId, transport.unshare),
     /** The whole table as the server has it, for a table this device started or joined. */
-    table: async (tableId: TableId) => {
-      const state = store.getSnapshot().state;
-      if (!state) throw new RecordingError("load", "Recording isn't loaded.");
+    table: (tableId: TableId) => online((actor) => transport.table(tableId, actor)),
+    /** A single-use link that lets another device record as `playerId`. */
+    invitePlayer: (playerId: PlayerId) =>
+      online((actor) => transport.invitePlayer(playerId, actor)),
+    /** The open invite and the other devices recording as `playerId`. */
+    playerAccess: (playerId: PlayerId) =>
+      online((actor) => transport.playerAccess(playerId, actor)),
+    revokeBinding: (playerId: PlayerId, actorId: ActorId) =>
+      online((actor) => transport.revokeBinding(playerId, actorId, actor)),
+    revokeInvite: (inviteId: PlayerInviteId) =>
+      online((actor) => transport.revokeInvite(inviteId, actor)),
+    /**
+     * Records as the player a personal invite names, from now on. It needs the network once; the
+     * next pull brings that player's tables and play.
+     */
+    redeem: async (token: string) => {
+      await store.transform((state) =>
+        state.sync ? state : { ...state, sync: { userId: null, synced: [], rejected: [] } },
+      );
+      const state = store.getSnapshot().state!;
       const actor = userId === null ? await actorCredential(keys, state.actor.id) : null;
-      return Effect.runPromise(transport.table(tableId, actor));
+      if (actor) await Effect.runPromise(transport.registerActor(actor));
+      const player = await Effect.runPromise(
+        transport.redeemInvite(
+          token,
+          { identity: { playerId: state.self.id, actorId: state.actor.id } },
+          actor,
+        ),
+      );
+      pull = true;
+      signal?.("wake");
+      return player;
     },
     /**
      * Joins a shared table as a new player named `displayName`, which needs the network once.

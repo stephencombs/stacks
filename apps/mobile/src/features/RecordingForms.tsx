@@ -296,7 +296,8 @@ const details = (game: GameChoice, highLimit: boolean) => ({
   highLimit,
 });
 
-const startedVisit = (receipt: RecordingReceipt) => receipt.command.visitId;
+const startedVisit = (receipt: RecordingReceipt) =>
+  "visitId" in receipt.command ? receipt.command.visitId : null;
 
 export function StartSheet({
   onClose,
@@ -324,7 +325,8 @@ export function StartSheet({
           buyIn: amount,
           ...details(game, highLimit),
         });
-        if (receipt) onStarted(startedVisit(receipt));
+        const visitId = receipt && startedVisit(receipt);
+        if (visitId) onStarted(visitId);
       }}
     >
       <KeypadAmount label="Buy-in" amount={buyIn} />
@@ -403,7 +405,8 @@ export function PastSessionSheet({
           finishedAt: parsed.finishedAt,
           ...details(game, highLimit),
         });
-        if (receipt) onAdded(startedVisit(receipt));
+        const visitId = receipt && startedVisit(receipt);
+        if (visitId) onAdded(visitId);
       }}
     >
       <View className="flex-row gap-3">
@@ -810,7 +813,7 @@ export function SitDownSheet({
           playerId: player.id,
           buyIn: value,
         });
-        if (receipt) onSeated(receipt.command.visitId);
+        if (receipt?.command.type === "join_table") onSeated(receipt.command.visitId);
       }}
     >
       <KeypadAmount label="Buy-in" amount={amount} />

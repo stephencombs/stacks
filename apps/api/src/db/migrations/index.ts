@@ -15,6 +15,7 @@ import personalRecording from "./0012_personal_recording.ts";
 import legacyImport from "./0013_legacy_import.ts";
 import sharedTables from "./0014_shared_tables.ts";
 import tableParticipants from "./0015_table_participants.ts";
+import invitesRecorders from "./0016_invites_recorders.ts";
 
 export const records = {
   "0001_init": init,
@@ -32,6 +33,7 @@ export const records = {
   "0013_legacy_import": legacyImport,
   "0014_shared_tables": sharedTables,
   "0015_table_participants": tableParticipants,
+  "0016_invites_recorders": invitesRecorders,
 };
 
 export const migrations = Migrator.fromRecord(records);

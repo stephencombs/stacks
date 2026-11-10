@@ -8,6 +8,7 @@ import {
   ActorId,
   Conflict,
   CurrentUser,
+  Forbidden,
   NotFound,
   PlayEntry,
   PlayerIdentity,
@@ -19,6 +20,7 @@ import {
   type TableId,
 } from "@stacks/contracts";
 import {
+  isTableCommand,
   RecordingCommand,
   type ActorCredential,
   type JoinedTable,
@@ -89,8 +91,8 @@ const commandJson = Schema.encodeSync(Schema.toCodecJson(RecordingCommand));
 const commandText = (command: RecordingCommand) => JSON.stringify(commandJson(command));
 const date = DateTime.toDateUtc;
 
-/** Secrets and share tokens are 32 random bytes, so a fast hash is enough to keep them unusable. */
-const digest = (secret: string) =>
+/** Secrets and tokens are 32 random bytes, so a fast hash is enough to keep them unusable. */
+export const digest = (secret: string) =>
   Effect.promise(() => crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret))).pipe(
     Effect.map((hash) => Buffer.from(hash).toString("hex")),
   );
@@ -119,14 +121,41 @@ const verifiedActor = Effect.fn("Recording.verifiedActor")(function* (
   return id;
 });
 
+export const randomToken = () =>
+  Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
+
+/**
+ * Who is at each table, as `(table_id, player_id)`: who joined through its link, and the players
+ * bound to an actor through a personal invite, at the tables where they play.
+ */
+const tablePlayers = (sql: SqlClient.SqlClient) => sql`(
+  select table_id, player_id from table_participants
+  union
+  select v.table_id, v.player_id from personal_visits v
+  where exists (
+    select 1 from player_actors pa
+    where pa.player_id = v.player_id and pa.bound_via = 'invite' and pa.revoked_at is null
+  )
+)`;
+
+/** Who records for everyone at each table, as `(table_id, player_id)`: the latest word wins. */
+const tableRecorders = (sql: SqlClient.SqlClient) => sql`(
+  select table_id, player_id from (
+    select distinct on (table_id, command ->> 'playerId')
+      table_id, (command ->> 'playerId')::uuid as player_id, command ->> 'type' as type
+    from personal_operations where visit_id is null
+    order by table_id, command ->> 'playerId', seq desc
+  ) latest where type = 'appoint_recorder'
+)`;
+
 const boundPlayers = Effect.fn("Recording.boundPlayers")(function* (actorId: string) {
   const sql = yield* SqlClient.SqlClient;
   return yield* sql<{ playerId: PlayerId }>`
-    select player_id from player_actors where actor_id = ${actorId}
+    select player_id from player_actors where actor_id = ${actorId} and revoked_at is null
   `.pipe(Effect.map((rows) => rows.map((row) => row.playerId)));
 });
 
-const principal = Effect.fn("Recording.principal")(function* () {
+export const principal = Effect.fn("Recording.principal")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const recorder = yield* Recorder;
   if (recorder._tag === "Account") {
@@ -173,7 +202,15 @@ const entryOf = (entry: typeof PersonalEntryRow.Type) =>
 const participantsAt = Effect.fn("Recording.participantsAt")(function* (tableId: TableId) {
   const sql = yield* SqlClient.SqlClient;
   const rows = yield* sql<{ playerId: PlayerId }>`
-    select player_id from table_participants where table_id = ${tableId}
+    select player_id from ${tablePlayers(sql)} t where table_id = ${tableId}
+  `;
+  return rows.map((row): Participant => ({ tableId, playerId: row.playerId }));
+});
+
+const recordersAt = Effect.fn("Recording.recordersAt")(function* (tableId: TableId) {
+  const sql = yield* SqlClient.SqlClient;
+  const rows = yield* sql<{ playerId: PlayerId }>`
+    select player_id from ${tableRecorders(sql)} r where table_id = ${tableId}
   `;
   return rows.map((row): Participant => ({ tableId, playerId: row.playerId }));
 });
@@ -195,12 +232,14 @@ const lockTable = Effect.fn("Recording.lockTable")(function* (
   if (row.starterPlayerId === null) return yield* new Rejected(readOnly);
   const table = tableOf(row, row.starterPlayerId);
   const participants = yield* participantsAt(table.id);
+  const recorders = yield* recordersAt(table.id);
   if (
     !actorPlayers.includes(table.starterPlayerId) &&
-    !participants.some((item) => actorPlayers.includes(item.playerId))
+    !participants.some((item) => actorPlayers.includes(item.playerId)) &&
+    !recorders.some((item) => actorPlayers.includes(item.playerId))
   )
     return yield* new Rejected(forbidden);
-  return { table, participants };
+  return { table, participants, recorders };
 });
 
 /** What a command needs to see, with its table and then its visit locked. */
@@ -216,11 +255,38 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
     actor: { id: self.actorId, userId: null },
     players: [me],
     participants: [],
+    recorders: [],
     tables: [],
     visits: [],
     entries: [],
     receipts: [],
   };
+  if (isTableCommand(command)) {
+    const { table, participants, recorders } = yield* lockTable(command.tableId, actorPlayers);
+    // The rules refuse anyone else too; first, so they learn nothing about the player.
+    if (!actorPlayers.includes(table.starterPlayerId))
+      return yield* new Rejected({
+        reason: "forbidden",
+        message: "Only the player who started this table can do that.",
+      });
+    if (command.type === "appoint_recorder") {
+      if (!participants.some((item) => item.playerId === command.playerId))
+        return yield* new Rejected({
+          reason: "invalid",
+          message: "Only a player who joined this table can record for it.",
+        });
+      const account = yield* sql`
+        select 1 from player_actors pa join recording_actors a on a.id = pa.actor_id
+        where pa.player_id = ${command.playerId} and pa.revoked_at is null and a.kind = 'account'
+      `;
+      if (account.length === 0)
+        return yield* new Rejected({
+          reason: "invalid",
+          message: "Only a player with an account can record for everyone.",
+        });
+    }
+    return { ...ledger, participants, recorders, tables: [table] };
+  }
   if (command.type === "start" || command.type === "record_completed") {
     const taken = yield* sql`
       select 1 from personal_visits where id = ${command.visitId}
@@ -230,7 +296,7 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
     return ledger;
   }
   if (command.type === "join_table") {
-    const { table, participants } = yield* lockTable(command.tableId, actorPlayers);
+    const { table, participants, recorders } = yield* lockTable(command.tableId, actorPlayers);
     const taken = yield* sql`select 1 from personal_visits where id = ${command.visitId}`;
     if (taken.length > 0) return yield* new Rejected(sessionRecorded);
     const visits = yield* sql`select * from personal_visits where table_id = ${table.id}`.pipe(
@@ -241,24 +307,33 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
       const used = yield* sql`select 1 from players where id = ${command.newPlayer.id}`;
       if (used.length > 0) return yield* new Rejected(playerRecorded);
     } else if (command.playerId !== self.playerId) {
-      // Only players this actor added or holds, or who joined this table, can be chosen: never
+      // Only players this actor added or holds, or who are at this table, can be chosen: never
       // someone found by name.
       const saved = yield* sql`
         select id, display_name from players
         where id = ${command.playerId}
           and (created_by_actor = ${self.actorId}
-            or id in (select player_id from player_actors where actor_id = ${self.actorId})
-            or id in (select player_id from table_participants where table_id = ${table.id}))
+            or id in (select player_id from player_actors
+              where actor_id = ${self.actorId} and revoked_at is null)
+            or id in (select player_id from ${tablePlayers(sql)} t where table_id = ${table.id})
+            or id in (select player_id from personal_visits where table_id = ${table.id}))
       `.pipe(Effect.flatMap(Access.decodeRows(PlayerIdentityRow)));
       players = [...players, ...saved.map((row) => PlayerIdentity.make(row))];
     }
-    return { ...ledger, players, participants, tables: [table], visits: visits.map(visitOf) };
+    return {
+      ...ledger,
+      players,
+      participants,
+      recorders,
+      tables: [table],
+      visits: visits.map(visitOf),
+    };
   }
   const [located] = yield* sql<{ tableId: TableId }>`
     select table_id from personal_visits where id = ${command.visitId}
   `;
   if (!located) return yield* new Rejected({ reason: "invalid", message: "Visit does not exist." });
-  const { table, participants } = yield* lockTable(located.tableId, actorPlayers);
+  const { table, participants, recorders } = yield* lockTable(located.tableId, actorPlayers);
   yield* sql`select 1 from personal_visits where id = ${command.visitId} for update`;
   const visits = yield* sql`select * from personal_visits where table_id = ${table.id}`.pipe(
     Effect.flatMap(Access.decodeRows(PersonalVisitRow)),
@@ -274,6 +349,7 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
   return {
     ...ledger,
     participants,
+    recorders,
     tables: [table],
     visits: visits.map(visitOf),
     entries: entries.map(entryOf),
@@ -288,6 +364,14 @@ const save = Effect.fn("Recording.save")(function* (
   command: RecordingCommand,
 ) {
   const sql = yield* SqlClient.SqlClient;
+  if (isTableCommand(command)) {
+    yield* sql`
+      insert into personal_operations (id, player_id, visit_id, table_id, actor_id, command)
+      values (${command.operationId}, ${self.playerId}, null, ${command.tableId},
+        ${self.actorId}, ${commandText(command)}::jsonb)
+    `;
+    return;
+  }
   for (const table of after.tables.filter((table) => !before.tables.includes(table))) {
     yield* sql`
       insert into tables (id, starter_player_id, game, venue_id, high_limit)
@@ -426,7 +510,9 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
  * identity; a device with a different one must pull and adopt it first. A device actor's first
  * write creates the player it records as.
  */
-const establish = Effect.fn("Recording.establish")(function* (identity: RecordingIdentityType) {
+export const establish = Effect.fn("Recording.establish")(function* (
+  identity: RecordingIdentityType,
+) {
   const sql = yield* SqlClient.SqlClient;
   const recorder = yield* Recorder;
   const { playerId, actorId } = identity;
@@ -497,35 +583,61 @@ export const history = Effect.fn("Recording.history")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const { self, actorPlayers } = yield* principal();
   if (!self || actorPlayers.length === 0)
-    return { identity: null, commands: [], tables: [], participants: [], visits: [], entries: [] };
+    return {
+      identity: null,
+      commands: [],
+      tables: [],
+      participants: [],
+      players: [],
+      visits: [],
+      entries: [],
+    };
   const mine = sql.in(actorPlayers);
-  // Everything at the tables it started; at the tables it joined, only its own play.
-  const started = sql`(select id from tables where starter_player_id in ${mine})`;
-  const joined = sql`(select player_id from table_participants where player_id in ${mine})`;
+  // Everything at the tables it started or records for; elsewhere, only its own play, and what it
+  // recorded there while it could.
+  const whole = sql`(
+    select id from tables where starter_player_id in ${mine}
+    union select table_id from ${tableRecorders(sql)} r where player_id in ${mine}
+  )`;
+  const at = sql`(select table_id from ${tablePlayers(sql)} t where player_id in ${mine})`;
   const visible = sql`(
-    select id from personal_visits where table_id in ${started} or player_id in ${joined}
+    select id from personal_visits
+    where table_id in ${whole} or player_id in ${mine}
+      or (table_id in ${at} and id in (
+        select visit_id from personal_operations where actor_id = ${self.actorId}))
   )`;
   const tables = yield* sql`
-    select * from tables
-    where id in ${started}
-      or id in (select table_id from table_participants where player_id in ${mine})
-    order by id
+    select * from tables where id in ${whole} or id in ${at} order by id
   `.pipe(Effect.flatMap(Access.decodeRows(TableRow)));
+  // Who joined the tables it sees whole, and who it is at others'. A table it started lists only
+  // who joined through the link: it added everyone else itself.
   const participants = yield* sql`
-    select tp.table_id, p.id, p.display_name
-    from table_participants tp join players p on p.id = tp.player_id
-    where tp.table_id in ${started} or tp.player_id in ${mine}
-    order by tp.joined_at, p.id
+    select t.table_id, p.id, p.display_name
+    from ${tablePlayers(sql)} t join players p on p.id = t.player_id
+    where t.player_id in ${mine}
+      or (t.table_id in ${whole} and (
+        t.table_id not in (select id from tables where starter_player_id in ${mine})
+        or (t.table_id, t.player_id) in (select table_id, player_id from table_participants)))
+    order by t.table_id, p.id
   `.pipe(Effect.flatMap(Access.decodeRows(ParticipantRow)));
   const visits = yield* sql`
     select * from personal_visits where id in ${visible} order by started_at, id
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalVisitRow)));
+  const known = new Set<string>([self.playerId, ...participants.map((row) => row.id)]);
+  const players = yield* sql`
+    select id, display_name from players
+    where id in (select player_id from personal_visits where id in ${visible})
+    order by id
+  `.pipe(
+    Effect.flatMap(Access.decodeRows(PlayerIdentityRow)),
+    Effect.map((rows) => rows.filter((row) => !known.has(row.id))),
+  );
   const entries = yield* sql`
     select * from personal_entries where visit_id in ${visible} order by created_at, id
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalEntryRow)));
   const operations = yield* sql`
     select actor_id, command from personal_operations
-    where table_id in ${started} or visit_id in ${visible}
+    where table_id in ${whole} or visit_id in ${visible}
     order by seq
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalOperationRow)));
   return {
@@ -536,6 +648,7 @@ export const history = Effect.fn("Recording.history")(function* () {
       tableId,
       player: PlayerIdentity.make(player),
     })),
+    players: players.map((player) => PlayerIdentity.make(player)),
     visits: visits.map(visitOf),
     entries: entries.map(entryOf),
   };
@@ -556,6 +669,17 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
       or id in (select player_id from table_participants where table_id = ${row.id})
     order by display_name, id
   `.pipe(Effect.flatMap(Access.decodeRows(PlayerIdentityRow)));
+  const recorders = yield* recordersAt(row.id);
+  // Players with an account, who could record for everyone: only the starter appoints.
+  const appointable =
+    viewerRole === "starter"
+      ? yield* sql<{ playerId: PlayerId }>`
+          select distinct t.player_id from ${tablePlayers(sql)} t
+          join player_actors pa on pa.player_id = t.player_id and pa.revoked_at is null
+          join recording_actors a on a.id = pa.actor_id and a.kind = 'account'
+          where t.table_id = ${row.id}
+        `.pipe(Effect.map((rows) => rows.map((item) => item.playerId)))
+      : [];
   const entries = yield* sql`
     select e.* from personal_entries e join personal_visits v on v.id = e.visit_id
     where v.table_id = ${row.id}
@@ -566,24 +690,18 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
     visits: visits.map((visit) => visitSummary(visitOf(visit), entries.map(entryOf))),
     viewerRole,
     viewerPlayerId,
+    recorders: recorders.map((item) => item.playerId),
+    appointable,
+    shared: viewerRole === "starter" && row.shareTokenHash !== null,
   };
   return view;
 });
 
-/** A table this recorder started. Any other table is a 404, so its existence stays private. */
-const startedTable = Effect.fn("Recording.startedTable")(function* (tableId: TableId) {
-  const sql = yield* SqlClient.SqlClient;
-  const { actorPlayers } = yield* principal();
-  if (actorPlayers.length === 0) return yield* new NotFound({ resource: "table" });
-  const [row] = yield* sql`
-    select * from tables where id = ${tableId} and starter_player_id in ${sql.in(actorPlayers)}
-  `.pipe(Effect.flatMap(Access.decodeRows(TableRow)));
-  if (!row?.starterPlayerId) return yield* new NotFound({ resource: "table" });
-  return { ...row, starterPlayerId: row.starterPlayerId };
-});
-
-/** A table this recorder started or joined. Any other is a 404, so its existence stays private. */
-export const table = Effect.fn("Recording.table")(function* (tableId: TableId) {
+/**
+ * A table this recorder started, joined or records for, and its role there. Any other is a 404, so
+ * its existence stays private.
+ */
+const tableAccess = Effect.fn("Recording.tableAccess")(function* (tableId: TableId) {
   const sql = yield* SqlClient.SqlClient;
   const { actorPlayers } = yield* principal();
   if (actorPlayers.length === 0) return yield* new NotFound({ resource: "table" });
@@ -593,20 +711,39 @@ export const table = Effect.fn("Recording.table")(function* (tableId: TableId) {
   if (!row?.starterPlayerId) return yield* new NotFound({ resource: "table" });
   const at = { ...row, starterPlayerId: row.starterPlayerId };
   if (actorPlayers.includes(row.starterPlayerId))
-    return yield* viewOf(at, "starter", row.starterPlayerId);
-  const [joined] = yield* sql<{ playerId: PlayerId }>`
-    select player_id from table_participants
-    where table_id = ${row.id} and player_id in ${sql.in(actorPlayers)}
-  `;
-  if (!joined) return yield* new NotFound({ resource: "table" });
-  return yield* viewOf(at, "participant", joined.playerId);
+    return { row: at, role: "starter" as const, playerId: row.starterPlayerId };
+  const recorder = (yield* recordersAt(row.id)).find((item) =>
+    actorPlayers.includes(item.playerId),
+  );
+  const joined = (yield* participantsAt(row.id)).find((item) =>
+    actorPlayers.includes(item.playerId),
+  );
+  const player = recorder ?? joined;
+  if (!player) return yield* new NotFound({ resource: "table" });
+  return {
+    row: at,
+    role: recorder ? ("recorder" as const) : ("participant" as const),
+    playerId: player.playerId,
+  };
+});
+
+/** A table this recorder started. Anyone else at it is refused; anyone else gets a 404. */
+const startedTable = Effect.fn("Recording.startedTable")(function* (tableId: TableId) {
+  const access = yield* tableAccess(tableId);
+  if (access.role !== "starter") return yield* new Forbidden({ reason: "starter_only" });
+  return access.row;
+});
+
+export const table = Effect.fn("Recording.table")(function* (tableId: TableId) {
+  const { row, role, playerId } = yield* tableAccess(tableId);
+  return yield* viewOf(row, role, playerId);
 });
 
 /** A new read-only link. Only its hash is kept, so an earlier link stops working. */
 export const share = Effect.fn("Recording.share")(function* (tableId: TableId) {
   const sql = yield* SqlClient.SqlClient;
   const row = yield* startedTable(tableId);
-  const token = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
+  const token = randomToken();
   yield* sql`update tables set share_token_hash = ${yield* digest(token)} where id = ${row.id}`;
   return { token };
 });
@@ -637,8 +774,11 @@ export const join = Effect.fn("Recording.join")(function* (
   request: JoinTableRequest,
 ) {
   const sql = yield* SqlClient.SqlClient;
-  const { self, actorPlayers } = yield* establish(request.identity);
   const hash = yield* digest(token);
+  // A bad link creates nothing, not even the recorder's own player.
+  const linked = yield* sql`select 1 from tables where share_token_hash = ${hash}`;
+  if (linked.length === 0) return yield* new NotFound({ resource: "table" });
+  const { self, actorPlayers } = yield* establish(request.identity);
   const attempt = Effect.gen(function* () {
     const [row] = yield* sql`select * from tables where share_token_hash = ${hash} for update`.pipe(
       Effect.flatMap(Access.decodeRows(TableRow)),
@@ -650,7 +790,7 @@ export const join = Effect.fn("Recording.join")(function* (
     const [existing] = yield* sql`
       select p.id, p.display_name
       from table_participants tp
-      join player_actors pa on pa.player_id = tp.player_id
+      join player_actors pa on pa.player_id = tp.player_id and pa.revoked_at is null
       join players p on p.id = tp.player_id
       where tp.table_id = ${table.id} and pa.actor_id = ${self.actorId}
     `.pipe(Effect.flatMap(Access.decodeRows(PlayerIdentityRow)));

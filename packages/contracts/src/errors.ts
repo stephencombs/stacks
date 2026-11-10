@@ -17,6 +17,7 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()(
       "not_your_stake",
       "not_your_trip",
       "not_your_player",
+      "starter_only",
     ]),
   },
   { httpApiStatus: 403 },
@@ -67,6 +68,7 @@ export const ConflictReason = Schema.Literals([
   "recording_identity",
   "actor_taken",
   "table_starter",
+  "too_many_devices",
 ]);
 export type ConflictReason = typeof ConflictReason.Type;
 
