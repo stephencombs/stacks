@@ -29,6 +29,7 @@ import type { ReactNode } from "react";
 import { FormError } from "~/components/ui/Field";
 import { Skeleton } from "~/components/ui/Surface";
 import { useAccount } from "./account";
+import { indexedDBActorKeys as actorKeys } from "@stacks/client-runtime/actorKeysIndexedDB";
 import { captureTestEvent } from "./telemetry";
 
 /**
@@ -40,7 +41,12 @@ export function SignedInProvider({ children }: { children: ReactNode }) {
   const userId = (account.available && account.isSignedIn && account.userId) || null;
   return (
     <SignedInRoot userId={userId} make={signIn} wake={wakeOutbox}>
-      <RecordingSyncRoot userId={userId} connect={connectRecording} wake={wakeOutbox}>
+      <RecordingSyncRoot
+        userId={userId}
+        connect={connectRecording}
+        keys={actorKeys}
+        wake={wakeOutbox}
+      >
         {children}
       </RecordingSyncRoot>
     </SignedInRoot>

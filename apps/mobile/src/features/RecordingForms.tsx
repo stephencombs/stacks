@@ -1,4 +1,12 @@
-import { Game, MinorUnits, type PlayEntry, type VisitId } from "@stacks/contracts";
+import {
+  Game,
+  MinorUnits,
+  type PlayEntry,
+  type PlayerId,
+  type PlayerIdentity,
+  type TableId,
+  type VisitId,
+} from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
 import type { RecordingInput, RecordingReceipt } from "@stacks/client-runtime/recording";
 import { useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
@@ -697,6 +705,75 @@ export function ReopenSheet({
           final cash-out will be voided, since you never cashed out.
         </Text>
       ) : null}
+    </RecordingSheet>
+  );
+}
+
+const NEW_PLAYER = "new";
+
+/**
+ * Starts a visit at this table for another player: one saved on this device, or someone new by
+ * name. A name never finds or merges anyone; a new name is always a new player.
+ */
+export function AddPlayerSheet({
+  tableId,
+  saved,
+  onClose,
+  onAdded,
+}: {
+  tableId: TableId;
+  saved: ReadonlyArray<PlayerIdentity>;
+  onClose: () => void;
+  onAdded: (visitId: VisitId) => void;
+}) {
+  const save = useRecordingSubmit();
+  const amount = useAmount("", 1);
+  const [choice, setChoice] = useState<string>(NEW_PLAYER);
+  const [name, setName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  return (
+    <RecordingSheet
+      title="Add player"
+      description="Record their buy-ins and cash-outs from this device."
+      submitLabel="Add player"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const isNew = choice === NEW_PLAYER;
+        const trimmed = name.trim();
+        setNameError(isNew && trimmed === "" ? "Enter the player's name." : null);
+        const value = amount.read();
+        if (value === null || (isNew && trimmed === "")) return;
+        const receipt = await save.submit(
+          isNew
+            ? { type: "join_table", tableId, displayName: trimmed, buyIn: value }
+            : { type: "join_table", tableId, playerId: choice as PlayerId, buyIn: value },
+        );
+        if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId);
+      }}
+    >
+      {saved.length > 0 ? (
+        <Choice
+          label="Player"
+          value={choice}
+          onChange={setChoice}
+          options={[
+            { value: NEW_PLAYER, label: "Someone new" },
+            ...saved.map((player) => ({ value: player.id, label: player.displayName })),
+          ]}
+        />
+      ) : null}
+      {choice === NEW_PLAYER ? (
+        <TextField
+          label="Name"
+          value={name}
+          maxLength={60}
+          autoComplete="off"
+          error={nameError}
+          onChangeText={setName}
+        />
+      ) : null}
+      <KeypadAmount label="Buy-in" amount={amount} />
     </RecordingSheet>
   );
 }

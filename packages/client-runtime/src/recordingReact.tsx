@@ -319,3 +319,4 @@ export const useTableSharing = (tableId: TableId) => {
       }),
   };
 };
+export type { ActorKeyStorage } from "./recordingSync.ts";

@@ -1,4 +1,5 @@
 // Preview only: one realistic group, encoded through the real contract schemas.
+import { TableView } from "@stacks/contracts/recordingCommands";
 import {
   GroupDetail,
   GroupListItem,
@@ -299,6 +300,64 @@ const invites = [
   },
 ];
 
+const shared = (n: number) => `0192e7a0-0000-7000-8000-0000000009${n.toString().padStart(2, "0")}`;
+const sharedEntry = (n: number, visit: number, kind: string, amount: number, minute: number) => ({
+  id: shared(n),
+  visitId: shared(visit),
+  kind,
+  counterpartyId: null,
+  amount,
+  currency: "USD",
+  occurredAt: `2026-11-07T21:${minute}:00.000Z`,
+  note: null,
+  createdBy: shared(99),
+  createdAt: `2026-11-07T21:${minute}:00.000Z`,
+  voidedAt: null,
+  voidedBy: null,
+  voidReason: null,
+  replacesEntryId: null,
+});
+/** A table its starter shared, as the read-only link shows it. */
+const sharedTable = {
+  table: {
+    id: shared(1),
+    tripId: null,
+    game: "blackjack",
+    venueId: null,
+    highLimit: false,
+    starterPlayerId: shared(10),
+  },
+  players: [
+    { id: shared(10), displayName: "Maya" },
+    { id: shared(11), displayName: "Bea" },
+  ],
+  visits: [
+    {
+      id: shared(20),
+      tableId: shared(1),
+      playerId: shared(10),
+      startedAt: "2026-11-07T21:00:00.000Z",
+      finishedAt: null,
+      revision: 1,
+    },
+    {
+      id: shared(21),
+      tableId: shared(1),
+      playerId: shared(11),
+      startedAt: "2026-11-07T21:10:00.000Z",
+      finishedAt: "2026-11-07T21:50:00.000Z",
+      revision: 1,
+    },
+  ],
+  entries: [
+    sharedEntry(30, 20, "buy_in", 20000, 10),
+    sharedEntry(31, 20, "buy_in", 10000, 30),
+    sharedEntry(32, 21, "buy_in", 10000, 10),
+    sharedEntry(33, 21, "cash_out", 16500, 50),
+  ],
+  viewerRole: "viewer",
+};
+
 // Decoding first checks every fixture against the contract, so a wrong field fails loudly here.
 const check = <S extends Schema.Top>(schema: S, value: unknown) => {
   const json = Schema.toCodecJson(schema as never);
@@ -332,4 +391,5 @@ export const routes: Record<string, unknown> = {
   [`/api/trips/${ids.trip}/limits`]: check(UserLimits, limits),
   [`/api/trips/${ids.oldTrip}/limits`]: check(UserLimits, limits),
   [`/api/sessions/${ids.live}`]: check(SessionDetail, sessionDetail),
+  "/api/shared/preview-token": check(TableView, sharedTable),
 };

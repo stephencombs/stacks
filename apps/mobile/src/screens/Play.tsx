@@ -1,7 +1,7 @@
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { formatDay, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
-import { useRecordingVisit } from "@stacks/client-runtime/recordingReact";
+import { useRecordingTable, useRecordingVisit } from "@stacks/client-runtime/recordingReact";
 import {
   RECORDING_CURRENCY,
   visitTitle,
@@ -30,6 +30,7 @@ import {
   StartSheet,
   VoidSheet,
 } from "../features/RecordingForms";
+import { TableSection } from "../features/SharedTable";
 
 type Props = StaticScreenProps<{ visitId: string }>;
 
@@ -93,6 +94,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const navigation = useNavigation();
   const [open, setOpen] = useState<Open | null>(null);
   const [saved, setSaved] = useState<{ entryId: EntryId; text: string } | null>(null);
+  const table = useRecordingTable(visit?.visit.tableId ?? null);
   if (visit === null) return <Missing />;
   if (visit === undefined)
     return (
@@ -124,6 +126,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
     });
   };
   const start = visit.visit.startedAt;
+  const player = table?.visits.find((item) => item.visit.id === visitId);
+  const own = player?.isSelf ?? true;
   return (
     <PersonalScreen
       dock={
@@ -147,6 +151,13 @@ function Visit({ visitId }: { visitId: VisitId }) {
               onPress={() => setOpen({ type: "cash_out" })}
             />
           </View>
+        ) : !own ? (
+          <Button
+            key="reopen"
+            label="Fix accidental finish"
+            size="lg"
+            onPress={() => setOpen({ type: "reopen" })}
+          />
         ) : (
           <>
             <Button
@@ -176,7 +187,9 @@ function Visit({ visitId }: { visitId: VisitId }) {
               : `${formatDay(start)} · ${formatTime(start)} to ${formatTime(visit.visit.finishedAt!)}`
           }
         >
-          {visitTitle(visit.table)}
+          {own
+            ? visitTitle(visit.table)
+            : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
         </Title>
         <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
       </View>
@@ -195,6 +208,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
           />
         </View>
       ) : null}
+      <TableSection
+        tableId={visit.visit.tableId}
+        onOpen={(next) => {
+          if (next === visitId) return;
+          setSaved(null);
+          navigation.dispatch(StackActions.push("Play", { visitId: next }));
+        }}
+      />
       <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
       {open?.type === "rebuy" ? (
         <RebuySheet visit={visit} onClose={close} onSaved={recorded} />

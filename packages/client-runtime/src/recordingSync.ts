@@ -65,7 +65,7 @@ const newSecret = () =>
   ).join("");
 
 /** The saved credential for `actorId`, or a new one, saved before it's used. */
-export const actorCredential = async (
+const actorCredential = async (
   keys: ActorKeyStorage,
   actorId: ActorCredential["actorId"],
 ): Promise<ActorCredential> => {
