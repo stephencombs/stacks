@@ -2,9 +2,9 @@ import { useAuth } from "@clerk/expo";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
-import { Button } from "../components/ui/Button";
+import { Button, IconButton } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
@@ -17,15 +17,12 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Pressable
-        accessibilityRole="button"
+      <IconButton
         accessibilityLabel="Trip options"
         accessibilityHint="End, reopen or delete this trip"
+        icon={<Icon name="more" color="ink" size={20} />}
         onPress={() => setOpen(true)}
-        className="size-11 items-center justify-center rounded-full bg-fill active:opacity-70"
-      >
-        <Icon name="more" color="ink" size={20} />
-      </Pressable>
+      />
       {open ? <TripOptions trip={trip} group={group} onClose={() => setOpen(false)} /> : null}
     </>
   );

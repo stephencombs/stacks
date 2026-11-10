@@ -80,7 +80,7 @@ export function Button({
         onPress();
       }}
       className={cn(
-        "flex-row items-center justify-center gap-2",
+        "flex-row items-center justify-center gap-2 active:scale-[0.97]",
         surfaces[variant],
         sizes[size],
         disabled && !pending && (variant === "ghost" ? "bg-transparent" : "bg-disabled"),
@@ -98,6 +98,97 @@ export function Button({
       >
         {label}
       </Text>
+    </Pressable>
+  );
+}
+
+export function IconButton({
+  icon,
+  accessibilityLabel,
+  accessibilityHint,
+  onPress,
+  disabled = false,
+  haptic = false,
+  className,
+}: {
+  icon: ReactNode;
+  accessibilityLabel: string;
+  accessibilityHint?: string;
+  onPress: () => void;
+  disabled?: boolean;
+  haptic?: boolean;
+  className?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={4}
+      onPress={() => {
+        if (haptic && Platform.OS !== "web")
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      className={cn(
+        "size-11 items-center justify-center rounded-full border border-line bg-surface active:scale-[0.95] active:bg-fill",
+        disabled && "opacity-50",
+        className,
+      )}
+    >
+      {icon}
+    </Pressable>
+  );
+}
+
+export function FilterPill({
+  label,
+  sublabel,
+  active = false,
+  leading,
+  trailing,
+  accessibilityLabel,
+  accessibilityHint,
+  onPress,
+  className,
+}: {
+  label: string;
+  sublabel?: string;
+  active?: boolean;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  onPress: () => void;
+  className?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? (sublabel ? `${sublabel}, ${label}` : label)}
+      accessibilityHint={accessibilityHint}
+      onPress={onPress}
+      className={cn(
+        "min-h-9 max-w-64 flex-row items-center gap-1.5 rounded-full border px-3.5 py-2 active:scale-[0.97]",
+        active ? "border-line-strong bg-fill" : "border-line bg-surface active:bg-fill",
+        className,
+      )}
+    >
+      {leading}
+      {sublabel ? (
+        <Text numberOfLines={1} className="type-footnote text-muted">
+          {sublabel} ·
+        </Text>
+      ) : null}
+      <Text
+        numberOfLines={1}
+        className={cn("shrink type-callout", active ? "font-semibold text-ink" : "text-ink")}
+      >
+        {label}
+      </Text>
+      {trailing}
     </Pressable>
   );
 }

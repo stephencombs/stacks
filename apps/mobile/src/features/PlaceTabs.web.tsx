@@ -3,52 +3,68 @@ import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { cn } from "../components/ui/cn";
+import { Icon, type IconName } from "../components/ui/Icon";
 
 export const createPlaceTabs = createBottomTabNavigator;
 
-/** The web build has no system tab bar, so it draws one with the same places. */
 export const placeTabsConfig = {
   screenOptions: { headerShown: false },
-  tabBar: (props: BottomTabBarProps) => <TabBar {...props} />,
+  tabBar: (props: BottomTabBarProps) => <FloatingCapsuleTabBar {...props} />,
 };
 
 export const placeTab = (title: string, _symbol: string) => ({ title });
 
-/** The bar sits below the scene here, so nothing needs room for it. */
-export const useTabBarHeight = () => 0;
+/** The capsule floats over the scene, so every place pads clear of it. */
+export function useTabBarHeight() {
+  const insets = useSafeAreaInsets();
+  return 68 + Math.max(insets.bottom, 12);
+}
 
-function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+const tabIcons: Record<string, IconName> = {
+  SessionsTab: "sessions",
+  BoardTab: "board",
+  SettleTab: "settle",
+  GroupTab: "group",
+};
+
+function FloatingCapsuleTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   return (
     <View
-      accessibilityRole="tablist"
-      className="flex-row border-t border-line bg-canvas"
-      style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+      pointerEvents="box-none"
+      className="absolute inset-x-0 bottom-0 items-center px-5"
+      style={{ paddingBottom: Math.max(insets.bottom, 12) }}
     >
-      {state.routes.map((route, index) => {
-        const current = index === state.index;
-        return (
-          <Pressable
-            key={route.key}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: current }}
-            onPress={() => navigation.navigate(route.name)}
-            className="h-14 flex-1 items-center justify-center gap-1 active:bg-sunken"
-          >
-            <View
-              className={cn("h-0.5 w-6 rounded-full", current ? "bg-accent" : "bg-transparent")}
-            />
-            <Text
+      <View
+        accessibilityRole="tablist"
+        className="w-full max-w-md flex-row items-center rounded-full border border-line bg-surface/95 p-1.5 shadow-lg"
+      >
+        {state.routes.map((route, index) => {
+          const current = index === state.index;
+          const title = descriptors[route.key]!.options.title ?? route.name;
+          return (
+            <Pressable
+              key={route.key}
+              accessibilityRole="tab"
+              accessibilityLabel={title}
+              accessibilityState={{ selected: current }}
+              onPress={() => navigation.navigate(route.name)}
               className={cn(
-                "type-callout font-medium",
-                current ? "text-accent-text" : "text-muted",
+                "min-h-11 flex-1 items-center justify-center rounded-full py-2 active:scale-[0.95]",
+                current && "bg-fill",
               )}
             >
-              {descriptors[route.key]!.options.title}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <Icon
+                name={tabIcons[route.name]!}
+                color={current ? "ink" : "muted"}
+                size={20}
+                filled={current}
+              />
+              <Text className="sr-only">{title}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }

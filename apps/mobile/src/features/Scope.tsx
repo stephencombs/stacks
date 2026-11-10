@@ -3,10 +3,10 @@ import { StackActions, useNavigation } from "@react-navigation/native";
 import { scopeTrips, tripDates, unsettledAmount } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { Button } from "../components/ui/Button";
+import { Button, FilterPill } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
@@ -24,36 +24,23 @@ export function ScopeButton() {
     return (
       <View
         accessibilityElementsHidden
-        className="min-h-11 w-36 justify-center rounded-xl border border-line bg-sunken px-3 py-1"
+        className="min-h-9 w-40 flex-row items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-2"
       >
-        <View className="h-4 justify-center">
-          <Skeleton className="h-2.5 w-20" />
-        </View>
-        <View className="h-6 justify-center">
-          <Skeleton className="h-4 w-28" />
-        </View>
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-3 w-20" />
       </View>
     );
   const { item, trip } = scope;
   return (
     <>
-      <Pressable
-        accessibilityRole="button"
+      <FilterPill
+        sublabel={item.group.name}
+        label={trip?.name ?? "No trips yet"}
         accessibilityLabel={`${item.group.name}, ${trip?.name ?? "no trips yet"}`}
         accessibilityHint="Switch to another trip or group"
+        trailing={<Icon name="chevron-down" color="muted" size={14} />}
         onPress={() => setOpen(true)}
-        className="min-h-11 max-w-64 justify-center rounded-xl border border-line bg-sunken px-3 py-1 active:bg-fill"
-      >
-        <Text numberOfLines={1} className="text-xs font-medium text-muted">
-          {item.group.name}
-        </Text>
-        <View className="flex-row items-center gap-1">
-          <Text numberOfLines={1} className="shrink font-display text-xl leading-6 text-ink">
-            {trip?.name ?? "No trips yet"}
-          </Text>
-          <Icon name="chevron-down" color="accent-text" size={14} />
-        </View>
-      </Pressable>
+      />
       {open ? <ScopeSheet scope={scope} onClose={() => setOpen(false)} /> : null}
     </>
   );
