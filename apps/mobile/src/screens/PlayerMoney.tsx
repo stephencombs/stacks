@@ -3,15 +3,16 @@ import { formatDay } from "@stacks/client-runtime/format";
 import {
   pairHistoryRows,
   pairStanding,
-  pendingPayments,
   type PairHistoryRow,
 } from "@stacks/client-runtime/playerMoney";
-import { useRecordingSubmit, useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import {
-  paymentSyncView,
-  parseRecordingAmount,
-  RECORDING_CURRENCY,
-} from "@stacks/client-runtime/recordingView";
+  usePaymentSync,
+  usePendingPayments,
+  usePlayerBalances,
+  usePlayerPair,
+  useRecordingSubmit,
+} from "@stacks/client-runtime/recordingReact";
+import { parseRecordingAmount, RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import { PlayerId, type EntryId, type PairHistory, type PlayerPair } from "@stacks/contracts";
 import { useState } from "react";
 import { Text, View } from "react-native";
@@ -24,7 +25,6 @@ import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { PersonalScreen } from "../features/Personal";
-import { useBalances, usePair, useRecordingState } from "../lib/playerMoney";
 
 const SEPARATE =
   "What you and the people you've played with owe each other, outside any trip. Trip balances stay on each trip's Settle up.";
@@ -63,9 +63,8 @@ function Failed({ error, onRetry }: { error: string; onRetry: () => void }) {
 
 /** The refused payments on this device, each to record again or discard. */
 function Refused() {
-  const state = useRecordingState();
-  const sync = useRecordingSync();
-  const rejected = paymentSyncView(state, null).rejected;
+  const sync = usePaymentSync();
+  const rejected = sync.rejected;
   if (rejected.length === 0 && sync.error === null) return null;
   return (
     <View className="gap-2">
@@ -99,8 +98,8 @@ function Refused() {
 /** Settle up, under You: per-person balances between players, outside any trip. */
 export function PlayerBalancesScreen() {
   const navigation = useNavigation();
-  const { result, reload } = useBalances();
-  const waiting = pendingPayments(useRecordingState()).length;
+  const { result, reload } = usePlayerBalances();
+  const waiting = usePendingPayments().length;
   return (
     <PersonalScreen>
       <View className="gap-1">
@@ -149,12 +148,11 @@ type PairProps = StaticScreenProps<{ playerId: string }>;
 
 export function PlayerPairScreen({ route }: PairProps) {
   const playerId = PlayerId.make(route.params.playerId);
-  const { result, reload } = usePair(playerId);
-  const state = useRecordingState();
+  const { result, reload, state } = usePlayerPair(playerId);
   const [open, setOpen] = useState<
     { type: "pay" } | { type: "correct" | "void"; row: PairHistoryRow } | null
   >(null);
-  const waiting = pendingPayments(state, playerId);
+  const waiting = usePendingPayments(playerId);
   const close = () => setOpen(null);
   if (result.status === "loading")
     return (
@@ -250,6 +248,7 @@ export function PlayerPairScreen({ route }: PairProps) {
           kind={open.type}
           row={open.row}
           history={history}
+          known={state?.repayments.some((item) => item.id === open.row.id) ?? false}
           onClose={close}
           onSaved={reload}
         />
@@ -397,22 +396,22 @@ function ChangePaymentSheet({
   kind,
   row,
   history,
+  known,
   onClose,
   onSaved,
 }: {
   kind: "correct" | "void";
   row: PairHistoryRow;
   history: PairHistory;
+  /** The device holds the payment once it has pulled it; until then it can't be changed offline. */
+  known: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const save = useRecordingSubmit();
-  const state = useRecordingState();
   const amount = useAmountText();
   const [reason, setReason] = useState("");
   const [missing, setMissing] = useState(false);
-  // The device holds the payment once it has pulled it; until then it can't be changed offline.
-  const known = state?.repayments.some((item) => item.id === row.id) ?? false;
   const repaymentId: EntryId = row.id;
   return (
     <Sheet

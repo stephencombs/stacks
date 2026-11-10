@@ -27,7 +27,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
-import { useRecordingState } from "../lib/playerMoney";
+import { useRecordingState } from "../lib/recording";
 import {
   CashOutSheet,
   CorrectSheet,

@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import { MinorUnits, PlayerId, type PlayerId as PlayerIdType } from "@stacks/contracts";
-import { RecordingCommand } from "@stacks/contracts/recordingCommands";
+import type { RecordingCommand } from "@stacks/contracts/recordingCommands";
 
 import {
   account,
@@ -54,11 +54,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("money between players", (it)
     Effect.gen(function* () {
       const { alex, bea, alexId, beaId, opened } = yield* table();
       // Bea covers Alex's $100 rebuy: Alex owes Bea $100.
-      const covered = RecordingCommand.make({
+      const covered = {
         ...rebuy(alex.identity, opened.visitId),
         amount: MinorUnits.make(10000),
         counterpartyId: beaId,
-      });
+      };
       expect(yield* alex.push(covered)).toEqual(["accepted"]);
       const owed = { debtorId: alexId, creditorId: beaId, amount: 10000 };
       expect(yield* balanceOf(alex, beaId)).toEqual(owed);
@@ -69,11 +69,14 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("money between players", (it)
       expect(yield* balanceOf(alex, beaId)).toEqual({ ...owed, amount: 5000 });
 
       // Bea receives Alex's $300 cash-out: Bea owes Alex $300, less the $50 Alex still owes.
-      const held = RecordingCommand.make({
-        ...finish(alex.identity, opened.visitId, 1),
+      const held = {
+        ...(finish(alex.identity, opened.visitId, 1) as Extract<
+          RecordingCommand,
+          { type: "finish" }
+        >),
         amount: MinorUnits.make(30000),
         counterpartyId: beaId,
-      });
+      };
       expect(yield* alex.push(held)).toEqual(["accepted"]);
       expect(yield* balanceOf(bea, alexId)).toEqual({
         debtorId: beaId,
@@ -134,16 +137,13 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("money between players", (it)
       const eve = yield* device();
       const elsewhere = start(eve.identity);
       expect(yield* eve.push(elsewhere)).toEqual(["accepted"]);
-      const covered = RecordingCommand.make({
+      const covered = {
         ...rebuy(alex.identity, opened.visitId),
         counterpartyId: eve.identity.playerId,
-      });
+      };
       expect(yield* alex.push(covered)).toEqual(["invalid"]);
       // Nor the player themselves.
-      const own = RecordingCommand.make({
-        ...rebuy(alex.identity, opened.visitId),
-        counterpartyId: alexId,
-      });
+      const own = { ...rebuy(alex.identity, opened.visitId), counterpartyId: alexId };
       expect(yield* alex.push(own)).toEqual(["invalid"]);
     }),
   );

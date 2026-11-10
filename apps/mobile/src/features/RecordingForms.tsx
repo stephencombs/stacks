@@ -29,7 +29,7 @@ import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { cn } from "../components/ui/cn";
-import { useRecordingState } from "../lib/playerMoney";
+import { useRecordingState } from "../lib/recording";
 import { AmountKeypad } from "./AmountKeypad";
 import { applyAmountKey } from "./amountKey";
 

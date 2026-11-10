@@ -1,12 +1,12 @@
 import {
   pairHistoryRows,
   pairStanding,
-  pendingPayments,
   type PairHistoryRow,
 } from "@stacks/client-runtime/playerMoney";
 import { formatDay } from "@stacks/client-runtime/format";
 import {
   usePaymentSync,
+  usePendingPayments,
   usePlayerBalances,
   usePlayerPair,
   useRecordingSubmit,
@@ -73,8 +73,7 @@ function PaymentStatus({ counterpartyId }: { counterpartyId?: PlayerId }) {
 }
 
 function Waiting({ counterpartyId }: { counterpartyId: PlayerId }) {
-  const { state } = usePlayerPair(counterpartyId);
-  const waiting = pendingPayments(state, counterpartyId);
+  const waiting = usePendingPayments(counterpartyId);
   if (waiting.length === 0) return null;
   return (
     <Section title="Waiting to sync">
@@ -109,30 +108,29 @@ const back = <BackLink to="/">Your play</BackLink>;
 
 /** Everyone you've shared a table with, and what's owed between you. */
 export function SettleUpList() {
-  const { balances, reload } = usePlayerBalances();
+  const { result, reload } = usePlayerBalances();
   return (
     <>
       <PageHeader back={back} title="Settle up">
         <Note>{separate}</Note>
       </PageHeader>
       <PaymentStatus />
-      {balances === undefined ? (
+      {result.status === "loading" ? (
         <Skeleton className="h-40 w-full rounded-xl" />
-      ) : balances === null ? (
+      ) : result.status === "error" ? (
         <div className="flex flex-col items-start gap-3">
           <EmptyState title="Balances need a connection">
-            They're worked out by Color Up from everyone's play. Payments you record still save on
-            this device.
+            {result.error} Payments you record still save on this device.
           </EmptyState>
           <Button onClick={reload}>Try again</Button>
         </div>
-      ) : balances.pairs.length === 0 ? (
+      ) : result.value.pairs.length === 0 ? (
         <EmptyState title="No one to settle with yet">
           Once you've shared a table, the people there show up here.
         </EmptyState>
       ) : (
         <List as="ul" label="People">
-          {balances.pairs.map((pair) => (
+          {result.value.pairs.map((pair) => (
             <li key={`${pair.playerId}-${pair.counterparty.id}`}>
               <RowLink to="/you/settle/$playerId" params={{ playerId: pair.counterparty.id }}>
                 <RowText title={pair.counterparty.displayName} meta={pairStanding(pair).text} />
@@ -152,16 +150,17 @@ type Open =
 
 /** One person: what's owed, Record a payment, and every fact between you. */
 export function SettleUpPerson({ playerId }: { playerId: PlayerId }) {
-  const { history, state } = usePlayerPair(playerId);
+  const { result, state } = usePlayerPair(playerId);
   const [open, setOpen] = useState<Open | null>(null);
   const backToList = <BackLink to="/you/settle">Settle up</BackLink>;
-  if (history === undefined)
+  if (result.status === "loading")
     return (
       <>
         <PageHeader back={backToList} title="Settle up" />
         <Skeleton className="h-40 w-full rounded-xl" />
       </>
     );
+  const history = result.status === "ready" ? result.value : null;
   const name = history?.pair.counterparty.displayName ?? "This player";
   const me = history?.pair.playerId ?? state?.self.id ?? null;
   const rows = history ? pairHistoryRows(history, state?.actor.id ?? null) : [];
@@ -177,9 +176,9 @@ export function SettleUpPerson({ playerId }: { playerId: PlayerId }) {
           <Standing pair={history.pair} />
         </div>
       ) : (
-        <EmptyState title="Can't reach Color Up">
-          The balance and history need a connection. A payment you record now saves on this device
-          and syncs later.
+        <EmptyState title="Can't show the balance">
+          {result.status === "error" ? `${result.error} ` : ""}A payment you record now saves on
+          this device and syncs later.
         </EmptyState>
       )}
       {me ? (

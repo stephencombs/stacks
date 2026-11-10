@@ -64,7 +64,7 @@ const api = {
     (await getClerkInstance({ publishableKey: clerkPublishableKey }).session?.getToken()) ?? null,
 };
 
-export const connectRecording = () => makeRecordingTransport(api);
+const connectRecording = () => makeRecordingTransport(api);
 
 const signIn = (userId: string) =>
   makeSignedIn({
