@@ -123,7 +123,8 @@ const recording = HttpApiBuilder.group(StacksApi, "recording", (handlers) =>
     .handle("push", ({ payload }) => serve(Recording.push(payload)))
     .handle("table", ({ params }) => serve(Recording.table(params.tableId)))
     .handle("share", ({ params }) => serve(Recording.share(params.tableId)))
-    .handle("unshare", ({ params }) => serve(Recording.unshare(params.tableId))),
+    .handle("unshare", ({ params }) => serve(Recording.unshare(params.tableId)))
+    .handle("join", ({ params, payload }) => serve(Recording.join(params.token, payload))),
 );
 
 const publicRecording = HttpApiBuilder.group(StacksApi, "publicRecording", (handlers) =>

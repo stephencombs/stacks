@@ -6,6 +6,7 @@ import {
   Visit,
   type EntryId,
   type PlayerId,
+  type TableId,
 } from "@stacks/contracts";
 import { RecordingCommand } from "@stacks/contracts/recordingCommands";
 import * as DateTime from "effect/DateTime";
@@ -17,14 +18,22 @@ export const RecordingReceipt = Schema.Struct({
 });
 export type RecordingReceipt = typeof RecordingReceipt.Type;
 
+/** A player who joined a table through its link. Each join is a new player, at one table. */
+export interface Participant {
+  readonly tableId: TableId;
+  readonly playerId: PlayerId;
+}
+
 /**
  * The tables one actor records at, as it applies commands to them, on a device or on the server.
- * `players` are the ones it may start visits for: `self` and the players it added.
+ * `players` are the ones it may start visits for: `self`, the players it added, and the players
+ * in `participants`: who joined its tables, or who it joined other tables as.
  */
 export interface RecordingLedger {
   readonly self: PlayerIdentity;
   readonly actor: Actor;
   readonly players: ReadonlyArray<PlayerIdentity>;
+  readonly participants: ReadonlyArray<Participant>;
   readonly tables: ReadonlyArray<Table>;
   readonly visits: ReadonlyArray<Visit>;
   readonly entries: ReadonlyArray<PlayEntry>;
@@ -40,13 +49,29 @@ type RecordingErrorReason =
   | "closed";
 
 /**
- * Whether an actor holding `actorPlayers` may write at a table. For now only the table's starter
- * records, for everyone at it.
+ * Whether an actor holding `actorPlayers` may write `playerId`'s play at a table. Its starter
+ * records for everyone; a player who joined it records only their own play.
  */
 export const authorize = (
-  table: Pick<Table, "starterPlayerId">,
+  table: Pick<Table, "id" | "starterPlayerId">,
   actorPlayers: ReadonlyArray<PlayerId>,
-) => actorPlayers.includes(table.starterPlayerId);
+  playerId: PlayerId,
+  participants: ReadonlyArray<Participant>,
+) =>
+  actorPlayers.includes(table.starterPlayerId) ||
+  (actorPlayers.includes(playerId) &&
+    participants.some((item) => item.tableId === table.id && item.playerId === playerId));
+
+/** The players a device records as: its own, and the ones it joined other tables as. */
+export const ownPlayers = (state: RecordingLedger): ReadonlyArray<PlayerId> => [
+  state.self.id,
+  ...state.participants
+    .filter(
+      (item) =>
+        state.tables.find((table) => table.id === item.tableId)?.starterPlayerId !== state.self.id,
+    )
+    .map((item) => item.playerId),
+];
 
 export class RecordingError extends Error {
   override readonly name = "RecordingError";
@@ -93,17 +118,22 @@ export const createdEntryIds = (command: RecordingCommand): ReadonlyArray<EntryI
 
 /**
  * Applies one command. `actorPlayers` are the players bound to the command's actor: on a device,
- * its own player; on the server, what the database binds to the authenticated actor.
+ * its own players; on the server, what the database binds to the authenticated actor. `null`
+ * applies a command the server already accepted, from whichever actor made it: a device can't
+ * know another actor's players, and the server checked them.
  */
 export const applyRecordingCommand = <S extends RecordingLedger>(
   state: S,
   command: RecordingCommand,
-  actorPlayers: ReadonlyArray<PlayerId> = [state.self.id],
+  actorPlayers: ReadonlyArray<PlayerId> | null = ownPlayers(state),
 ): S => {
-  requireValid(command.actorId === state.actor.id, "Command has a foreign local actor.");
-  const forbid = (table: Pick<Table, "starterPlayerId">) => {
-    if (!authorize(table, actorPlayers))
-      throw new RecordingError("forbidden", "Only the player who started this table records here.");
+  requireValid(
+    actorPlayers === null || command.actorId === state.actor.id,
+    "Command has a foreign local actor.",
+  );
+  const forbid = (table: Pick<Table, "id" | "starterPlayerId">, playerId: PlayerId) => {
+    if (actorPlayers !== null && !authorize(table, actorPlayers, playerId, state.participants))
+      throw new RecordingError("forbidden", "You can record only your own play at this table.");
   };
   const tables = [...state.tables];
   const players = [...state.players];
@@ -159,7 +189,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     if (command.type === "join_table") {
       const table = tables.find((table) => table.id === command.tableId);
       requireValid(table, "Table does not exist.");
-      forbid(table);
+      forbid(table, command.playerId);
       if (command.newPlayer) {
         requireValid(
           command.newPlayer.id === command.playerId &&
@@ -181,7 +211,8 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         "This player is already playing at this table.",
       );
     } else {
-      forbid({ starterPlayerId: command.playerId });
+      if (actorPlayers !== null && command.playerId !== state.self.id)
+        throw new RecordingError("forbidden", "Start a table as yourself.");
       requireValid(
         !visits.some((visit) => visit.id === command.visitId) &&
           !tables.some((table) => table.id === command.tableId),
@@ -216,7 +247,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     requireValid(visit, "Visit does not exist.");
     const table = tables.find((table) => table.id === visit.tableId);
     requireValid(table, "Table does not exist.");
-    forbid(table);
+    forbid(table, visit.playerId);
     if (visit.revision !== command.expectedRevision)
       throw new RecordingError(
         "conflict",

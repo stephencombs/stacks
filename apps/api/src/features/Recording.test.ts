@@ -192,7 +192,14 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       yield* alex.recording.push({ payload: { identity: alexDevice, commands: [opened] } });
 
       const empty = yield* bea.recording.history();
-      expect(empty).toEqual({ identity: null, commands: [], tables: [], visits: [], entries: [] });
+      expect(empty).toEqual({
+        identity: null,
+        commands: [],
+        tables: [],
+        participants: [],
+        visits: [],
+        entries: [],
+      });
 
       // Bea can't borrow Alex's identity, and her own can't reach his visit or operations.
       const borrowed = yield* bea.recording
