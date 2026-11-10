@@ -204,6 +204,45 @@ function DetailsFields({
   );
 }
 
+/** Who else's money a buy-in or cash-out was, among the others at the table. */
+export type Counterparties = {
+  /** Whose own money it is when no one else is chosen: "Me", or the player's name. */
+  readonly owner: string;
+  readonly people: ReadonlyArray<PlayerIdentity>;
+};
+
+const noCounterparties: Counterparties = { owner: "Me", people: [] };
+
+function CounterpartyField({
+  label,
+  counterparties,
+  value,
+  onChange,
+}: {
+  label: string;
+  counterparties: Counterparties;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  if (counterparties.people.length === 0) return null;
+  return (
+    <Field label={label}>
+      {(props) => (
+        <Select {...props} value={value} onChange={(event) => onChange(event.target.value)}>
+          <option value="">{counterparties.owner}</option>
+          {counterparties.people.map((player) => (
+            <option key={player.id} value={player.id}>
+              {player.displayName}
+            </option>
+          ))}
+        </Select>
+      )}
+    </Field>
+  );
+}
+
+const counterparty = (value: string) => (value === "" ? {} : { counterpartyId: value as PlayerId });
+
 const startedVisit = (receipt: RecordingReceipt) =>
   "visitId" in receipt.command ? receipt.command.visitId : null;
 
@@ -332,15 +371,18 @@ type Saved = (entryId: PlayEntry["id"], input: RecordingInput) => void;
 
 export function RebuyDialog({
   visit,
+  counterparties = noCounterparties,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  counterparties?: Counterparties;
   onClose: () => void;
   onSaved: Saved;
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 1);
+  const [paidBy, setPaidBy] = useState("");
   return (
     <RecordingDialog
       title="Rebuy"
@@ -355,6 +397,7 @@ export function RebuyDialog({
           visitId: visit.visit.id,
           kind: "buy_in",
           amount: value,
+          ...counterparty(paidBy),
         } as const;
         const receipt = await save.submit(input);
         if (receipt?.command.type === "add") onSaved(receipt.command.entryId, input);
@@ -374,6 +417,12 @@ export function RebuyDialog({
           ))}
         </div>
       ) : null}
+      <CounterpartyField
+        label="Paid by"
+        counterparties={counterparties}
+        value={paidBy}
+        onChange={setPaidBy}
+      />
     </RecordingDialog>
   );
 }
@@ -385,15 +434,18 @@ const afterOptions = [
 
 export function CashOutDialog({
   visit,
+  counterparties = noCounterparties,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  counterparties?: Counterparties;
   onClose: () => void;
   onSaved: Saved;
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 0);
+  const [paidTo, setPaidTo] = useState("");
   const [after, setAfter] = useState<"keep" | "finish">("keep");
   const previous = visit.totals.cashOut;
   return (
@@ -407,8 +459,19 @@ export function CashOutDialog({
         if (value === null) return;
         const input =
           after === "finish"
-            ? ({ type: "finish", visitId: visit.visit.id, amount: value } as const)
-            : ({ type: "add", visitId: visit.visit.id, kind: "cash_out", amount: value } as const);
+            ? ({
+                type: "finish",
+                visitId: visit.visit.id,
+                amount: value,
+                ...counterparty(paidTo),
+              } as const)
+            : ({
+                type: "add",
+                visitId: visit.visit.id,
+                kind: "cash_out",
+                amount: value,
+                ...counterparty(paidTo),
+              } as const);
         const receipt = await save.submit(input);
         if (receipt?.command.type === "add" || receipt?.command.type === "finish")
           onSaved(receipt.command.entryId, input);
@@ -430,6 +493,12 @@ export function CashOutDialog({
       <Button className="self-start" onClick={() => amount.set(amountInputText(0))}>
         {previous > 0 ? "Nothing more" : "Nothing to cash out"} · {money(0)}
       </Button>
+      <CounterpartyField
+        label="Paid to"
+        counterparties={counterparties}
+        value={paidTo}
+        onChange={setPaidTo}
+      />
       <RadioCards
         label="After this cash-out"
         options={afterOptions}
@@ -452,15 +521,18 @@ const kindName = (entry: PlayEntry) => (entry.kind === "buy_in" ? "buy-in" : "ca
 export function CorrectDialog({
   visit,
   entry,
+  counterparties = noCounterparties,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
   entry: PlayEntry;
+  counterparties?: Counterparties;
   onClose: () => void;
   onSaved: Saved;
 }) {
   const save = useRecordingSubmit();
+  const [other, setOther] = useState<string>(entry.counterpartyId ?? "");
   const amount = useAmount(amountInputText(entry.amount), entry.kind === "buy_in" ? 1 : 0);
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
@@ -481,7 +553,7 @@ export function CorrectDialog({
           visitId: visit.visit.id,
           entryId: entry.id,
           reason: why,
-          replacement: { amount: value },
+          replacement: { amount: value, ...counterparty(other) },
         } as const;
         const receipt = await save.submit(input);
         if (receipt?.command.type === "correct" && receipt.command.replacement)
@@ -489,6 +561,12 @@ export function CorrectDialog({
       }}
     >
       <AmountField label="Correct amount" amount={amount} first />
+      <CounterpartyField
+        label={entry.kind === "buy_in" ? "Paid by" : "Paid to"}
+        counterparties={counterparties}
+        value={other}
+        onChange={setOther}
+      />
       <ReasonField
         label="What was wrong"
         value={reason}

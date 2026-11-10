@@ -1,7 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { formatDay, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
-import { useRecordingTable, useRecordingVisit } from "@stacks/client-runtime/recordingReact";
+import { counterpartiesAt } from "@stacks/client-runtime/playerMoney";
+import {
+  useRecordingTable,
+  useRecordingVisit,
+  useServerTable,
+} from "@stacks/client-runtime/recordingReact";
 import {
   RECORDING_CURRENCY,
   visitTitle,
@@ -12,7 +17,7 @@ import { VisitId, type EntryId, type PlayEntry } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 
 import { Money } from "~/components/Money";
 import { Button, ButtonLink } from "~/components/ui/Button";
@@ -21,9 +26,11 @@ import { BackLink } from "~/components/ui/Nav";
 import { EmptyState, PageHeader, Section } from "~/components/ui/Page";
 import { Glow, List, Row, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
 import { Dock, focusMain, PersonalFrame, SaveStatus, useDialogFocus } from "~/features/Personal";
+import { recordingStore } from "~/lib/recording";
 import {
   CashOutDialog,
   CorrectDialog,
+  type Counterparties,
   RebuyDialog,
   ReopenDialog,
   SitDownDialog,
@@ -70,6 +77,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const savedButton = useRef<HTMLButtonElement>(null);
   const focus = useDialogFocus(() => savedButton.current);
   const table = useRecordingTable(visit?.visit.tableId ?? null);
+  const serverTable = useServerTable(visit?.visit.tableId ?? null);
+  const state = useSyncExternalStore(recordingStore.subscribe, recordingStore.getSnapshot).state;
   if (visit === null) return <Missing />;
   if (visit === undefined)
     return (
@@ -105,6 +114,11 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const start = visit.visit.startedAt;
   const player = table?.visits.find((item) => item.visit.id === visitId);
   const own = player?.isSelf ?? true;
+  const counterparties: Counterparties = {
+    owner: own ? "Me" : (player?.player.displayName ?? "Their own"),
+    people: counterpartiesAt(state, visit.visit.tableId, visit.visit.playerId, serverTable ?? null),
+  };
+  const names = new Map(counterparties.people.map((item) => [item.id, item.displayName]));
   // Back at the table: a new visit for whoever this was, once they aren't playing here.
   const canReturn =
     !live &&
@@ -163,7 +177,11 @@ function Visit({ visitId }: { visitId: VisitId }) {
           void navigate({ to: "/play/$visitId", params: { visitId: next } }).then(focusMain);
         }}
       />
-      <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
+      <History
+        visit={visit}
+        names={names}
+        onInspect={(entryId) => setOpen({ type: "inspect", entryId })}
+      />
       <Dock>
         {live ? (
           <>
@@ -222,9 +240,19 @@ function Visit({ visitId }: { visitId: VisitId }) {
         )}
       </Dock>
       {open?.type === "rebuy" ? (
-        <RebuyDialog visit={visit} onClose={close} onSaved={recorded} />
+        <RebuyDialog
+          visit={visit}
+          counterparties={counterparties}
+          onClose={close}
+          onSaved={recorded}
+        />
       ) : open?.type === "cash_out" ? (
-        <CashOutDialog visit={visit} onClose={close} onSaved={recorded} />
+        <CashOutDialog
+          visit={visit}
+          counterparties={counterparties}
+          onClose={close}
+          onSaved={recorded}
+        />
       ) : open?.type === "reopen" ? (
         <ReopenDialog
           visit={visit}
@@ -254,6 +282,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       ) : open?.type === "inspect" ? (
         <EntryInspector
           visit={visit}
+          names={names}
           entry={entry(open.entryId)}
           onClose={close}
           onShow={(entryId) => setOpen({ type: "inspect", entryId })}
@@ -264,6 +293,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
         <CorrectDialog
           visit={visit}
           entry={entry(open.entryId)}
+          counterparties={counterparties}
           onClose={close}
           onSaved={recorded}
         />
@@ -352,11 +382,19 @@ type Line =
   | { readonly type: "entry"; readonly at: DateTime.Utc; readonly entry: PlayEntry }
   | { readonly type: "event"; readonly at: DateTime.Utc; readonly event: RecordingEvent };
 
+/** "Paid by Bea" or "Paid to Bea", when someone else's money was in the entry. */
+const paidText = (entry: PlayEntry, names: ReadonlyMap<string, string>) =>
+  entry.counterpartyId === null
+    ? null
+    : `${entry.kind === "buy_in" ? "Paid by" : "Paid to"} ${names.get(entry.counterpartyId) ?? "another player"}`;
+
 function History({
   visit,
+  names,
   onInspect,
 }: {
   visit: RecordingVisitView;
+  names: ReadonlyMap<string, string>;
   onInspect: (entryId: EntryId) => void;
 }) {
   const lines: Line[] = [
@@ -396,6 +434,7 @@ function History({
                   title={entryName(visit, line.entry)}
                   meta={[
                     formatTime(line.entry.occurredAt),
+                    paidText(line.entry, names),
                     line.entry.voidedAt ? "Voided" : null,
                     line.entry.replacesEntryId ? "Correction" : null,
                   ]
@@ -418,6 +457,7 @@ function History({
 
 function EntryInspector({
   visit,
+  names,
   entry,
   onClose,
   onShow,
@@ -425,6 +465,7 @@ function EntryInspector({
   onVoid,
 }: {
   visit: RecordingVisitView;
+  names: ReadonlyMap<string, string>;
   entry: PlayEntry;
   onClose: () => void;
   onShow: (entryId: EntryId) => void;
@@ -452,6 +493,12 @@ function EntryInspector({
           </dd>
           <dt className="text-muted">Time</dt>
           <dd>{at(entry.occurredAt)}</dd>
+          {entry.counterpartyId ? (
+            <>
+              <dt className="text-muted">{entry.kind === "buy_in" ? "Paid by" : "Paid to"}</dt>
+              <dd>{names.get(entry.counterpartyId) ?? "Another player"}</dd>
+            </>
+          ) : null}
           <dt className="text-muted">Recorded</dt>
           <dd>By you on this device, {at(entry.createdAt)}</dd>
           {entry.note ? (
