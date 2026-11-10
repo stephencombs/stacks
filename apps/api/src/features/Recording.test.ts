@@ -27,6 +27,7 @@ const start = (identity: RecordingIdentity, buyIn = 20000) => {
     actorId: identity.actorId,
     preparedAt: at(0),
     tableId: TableId.make(uuid()),
+    playerId: identity.playerId,
     visitId: VisitId.make(uuid()),
     buyInId: EntryId.make(uuid()),
     buyIn: usd(buyIn),
@@ -214,7 +215,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       });
       expect(
         results.map((result) => (result.status === "rejected" ? result.reason : "ok")),
-      ).toEqual(["invalid", "operation_reused", "conflict"]);
+      ).toEqual(["forbidden", "operation_reused", "conflict"]);
       expect((yield* bea.recording.history()).visits).toEqual([]);
       expect((yield* alex.recording.history()).entries).toHaveLength(1);
     }),

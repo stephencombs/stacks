@@ -72,7 +72,7 @@ describe("native recording contracts", () => {
         game: null,
         venueId: null,
         highLimit: false,
-        starterActorId: ACTOR,
+        starterPlayerId: ALEX,
       }),
     ).toBe(true);
   });

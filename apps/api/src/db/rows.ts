@@ -163,12 +163,23 @@ export const RecordingIdentityRow = Schema.Struct({
   displayName: Schema.NonEmptyString,
 });
 
-export const PersonalVisitRow = Schema.Struct({
-  id: VisitId,
-  tableId: TableId,
+export const TableRow = Schema.Struct({
+  id: TableId,
+  starterPlayerId: Schema.NullOr(PlayerId),
   game: Schema.NullOr(Game),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
+});
+
+export const PlayerIdentityRow = Schema.Struct({
+  id: PlayerId,
+  displayName: Schema.NonEmptyString,
+});
+
+export const PersonalVisitRow = Schema.Struct({
+  id: VisitId,
+  tableId: TableId,
+  playerId: PlayerId,
   startedAt: Timestamp,
   finishedAt: Schema.NullOr(Timestamp),
   revision: Schema.Int,
@@ -190,6 +201,6 @@ export const PersonalEntryRow = Schema.Struct({
 });
 
 export const PersonalOperationRow = Schema.Struct({
-  playerId: PlayerId,
+  actorId: ActorId,
   command: Schema.toCodecJson(RecordingCommand),
 });
