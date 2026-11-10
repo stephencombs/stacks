@@ -1,4 +1,5 @@
 import { useClerk, useUser } from "@clerk/expo";
+import { useNavigation } from "@react-navigation/native";
 import { useAtomValue } from "@effect/atom-react";
 import type { GroupListItem } from "@stacks/contracts";
 import { themeChoices } from "@stacks/client-runtime/theme";
@@ -15,6 +16,7 @@ import { useScope } from "../lib/scope";
 import { Loaded, TripLoaded, useStacks } from "../lib/stacks";
 import { setTheme, useTheme } from "../lib/theme";
 import { Chip } from "./Chip";
+import { SettleUpLink } from "./Personal";
 import { PlayLimits } from "./PersonalLimits";
 
 /** Your chip, top right of every screen: everything that's only about you opens from it. */
@@ -57,6 +59,7 @@ function YouSheet({ name, onClose }: { name: string; onClose: () => void }) {
   const { scope } = useScope();
   const stacks = useStacks();
   const theme = useTheme();
+  const navigation = useNavigation();
   const email = user?.primaryEmailAddress?.emailAddress;
   return (
     <Sheet
@@ -105,6 +108,12 @@ function YouSheet({ name, onClose }: { name: string; onClose: () => void }) {
           </Text>
         )}
       </View>
+      <SettleUpLink
+        onPress={() => {
+          onClose();
+          navigation.navigate("PlayerBalances");
+        }}
+      />
       <Choice label="Appearance" options={themeChoices} value={theme} onChange={setTheme} />
     </Sheet>
   );

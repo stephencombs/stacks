@@ -183,8 +183,15 @@ export function PersonalNav() {
 
 function PersonalYou({ onClose }: { onClose: () => void }) {
   const theme = useTheme();
+  const navigation = useNavigation();
   return (
     <Sheet open onClose={onClose} title="You">
+      <SettleUpLink
+        onPress={() => {
+          onClose();
+          navigation.navigate("PlayerBalances");
+        }}
+      />
       <View className="gap-2">
         <SectionHeading>Your sessions</SectionHeading>
         <Text className="text-base text-muted">
@@ -198,6 +205,19 @@ function PersonalYou({ onClose }: { onClose: () => void }) {
         <AccountActions />
       </View>
     </Sheet>
+  );
+}
+
+/** The way to money between players, from either You. */
+export function SettleUpLink({ onPress }: { onPress: () => void }) {
+  return (
+    <View className="gap-2">
+      <SectionHeading>Settle up</SectionHeading>
+      <Text className="text-base text-muted">
+        Who owes whom between you and the people you've played with, outside any trip.
+      </Text>
+      <Button label="Settle up" onPress={onPress} />
+    </View>
   );
 }
 

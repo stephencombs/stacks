@@ -41,6 +41,7 @@ import { GroupsScreen, NoGroups } from "./screens/Groups";
 import { NewSessionScreen } from "./screens/NewSession";
 import { PeopleScreen } from "./screens/People";
 import { PlayScreen } from "./screens/Play";
+import { PlayerBalancesScreen, PlayerPairScreen } from "./screens/PlayerMoney";
 import { SessionScreen } from "./screens/Session";
 import { SessionsScreen } from "./screens/Sessions";
 import { SettleUpScreen } from "./screens/SettleUp";
@@ -197,6 +198,9 @@ const RootStack = createNativeStackNavigator({
   screens: {
     Home: { screen: HomeScreen, linking: "" },
     Play: { screen: PlayScreen, linking: "play/:visitId" },
+    // Money between players lives under You, apart from any trip's Settle up.
+    PlayerBalances: { screen: PlayerBalancesScreen, linking: "you/settle" },
+    PlayerPair: { screen: PlayerPairScreen, linking: "you/settle/:playerId" },
     Account: {
       screen: AccountStack,
       options: { headerShown: false },

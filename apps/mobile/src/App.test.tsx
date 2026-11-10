@@ -178,6 +178,7 @@ async function load({
     "./screens/NewSession": ["NewSessionScreen"],
     "./screens/People": ["PeopleScreen"],
     "./screens/Play": ["PlayScreen"],
+    "./screens/PlayerMoney": ["PlayerBalancesScreen", "PlayerPairScreen"],
     "./screens/Session": ["SessionScreen"],
     "./screens/Sessions": ["SessionsScreen"],
     "./screens/SettleUp": ["SettleUpScreen"],
@@ -315,6 +316,8 @@ it("keeps every address: your play at the root, groups and invites behind the ac
   expect(root.initialRouteName).toBe("Home");
   expect(root.screens.Home!.linking).toBe("");
   expect(root.screens.Play!.linking).toBe("play/:visitId");
+  expect(root.screens.PlayerBalances!.linking).toBe("you/settle");
+  expect(root.screens.PlayerPair!.linking).toBe("you/settle/:playerId");
   expect(root.screens.Account!.screen).toEqual({ config: account });
   expect(account.screens.Groups!.linking).toBe("groups");
   expect(account.screens.Join!.linking).toBe("join/:code");

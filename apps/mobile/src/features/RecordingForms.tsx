@@ -9,7 +9,8 @@ import {
 } from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
 import type { RecordingInput, RecordingReceipt } from "@stacks/client-runtime/recording";
-import { useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
+import { counterpartiesAt } from "@stacks/client-runtime/playerMoney";
+import { useRecordingSubmit, useServerTable } from "@stacks/client-runtime/recordingReact";
 import {
   amountInputText,
   localDateText,
@@ -28,6 +29,7 @@ import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { cn } from "../components/ui/cn";
+import { useRecordingState } from "../lib/playerMoney";
 import { AmountKeypad } from "./AmountKeypad";
 import { applyAmountKey } from "./amountKey";
 
@@ -430,6 +432,34 @@ export function PastSessionSheet({
 
 type Saved = (entryId: PlayEntry["id"], input: RecordingInput) => void;
 
+/**
+ * Whose money paid for a buy-in, or who took a cash-out: the player's own by default, or someone
+ * else at the table, who then owes or is owed it.
+ */
+function usePaidBy(visit: RecordingVisitView) {
+  const state = useRecordingState();
+  const view = useServerTable(visit.visit.tableId);
+  const people = counterpartiesAt(state, visit.visit.tableId, visit.visit.playerId, view ?? null);
+  const [value, setValue] = useState<"own" | PlayerId>("own");
+  const own = visit.visit.playerId === state?.self.id ? "Me" : "Their own money";
+  return {
+    people,
+    value,
+    set: setValue,
+    options: [
+      { value: "own" as const, label: own },
+      ...people.map((person) => ({ value: person.id, label: person.displayName })),
+    ],
+    /** Spread into an add or finish input. */
+    input: () => (value === "own" ? {} : { counterpartyId: value }),
+  };
+}
+
+function PaidField({ label, paid }: { label: string; paid: ReturnType<typeof usePaidBy> }) {
+  if (paid.people.length === 0) return null;
+  return <Choice label={label} options={paid.options} value={paid.value} onChange={paid.set} />;
+}
+
 export function RebuySheet({
   visit,
   onClose,
@@ -441,6 +471,7 @@ export function RebuySheet({
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 1);
+  const paid = usePaidBy(visit);
   return (
     <RecordingSheet
       title="Rebuy"
@@ -455,6 +486,7 @@ export function RebuySheet({
           visitId: visit.visit.id,
           kind: "buy_in",
           amount: value,
+          ...paid.input(),
         } as const;
         const receipt = await save.submit(input);
         if (receipt?.command.type === "add") onSaved(receipt.command.entryId, input);
@@ -478,6 +510,7 @@ export function RebuySheet({
           ))}
         </View>
       ) : null}
+      <PaidField label="Paid by" paid={paid} />
     </RecordingSheet>
   );
 }
@@ -499,6 +532,7 @@ export function CashOutSheet({
   const save = useRecordingSubmit();
   const amount = useAmount("", 0);
   const [after, setAfter] = useState<"keep" | "finish">("keep");
+  const paid = usePaidBy(visit);
   const previous = visit.totals.cashOut;
   return (
     <RecordingSheet
@@ -511,8 +545,14 @@ export function CashOutSheet({
         if (value === null) return;
         const input =
           after === "finish"
-            ? ({ type: "finish", visitId: visit.visit.id, amount: value } as const)
-            : ({ type: "add", visitId: visit.visit.id, kind: "cash_out", amount: value } as const);
+            ? ({ type: "finish", visitId: visit.visit.id, amount: value, ...paid.input() } as const)
+            : ({
+                type: "add",
+                visitId: visit.visit.id,
+                kind: "cash_out",
+                amount: value,
+                ...paid.input(),
+              } as const);
         const receipt = await save.submit(input);
         if (receipt?.command.type === "add" || receipt?.command.type === "finish")
           onSaved(receipt.command.entryId, input);
@@ -543,6 +583,7 @@ export function CashOutSheet({
           onPress={() => amount.set(amountInputText(0))}
         />
       </View>
+      <PaidField label="Paid to" paid={paid} />
       <Choice
         label="After this cash-out"
         options={afterOptions}
