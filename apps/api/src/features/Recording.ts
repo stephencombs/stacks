@@ -128,7 +128,7 @@ export const randomToken = () =>
  * Who is at each table, as `(table_id, player_id)`: who joined through its link, and the players
  * bound to an actor through a personal invite, at the tables where they play.
  */
-export const tablePlayers = (sql: SqlClient.SqlClient) => sql`(
+const tablePlayers = (sql: SqlClient.SqlClient) => sql`(
   select table_id, player_id from table_participants
   union
   select v.table_id, v.player_id from personal_visits v
@@ -139,7 +139,7 @@ export const tablePlayers = (sql: SqlClient.SqlClient) => sql`(
 )`;
 
 /** Who records for everyone at each table, as `(table_id, player_id)`: the latest word wins. */
-export const tableRecorders = (sql: SqlClient.SqlClient) => sql`(
+const tableRecorders = (sql: SqlClient.SqlClient) => sql`(
   select table_id, player_id from (
     select distinct on (table_id, command ->> 'playerId')
       table_id, (command ->> 'playerId')::uuid as player_id, command ->> 'type' as type

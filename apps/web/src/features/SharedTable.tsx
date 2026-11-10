@@ -368,7 +368,7 @@ function TableSettingsDialog({ tableId, onClose }: { tableId: TableId; onClose: 
  * A single-use link that lets one more device record as this player, and the devices that already
  * do. Only the starter, or a device recording as the player, can make one.
  */
-export function InviteDialog({ player, onClose }: { player: PlayerIdentity; onClose: () => void }) {
+function InviteDialog({ player, onClose }: { player: PlayerIdentity; onClose: () => void }) {
   const invite = usePlayerInvite(player.id);
   const url = invite.link ? `${location.origin}/invite/${invite.link.token}` : null;
   const devices = invite.access?.devices ?? [];
