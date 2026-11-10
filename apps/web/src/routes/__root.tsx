@@ -21,7 +21,10 @@ const invitation = /^\/(join|claim)\//;
 
 /** Your own play: it lives on this device, so it never waits for sign-in or the network. */
 const personal = (pathname: string) =>
-  pathname === "/" || pathname.startsWith("/play/") || pathname.startsWith("/t/");
+  pathname === "/" ||
+  pathname.startsWith("/play/") ||
+  pathname.startsWith("/t/") ||
+  pathname.startsWith("/invite/");
 
 function Root() {
   // Decide from the page being drawn, not the address: while a navigation is pending the router

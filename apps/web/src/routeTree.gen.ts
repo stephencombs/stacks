@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClaimCodeRouteImport } from './routes/claim/$code'
 import { Route as GroupsIndexRouteImport } from './routes/groups/index'
+import { Route as InviteTokenRouteImport } from './routes/invite/$token'
 import { Route as JoinCodeRouteImport } from './routes/join/$code'
 import { Route as PlayVisitIdRouteImport } from './routes/play/$visitId'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions/$sessionId'
@@ -40,6 +41,11 @@ const ClaimCodeRoute = ClaimCodeRouteImport.update({
 const GroupsIndexRoute = GroupsIndexRouteImport.update({
   id: '/groups/',
   path: '/groups/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const JoinCodeRoute = JoinCodeRouteImport.update({
@@ -116,6 +122,7 @@ const TripsTripIdSessionsNewRoute = TripsTripIdSessionsNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/claim/$code': typeof ClaimCodeRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/join/$code': typeof JoinCodeRoute
   '/play/$visitId': typeof PlayVisitIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/claim/$code': typeof ClaimCodeRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/join/$code': typeof JoinCodeRoute
   '/play/$visitId': typeof PlayVisitIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/claim/$code': typeof ClaimCodeRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/join/$code': typeof JoinCodeRoute
   '/play/$visitId': typeof PlayVisitIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/claim/$code'
+    | '/invite/$token'
     | '/join/$code'
     | '/play/$visitId'
     | '/sessions/$sessionId'
@@ -195,6 +205,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/claim/$code'
+    | '/invite/$token'
     | '/join/$code'
     | '/play/$visitId'
     | '/sessions/$sessionId'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/claim/$code'
+    | '/invite/$token'
     | '/join/$code'
     | '/play/$visitId'
     | '/sessions/$sessionId'
@@ -234,6 +246,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClaimCodeRoute: typeof ClaimCodeRoute
+  InviteTokenRoute: typeof InviteTokenRoute
   JoinCodeRoute: typeof JoinCodeRoute
   PlayVisitIdRoute: typeof PlayVisitIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       path: '/groups'
       fullPath: '/groups/'
       preLoaderRoute: typeof GroupsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/join/$code': {
@@ -378,6 +398,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClaimCodeRoute: ClaimCodeRoute,
+  InviteTokenRoute: InviteTokenRoute,
   JoinCodeRoute: JoinCodeRoute,
   PlayVisitIdRoute: PlayVisitIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,

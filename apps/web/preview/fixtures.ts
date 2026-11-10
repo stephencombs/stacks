@@ -1,5 +1,5 @@
 // Preview only: one realistic group, encoded through the real contract schemas.
-import { JoinedTable, TableView } from "@stacks/contracts/recordingCommands";
+import { JoinedTable, PlayerInvitePreview, TableView } from "@stacks/contracts/recordingCommands";
 import {
   GroupDetail,
   GroupListItem,
@@ -402,4 +402,9 @@ export const routes: Record<string, unknown> = {
   [`/api/trips/${ids.oldTrip}/limits`]: check(UserLimits, limits),
   [`/api/sessions/${ids.live}`]: check(SessionDetail, sessionDetail),
   "/api/shared/preview-token": check(TableView, sharedTable),
+  "/api/invites/preview-invite": check(PlayerInvitePreview, {
+    player: { id: shared(11), displayName: "Bea" },
+    startedBy: "Maya",
+  }),
+  "/api/invites/preview-invite/redeem": { id: shared(11), displayName: "Bea" },
 };
