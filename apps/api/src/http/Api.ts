@@ -11,6 +11,7 @@ import * as Ledger from "../features/Ledger.ts";
 import * as Limits from "../features/Limits.ts";
 import * as PlayerInvites from "../features/PlayerInvites.ts";
 import * as Recording from "../features/Recording.ts";
+import * as Relationships from "../features/Relationships.ts";
 import * as Sessions from "../features/Sessions.ts";
 import * as Stakes from "../features/Stakes.ts";
 import * as Trips from "../features/Trips.ts";
@@ -134,7 +135,9 @@ const recording = HttpApiBuilder.group(StacksApi, "recording", (handlers) =>
     .handle("revokeInvite", ({ params }) => serve(PlayerInvites.revoke(params.inviteId)))
     .handle("redeemInvite", ({ params, payload }) =>
       serve(PlayerInvites.redeem(params.token, payload)),
-    ),
+    )
+    .handle("balances", () => serve(Relationships.balances()))
+    .handle("pair", ({ params }) => serve(Relationships.pair(params.playerId))),
 );
 
 const publicRecording = HttpApiBuilder.group(StacksApi, "publicRecording", (handlers) =>

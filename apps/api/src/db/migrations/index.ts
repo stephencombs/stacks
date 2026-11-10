@@ -16,6 +16,7 @@ import legacyImport from "./0013_legacy_import.ts";
 import sharedTables from "./0014_shared_tables.ts";
 import tableParticipants from "./0015_table_participants.ts";
 import invitesRecorders from "./0016_invites_recorders.ts";
+import playerMoney from "./0017_player_money.ts";
 
 export const records = {
   "0001_init": init,
@@ -34,6 +35,7 @@ export const records = {
   "0014_shared_tables": sharedTables,
   "0015_table_participants": tableParticipants,
   "0016_invites_recorders": invitesRecorders,
+  "0017_player_money": playerMoney,
 };
 
 export const migrations = Migrator.fromRecord(records);

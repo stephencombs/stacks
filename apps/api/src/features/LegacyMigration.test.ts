@@ -21,7 +21,7 @@ import {
   type SessionId,
 } from "@stacks/contracts";
 import { balances } from "@stacks/shared/balances";
-import { financialContributions, pairBalances } from "@stacks/shared/pairBalances";
+import { financialContributions, netObligations } from "@stacks/shared/pairBalances";
 import { playerResults } from "@stacks/shared/results";
 
 import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
@@ -202,7 +202,7 @@ const importedLedger = Effect.fn("test.importedLedger")(function* (groupId: Grou
     .map((trip) => {
       const inTrip = new Set(visitRows.filter((row) => row.tripId === trip).map((row) => row.id));
       const nets = new Map<PlayerId, number>();
-      for (const pair of pairBalances(
+      for (const pair of netObligations(
         financialContributions({
           tables,
           visits,
