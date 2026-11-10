@@ -72,7 +72,9 @@ it("keeps scrubbed page URLs and drops ledger details and exception text", () =>
 it("redacts invite, claim, and share path secrets", () => {
   expect(scrubTelemetryUrl("/invite/secret-token?x=1")).toBe("/invite/:code");
   expect(scrubTelemetryUrl("/t/share-token#hash")).toBe("/t/:code");
-  expect(scrubTelemetryUrl("https://colorup.app/groups/abc")).toBe("https://colorup.app/groups/abc");
+  expect(scrubTelemetryUrl("https://colorup.app/groups/abc")).toBe(
+    "https://colorup.app/groups/abc",
+  );
 });
 
 it("keeps known exception types without forwarding arbitrary error text", () => {
