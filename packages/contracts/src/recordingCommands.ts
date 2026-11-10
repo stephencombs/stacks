@@ -207,10 +207,10 @@ export type JoinedTable = typeof JoinedTable.Type;
 export const PlayerInviteLink = Schema.Struct({ id: PlayerInviteId, token: Schema.String });
 export type PlayerInviteLink = typeof PlayerInviteLink.Type;
 
-/** What an invite link shows before it's used: whose play it records, at whose tables. */
+/** What an invite link shows before it's used: whose play it records, and who sent it. */
 export const PlayerInvitePreview = Schema.Struct({
   player: PlayerIdentity,
-  startedBy: Schema.String,
+  invitedBy: Schema.String,
 });
 export type PlayerInvitePreview = typeof PlayerInvitePreview.Type;
 

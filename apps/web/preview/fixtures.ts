@@ -404,7 +404,7 @@ export const routes: Record<string, unknown> = {
   "/api/shared/preview-token": check(TableView, sharedTable),
   "/api/invites/preview-invite": check(PlayerInvitePreview, {
     player: { id: shared(11), displayName: "Bea" },
-    startedBy: "Maya",
+    invitedBy: "Maya",
   }),
   "/api/invites/preview-invite/redeem": { id: shared(11), displayName: "Bea" },
 };

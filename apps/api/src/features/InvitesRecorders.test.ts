@@ -368,4 +368,118 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("invites and recorders", (it)
       expect((yield* bea.client.recording.table(params)).viewerRole).toBe("participant");
     }),
   );
+
+  it.effect("stops a revoked device's earlier invites, and re-checks the issuer on redeem", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { starter, seated, invite } = yield* invitedTable();
+      const bea = yield* device();
+      yield* bea.redeem(invite.token);
+      const spare = yield* bea.client.recording.invitePlayer({
+        params: { playerId: seated.playerId },
+      });
+      yield* starter.client.recording.revokeBinding({
+        params: { playerId: seated.playerId, actorId: bea.identity.actorId },
+      });
+      const thief = yield* device();
+      expect(yield* thief.redeem(spare.token).pipe(Effect.flip)).toMatchObject({
+        _tag: "Conflict",
+        reason: "invite_revoked",
+      });
+
+      // An invite whose issuer lost authority some other way fails on redeem too.
+      const laptop = yield* device();
+      yield* laptop.redeem(
+        (yield* starter.client.recording.invitePlayer({ params: { playerId: seated.playerId } }))
+          .token,
+      );
+      const late = yield* laptop.client.recording.invitePlayer({
+        params: { playerId: seated.playerId },
+      });
+      yield* sql`
+        update player_actors set revoked_at = now()
+        where actor_id = ${laptop.identity.actorId} and player_id = ${seated.playerId}
+      `;
+      expect(yield* thief.redeem(late.token).pipe(Effect.flip)).toMatchObject({
+        _tag: "Conflict",
+        reason: "invite_revoked",
+      });
+      expect(
+        yield* sql`select 1 from player_actors where player_id = ${seated.playerId} and actor_id = ${thief.identity.actorId}`,
+      ).toEqual([]);
+    }),
+  );
+
+  it.effect("lets a bound device only move itself, never manage others", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { starter, seated, invite } = yield* invitedTable();
+      const bea = yield* device();
+      yield* bea.redeem(invite.token);
+      const fromStarter = yield* starter.client.recording.invitePlayer({
+        params: { playerId: seated.playerId },
+      });
+      // Bea's own invite doesn't cancel the starter's.
+      const fromBea = yield* bea.client.recording.invitePlayer({
+        params: { playerId: seated.playerId },
+      });
+      const laptop = yield* device();
+      yield* laptop.redeem(fromStarter.token);
+      const params = { params: { playerId: seated.playerId } };
+      expect(
+        yield* bea.client.recording
+          .revokeBinding({ params: { ...params.params, actorId: laptop.identity.actorId } })
+          .pipe(Effect.flip),
+      ).toMatchObject({ _tag: "Forbidden" });
+      expect(
+        yield* bea.client.recording
+          .revokeInvite({ params: { inviteId: fromBea.id } })
+          .pipe(Effect.flip),
+      ).toMatchObject({ _tag: "Forbidden" });
+      expect(yield* bea.client.recording.playerAccess(params).pipe(Effect.flip)).toMatchObject({
+        _tag: "Forbidden",
+      });
+      // Bea may stop her own device.
+      yield* bea.client.recording.revokeBinding({
+        params: { ...params.params, actorId: bea.identity.actorId },
+      });
+      // Her unused invite went with it.
+      const [row] = yield* sql<{ revokedAt: Date | null }>`
+        select revoked_at from player_invites where id = ${fromBea.id}
+      `;
+      expect(row?.revokedAt).not.toBeNull();
+    }),
+  );
+
+  it.effect("restores a revoked binding as an invite, and previews the issuer only", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { starter, opened, token } = yield* sharedTable();
+      const bea = yield* device();
+      const { player } = yield* bea.join(token);
+      yield* bea.push(sitDown(bea.identity, opened.tableId, player.id));
+      yield* starter.client.recording.revokeBinding({
+        params: { playerId: player.id, actorId: bea.identity.actorId },
+      });
+      const again = yield* starter.client.recording.invitePlayer({
+        params: { playerId: player.id },
+      });
+      const anon = yield* TestApi.pipe(Effect.flatMap((api) => api.asActor(null)));
+      const preview = yield* anon.publicRecording.previewInvite({ params: { token: again.token } });
+      expect(preview.invitedBy).toBe("Starter");
+      yield* bea.redeem(again.token);
+      const [binding] = yield* sql<{ boundVia: string; revokedAt: Date | null }>`
+        select bound_via, revoked_at from player_actors
+        where player_id = ${player.id} and actor_id = ${bea.identity.actorId}
+      `;
+      expect(binding).toEqual({ boundVia: "invite", revokedAt: null });
+
+      // A used link creates nothing for whoever tries it next.
+      const stray = yield* device();
+      expect(yield* stray.redeem(again.token).pipe(Effect.flip)).toMatchObject({
+        reason: "invite_used_up",
+      });
+      expect(yield* sql`select 1 from players where id = ${stray.identity.playerId}`).toEqual([]);
+    }),
+  );
 });

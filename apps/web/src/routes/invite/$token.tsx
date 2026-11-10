@@ -57,8 +57,8 @@ function InvitePage() {
       ) : (
         <>
           <EmptyState title={`Record as ${preview.ok.player.displayName}`}>
-            {preview.ok.startedBy
-              ? `${preview.ok.startedBy} invited you to record your own play at their table.`
+            {preview.ok.invitedBy
+              ? `${preview.ok.invitedBy} invited you to record your own play at their table.`
               : "You were invited to record your own play at a table."}{" "}
             Only take this up if you're {preview.ok.player.displayName}. It works once, and you
             don't need an account.

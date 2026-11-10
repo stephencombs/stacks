@@ -28,8 +28,24 @@ const tablesOf = (sql: SqlClient.SqlClient, playerId: PlayerId) => sql`(
 )`;
 
 /**
- * A player the recorder may hand to another device: one at a table it started, or one it records
- * as. An actor's own player never moves this way: it would carry the actor's tables with it.
+ * Whether an actor still has authority over a player: it started a table the player is at, or it
+ * holds an unrevoked binding to them.
+ */
+const holds = (sql: SqlClient.SqlClient, actorId: string, playerId: PlayerId) => sql`(
+  exists (
+    select 1 from tables t join player_actors pa on pa.player_id = t.starter_player_id
+    where pa.actor_id = ${actorId} and pa.revoked_at is null
+      and t.id in ${tablesOf(sql, playerId)}
+  ) or exists (
+    select 1 from player_actors
+    where actor_id = ${actorId} and player_id = ${playerId} and revoked_at is null
+  )
+)`;
+
+/**
+ * A player the recorder may hand to another device: one at a table it started (`starter`, who
+ * manages every invite and device for them), or one it records as (`bound`, which may only move
+ * itself). An actor's own player never moves this way: it would carry the actor's tables with it.
  */
 const authority = Effect.fn("PlayerInvites.authority")(function* (playerId: PlayerId) {
   const sql = yield* SqlClient.SqlClient;
@@ -52,10 +68,16 @@ const authority = Effect.fn("PlayerInvites.authority")(function* (playerId: Play
   if (!standing?.starter && !actorPlayers.includes(playerId))
     return yield* new NotFound({ resource: "player" });
   if (standing?.owned) return yield* new Forbidden({ reason: "not_your_player" });
-  return { self, player: PlayerIdentity.make(player) };
+  return { self, player: PlayerIdentity.make(player), starter: standing?.starter === true };
 });
 
-/** A new single-use link for the player. Any earlier unused link stops working. */
+const starterOnly = Effect.fn("PlayerInvites.starterOnly")(function* (playerId: PlayerId) {
+  const held = yield* authority(playerId);
+  if (!held.starter) return yield* new Forbidden({ reason: "starter_only" });
+  return held;
+});
+
+/** A new single-use link for the player. The issuer's earlier unused links stop working. */
 export const issue = Effect.fn("PlayerInvites.issue")(function* (playerId: PlayerId) {
   const sql = yield* SqlClient.SqlClient;
   const { self } = yield* authority(playerId);
@@ -66,7 +88,8 @@ export const issue = Effect.fn("PlayerInvites.issue")(function* (playerId: Playe
     Effect.gen(function* () {
       yield* sql`
         update player_invites set revoked_at = now()
-        where player_id = ${playerId} and redeemed_at is null and revoked_at is null
+        where player_id = ${playerId} and issued_by_actor = ${self.actorId}
+          and redeemed_at is null and revoked_at is null
       `;
       yield* sql`
         insert into player_invites (id, player_id, token_hash, issued_by_actor)
@@ -80,10 +103,11 @@ export const issue = Effect.fn("PlayerInvites.issue")(function* (playerId: Playe
 
 export const access = Effect.fn("PlayerInvites.access")(function* (playerId: PlayerId) {
   const sql = yield* SqlClient.SqlClient;
-  const { player } = yield* authority(playerId);
+  const { player } = yield* starterOnly(playerId);
   const [invite] = yield* sql<{ id: PlayerInviteId; createdAt: Date }>`
     select id, created_at from player_invites
     where player_id = ${playerId} and redeemed_at is null and revoked_at is null
+    order by created_at desc limit 1
   `;
   const devices = yield* sql<{ actorId: ActorId; boundVia: "join" | "invite" }>`
     select actor_id, bound_via from player_actors
@@ -98,20 +122,33 @@ export const access = Effect.fn("PlayerInvites.access")(function* (playerId: Pla
   return result;
 });
 
-/** Stops one device recording as the player. Its earlier entries stay, signed by it. */
+/**
+ * Stops one device recording as the player, with the links it made for them. Its earlier entries
+ * stay, signed by it. The starter stops any device; a device stops only itself.
+ */
 export const revokeBinding = Effect.fn("PlayerInvites.revokeBinding")(function* (
   playerId: PlayerId,
   actorId: ActorId,
 ) {
   const sql = yield* SqlClient.SqlClient;
-  yield* authority(playerId);
-  const revoked = yield* sql`
-    update player_actors set revoked_at = now()
-    where player_id = ${playerId} and actor_id = ${actorId} and bound_via <> 'self'
-      and revoked_at is null
-    returning actor_id
-  `;
-  if (revoked.length === 0) return yield* new NotFound({ resource: "player" });
+  const { self, starter } = yield* authority(playerId);
+  if (!starter && actorId !== self.actorId) return yield* new Forbidden({ reason: "starter_only" });
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      const revoked = yield* sql`
+        update player_actors set revoked_at = now()
+        where player_id = ${playerId} and actor_id = ${actorId} and bound_via <> 'self'
+          and revoked_at is null
+        returning actor_id
+      `;
+      if (revoked.length === 0) return yield* new NotFound({ resource: "player" });
+      yield* sql`
+        update player_invites set revoked_at = now()
+        where player_id = ${playerId} and issued_by_actor = ${actorId}
+          and redeemed_at is null and revoked_at is null
+      `;
+    }),
+  );
 });
 
 export const revoke = Effect.fn("PlayerInvites.revoke")(function* (inviteId: PlayerInviteId) {
@@ -120,7 +157,7 @@ export const revoke = Effect.fn("PlayerInvites.revoke")(function* (inviteId: Pla
     select player_id from player_invites where id = ${inviteId}
   `;
   if (!invite) return yield* new NotFound({ resource: "invite" });
-  yield* authority(invite.playerId);
+  yield* starterOnly(invite.playerId);
   const revoked = yield* sql`
     update player_invites set revoked_at = now()
     where id = ${inviteId} and redeemed_at is null and revoked_at is null
@@ -132,9 +169,16 @@ export const revoke = Effect.fn("PlayerInvites.revoke")(function* (inviteId: Pla
 type InviteRow = {
   readonly id: PlayerInviteId;
   readonly playerId: PlayerId;
+  readonly issuedByActor: string;
   readonly redeemedAt: Date | null;
   readonly revokedAt: Date | null;
 };
+
+const find = (sql: SqlClient.SqlClient, hash: string) =>
+  sql<InviteRow>`
+    select id, player_id, issued_by_actor, redeemed_at, revoked_at from player_invites
+    where token_hash = ${hash}
+  `.pipe(Effect.map(([row]) => row));
 
 const usable = (invite: InviteRow | undefined) =>
   !invite
@@ -147,22 +191,18 @@ const usable = (invite: InviteRow | undefined) =>
 
 export const preview = Effect.fn("PlayerInvites.preview")(function* (token: string) {
   const sql = yield* SqlClient.SqlClient;
-  const [row] = yield* sql<InviteRow>`
-    select id, player_id, redeemed_at, revoked_at from player_invites
-    where token_hash = ${yield* digest(token)}
-  `;
-  const invite = yield* usable(row);
+  const invite = yield* usable(yield* find(sql, yield* digest(token)));
   const [player] = yield* sql`
     select id, display_name from players where id = ${invite.playerId}
   `.pipe(Effect.flatMap(Access.decodeRows(PlayerIdentityRow)));
-  const [starter] = yield* sql<{ displayName: string }>`
-    select s.display_name from tables t join players s on s.id = t.starter_player_id
-    where t.id in ${tablesOf(sql, invite.playerId)}
-    order by t.id limit 1
+  // Who sent it, by the issuer's own player: never anyone else at the player's tables.
+  const [issuer] = yield* sql<{ displayName: string }>`
+    select p.display_name from player_actors pa join players p on p.id = pa.player_id
+    where pa.actor_id = ${invite.issuedByActor} and pa.bound_via = 'self'
   `;
   const result: PlayerInvitePreview = {
     player: PlayerIdentity.make(player!),
-    startedBy: starter?.displayName ?? "",
+    invitedBy: issuer?.displayName ?? "",
   };
   return result;
 });
@@ -177,19 +217,24 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   const hash = yield* digest(token);
-  // A bad link creates nothing, not even the recorder's own player.
-  const [found] = yield* sql<{ id: PlayerInviteId }>`
-    select id from player_invites where token_hash = ${hash}
-  `;
-  if (!found) return yield* new NotFound({ resource: "invite" });
+  // A bad, used or revoked link creates nothing, not even the recorder's own player.
+  const found = yield* usable(yield* find(sql, hash));
   const { self, actorPlayers } = yield* establish(request.identity);
   return yield* sql.withTransaction(
     Effect.gen(function* () {
       const [row] = yield* sql<InviteRow>`
-        select id, player_id, redeemed_at, revoked_at from player_invites
+        select id, player_id, issued_by_actor, redeemed_at, revoked_at from player_invites
         where id = ${found.id} for update
       `;
       const invite = yield* usable(row);
+      // The issuer may have lost the player since: then its link has too.
+      const [issuer] = yield* sql<{ holds: boolean }>`
+        select ${holds(sql, invite.issuedByActor, invite.playerId)} as holds
+      `;
+      if (!issuer?.holds) {
+        yield* sql`update player_invites set revoked_at = now() where id = ${invite.id}`;
+        return yield* new Conflict({ reason: "invite_revoked" });
+      }
       const starts = yield* sql`
         select 1 from tables
         where starter_player_id in ${sql.in(actorPlayers)}
@@ -199,7 +244,7 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
       yield* sql`
         insert into player_actors (player_id, actor_id, bound_via)
         values (${invite.playerId}, ${self.actorId}, 'invite')
-        on conflict (player_id, actor_id) do update set revoked_at = null
+        on conflict (player_id, actor_id) do update set revoked_at = null, bound_via = 'invite'
       `;
       yield* sql`update player_invites set redeemed_at = now() where id = ${invite.id}`;
       const [player] = yield* sql`
