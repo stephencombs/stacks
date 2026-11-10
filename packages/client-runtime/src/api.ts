@@ -78,6 +78,9 @@ export const makeRecordingTransport = ({
       Effect.flatMap(client(actor), (api) =>
         api.recording.redeemInvite({ params: { token }, payload }),
       ),
+    balances: (actor) => Effect.flatMap(client(actor), (api) => api.recording.balances()),
+    pair: (playerId, actor) =>
+      Effect.flatMap(client(actor), (api) => api.recording.pair({ params: { playerId } })),
   };
 };
 
