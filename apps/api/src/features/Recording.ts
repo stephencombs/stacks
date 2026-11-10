@@ -409,27 +409,38 @@ export const push = Effect.fn("Recording.push")(function* (request: PushRecordin
   const { playerId, actorId } = request.identity;
   if (recorder._tag === "Account") {
     const user = recorder.user;
-    yield* Access.ensureUser().pipe(Effect.provideService(CurrentUser, user));
-    // One actor namespace: an ID a device registered is never an account's. The players foreign
-    // key enforces the same, so a race can't slip past this check.
-    yield* sql`
-      insert into recording_actors (id, kind) values (${actorId}, 'account') on conflict do nothing
-    `;
-    const [actor] = yield* sql<{ kind: string }>`
-      select kind from recording_actors where id = ${actorId}
-    `;
-    if (actor?.kind !== "account") return yield* new Conflict({ reason: "recording_identity" });
-    yield* sql`
-      insert into players (id, group_id, display_name, user_id, created_by, recording_actor_id)
-      values (${playerId}, null, ${user.displayName.slice(0, 60) || "You"},
-        ${user.userId}, ${user.userId}, ${actorId})
-      on conflict do nothing
-    `;
-    yield* sql`
-      insert into player_actors (player_id, actor_id)
-      select id, recording_actor_id from players where user_id = ${user.userId} and group_id is null
-      on conflict do nothing
-    `;
+    const establish = Effect.gen(function* () {
+      yield* Access.ensureUser().pipe(Effect.provideService(CurrentUser, user));
+      // One actor namespace: an ID a device registered is never an account's. The players foreign
+      // key enforces the same, so a race can't slip past this check.
+      yield* sql`
+        insert into recording_actors (id, kind) values (${actorId}, 'account') on conflict do nothing
+      `;
+      const [actor] = yield* sql<{ kind: string }>`
+        select kind from recording_actors where id = ${actorId}
+      `;
+      if (actor?.kind !== "account") return yield* new Conflict({ reason: "recording_identity" });
+      yield* sql`
+        insert into players (id, group_id, display_name, user_id, created_by, recording_actor_id)
+        values (${playerId}, null, ${user.displayName.slice(0, 60) || "You"},
+          ${user.userId}, ${user.userId}, ${actorId})
+        on conflict do nothing
+      `;
+      yield* sql`
+        insert into player_actors (player_id, actor_id)
+        select id, recording_actor_id from players where user_id = ${user.userId} and group_id is null
+        on conflict do nothing
+      `;
+    });
+    yield* sql
+      .withTransaction(establish)
+      .pipe(
+        Effect.catchTag("SqlError", (error) =>
+          error.reason._tag === "UniqueViolation" || error.reason._tag === "ConstraintError"
+            ? Effect.fail<Conflict | typeof error>(new Conflict({ reason: "recording_identity" }))
+            : Effect.fail<Conflict | typeof error>(error),
+        ),
+      );
   } else {
     const verified = yield* verifiedActor(recorder.actorId, recorder.secret);
     if (verified !== actorId) return yield* new Conflict({ reason: "recording_identity" });
@@ -576,30 +587,44 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   const user = yield* CurrentUser;
-  const [actor] = yield* sql<{ secretHash: string }>`
-    select secret_hash from recording_actors where id = ${credential.actorId} and kind = 'device'
-  `;
-  if (!actor) return;
-  if (actor.secretHash !== (yield* digest(credential.secret))) return yield* new Unauthorized();
-  const [player] = yield* sql<{ id: PlayerId }>`
-    select p.id from player_actors pa join players p on p.id = pa.player_id
-    where pa.actor_id = ${credential.actorId} and p.created_by_actor = ${credential.actorId}
-      and p.user_id is null and p.group_id is null
-    for update of p
-  `;
-  if (!player) return;
-  const own = yield* personalIdentity(user.userId);
-  if (own) return yield* new Conflict({ reason: "recording_identity" });
-  yield* Access.ensureUser();
-  // The actor becomes the account's: from now on the account's session records as it.
-  yield* sql`
-    update recording_actors set kind = 'account', secret_hash = null
-    where id = ${credential.actorId}
-  `;
-  yield* sql`
-    update players
-    set user_id = ${user.userId}, recording_actor_id = ${credential.actorId},
-      display_name = ${user.displayName.slice(0, 60) || "You"}
-    where id = ${player.id}
-  `;
+  const claim = Effect.gen(function* () {
+    const [actor] = yield* sql<{ secretHash: string }>`
+      select secret_hash from recording_actors where id = ${credential.actorId} and kind = 'device'
+      for update
+    `;
+    if (!actor) return;
+    if (actor.secretHash !== (yield* digest(credential.secret))) return yield* new Unauthorized();
+    const [player] = yield* sql<{ id: PlayerId }>`
+      select p.id from player_actors pa join players p on p.id = pa.player_id
+      where pa.actor_id = ${credential.actorId} and p.created_by_actor = ${credential.actorId}
+        and p.user_id is null and p.group_id is null
+      for update of p
+    `;
+    if (player && (yield* personalIdentity(user.userId)))
+      return yield* new Conflict({ reason: "recording_identity" });
+    yield* Access.ensureUser();
+    // The actor becomes the account's: from now on the account's session records as it. One that
+    // never pushed has no player yet; the account's next push creates it.
+    yield* sql`
+      update recording_actors set kind = 'account', secret_hash = null
+      where id = ${credential.actorId}
+    `;
+    if (player)
+      yield* sql`
+        update players
+        set user_id = ${user.userId}, recording_actor_id = ${credential.actorId},
+          display_name = ${user.displayName.slice(0, 60) || "You"}
+        where id = ${player.id}
+      `;
+  });
+  // Two devices claiming for one account at once: the loser rolls back and keeps its actor.
+  return yield* sql
+    .withTransaction(claim)
+    .pipe(
+      Effect.catchTag("SqlError", (error) =>
+        error.reason._tag === "UniqueViolation"
+          ? Effect.fail<Conflict | typeof error>(new Conflict({ reason: "recording_identity" }))
+          : Effect.fail<Conflict | typeof error>(error),
+      ),
+    );
 });

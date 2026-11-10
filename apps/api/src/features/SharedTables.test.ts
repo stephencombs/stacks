@@ -330,14 +330,54 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       expect(refused).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
       expect((yield* bea.recording.history()).identity).toBeNull();
 
-      // Even an actor that registered and never pushed stays the device's.
-      const fresh = yield* device();
-      const unbound = { playerId: PlayerId.make(uuid()), actorId: fresh.identity.actorId };
-      const again = yield* bea.recording
-        .push({ payload: { identity: unbound, commands: [start(unbound)] } })
-        .pipe(Effect.flip);
-      expect(again).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
       expect((yield* starter.client.recording.history()).identity).toEqual(starter.identity);
+    }),
+  );
+
+  it.effect("lets an account claim a device's actor that registered but never pushed", () =>
+    Effect.gen(function* () {
+      const fresh = yield* device();
+      const { cal, dee } = yield* users("cal", "dee");
+      const opened = start(fresh.identity);
+      // Without the secret, the device's actor isn't the account's to use.
+      const refused = yield* dee.recording
+        .push({ payload: { identity: fresh.identity, commands: [opened] } })
+        .pipe(Effect.flip);
+      expect(refused).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
+
+      // Signed in on the device itself, the claim proves the secret and the account records as it.
+      yield* cal.claim.claimActor({ payload: fresh.credential });
+      const { results } = yield* cal.recording.push({
+        payload: { identity: fresh.identity, commands: [opened] },
+      });
+      expect(results.map((result) => result.status)).toEqual(["accepted"]);
+      expect((yield* cal.recording.history()).identity).toEqual(fresh.identity);
+      expect(yield* fresh.client.recording.history().pipe(Effect.flip)).toMatchObject({
+        _tag: "Unauthorized",
+      });
+    }),
+  );
+
+  it.effect("rolls back a claim that loses a race, leaving the other device's actor working", () =>
+    Effect.gen(function* () {
+      const devices = [yield* device(), yield* device()];
+      for (const item of devices)
+        yield* item.client.recording.push({
+          payload: { identity: item.identity, commands: [start(item.identity)] },
+        });
+      const { eve } = yield* users("eve");
+      const outcomes = yield* Effect.forEach(
+        devices,
+        (item) =>
+          eve.claim.claimActor({ payload: item.credential }).pipe(
+            Effect.as("claimed"),
+            Effect.catchTag("Conflict", (conflict) => Effect.succeed(conflict.reason)),
+          ),
+        { concurrency: "unbounded" },
+      );
+      expect(outcomes.toSorted()).toEqual(["claimed", "recording_identity"]);
+      const loser = devices[outcomes.indexOf("recording_identity")]!;
+      expect((yield* loser.client.recording.history()).identity).toEqual(loser.identity);
     }),
   );
 });
