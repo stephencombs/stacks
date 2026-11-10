@@ -92,13 +92,15 @@ export const financialContributions = ({
   return result;
 };
 
+type Obligation = Pick<PairBalance, "debtorId" | "creditorId" | "amount">;
+
 /** Only opposite obligations between the same two players cancel. */
-export const pairBalances = (
-  contributions: Iterable<FinancialContribution>,
-): ReadonlyArray<PairBalance> => {
+export const netObligations = (obligations: Iterable<Obligation>): ReadonlyArray<PairBalance> => {
   const pairs = new Map<PlayerId, Map<PlayerId, bigint>>();
-  for (const contribution of contributions) {
-    const { debtorId, creditorId, amount } = FinancialContribution.make(contribution);
+  for (const obligation of obligations) {
+    const { debtorId, creditorId, amount } = obligation;
+    if (debtorId === creditorId || !(amount > 0))
+      throw new RangeError("An obligation is a positive amount between different players.");
     const [first, second] = debtorId < creditorId ? [debtorId, creditorId] : [creditorId, debtorId];
     const row = pairs.get(first) ?? new Map<PlayerId, bigint>();
     row.set(
@@ -129,4 +131,41 @@ export const pairBalances = (
             ? 1
             : 0,
   );
+};
+
+/** A play entry with the player whose visit holds it. */
+export type PairEntry = PlayEntry & { readonly playerId: PlayerId };
+
+/**
+ * What each pair of players owes, from covered buy-ins, held cash-outs and repayments that aren't
+ * voided. A player's own money creates no debt, and obligations never net through a third player.
+ */
+export const pairBalances = (
+  entries: Iterable<PairEntry>,
+  repayments: Iterable<Repayment>,
+): ReadonlyArray<PairBalance> => {
+  const obligations: Obligation[] = [];
+  for (const entry of entries) {
+    if (
+      entry.voidedAt !== null ||
+      entry.counterpartyId === null ||
+      entry.amount === 0 ||
+      entry.kind === "adjustment"
+    )
+      continue;
+    obligations.push(
+      entry.kind === "buy_in"
+        ? { debtorId: entry.playerId, creditorId: entry.counterpartyId, amount: entry.amount }
+        : { debtorId: entry.counterpartyId, creditorId: entry.playerId, amount: entry.amount },
+    );
+  }
+  for (const repayment of repayments) {
+    if (repayment.voidedAt !== null) continue;
+    obligations.push({
+      debtorId: repayment.toPlayerId,
+      creditorId: repayment.fromPlayerId,
+      amount: repayment.amount,
+    });
+  }
+  return netObligations(obligations);
 };

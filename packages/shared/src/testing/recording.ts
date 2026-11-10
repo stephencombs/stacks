@@ -16,7 +16,7 @@ export const ALEX = PlayerId.make("0192e7a0-0000-7000-8000-000000000001");
 export const BEA = PlayerId.make("0192e7a0-0000-7000-8000-000000000002");
 export const CAL = PlayerId.make("0192e7a0-0000-7000-8000-000000000003");
 export const ACTOR = ActorId.make("0192e7a0-0000-7000-8000-000000000004");
-const AT = DateTime.makeUnsafe("2026-11-06T20:00:00Z");
+export const AT = DateTime.makeUnsafe("2026-11-06T20:00:00Z");
 export const LATER = DateTime.makeUnsafe("2026-11-06T21:00:00Z");
 export const table: Table = {
   id: TableId.make("0192e7a0-0000-7000-8000-0000000000a1"),
