@@ -1,4 +1,12 @@
-import { UserId, type ActorId, type PlayerId, type TableId, type VisitId } from "@stacks/contracts";
+import {
+  UserId,
+  type ActorId,
+  type PairHistory,
+  type PlayerBalances,
+  type PlayerId,
+  type TableId,
+  type VisitId,
+} from "@stacks/contracts";
 import type {
   JoinedTable,
   PlayerAccess,
@@ -40,6 +48,7 @@ import {
 import {
   canRetryRecording,
   describeRecordingError,
+  paymentSyncView,
   PRIVATE_RECORDING_NAMESPACE,
   recordingHome,
   recordingSyncView,
@@ -467,3 +476,77 @@ const describeInviteError = (error: unknown) => {
 };
 
 export type { ActorKeyStorage } from "./recordingSync.ts";
+
+/**
+ * What the device's players and the people they've shared a table with owe each other, from the
+ * server. `undefined` while loading, null when it can't be reached. `reload` fetches again.
+ */
+export const usePlayerBalances = () => {
+  const sync = use(RecordingSyncContext);
+  const [attempt, setAttempt] = useState(0);
+  const [result, setResult] = useState<{
+    attempt: number;
+    value: PlayerBalances | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!sync) return;
+    let current = true;
+    sync.balances().then(
+      (value) => current && setResult({ attempt, value }),
+      () => current && setResult({ attempt, value: null }),
+    );
+    return () => {
+      current = false;
+    };
+  }, [sync, attempt]);
+  return {
+    balances: sync ? (result?.attempt === attempt ? result.value : undefined) : null,
+    reload: () => setAttempt((n) => n + 1),
+  };
+};
+
+/**
+ * Everything between this device's player and `playerId`, from the server, fetched again as this
+ * device's payments sync. `undefined` while loading, null when it can't be reached.
+ */
+export const usePlayerPair = (playerId: PlayerId) => {
+  const sync = use(RecordingSyncContext);
+  const store = useRecordingStore();
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const [result, setResult] = useState<{ key: string; value: PairHistory | null } | null>(null);
+  const key = `${playerId}:${snapshot.state?.sync?.synced.length ?? 0}`;
+  useEffect(() => {
+    if (!sync) return;
+    let current = true;
+    sync.pair(playerId).then(
+      (value) => current && setResult({ key, value }),
+      () => current && setResult({ key, value: null }),
+    );
+    return () => {
+      current = false;
+    };
+  }, [sync, playerId, key]);
+  const fresh = result?.key.startsWith(`${playerId}:`) ? result.value : undefined;
+  return { history: sync ? fresh : null, state: snapshot.state };
+};
+
+/** The sync line and refused payments, with the same record-again and discard as play. */
+export const usePaymentSync = () => {
+  const store = useRecordingStore();
+  const sync = use(RecordingSyncContext);
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const status = useSyncExternalStore(sync?.subscribe ?? noSubscription, sync?.getStatus ?? idle);
+  const view = useMemo(() => paymentSyncView(snapshot.state, status), [snapshot.state, status]);
+  const [error, setError] = useState<string | null>(null);
+  const resolve =
+    (action: "recordAgain" | "discard") => async (operationId: RecordingOperationId) => {
+      if (!sync) return;
+      setError(null);
+      try {
+        await sync[action](operationId);
+      } catch (cause) {
+        setError(describeRecordingError(cause));
+      }
+    };
+  return { ...view, error, recordAgain: resolve("recordAgain"), discard: resolve("discard") };
+};
