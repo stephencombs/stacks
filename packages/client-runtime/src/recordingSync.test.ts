@@ -730,7 +730,7 @@ describe("shared tables", () => {
       tableId: table.id,
       displayName: "Dee",
       buyIn: 100,
-    });
+    }) as Extract<RecordingCommand, { type: "join_table" }>;
     expect(() => applyRecordingCommand(state(joiner), someoneElses)).toThrow(
       expect.objectContaining({ reason: "forbidden" }),
     );

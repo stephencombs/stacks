@@ -31,7 +31,11 @@ const device = Effect.fn("test.device")(function* () {
   const push = (...commands: ReadonlyArray<RecordingCommand>) =>
     client.recording
       .push({ payload: { identity, commands: [commands[0]!, ...commands.slice(1)] } })
-      .pipe(Effect.map(({ results }) => results.map((result) => result.reason ?? result.status)));
+      .pipe(
+        Effect.map(({ results }) =>
+          results.map((result) => (result.status === "rejected" ? result.reason : result.status)),
+        ),
+      );
   const join = (token: string, player = { id: PlayerId.make(uuid()), displayName: "Bea" }) =>
     client.recording.join({ params: { token }, payload: { identity, player } });
   return { identity, client, push, join };

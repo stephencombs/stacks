@@ -671,3 +671,109 @@ export function AddPlayerDialog({
     </RecordingDialog>
   );
 }
+
+/**
+ * Sits a player down at a table with a new buy-in: their first visit after joining, or a new one
+ * when they come back. It records on this device, so it works offline.
+ */
+export function SitDownDialog({
+  tableId,
+  player,
+  returning,
+  onClose,
+  onSeated,
+}: {
+  tableId: TableId;
+  player: PlayerIdentity;
+  returning: boolean;
+  onClose: () => void;
+  onSeated: (visitId: VisitId) => void;
+}) {
+  const save = useRecordingSubmit();
+  const amount = useAmount("", 1);
+  return (
+    <RecordingDialog
+      title={returning ? "Back at the table" : "Buy in"}
+      description={
+        returning
+          ? "This starts a new session at the same table. Your last one stays as it finished."
+          : `Your buy-in as ${player.displayName}.`
+      }
+      submitLabel={returning ? "Sit back down" : "Buy in"}
+      cancelLabel="Cancel"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const value = amount.read();
+        if (value === null) return;
+        const receipt = await save.submit({
+          type: "join_table",
+          tableId,
+          playerId: player.id,
+          buyIn: value,
+        });
+        if (receipt) onSeated(receipt.command.visitId);
+      }}
+    >
+      <AmountField label="Buy-in" amount={amount} first />
+    </RecordingDialog>
+  );
+}
+
+/**
+ * Joins a shared table as a new player. It asks only for a name, and says what joining does:
+ * it never picks someone already at the table.
+ */
+export function JoinDialog({
+  join,
+  onClose,
+  onJoined,
+}: {
+  join: { pending: boolean; error: string | null; join: (name: string) => Promise<unknown> };
+  onClose: () => void;
+  onJoined: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    setNameError(trimmed === "" ? "Enter your name." : null);
+    if (trimmed === "") return;
+    if (await join.join(trimmed)) onJoined();
+  };
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !join.pending) onClose();
+      }}
+      title="Join this table"
+      description="This adds you to the table as a new player. You record your own buy-ins and cash-outs; whoever started the table can record and correct everyone's."
+    >
+      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+        <Field label="Your name" hint="Others at the table see it." error={nameError}>
+          {(props) => (
+            <Input
+              {...props}
+              value={name}
+              maxLength={60}
+              autoComplete="given-name"
+              autoFocus={matchMedia("(pointer: fine)").matches}
+              onChange={(event) => setName(event.target.value)}
+            />
+          )}
+        </Field>
+        {join.error ? <FormError>{join.error}</FormError> : null}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button size="lg" disabled={join.pending} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" size="lg" pending={join.pending}>
+            Join as a new player
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}

@@ -1,5 +1,9 @@
 import { formatTime } from "@stacks/client-runtime/format";
-import { useRecordingTable, useTableSharing } from "@stacks/client-runtime/recordingReact";
+import {
+  useRecordingTable,
+  useServerTable,
+  useTableSharing,
+} from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import type { TableId, VisitId } from "@stacks/contracts";
 import { Link } from "@tanstack/react-router";
@@ -11,7 +15,7 @@ import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
 import { Note, Section } from "~/components/ui/Page";
-import { List, RowLink, RowText, Tag } from "~/components/ui/Surface";
+import { List, Row, RowLink, RowText, Tag } from "~/components/ui/Surface";
 import { useAccount } from "~/lib/account";
 
 import { AddPlayerDialog } from "./RecordingForms";
@@ -33,6 +37,8 @@ export function TableSection({
   const account = useAccount();
   const [open, setOpen] = useState<"add" | "share" | null>(null);
   if (!table) return null;
+  if (table.role === "participant")
+    return <JoinedTableSection tableId={tableId} visitId={visitId} />;
   const others = table.visits.some((item) => !item.isSelf);
   const signedOut = account.available && account.isLoaded && !account.isSignedIn;
   return (
@@ -96,6 +102,73 @@ export function TableSection({
       ) : open === "share" ? (
         <ShareDialog tableId={tableId} onClose={() => setOpen(null)} />
       ) : null}
+    </Section>
+  );
+}
+
+/**
+ * A table this device joined. Its own visits are here; everyone else's come from the server, so
+ * they show only online, and only to read: a participant records just their own play.
+ */
+function JoinedTableSection({ tableId, visitId }: { tableId: TableId; visitId: VisitId }) {
+  const table = useRecordingTable(tableId)!;
+  const server = useServerTable(tableId);
+  const names = new Map(server?.players.map((player) => [player.id, player.displayName]));
+  const others = (server?.visits ?? []).filter(
+    (item) => item.visit.playerId !== table.you.player.id,
+  );
+  const count = table.visits.length + others.length;
+  return (
+    <Section title="At this table" aside={count === 1 ? "1 player" : `${count} players`}>
+      <List as="ul" label="Players at this table">
+        {table.visits.map((item) => (
+          <li key={item.visit.id}>
+            <RowLink
+              to="/play/$visitId"
+              params={{ visitId: item.visit.id }}
+              {...(item.visit.id === visitId ? { "aria-current": "page" as const } : {})}
+            >
+              <RowText
+                title="You"
+                meta={
+                  item.finalResult === null
+                    ? `Playing since ${formatTime(item.visit.startedAt)}`
+                    : `Finished ${formatTime(item.visit.finishedAt!)}`
+                }
+              />
+              {item.finalResult === null ? (
+                <Tag tone="live">Live</Tag>
+              ) : (
+                <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
+              )}
+            </RowLink>
+          </li>
+        ))}
+        {others.map((item) => (
+          <li key={item.visit.id}>
+            <Row>
+              <RowText
+                title={names.get(item.visit.playerId) ?? "Player"}
+                meta={
+                  item.finalResult === null
+                    ? `Playing since ${formatTime(item.visit.startedAt)}`
+                    : `Finished ${formatTime(item.visit.finishedAt!)}`
+                }
+              />
+              {item.finalResult === null ? (
+                <Tag tone="live">Live</Tag>
+              ) : (
+                <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
+              )}
+            </Row>
+          </li>
+        ))}
+      </List>
+      {server === null ? (
+        <Note>The others at this table show when Color Up can be reached.</Note>
+      ) : (
+        <Note>You record your own play here. Whoever started the table records for everyone.</Note>
+      )}
     </Section>
   );
 }

@@ -1,5 +1,5 @@
 // Preview only: one realistic group, encoded through the real contract schemas.
-import { TableView } from "@stacks/contracts/recordingCommands";
+import { JoinedTable, TableView } from "@stacks/contracts/recordingCommands";
 import {
   GroupDetail,
   GroupListItem,
@@ -342,7 +342,10 @@ const sharedTable = {
     },
   ],
   viewerRole: "viewer",
+  viewerPlayerId: null,
 };
+/** Joining the shared table through its link, as Cal. */
+const joinedAs = { id: shared(12), displayName: "Cal" };
 
 // Decoding first checks every fixture against the contract, so a wrong field fails loudly here.
 const check = <S extends Schema.Top>(schema: S, value: unknown) => {
@@ -350,7 +353,24 @@ const check = <S extends Schema.Top>(schema: S, value: unknown) => {
   return Schema.encodeSync(json)(Schema.decodeUnknownSync(json)(value));
 };
 export const routes: Record<string, unknown> = {
-  "/api/recording": { identity: null, commands: [], tables: [], visits: [], entries: [] },
+  "/api/recording": {
+    identity: null,
+    commands: [],
+    tables: [],
+    participants: [],
+    visits: [],
+    entries: [],
+  },
+  "/api/shared/preview-token/join": check(JoinedTable, {
+    table: sharedTable.table,
+    player: joinedAs,
+  }),
+  [`/api/tables/${shared(1)}`]: check(TableView, {
+    ...sharedTable,
+    players: [...sharedTable.players, joinedAs],
+    viewerRole: "participant",
+    viewerPlayerId: joinedAs.id,
+  }),
   "/api/groups": check(Schema.Array(GroupListItem), groupList),
   [`/api/groups/${ids.group}`]: check(GroupDetail, groupDetail),
   [`/api/groups/${ids.group}/stats`]: check(GroupStats, stats),

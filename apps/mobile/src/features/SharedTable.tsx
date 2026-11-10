@@ -1,5 +1,9 @@
 import { formatTime } from "@stacks/client-runtime/format";
-import { useRecordingTable, useTableSharing } from "@stacks/client-runtime/recordingReact";
+import {
+  useRecordingTable,
+  useServerTable,
+  useTableSharing,
+} from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import type { TableId, VisitId } from "@stacks/contracts";
 import { useState } from "react";
@@ -30,6 +34,7 @@ export function TableSection({
   const account = useAccount();
   const [open, setOpen] = useState<"add" | "share" | null>(null);
   if (!table) return null;
+  if (table.role === "participant") return <JoinedTableSection tableId={tableId} onOpen={onOpen} />;
   const others = table.visits.some((item) => !item.isSelf);
   const signedOut = account.available && account.isLoaded && !account.isSignedIn;
   return (
@@ -150,5 +155,61 @@ function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: () => voi
         {sharing.error ? <FormError>{sharing.error}</FormError> : null}
       </View>
     </Sheet>
+  );
+}
+
+/**
+ * A table this device joined. Its own visits are here; everyone else's come from the server, so
+ * they show only online, and only to read: a participant records just their own play.
+ */
+function JoinedTableSection({
+  tableId,
+  onOpen,
+}: {
+  tableId: TableId;
+  onOpen: (visitId: VisitId) => void;
+}) {
+  const table = useRecordingTable(tableId)!;
+  const server = useServerTable(tableId);
+  const names = new Map(server?.players.map((player) => [player.id, player.displayName]));
+  const rows = [
+    ...table.visits.map((item) => ({ ...item, name: "You", mine: true })),
+    ...(server?.visits ?? [])
+      .filter((item) => item.visit.playerId !== table.you.player.id)
+      .map((item) => ({ ...item, name: names.get(item.visit.playerId) ?? "Player", mine: false })),
+  ];
+  return (
+    <View className="gap-2">
+      <SectionHeading>At this table</SectionHeading>
+      <List>
+        {rows.map((item) => (
+          <Row
+            key={item.visit.id}
+            {...(item.mine
+              ? { onPress: () => onOpen(item.visit.id), accessibilityHint: "Opens your session" }
+              : {})}
+          >
+            <View className="min-w-0 flex-1 gap-0.5">
+              <Text className="font-medium text-ink">{item.name}</Text>
+              <Text className="text-sm text-muted">
+                {item.finalResult === null
+                  ? `Playing since ${formatTime(item.visit.startedAt)}`
+                  : `Finished ${formatTime(item.visit.finishedAt!)}`}
+              </Text>
+            </View>
+            {item.finalResult === null ? (
+              <Tag tone="live">Live</Tag>
+            ) : (
+              <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
+            )}
+          </Row>
+        ))}
+      </List>
+      <Text className="text-sm text-muted">
+        {server === null
+          ? "The others at this table show when Color Up can be reached."
+          : "You record your own play here. Whoever started the table records for everyone."}
+      </Text>
+    </View>
   );
 }

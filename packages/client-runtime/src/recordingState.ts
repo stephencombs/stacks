@@ -30,7 +30,7 @@ export { applyRecordingCommand, RecordingError, RecordingReceipt } from "@stacks
  * Applies a receipt as it was recorded: this device's own commands under its rules, and another
  * actor's, which only ever come from the server, as the server accepted them.
  */
-export const applyReceipt = <S extends RecordingState>(state: S, command: RecordingCommand) =>
+const applyReceipt = <S extends RecordingState>(state: S, command: RecordingCommand) =>
   applyRecordingCommand(state, command, command.actorId === state.actor.id ? undefined : null);
 
 /** A command the server refused, kept out of the ledger until it's recorded again or discarded. */

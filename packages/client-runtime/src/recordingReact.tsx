@@ -1,5 +1,10 @@
 import { UserId, type TableId, type VisitId } from "@stacks/contracts";
-import type { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
+import type {
+  JoinedTable,
+  RecordingCommand,
+  RecordingOperationId,
+  TableView,
+} from "@stacks/contracts/recordingCommands";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import {
@@ -318,5 +323,59 @@ export const useTableSharing = (tableId: TableId) => {
         return null;
       }),
   };
+};
+/**
+ * Joins a shared table through its link as a new player named as typed. It needs the network
+ * once; `join` resolves with the table, or null with `error` set.
+ */
+export const useJoinTable = (token: string) => {
+  const sync = use(RecordingSyncContext);
+  const [state, setState] = useState<{ pending: boolean; error: string | null }>({
+    pending: false,
+    error: null,
+  });
+  const join = async (displayName: string): Promise<JoinedTable | null> => {
+    if (!sync) return null;
+    setState({ pending: true, error: null });
+    try {
+      const joined = await sync.join(token, displayName);
+      setState({ pending: false, error: null });
+      return joined;
+    } catch (error) {
+      setState({ pending: false, error: describeJoinError(error) });
+      return null;
+    }
+  };
+  return { ...state, join };
+};
+
+const describeJoinError = (error: unknown) => {
+  if (error instanceof RecordingError) return describeRecordingError(error);
+  const tag = typeof error === "object" && error !== null && "_tag" in error ? error._tag : null;
+  if (tag === "NotFound")
+    return "This link doesn't work anymore. Ask whoever shared it for the current one.";
+  if (tag === "Conflict" || tag === "Unauthorized") return describeError(error);
+  return "Joining needs a connection. Try again once you're online.";
+};
+
+/**
+ * The whole table as the server has it, for a table this device joined: everyone else's play
+ * lives there, not on this device. `undefined` while loading, null when it can't be reached.
+ */
+export const useServerTable = (tableId: TableId | null) => {
+  const sync = use(RecordingSyncContext);
+  const [view, setView] = useState<{ id: TableId; view: TableView | null } | null>(null);
+  useEffect(() => {
+    if (!sync || !tableId) return;
+    let current = true;
+    sync.table(tableId).then(
+      (next) => current && setView({ id: tableId, view: next }),
+      () => current && setView({ id: tableId, view: null }),
+    );
+    return () => {
+      current = false;
+    };
+  }, [sync, tableId]);
+  return view?.id === tableId ? view.view : undefined;
 };
 export type { ActorKeyStorage } from "./recordingSync.ts";

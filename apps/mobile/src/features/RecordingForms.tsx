@@ -777,3 +777,43 @@ export function AddPlayerSheet({
     </RecordingSheet>
   );
 }
+
+/**
+ * Sits a player down at a table again with a new buy-in: a new visit, since their last one is
+ * over. It records on this device, so it works offline.
+ */
+export function SitDownSheet({
+  tableId,
+  player,
+  onClose,
+  onSeated,
+}: {
+  tableId: TableId;
+  player: PlayerIdentity;
+  onClose: () => void;
+  onSeated: (visitId: VisitId) => void;
+}) {
+  const save = useRecordingSubmit();
+  const amount = useAmount("", 1);
+  return (
+    <RecordingSheet
+      title="Back at the table"
+      submitLabel="Sit back down"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const value = amount.read();
+        if (value === null) return;
+        const receipt = await save.submit({
+          type: "join_table",
+          tableId,
+          playerId: player.id,
+          buyIn: value,
+        });
+        if (receipt) onSeated(receipt.command.visitId);
+      }}
+    >
+      <KeypadAmount label="Buy-in" amount={amount} />
+    </RecordingSheet>
+  );
+}
