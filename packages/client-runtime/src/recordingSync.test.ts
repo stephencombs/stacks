@@ -320,6 +320,51 @@ describe("merging", () => {
     expect(merged.tables[0]!.starterPlayerId).toBe(device.self.id);
   });
 
+  it("won't merge a device the server doesn't report as linked, even if it chose to link", async () => {
+    const store = await open();
+    await store.transform((s) => ({ ...s, sync: { userId: null, synced: [], rejected: [] } }));
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const remote = server();
+    await pushAll(store, remote);
+    const account = {
+      playerId: PlayerId.make(crypto.randomUUID()),
+      actorId: ActorId.make(crypto.randomUUID()),
+    };
+    // The account's history holds none of the device's player: nothing was linked.
+    const history: RecordingHistory = {
+      identity: account,
+      commands: [],
+      tables: [],
+      participants: [],
+      players: [],
+      visits: [],
+      entries: [],
+    };
+    await expect(
+      store.transform((s) => mergeRecordingHistory(s, alex, history)),
+    ).rejects.toBeInstanceOf(RecordingError);
+    expect(state(store).self.id).not.toBe(account.playerId);
+  });
+
+  it("adopts the account's identity on a device that never synced, link or not", async () => {
+    const store = await open();
+    await store.transform((s) => ({ ...s, sync: { userId: null, synced: [], rejected: [] } }));
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const device = state(store);
+    const account = {
+      playerId: PlayerId.make(crypto.randomUUID()),
+      actorId: ActorId.make(crypto.randomUUID()),
+    };
+    const history: RecordingHistory = { ...server().history(), identity: account };
+    await store.transform((s) => mergeRecordingHistory(s, alex, history));
+    // Its own player becomes the account's personal player, with nothing left under the old ID.
+    const merged = state(store);
+    expect(merged.self.id).toBe(account.playerId);
+    expect(merged.tables[0]!.starterPlayerId).toBe(account.playerId);
+    expect(merged.visits.every((visit) => visit.playerId === account.playerId)).toBe(true);
+    expect(merged.players.some((player) => player.id === device.self.id)).toBe(false);
+  });
+
   it("still refuses to adopt another identity once it synced under an account", async () => {
     const store = await open();
     await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });

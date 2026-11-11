@@ -244,9 +244,15 @@ export const mergeRecordingHistory = (
     identity !== null &&
     (identity.playerId !== state.self.id || identity.actorId !== state.actor.id);
   const accepted = new Set(state.sync?.synced);
-  // A device that synced as its own actor can only meet another identity here once the account
+  // A device that synced as its own actor meets another identity here only once the account
   // linked its player (never merged): that player is still the device's, now one of the account's.
-  const linked = adopt && state.sync?.userId === null && accepted.size > 0;
+  // That's so when the server's history includes the device's player, and not merely because the
+  // identity differs; a device that never synced has nothing to link and is adopted instead.
+  const reported =
+    history.tables.some((table) => table.starterPlayerId === state.self.id) ||
+    history.participants.some((item) => item.player.id === state.self.id) ||
+    history.players.some((player) => player.id === state.self.id);
+  const linked = adopt && state.sync?.userId === null && accepted.size > 0 && reported;
   if (adopt && accepted.size > 0 && !linked)
     throw new RecordingError("load", "This device already synced as a different player.");
   const actorId = identity?.actorId ?? state.actor.id;
