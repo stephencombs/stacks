@@ -39,9 +39,9 @@ A one-tap write, like a rebuy, keeps its button where it was, so a second tap do
 Pick one of a few options, all in sight. Web `Segmented` lives in its own file, `Segmented.tsx`.
 
 ```
-How many options?
- ├── Up to 4 → web Segmented; mobile Choice, which draws a pill segmented control (rounded-full track in bg-fill, rounded-full active thumb in bg-surface)
- └── 5 or more → web Select; mobile Choice, which draws a checked list
+How do the choices fit?
+ ├── A few short labels → web Segmented; native Choice uses a system segmented picker
+ └── Long labels or more options → web Select; native Choice uses a menu picker
 ```
 
 ```tsx
@@ -52,7 +52,7 @@ How many options?
 <div role="group">{views.map((v) => <button aria-pressed={v.key === view}>…</button>)}</div>
 ```
 
-On mobile, `Choice` supports stacking two full-width pill segmented controls (`rounded-full bg-fill p-1`) when a screen switches both primary metric and time window (for example, `This trip | All time` or `Money | % of buy-in` above `24h | 7d | 30d | All` on Board). Selection is signaled by the elevated `bg-surface` pill thumb and text color (`text-ink` vs `text-muted`), keeping font weight and box width stable so switching tabs never causes layout shift.
+On native mobile, `Choice` uses SwiftUI or Compose controls and accounts for label length and text scale. Use `presentation="menu"` for compact player or counterparty selection. The mobile web build retains its custom controls.
 
 A form value from a few short options, where the choice deserves weight, is `RadioCards` on web: `kind` of an entry or venue, the game of a session. Set columns with `className`.
 
@@ -117,22 +117,9 @@ On web, every group and trip page except an invite or claim link sits in `AppShe
 - **`ScopeButton`** says where you are: the trip in scope, its group small above it, and a chevron. It's a real button, outlined like a secondary one, and opens the scope sheet (trips, New trip, the group, your other groups). A group with no trips shows its name alone.
 - **`PlaceLink`** is one of the four places, Sessions, Board, Settle up and Group, with a lucide icon. `layout="bar"` stacks icon over label in the bottom bar; `layout="side"` is a sidebar row. The current place is gold. A group with no trips offers only Group.
 
-On mobile (`apps/mobile`), navigation chrome follows a three-part layout:
+On mobile, keep React Navigation native-stack. iOS uses native bottom tabs and grouped native header actions; Android uses the standard destination bar. Scope remains an explicit group/trip selection button. Its pill uses native glass when supported. Reserve the measured LiveBar height above navigation so the final content remains reachable.
 
-- **`TopBar` / `PageTitle` (`components/ui/Surface.tsx`, `components/ui/Screen.tsx`)**: Left-aligned wordmark (`Color Up` + compact `BETA` **tag** on `HomeScreen`) or `28px` bold sentence-case screen title (`Sessions`, `Board`, `Settle up`, or group name). Right-aligned actions are `44×44px` circular `rounded-full bg-surface border border-line` `IconButton` controls (`YouButton`, `TripOptionsButton`, new session compose, filter/search)—never unframed bare icons.
-- **`FilterPillBar` / `ScopeButton` (`features/Scope.tsx`)**: Renders horizontal `rounded-full` filter pills (`bg-surface border border-line px-3.5 py-2`) for switching group and trip scope (`accessibilityLabel="${group.name}, ${trip?.name ?? 'no trips yet'}"`) plus contextual filter pills.
-- **Floating Capsule `PlaceTabs` (`features/PlaceTabs.tsx` & `features/PlaceTabs.web.tsx`)**: Uses `createBottomTabNavigator` with a shared custom floating `rounded-full` capsule `tabBar` positioned above the safe-area home indicator (`mx-5`, `p-1.5`, `bg-surface/95`, `border border-line`) containing the 4 icon-only peer **navigation** tabs (`Sessions`, `Board`, `Settle up`, `Group`, each `accessibilityRole="tab"` with its exact place `accessibilityLabel` and `>=44×44px` touch target). The active place renders a concentric `rounded-full` pill thumb (`bg-fill`) and a **filled vs. outlined** icon swap (`components/ui/Icon.ios.tsx` / `components/ui/Icon.tsx`). When a session is in play, `LiveBar` floats cleanly as a compact pill card immediately above the capsule tab bar.
-
-Your avatar (`YouButton`) opens **You**: play limits for the trip in scope, appearance, and account, laid out with `SettingsGroup` and `SettingsRow`.
-
-```
-How wide is the window?
- ├── Mobile app (iOS / Android) → TopBar + FilterPillBar at the top, floating capsule PlaceTabs at the bottom, LiveBar floating just above PlaceTabs
- ├── Web below lg → a top bar (ScopeButton, avatar) and a bottom bar of PlaceLinks, with the LiveBar floating just above it
- └── Web lg and up → a 240px sidebar: wordmark, ScopeButton, PlaceLinks, your live table, this group's trips, You at the foot
-```
-
-The sheets are `Dialog` on web and `Sheet` (`rounded-t-3xl`) on mobile, sliding up from the bottom on a phone and sitting centered on a wide screen. `Dialog` and `Menu` layer above the bars.
+See [mobile controls](mobile-redesign.md) for platform selection, native sheet sizing and chart interaction.
 
 Pages pushed onto a place, like a session onto Sessions or People onto Group, take a `BackLink` in `PageHeader`'s `back` (or the stack's back button on mobile). The back slot only ever goes back; it never switches scope.
 
@@ -184,7 +171,7 @@ A long form's submit action stays visible: use `ActionBar` on web and `Screen`'s
 
 Keep a form's submit action and submission errors in `footer`, outside the scrolling fields. Secondary outcomes stay in the body so the keyboard leaves room for inputs. A web submit button in the footer links to its form with the `form` attribute.
 
-A focused task or a confirmation. The title says what's being decided, and a confirmation names the outcome on its button. Keep the safe choice beside it: "Keep it" and "Void entry".
+Use native action menus for short choices and confirmations for destructive outcomes. iOS Sheet uses native detents and title/close controls; pass `busy` while saving to prevent dismissal. A reason field stays in a form sheet. The title says what's being decided, and a confirmation names the outcome on its button. Keep the safe choice beside it: "Keep it" and "Void entry".
 
 ## Menu, MenuItem, MenuChoice (web)
 

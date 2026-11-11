@@ -14,7 +14,10 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
-import { Choice, FormError, TextField } from "../components/ui/Field";
+import { DateTimeField } from "../components/ui/DateTimeField";
+import { fieldDate } from "../components/ui/dateTimeValue";
+import { localDateText } from "@stacks/client-runtime/recordingView";
+import { FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
@@ -139,13 +142,6 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   );
 }
 
-const STARTS = [
-  { value: "0", label: "Today" },
-  { value: "1", label: "Yesterday" },
-  { value: "2", label: "2 days ago" },
-  { value: "3", label: "3 days ago" },
-] as const;
-
 /**
  * Starts a trip and puts it in scope. A group's first trip brings Sessions, Board and Settle up
  * into the tab bar, so that one stays put; any later one opens its sessions.
@@ -168,14 +164,15 @@ export function StartTripSheet({
   const create = useAction(stacks.Client.mutation("trips", "create"));
   const [now] = useState(() => new Date());
   const [name, setName] = useState("");
-  const [daysAgo, setDaysAgo] = useState<(typeof STARTS)[number]["value"]>("0");
+  const [started, setStarted] = useState(() => localDateText(now));
   const [problem, setProblem] = useState<string | null>(null);
 
   const submit = async () => {
     if (!name.trim()) return setProblem("Give the trip a name.");
     setProblem(null);
     // A trip starts at midnight of its first day.
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - Number(daysAgo));
+    const start = fieldDate(started, "date");
+    if (!start || start > now) return setProblem("Choose a start date today or earlier.");
     const saved = await create.run({
       params: { groupId },
       payload: {
@@ -214,7 +211,13 @@ export function StartTripSheet({
         maxLength={60}
         placeholder={`Vegas ${now.getFullYear()}`}
       />
-      <Choice label="Started" options={STARTS} value={daysAgo} onChange={setDaysAgo} />
+      <DateTimeField
+        label="Started"
+        kind="date"
+        value={started}
+        onChange={setStarted}
+        maximumDate={now}
+      />
       {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
     </Sheet>
   );

@@ -803,6 +803,7 @@ function SeatSheet({
   return (
     <Sheet
       open={seat !== null}
+      busy={sit.pending}
       onClose={close}
       title={
         seat === null ? "" : sitting ? `${name(sitting.playerId)} · Seat ${seat}` : seatName(seat)
@@ -822,12 +823,15 @@ function SeatSheet({
       <List>
         {sitting
           ? free.map((n) => (
-              <Row key={n} onPress={() => void save(sitting.playerId, n)}>
+              <Row key={n} onPress={sit.pending ? undefined : () => void save(sitting.playerId, n)}>
                 <Text className="text-base text-ink">Move to {seatName(n).toLowerCase()}</Text>
               </Row>
             ))
           : detail.playerIds.map((playerId) => (
-              <Row key={playerId} onPress={() => void save(playerId, seat)}>
+              <Row
+                key={playerId}
+                onPress={sit.pending ? undefined : () => void save(playerId, seat)}
+              >
                 <Chip chip={chipOf(playerId)} name={name(playerId)} size={28} />
                 <Text className="flex-1 text-base text-ink">{name(playerId)}</Text>
                 {seatOf.has(playerId) ? (

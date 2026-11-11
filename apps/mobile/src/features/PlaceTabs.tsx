@@ -48,7 +48,15 @@ function FloatingCapsuleTabBar({ state, descriptors, navigation }: BottomTabBarP
               accessibilityRole="tab"
               accessibilityLabel={title}
               accessibilityState={{ selected: current }}
-              onPress={() => navigation.navigate(route.name)}
+              onPress={() => {
+                const event = navigation.emit({
+                  type: "tabPress",
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!current && !event.defaultPrevented) navigation.navigate(route.name);
+              }}
+              onLongPress={() => navigation.emit({ type: "tabLongPress", target: route.key })}
               className={cn(
                 "min-h-11 flex-1 items-center justify-center rounded-full py-2 active:scale-[0.95]",
                 current && "bg-fill",

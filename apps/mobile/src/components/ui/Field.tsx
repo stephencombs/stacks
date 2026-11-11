@@ -1,9 +1,9 @@
 import { useId, type ReactNode } from "react";
-import * as Haptics from "expo-haptics";
 import { Platform, Pressable, Text, TextInput, View, type TextInputProps } from "react-native";
 
 import { Icon } from "./Icon";
 import { cn } from "./cn";
+import { FieldChoice } from "./FieldChoice";
 
 /** A caption over a group of rows, in the iOS grouped-list style. */
 function FieldLabel({ id, children }: { id?: string; children: ReactNode }) {
@@ -80,6 +80,7 @@ export function Choice<A extends string>({
   value,
   onChange,
   labelHidden = false,
+  presentation = "automatic",
 }: {
   label: string;
   options: ReadonlyArray<{ readonly value: A; readonly label: string }>;
@@ -87,11 +88,19 @@ export function Choice<A extends string>({
   onChange: (value: A) => void;
   /** Read out but not shown, where the options speak for themselves. */
   labelHidden?: boolean;
+  presentation?: "automatic" | "menu";
 }) {
-  const pick = (next: A) => {
-    if (next !== value && Platform.OS !== "web") void Haptics.selectionAsync();
-    onChange(next);
-  };
+  if (Platform.OS !== "web")
+    return (
+      <FieldChoice
+        label={label}
+        options={options}
+        value={value}
+        onChange={onChange}
+        labelHidden={labelHidden}
+        presentation={presentation}
+      />
+    );
   if (options.length <= 4)
     return (
       <View className="gap-1.5" accessibilityRole="radiogroup" accessibilityLabel={label}>
@@ -105,9 +114,9 @@ export function Choice<A extends string>({
                 accessibilityRole="radio"
                 accessibilityLabel={option.label}
                 accessibilityState={{ checked: selected }}
-                onPress={() => pick(option.value)}
+                onPress={() => onChange(option.value)}
                 className={cn(
-                  "min-h-10 flex-1 items-center justify-center rounded-full px-3 active:scale-[0.98]",
+                  "min-h-11 flex-1 items-center justify-center rounded-full px-3 active:scale-[0.98]",
                   selected && "bg-surface shadow-sm",
                 )}
               >
@@ -138,7 +147,7 @@ export function Choice<A extends string>({
               accessibilityRole="radio"
               accessibilityLabel={option.label}
               accessibilityState={{ checked: selected }}
-              onPress={() => pick(option.value)}
+              onPress={() => onChange(option.value)}
               className="min-h-12 flex-row items-center pl-4 active:bg-sunken"
             >
               <View

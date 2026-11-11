@@ -41,11 +41,11 @@ const steps = [
   },
   {
     title: "Log it at the table.",
-    body: "Buy-ins and cash-outs take a few taps. A rebuy repeats your last amount in one.",
+    body: "Buy-ins and cash-outs take a few taps. Reuse a recent rebuy amount, then confirm.",
   },
   {
     title: "Watch the board.",
-    body: "Everyone's running total, session by session, with your line in gold.",
+    body: "Follow your trip result, session by session, and see where you stand.",
   },
   {
     title: "Settle up once.",

@@ -388,10 +388,16 @@ const describeJoinError = (error: unknown) => {
  * lives there, not on this device. `undefined` while loading, null when it can't be reached.
  */
 export const useServerTable = (tableId: TableId | null) => {
+  const store = useRecordingStore();
   const sync = use(RecordingSyncContext);
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const enabled =
+    snapshot.state !== null &&
+    sync !== null &&
+    (sync.userId !== null || syncsAsDevice(snapshot.state));
   const [view, setView] = useState<{ id: TableId; view: TableView | null } | null>(null);
   useEffect(() => {
-    if (!sync || !tableId) return;
+    if (!enabled || !sync || !tableId) return;
     let current = true;
     sync.table(tableId).then(
       (next) => current && setView({ id: tableId, view: next }),
@@ -400,8 +406,8 @@ export const useServerTable = (tableId: TableId | null) => {
     return () => {
       current = false;
     };
-  }, [sync, tableId]);
-  return view?.id === tableId ? view.view : undefined;
+  }, [enabled, sync, tableId]);
+  return enabled && view?.id === tableId ? view.view : undefined;
 };
 /**
  * Hands a player to another device: a single-use invite link (a new one cancels the last), and

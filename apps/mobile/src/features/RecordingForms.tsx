@@ -27,6 +27,7 @@ import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
+import { DateTimeField } from "../components/ui/DateTimeField";
 import { Sheet } from "../components/ui/Sheet";
 import { cn } from "../components/ui/cn";
 import { useRecordingState } from "../lib/recording";
@@ -354,8 +355,9 @@ export function PastSessionSheet({
   const save = useRecordingSubmit();
   const buyIn = useAmount("", 1);
   const cashOut = useAmount("", 0);
+  const [now] = useState(() => new Date());
   const [times, setTimes] = useState<Times>(() => ({
-    date: localDateText(),
+    date: localDateText(now),
     start: "",
     finish: "",
   }));
@@ -370,20 +372,14 @@ export function PastSessionSheet({
       setTimeError(parsed.error === null ? null : parsed);
     }
   };
-  const timeField = (field: keyof Times, label: string, example: string) => (
-    <TextField
+  const timeField = (field: keyof Times, label: string) => (
+    <DateTimeField
       label={label}
+      kind={field === "date" ? "date" : "time"}
       value={times[field]}
-      onChangeText={setTime(field)}
+      onChange={setTime(field)}
       error={timeError?.field === field ? timeError.error : null}
-      placeholder={example}
-      keyboardType="numbers-and-punctuation"
-      autoComplete="off"
-      autoCorrect={false}
-      autoCapitalize="none"
-      maxLength={field === "date" ? 10 : 5}
-      className="flex-1"
-      inputClassName="font-mono"
+      maximumDate={field === "date" ? now : undefined}
     />
   );
   return (
@@ -415,11 +411,9 @@ export function PastSessionSheet({
         <TypedAmount label="Total in" amount={buyIn} />
         <TypedAmount label="Total out" amount={cashOut} />
       </View>
-      {timeField("date", "Date", "2026-11-07")}
-      <View className="flex-row gap-3">
-        {timeField("start", "Started", "21:30")}
-        {timeField("finish", "Finished", "23:45")}
-      </View>
+      {timeField("date", "Date")}
+      {timeField("start", "Started")}
+      {timeField("finish", "Finished")}
       <DetailsFields
         game={game}
         highLimit={highLimit}
@@ -817,7 +811,7 @@ export function AddPlayerSheet({
           onChangeText={setName}
         />
       ) : null}
-      <KeypadAmount label="Buy-in" amount={amount} />
+      <TypedAmount label="Buy-in" amount={amount} />
     </RecordingSheet>
   );
 }

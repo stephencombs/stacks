@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, Text } from "react-native";
 
 import { cn } from "./cn";
+import { GlassSurface } from "./GlassSurface";
 
 type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg" | "xl";
@@ -170,25 +171,28 @@ export function FilterPill({
       accessibilityLabel={accessibilityLabel ?? (sublabel ? `${sublabel}, ${label}` : label)}
       accessibilityHint={accessibilityHint}
       onPress={onPress}
-      className={cn(
-        "min-h-9 max-w-64 flex-row items-center gap-1.5 rounded-full border px-3.5 py-2 active:scale-[0.97]",
-        active ? "border-line-strong bg-fill" : "border-line bg-surface active:bg-fill",
-        className,
-      )}
+      className={cn("max-w-64 rounded-full active:scale-[0.97]", className)}
     >
-      {leading}
-      {sublabel ? (
-        <Text numberOfLines={1} className="type-footnote text-muted">
-          {sublabel} ·
-        </Text>
-      ) : null}
-      <Text
-        numberOfLines={1}
-        className={cn("shrink type-callout", active ? "font-semibold text-ink" : "text-ink")}
+      <GlassSurface
+        className="min-h-11 flex-row items-center gap-1.5 rounded-full px-3.5 py-2"
+        fallbackClassName={
+          active ? "border border-line-strong bg-fill" : "border border-line bg-surface"
+        }
       >
-        {label}
-      </Text>
-      {trailing}
+        {leading}
+        {sublabel ? (
+          <Text numberOfLines={1} className="type-footnote text-muted">
+            {sublabel} ·
+          </Text>
+        ) : null}
+        <Text
+          numberOfLines={1}
+          className={cn("shrink type-callout", active ? "font-semibold text-ink" : "text-ink")}
+        >
+          {label}
+        </Text>
+        {trailing}
+      </GlassSurface>
     </Pressable>
   );
 }

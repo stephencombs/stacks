@@ -126,7 +126,7 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
     expect(step("Start a group.")?.getAttribute("data-hidden")).toBe("true");
     expect(button("Create an account").closest("[data-hidden='true']")).not.toBeNull();
     expect(container.textContent).toContain("who owes whom");
-    expect(container.textContent).toContain("A rebuy repeats your last amount");
+    expect(container.textContent).toContain("Reuse a recent rebuy amount, then confirm");
     expect(container.querySelector("[data-trip='true']")).not.toBeNull();
 
     await act(async () => button("Continue").click());

@@ -1,97 +1,70 @@
 import { useAuth } from "@clerk/expo";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
-import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
-import { Button, IconButton } from "../components/ui/Button";
+import { confirmAction } from "../components/ui/confirmAction";
+import { ActionMenu } from "../components/ui/ActionMenu";
+import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
-import { Icon } from "../components/ui/Icon";
-import { Sheet } from "../components/ui/Sheet";
 import { useGo } from "../lib/go";
 import { useScope } from "../lib/scope";
 import { useAction, useStacks } from "../lib/stacks";
 
-/** The trip's own actions behind "…" beside the Sessions title: end, reopen, delete. */
 export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <IconButton
-        accessibilityLabel="Trip options"
-        accessibilityHint="End, reopen or delete this trip"
-        icon={<Icon name="more" color="ink" size={20} />}
-        onPress={() => setOpen(true)}
-      />
-      {open ? <TripOptions trip={trip} group={group} onClose={() => setOpen(false)} /> : null}
-    </>
-  );
-}
-
-function TripOptions({
-  trip,
-  group,
-  onClose,
-}: {
-  trip: TripDetail;
-  group: GroupDetail;
-  onClose: () => void;
-}) {
   const go = useGo();
   const stacks = useStacks();
   const { userId } = useAuth();
   const end = useAction(stacks.Client.mutation("trips", "end"));
+  const reopen = useAction(stacks.Client.mutation("trips", "reopen"));
   const remove = useAction(stacks.Client.mutation("trips", "delete"));
   const { forgetTrip } = useScope();
-  const [confirming, setConfirming] = useState(false);
   const params = { tripId: trip.trip.id };
+  const pending = end.pending || reopen.pending || remove.pending;
+  const error = end.error ?? reopen.error ?? remove.error;
   const canDelete =
     trip.sessions.length === 0 && (isAdmin(group) || trip.trip.createdBy === userId);
-  const error = end.error ?? remove.error;
-
-  return (
-    <Sheet open onClose={onClose} title={trip.trip.name}>
-      {trip.trip.endedAt === null ? (
-        <Button
-          label="End trip"
-          size="lg"
-          pending={end.pending}
-          onPress={() =>
+  const actions = [
+    trip.trip.endedAt === null
+      ? {
+          label: "End trip",
+          onPress: () => {
             void end.run({ params, payload: {} }).then((ok) => {
-              if (!ok) return;
-              onClose();
-              go.trip(trip.trip.id, "SettleUp");
-            })
-          }
-        />
-      ) : (
-        <ReopenTrip trip={trip} onDone={onClose} />
-      )}
-      {canDelete ? (
-        <View className="gap-2">
-          {confirming ? (
-            <Text className="text-sm text-muted">
-              Nothing has been played in it yet, so nothing else changes.
-            </Text>
-          ) : null}
-          <Button
-            label={confirming ? "Delete for good" : "Delete trip"}
-            variant="danger"
-            size="lg"
-            pending={remove.pending}
-            onPress={() => {
-              if (!confirming) return setConfirming(true);
-              void remove.run({ params }).then((ok) => {
-                if (!ok) return;
-                forgetTrip(group.group.id);
-                onClose();
-              });
-            }}
-          />
-        </View>
-      ) : null}
+              if (ok) go.trip(trip.trip.id, "SettleUp");
+            });
+          },
+        }
+      : {
+          label: "Reopen trip",
+          onPress: () => {
+            void reopen.run({ params });
+          },
+        },
+    ...(canDelete
+      ? [
+          {
+            label: "Delete trip",
+            destructive: true,
+            onPress: () =>
+              confirmAction(
+                "Delete this trip?",
+                "Nothing has been played in it yet. This cannot be undone.",
+                "Delete trip",
+                () => {
+                  void remove.run({ params }).then((ok) => {
+                    if (ok) forgetTrip(group.group.id);
+                  });
+                },
+              ),
+          },
+        ]
+      : []),
+  ];
+  return (
+    <View className="gap-2">
+      <ActionMenu label="Trip options" disabled={pending} actions={actions} />
       {error ? <FormError>{error}</FormError> : null}
-    </Sheet>
+    </View>
   );
 }
 

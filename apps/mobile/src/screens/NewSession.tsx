@@ -20,7 +20,7 @@ import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Choice, FormError } from "../components/ui/Field";
 import { Screen, screenError } from "../components/ui/Screen";
-import { List, Row, SectionHeading, Surface } from "../components/ui/Surface";
+import { List, SectionHeading, Surface } from "../components/ui/Surface";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { VenuePicker } from "../features/VenuePicker";
 import { Chip } from "../features/Chip";
@@ -75,9 +75,9 @@ const GAMES = (Object.keys(gameNames) as ReadonlyArray<Game>).map((game) => ({
 
 const STARTS = [
   { value: "0", label: "Now" },
-  { value: "30", label: "30 min ago" },
-  { value: "60", label: "1 hr ago" },
-  { value: "120", label: "2 hr ago" },
+  { value: "30", label: "30m ago" },
+  { value: "60", label: "1h ago" },
+  { value: "120", label: "2h ago" },
 ] as const;
 
 function NewSessionForm({
@@ -187,25 +187,24 @@ function NewSessionForm({
           {players.map((player) => {
             const checked = playerIds.has(player.id);
             return (
-              <Row key={player.id}>
-                <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityLabel={player.displayName}
-                  accessibilityState={{ checked }}
-                  onPress={() => toggle(player.id)}
-                  className="flex-1 flex-row items-center gap-3"
-                >
-                  <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
-                  <Text className="flex-1 type-body text-ink">
-                    {player.displayName}
-                    {player.id === detail.myPlayerId ? (
-                      <Text className="text-muted"> (you)</Text>
-                    ) : null}
-                    {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
-                  </Text>
-                  {checked ? <Icon name="check" color="accent-text" size={18} /> : null}
-                </Pressable>
-              </Row>
+              <Pressable
+                key={player.id}
+                accessibilityRole="checkbox"
+                accessibilityLabel={player.displayName}
+                accessibilityState={{ checked }}
+                onPress={() => toggle(player.id)}
+                className="min-h-11 flex-row items-center gap-3 border-t border-line px-4 py-3.5 active:bg-sunken"
+              >
+                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
+                <Text className="flex-1 type-body text-ink">
+                  {player.displayName}
+                  {player.id === detail.myPlayerId ? (
+                    <Text className="text-muted"> (you)</Text>
+                  ) : null}
+                  {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
+                </Text>
+                {checked ? <Icon name="check" color="accent-text" size={18} /> : null}
+              </Pressable>
             );
           })}
         </List>

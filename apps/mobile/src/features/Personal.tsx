@@ -17,6 +17,7 @@ import { cn } from "../components/ui/cn";
 import { useAccount } from "../lib/account";
 import { setTheme, useTheme } from "../lib/theme";
 import { SignInButton } from "./SignInButton";
+import { useNativeHeaderActions } from "./NativeHeaderActions";
 
 /**
  * A screen of your own play: it scrolls under the header, and its main actions sit in a dock
@@ -24,6 +25,7 @@ import { SignInButton } from "./SignInButton";
  * so it has no live bar.
  */
 export function PersonalScreen({ children, dock }: { children: ReactNode; dock?: ReactNode }) {
+  const header = useNativeHeaderActions(true);
   const insets = useSafeAreaInsets();
   const sides = {
     paddingLeft: Math.max(16, insets.left),
@@ -31,6 +33,7 @@ export function PersonalScreen({ children, dock }: { children: ReactNode; dock?:
   };
   return (
     <View className="flex-1 bg-canvas">
+      {header}
       <ScrollView
         className="flex-1"
         contentInsetAdjustmentBehavior="automatic"
@@ -223,7 +226,8 @@ export function PersonalNav() {
   );
 }
 
-function PersonalYou({ onClose }: { onClose: () => void }) {
+export function PersonalYou({ onClose }: { onClose: () => void }) {
+  const sync = useRecordingSync();
   const theme = useTheme();
   const navigation = useNavigation();
   return (
@@ -236,9 +240,12 @@ function PersonalYou({ onClose }: { onClose: () => void }) {
       />
       <View className="gap-2">
         <SectionHeading>Your sessions</SectionHeading>
+        <Text accessibilityLiveRegion="polite" className="text-base text-ink">
+          {sync.line.text}
+        </Text>
         <Text className="text-base text-muted">
-          Sessions you record are saved on this device only. They aren't backed up or shared yet,
-          and signing in or out leaves them here.
+          Sessions save on this device first. Sign in to sync them to your account. Signing in or
+          out leaves them on this device.
         </Text>
       </View>
       <Choice label="Appearance" options={themeChoices} value={theme} onChange={setTheme} />
