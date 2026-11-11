@@ -35,7 +35,7 @@ export function LiveBar({
   return (
     <View
       pointerEvents="box-none"
-      className="absolute inset-x-0 px-3"
+      className="absolute inset-x-0 px-5"
       style={
         bottom === undefined
           ? { bottom: 0, paddingBottom: Math.max(insets.bottom, 12) }
@@ -47,7 +47,7 @@ export function LiveBar({
         accessibilityLabel={`Back to your table at ${seat.venueName}, since ${formatTime(seat.startedAt)}`}
         accessibilityHint="Goes back to your table"
         onPress={() => go.session(seat.id)}
-        className="min-h-13 flex-row items-center gap-3 rounded-xl border border-line-strong bg-surface px-4 py-3 active:bg-sunken"
+        className="min-h-13 flex-row items-center gap-3 rounded-2xl border border-line-strong bg-surface px-4 py-3 shadow-md active:scale-[0.98] active:bg-sunken"
       >
         <View className="size-2 rounded-full bg-live" />
         <Text className="type-label text-live">Live</Text>

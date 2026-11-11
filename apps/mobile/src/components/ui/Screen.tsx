@@ -47,8 +47,8 @@ export function Screen({
           contentContainerClassName="gap-6 px-4 pt-4 pb-24"
         >
           <Content>{children}</Content>
-          {/* iOS insets the scroll view for the tab bar; Android's sits over the scene's foot. */}
-          {!footer && Platform.OS === "android" && bar ? <View style={{ height: bar }} /> : null}
+          {/* The floating tab bar sits over the scene's foot on every platform, so the list ends clear of it. */}
+          {!footer && bar ? <View style={{ height: bar }} /> : null}
         </ScrollView>
         {footer ? (
           <View

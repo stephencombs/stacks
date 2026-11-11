@@ -299,7 +299,7 @@ function useNavigationTheme() {
     },
     fonts: {
       ...base.fonts,
-      bold: { fontFamily: "BarlowCondensed-Bold", fontWeight: "normal" as const },
+      bold: { ...base.fonts.bold, fontWeight: "700" as const },
     },
   };
 }

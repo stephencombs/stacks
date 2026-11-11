@@ -94,22 +94,36 @@
 
 /* Type roles, the same names as apps/web/src/index.css. Text doesn't inherit color here: pair each
    with text-ink or another palette color. */
+@utility type-hero {
+  @apply font-sans text-[38px] leading-[41px] font-semibold tracking-[-1px] tabular-nums;
+}
 @utility type-title {
-  @apply font-display text-[40px] leading-[40px] uppercase;
+  @apply font-sans text-[28px] leading-[32px] font-bold tracking-[-0.7px];
 }
 @utility type-headline {
-  @apply font-display text-4xl leading-10 uppercase;
+  @apply font-sans text-[32px] leading-[36px] font-bold tracking-[-0.8px];
+}
+@utility type-heading {
+  @apply font-sans text-[17px] leading-[22px] font-semibold tracking-[-0.25px];
+}
+@utility type-body {
+  @apply text-[17px] leading-[24px];
 }
 @utility type-callout {
-  @apply text-[15px];
+  @apply text-[15px] leading-[20px] font-medium;
 }
-@utility type-label {
-  @apply font-mono text-[11px] tracking-[1px] uppercase;
-}
-/* The iOS body and footnote sizes, for native controls. */
-@utility type-body {
-  @apply text-[17px];
+@utility type-section {
+  @apply text-[13px] leading-[18px] font-medium;
 }
 @utility type-footnote {
-  @apply text-[13px];
+  @apply text-[13px] leading-[18px] tabular-nums;
+}
+@utility type-label {
+  @apply text-[12px] leading-[16px] font-medium tabular-nums;
+}
+@utility type-number {
+  @apply text-[16px] leading-[22px] font-semibold tabular-nums;
+}
+@utility type-number-lg {
+  @apply text-[20px] leading-[26px] font-semibold tabular-nums;
 }

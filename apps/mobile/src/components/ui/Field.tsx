@@ -42,8 +42,8 @@ export function TextField({
         aria-labelledby={id}
         placeholderTextColorClassName="accent-muted"
         className={cn(
-          "min-h-12 rounded-xl bg-surface px-4 py-3 type-body text-ink",
-          error && "border border-danger",
+          "min-h-12 rounded-2xl border border-line bg-surface px-4 py-3 type-body text-ink",
+          error && "border-danger",
           inputClassName,
         )}
         {...props}
@@ -96,7 +96,7 @@ export function Choice<A extends string>({
     return (
       <View className="gap-1.5" accessibilityRole="radiogroup" accessibilityLabel={label}>
         {labelHidden ? null : <FieldLabel>{label}</FieldLabel>}
-        <View className="flex-row rounded-[10px] bg-fill p-0.5">
+        <View className="flex-row rounded-full bg-fill p-1">
           {options.map((option) => {
             const selected = option.value === value;
             return (
@@ -107,15 +107,15 @@ export function Choice<A extends string>({
                 accessibilityState={{ checked: selected }}
                 onPress={() => pick(option.value)}
                 className={cn(
-                  "min-h-11 flex-1 items-center justify-center rounded-lg px-2",
-                  selected && "bg-raised shadow-sm",
+                  "min-h-10 flex-1 items-center justify-center rounded-full px-3 active:scale-[0.98]",
+                  selected && "bg-surface shadow-sm",
                 )}
               >
                 <Text
                   numberOfLines={1}
                   className={cn(
-                    "type-footnote",
-                    selected ? "font-semibold text-ink" : "font-medium text-ink",
+                    "type-callout",
+                    selected ? "font-semibold text-ink" : "font-medium text-muted",
                   )}
                 >
                   {option.label}
@@ -129,7 +129,7 @@ export function Choice<A extends string>({
   return (
     <View className="gap-1.5" accessibilityRole="radiogroup" accessibilityLabel={label}>
       {labelHidden ? null : <FieldLabel>{label}</FieldLabel>}
-      <View className="overflow-hidden rounded-xl bg-surface">
+      <View className="overflow-hidden rounded-2xl border border-line bg-surface">
         {options.map((option, index) => {
           const selected = option.value === value;
           return (

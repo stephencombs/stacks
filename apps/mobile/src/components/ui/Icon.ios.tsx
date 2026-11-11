@@ -1,7 +1,7 @@
 import { SymbolView, type SFSymbol } from "expo-symbols";
 import { useCSSVariable } from "uniwind";
 
-import type { IconName } from "./Icon";
+import type { IconColor, IconName } from "./Icon";
 
 const symbols: Record<IconName, SFSymbol> = {
   alert: "exclamationmark.circle",
@@ -15,24 +15,42 @@ const symbols: Record<IconName, SFSymbol> = {
   "cloud-check": "checkmark.icloud",
   "cloud-upload": "icloud.and.arrow.up",
   "cloud-off": "icloud.slash",
+  sessions: "suit.club",
+  board: "chart.line.uptrend.xyaxis",
+  settle: "arrow.left.arrow.right",
+  group: "person.2",
+  plus: "plus",
+  search: "magnifyingglass",
+  filter: "line.3.horizontal.decrease",
+  settings: "gearshape",
+  download: "square.and.arrow.up",
+  sparkles: "sparkles",
+};
+
+const filledSymbols: Partial<Record<IconName, SFSymbol>> = {
+  sessions: "suit.club.fill",
+  group: "person.2.fill",
+  settings: "gearshape.fill",
 };
 
 export function Icon({
   name,
   color,
   size = 20,
+  filled = false,
 }: {
   name: IconName;
-  color: "ink" | "muted" | "faint" | "accent-ink" | "accent-text" | "danger";
+  color: IconColor;
   size?: number;
+  filled?: boolean;
 }) {
   const tint = useCSSVariable(`--color-${color}`);
   return (
     <SymbolView
-      name={symbols[name]}
+      name={(filled ? filledSymbols[name] : undefined) ?? symbols[name]}
       size={size}
       tintColor={String(tint)}
-      weight="semibold"
+      weight={filled ? "bold" : "semibold"}
       accessibilityElementsHidden
       importantForAccessibility="no"
     />
