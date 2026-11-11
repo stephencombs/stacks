@@ -8,6 +8,10 @@
       "types": "./src/telemetry.ts",
       "import": "./src/telemetry.ts"
     },
+    "./playerMoney": {
+      "types": "./src/playerMoney.ts",
+      "import": "./src/playerMoney.ts"
+    },
     "./api": {
       "types": "./src/api.ts",
       "import": "./src/api.ts"

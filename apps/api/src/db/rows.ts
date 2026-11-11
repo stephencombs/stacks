@@ -201,6 +201,23 @@ export const PersonalEntryRow = Schema.Struct({
   voidedBy: Schema.NullOr(ActorId),
   voidReason: Schema.NullOr(Schema.String),
   replacesEntryId: Schema.NullOr(EntryId),
+  counterpartyId: Schema.NullOr(PlayerId),
+});
+
+export const RepaymentRow = Schema.Struct({
+  id: EntryId,
+  fromPlayerId: PlayerId,
+  toPlayerId: PlayerId,
+  amount: Amount,
+  occurredAt: Timestamp,
+  note: Schema.NullOr(Schema.String),
+  recordedFromTripId: Schema.NullOr(TripId),
+  createdBy: ActorId,
+  createdAt: Timestamp,
+  voidedAt: Schema.NullOr(Timestamp),
+  voidedBy: Schema.NullOr(ActorId),
+  voidReason: Schema.NullOr(Schema.String),
+  replacesEntryId: Schema.NullOr(EntryId),
 });
 
 export const PersonalOperationRow = Schema.Struct({

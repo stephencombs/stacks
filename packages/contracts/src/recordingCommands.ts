@@ -37,13 +37,28 @@ const start = {
   highLimit: Schema.Boolean,
 };
 const recorder = { ...common, tableId: TableId, playerId: PlayerId };
+/**
+ * Whose money paid for a buy-in, or who took a cash-out: another player at the same table. Absent
+ * for the player's own money, so commands recorded before counterparties keep their encoding.
+ */
+const counterparty = { counterpartyId: Schema.optionalKey(PlayerId) };
 export const RecordingReplacement = Schema.Struct({
   id: EntryId,
   amount: MinorUnits,
   occurredAt: Schema.DateTimeUtc,
   note: Schema.NullOr(Schema.String),
+  ...counterparty,
 });
 export type RecordingReplacement = typeof RecordingReplacement.Type;
+
+// A payment between two players belongs to their pair, not a table: `expectedRevision` counts the
+// pair's applied payment commands.
+const pair = { ...common, expectedRevision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) };
+export const RepaymentDetails = Schema.Struct({
+  amount: MinorUnits.check(Schema.isGreaterThan(0)),
+  occurredAt: Schema.DateTimeUtc,
+  note: Schema.NullOr(Schema.String),
+});
 
 // The actor is checked against the push's credential; the rules decide what it may record.
 export const RecordingCommand = Schema.Union([
@@ -65,6 +80,7 @@ export const RecordingCommand = Schema.Union([
         displayName: Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(60)),
       }),
     ),
+    ...counterparty,
   }),
   Schema.Struct({
     type: Schema.Literal("add"),
@@ -74,6 +90,7 @@ export const RecordingCommand = Schema.Union([
     amount: MinorUnits,
     occurredAt: Schema.DateTimeUtc,
     note: Schema.NullOr(Schema.String),
+    ...counterparty,
   }),
   Schema.Struct({
     type: Schema.Literal("finish"),
@@ -81,6 +98,7 @@ export const RecordingCommand = Schema.Union([
     entryId: EntryId,
     amount: MinorUnits.check(Schema.isGreaterThanOrEqualTo(0)),
     finishedAt: Schema.DateTimeUtc,
+    ...counterparty,
   }),
   Schema.Struct({
     type: Schema.Literal("correct"),
@@ -94,15 +112,47 @@ export const RecordingCommand = Schema.Union([
   // the table, not a visit, and are ordered with its play.
   Schema.Struct({ type: Schema.Literal("appoint_recorder"), ...recorder }),
   Schema.Struct({ type: Schema.Literal("revoke_recorder"), ...recorder }),
+  // Payments between two players, recorded by either of them, with no table or Trip.
+  Schema.Struct({
+    type: Schema.Literal("repay"),
+    ...pair,
+    ...RepaymentDetails.fields,
+    repaymentId: EntryId,
+    fromPlayerId: PlayerId,
+    toPlayerId: PlayerId,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("correct_repayment"),
+    ...pair,
+    repaymentId: EntryId,
+    reason: Schema.NonEmptyString,
+    replacement: Schema.Struct({ id: EntryId, ...RepaymentDetails.fields }),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("void_repayment"),
+    ...pair,
+    repaymentId: EntryId,
+    reason: Schema.NonEmptyString,
+  }),
 ]);
 export type RecordingCommand = typeof RecordingCommand.Type;
 export type TableCommand = Extract<
   RecordingCommand,
   { type: "appoint_recorder" | "revoke_recorder" }
 >;
-export type VisitCommand = Exclude<RecordingCommand, TableCommand>;
+export type PairCommand = Extract<
+  RecordingCommand,
+  { type: "repay" | "correct_repayment" | "void_repayment" }
+>;
+export type VisitCommand = Exclude<RecordingCommand, TableCommand | PairCommand>;
 export const isTableCommand = (command: RecordingCommand): command is TableCommand =>
   command.type === "appoint_recorder" || command.type === "revoke_recorder";
+export const isPairCommand = (command: RecordingCommand): command is PairCommand =>
+  command.type === "repay" ||
+  command.type === "correct_repayment" ||
+  command.type === "void_repayment";
+export const isVisitCommand = (command: RecordingCommand): command is VisitCommand =>
+  !isTableCommand(command) && !isPairCommand(command);
 
 /** The player and actor a device records as. An account's are the same on every device. */
 export const RecordingIdentity = Schema.Struct({ playerId: PlayerId, actorId: ActorId });
@@ -150,9 +200,10 @@ export const TableParticipant = Schema.Struct({ tableId: TableId, player: Player
 export type TableParticipant = typeof TableParticipant.Type;
 
 /**
- * Everything at the tables this account or device started or records at, and its own play at
- * the tables it joined. `participants` are who joined those tables, and who it plays as at
- * others'. `players` are anyone else whose play it sees. `commands` are in the order the server
+ * Everything at the tables this account or device started or records at, its own play at the
+ * tables it joined, and the payments between its players and anyone else. `participants` are who
+ * joined those tables, and who it plays as at others'. `players` are anyone else whose play or
+ * payments it sees. `commands` are in the order the server
  * applied them, whoever made them.
  */
 export const RecordingHistory = Schema.Struct({

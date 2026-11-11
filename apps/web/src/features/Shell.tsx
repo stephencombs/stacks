@@ -1,6 +1,6 @@
 import { useClerk, useUser } from "@clerk/react";
 import { useAtomValue } from "@effect/atom-react";
-import { Link, useLocation, useParams } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import type { GroupId, GroupListItem, Trip, TripId } from "@stacks/contracts";
 import { formatTime } from "@stacks/client-runtime/format";
 import { resolveScope, tripIsLive } from "@stacks/client-runtime/scope";
@@ -455,6 +455,7 @@ function ScopeTripRow({
 /** Your avatar, and behind it everything that's only about you: limits, appearance, account. */
 export function You({ layout, scope }: { layout: "bar" | "side"; scope?: Scope }) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { user } = useUser();
   const clerk = useClerk();
   const theme = useTheme();
@@ -526,6 +527,20 @@ export function You({ layout, scope }: { layout: "bar" | "side"; scope?: Scope }
             ) : (
               <Note>Limits are set for a trip. Open one to set yours.</Note>
             )}
+          </Section>
+          <Section title="Settle up">
+            <Note>
+              What you and the people you've played with owe each other, outside any trip.
+            </Note>
+            <Button
+              className="self-start"
+              onClick={() => {
+                setOpen(false);
+                void navigate({ to: "/you/settle" });
+              }}
+            >
+              Balances and payments
+            </Button>
           </Section>
           <Section title="Appearance">
             <Segmented

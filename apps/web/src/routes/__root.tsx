@@ -24,7 +24,8 @@ const personal = (pathname: string) =>
   pathname === "/" ||
   pathname.startsWith("/play/") ||
   pathname.startsWith("/t/") ||
-  pathname.startsWith("/invite/");
+  pathname.startsWith("/invite/") ||
+  pathname.startsWith("/you/");
 
 function Root() {
   // Decide from the page being drawn, not the address: while a navigation is pending the router

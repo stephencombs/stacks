@@ -1,6 +1,9 @@
 import {
   PlayerId,
   type ActorId,
+  type EntryId,
+  type PairHistory,
+  type PlayerBalances,
   type PlayEntry,
   type PlayerIdentity,
   type PlayerInviteId,
@@ -8,6 +11,7 @@ import {
   type UserId,
 } from "@stacks/contracts";
 import {
+  isPairCommand,
   isTableCommand,
   RecordingCommand,
   RecordingOperationId,
@@ -87,6 +91,11 @@ export interface RecordingTransport {
     request: RedeemInviteRequest,
     actor: ActorCredential | null,
   ) => Effect.Effect<PlayerIdentity, unknown>;
+  readonly balances: (actor: ActorCredential | null) => Effect.Effect<PlayerBalances, unknown>;
+  readonly pair: (
+    playerId: PlayerId,
+    actor: ActorCredential | null,
+  ) => Effect.Effect<PairHistory, unknown>;
 }
 
 /** Whether the server has the table, so it can be shared. */
@@ -261,6 +270,7 @@ export const mergeRecordingHistory = (
     tables: history.tables.filter((table) => table.starterPlayerId !== self.id),
     visits: [],
     entries: [],
+    repayments: [],
     receipts: [],
   };
   const synced = replay(
@@ -304,6 +314,36 @@ const settled = (
   const held = remote.get(command.operationId);
   if (held) return commandText(held) === commandText(command);
   if (isTableCommand(command)) return false;
+  if (isPairCommand(command)) {
+    const payment = (
+      id: string,
+      details: { readonly amount: number; readonly occurredAt: DateTime.Utc; note: string | null },
+    ) =>
+      ledger.repayments.some(
+        (item) =>
+          item.id === id &&
+          item.amount === details.amount &&
+          ms(item.occurredAt) === ms(details.occurredAt) &&
+          item.note === details.note,
+      );
+    if (command.type === "repay")
+      return (
+        payment(command.repaymentId, command) &&
+        ledger.repayments.some(
+          (item) =>
+            item.id === command.repaymentId &&
+            item.fromPlayerId === command.fromPlayerId &&
+            item.toPlayerId === command.toPlayerId,
+        )
+      );
+    const original = ledger.repayments.find((item) => item.id === command.repaymentId);
+    return (
+      original !== undefined &&
+      original.voidedAt !== null &&
+      original.voidReason === command.reason &&
+      (command.type === "void_repayment" || payment(command.replacement.id, command.replacement))
+    );
+  }
   const visit = ledger.visits.find((item) => item.id === command.visitId);
   if (!visit) return false;
   const entry = (
@@ -439,6 +479,31 @@ const optional = <K extends string, V>(key: K, value: V | null) =>
 const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): RecordingInput => {
   if (isTableCommand(command))
     return { type: command.type, tableId: command.tableId, playerId: command.playerId };
+  if (isPairCommand(command)) {
+    const repaymentId = (ids.get(command.repaymentId) ?? command.repaymentId) as EntryId;
+    switch (command.type) {
+      case "repay":
+        return {
+          type: "repay",
+          fromPlayerId: command.fromPlayerId,
+          toPlayerId: command.toPlayerId,
+          amount: command.amount,
+          occurredAt: command.occurredAt,
+          ...optional("note", command.note),
+        };
+      case "correct_repayment":
+        return {
+          type: "correct_repayment",
+          repaymentId,
+          reason: command.reason,
+          amount: command.replacement.amount,
+          occurredAt: command.replacement.occurredAt,
+          note: command.replacement.note ?? "",
+        };
+      case "void_repayment":
+        return { type: "void_repayment", repaymentId, reason: command.reason };
+    }
+  }
   const visitId = (ids.get(command.visitId) ?? command.visitId) as typeof command.visitId;
   switch (command.type) {
     case "start":
@@ -468,6 +533,7 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
         buyIn: command.buyIn,
         startedAt: command.startedAt,
         ...optional("displayName", command.newPlayer?.displayName ?? null),
+        ...optional("counterpartyId", command.counterpartyId ?? null),
       };
     case "add":
       return {
@@ -477,6 +543,7 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
         amount: command.amount,
         occurredAt: command.occurredAt,
         ...optional("note", command.note),
+        ...optional("counterpartyId", command.counterpartyId ?? null),
       };
     case "finish":
       return {
@@ -484,6 +551,7 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
         visitId,
         amount: command.amount,
         finishedAt: command.finishedAt,
+        ...optional("counterpartyId", command.counterpartyId ?? null),
       };
     case "correct":
       return {
@@ -495,6 +563,7 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
           amount: command.replacement.amount,
           occurredAt: command.replacement.occurredAt,
           ...optional("note", command.replacement.note),
+          ...optional("counterpartyId", command.replacement.counterpartyId ?? null),
         },
       };
     case "reopen":
@@ -725,6 +794,13 @@ export const makeRecordingSync = (
       online((actor) => transport.revokeBinding(playerId, actorId, actor)),
     revokeInvite: (inviteId: PlayerInviteId) =>
       online((actor) => transport.revokeInvite(inviteId, actor)),
+    /**
+     * What the device's players and the people they've shared a table with owe each other, as
+     * the server has it. Payments still on this device aren't in it.
+     */
+    balances: () => online((actor) => transport.balances(actor)),
+    /** Everything between this device's player and `playerId`, as the server has it. */
+    pair: (playerId: PlayerId) => online((actor) => transport.pair(playerId, actor)),
     /**
      * Records as the player a personal invite names, from now on. It needs the network once; the
      * next pull brings that player's tables and play.

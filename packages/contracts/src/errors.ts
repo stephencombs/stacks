@@ -69,6 +69,8 @@ export const ConflictReason = Schema.Literals([
   "actor_taken",
   "table_starter",
   "too_many_devices",
+  // A stored total between two players is past what integer minor units count exactly.
+  "unsafe_amount",
 ]);
 export type ConflictReason = typeof ConflictReason.Type;
 

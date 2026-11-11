@@ -1,6 +1,8 @@
 // Preview only: one realistic group, encoded through the real contract schemas.
 import { JoinedTable, PlayerInvitePreview, TableView } from "@stacks/contracts/recordingCommands";
 import {
+  PairHistory,
+  PlayerBalances,
   GroupDetail,
   GroupListItem,
   GroupStats,
@@ -350,6 +352,84 @@ const sharedTable = {
 /** Joining the shared table through its link, as Cal. */
 const joinedAs = { id: shared(12), displayName: "Cal" };
 
+/** Money between players outside trips: Priya owes you, you owe Dev, Jonah is square. */
+const me = u(950);
+const meActor = u(951);
+const priyaActor = u(952);
+const priya = { id: P[1]!, displayName: "Priya" };
+const playerBalances = {
+  pairs: [
+    {
+      playerId: me,
+      counterparty: priya,
+      balance: { debtorId: P[1], creditorId: me, amount: 8500 },
+    },
+    {
+      playerId: me,
+      counterparty: { id: P[3]!, displayName: "Dev" },
+      balance: { debtorId: me, creditorId: P[3], amount: 4000 },
+    },
+    { playerId: me, counterparty: { id: P[4]!, displayName: "Jonah" }, balance: null },
+  ],
+};
+const fact = (createdBy: string, createdAt: string) => ({
+  currency: "USD",
+  note: null,
+  createdBy,
+  createdAt,
+  voidedAt: null,
+  voidedBy: null,
+  voidReason: null,
+  replacesEntryId: null,
+});
+const priyaPair = {
+  pair: playerBalances.pairs[0],
+  revision: 2,
+  play: [
+    {
+      playerId: P[1],
+      tableId: shared(1),
+      entry: {
+        id: u(960),
+        visitId: shared(21),
+        kind: "buy_in",
+        counterpartyId: me,
+        amount: 10000,
+        occurredAt: "2026-11-07T21:10:00.000Z",
+        ...fact(meActor, "2026-11-07T21:10:00.000Z"),
+      },
+    },
+  ],
+  repayments: [
+    {
+      id: u(961),
+      fromPlayerId: P[1],
+      toPlayerId: me,
+      amount: 5000,
+      occurredAt: "2026-11-08T10:00:00.000Z",
+      recordedFromTripId: null,
+      ...fact(priyaActor, "2026-11-08T10:00:00.000Z"),
+      voidedAt: "2026-11-08T11:00:00.000Z",
+      voidedBy: meActor,
+      voidReason: "It was $15",
+    },
+    {
+      id: u(962),
+      fromPlayerId: P[1],
+      toPlayerId: me,
+      amount: 1500,
+      occurredAt: "2026-11-08T10:00:00.000Z",
+      recordedFromTripId: null,
+      ...fact(meActor, "2026-11-08T11:00:00.000Z"),
+      replacesEntryId: u(961),
+    },
+  ],
+  actors: [
+    { actorId: meActor, displayName: "Maya" },
+    { actorId: priyaActor, displayName: "Priya" },
+  ],
+};
+
 // Decoding first checks every fixture against the contract, so a wrong field fails loudly here.
 const check = <S extends Schema.Top>(schema: S, value: unknown) => {
   const json = Schema.toCodecJson(schema as never);
@@ -375,6 +455,8 @@ export const routes: Record<string, unknown> = {
     viewerRole: "participant",
     viewerPlayerId: joinedAs.id,
   }),
+  "/api/balances": check(PlayerBalances, playerBalances),
+  [`/api/players/${P[1]}/pair`]: check(PairHistory, priyaPair),
   "/api/groups": check(Schema.Array(GroupListItem), groupList),
   [`/api/groups/${ids.group}`]: check(GroupDetail, groupDetail),
   [`/api/groups/${ids.group}/stats`]: check(GroupStats, stats),

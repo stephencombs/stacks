@@ -1,7 +1,12 @@
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { formatDay, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
-import { useRecordingTable, useRecordingVisit } from "@stacks/client-runtime/recordingReact";
+import { counterpartiesAt } from "@stacks/client-runtime/playerMoney";
+import {
+  useRecordingTable,
+  useRecordingVisit,
+  useServerTable,
+} from "@stacks/client-runtime/recordingReact";
 import {
   RECORDING_CURRENCY,
   visitTitle,
@@ -22,6 +27,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
+import { useRecordingState } from "../lib/recording";
 import {
   CashOutSheet,
   CorrectSheet,
@@ -368,6 +374,15 @@ function History({
   visit: RecordingVisitView;
   onInspect: (entryId: EntryId) => void;
 }) {
+  const state = useRecordingState();
+  const view = useServerTable(visit.visit.tableId);
+  const people = counterpartiesAt(state, visit.visit.tableId, visit.visit.playerId, view ?? null);
+  const paid = (item: PlayEntry) => {
+    if (item.counterpartyId === null) return null;
+    const name =
+      people.find((person) => person.id === item.counterpartyId)?.displayName ?? "someone";
+    return `${item.kind === "cash_out" ? "Paid to" : "Paid by"} ${name}`;
+  };
   const lines: Line[] = [
     ...visit.entries.map((entry) => ({ type: "entry" as const, at: entry.occurredAt, entry })),
     ...visit.events.map((event) => ({ type: "event" as const, at: event.at, event })),
@@ -420,7 +435,12 @@ function History({
                   {name}
                 </Text>
                 <Text className="text-sm text-muted">
-                  {[time, voided ? "Voided" : null, item.replacesEntryId ? "Correction" : null]
+                  {[
+                    time,
+                    paid(item),
+                    voided ? "Voided" : null,
+                    item.replacesEntryId ? "Correction" : null,
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
                 </Text>

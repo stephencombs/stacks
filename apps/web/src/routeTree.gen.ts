@@ -26,6 +26,8 @@ import { Route as TripsTripIdBoardRouteImport } from './routes/trips/$tripId/boa
 import { Route as TripsTripIdMoneyRouteImport } from './routes/trips/$tripId/money'
 import { Route as TripsTripIdResultsRouteImport } from './routes/trips/$tripId/results'
 import { Route as TripsTripIdSettleRouteImport } from './routes/trips/$tripId/settle'
+import { Route as YouSettleIndexRouteImport } from './routes/you/settle/index'
+import { Route as YouSettlePlayerIdRouteImport } from './routes/you/settle/$playerId'
 import { Route as TripsTripIdSessionsNewRouteImport } from './routes/trips/$tripId/sessions.new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -113,6 +115,16 @@ const TripsTripIdSettleRoute = TripsTripIdSettleRouteImport.update({
   path: '/trips/$tripId/settle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const YouSettleIndexRoute = YouSettleIndexRouteImport.update({
+  id: '/you/settle/',
+  path: '/you/settle/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const YouSettlePlayerIdRoute = YouSettlePlayerIdRouteImport.update({
+  id: '/you/settle/$playerId',
+  path: '/you/settle/$playerId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TripsTripIdSessionsNewRoute = TripsTripIdSessionsNewRouteImport.update({
   id: '/trips/$tripId/sessions/new',
   path: '/trips/$tripId/sessions/new',
@@ -135,8 +147,10 @@ export interface FileRoutesByFullPath {
   '/trips/$tripId/money': typeof TripsTripIdMoneyRoute
   '/trips/$tripId/results': typeof TripsTripIdResultsRoute
   '/trips/$tripId/settle': typeof TripsTripIdSettleRoute
+  '/you/settle/$playerId': typeof YouSettlePlayerIdRoute
   '/groups/$groupId/': typeof GroupsGroupIdIndexRoute
   '/trips/$tripId/': typeof TripsTripIdIndexRoute
+  '/you/settle/': typeof YouSettleIndexRoute
   '/trips/$tripId/sessions/new': typeof TripsTripIdSessionsNewRoute
 }
 export interface FileRoutesByTo {
@@ -155,8 +169,10 @@ export interface FileRoutesByTo {
   '/trips/$tripId/money': typeof TripsTripIdMoneyRoute
   '/trips/$tripId/results': typeof TripsTripIdResultsRoute
   '/trips/$tripId/settle': typeof TripsTripIdSettleRoute
+  '/you/settle/$playerId': typeof YouSettlePlayerIdRoute
   '/groups/$groupId': typeof GroupsGroupIdIndexRoute
   '/trips/$tripId': typeof TripsTripIdIndexRoute
+  '/you/settle': typeof YouSettleIndexRoute
   '/trips/$tripId/sessions/new': typeof TripsTripIdSessionsNewRoute
 }
 export interface FileRoutesById {
@@ -176,8 +192,10 @@ export interface FileRoutesById {
   '/trips/$tripId/money': typeof TripsTripIdMoneyRoute
   '/trips/$tripId/results': typeof TripsTripIdResultsRoute
   '/trips/$tripId/settle': typeof TripsTripIdSettleRoute
+  '/you/settle/$playerId': typeof YouSettlePlayerIdRoute
   '/groups/$groupId/': typeof GroupsGroupIdIndexRoute
   '/trips/$tripId/': typeof TripsTripIdIndexRoute
+  '/you/settle/': typeof YouSettleIndexRoute
   '/trips/$tripId/sessions/new': typeof TripsTripIdSessionsNewRoute
 }
 export interface FileRouteTypes {
@@ -198,8 +216,10 @@ export interface FileRouteTypes {
     | '/trips/$tripId/money'
     | '/trips/$tripId/results'
     | '/trips/$tripId/settle'
+    | '/you/settle/$playerId'
     | '/groups/$groupId/'
     | '/trips/$tripId/'
+    | '/you/settle/'
     | '/trips/$tripId/sessions/new'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -218,8 +238,10 @@ export interface FileRouteTypes {
     | '/trips/$tripId/money'
     | '/trips/$tripId/results'
     | '/trips/$tripId/settle'
+    | '/you/settle/$playerId'
     | '/groups/$groupId'
     | '/trips/$tripId'
+    | '/you/settle'
     | '/trips/$tripId/sessions/new'
   id:
     | '__root__'
@@ -238,8 +260,10 @@ export interface FileRouteTypes {
     | '/trips/$tripId/money'
     | '/trips/$tripId/results'
     | '/trips/$tripId/settle'
+    | '/you/settle/$playerId'
     | '/groups/$groupId/'
     | '/trips/$tripId/'
+    | '/you/settle/'
     | '/trips/$tripId/sessions/new'
   fileRoutesById: FileRoutesById
 }
@@ -259,8 +283,10 @@ export interface RootRouteChildren {
   TripsTripIdMoneyRoute: typeof TripsTripIdMoneyRoute
   TripsTripIdResultsRoute: typeof TripsTripIdResultsRoute
   TripsTripIdSettleRoute: typeof TripsTripIdSettleRoute
+  YouSettlePlayerIdRoute: typeof YouSettlePlayerIdRoute
   GroupsGroupIdIndexRoute: typeof GroupsGroupIdIndexRoute
   TripsTripIdIndexRoute: typeof TripsTripIdIndexRoute
+  YouSettleIndexRoute: typeof YouSettleIndexRoute
   TripsTripIdSessionsNewRoute: typeof TripsTripIdSessionsNewRoute
 }
 
@@ -385,6 +411,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TripsTripIdSettleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/you/settle/': {
+      id: '/you/settle/'
+      path: '/you/settle'
+      fullPath: '/you/settle/'
+      preLoaderRoute: typeof YouSettleIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/you/settle/$playerId': {
+      id: '/you/settle/$playerId'
+      path: '/you/settle/$playerId'
+      fullPath: '/you/settle/$playerId'
+      preLoaderRoute: typeof YouSettlePlayerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trips/$tripId/sessions/new': {
       id: '/trips/$tripId/sessions/new'
       path: '/trips/$tripId/sessions/new'
@@ -411,8 +451,10 @@ const rootRouteChildren: RootRouteChildren = {
   TripsTripIdMoneyRoute: TripsTripIdMoneyRoute,
   TripsTripIdResultsRoute: TripsTripIdResultsRoute,
   TripsTripIdSettleRoute: TripsTripIdSettleRoute,
+  YouSettlePlayerIdRoute: YouSettlePlayerIdRoute,
   GroupsGroupIdIndexRoute: GroupsGroupIdIndexRoute,
   TripsTripIdIndexRoute: TripsTripIdIndexRoute,
+  YouSettleIndexRoute: YouSettleIndexRoute,
   TripsTripIdSessionsNewRoute: TripsTripIdSessionsNewRoute,
 }
 export const routeTree = rootRouteImport

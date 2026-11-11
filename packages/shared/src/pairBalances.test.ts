@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 import {
   MinorUnits,
+  PlayerId,
   PlayerIdentity,
   TableId,
   TripId,
@@ -9,10 +10,11 @@ import {
   type FinancialContribution,
 } from "@stacks/contracts";
 
-import { financialContributions, pairBalances } from "./pairBalances.ts";
+import { financialContributions, netObligations, pairBalances } from "./pairBalances.ts";
 import {
   ACTOR,
   ALEX,
+  AT,
   BEA,
   CAL,
   LATER,
@@ -47,11 +49,11 @@ const contributions = (
 
 describe("financialContributions", () => {
   it("directs covered buy-ins and held cash-outs oppositely", () => {
-    expect(pairBalances(contributions())).toEqual([
+    expect(netObligations(contributions())).toEqual([
       { debtorId: ALEX, creditorId: BEA, amount: 10000 },
     ]);
     expect(
-      pairBalances(
+      netObligations(
         contributions([
           play({ kind: "cash_out", amount: MinorUnits.make(30000), counterpartyId: BEA }),
         ]),
@@ -73,13 +75,13 @@ describe("financialContributions", () => {
 
   it("applies partial repayments and reverses the pair after overpayment", () => {
     expect(
-      pairBalances(contributions(undefined, [repayment({ amount: MinorUnits.make(4000) })])),
+      netObligations(contributions(undefined, [repayment({ amount: MinorUnits.make(4000) })])),
     ).toEqual([{ debtorId: ALEX, creditorId: BEA, amount: 6000 }]);
     expect(
-      pairBalances(contributions(undefined, [repayment({ amount: MinorUnits.make(10000) })])),
+      netObligations(contributions(undefined, [repayment({ amount: MinorUnits.make(10000) })])),
     ).toEqual([]);
     expect(
-      pairBalances(contributions(undefined, [repayment({ amount: MinorUnits.make(14000) })])),
+      netObligations(contributions(undefined, [repayment({ amount: MinorUnits.make(14000) })])),
     ).toEqual([{ debtorId: BEA, creditorId: ALEX, amount: 4000 }]);
   });
 
@@ -103,7 +105,7 @@ describe("financialContributions", () => {
       ],
       repayments: [repayment({ amount: MinorUnits.make(4000) })],
     });
-    expect(pairBalances(source)).toEqual([
+    expect(netObligations(source)).toEqual([
       { debtorId: ALEX, creditorId: BEA, amount: 6000 },
       { debtorId: BEA, creditorId: CAL, amount: 10000 },
     ]);
@@ -125,7 +127,7 @@ describe("financialContributions", () => {
     });
     const result = contributions([original, replacement], [paid, corrected]);
     expect(result.map((item) => item.source.entryId)).toEqual([replacement.id, corrected.id]);
-    expect(pairBalances(result)).toEqual([{ debtorId: ALEX, creditorId: BEA, amount: 20000 }]);
+    expect(netObligations(result)).toEqual([{ debtorId: ALEX, creditorId: BEA, amount: 20000 }]);
     expect(original.voidedAt).toBe(LATER);
   });
 
@@ -152,9 +154,9 @@ describe("financialContributions", () => {
       ],
       repayments: [repayment({ amount: MinorUnits.make(8000), recordedFromTripId: tripId })],
     });
-    expect(pairBalances(source)).toEqual([{ debtorId: ALEX, creditorId: BEA, amount: 7000 }]);
+    expect(netObligations(source)).toEqual([{ debtorId: ALEX, creditorId: BEA, amount: 7000 }]);
     expect(
-      pairBalances(
+      netObligations(
         source.filter(({ source }) => source.kind === "play" && source.tripId === tripId),
       ),
     ).toEqual([{ debtorId: ALEX, creditorId: BEA, amount: 10000 }]);
@@ -189,21 +191,21 @@ describe("financialContributions", () => {
   });
 });
 
-describe("pairBalances", () => {
+describe("netObligations", () => {
   it("keeps a chain and a cycle intact without third-party rerouting", () => {
     const chain = [debt(), debt(BEA, CAL, 10000, 2)];
-    expect(pairBalances(chain)).toEqual([
+    expect(netObligations(chain)).toEqual([
       { debtorId: ALEX, creditorId: BEA, amount: 10000 },
       { debtorId: BEA, creditorId: CAL, amount: 10000 },
     ]);
     const cycle = [...chain, debt(CAL, ALEX, 10000, 3)];
-    expect(pairBalances(cycle)).toHaveLength(3);
-    expect(pairBalances([...cycle, debt(BEA, ALEX, 4000, 4)])).toContainEqual({
+    expect(netObligations(cycle)).toHaveLength(3);
+    expect(netObligations([...cycle, debt(BEA, ALEX, 4000, 4)])).toContainEqual({
       debtorId: ALEX,
       creditorId: BEA,
       amount: 6000,
     });
-    expect(pairBalances([...cycle, debt(BEA, ALEX, 4000, 4)])).toContainEqual({
+    expect(netObligations([...cycle, debt(BEA, ALEX, 4000, 4)])).toContainEqual({
       debtorId: BEA,
       creditorId: CAL,
       amount: 10000,
@@ -213,15 +215,15 @@ describe("pairBalances", () => {
   it("distinguishes players by ID even when their names match", () => {
     const first = PlayerIdentity.make({ id: ALEX, displayName: "Alex" });
     const second = PlayerIdentity.make({ id: BEA, displayName: "Alex" });
-    expect(pairBalances([debt(first.id, second.id)])).toHaveLength(1);
+    expect(netObligations([debt(first.id, second.id)])).toHaveLength(1);
   });
 
   it("accumulates exactly before checking the final pair amount", () => {
     const max = Number.MAX_SAFE_INTEGER;
     const source = [debt(ALEX, BEA, max), debt(ALEX, BEA, 2, 2), debt(BEA, ALEX, max, 3)];
-    expect(pairBalances(source)).toEqual([{ debtorId: ALEX, creditorId: BEA, amount: 2 }]);
-    expect(pairBalances(source.toReversed())).toEqual(pairBalances(source));
-    expect(() => pairBalances([debt(ALEX, BEA, max), debt(ALEX, BEA, 1, 2)])).toThrow();
+    expect(netObligations(source)).toEqual([{ debtorId: ALEX, creditorId: BEA, amount: 2 }]);
+    expect(netObligations(source.toReversed())).toEqual(netObligations(source));
+    expect(() => netObligations([debt(ALEX, BEA, max), debt(ALEX, BEA, 1, 2)])).toThrow();
   });
 
   const RandomContributions = Schema.Array(
@@ -245,8 +247,8 @@ describe("pairBalances", () => {
         const [a, b] = pairs[pair]!;
         return debt(reverse ? b : a, reverse ? a : b, amount, i + 1);
       });
-      const result = pairBalances(source);
-      expect(pairBalances(source.toReversed())).toEqual(result);
+      const result = netObligations(source);
+      expect(netObligations(source.toReversed())).toEqual(result);
       for (const playerId of [ALEX, BEA, CAL]) {
         const net = (
           facts: Iterable<{
@@ -277,10 +279,10 @@ describe("pairBalances", () => {
             ({ debtorId, creditorId }) =>
               (debtorId === a && creditorId === b) || (debtorId === b && creditorId === a),
           ),
-        ).toEqual(pairBalances(pairSource));
+        ).toEqual(netObligations(pairSource));
       }
       expect(
-        pairBalances(
+        netObligations(
           source.flatMap((fact) => [
             fact,
             { ...fact, debtorId: fact.creditorId, creditorId: fact.debtorId },
@@ -292,4 +294,116 @@ describe("pairBalances", () => {
       ).toBe(true);
     },
   );
+});
+
+describe("pairBalances", () => {
+  const alexPlays = (fields: Parameters<typeof play>[0] = {}) => ({
+    ...play(fields),
+    playerId: ALEX,
+  });
+
+  it("follows the PLAN examples", () => {
+    // Bea covers Alex's $100 buy-in: Alex owes Bea $100.
+    const covered = alexPlays({ amount: MinorUnits.make(10000), counterpartyId: BEA });
+    expect(pairBalances([covered], [])).toEqual([
+      { debtorId: ALEX, creditorId: BEA, amount: 10000 },
+    ]);
+    // Bea receives Alex's $300 cash-out: Bea owes Alex $300.
+    const held = alexPlays({
+      id: entryId(2),
+      kind: "cash_out",
+      amount: MinorUnits.make(30000),
+      counterpartyId: BEA,
+    });
+    expect(pairBalances([held], [])).toEqual([{ debtorId: BEA, creditorId: ALEX, amount: 30000 }]);
+    // Alex repays Bea $50: their running balance moves by $50.
+    const paid = repayment({ amount: MinorUnits.make(5000) });
+    expect(pairBalances([covered], [paid])).toEqual([
+      { debtorId: ALEX, creditorId: BEA, amount: 5000 },
+    ]);
+    // A player's own buy-in or cash-out creates no debt.
+    expect(
+      pairBalances([alexPlays(), alexPlays({ id: entryId(3), kind: "cash_out" })], []),
+    ).toEqual([]);
+  });
+
+  it("counts only the replacement after a void, and keeps the original", () => {
+    const original = repayment({
+      amount: MinorUnits.make(5000),
+      voidedAt: LATER,
+      voidedBy: ACTOR,
+      voidReason: "Wrong amount",
+    });
+    const replacement = repayment({
+      id: entryId(101),
+      amount: MinorUnits.make(3000),
+      replacesEntryId: original.id,
+    });
+    const covered = alexPlays({ amount: MinorUnits.make(10000), counterpartyId: BEA });
+    expect(pairBalances([covered], [original, replacement])).toEqual([
+      { debtorId: ALEX, creditorId: BEA, amount: 7000 },
+    ]);
+    expect(pairBalances([covered], [original])).toEqual([
+      { debtorId: ALEX, creditorId: BEA, amount: 10000 },
+    ]);
+  });
+
+  const players = [ALEX, BEA, CAL, PlayerId.make("0192e7a0-0000-7000-8000-000000000009")];
+  const Facts = Schema.Array(
+    Schema.Struct({
+      from: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 3 })),
+      to: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 3 })),
+      kind: Schema.Literals(["buy_in", "cash_out", "repayment"]),
+      amount: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 1000000 })),
+      voided: Schema.Boolean,
+    }),
+  );
+
+  it.prop("never nets obligations across a third player", [Facts], ([facts]) => {
+    const valid = facts.filter((fact) => fact.from !== fact.to);
+    const between = (keep: (a: PlayerId, b: PlayerId) => boolean) => {
+      const entries = [];
+      const repayments = [];
+      for (const [index, fact] of valid.entries()) {
+        const a = players[fact.from]!;
+        const b = players[fact.to]!;
+        if (!keep(a, b)) continue;
+        const voided = fact.voided ? { voidedAt: LATER, voidedBy: ACTOR, voidReason: "x" } : {};
+        if (fact.kind === "repayment")
+          repayments.push(
+            repayment({
+              id: entryId(index + 1),
+              fromPlayerId: a,
+              toPlayerId: b,
+              amount: MinorUnits.make(fact.amount),
+              ...voided,
+            }),
+          );
+        else
+          entries.push({
+            ...play({
+              id: entryId(index + 1),
+              kind: fact.kind,
+              amount: MinorUnits.make(fact.amount),
+              counterpartyId: b,
+              occurredAt: AT,
+              ...voided,
+            }),
+            playerId: a,
+          });
+      }
+      return pairBalances(entries, repayments);
+    };
+    const all = between(() => true);
+    for (const a of players)
+      for (const b of players) {
+        if (a >= b) continue;
+        const inPair = (x: PlayerId, y: PlayerId) => (x === a && y === b) || (x === b && y === a);
+        // Each pair's balance depends on its own facts and nothing anyone else did.
+        expect(all.filter((item) => inPair(item.debtorId, item.creditorId))).toEqual(
+          between(inPair),
+        );
+      }
+    expect(all.every((item) => item.debtorId !== item.creditorId && item.amount > 0)).toBe(true);
+  });
 });

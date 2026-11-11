@@ -26,6 +26,7 @@ import {
 import { Entry, Game, Seat, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import { PlayerIdentity } from "./players.ts";
+import { PairHistory, PlayerBalances } from "./relationships.ts";
 import {
   ActorCredential,
   JoinedTable,
@@ -669,6 +670,25 @@ const RecordingGroup = HttpApiGroup.make("recording")
       success: PlayerIdentity,
       error: [Conflict, NotFound, Unauthorized],
     }).annotate(OpenApi.Summary, "Records as the invited player from now on"),
+  )
+  .add(
+    HttpApiEndpoint.get("balances", "/balances", {
+      success: PlayerBalances,
+      error: [Conflict, Unauthorized],
+    }).annotate(
+      OpenApi.Summary,
+      "What the caller's players and the people they've shared a table with owe each other",
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("pair", "/players/:playerId/pair", {
+      params: playerParams,
+      success: PairHistory,
+      error: [Conflict, NotFound, Unauthorized],
+    }).annotate(
+      OpenApi.Summary,
+      "The play and payments between the caller and someone they've shared a table with",
+    ),
   )
   .middleware(RecordingAuthentication);
 

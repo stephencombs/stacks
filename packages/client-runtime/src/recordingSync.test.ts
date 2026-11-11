@@ -95,6 +95,7 @@ const server = () => {
       tables: [],
       visits: [],
       entries: [],
+      repayments: [],
       receipts: [],
     };
     if (ledger.self.id !== request.identity.playerId) throw new Error("identity conflict");
@@ -175,6 +176,8 @@ const transportFor = (remote: ReturnType<typeof server>): RecordingTransport => 
   revokeBinding: unused,
   revokeInvite: unused,
   redeemInvite: unused,
+  balances: unused,
+  pair: unused,
 });
 
 /** An actor key store in memory. */
@@ -198,6 +201,7 @@ const otherDevice = (identity: RecordingIdentity) => {
     tables: [],
     visits: [],
     entries: [],
+    repayments: [],
     receipts: [],
   };
   const record = (input: Parameters<typeof prepareRecordingCommand>[1]) => {
@@ -583,6 +587,113 @@ describe("rejections", () => {
     await pushAll(store, remote);
     expect(state(store).sync?.rejected).toEqual([]);
     expect(remote.history().entries).toHaveLength(again.entries.length);
+  });
+});
+
+describe("payments between players", () => {
+  const bea = PlayerId.make("0192e7a0-0000-7000-8000-0000000000be");
+  const synced = async () => {
+    const db = memory();
+    const store = await open(db);
+    const remote = server();
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    return { db, store, remote, me: state(store).self.id };
+  };
+
+  it("records, corrects and voids offline, survives a relaunch, then syncs", async () => {
+    const { db, store, remote, me } = await synced();
+    const paid = await save(store, {
+      type: "repay",
+      fromPlayerId: me,
+      toPlayerId: bea,
+      amount: 5000,
+      occurredAt: at(10),
+    });
+    expect(paid.command).toMatchObject({ type: "repay", expectedRevision: 0 });
+    const repaymentId = state(store).repayments[0]!.id;
+    const corrected = await save(store, {
+      type: "correct_repayment",
+      repaymentId,
+      reason: "It was $30",
+      amount: 3000,
+    });
+    expect(corrected.command).toMatchObject({ expectedRevision: 1 });
+    const reloaded = decodeRecordingState(db.document.payload!, db.document.revision);
+    expect(reloaded.repayments.map((item) => [item.amount, item.voidedAt !== null])).toEqual([
+      [5000, true],
+      [3000, false],
+    ]);
+    expect(pendingRecordingCommands(reloaded).map((c) => c.type)).toEqual([
+      "repay",
+      "correct_repayment",
+    ]);
+
+    await pushAll(store, remote);
+    expect(pendingRecordingCommands(state(store))).toEqual([]);
+    const replacement = state(store).repayments[1]!.id;
+    await save(store, { type: "void_repayment", repaymentId: replacement, reason: "Undone" });
+    await pushAll(store, remote);
+    expect(state(store).repayments.every((item) => item.voidedAt !== null)).toBe(true);
+    // A pull rebuilds the payments from the commands alone.
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    expect(state(store).repayments).toHaveLength(2);
+  });
+
+  it("keeps a refused payment visible until it's recorded again or discarded", async () => {
+    const { store, remote, me } = await synced();
+    const first = store.prepare({ type: "repay", fromPlayerId: bea, toPlayerId: me, amount: 2500 });
+    await store.execute(first);
+    remote.refuse(first.operationId);
+    await pushAll(store, remote);
+    expect(state(store).repayments).toEqual([]);
+    expect(state(store).sync?.rejected.map((item) => item.command.type)).toEqual(["repay"]);
+
+    await store.transform((s) => recordRejectedAgain(s, first.operationId));
+    const [again] = pendingRecordingCommands(state(store));
+    expect(again).toMatchObject({ type: "repay", amount: 2500, expectedRevision: 0 });
+    expect(again!.operationId).not.toBe(first.operationId);
+
+    const second = store.prepare({ type: "repay", fromPlayerId: me, toPlayerId: bea, amount: 100 });
+    await store.execute(second);
+    remote.refuse(second.operationId);
+    await pushAll(store, remote);
+    await store.transform((s) => discardRejected(s, second.operationId));
+    expect(state(store).sync?.rejected).toEqual([]);
+    expect(state(store).repayments.map((item) => item.amount)).toEqual([2500]);
+  });
+
+  it("keeps who paid for a buy-in through a relaunch", async () => {
+    const { db, store } = await synced();
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const visitId = state(store).visits[0]!.id;
+    await save(store, {
+      type: "add",
+      visitId,
+      kind: "buy_in",
+      amount: 10000,
+      occurredAt: at(11),
+      counterpartyId: bea,
+    });
+    const reloaded = decodeRecordingState(db.document.payload!, db.document.revision);
+    expect(reloaded.entries.map((entry) => entry.counterpartyId)).toEqual([null, bea]);
+    expect(() =>
+      store.prepare({
+        type: "add",
+        visitId,
+        kind: "buy_in",
+        amount: 1,
+        counterpartyId: state(store).self.id,
+      }),
+    ).not.toThrow();
+    await expect(
+      save(store, {
+        type: "add",
+        visitId,
+        kind: "buy_in",
+        amount: 1,
+        counterpartyId: state(store).self.id,
+      }),
+    ).rejects.toBeInstanceOf(RecordingError);
   });
 });
 

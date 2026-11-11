@@ -43,7 +43,14 @@ screen. Under it, four places answer the questions people open a trip with:
 | **Settle up** | Who owes whom?               | Suggested payments, balances, backing, payment history                    |
 | **Group**     | Who's in it, and what trips? | Trips, People (members, guests, invites), Settings (payment apps, export) |
 
-Anything that's only about you (play limits, appearance, account, sign out) sits behind **You**.
+Anything that's only about you (play limits, appearance, account, sign out) sits behind **You**,
+and so does your own **Settle up**: `/you/settle` lists everyone you've shared a table with and
+what's owed between you, and `/you/settle/:playerId` shows one person's balance, Record a payment,
+and the history of covered buy-ins, held cash-outs and payments, with corrections, voids and who
+made them. These balances are between players, built from play and payments outside any trip. They
+are not a trip's Settle up, which stays a group place, and neither shows the other's numbers. A
+person you've never shared a table with has no page. Recording a payment saves on the device and
+syncs like play; the balances and history need the network.
 Phones and narrow web windows draw the four places as a bottom bar; wide web windows draw them as
 a left sidebar. The places are the same on both. The wordmark goes back to your play.
 
@@ -111,7 +118,8 @@ the Board is one tap away mid-session.
 ## Addresses
 
 Web and mobile share addresses: `/` (your play), `/play/:visitId` (a personal session), `/t/:token`
-(a shared table, web only), `/invite/:token` (a personal invite, web only),
+(a shared table, web only), `/invite/:token` (a personal invite, web only), `/you/settle` and
+`/you/settle/:playerId` (your Settle up, and one person in it),
 `/groups` (your groups), `/trips/:id` (Sessions), `/trips/:id/board` (`?scope=all` for All
 time), `/trips/:id/settle`, `/sessions/:id`, `/groups/:id` (the hub), `/groups/:id/people` and
 `/groups/:id/settings`. Old addresses keep working: a trip's `/results` goes to its Board and a
