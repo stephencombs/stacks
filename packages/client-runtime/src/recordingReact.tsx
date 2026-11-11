@@ -41,6 +41,7 @@ import {
 import type { RecordingStorage, RecordingStorageChange } from "./recordingStorage.ts";
 import {
   makeRecordingSync,
+  RecordingSyncBlocked,
   syncsAsDevice,
   tableSynced,
   type ActorKeyStorage,
@@ -49,6 +50,7 @@ import {
 } from "./recordingSync.ts";
 import {
   canRetryRecording,
+  claimLines,
   describeRecordingError,
   paymentSyncView,
   PRIVATE_RECORDING_NAMESPACE,
@@ -251,11 +253,21 @@ export const useRecordingSync = (visitId?: VisitId) => {
         setError(describeRecordingError(cause));
       }
     };
+  const claim = useMemo(() => claimLines(status?.claim ?? null), [status?.claim]);
   return {
     ...view,
     error,
     recordAgain: resolve("recordAgain"),
     discard: resolve("discard"),
+    /** What signing in claimed from this device, or was refused, until dismissed. */
+    claim,
+    dismissClaim: () => sync?.dismissClaim(),
+    /** Whether this device's player can be linked to the account's, which keeps them separate. */
+    canLink:
+      status?.phase === "blocked" &&
+      status.error instanceof RecordingSyncBlocked &&
+      status.error.reason === "separate_player",
+    link: () => sync?.link(),
   };
 };
 

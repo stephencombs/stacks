@@ -141,11 +141,50 @@ export function SaveStatus({
   visitId?: VisitId;
 }) {
   const sync = useRecordingSync(visitId);
-  if (status !== "saved" || (sync.rejected.length === 0 && sync.error === null))
+  if (
+    status !== "saved" ||
+    (sync.rejected.length === 0 && sync.error === null && sync.claim.length === 0 && !sync.canLink)
+  )
     return <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />;
   return (
     <>
       <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />
+      {sync.canLink ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-sunken px-3 py-2.5">
+          <p className="text-sm text-muted">
+            Link them to your account to keep them there. They stay separate players, and nothing is
+            merged.
+          </p>
+          <Button size="sm" onClick={sync.link}>
+            Link to my account
+          </Button>
+        </div>
+      ) : null}
+      {sync.claim.map((line) => (
+        <div
+          key={line.kind}
+          role={line.kind === "refused" ? "alert" : "status"}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-sunken px-3 py-2.5"
+        >
+          <p
+            className={
+              line.kind === "refused"
+                ? "flex items-start gap-2 text-sm text-danger"
+                : "flex items-start gap-2 text-sm text-muted"
+            }
+          >
+            {line.kind === "refused" ? (
+              <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            ) : (
+              <CloudCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
+            )}
+            {line.text}
+          </p>
+          <Button size="sm" onClick={sync.dismissClaim}>
+            Dismiss
+          </Button>
+        </div>
+      ))}
       {sync.rejected.map((item) => (
         <div
           key={item.operationId}

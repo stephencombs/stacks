@@ -16,6 +16,8 @@ import {
   RecordingCommand,
   RecordingOperationId,
   type ActorCredential,
+  type ClaimActorRequest,
+  type ClaimResult,
   type JoinedTable,
   type JoinTableRequest,
   type PlayerAccess,
@@ -51,7 +53,7 @@ export interface RecordingTransport {
     actor: ActorCredential | null,
   ) => Effect.Effect<PushRecordingResponse, unknown>;
   readonly registerActor: (actor: ActorCredential) => Effect.Effect<void, unknown>;
-  readonly claimActor: (actor: ActorCredential) => Effect.Effect<void, unknown>;
+  readonly claimActor: (request: ClaimActorRequest) => Effect.Effect<ClaimResult, unknown>;
   readonly share: (
     tableId: TableId,
     actor: ActorCredential | null,
@@ -141,11 +143,21 @@ export const syncsAsDevice = (state: RecordingState) =>
     ? state.visits.some((visit) => visit.playerId !== state.self.id)
     : state.sync.userId === null;
 
-/** This device's history belongs to another account, so nothing syncs while this one is in. */
+/**
+ * Nothing on this device syncs while this account is in. Either its sessions belong to another
+ * account, or they're a different player from the one this account already has: those can be
+ * linked to it, never merged.
+ */
 export class RecordingSyncBlocked extends Error {
   override readonly name = "RecordingSyncBlocked";
-  constructor() {
-    super("The sessions on this device belong to another account.");
+  readonly reason: "other_account" | "separate_player";
+  constructor(reason: "other_account" | "separate_player" = "other_account") {
+    super(
+      reason === "other_account"
+        ? "The sessions on this device belong to another account."
+        : "The sessions on this device are a different player from this account's.",
+    );
+    this.reason = reason;
   }
 }
 
@@ -231,18 +243,24 @@ export const mergeRecordingHistory = (
   const adopt =
     identity !== null &&
     (identity.playerId !== state.self.id || identity.actorId !== state.actor.id);
-  if (adopt && (state.sync?.synced.length ?? 0) > 0)
+  const accepted = new Set(state.sync?.synced);
+  // A device that synced as its own actor can only meet another identity here once the account
+  // linked its player (never merged): that player is still the device's, now one of the account's.
+  const linked = adopt && state.sync?.userId === null && accepted.size > 0;
+  if (adopt && accepted.size > 0 && !linked)
     throw new RecordingError("load", "This device already synced as a different player.");
   const actorId = identity?.actorId ?? state.actor.id;
   const playerId = identity?.playerId ?? state.self.id;
+  // Only what the server doesn't hold yet is signed as the account's actor. Only the device's own
+  // player, never synced, becomes the account's personal player; a table player keeps its ID.
   const own = (command: RecordingCommand) =>
-    adopt
-      ? RecordingCommand.make(
-          "playerId" in command && command.playerId === state.self.id
+    !adopt || accepted.has(command.operationId)
+      ? command
+      : RecordingCommand.make(
+          !linked && "playerId" in command && command.playerId === state.self.id
             ? { ...command, actorId, playerId }
             : { ...command, actorId },
-        )
-      : command;
+        );
   const remote = new Map(history.commands.map((command) => [command.operationId, command]));
   const local = state.receipts.map((receipt) => own(receipt.command));
   const reused = local
@@ -627,6 +645,8 @@ export type RecordingSyncStatus = {
   /** `retrying` waits out a failure that more signal or time can fix; `blocked` waits for a person. */
   readonly phase: "idle" | "syncing" | "retrying" | "blocked";
   readonly error: unknown | null;
+  /** What signing in took from this device, until it's dismissed. */
+  readonly claim: ClaimResult | null;
 };
 
 const MAX_DELAY = Duration.minutes(5);
@@ -643,12 +663,16 @@ export const makeRecordingSync = (
   transport: RecordingTransport,
   keys: ActorKeyStorage,
 ) => {
-  let status: RecordingSyncStatus = { phase: "idle", error: null };
+  let status: RecordingSyncStatus = { phase: "idle", error: null, claim: null };
   const listeners = new Set<() => void>();
-  const setStatus = (next: RecordingSyncStatus) => {
+  const publish = (next: RecordingSyncStatus) => {
     status = next;
     for (const listener of listeners) listener();
   };
+  const setStatus = (next: Omit<RecordingSyncStatus, "claim">) =>
+    publish({ ...next, claim: status.claim });
+  // The account asked to link this device's own player to its own, instead of staying blocked.
+  let linking = false;
   let pull = true;
   let signal: ((reason: "wake" | "change") => void) | null = null;
 
@@ -669,14 +693,23 @@ export const makeRecordingSync = (
     if (!prepared) {
       if (actor) yield* transport.registerActor(actor);
       // The device synced as its actor before this sign-in: the account takes that player.
-      else if (loaded!.sync?.userId === null)
-        yield* transport
-          .claimActor(yield* credential(loaded!))
+      else if (loaded!.sync?.userId === null) {
+        const request = { ...(yield* credential(loaded!)), ...(linking ? { link: true } : {}) };
+        const result = yield* transport
+          .claimActor(request)
           .pipe(
             Effect.mapError((error) =>
-              isIdentityConflict(error) ? new RecordingSyncBlocked() : error,
+              isConflict(error, "recording_identity")
+                ? new RecordingSyncBlocked("separate_player")
+                : isConflict(error, "player_claimed")
+                  ? new RecordingSyncBlocked("other_account")
+                  : error,
             ),
           );
+        linking = false;
+        if (result.adopted || result.claimed.length > 0 || result.refused.length > 0)
+          publish({ ...status, claim: result });
+      }
       prepared = true;
     }
     for (;;) {
@@ -695,7 +728,7 @@ export const makeRecordingSync = (
           Effect.tapError((error) =>
             Effect.sync(() => {
               // Another device established the account first: adopt it on the next try.
-              if (isIdentityConflict(error)) pull = true;
+              if (isConflict(error, "recording_identity")) pull = true;
             }),
           ),
         );
@@ -770,6 +803,16 @@ export const makeRecordingSync = (
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => void listeners.delete(listener);
+    },
+    /** Puts away what signing in claimed, once it's been read. */
+    dismissClaim: () => publish({ ...status, claim: null }),
+    /**
+     * Links this device's own player to the account's, after the account refused to take it as its
+     * personal player. They stay two players: nothing is merged, and the device keeps its history.
+     */
+    link: () => {
+      linking = true;
+      signal?.("wake");
     },
     /** Starts syncing a signed-out device's tables, so one can be shared. */
     enable: async () => {
@@ -861,10 +904,10 @@ export const makeRecordingSync = (
 };
 export type RecordingSync = ReturnType<typeof makeRecordingSync>;
 
-const isIdentityConflict = (error: unknown) =>
+const isConflict = (error: unknown, reason: "recording_identity" | "player_claimed") =>
   typeof error === "object" &&
   error !== null &&
   "_tag" in error &&
   error._tag === "Conflict" &&
   "reason" in error &&
-  error.reason === "recording_identity";
+  error.reason === reason;

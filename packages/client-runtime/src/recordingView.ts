@@ -24,7 +24,11 @@ import {
 
 import { RecordingError, type RecordingRejection, type RecordingState } from "./recordingState.ts";
 import { RecordingStorageConflict, RecordingStorageError } from "./recordingStorage.ts";
-import { pendingRecordingCommands, type RecordingSyncStatus } from "./recordingSync.ts";
+import {
+  pendingRecordingCommands,
+  RecordingSyncBlocked,
+  type RecordingSyncStatus,
+} from "./recordingSync.ts";
 
 /**
  * The one private ledger on this device. It never changes with sign-in, so signing in or out
@@ -410,6 +414,34 @@ export type RecordingSyncLine = {
   readonly text: string;
 };
 
+type SyncPhase = Pick<RecordingSyncStatus, "phase" | "error">;
+
+/** What signing in did with the tables on this device: a quiet confirmation, or a refusal. */
+export type ClaimLine = {
+  readonly kind: "claimed" | "refused";
+  readonly text: string;
+};
+
+export const claimLines = (claim: RecordingSyncStatus["claim"]): ReadonlyArray<ClaimLine> => {
+  if (claim === null) return [];
+  const lines: ClaimLine[] = [];
+  if (claim.adopted || claim.claimed.length > 0)
+    lines.push({
+      kind: "claimed",
+      text: "Your tables from this device are now in your account.",
+    });
+  const [first, ...rest] = claim.refused;
+  if (first)
+    lines.push({
+      kind: "refused",
+      text:
+        rest.length === 0
+          ? `${first.displayName} already belongs to another account, so they stay out of yours.`
+          : `${claim.refused.length} players on this device already belong to another account, so they stay out of yours.`,
+    });
+  return lines;
+};
+
 export type RecordingSyncView = {
   readonly line: RecordingSyncLine;
   /** Refused changes, oldest first: each needs recording again or discarding. */
@@ -425,7 +457,7 @@ export type RecordingSyncView = {
  */
 export const recordingSyncView = (
   state: RecordingState | null,
-  sync: RecordingSyncStatus | null,
+  sync: SyncPhase | null,
   visitId?: VisitId,
 ): RecordingSyncView =>
   syncView(
@@ -437,12 +469,12 @@ export const recordingSyncView = (
 /** The sync line and refusals for payments between players only. */
 export const paymentSyncView = (
   state: RecordingState | null,
-  sync: RecordingSyncStatus | null,
+  sync: SyncPhase | null,
 ): RecordingSyncView => syncView(state, sync, isPairCommand);
 
 const syncView = (
   state: RecordingState | null,
-  sync: RecordingSyncStatus | null,
+  sync: SyncPhase | null,
   mine: (command: RecordingCommand) => boolean,
 ): RecordingSyncView => {
   const rejected = (state?.sync?.rejected ?? [])
@@ -457,7 +489,10 @@ const syncView = (
     return {
       line: {
         kind: "blocked",
-        text: "Saved on this device. These sessions belong to another account, so they don't sync to this one.",
+        text:
+          sync.error instanceof RecordingSyncBlocked && sync.error.reason === "separate_player"
+            ? "Saved on this device. These sessions are a different player from the one on your account, so they don't sync to it yet."
+            : "Saved on this device. These sessions belong to another account, so they don't sync to this one.",
       },
       rejected: [],
     };

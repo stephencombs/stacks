@@ -71,11 +71,53 @@ export function SaveStatus({
   visitId?: VisitId;
 }) {
   const sync = useRecordingSync(visitId);
-  if (status !== "saved" || (sync.rejected.length === 0 && sync.error === null))
+  if (
+    status !== "saved" ||
+    (sync.rejected.length === 0 && sync.error === null && sync.claim.length === 0 && !sync.canLink)
+  )
     return <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />;
   return (
     <View className="gap-2">
       <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />
+      {sync.canLink ? (
+        <View className="gap-3 rounded-lg bg-sunken px-3 py-2.5">
+          <Text className="text-sm text-muted">
+            Link them to your account to keep them there. They stay separate players, and nothing is
+            merged.
+          </Text>
+          <View className="flex-row justify-end">
+            <Button label="Link to my account" size="sm" onPress={sync.link} />
+          </View>
+        </View>
+      ) : null}
+      {sync.claim.map((line) => (
+        <View
+          key={line.kind}
+          accessibilityRole={line.kind === "refused" ? "alert" : undefined}
+          accessibilityLiveRegion="polite"
+          className="gap-3 rounded-lg bg-sunken px-3 py-2.5"
+        >
+          <View className="min-w-0 flex-row gap-2">
+            <Icon
+              name={line.kind === "refused" ? "alert" : "cloud-check"}
+              color={line.kind === "refused" ? "danger" : "muted"}
+              size={16}
+            />
+            <Text
+              selectable
+              className={cn(
+                "flex-1 text-sm",
+                line.kind === "refused" ? "text-danger" : "text-muted",
+              )}
+            >
+              {line.text}
+            </Text>
+          </View>
+          <View className="flex-row justify-end">
+            <Button label="Dismiss" size="sm" onPress={sync.dismissClaim} />
+          </View>
+        </View>
+      ))}
       {sync.rejected.map((item) => (
         <View
           key={item.operationId}
