@@ -47,7 +47,20 @@ export const device = Effect.fn("test.device")(function* () {
   const identity = newIdentity();
   const credential = { actorId: identity.actorId, secret: secret() };
   yield* (yield* api.asActor(null)).publicRecording.registerActor({ payload: credential });
-  return recorder(identity, yield* api.asActor(credential));
+  return { ...recorder(identity, yield* api.asActor(credential)), credential };
+});
+
+/**
+ * An account on one of its devices: `handle` is its sign-in, so two calls are two devices of one
+ * account. `identity` is what that device records as; a device signing in to an account that has
+ * recorded already must use the account's.
+ */
+export const signedIn = Effect.fn("test.signedIn")(function* (
+  handle: string,
+  identity: RecordingIdentity = newIdentity(),
+) {
+  const api = yield* TestApi;
+  return recorder(identity, yield* api.as(handle));
 });
 
 /** A signed-in account, recording as its account actor. */

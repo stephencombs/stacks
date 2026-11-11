@@ -7,6 +7,7 @@ import {
   NotFound,
   PlayerIdentity,
   PlayerInviteId,
+  Recorder,
   type ActorId,
   type PlayerId,
 } from "@stacks/contracts";
@@ -19,10 +20,7 @@ import type {
 
 import { PlayerIdentityRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
-import { digest, establish, principal, randomToken } from "./Recording.ts";
-
-/** The most devices, besides an actor's own, that may record as one player at once. */
-const MAX_DEVICES = 5;
+import { digest, establish, MAX_DEVICES, principal, randomToken } from "./Recording.ts";
 
 /**
  * Revoking and redeeming both lock the player first, then its invites and bindings, so they
@@ -167,6 +165,16 @@ export const revokeBinding = Effect.fn("PlayerInvites.revokeBinding")(function* 
           and issued_by_actor in ${sql.in(revoked.map((row) => row.actorId))}
           and redeemed_at is null and revoked_at is null
       `;
+      // A claim lasts as long as the claiming account's actor is bound to the player.
+      yield* sql`
+        update players set user_id = null
+        where id = ${playerId} and recording_actor_id is null and user_id is not null
+          and not exists (
+            select 1 from player_actors pa join players own on own.recording_actor_id = pa.actor_id
+            where pa.player_id = players.id and pa.revoked_at is null
+              and own.user_id = players.user_id
+          )
+      `;
     }),
   );
 });
@@ -194,10 +202,12 @@ type InviteRow = {
   readonly revokedAt: Date | null;
 };
 
+// Only table players are invited: a legacy group guest is claimed with its group's code instead.
 const find = (sql: SqlClient.SqlClient, hash: string) =>
   sql<InviteRow>`
-    select id, player_id, issued_by_actor, redeemed_at, revoked_at from player_invites
-    where token_hash = ${hash}
+    select i.id, i.player_id, i.issued_by_actor, i.redeemed_at, i.revoked_at
+    from player_invites i join players p on p.id = i.player_id
+    where i.token_hash = ${hash} and p.group_id is null
   `.pipe(Effect.map(([row]) => row));
 
 const usable = (invite: InviteRow | undefined) =>
@@ -230,6 +240,7 @@ export const preview = Effect.fn("PlayerInvites.preview")(function* (token: stri
 /**
  * Binds the recorder's actor to the invited player, once. From then on it records that player's
  * play wherever they're at, and nobody else's. A table's starter already records for everyone.
+ * Signed in, redeeming also claims the player for the account, unless another account has them.
  */
 export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
   token: string,
@@ -237,8 +248,18 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   const hash = yield* digest(token);
-  // A bad, used or revoked link creates nothing, not even the recorder's own player.
+  const recorder = yield* Recorder;
+  const unclaimed = Effect.gen(function* () {
+    if (recorder._tag !== "Account") return;
+    const [owner] = yield* sql<{ userId: string | null }>`
+      select user_id from players where id = ${found.playerId}
+    `;
+    if (owner?.userId != null && owner.userId !== recorder.user.userId)
+      return yield* new Conflict({ reason: "player_claimed" });
+  });
+  // A bad, used, revoked or refused link creates nothing, not even the recorder's own player.
   const found = yield* usable(yield* find(sql, hash));
+  yield* unclaimed;
   const { self, actorPlayers } = yield* establish(request.identity);
   return yield* sql.withTransaction(
     Effect.gen(function* () {
@@ -248,6 +269,8 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
         where id = ${found.id} for update
       `;
       const invite = yield* usable(row);
+      // Another account may have claimed the player since the check above.
+      yield* unclaimed;
       // The issuer may have lost the player since: then its link has too.
       const [issuer] = yield* sql<{ holds: boolean }>`
         select ${holds(sql, invite.issuedByActor, invite.playerId)} as holds
@@ -276,6 +299,15 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
           set revoked_at = null, bound_via = 'invite', invited_by_actor = excluded.invited_by_actor
       `;
       yield* sql`update player_invites set redeemed_at = now() where id = ${invite.id}`;
+      if (recorder._tag === "Account") {
+        // The player row is locked above, so this can only match a player nobody else claimed.
+        const claimed = yield* sql`
+          update players set user_id = ${recorder.user.userId}
+          where id = ${invite.playerId} and (user_id is null or user_id = ${recorder.user.userId})
+          returning id
+        `;
+        if (claimed.length === 0) return yield* new Conflict({ reason: "player_claimed" });
+      }
       const [player] = yield* sql`
         select id, display_name from players where id = ${invite.playerId}
       `.pipe(Effect.flatMap(Access.decodeRows(PlayerIdentityRow)));

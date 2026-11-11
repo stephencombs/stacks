@@ -223,7 +223,9 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       insert into players (id, group_id, display_name, user_id, created_by, recording_actor_id)
       select gen_random_uuid(), null, u.display_name, u.id, u.id, gen_random_uuid()
       from users u
-      where not exists (select 1 from players own where own.user_id = u.id and own.group_id is null)
+      where not exists (
+        select 1 from players own where own.user_id = u.id and own.recording_actor_id is not null
+      )
         and (
           exists (select 1 from players p where p.user_id = u.id and ${within("p.group_id")})
           or exists (
@@ -276,7 +278,7 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
 
     const actor = (alias: string, user: string) =>
       sql.literal(
-        `left join players ${alias} on ${alias}.user_id = ${user} and ${alias}.group_id is null`,
+        `left join players ${alias} on ${alias}.user_id = ${user} and ${alias}.recording_actor_id is not null`,
       );
     const entries = yield* sql`
       insert into personal_entries (id, visit_id, kind, amount, occurred_at, note, created_by,

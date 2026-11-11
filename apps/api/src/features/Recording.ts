@@ -25,6 +25,8 @@ import {
   isTableCommand,
   RecordingCommand,
   type ActorCredential,
+  type ClaimActorRequest,
+  type ClaimResult,
   type JoinedTable,
   type JoinTableRequest,
   type PushRecordingRequest,
@@ -110,7 +112,7 @@ const personalIdentity = Effect.fn("Recording.personalIdentity")(function* (user
   const sql = yield* SqlClient.SqlClient;
   const [row] = yield* sql`
     select id as player_id, recording_actor_id as actor_id, display_name
-    from players where user_id = ${userId} and group_id is null
+    from players where user_id = ${userId} and recording_actor_id is not null
   `.pipe(Effect.flatMap(Access.decodeRows(RecordingIdentityRow)));
   return row ?? null;
 });
@@ -709,7 +711,8 @@ export const establish = Effect.fn("Recording.establish")(function* (
       `;
       yield* sql`
         insert into player_actors (player_id, actor_id)
-        select id, recording_actor_id from players where user_id = ${user.userId} and group_id is null
+        select id, recording_actor_id from players
+        where user_id = ${user.userId} and recording_actor_id is not null
         on conflict do nothing
       `;
     });
@@ -975,9 +978,12 @@ export const join = Effect.fn("Recording.join")(function* (
     `.pipe(Effect.flatMap(Access.decodeRows(PlayerIdentityRow)));
     if (existing) return { table, player: PlayerIdentity.make(existing) };
     const { id, displayName } = request.player;
+    // Someone signed in who joins is the player, so the account claims it as it's made.
+    const recorder = yield* Recorder;
     const created = yield* sql`
-      insert into players (id, display_name, created_by_actor)
-      values (${id}, ${displayName}, ${self.actorId})
+      insert into players (id, display_name, created_by_actor, user_id)
+      values (${id}, ${displayName}, ${self.actorId},
+        ${recorder._tag === "Account" ? recorder.user.userId : null})
       on conflict do nothing
       returning id
     `;
@@ -1022,44 +1028,144 @@ export const registerActor = Effect.fn("Recording.registerActor")(function* (
   if (row?.secretHash !== hash) return yield* new Conflict({ reason: "actor_taken" });
 });
 
+/** The most devices, besides an actor's own, that may record as one player at once. */
+export const MAX_DEVICES = 5;
+
+interface HeldPlayer {
+  readonly id: PlayerId;
+  readonly displayName: string;
+  readonly userId: string | null;
+  readonly boundVia: "self" | "join" | "invite";
+}
+
 /**
- * Makes the player a device recorded as, signed out, the signed-in account's own player, so
- * its tables stay the account's. An account that already has a different player can't take it.
+ * Takes what a signed-out device holds for the signed-in account, once the device proves its
+ * secret. Claiming links players to the account; it never copies an entry, visit or payment.
+ *
+ * - An account without a personal player takes the device's own player as it, and the actor
+ *   becomes the account's: the account records as it from now on.
+ * - An account that already has one can't take a second as its personal player. The two stay
+ *   different people, and nothing is claimed until `link` asks for it: then the device's own
+ *   player is linked beside the personal one, and the device keeps its actor and secret.
+ * - Every other player the device is bound to (it joined a table as them, or redeemed an invite
+ *   for them) is claimed too, unless another account has them. Each claimed player is bound to
+ *   the account's actor, so authority over it, a starter's included, follows the account to any
+ *   device it signs in on.
+ *
+ * A revoked binding claims nothing. A legacy group guest is never held this way.
  */
-export const claimActor = Effect.fn("Recording.claimActor")(function* (
-  credential: ActorCredential,
-) {
+export const claimActor = Effect.fn("Recording.claimActor")(function* (request: ClaimActorRequest) {
   const sql = yield* SqlClient.SqlClient;
   const user = yield* CurrentUser;
+  const name = user.displayName.slice(0, 60) || "You";
   const claim = Effect.gen(function* () {
-    const [actor] = yield* sql<{ secretHash: string }>`
-      select secret_hash from recording_actors where id = ${credential.actorId} and kind = 'device'
-      for update
+    const none = { adopted: false, claimed: [], refused: [] } satisfies ClaimResult;
+    const [device] = yield* sql<{ secretHash: string }>`
+      select secret_hash from recording_actors where id = ${request.actorId} and kind = 'device'
     `;
-    if (!actor) return;
-    if (actor.secretHash !== (yield* digest(credential.secret))) return yield* new Unauthorized();
-    const [player] = yield* sql<{ id: PlayerId }>`
-      select p.id from player_actors pa join players p on p.id = pa.player_id
-      where pa.actor_id = ${credential.actorId} and pa.bound_via = 'self'
-        and p.user_id is null and p.group_id is null
-      for update of p
-    `;
-    if (player && (yield* personalIdentity(user.userId)))
-      return yield* new Conflict({ reason: "recording_identity" });
+    if (!device) return none;
+    if (device.secretHash !== (yield* digest(request.secret))) return yield* new Unauthorized();
     yield* Access.ensureUser();
+    const own = yield* personalIdentity(user.userId);
+    const heldBy = sql<HeldPlayer>`
+      select p.id, p.display_name, p.user_id, pa.bound_via
+      from player_actors pa join players p on p.id = pa.player_id
+      where pa.actor_id = ${request.actorId} and pa.revoked_at is null and p.group_id is null
+      order by p.id
+    `;
+    const lockPlayers = (players: ReadonlyArray<HeldPlayer>) =>
+      players.length === 0
+        ? Effect.void
+        : sql`
+            select 1 from players where id in ${sql.in(players.map(({ id }) => id))}
+            order by id for update
+          `;
+    // Players are locked before anything else, as a revoke or a redeem does, and bindings are read
+    // only after: a binding revoked before the lock can't be claimed, and one revoked after waits.
+    const candidates = yield* heldBy;
+    yield* lockPlayers(candidates);
+    // While the actor is locked, nothing can bind it to another player.
+    const [actor] = yield* sql`
+      select 1 from recording_actors where id = ${request.actorId} and kind = 'device' for update
+    `;
+    if (!actor) return none;
+    let held = yield* heldBy;
+    const unlocked = held.filter((player) => !candidates.some(({ id }) => id === player.id));
+    if (unlocked.length > 0) {
+      yield* lockPlayers(unlocked);
+      held = yield* heldBy;
+    }
+    const self = held.find((player) => player.boundVia === "self");
+    if (self && self.userId !== null && self.userId !== user.userId)
+      return yield* new Conflict({ reason: "player_claimed" });
+    const separate = self !== undefined && own !== null;
+    if (separate && self.userId === null && request.link !== true)
+      return yield* new Conflict({ reason: "recording_identity" });
+    const taken = held.filter((player) => player.userId !== null && player.userId !== user.userId);
+    const fresh = held.filter((player) => player.userId === null);
+    const identity = ({ id, displayName }: HeldPlayer) => ({ id, displayName });
+    if (separate) {
+      const linked: HeldPlayer[] = [];
+      for (const player of held.filter((player) => !taken.includes(player))) {
+        // An existing binding stays as it is: never brought back once revoked, never rewritten.
+        const [binding] = yield* sql<{ revokedAt: Date | null }>`
+          select revoked_at from player_actors
+          where player_id = ${player.id} and actor_id = ${own.actorId}
+        `;
+        if (binding?.revokedAt) continue;
+        if (!binding) {
+          const [bound] = yield* sql<{ count: number }>`
+            select count(*)::int as count from player_actors
+            where player_id = ${player.id} and bound_via <> 'self' and revoked_at is null
+              and actor_id <> ${own.actorId}
+          `;
+          if ((bound?.count ?? 0) >= MAX_DEVICES) continue;
+          yield* sql`
+            insert into player_actors (player_id, actor_id, bound_via, invited_by_actor)
+            values (${player.id}, ${own.actorId},
+              ${player.boundVia === "self" ? "invite" : player.boundVia}, ${request.actorId})
+          `;
+        }
+        yield* sql`update players set user_id = ${user.userId} where id = ${player.id}`;
+        linked.push(player);
+      }
+      return {
+        adopted: false,
+        claimed: fresh.filter((player) => linked.includes(player)).map(identity),
+        refused: taken.map(identity),
+      } satisfies ClaimResult;
+    }
     // The actor becomes the account's: from now on the account's session records as it. One that
     // never pushed has no player yet; the account's next push creates it.
     yield* sql`
       update recording_actors set kind = 'account', secret_hash = null
-      where id = ${credential.actorId}
+      where id = ${request.actorId}
     `;
-    if (player)
+    // The account takes the device's bindings with it, so players another account claimed first
+    // are let go rather than handed over.
+    if (taken.length > 0)
+      yield* sql`
+        update player_actors set revoked_at = now()
+        where actor_id = ${request.actorId} and player_id in ${sql.in(taken.map(({ id }) => id))}
+      `;
+    if (self?.userId === null)
       yield* sql`
         update players
-        set user_id = ${user.userId}, recording_actor_id = ${credential.actorId},
-          display_name = ${user.displayName.slice(0, 60) || "You"}
-        where id = ${player.id}
+        set user_id = ${user.userId}, recording_actor_id = ${request.actorId}, display_name = ${name}
+        where id = ${self.id}
       `;
+    const others = fresh.filter((player) => player.boundVia !== "self");
+    if (others.length > 0)
+      yield* sql`
+        update players set user_id = ${user.userId} where id in ${sql.in(others.map(({ id }) => id))}
+      `;
+    return {
+      adopted: self?.userId === null,
+      claimed: fresh.map((player) =>
+        player === self ? { id: player.id, displayName: name } : identity(player),
+      ),
+      refused: taken.map(identity),
+    } satisfies ClaimResult;
   });
   // Two devices claiming for one account at once: the loser rolls back and keeps its actor.
   return yield* sql

@@ -17,6 +17,7 @@ import sharedTables from "./0014_shared_tables.ts";
 import tableParticipants from "./0015_table_participants.ts";
 import invitesRecorders from "./0016_invites_recorders.ts";
 import playerMoney from "./0017_player_money.ts";
+import claimedTablePlayers from "./0018_claimed_table_players.ts";
 
 export const records = {
   "0001_init": init,
@@ -36,6 +37,7 @@ export const records = {
   "0015_table_participants": tableParticipants,
   "0016_invites_recorders": invitesRecorders,
   "0017_player_money": playerMoney,
+  "0018_claimed_table_players": claimedTablePlayers,
 };
 
 export const migrations = Migrator.fromRecord(records);

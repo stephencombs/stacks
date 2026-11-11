@@ -31,6 +31,7 @@ const conflictMessages: Record<ConflictReason, string> = {
   unsafe_amount:
     "A balance here is too large to count exactly, so it isn't shown. Nothing changed.",
   table_starter: "You started this table. Open it from your play.",
+  player_claimed: "That player already belongs to another account, so it can't be added to yours.",
   stake_voided: "That stake was voided.",
   stake_ended: "That stake has already ended. Reopen it first.",
   stake_open: "That stake is still open.",

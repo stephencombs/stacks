@@ -29,6 +29,8 @@ import { PlayerIdentity } from "./players.ts";
 import { PairHistory, PlayerBalances } from "./relationships.ts";
 import {
   ActorCredential,
+  ClaimActorRequest,
+  ClaimResult,
   JoinedTable,
   JoinTableRequest,
   PlayerAccess,
@@ -720,8 +722,8 @@ const PublicRecordingGroup = HttpApiGroup.make("publicRecording")
 const ClaimGroup = HttpApiGroup.make("claim")
   .add(
     HttpApiEndpoint.post("claimActor", "/recording/claim", {
-      payload: ActorCredential,
-      success: HttpApiSchema.NoContent,
+      payload: ClaimActorRequest,
+      success: ClaimResult,
       error: [Conflict, Unauthorized],
     }),
   )

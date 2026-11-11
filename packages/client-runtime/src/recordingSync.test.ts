@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   ActorId,
+  Conflict,
   EntryId,
   MinorUnits,
   PlayerId,
@@ -45,7 +46,7 @@ import {
   type ActorKeyStorage,
   type RecordingTransport,
 } from "./recordingSync.ts";
-import { recordingHome, recordingSyncView, recordingTable } from "./recordingView.ts";
+import { claimLines, recordingHome, recordingSyncView, recordingTable } from "./recordingView.ts";
 
 const alex = UserId.make("user_alex");
 const at = (hour: number) =>
@@ -166,7 +167,7 @@ const transportFor = (remote: ReturnType<typeof server>): RecordingTransport => 
   history: () => Effect.sync(remote.history),
   push: (request) => Effect.sync(() => ({ results: remote.push(request) })),
   registerActor: () => Effect.void,
-  claimActor: () => Effect.void,
+  claimActor: () => Effect.succeed({ adopted: false, claimed: [], refused: [] }),
   share: unused,
   unshare: unused,
   table: unused,
@@ -281,6 +282,105 @@ describe("merging", () => {
 
     await pushAll(store, remote);
     expect(remote.history().visits).toHaveLength(2);
+  });
+
+  it("keeps what the server holds and a table player's ID when a linked device meets the account", async () => {
+    const store = await open();
+    await store.transform((s) => ({ ...s, sync: { userId: null, synced: [], rejected: [] } }));
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const device = state(store);
+    const visitId = device.visits[0]!.id;
+    const remote = server();
+    await pushAll(store, remote);
+    await save(store, { type: "add", visitId, kind: "buy_in", amount: 5000, occurredAt: at(11) });
+    const [pending] = pendingRecordingCommands(state(store));
+
+    // The account has its own player; the device's was linked to it, so the server returns both.
+    const account = {
+      playerId: PlayerId.make(crypto.randomUUID()),
+      actorId: ActorId.make(crypto.randomUUID()),
+    };
+    const history: RecordingHistory = {
+      ...remote.history(),
+      identity: account,
+      participants: [{ tableId: device.tables[0]!.id, player: device.self }],
+    };
+    await store.transform((s) => mergeRecordingHistory(s, alex, history));
+
+    const merged = state(store);
+    expect(merged.self.id).toBe(account.playerId);
+    expect(merged.actor.id).toBe(account.actorId);
+    // What the device already synced stays as the device signed it, so it still matches the server.
+    const bought = merged.entries.filter((entry) => entry.visitId === visitId);
+    expect(bought.map((entry) => entry.createdBy)).toEqual([device.actor.id, account.actorId]);
+    expect(merged.visits[0]).toMatchObject({ id: visitId, playerId: device.self.id });
+    expect(merged.sync?.rejected).toEqual([]);
+    const [next] = pendingRecordingCommands(merged);
+    expect(next).toMatchObject({ operationId: pending!.operationId, actorId: account.actorId });
+    expect(merged.tables[0]!.starterPlayerId).toBe(device.self.id);
+  });
+
+  it("won't merge a device the server doesn't report as linked, even if it chose to link", async () => {
+    const store = await open();
+    await store.transform((s) => ({ ...s, sync: { userId: null, synced: [], rejected: [] } }));
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const remote = server();
+    await pushAll(store, remote);
+    const account = {
+      playerId: PlayerId.make(crypto.randomUUID()),
+      actorId: ActorId.make(crypto.randomUUID()),
+    };
+    // The account's history holds none of the device's player: nothing was linked.
+    const history: RecordingHistory = {
+      identity: account,
+      commands: [],
+      tables: [],
+      participants: [],
+      players: [],
+      visits: [],
+      entries: [],
+    };
+    await expect(
+      store.transform((s) => mergeRecordingHistory(s, alex, history)),
+    ).rejects.toBeInstanceOf(RecordingError);
+    expect(state(store).self.id).not.toBe(account.playerId);
+  });
+
+  it("adopts the account's identity on a device that never synced, link or not", async () => {
+    const store = await open();
+    await store.transform((s) => ({ ...s, sync: { userId: null, synced: [], rejected: [] } }));
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const device = state(store);
+    const account = {
+      playerId: PlayerId.make(crypto.randomUUID()),
+      actorId: ActorId.make(crypto.randomUUID()),
+    };
+    const history: RecordingHistory = { ...server().history(), identity: account };
+    await store.transform((s) => mergeRecordingHistory(s, alex, history));
+    // Its own player becomes the account's personal player, with nothing left under the old ID.
+    const merged = state(store);
+    expect(merged.self.id).toBe(account.playerId);
+    expect(merged.tables[0]!.starterPlayerId).toBe(account.playerId);
+    expect(merged.visits.every((visit) => visit.playerId === account.playerId)).toBe(true);
+    expect(merged.players.some((player) => player.id === device.self.id)).toBe(false);
+  });
+
+  it("still refuses to adopt another identity once it synced under an account", async () => {
+    const store = await open();
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const remote = server();
+    await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+    await pushAll(store, remote);
+    const other = {
+      ...remote.history(),
+      identity: {
+        playerId: PlayerId.make(crypto.randomUUID()),
+        actorId: ActorId.make(crypto.randomUUID()),
+      },
+    };
+    await expect(
+      store.transform((s) => mergeRecordingHistory(s, alex, other)),
+    ).rejects.toBeInstanceOf(RecordingError);
   });
 
   it("won't mix one account's device history into another's", async () => {
@@ -773,6 +873,122 @@ describe("engine", () => {
       yield* Fiber.interrupt(fiber);
     }),
   );
+
+  /** A device that synced as its own actor before anyone signed in on it. */
+  const syncedDevice = async () => {
+    const store = await open();
+    await store.transform((s) => ({ ...s, sync: { userId: null, synced: [], rejected: [] } }));
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const remote = server();
+    await pushAll(store, remote);
+    return { store, remote };
+  };
+
+  it.effect("says what signing in claimed from the device, and puts it away once read", () =>
+    Effect.gen(function* () {
+      const { store, remote } = yield* Effect.promise(syncedDevice);
+      const bea = { id: PlayerId.make(crypto.randomUUID()), displayName: "Bea" };
+      const cal = { id: PlayerId.make(crypto.randomUUID()), displayName: "Cal" };
+      const sync = makeRecordingSync(
+        store,
+        alex,
+        {
+          ...transportFor(remote),
+          claimActor: () => Effect.succeed({ adopted: true, claimed: [bea], refused: [cal] }),
+        },
+        memoryKeys(),
+      );
+      const statuses = yield* Queue.unbounded<string>();
+      sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
+      const fiber = yield* Effect.forkChild(sync.run);
+      while ((yield* Queue.take(statuses)) !== "idle");
+      expect(claimLines(sync.getStatus().claim)).toEqual([
+        { kind: "claimed", text: "Your tables from this device are now in your account." },
+        {
+          kind: "refused",
+          text: "Cal already belongs to another account, so they stay out of yours.",
+        },
+      ]);
+      sync.dismissClaim();
+      expect(claimLines(sync.getStatus().claim)).toEqual([]);
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+
+  it.effect("says nothing when a sign-in claimed nothing", () =>
+    Effect.gen(function* () {
+      const { store, remote } = yield* Effect.promise(syncedDevice);
+      const sync = makeRecordingSync(store, alex, transportFor(remote), memoryKeys());
+      const statuses = yield* Queue.unbounded<string>();
+      sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
+      const fiber = yield* Effect.forkChild(sync.run);
+      while ((yield* Queue.take(statuses)) !== "idle");
+      expect(sync.getStatus().claim).toBeNull();
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+
+  it.effect("waits for an explicit link when the account already has its own player", () =>
+    Effect.gen(function* () {
+      const { store, remote } = yield* Effect.promise(syncedDevice);
+      const requests: Array<{ readonly link?: boolean }> = [];
+      const sync = makeRecordingSync(
+        store,
+        alex,
+        {
+          ...transportFor(remote),
+          claimActor: (request) =>
+            request.link === true
+              ? Effect.sync(() => {
+                  requests.push(request);
+                  return { adopted: false, claimed: [], refused: [] };
+                })
+              : Effect.fail(new Conflict({ reason: "recording_identity" })),
+        },
+        memoryKeys(),
+      );
+      const statuses = yield* Queue.unbounded<string>();
+      sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
+      const fiber = yield* Effect.forkChild(sync.run);
+      while ((yield* Queue.take(statuses)) !== "blocked");
+      const blocked = sync.getStatus().error;
+      expect(blocked).toBeInstanceOf(RecordingSyncBlocked);
+      expect((blocked as RecordingSyncBlocked).reason).toBe("separate_player");
+      expect(requests).toEqual([]);
+      expect(recordingSyncView(state(store), sync.getStatus()).line.text).toContain(
+        "different player from the one on your account",
+      );
+
+      sync.link();
+      while ((yield* Queue.take(statuses)) !== "idle");
+      expect(requests).toHaveLength(1);
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+
+  it.effect("stops for another account when the device's player was claimed by one", () =>
+    Effect.gen(function* () {
+      const { store, remote } = yield* Effect.promise(syncedDevice);
+      const sync = makeRecordingSync(
+        store,
+        alex,
+        {
+          ...transportFor(remote),
+          claimActor: () => Effect.fail(new Conflict({ reason: "player_claimed" })),
+        },
+        memoryKeys(),
+      );
+      const statuses = yield* Queue.unbounded<string>();
+      sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
+      const fiber = yield* Effect.forkChild(sync.run);
+      while ((yield* Queue.take(statuses)) !== "blocked");
+      expect((sync.getStatus().error as RecordingSyncBlocked).reason).toBe("other_account");
+      expect(recordingSyncView(state(store), sync.getStatus()).line.text).toContain(
+        "belong to another account",
+      );
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
 });
 
 describe("shared tables", () => {
@@ -1135,7 +1351,11 @@ describe("shared tables", () => {
         alex,
         {
           ...transportFor(remote),
-          claimActor: (actor) => Effect.sync(() => void claims.push(actor.actorId)),
+          claimActor: (actor) =>
+            Effect.sync(() => {
+              claims.push(actor.actorId);
+              return { adopted: true, claimed: [], refused: [] };
+            }),
         },
         keys,
       );

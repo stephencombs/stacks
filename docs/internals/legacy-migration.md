@@ -8,18 +8,18 @@ Neither changes what the app reads or writes; that is the cutover, which comes l
 
 ## Mapping
 
-| Legacy                               | New model                                                                                                                                               |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Account (`users`)                    | Its one personal player (`players` with no group), created by the import if the account never synced. Devices adopt it as they do any account identity. |
-| Claimed group player (`user_id` set) | Stays its own `players` row with its ID. `user_id` links it to the account's personal player. Its history is not copied into the personal player's.     |
-| Guest                                | Stays its own `players` row. Two guests are never joined, even with the same name.                                                                      |
-| Session                              | A historical table whose ID is the session ID. Its trip, venue, game and high-limit flag stay on the session.                                           |
-| A player's part in a session         | One historical participation: a `personal_visits` row with `legacy_session_id` set, owned by the legacy player, from the session's start to its close.  |
-| Buy-in, cash-out, adjustment         | A `personal_entries` row with the same ID, amount, counterparty, times, note, void and `replaces_entry_id`.                                             |
-| Settlement                           | A `repayments` row with the same ID: a payment between two players, with its trip kept only as `recorded_from_trip_id`.                                 |
-| Stake                                | Stays in `stakes` as legacy terms, permanently. Whole-Trip backing applies only to agreements made after the cutover.                                   |
-| Group, membership, trip              | Unchanged. Access to a historical table or repayment goes through the legacy group, as it does today.                                                   |
-| Group in a currency other than USD   | Not imported. It stays on the legacy ledger until the new model supports its currency.                                                                  |
+| Legacy                               | New model                                                                                                                                                                                                  |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Account (`users`)                    | Its one personal player (`players` with no group), created by the import if the account never synced. Devices adopt it as they do any account identity.                                                    |
+| Claimed group player (`user_id` set) | Stays its own `players` row with its ID. `user_id` links it to the account's personal player. Its history is not copied into the personal player's. A group player is never claimed again through a table. |
+| Guest                                | Stays its own `players` row. Two guests are never joined, even with the same name.                                                                                                                         |
+| Session                              | A historical table whose ID is the session ID. Its trip, venue, game and high-limit flag stay on the session.                                                                                              |
+| A player's part in a session         | One historical participation: a `personal_visits` row with `legacy_session_id` set, owned by the legacy player, from the session's start to its close.                                                     |
+| Buy-in, cash-out, adjustment         | A `personal_entries` row with the same ID, amount, counterparty, times, note, void and `replaces_entry_id`.                                                                                                |
+| Settlement                           | A `repayments` row with the same ID: a payment between two players, with its trip kept only as `recorded_from_trip_id`.                                                                                    |
+| Stake                                | Stays in `stakes` as legacy terms, permanently. Whole-Trip backing applies only to agreements made after the cutover.                                                                                      |
+| Group, membership, trip              | Unchanged. Access to a historical table or repayment goes through the legacy group, as it does today.                                                                                                      |
+| Group in a currency other than USD   | Not imported. It stays on the legacy ledger until the new model supports its currency.                                                                                                                     |
 
 Users who created or voided entries are audit actors in the new model, so each also gets a personal
 player, and its `recording_actor_id` becomes the entry's `created_by` or `voided_by`.
