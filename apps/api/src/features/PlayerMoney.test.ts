@@ -18,6 +18,7 @@ import {
   uuid,
   voidRepayment,
 } from "../testing/recording.ts";
+import { groupWith, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
 
 type Recorder = Effect.Success<ReturnType<typeof device>>;
@@ -255,6 +256,70 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("money between players", (it)
           expectedRevision: 1,
         }),
       ).toEqual(["conflict"]);
+    }),
+  );
+
+  it.effect("never nets an imported trip settlement against new play", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { alex, bea, alexId, beaId, opened } = yield* table();
+      const { owner } = yield* users("owner");
+      const { tripId } = yield* groupWith(owner);
+      const covered = {
+        ...rebuy(alex.identity, opened.visitId),
+        amount: MinorUnits.make(10000),
+        counterpartyId: beaId,
+      };
+      expect(yield* alex.push(covered)).toEqual(["accepted"]);
+      const imported = uuid();
+      yield* sql`
+        insert into repayments (id, from_player_id, to_player_id, amount, occurred_at,
+          recorded_from_trip_id, created_by, created_at)
+        values (${imported}, ${alexId}, ${beaId}, 20000, now(), ${tripId},
+          ${alex.identity.actorId}, now())
+      `;
+      const owed = { debtorId: alexId, creditorId: beaId, amount: 10000 };
+      expect(yield* balanceOf(alex, beaId)).toEqual(owed);
+      expect(yield* balanceOf(bea, alexId)).toEqual(owed);
+      const history = yield* alex.client.recording.pair({ params: { playerId: beaId } });
+      expect(history.pair.balance).toEqual(owed);
+      expect(history.repayments.map((item) => item.id)).not.toContain(imported);
+    }),
+  );
+
+  it.effect("replays a payment or rebuy pushed twice at the same moment", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { alex, alexId, beaId, opened } = yield* table();
+      const paid = repay(alex.identity, alexId, beaId, 5000);
+      const added = rebuy(alex.identity, opened.visitId);
+      const results = yield* Effect.all(
+        [alex.push(paid), alex.push(paid), alex.push(added), alex.push(added)],
+        { concurrency: "unbounded" },
+      );
+      expect(results.flat()).toEqual(["accepted", "accepted", "accepted", "accepted"]);
+      expect(yield* sql`select 1 from repayments where id = ${paid.repaymentId}`).toHaveLength(1);
+    }),
+  );
+
+  it.effect("refuses clearly when a pair's stored total can't be counted exactly", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { alex, alexId, beaId } = yield* table();
+      for (let n = 0; n < 2; n++)
+        yield* sql`
+          insert into repayments (id, from_player_id, to_player_id, amount, occurred_at,
+            created_by, created_at)
+          values (${uuid()}, ${alexId}, ${beaId}, ${BigInt(Number.MAX_SAFE_INTEGER)}, now(),
+            ${alex.identity.actorId}, now())
+        `;
+      expect(yield* alex.client.recording.balances().pipe(Effect.flip)).toMatchObject({
+        _tag: "Conflict",
+        reason: "unsafe_amount",
+      });
+      expect(
+        yield* alex.client.recording.pair({ params: { playerId: beaId } }).pipe(Effect.flip),
+      ).toMatchObject({ _tag: "Conflict", reason: "unsafe_amount" });
     }),
   );
 

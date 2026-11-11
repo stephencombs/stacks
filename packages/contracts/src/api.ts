@@ -674,7 +674,7 @@ const RecordingGroup = HttpApiGroup.make("recording")
   .add(
     HttpApiEndpoint.get("balances", "/balances", {
       success: PlayerBalances,
-      error: Unauthorized,
+      error: [Conflict, Unauthorized],
     }).annotate(
       OpenApi.Summary,
       "What the caller's players and the people they've shared a table with owe each other",
@@ -684,7 +684,7 @@ const RecordingGroup = HttpApiGroup.make("recording")
     HttpApiEndpoint.get("pair", "/players/:playerId/pair", {
       params: playerParams,
       success: PairHistory,
-      error: [NotFound, Unauthorized],
+      error: [Conflict, NotFound, Unauthorized],
     }).annotate(
       OpenApi.Summary,
       "The play and payments between the caller and someone they've shared a table with",

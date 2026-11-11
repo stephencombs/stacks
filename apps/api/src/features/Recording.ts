@@ -608,22 +608,24 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
   command: RecordingCommand,
 ) {
   const sql = yield* SqlClient.SqlClient;
-  const apply = Effect.gen(function* () {
+  // Whether this operation is already saved: the same content is a replay, any other a refusal.
+  const replayed = Effect.gen(function* () {
     const [existing] = yield* sql`
       select actor_id, command from personal_operations where id = ${command.operationId}
     `.pipe(Effect.flatMap(Access.decodeRows(PersonalOperationRow)));
-    if (existing) {
-      if (
-        existing.actorId === self.actorId &&
-        commandText(existing.command) === commandText(command)
-      )
-        return;
-      return yield* new Rejected({
-        reason: "operation_reused",
-        message: "This operation ID was already saved with different content.",
-      });
-    }
+    if (!existing) return false;
+    if (existing.actorId === self.actorId && commandText(existing.command) === commandText(command))
+      return true;
+    return yield* new Rejected({
+      reason: "operation_reused",
+      message: "This operation ID was already saved with different content.",
+    });
+  });
+  const apply = Effect.gen(function* () {
+    if (yield* replayed) return;
     const before = yield* loadLedger(self, actorPlayers, command);
+    // A push of the same operation may have committed while this one waited for the lock.
+    if (yield* replayed) return;
     const created = createdEntryIds(command);
     if (created.length > 0) {
       const taken = yield* sql`select 1 from personal_entries where id in ${sql.in(created)}`;
@@ -649,11 +651,16 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
     yield* save(self, before, after, command);
   });
   return yield* sql.withTransaction(apply).pipe(
-    // A concurrent push can claim the same IDs between the check and the insert.
-    Effect.mapError((error) =>
+    // A concurrent push can claim the same IDs between the check and the insert. When it saved
+    // this very operation, this push is its replay.
+    Effect.catch((error) =>
       error._tag === "SqlError" && error.reason._tag === "UniqueViolation"
-        ? new Rejected(uniqueViolation(error.reason.constraint))
-        : error,
+        ? error.reason.constraint === "personal_operations_pkey"
+          ? Effect.flatMap(replayed, (same) =>
+              same ? Effect.void : Effect.fail(new Rejected(sessionRecorded)),
+            )
+          : Effect.fail(new Rejected(uniqueViolation(error.reason.constraint)))
+        : Effect.fail(error),
     ),
     Effect.map((): RecordingCommandResult => ({
       operationId: command.operationId,

@@ -3,6 +3,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as Schema from "effect/Schema";
 import {
   ActorId,
+  Conflict,
   NotFound,
   PlayerIdentity,
   TableId,
@@ -11,7 +12,8 @@ import {
   type PlayerBalances,
   PlayerId,
 } from "@stacks/contracts";
-import { pairBalances } from "@stacks/shared/pairBalances";
+import { pairBalances, type PairEntry } from "@stacks/shared/pairBalances";
+import type { Repayment } from "@stacks/contracts";
 
 import { PersonalEntryRow, RepaymentRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
@@ -28,8 +30,33 @@ const between = (balance: PairBalance, a: PlayerId, b: PlayerId) =>
   (balance.debtorId === b && balance.creditorId === a);
 
 /**
+ * Nets the pair facts, or refuses with the players named in the log when a stored total is past
+ * what minor units count exactly. Money is never dropped or rounded to make a balance fit.
+ */
+const owedFrom = Effect.fn("Relationships.owedFrom")(function* (
+  entries: ReadonlyArray<PairEntry>,
+  repayments: ReadonlyArray<Repayment>,
+) {
+  return yield* Effect.try({
+    try: () => pairBalances(entries, repayments),
+    catch: (cause) => cause,
+  }).pipe(
+    Effect.catch((cause) =>
+      cause instanceof RangeError
+        ? Effect.logError("Pair balance can't be counted exactly", {
+            cause: cause.message,
+            entries: entries.map((entry) => entry.id),
+            repayments: repayments.map((repayment) => repayment.id),
+          }).pipe(Effect.andThen(Effect.fail(new Conflict({ reason: "unsafe_amount" }))))
+        : Effect.die(cause),
+    ),
+  );
+});
+
+/**
  * The play and payments between `players` and anyone. Only covered buy-ins and held cash-outs at
- * the new tables count; imported Trip history keeps its own balances.
+ * the new tables, and payments recorded between players, count: imported Trip history, including
+ * its settlements, keeps its own balances and never nets against new play.
  */
 const facts = Effect.fn("Relationships.facts")(function* (
   players: ReadonlyArray<PlayerId>,
@@ -48,8 +75,9 @@ const facts = Effect.fn("Relationships.facts")(function* (
   `.pipe(Effect.flatMap(Access.decodeRows(PairEntryRow)));
   const repayments = yield* sql`
     select * from repayments
-    where (from_player_id in ${mine} and (${other} or to_player_id = ${counterparty}))
-      or (to_player_id in ${mine} and (${other} or from_player_id = ${counterparty}))
+    where recorded_from_trip_id is null
+      and ((from_player_id in ${mine} and (${other} or to_player_id = ${counterparty}))
+        or (to_player_id in ${mine} and (${other} or from_player_id = ${counterparty})))
     order by created_at, id
   `.pipe(Effect.flatMap(Access.decodeRows(RepaymentRow)));
   return {
@@ -70,7 +98,7 @@ export const balances = Effect.fn("Relationships.balances")(function* () {
   );
   if (known.length === 0) return { pairs: [] } satisfies PlayerBalances;
   const { entries, repayments } = yield* facts(actorPlayers);
-  const owed = pairBalances(
+  const owed = yield* owedFrom(
     entries.map(({ playerId, entry }) => ({ ...entry, playerId })),
     repayments,
   );
@@ -119,15 +147,15 @@ export const pair = Effect.fn("Relationships.pair")(function* (counterpartyId: P
           from player_actors pa join players p on p.id = pa.player_id
           where pa.bound_via = 'self' and pa.actor_id in ${sql.in(actorIds)}
         `;
+  const [balance] = yield* owedFrom(
+    entries.map(({ playerId, entry }) => ({ ...entry, playerId })),
+    repayments,
+  );
   const history: PairHistory = {
     pair: {
       playerId: row.playerId,
       counterparty: PlayerIdentity.make({ id: row.id, displayName: row.displayName }),
-      balance:
-        pairBalances(
-          entries.map(({ playerId, entry }) => ({ ...entry, playerId })),
-          repayments,
-        )[0] ?? null,
+      balance: balance ?? null,
     },
     revision: counted?.count ?? 0,
     play: entries,

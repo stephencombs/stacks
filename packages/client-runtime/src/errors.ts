@@ -28,6 +28,8 @@ const conflictMessages: Record<ConflictReason, string> = {
   recording_identity: "Your sessions on another device synced first. Trying again.",
   actor_taken: "This device's ID is already in use. Reinstall to get a new one.",
   too_many_devices: "Five devices already record as this player. Stop one before inviting another.",
+  unsafe_amount:
+    "A balance here is too large to count exactly, so it isn't shown. Nothing changed.",
   table_starter: "You started this table. Open it from your play.",
   stake_voided: "That stake was voided.",
   stake_ended: "That stake has already ended. Reopen it first.",
