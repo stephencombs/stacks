@@ -20,6 +20,23 @@ export default Effect.gen(function* () {
   yield* sql`
     create unique index players_one_personal on players (user_id) where recording_actor_id is not null
   `;
+  // Players an account's actor already holds, from joins, invites and earlier claims, are that
+  // account's. Without this they'd look unclaimed, and another account could claim them. A player
+  // held by actors of several accounts has no single owner: it stays unclaimed.
+  yield* sql`
+    update players p set user_id = held.user_id
+    from (
+      select pa.player_id, min(own.user_id) as user_id
+      from player_actors pa
+      join recording_actors a on a.id = pa.actor_id and a.kind = 'account'
+      join players own on own.recording_actor_id = pa.actor_id
+      where pa.revoked_at is null
+      group by pa.player_id
+      having count(distinct own.user_id) = 1
+    ) held
+    where p.id = held.player_id and p.group_id is null and p.recording_actor_id is null
+      and p.user_id is null
+  `;
   yield* sql`
     create index players_claimed on players (user_id) where group_id is null and user_id is not null
   `;

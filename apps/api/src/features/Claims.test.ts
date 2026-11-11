@@ -474,6 +474,137 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
     }),
   );
 
+  it.effect("links without touching bindings the account already has or the starter revoked", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { starter, seated, invite } = yield* invitedPlayer("Bea");
+      const alex = yield* signedIn(handle("alex"));
+      expect(yield* alex.push(start(alex.identity))).toEqual(["accepted"]);
+      yield* alex.redeem(invite.token);
+      const phone = yield* device();
+      const next = yield* starter.client.recording.invitePlayer({
+        params: { playerId: seated.playerId },
+      });
+      yield* phone.redeem(next.token);
+      const binding = sql`
+        select revoked_at, bound_via, invited_by_actor from player_actors
+        where player_id = ${seated.playerId} and actor_id = ${alex.identity.actorId}
+      `;
+
+      // The account's own binding stays exactly as it is, however the device came by Bea.
+      const held = yield* binding;
+      expect(held).toHaveLength(1);
+      yield* alex.client.claim.claimActor({ payload: { ...phone.credential, link: true } });
+      expect(yield* binding).toEqual(held);
+
+      // Once the starter stops the account's access, linking the phone can't bring it back.
+      yield* starter.client.recording.revokeBinding({
+        params: { playerId: seated.playerId, actorId: alex.identity.actorId },
+      });
+      expect((yield* owners([seated.playerId]))[seated.playerId]).toBeNull();
+      const again = yield* alex.client.claim.claimActor({
+        payload: { ...phone.credential, link: true },
+      });
+      expect(again.claimed.map((item) => item.id)).not.toContain(seated.playerId);
+      expect((yield* binding)[0]!.revokedAt).not.toBeNull();
+      expect((yield* owners([seated.playerId]))[seated.playerId]).toBeNull();
+      expect(
+        (yield* alex.client.recording.history()).visits.map((visit) => visit.id),
+      ).not.toContain(seated.visitId);
+    }),
+  );
+
+  it.effect("won't link past the cap on devices recording as one player", () =>
+    Effect.gen(function* () {
+      const { starter, seated, invite } = yield* invitedPlayer("Bea");
+      const phone = yield* device();
+      yield* phone.redeem(invite.token);
+      for (let held = 1; held < 5; held += 1) {
+        const next = yield* starter.client.recording.invitePlayer({
+          params: { playerId: seated.playerId },
+        });
+        yield* (yield* device()).redeem(next.token);
+      }
+      const alex = yield* signedIn(handle("alex"));
+      expect(yield* alex.push(start(alex.identity))).toEqual(["accepted"]);
+      const result = yield* alex.client.claim.claimActor({
+        payload: { ...phone.credential, link: true },
+      });
+      expect(result.claimed.map((item) => item.id)).toEqual([phone.identity.playerId]);
+      expect((yield* owners([seated.playerId]))[seated.playerId]).toBeNull();
+      const sql = yield* SqlClient.SqlClient;
+      expect(
+        yield* sql`
+          select 1 from player_actors
+          where player_id = ${seated.playerId} and actor_id = ${alex.identity.actorId}
+        `,
+      ).toEqual([]);
+    }),
+  );
+
+  it.effect("leaves no claim on a player whose binding a revoke ended at the same time", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      for (let round = 0; round < 12; round += 1) {
+        const { starter, seated, invite } = yield* invitedPlayer("Bea");
+        const phone = yield* device();
+        yield* phone.redeem(invite.token);
+        const alex = yield* signedIn(handle("alex"), phone.identity);
+        yield* Effect.all(
+          [
+            alex.client.claim.claimActor({ payload: phone.credential }),
+            starter.client.recording.revokeBinding({
+              params: { playerId: seated.playerId, actorId: phone.identity.actorId },
+            }),
+          ],
+          { concurrency: "unbounded" },
+        ).pipe(Effect.exit);
+        // Whichever came first, a claimed player has a live binding for the claiming account.
+        const [row] = yield* sql<{ userId: string | null; live: boolean }>`
+          select p.user_id, exists (
+            select 1 from player_actors pa join players own on own.recording_actor_id = pa.actor_id
+            where pa.player_id = p.id and pa.revoked_at is null and own.user_id = p.user_id
+          ) as live
+          from players p where p.id = ${seated.playerId}
+        `;
+        expect(row!.userId === null || row!.live).toBe(true);
+      }
+    }),
+  );
+
+  it.effect("lets only one of two accounts redeeming at once claim the player", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { starter, seated, invite } = yield* invitedPlayer("Bea");
+      const phone = yield* device();
+      yield* phone.redeem(invite.token);
+      const first = yield* starter.client.recording.invitePlayer({
+        params: { playerId: seated.playerId },
+      });
+      const second = yield* phone.client.recording.invitePlayer({
+        params: { playerId: seated.playerId },
+      });
+      const alex = yield* signedIn(handle("alex"));
+      const bea = yield* signedIn(handle("bea"));
+      const outcomes = yield* Effect.all(
+        [alex.redeem(first.token), bea.redeem(second.token)].map((redeem) =>
+          redeem.pipe(
+            Effect.as("claimed"),
+            Effect.catchTag("Conflict", (conflict) => Effect.succeed(conflict.reason)),
+          ),
+        ),
+        { concurrency: "unbounded" },
+      );
+      expect(outcomes.toSorted()).toEqual(["claimed", "player_claimed"]);
+      const winner = outcomes[0] === "claimed" ? alex : bea;
+      const owner = yield* owners([seated.playerId, winner.identity.playerId]);
+      expect(owner[seated.playerId]).toBe(owner[winner.identity.playerId]);
+      expect(
+        yield* sql`select 1 from players where user_id = ${owner[seated.playerId]!} and id = ${seated.playerId}`,
+      ).toHaveLength(1);
+    }),
+  );
+
   it.effect("keeps the legacy group claim and the table claims apart", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;

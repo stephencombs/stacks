@@ -1028,6 +1028,9 @@ export const registerActor = Effect.fn("Recording.registerActor")(function* (
   if (row?.secretHash !== hash) return yield* new Conflict({ reason: "actor_taken" });
 });
 
+/** The most devices, besides an actor's own, that may record as one player at once. */
+export const MAX_DEVICES = 5;
+
 interface HeldPlayer {
   readonly id: PlayerId;
   readonly displayName: string;
@@ -1056,21 +1059,42 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (request: 
   const user = yield* CurrentUser;
   const name = user.displayName.slice(0, 60) || "You";
   const claim = Effect.gen(function* () {
-    const [actor] = yield* sql<{ secretHash: string }>`
+    const none = { adopted: false, claimed: [], refused: [] } satisfies ClaimResult;
+    const [device] = yield* sql<{ secretHash: string }>`
       select secret_hash from recording_actors where id = ${request.actorId} and kind = 'device'
-      for update
     `;
-    if (!actor) return { adopted: false, claimed: [], refused: [] } satisfies ClaimResult;
-    if (actor.secretHash !== (yield* digest(request.secret))) return yield* new Unauthorized();
+    if (!device) return none;
+    if (device.secretHash !== (yield* digest(request.secret))) return yield* new Unauthorized();
     yield* Access.ensureUser();
     const own = yield* personalIdentity(user.userId);
-    const held = yield* sql<HeldPlayer>`
+    const heldBy = sql<HeldPlayer>`
       select p.id, p.display_name, p.user_id, pa.bound_via
       from player_actors pa join players p on p.id = pa.player_id
       where pa.actor_id = ${request.actorId} and pa.revoked_at is null and p.group_id is null
       order by p.id
-      for update of p
     `;
+    const lockPlayers = (players: ReadonlyArray<HeldPlayer>) =>
+      players.length === 0
+        ? Effect.void
+        : sql`
+            select 1 from players where id in ${sql.in(players.map(({ id }) => id))}
+            order by id for update
+          `;
+    // Players are locked before anything else, as a revoke or a redeem does, and bindings are read
+    // only after: a binding revoked before the lock can't be claimed, and one revoked after waits.
+    const candidates = yield* heldBy;
+    yield* lockPlayers(candidates);
+    // While the actor is locked, nothing can bind it to another player.
+    const [actor] = yield* sql`
+      select 1 from recording_actors where id = ${request.actorId} and kind = 'device' for update
+    `;
+    if (!actor) return none;
+    let held = yield* heldBy;
+    const unlocked = held.filter((player) => !candidates.some(({ id }) => id === player.id));
+    if (unlocked.length > 0) {
+      yield* lockPlayers(unlocked);
+      held = yield* heldBy;
+    }
     const self = held.find((player) => player.boundVia === "self");
     if (self && self.userId !== null && self.userId !== user.userId)
       return yield* new Conflict({ reason: "player_claimed" });
@@ -1081,20 +1105,33 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (request: 
     const fresh = held.filter((player) => player.userId === null);
     const identity = ({ id, displayName }: HeldPlayer) => ({ id, displayName });
     if (separate) {
+      const linked: HeldPlayer[] = [];
       for (const player of held.filter((player) => !taken.includes(player))) {
-        yield* sql`update players set user_id = ${user.userId} where id = ${player.id}`;
-        yield* sql`
-          insert into player_actors (player_id, actor_id, bound_via, invited_by_actor)
-          values (${player.id}, ${own.actorId},
-            ${player.boundVia === "self" ? "invite" : player.boundVia}, ${request.actorId})
-          on conflict (player_id, actor_id) do update
-            set revoked_at = null, bound_via = excluded.bound_via,
-              invited_by_actor = excluded.invited_by_actor
+        // An existing binding stays as it is: never brought back once revoked, never rewritten.
+        const [binding] = yield* sql<{ revokedAt: Date | null }>`
+          select revoked_at from player_actors
+          where player_id = ${player.id} and actor_id = ${own.actorId}
         `;
+        if (binding?.revokedAt) continue;
+        if (!binding) {
+          const [bound] = yield* sql<{ count: number }>`
+            select count(*)::int as count from player_actors
+            where player_id = ${player.id} and bound_via <> 'self' and revoked_at is null
+              and actor_id <> ${own.actorId}
+          `;
+          if ((bound?.count ?? 0) >= MAX_DEVICES) continue;
+          yield* sql`
+            insert into player_actors (player_id, actor_id, bound_via, invited_by_actor)
+            values (${player.id}, ${own.actorId},
+              ${player.boundVia === "self" ? "invite" : player.boundVia}, ${request.actorId})
+          `;
+        }
+        yield* sql`update players set user_id = ${user.userId} where id = ${player.id}`;
+        linked.push(player);
       }
       return {
         adopted: false,
-        claimed: fresh.map(identity),
+        claimed: fresh.filter((player) => linked.includes(player)).map(identity),
         refused: taken.map(identity),
       } satisfies ClaimResult;
     }

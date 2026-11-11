@@ -31,5 +31,10 @@ both is proven (a device secret, an invite, a sign-in) and the account asks to l
   linked beside the account's and the device keeps its actor and secret. Otherwise the device's
   actor becomes the account's, and any player another account claimed first is let go, not handed
   over.
+- Players are locked before bindings are read, in the order a revoke or a redeem takes them, so a
+  claim can't act on a binding a revoke just ended. Linking leaves an account's existing binding
+  as it is, never brings back one the starter revoked, and respects the five-device cap.
+- Migration 0018 gives players an account's actor already held to that account, unless actors of
+  several accounts hold them: those stay unclaimed rather than guessed.
 - A device's unsynced commands are re-signed by the account when it adopts an identity; what the
   server already holds, and every table player's ID, is left as it is.

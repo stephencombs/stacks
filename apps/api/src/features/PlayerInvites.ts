@@ -20,10 +20,7 @@ import type {
 
 import { PlayerIdentityRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
-import { digest, establish, principal, randomToken } from "./Recording.ts";
-
-/** The most devices, besides an actor's own, that may record as one player at once. */
-const MAX_DEVICES = 5;
+import { digest, establish, MAX_DEVICES, principal, randomToken } from "./Recording.ts";
 
 /**
  * Revoking and redeeming both lock the player first, then its invites and bindings, so they
@@ -302,8 +299,15 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
           set revoked_at = null, bound_via = 'invite', invited_by_actor = excluded.invited_by_actor
       `;
       yield* sql`update player_invites set redeemed_at = now() where id = ${invite.id}`;
-      if (recorder._tag === "Account")
-        yield* sql`update players set user_id = ${recorder.user.userId} where id = ${invite.playerId}`;
+      if (recorder._tag === "Account") {
+        // The player row is locked above, so this can only match a player nobody else claimed.
+        const claimed = yield* sql`
+          update players set user_id = ${recorder.user.userId}
+          where id = ${invite.playerId} and (user_id is null or user_id = ${recorder.user.userId})
+          returning id
+        `;
+        if (claimed.length === 0) return yield* new Conflict({ reason: "player_claimed" });
+      }
       const [player] = yield* sql`
         select id, display_name from players where id = ${invite.playerId}
       `.pipe(Effect.flatMap(Access.decodeRows(PlayerIdentityRow)));
