@@ -21,7 +21,7 @@ import {
 import { groupWith, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
 
-type Recorder = Effect.Success<ReturnType<typeof device>>;
+type Recorder = Effect.Success<ReturnType<typeof account>>;
 
 /** Alex started a shared table and Bea joined it from her own device, with a visit each. */
 const table = Effect.fn("test.moneyTable")(function* () {

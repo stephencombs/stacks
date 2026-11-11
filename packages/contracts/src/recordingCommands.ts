@@ -195,6 +195,29 @@ export const ActorCredential = Schema.Struct({
 });
 export type ActorCredential = typeof ActorCredential.Type;
 
+/**
+ * Signing in on a device that recorded as its own actor claims what the device holds. `link` is
+ * the explicit action that keeps the device's own player separate from an account that already has
+ * a personal player: the two stay different people, both the account's.
+ */
+export const ClaimActorRequest = Schema.Struct({
+  ...ActorCredential.fields,
+  link: Schema.optionalKey(Schema.Boolean),
+});
+export type ClaimActorRequest = typeof ClaimActorRequest.Type;
+
+/**
+ * What a claim did. `adopted`: the device's own player became the account's personal player.
+ * `claimed`: every player newly linked to the account, including that one. `refused`: players the
+ * device holds that already belong to another account, which stay theirs.
+ */
+export const ClaimResult = Schema.Struct({
+  adopted: Schema.Boolean,
+  claimed: Schema.Array(PlayerIdentity),
+  refused: Schema.Array(PlayerIdentity),
+});
+export type ClaimResult = typeof ClaimResult.Type;
+
 /** A player who joined a table through its link. */
 export const TableParticipant = Schema.Struct({ tableId: TableId, player: PlayerIdentity });
 export type TableParticipant = typeof TableParticipant.Type;
