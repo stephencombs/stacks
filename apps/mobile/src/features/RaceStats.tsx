@@ -22,6 +22,7 @@ import { PanResponder, Pressable, Text, View } from "react-native";
 import Svg, { Circle, G, Line, Polyline, Text as SvgText } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 
+import { Button } from "../components/ui/Button";
 import { Choice } from "../components/ui/Field";
 import { cn } from "../components/ui/cn";
 import { Chip } from "./Chip";
@@ -107,8 +108,7 @@ const measures = [
 ] as const;
 const HEIGHT = 168;
 const PAD = { x: 16, y: 14 };
-/** Room past the furthest point for each line's initial, and below the plot for the day marks. */
-const LABEL = 30;
+
 const MARKS = 22;
 const MARK_FONT = 11;
 const LETTER = 12;
@@ -153,9 +153,16 @@ function Race<S extends RaceSession>({
     players.map((p) => p.playerId),
     measure,
   ).map((line, i) => ({ ...line, ...players[i]! }));
+  const chartNames = new Map(
+    players.map(({ playerId, name }) => [playerId, name.trim().split(/\s+/)[0] || name]),
+  );
+  const labelSpace = Math.min(
+    100,
+    Math.max(30, ...[...chartNames.values()].map((name) => labelWidth(name, LETTER) + 24)),
+  );
   const plot = lineScale(
     lines.map((l) => l.line),
-    { width: Math.max(0, width - LABEL), height: HEIGHT },
+    { width: Math.max(0, width - labelSpace), height: HEIGHT },
     PAD,
     around(
       lines.findIndex((l) => l.playerId === picked),
@@ -186,7 +193,7 @@ function Race<S extends RaceSession>({
         0,
         Math.min(
           last,
-          Math.round(((locationX - PAD.x) / (width - LABEL - 2 * PAD.x)) * (last + 1)) - 1,
+          Math.round(((locationX - PAD.x) / (width - labelSpace - 2 * PAD.x)) * (last + 1)) - 1,
         ),
       ),
     );
@@ -264,7 +271,7 @@ function Race<S extends RaceSession>({
           <Svg width={width} height={HEIGHT + MARKS} pointerEvents="none">
             <Line
               x1={0}
-              x2={width - LABEL}
+              x2={width - labelSpace}
               y1={plot.zero}
               y2={plot.zero}
               stroke={ring}
@@ -296,15 +303,15 @@ function Race<S extends RaceSession>({
               y2={HEIGHT - PAD.y / 2}
               stroke={ring}
             />
-            {drawn.map(({ playerId, name, line }, i) => {
+            {drawn.map(({ playerId, line }, i) => {
               const yours = playerId === picked;
               const color = yours ? accent : muted;
               const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
               const now = { x: plot.x(point), y: plot.y(line[point]!) };
               const off = plot.clipped(line[point]!);
-              const initial =
-                name.slice(0, 1).toUpperCase() + (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
-              const seatWidth = labelWidth(initial, LETTER);
+              const chartName =
+                chartNames.get(playerId)! + (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
+              const seatWidth = labelWidth(chartName, LETTER);
               const seat = placeLabel(now.x + 9 + seatWidth / 2, seatWidth, edges);
               return (
                 <G key={playerId}>
@@ -337,7 +344,7 @@ function Race<S extends RaceSession>({
                     fontWeight={yours ? "600" : "400"}
                     fill={yours ? accentText : muted}
                   >
-                    {initial}
+                    {chartName}
                   </SvgText>
                 </G>
               );
@@ -427,17 +434,18 @@ export function PlayerSheet({
       title: "Best casino",
       value: sheet.bestVenue ? money(sheet.bestVenue.net) : "—",
       line: sheet.bestVenue
-        ? `${sheet.bestVenue.name} · ${sheet.bestVenue.sessions} sess`
+        ? `${sheet.bestVenue.name} · ${sheet.bestVenue.sessions} ${sheet.bestVenue.sessions === 1 ? "session" : "sessions"}`
         : "Still looking",
       tone: sheet.bestVenue?.net,
     },
     {
       title: "Avg buy-in",
       value: sheet.averageBuyIn === null ? "—" : money(sheet.averageBuyIn, false),
-      line: `${sheet.venues} ${sheet.venues === 1 ? "casino" : "casinos"} played`,
+      line: "Per session with a buy-in, including rebuys",
     },
   ];
-  const focus = shown === null ? null : sheet.played[shown]!;
+  const selectedSession = Math.min(shown ?? sheet.played.length - 1, sheet.played.length - 1);
+  const focus = sheet.played[selectedSession]!;
 
   return (
     <View className="gap-4">
@@ -484,25 +492,38 @@ export function PlayerSheet({
       </View>
 
       <View className="gap-2">
-        <View className="flex-row items-baseline justify-between gap-3">
-          <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
-            Every session
-          </Text>
-          <Text
-            accessibilityLiveRegion="polite"
-            numberOfLines={1}
-            className="shrink font-mono text-xs text-muted"
-          >
-            {focus
-              ? `${formatDay(focus.session.session.startedAt)} · ${focus.session.venue.name} · ${money(focus.net)}`
-              : "Tap a bar"}
-          </Text>
+        <Text accessibilityRole="header" className="text-lg font-semibold text-ink">
+          Every session
+        </Text>
+        <Text accessibilityLiveRegion="polite" className="type-footnote text-muted">
+          Session {selectedSession + 1} of {sheet.played.length} ·{" "}
+          {formatDay(focus.session.session.startedAt)}
+          {"\n"}
+          {focus.session.venue.name} · {money(focus.net)}
+        </Text>
+        <View className="flex-row gap-2">
+          <Button
+            label="Previous"
+            accessibilityLabel={`Previous session for ${player.name}`}
+            className="flex-1"
+            disabled={selectedSession === 0}
+            onPress={() => setShown(selectedSession - 1)}
+          />
+          <Button
+            label="Next"
+            accessibilityLabel={`Next session for ${player.name}`}
+            className="flex-1"
+            disabled={selectedSession === sheet.played.length - 1}
+            onPress={() => setShown(selectedSession + 1)}
+          />
         </View>
         <View className="h-36 flex-row gap-[2px] rounded-xl border border-line bg-surface p-3">
           {sheet.played.map((p, i) => (
             <Pressable
               key={p.session.session.id}
-              accessibilityLabel={`${formatDay(p.session.session.startedAt)}, ${p.session.venue.name}: ${money(p.net)}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: selectedSession === i }}
+              accessibilityLabel={`Session ${i + 1} of ${sheet.played.length}, ${formatDay(p.session.session.startedAt)}, ${p.session.venue.name}: ${money(p.net)}`}
               onPress={() => setShown(i)}
               className="flex-1"
             >
@@ -510,7 +531,7 @@ export function PlayerSheet({
                 className={cn(
                   "absolute inset-x-0 rounded-[2px]",
                   p.net > 0 ? "bg-win" : p.net < 0 ? "bg-loss" : "bg-muted",
-                  shown !== null && shown !== i && "opacity-40",
+                  selectedSession !== i && "opacity-40",
                 )}
                 style={{
                   ...(p.net >= 0

@@ -2,6 +2,7 @@ import type { SessionId, TripId } from "@stacks/contracts";
 import { formatTime } from "@stacks/client-runtime/format";
 import { useAtomValue } from "@effect/atom-react";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,23 +20,30 @@ export type ShowsTable = { readonly session: SessionId } | { readonly trip: Trip
 export function LiveBar({
   shows,
   bottom,
+  onHeightChange,
 }: {
   shows?: ShowsTable;
   /** Room to leave below the bar, such as a tab bar. */
   bottom?: number;
+  onHeightChange?: (height: number) => void;
 }) {
   const stacks = useStacks();
   const go = useGo();
   const insets = useSafeAreaInsets();
   const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
   const seat = groups.flatMap((item) => (item.mySession ? [item.mySession] : []))[0];
-  if (!seat) return null;
-  if (shows && ("session" in shows ? shows.session === seat.id : shows.trip === seat.tripId))
-    return null;
+  const visible =
+    seat &&
+    !(shows && ("session" in shows ? shows.session === seat.id : shows.trip === seat.tripId));
+  useEffect(() => {
+    if (!visible) onHeightChange?.(0);
+  }, [visible, onHeightChange]);
+  if (!visible) return null;
   return (
     <View
       pointerEvents="box-none"
       className="absolute inset-x-0 px-5"
+      onLayout={(event) => onHeightChange?.(event.nativeEvent.layout.height)}
       style={
         bottom === undefined
           ? { bottom: 0, paddingBottom: Math.max(insets.bottom, 12) }

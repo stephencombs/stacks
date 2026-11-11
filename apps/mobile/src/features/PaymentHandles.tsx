@@ -6,63 +6,16 @@ import {
   type PaymentHandlesErrors,
 } from "@stacks/client-runtime/pay";
 import { useState } from "react";
-import { Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
-import { List, Row, SectionHeading } from "../components/ui/Surface";
 import { useAction, useStacks } from "../lib/stacks";
 
 export const playerHandlesMeta = (player: Player): string | undefined => {
   const items = paymentHandlesList(player);
   return items.length > 0 ? items.map((item) => item.value).join(" · ") : undefined;
 };
-
-export function PaymentAppsSection({ detail }: { detail: GroupDetail }) {
-  const [editing, setEditing] = useState(false);
-  const me = detail.players.find((player) => player.id === detail.myPlayerId);
-  if (!me) return null;
-  const items = paymentHandlesList(me);
-
-  return (
-    <View className="gap-2">
-      <SectionHeading
-        action={
-          <Button
-            label={items.length > 0 ? "Edit" : "Add"}
-            size="sm"
-            variant="ghost"
-            onPress={() => setEditing(true)}
-          />
-        }
-      >
-        Payment apps
-      </SectionHeading>
-      {items.length === 0 ? (
-        <Text className="text-sm text-muted">
-          Add your Venmo, Cash App or PayPal so people can pay you straight from settle up.
-        </Text>
-      ) : (
-        <List>
-          {items.map((item) => (
-            <Row
-              key={item.app}
-              onPress={() => setEditing(true)}
-              accessibilityHint="Edit your payment apps"
-            >
-              <Text className="flex-1 text-base font-medium text-ink">{item.label}</Text>
-              <Text className="text-sm text-muted">{item.value}</Text>
-            </Row>
-          ))}
-        </List>
-      )}
-      {editing ? (
-        <PaymentHandlesSheet detail={detail} player={me} onClose={() => setEditing(false)} />
-      ) : null}
-    </View>
-  );
-}
 
 export function GuestPaymentHandlesAction({
   detail,
@@ -83,7 +36,7 @@ export function GuestPaymentHandlesAction({
   );
 }
 
-function PaymentHandlesSheet({
+export function PaymentHandlesSheet({
   detail,
   player,
   onClose,
@@ -119,6 +72,7 @@ function PaymentHandlesSheet({
     <Sheet
       open
       onClose={onClose}
+      busy={save.pending}
       title={self ? "Payment apps" : `${player.displayName}'s payment apps`}
       description={
         self

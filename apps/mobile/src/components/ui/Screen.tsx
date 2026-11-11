@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { LiveBar, type ShowsTable } from "../../features/LiveBar";
+import { useNativeHeaderActions } from "../../features/NativeHeaderActions";
 import { FormError } from "./Field";
 import { ToastHost, useToast, type Toast } from "./Toast";
 
@@ -31,14 +32,17 @@ export function Screen({
   renderFooter?: (toast: (toast: Toast) => void) => ReactNode;
 }) {
   const footer = renderFooter;
+  const header = useNativeHeaderActions();
   const bar = use(TabBarHeight);
   const insets = useSafeAreaInsets();
   const [footerHeight, setFooterHeight] = useState(0);
+  const [liveBarHeight, setLiveBarHeight] = useState(0);
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-canvas"
     >
+      {header}
       <ToastHost {...(footer ? { above: footerHeight } : bar ? { above: bar } : {})}>
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
@@ -48,7 +52,7 @@ export function Screen({
         >
           <Content>{children}</Content>
           {/* The floating tab bar sits over the scene's foot on every platform, so the list ends clear of it. */}
-          {!footer && bar ? <View style={{ height: bar }} /> : null}
+          <View style={{ height: (footer ? 0 : bar) + liveBarHeight }} />
         </ScrollView>
         {footer ? (
           <View
@@ -63,6 +67,7 @@ export function Screen({
         ) : null}
       </ToastHost>
       <LiveBar
+        onHeightChange={setLiveBarHeight}
         {...(shows ? { shows } : {})}
         {...(footer ? { bottom: footerHeight } : bar ? { bottom: bar } : {})}
       />

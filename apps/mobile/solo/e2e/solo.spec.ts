@@ -84,7 +84,11 @@ const hero = (page: Page) =>
     .locator("xpath=ancestor::div[2]");
 
 async function expectLive(page: Page, totalIn: string, totalOut: string) {
-  await expect(text(page, "Live")).toBeVisible();
+  await expect(
+    visible(page.getByRole("heading", { name: "Session", exact: true }))
+      .locator("..")
+      .getByText("Live", { exact: true }),
+  ).toBeVisible();
   await expect(text(page, "Final result pending until you finish playing.")).toBeVisible();
   await expect(hero(page)).toContainText(`Total in${totalIn}`);
   await expect(hero(page)).toContainText(`Total out${totalOut}`);
@@ -281,9 +285,7 @@ test("groups and trips wait for sign-in, and your play stays a tap away", async 
   const api = await isolate(context);
   await home(page);
   await button(page, "You").click();
-  await expect(
-    text(sheet(page), /^Sessions you record are saved on this device only\./),
-  ).toBeVisible();
+  await expect(text(sheet(page), /^Sessions save on this device first\./)).toBeVisible();
   await expect(text(sheet(page), /^Sign-in isn't set up in this copy of Color Up\./)).toBeVisible();
   await visible(sheet(page).getByRole("radio", { name: "Light" })).click();
   await button(sheet(page), "Close").click();

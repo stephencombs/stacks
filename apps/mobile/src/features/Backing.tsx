@@ -14,6 +14,7 @@ import * as Option from "effect/Option";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
+import { confirmAction } from "../components/ui/confirmAction";
 import { Button } from "../components/ui/Button";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
@@ -203,34 +204,34 @@ function StakeSheet({
     <Sheet
       open
       onClose={onClose}
-      title={title}
+      title="Backing"
+      busy={end.pending || reopen.pending || voidStake.pending}
       footer={
-        <Button
-          label="Void stake"
-          variant="danger"
-          size="lg"
-          pending={voidStake.pending}
-          onPress={() =>
-            void voidStake.run({ params, payload: { reason: reason.trim() || null } }).then(done)
-          }
-        />
+        view.stake.endedAt === null ? (
+          <Button
+            label="End stake"
+            variant="primary"
+            size="lg"
+            pending={end.pending}
+            disabled={reopen.pending || voidStake.pending}
+            onPress={() => void end.run({ params, payload: {} }).then(done)}
+          />
+        ) : (
+          <Button
+            label="Reopen stake"
+            variant="primary"
+            size="lg"
+            pending={reopen.pending}
+            disabled={end.pending || voidStake.pending}
+            onPress={() => void reopen.run({ params }).then(done)}
+          />
+        )
       }
     >
-      {view.stake.endedAt === null ? (
-        <Button
-          label="End now"
-          size="lg"
-          pending={end.pending}
-          onPress={() => void end.run({ params, payload: {} }).then(done)}
-        />
-      ) : (
-        <Button
-          label="Reopen"
-          size="lg"
-          pending={reopen.pending}
-          onPress={() => void reopen.run({ params }).then(done)}
-        />
-      )}
+      <Text className="type-heading text-ink">{title}</Text>
+      <Text className="type-footnote text-muted">
+        {view.stake.endedAt === null ? "Open stake" : "Ended stake"}
+      </Text>
       <Text className="text-sm text-muted">
         Voided stakes stay listed, crossed out, and stop counting toward balances.
       </Text>
@@ -239,6 +240,21 @@ function StakeSheet({
         value={reason}
         onChangeText={setReason}
         maxLength={280}
+      />
+      <Button
+        label="Void stake"
+        variant="danger"
+        disabled={end.pending || reopen.pending || voidStake.pending}
+        onPress={() =>
+          confirmAction(
+            "Void this stake?",
+            "It will stay in the history but stop counting toward balances.",
+            "Void stake",
+            () => {
+              void voidStake.run({ params, payload: { reason: reason.trim() || null } }).then(done);
+            },
+          )
+        }
       />
       {error ? <FormError>{error}</FormError> : null}
     </Sheet>

@@ -2,7 +2,7 @@ import { MinorUnits, PlayerId, type Entry, type GroupDetail } from "@stacks/cont
 import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
 import * as Option from "effect/Option";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Choice, TextField } from "../components/ui/Field";
@@ -27,69 +27,6 @@ export type EntryInput = {
   readonly note: string | null;
   readonly replacesEntryId: Entry["id"] | null;
 };
-
-/** A checked row is `min-h-12`. Past this the menu scrolls instead of covering the header. */
-const whoseRowHeight = 48;
-const whoseMenuMaxHeight = 320;
-
-function WhoseMenu({
-  label,
-  options,
-  value,
-  anchorHeight,
-  onClose,
-  onChange,
-}: {
-  label: string;
-  options: ReadonlyArray<{ readonly value: string; readonly label: string }>;
-  value: string;
-  /** Height of the row that opened the menu, so the list sits just above it. */
-  anchorHeight: number;
-  onClose: () => void;
-  onChange: (value: string) => void;
-}) {
-  const scrolls = options.length * whoseRowHeight > whoseMenuMaxHeight;
-  return (
-    // Out of the sheet's scroll flow: an in-flow list pushes the keypad up.
-    <View
-      accessibilityViewIsModal
-      pointerEvents="box-none"
-      style={[StyleSheet.absoluteFill, { bottom: anchorHeight }]}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Close ${label}`}
-        onPress={onClose}
-        style={StyleSheet.absoluteFill}
-      />
-      <View
-        style={{
-          position: "absolute",
-          zIndex: 1,
-          left: 0,
-          right: 0,
-          bottom: 8,
-          maxHeight: whoseMenuMaxHeight,
-          ...(scrolls ? { height: whoseMenuMaxHeight } : null),
-        }}
-        className="overflow-hidden rounded-xl border border-line-strong bg-surface"
-      >
-        {scrolls ? (
-          <ScrollView
-            style={{ flex: 1 }}
-            nestedScrollEnabled
-            keyboardShouldPersistTaps="handled"
-            bounces={false}
-          >
-            <Choice label={label} labelHidden options={options} value={value} onChange={onChange} />
-          </ScrollView>
-        ) : (
-          <Choice label={label} labelHidden options={options} value={value} onChange={onChange} />
-        )}
-      </View>
-    </View>
-  );
-}
 
 const titles = { buy_in: "Buy in", cash_out: "Cash out", adjustment: "Adjust" } as const;
 const kinds = [
@@ -138,8 +75,7 @@ export function EntrySheet({
     draft.replaces ? amountText(draft.replaces.amount, currency) : "",
   );
   const [counterparty, setCounterparty] = useState<string>(draft.replaces?.counterpartyId ?? "");
-  const [choosingWhose, setChoosingWhose] = useState(false);
-  const [whoseAnchor, setWhoseAnchor] = useState(0);
+  const [noteFocused, setNoteFocused] = useState(false);
   const [note, setNote] = useState(draft.replaces?.note ?? "");
   const [noting, setNoting] = useState(Boolean(draft.replaces?.note));
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -176,7 +112,6 @@ export function EntrySheet({
 
   const bottomLeft = kind === "adjustment" ? "sign" : cents ? decimal : null;
   const whoseLabel = kind === "buy_in" ? "Whose money" : "Who has the cash";
-  const whose = others.find((other) => other.id === counterparty)?.displayName;
   const showWhose = kind !== "adjustment" && others.length > 0;
   const whoseOptions = [
     {
@@ -219,10 +154,7 @@ export function EntrySheet({
             labelHidden
             options={kinds}
             value={kind}
-            onChange={(next) => {
-              setKind(next);
-              setChoosingWhose(false);
-            }}
+            onChange={setKind}
           />
         )}
         <View
@@ -274,44 +206,35 @@ export function EntrySheet({
             )}
           </View>
         ) : null}
-        <AmountKeypad onKey={press} bottomLeft={bottomLeft} />
+        {noteFocused ? null : <AmountKeypad onKey={press} bottomLeft={bottomLeft} />}
         {noting ? (
-          <TextField label="Note" value={note} onChangeText={setNote} maxLength={280} />
+          <TextField
+            label="Note"
+            value={note}
+            onChangeText={setNote}
+            maxLength={280}
+            onFocus={() => setNoteFocused(true)}
+            onBlur={() => setNoteFocused(false)}
+            returnKeyType="done"
+            submitBehavior="blurAndSubmit"
+          />
         ) : null}
-        <View
-          onLayout={(event) => setWhoseAnchor(event.nativeEvent.layout.height)}
-          className="overflow-hidden rounded-xl bg-surface"
-        >
+        <View className="gap-3">
           {showWhose ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: choosingWhose }}
-              accessibilityLabel={`${whoseLabel}: ${whose ?? "their own"}. Change`}
-              onPress={() => setChoosingWhose((open) => !open)}
-              className={cn(
-                "min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken",
-                choosingWhose && "bg-sunken",
-              )}
-            >
-              <Text className="type-body text-ink">{whoseLabel}</Text>
-              <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
-                {whose ?? (kind === "buy_in" ? "Their own" : "They do")}
-              </Text>
-              <Icon name="chevron-right" color="faint" size={16} />
-            </Pressable>
+            <Choice
+              label={whoseLabel}
+              options={whoseOptions}
+              value={counterparty}
+              onChange={setCounterparty}
+              presentation="menu"
+            />
           ) : null}
           {noting ? null : (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Add a note"
-              onPress={() => {
-                setNoting(true);
-                setChoosingWhose(false);
-              }}
-              className={cn(
-                "min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken",
-                showWhose && "border-t border-line",
-              )}
+              onPress={() => setNoting(true)}
+              className="min-h-12 flex-row items-center gap-3 rounded-xl bg-surface px-4 active:bg-sunken"
             >
               <Text className="flex-1 type-body text-ink">Note</Text>
               <Text className="type-body text-muted">Add</Text>
@@ -319,19 +242,6 @@ export function EntrySheet({
             </Pressable>
           )}
         </View>
-        {showWhose && choosingWhose && whoseAnchor > 0 ? (
-          <WhoseMenu
-            label={whoseLabel}
-            options={whoseOptions}
-            value={counterparty}
-            anchorHeight={whoseAnchor}
-            onClose={() => setChoosingWhose(false)}
-            onChange={(next) => {
-              setCounterparty(next);
-              setChoosingWhose(false);
-            }}
-          />
-        ) : null}
       </View>
     </Sheet>
   );

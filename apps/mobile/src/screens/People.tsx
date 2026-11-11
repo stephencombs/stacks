@@ -1,19 +1,13 @@
 import { useAuth } from "@clerk/expo";
 import type { StaticScreenProps } from "@react-navigation/native";
-import {
-  GroupId,
-  InviteId,
-  UserId,
-  type GroupDetail,
-  type Invite,
-  type Player,
-} from "@stacks/contracts";
+import { GroupId, InviteId, UserId, type GroupDetail, type Player } from "@stacks/contracts";
 import { formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
+import { confirmAction } from "../components/ui/confirmAction";
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
@@ -179,7 +173,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
 function InviteSection({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("invites", "create"));
-  const [revoking, setRevoking] = useState<Invite | null>(null);
+  const revoke = useAction(stacks.Client.mutation("invites", "revoke"));
   const [copied, setCopied] = useState<string | null>(null);
   return (
     <View className="gap-2">
@@ -234,7 +228,17 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
                         label="Revoke"
                         size="sm"
                         variant="ghost"
-                        onPress={() => setRevoking(invite)}
+                        pending={revoke.pending}
+                        onPress={() =>
+                          confirmAction(
+                            "Revoke this invite link?",
+                            "Anyone who has not joined yet will need a new link.",
+                            "Revoke link",
+                            () => {
+                              void revoke.run({ params: { inviteId: invite.id } });
+                            },
+                          )
+                        }
                       />
                     </View>
                   </Row>
@@ -245,7 +249,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
         }
       </Loaded>
       {create.error ? <FormError>{create.error}</FormError> : null}
-      {revoking ? <RevokeSheet invite={revoking} onClose={() => setRevoking(null)} /> : null}
+      {revoke.error ? <FormError>{revoke.error}</FormError> : null}
     </View>
   );
 }
@@ -305,39 +309,6 @@ function ManageMemberSheet({
       <Button label="Remove from group" variant="danger" onPress={() => setConfirming(true)} />
       <Text className="text-sm text-muted">Their history stays in the group's ledger.</Text>
       {setRole.error ? <FormError>{setRole.error}</FormError> : null}
-    </Sheet>
-  );
-}
-
-function RevokeSheet({ invite, onClose }: { invite: Invite; onClose: () => void }) {
-  const stacks = useStacks();
-  const revoke = useAction(stacks.Client.mutation("invites", "revoke"));
-  const confirm = async () => {
-    if (await revoke.run({ params: { inviteId: invite.id } })) onClose();
-  };
-  return (
-    <Sheet
-      open
-      onClose={onClose}
-      title="Revoke this invite link?"
-      description="Anyone who hasn't joined yet will need a new link."
-      footer={
-        <>
-          <Button
-            label="Revoke link"
-            variant="danger"
-            size="lg"
-            pending={revoke.pending}
-            onPress={() => void confirm()}
-          />
-          <Button label="Keep it" onPress={onClose} />
-        </>
-      }
-    >
-      <Text numberOfLines={1} className="font-mono text-sm text-muted">
-        {`${webUrl}/join/${invite.code}`}
-      </Text>
-      {revoke.error ? <FormError>{revoke.error}</FormError> : null}
     </Sheet>
   );
 }

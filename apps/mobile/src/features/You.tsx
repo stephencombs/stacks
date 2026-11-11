@@ -53,7 +53,7 @@ function MyChip({ item, name, size }: { item: GroupListItem; name: string; size:
   return <Chip chip={detail ? chipOf(detail, item.myPlayerId) : 1} name={name} size={size} />;
 }
 
-function YouSheet({ name, onClose }: { name: string; onClose: () => void }) {
+export function YouSheet({ name = "You", onClose }: { name?: string; onClose: () => void }) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const { scope } = useScope();
@@ -87,6 +87,11 @@ function YouSheet({ name, onClose }: { name: string; onClose: () => void }) {
       </Card>
       <View className="gap-2">
         <SectionHeading>Play limits</SectionHeading>
+        {scope?.trip ? (
+          <Text className="type-footnote text-muted">
+            {scope.item.group.name} · {scope.trip.name}
+          </Text>
+        ) : null}
         {scope?.trip ? (
           <TripLoaded tripId={scope.trip.id} skeleton={<Skeleton className="h-56 rounded-xl" />}>
             {(trip, group) => (

@@ -12,6 +12,7 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
+import { confirmAction } from "../components/ui/confirmAction";
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
@@ -146,7 +147,16 @@ function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: () => voi
               label="Stop sharing"
               variant="danger"
               pending={sharing.pending}
-              onPress={() => void sharing.revoke()}
+              onPress={() =>
+                confirmAction(
+                  "Stop sharing this table?",
+                  "The current link will stop working. People who already joined keep their access.",
+                  "Stop sharing",
+                  () => {
+                    void sharing.revoke();
+                  },
+                )
+              }
             />
             <Text className="text-sm text-muted">A new link stops this one working.</Text>
           </>
@@ -159,11 +169,23 @@ function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: () => voi
               pending={sharing.pending}
               onPress={() => void sharing.share()}
             />
+            <Text className="text-sm text-muted">
+              Creating a new link replaces any earlier link.
+            </Text>
             <Button
-              label="Stop sharing"
-              variant="danger"
+              label="Stop any earlier link"
+              variant="ghost"
               pending={sharing.pending}
-              onPress={() => void sharing.revoke()}
+              onPress={() =>
+                confirmAction(
+                  "Stop any earlier link?",
+                  "Any existing table link will stop working for new viewers and joins. People who already joined keep their access.",
+                  "Stop link",
+                  () => {
+                    void sharing.revoke();
+                  },
+                )
+              }
             />
           </>
         )}

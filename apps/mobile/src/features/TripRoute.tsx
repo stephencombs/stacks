@@ -56,6 +56,7 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const route = tripRoute(trip.sessions.filter((s) => s.session.status === "closed"));
   if (route.stops.length === 0) return null;
   const onMap = route.stops.filter((s) => placed(s.venue));
+  const missingLocations = route.stops.length - onMap.length;
   const camera = onMap.length > 0 ? cameraFor(onMap.map((s) => s.venue as Placed)) : null;
   const line = route.path.filter(placed).map((v) => ({ latitude: v.lat, longitude: v.lng }));
   const colorScheme = theme === "dark" ? "DARK" : "LIGHT";
@@ -107,6 +108,12 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
           )}
         </View>
       ) : null}
+      {missingLocations > 0 ? (
+        <Text className="type-footnote text-muted">
+          {missingLocations} {missingLocations === 1 ? "casino has" : "casinos have"} no saved map
+          location. Directions are still available by name.
+        </Text>
+      ) : null}
       <View className="rounded-xl border border-line bg-surface">
         {route.stops.map((stop, index) => (
           <Pressable
@@ -128,7 +135,6 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
               </Text>
               <Text className="type-label text-muted">
                 {stop.visits} {stop.visits === 1 ? "session" : "sessions"}
-                {placed(stop.venue) ? "" : " · not on the map"}
               </Text>
             </View>
             <Text className={cn("font-mono text-lg", tone(stop.net))}>

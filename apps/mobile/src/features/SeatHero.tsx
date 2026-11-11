@@ -64,7 +64,16 @@ export function SeatHero({
       </View>
       {final ? (
         <Text className="mt-2 type-footnote text-muted">
-          In {formatMoney(result.buyIn, currency)} · Out {formatMoney(result.cashOut, currency)}
+          {result.buyIn === 0 && result.cashOut === 0 && result.adjustment !== 0 ? (
+            "Result from adjustments"
+          ) : (
+            <>
+              In {formatMoney(result.buyIn, currency)} · Out {formatMoney(result.cashOut, currency)}
+              {result.adjustment !== 0
+                ? ` · Adjustments ${formatMoney(result.adjustment, currency, { signDisplay: "exceptZero" })}`
+                : null}
+            </>
+          )}
         </Text>
       ) : null}
     </View>

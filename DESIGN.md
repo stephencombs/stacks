@@ -6,7 +6,7 @@ Before building UI, read the file for what you're touching:
 
 - [docs/design/foundations.md](docs/design/foundations.md): color, type, radius, elevation, motion.
 - [docs/design/components.md](docs/design/components.md): which part to use, and which variant.
-- [docs/design/mobile-redesign.md](docs/design/mobile-redesign.md): T3 Code-inspired mobile redesign architecture and implementation phases.
+- [docs/design/mobile-redesign.md](docs/design/mobile-redesign.md): native mobile controls, navigation and chart interaction.
 
 To judge a change, run `pnpm --filter @stacks/web dev` and open `/design.html`: the shared web parts and their states, with a theme menu. It needs no sign-in or database, and never ships. It says nothing about mobile, so check mobile changes on a device.
 
@@ -24,12 +24,12 @@ To judge a change, run `pnpm --filter @stacks/web dev` and open `/design.html`: 
 
 The two clients share meaning, and each keeps its own platform's controls. Don't "fix" a difference in the second column.
 
-| Shared: must match                                    | Native: meant to differ                                                                                                        |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Palette, and what each color means                    | Button & pill shape: `rounded-lg` on web, `rounded-full` on mobile (`IconButton` is a `44×44px` circular surface button)       |
-| Type role names, where both clients define one        | Page titles & headings: condensed uppercase on web, tight-tracked **sentence case** system sans on mobile                      |
-| Variant names on `Button`, tones on `Tag` and `Money` | Cards & heroes: `rounded-xl` on web, glow-free `rounded-2xl` (`20px`) on mobile with concentric inner radii                    |
-| Copy, including how a balance is worded               | Navigation chrome: sidebar/bottom bar on web, floating capsule bottom bar (`rounded-full`) + horizontal filter pills on mobile |
-| The `pending` and `disabled` props on `Button`        | Press feedback: scale on web, tactile `scale(0.97)` + opacity and haptics on mobile                                            |
-|                                                       | `type-body`, `type-section` and `type-footnote` exist on mobile for iOS hierarchy; a Sheet title is `type-body`                |
-|                                                       | Pending: web holds the width with a spinner alone, mobile shows the spinner beside the label                                   |
+| Shared: must match                                    | Native: meant to differ                                                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Palette, and what each color means                    | Button & pill shape: `rounded-lg` on web, `rounded-full` on mobile (`IconButton` is a `44×44px` circular surface button) |
+| Type role names, where both clients define one        | Page titles & headings: condensed uppercase on web, tight-tracked **sentence case** system sans on mobile                |
+| Variant names on `Button`, tones on `Tag` and `Money` | Cards & heroes: `rounded-xl` on web, glow-free `rounded-2xl` (`20px`) on mobile with concentric inner radii              |
+| Copy, including how a balance is worded               | Navigation chrome: sidebar/bottom bar on web; native tabs and header controls on iOS, platform tab bar on Android        |
+| The `pending` and `disabled` props on `Button`        | Press feedback: scale on web, tactile `scale(0.97)` + opacity and haptics on mobile                                      |
+|                                                       | `type-body`, `type-section` and `type-footnote` exist on mobile for iOS hierarchy; a Sheet title is `type-body`          |
+|                                                       | Pending: web holds the width with a spinner alone, mobile shows the spinner beside the label                             |

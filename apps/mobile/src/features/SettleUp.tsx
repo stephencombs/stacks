@@ -21,7 +21,6 @@ import { Text, View } from "react-native";
 import { BalanceLabel, Money } from "../components/Money";
 import { Screen } from "../components/ui/Screen";
 import { Button } from "../components/ui/Button";
-import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, PageTitle, Row, SectionHeading } from "../components/ui/Surface";
@@ -70,16 +69,21 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
   );
   const transferRow = (transfer: Transfer) => (
     <Row key={`${transfer.from}:${transfer.to}`} className="flex-col items-stretch gap-2.5">
-      <View className="flex-row items-center gap-3">
-        <View
-          accessible
-          accessibilityLabel={`${names.get(transfer.from)} pays ${names.get(transfer.to)}`}
-          className="flex-1 flex-row flex-wrap items-center gap-x-1.5"
-        >
+      <View
+        accessible
+        accessibilityLabel={`${names.get(transfer.from)} pays ${names.get(transfer.to)}`}
+        className="gap-2"
+      >
+        <View className="flex-row items-center gap-3">
+          <Text className="w-10 type-footnote text-muted">From</Text>
           <Payer detail={detail} playerId={transfer.from} />
-          <Icon name="arrow-right" color="accent-text" size={16} />
+        </View>
+        <View className="flex-row items-center gap-3">
+          <Text className="w-10 type-footnote text-muted">To</Text>
           <Payer detail={detail} playerId={transfer.to} />
         </View>
+      </View>
+      <View className="flex-row flex-wrap items-center justify-between gap-3">
         <Money amount={transfer.amount} currency={currency} className="text-lg" />
         <Button label="Mark paid" size="sm" onPress={() => setPaying(transfer)} />
       </View>
@@ -108,7 +112,7 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
       renderFooter={() => (
         <Button
           label="Record a payment"
-          variant="primary"
+          variant={transfers.length > 0 ? "primary" : "secondary"}
           size="lg"
           onPress={() => setPaying("custom")}
         />
@@ -375,6 +379,7 @@ function Payer({ detail, playerId }: { detail: GroupDetail; playerId: PlayerId }
 
 /** A balance as a bar from break-even: right and green when owed, left and red when owing. */
 function BalanceBar({ balance, track }: { balance: number; track: ReturnType<typeof barTrack> }) {
+  if (balance === 0) return null;
   const extent = track.extent(balance) * 100;
   return (
     <View className="h-1.5 w-16 rounded-full bg-sunken">

@@ -17,8 +17,8 @@ import { MinorUnits, VisitId, type EntryId, type PlayEntry } from "@stacks/contr
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import { useState, type ReactNode } from "react";
-import { Text, View } from "react-native";
+import { useLayoutEffect, useState, type ReactNode } from "react";
+import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -55,6 +55,10 @@ function Title({
   context?: string;
   children: string;
 }) {
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    if (Platform.OS !== "web") navigation.setOptions({ title: children });
+  }, [navigation, children]);
   return (
     <View className="gap-1">
       <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">

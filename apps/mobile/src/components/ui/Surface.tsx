@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { NavigationContext } from "@react-navigation/native";
+import { use, useLayoutEffect, type ReactNode } from "react";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { cn } from "./cn";
 import { Icon } from "./Icon";
@@ -78,13 +79,21 @@ export function PageTitle({
   tag?: ReactNode;
   right?: ReactNode;
 }) {
+  const navigation = use(NavigationContext);
+  const nativeTitle = Platform.OS !== "web" && navigation !== undefined;
+  useLayoutEffect(() => {
+    if (nativeTitle)
+      navigation?.setOptions({ title: children, headerLargeTitle: Platform.OS === "ios" });
+  }, [navigation, children, nativeTitle]);
   return (
     <View className="gap-1">
       <View className="flex-row items-center justify-between gap-2">
         <View className="min-w-0 flex-row items-center gap-2">
-          <Text accessibilityRole="header" className="type-title text-ink">
-            {children}
-          </Text>
+          {nativeTitle ? null : (
+            <Text accessibilityRole="header" className="type-title text-ink">
+              {children}
+            </Text>
+          )}
           {tag}
         </View>
         {right}

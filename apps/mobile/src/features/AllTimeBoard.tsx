@@ -85,6 +85,9 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       />
       <View className="gap-2">
         <SectionHeading>By game</SectionHeading>
+        <Text className="type-footnote text-muted">
+          Bars show share of sessions; amounts show total result.
+        </Text>
         <List>
           {byNet(stats.byGame).map((row) => {
             const net = tableNet(row.results);
@@ -97,7 +100,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                   <Money amount={net} currency={currency} tone="result" className="type-number" />
                 }
                 share={share}
-                tone={net > 0 ? "win" : net < 0 ? "loss" : "accent"}
+                tone="muted"
                 subtitle={`${Math.round(share * 100)}% of sessions · ${row.sessionCount} ${row.sessionCount === 1 ? "session" : "sessions"}`}
               />
             );
@@ -106,6 +109,9 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       </View>
       <View className="gap-2">
         <SectionHeading>By casino</SectionHeading>
+        <Text className="type-footnote text-muted">
+          Bars show share of sessions; amounts show total result.
+        </Text>
         <List>
           {byNet(stats.byVenue).map((row) => {
             const net = tableNet(row.results);
@@ -118,7 +124,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                   <Money amount={net} currency={currency} tone="result" className="type-number" />
                 }
                 share={share}
-                tone={net > 0 ? "win" : net < 0 ? "loss" : "accent"}
+                tone="muted"
                 subtitle={`${Math.round(share * 100)}% of sessions · ${row.sessionCount} ${row.sessionCount === 1 ? "session" : "sessions"}`}
               />
             );
@@ -128,6 +134,9 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
       {stats.bySeat.length > 0 ? (
         <View className="gap-2">
           <SectionHeading>By blackjack seat</SectionHeading>
+          <Text className="type-footnote text-muted">
+            Bars show share of all sessions; amounts show total result.
+          </Text>
           <List>
             {stats.bySeat.map((row) => {
               const net = tableNet(row.results);
@@ -140,7 +149,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
                     <Money amount={net} currency={currency} tone="result" className="type-number" />
                   }
                   share={share}
-                  tone={net > 0 ? "win" : net < 0 ? "loss" : "accent"}
+                  tone="muted"
                   subtitle={`${Math.round(share * 100)}% of sessions · ${row.sessionCount} ${row.sessionCount === 1 ? "session" : "sessions"}`}
                 />
               );

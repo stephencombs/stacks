@@ -52,7 +52,7 @@ are not a trip's Settle up, which stays a group place, and neither shows the oth
 person you've never shared a table with has no page. Recording a payment saves on the device and
 syncs like play; the balances and history need the network.
 Web windows below `lg` draw the four places as a docked bottom bar and wide web windows draw them as
-a left sidebar; mobile (`apps/mobile`) draws them as a floating `rounded-full` capsule bottom bar (`PlaceTabs`) with 4 icon-only peer **navigation** tabs (`>=44×44px` touch targets, concentric `rounded-full` active pill thumb in `bg-fill`, and **filled vs. outlined** icon swaps) above the safe-area home indicator. The places are the same on both. The wordmark goes back to your play.
+a left sidebar; mobile (`apps/mobile`) uses native tabs on iOS and the platform destination bar on Android. The mobile web build keeps its floating capsule. The places are the same on both. The wordmark goes back to your play.
 
 ## Why your play comes first
 
