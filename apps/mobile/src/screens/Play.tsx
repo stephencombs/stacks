@@ -22,7 +22,6 @@ import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
-import { Glow } from "../components/ui/Glow";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
@@ -309,42 +308,40 @@ function Visit({ visitId }: { visitId: VisitId }) {
   );
 }
 
-const FIGURE = "font-display text-5xl leading-[56px]";
+const FIGURE = "type-hero";
 
 function VisitHero({ visit }: { visit: RecordingVisitView }) {
   const { totals, finalResult } = visit;
   if (finalResult === null)
     return (
-      <View className="overflow-hidden rounded-xl bg-surface p-4">
-        <Glow tone="accent" />
+      <View className="overflow-hidden rounded-2xl border border-line bg-surface p-5">
         <View className="flex-row gap-4">
           <View className="min-w-0 flex-1 gap-1">
-            <Text className="text-sm font-medium text-muted">Total in</Text>
+            <Text className="type-label text-muted">Total in</Text>
             <Money amount={totals.buyIn} currency={RECORDING_CURRENCY} fit className={FIGURE} />
           </View>
           <View className="min-w-0 flex-1 gap-1">
-            <Text className="text-sm font-medium text-muted">Total out</Text>
+            <Text className="type-label text-muted">Total out</Text>
             <Money amount={totals.cashOut} currency={RECORDING_CURRENCY} fit className={FIGURE} />
           </View>
         </View>
-        <Text className="mt-3 text-sm text-muted">
+        <Text className="mt-3 type-footnote text-muted">
           Final result pending until you finish playing.
         </Text>
       </View>
     );
   return (
-    <View className="overflow-hidden rounded-xl bg-surface p-4">
-      <Glow tone={finalResult > 0 ? "win" : finalResult < 0 ? "loss" : "accent"} />
+    <View className="overflow-hidden rounded-2xl border border-line bg-surface p-5">
       <View className="gap-1">
-        <Text className="text-sm font-medium text-muted">Final result</Text>
+        <Text className="type-label text-muted">Final result</Text>
         <Money
           amount={finalResult}
           currency={RECORDING_CURRENCY}
           tone="result"
           fit
-          className="font-display text-6xl leading-[64px]"
+          className="type-hero"
         />
-        <Text className="text-sm text-muted">
+        <Text className="type-footnote text-muted">
           In <Money amount={totals.buyIn} currency={RECORDING_CURRENCY} className="text-muted" /> ·
           Out <Money amount={totals.cashOut} currency={RECORDING_CURRENCY} className="text-muted" />
         </Text>
@@ -390,11 +387,7 @@ function History({
   return (
     <View className="gap-2">
       <SectionHeading
-        action={
-          <Text className="text-sm text-muted">
-            {visit.entries.length === 1 ? "1 entry" : `${visit.entries.length} entries`}
-          </Text>
-        }
+        count={visit.entries.length === 1 ? "1 entry" : `${visit.entries.length} entries`}
       >
         History
       </SectionHeading>

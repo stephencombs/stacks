@@ -44,7 +44,7 @@ export function BackingSection({ detail, trip }: { detail: GroupDetail; trip: Tr
         Backing
       </SectionHeading>
       {trip.stakes.length === 0 ? (
-        <Text className="text-sm text-muted">
+        <Text className="rounded-2xl border border-line bg-surface p-4 type-footnote text-muted">
           When someone gives another player money to play with on this trip, add it here. The backer
           gets it back plus their share of the winnings, or what's left if it's lost.
         </Text>
@@ -55,10 +55,12 @@ export function BackingSection({ detail, trip }: { detail: GroupDetail; trip: Tr
             const voided = view.stake.voidedAt !== null;
             const content = (
               <View className="flex-1 gap-0.5">
-                <Text className={cn("text-base", voided ? "text-muted line-through" : "text-ink")}>
+                <Text
+                  className={cn("type-heading", voided ? "text-muted line-through" : "text-ink")}
+                >
                   {title}
                 </Text>
-                <Text className="text-sm text-muted tabular-nums">
+                <Text className="type-footnote text-muted">
                   {status}
                   {view.stake.note ? ` · ${view.stake.note}` : ""}
                 </Text>

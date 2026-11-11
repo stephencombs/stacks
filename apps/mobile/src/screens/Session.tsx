@@ -37,7 +37,7 @@ import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Screen, screenError } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { List, PageTitle, Row, SectionHeading, Tag } from "../components/ui/Surface";
+import { Badge, List, PageTitle, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import type { Toast } from "../components/ui/Toast";
 import { cn } from "../components/ui/cn";
 import { AddGuestSheet } from "../features/AddGuestSheet";
@@ -322,7 +322,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
               {venue.name}
             </PageTitle>
             <View className="flex-row items-center gap-2">
-              {live ? <Tag tone="live">Live</Tag> : <Tag>Closed</Tag>}
+              {live ? <Badge tone="live">Live</Badge> : <Tag>Closed</Tag>}
               <HighLimitToggle detail={detail} />
               <Text className="flex-1 text-sm text-muted">
                 {formatTime(session.startedAt)}
@@ -1053,7 +1053,7 @@ function TicketStub({
       ? [
           {
             label: "Players",
-            value: <Text className="font-mono text-base text-ink">{players}</Text>,
+            value: <Text className="type-number text-ink">{players}</Text>,
           },
           {
             label: "Table net",
@@ -1063,20 +1063,20 @@ function TicketStub({
       : [
           {
             label: "Players",
-            value: <Text className="font-mono text-base text-ink">{players}</Text>,
+            value: <Text className="type-number text-ink">{players}</Text>,
           },
           { label: "In", value: <Money amount={buyIn} currency={currency} /> },
           { label: "Out", value: <Money amount={cashOut} currency={currency} /> },
         ];
   return (
-    <View className="flex-row overflow-hidden rounded-xl bg-surface">
+    <View className="flex-row overflow-hidden rounded-2xl border border-line bg-surface">
       {cells.map((cell, index) => (
         <View
           key={cell.label}
           accessible
           className={cn("grow gap-0.5 px-4 py-3", index > 0 && "border-l border-line")}
         >
-          <Text className="text-sm text-muted">{cell.label}</Text>
+          <Text className="type-label text-muted">{cell.label}</Text>
           {cell.value}
         </View>
       ))}
