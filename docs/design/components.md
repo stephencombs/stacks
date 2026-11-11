@@ -40,7 +40,7 @@ Pick one of a few options, all in sight. Web `Segmented` lives in its own file, 
 
 ```
 How many options?
- ├── Up to 4 → web Segmented; mobile Choice, which draws a segmented control
+ ├── Up to 4 → web Segmented; mobile Choice, which draws a pill segmented control (rounded-full track in bg-fill, rounded-full active thumb in bg-surface)
  └── 5 or more → web Select; mobile Choice, which draws a checked list
 ```
 
@@ -51,6 +51,8 @@ How many options?
 // Incorrect: a hand-built toggle row repeats the look and drifts from the others
 <div role="group">{views.map((v) => <button aria-pressed={v.key === view}>…</button>)}</div>
 ```
+
+On mobile, `Choice` supports stacking two full-width pill segmented controls (`rounded-full bg-fill p-1`) when a screen switches both primary metric and time window (for example, `This trip | All time` or `Money | % of buy-in` above `24h | 7d | 30d | All` on Board). Selection is signaled by the elevated `bg-surface` pill thumb and text color (`text-ink` vs `text-muted`), keeping font weight and box width stable so switching tabs never causes layout shift.
 
 A form value from a few short options, where the choice deserves weight, is `RadioCards` on web: `kind` of an entry or venue, the game of a session. Set columns with `className`.
 
@@ -73,11 +75,18 @@ A yes-or-no option on web is `Checkbox`, wrapped in a `<label>` with its text: t
 
 An error beside one field goes in `error`. A failure of the whole form, such as the API refusing it, is `FormError`.
 
-## Surface, List and Row
+## Surface, List, Row, ProportionalBarRow and QuotaCard
 
-`Surface` is a card. A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the dividers, and `Row` the padding. On web, a row that goes somewhere is `RowLink`, which adds the pressed state and a chevron, and a row's main text is `RowText`: a `title`, a quieter `meta` line, and `struck` for something voided. On mobile, a pressable `Row` takes `onPress`.
+`Surface` is an elevated card container (`rounded-xl` on web, `rounded-2xl` / `20px` on mobile). A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the `0.5px` hairline dividers (`border-line`), and `Row` the padding. On web, a row that goes somewhere is `RowLink`, which adds the pressed state and a chevron, and a row's main text is `RowText`: a `title`, a quieter `meta` line, and `struck` for something voided. On mobile, a pressable `Row` takes `onPress`.
 
-A row runs chip, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` text, not display type.
+A row runs chip, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` (`font-semibold` for primary feed titles on mobile) text, not display type.
+
+On mobile, four specialized row/card patterns handle feeds, breakdowns, limits and settings:
+
+1. **Feed & Status Rows (`screens/Home.tsx`, `screens/Sessions.tsx`, `features/SessionList.tsx`)**: Two-line rows with a `rounded-lg` player/venue monogram `Chip` on the left, sentence-case title + right-aligned relative timestamp or live badge (`Live · 2h 14m` with spinner/dot) on the top line, and venue/trip metadata + tabular `Money` result on the bottom line.
+2. **Proportional Breakdown Rows (`ProportionalBarRow` in `components/ui/Surface.tsx`, used by `features/TripBoard.tsx` and `features/AllTimeBoard.tsx`)**: Grouped inside a `rounded-2xl bg-surface` card under a muted `type-section` header. Each row displays a color dot or `Chip` + title on the left and tabular `Money` on the right, a thin (`4px` high, `rounded-full`) horizontal **progress** bar in the middle scaled to share of total, and a muted `type-footnote` line below (`64.9% of buy-ins · 8 sessions · +$52/hr`).
+3. **Quota & Pace Cards (`QuotaCard` in `components/ui/Surface.tsx`, used by `features/PersonalLimits.tsx`, `features/SettleUp.tsx`, `features/Backing.tsx`)**: A `rounded-2xl bg-surface p-5` card with a sentence-case title on the left, pace status (`Within limit`, `Ahead of pace`) on the right, a `type-hero` tabular readout (`87% left` or `$410 left`), a `24px`-high `rounded-md` progress bar combining a solid fill, diagonal SVG hatch stripes for the consumed/remaining portion, and a vertical `2px` pace tick mark (`|`), plus a reset or settlement metadata footer (`↻ Resets in 6d 14h`).
+4. **Grouped Settings Rows (`SettingsGroup` & `SettingsRow` in `components/ui/Surface.tsx`, used by `features/You.tsx`, `screens/Group.tsx`, `screens/GroupSettings.tsx`)**: Grouped `rounded-2xl bg-surface` cards beneath sentence-case `type-section` headers (`Account & sync`, `Preferences`, `Group & table`). Each `SettingsRow` (`min-h-[52px]`) pairs a `20px` outlined left icon, a `type-body` label, a right-aligned `text-muted` value, and a `text-faint` `chevron-right` disclosure indicator with inset `0.5px` dividers.
 
 Don't put a `Surface` inside a `Surface`. Use `bg-sunken` for a well.
 
@@ -85,9 +94,9 @@ Don't put a `Surface` inside a `Surface`. Use `bg-sunken` for a well.
 
 A place can open on one hero card: the figure that place exists to show, big enough to read across a table. Sessions has `TripHero` (your trip total, your running line, win rate, best session, board place), Settle up `BalanceHero` (your balance), and the Board's This trip `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in gold). The Board's All time opens on the same `TripHero` across every trip ("All time with …"). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. When you're seated at a live session, Sessions opens on `LiveSessionCard`, above the hero, with "Back to the table" as the screen's primary action.
 
-One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure. A venue name inside a card can take `font-display uppercase` like a page title; nothing else borrows display type.
+One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure.
 
-A hero is a `Surface` on web and a `rounded-xl bg-surface` view on mobile, inset `p-4` like the rows around it, with `Glow` first inside it in the tone of the figure: `win` up or ahead, `loss` down or behind, `accent` level or tied. A sentence-case `text-sm font-medium text-muted` label sits over the figure, which is `Money` in `font-display text-6xl` (`text-5xl` below `sm` on web), then one `text-sm text-muted` comparison. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`, never gold. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`) so both clients say the same thing.
+On web, a hero is a `Surface` with `Glow` inside it in the tone of the figure (`win`, `loss`, `accent`). On mobile, hero cards are **glow-free** `rounded-2xl bg-surface p-5` cards (`emil-unslop-design`: no decorative radial `Glow` blobs behind the figure). A sentence-case `type-label text-muted` kicker (`Net bankroll`, `Trip total`) sits over the `type-hero` `Money` figure (`36px–40px` `tabular-nums`), followed by a `type-footnote text-muted` subtitle (`Across 14 sessions`), the clean chart (`rx={4}` rounded-cap vertical session bars or running `RaceChart` lines), bottom-corner date range labels (`Oct 11` … `Nov 9`), and an inline color-dot legend along the bottom edge. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`, never gold. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`) so both clients say the same thing.
 
 ## Charts
 
@@ -99,38 +108,55 @@ Players at very different stakes would flatten each other, so:
 - **A race can compare stakes fairly.** The All time race has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
 - **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
 
-## Navigation: AppShell, ScopeButton, PlaceLink (web)
+## Navigation: AppShell, ScopeButton, PlaceLink (web); TopBar, FilterPillBar, PlaceTabs (mobile)
 
-Where content lives is decided in [docs/internals/navigation.md](../internals/navigation.md). Your play and personal sessions sit in `PersonalFrame` (`features/Personal.tsx`): the wordmark, Groups and You, with no places and nothing read from an account. Their main actions go in its `Dock`, pinned above the home indicator on a phone and in the page's flow from `sm` up, and their save state is `SaveStatus`, which only ever says "Saved on this device" after the device has it. On web, every group and trip page except an invite or claim link sits in `AppShell` (`features/Shell.tsx`), which draws it from two parts in `ui/Nav.tsx`:
+Where content lives is decided in [docs/internals/navigation.md](../internals/navigation.md). Your play and personal sessions sit in `PersonalFrame` (`features/Personal.tsx`): the wordmark, Groups and You, with no places and nothing read from an account. Their main actions go in its `Dock`, pinned above the home indicator on a phone and in the page's flow from `sm` up, and their save state is `SaveStatus`, which only ever says "Saved on this device" after the device has it.
+
+On web, every group and trip page except an invite or claim link sits in `AppShell` (`features/Shell.tsx`), which draws it from two parts in `ui/Nav.tsx`:
 
 - **`ScopeButton`** says where you are: the trip in scope, its group small above it, and a chevron. It's a real button, outlined like a secondary one, and opens the scope sheet (trips, New trip, the group, your other groups). A group with no trips shows its name alone.
 - **`PlaceLink`** is one of the four places, Sessions, Board, Settle up and Group, with a lucide icon. `layout="bar"` stacks icon over label in the bottom bar; `layout="side"` is a sidebar row. The current place is gold. A group with no trips offers only Group.
 
-Your avatar opens **You**: play limits for the trip in scope, appearance, and account. Nothing personal goes in a place.
+On mobile (`apps/mobile`), navigation chrome follows a three-part layout:
+
+- **`TopBar` / `PageTitle` (`components/ui/Surface.tsx`, `components/ui/Screen.tsx`)**: Left-aligned wordmark (`Color Up` + compact `BETA` **tag** on `HomeScreen`) or `28px` bold sentence-case screen title (`Sessions`, `Board`, `Settle up`, or group name). Right-aligned actions are `44×44px` circular `rounded-full bg-surface border border-line` `IconButton` controls (`YouButton`, `TripOptionsButton`, new session compose, filter/search)—never unframed bare icons.
+- **`FilterPillBar` / `ScopeButton` (`features/Scope.tsx`)**: Renders horizontal `rounded-full` filter pills (`bg-surface border border-line px-3.5 py-2`) for switching group and trip scope (`accessibilityLabel="${group.name}, ${trip?.name ?? 'no trips yet'}"`) plus contextual filter pills.
+- **Floating Capsule `PlaceTabs` (`features/PlaceTabs.tsx` & `features/PlaceTabs.web.tsx`)**: Uses `createBottomTabNavigator` with a shared custom floating `rounded-full` capsule `tabBar` positioned above the safe-area home indicator (`mx-5`, `p-1.5`, `bg-surface/95`, `border border-line`) containing the 4 icon-only peer **navigation** tabs (`Sessions`, `Board`, `Settle up`, `Group`, each `accessibilityRole="tab"` with its exact place `accessibilityLabel` and `>=44×44px` touch target). The active place renders a concentric `rounded-full` pill thumb (`bg-fill`) and a **filled vs. outlined** icon swap (`components/ui/Icon.ios.tsx` / `components/ui/Icon.tsx`). When a session is in play, `LiveBar` floats cleanly as a compact pill card immediately above the capsule tab bar.
+
+Your avatar (`YouButton`) opens **You**: play limits for the trip in scope, appearance, and account, laid out with `SettingsGroup` and `SettingsRow`.
 
 ```
 How wide is the window?
- ├── Below lg → a top bar (ScopeButton, avatar) and a bottom bar of PlaceLinks, with the LiveBar floating just above it
- └── lg and up → a 240px sidebar: wordmark, ScopeButton, PlaceLinks, your live table, this group's trips, You at the foot
+ ├── Mobile app (iOS / Android) → TopBar + FilterPillBar at the top, floating capsule PlaceTabs at the bottom, LiveBar floating just above PlaceTabs
+ ├── Web below lg → a top bar (ScopeButton, avatar) and a bottom bar of PlaceLinks, with the LiveBar floating just above it
+ └── Web lg and up → a 240px sidebar: wordmark, ScopeButton, PlaceLinks, your live table, this group's trips, You at the foot
 ```
 
-The sheets are `Dialog`, so they slide up from the bottom on a phone and sit centered on a wide screen. `Dialog` and `Menu` layer above the bars.
+The sheets are `Dialog` on web and `Sheet` (`rounded-t-3xl`) on mobile, sliding up from the bottom on a phone and sitting centered on a wide screen. `Dialog` and `Menu` layer above the bars.
 
-Pages pushed onto a place, like a session onto Sessions or People onto Group, take a `BackLink` in `PageHeader`'s `back`. The back slot only ever goes back; it never switches scope.
+Pages pushed onto a place, like a session onto Sessions or People onto Group, take a `BackLink` in `PageHeader`'s `back` (or the stack's back button on mobile). The back slot only ever goes back; it never switches scope.
 
 ## Wide screens: TripLayout, TripRail (web)
 
 Pages keep the 672px reading column beside the sidebar. Sessions is the one exception: from `xl` it widens to take a 320px rail through `TripLayout`, where `TripRail` shows the board and your balance with Settle up, a glance before going to either place. Below `xl` the rail drops away, and nothing moves into it that isn't also elsewhere.
 
-## PageHeader, Section, Note (web); PageTitle, SectionHeading (mobile)
+## PageHeader, Section, Note (web); PageTitle, SectionHeading, AccordionSectionHeading (mobile)
 
 One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `children` for what sits under the title (a session's notes, the Board's `Segmented`), and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip place's title is the place, through `TripHeader`, since the scope button already names the trip; Sessions carries the trip's ⋯ menu.
 
-Each group of content is a `Section` on web (`title`, plus an `action` or a quiet `aside`) and a `SectionHeading` on mobile. A section's action is a `ghost` or `sm` button or a `Segmented`. Supporting text on web is `Note`.
+Each group of content is a `Section` on web (`title`, plus an `action` or a quiet `aside`) and a `SectionHeading` on mobile (`components/ui/Surface.tsx`). Mobile `SectionHeading` has two variants:
 
-## Tag
+1. **Grouped Card Header (`SectionHeading`)**: Sentence-case `type-section text-muted` label sitting above a `rounded-2xl` `Surface` card (`Standings`, `By game`, `People`).
+2. **Inline-Rule Header (`AccordionSectionHeading`)**: Sentence-case `type-section text-muted` label (with optional count, e.g. `Playing now`, `Finished (16)`) followed by a `flex-1 h-[0.5px] bg-line` horizontal separator rule and optional collapse chevron for collapsible feed sections.
 
-A short state something is in: "Live", "Closed". Tones: `neutral` (default), `live`. Nothing else exists. A "live" tag is only for something in play: a session or a running trip. A caption that names rather than states ("Biggest winner") is not a tag: it's plain muted text.
+A section's action is a `ghost` or `sm` button or a `Segmented`. Supporting text on web is `Note`.
+
+## Tag vs. Badge
+
+Keep **Tag** and **Badge** distinct (`emil-design-vocabulary`):
+
+- **Tag**: A static categorical label (`BETA`, `NLH $1/$3`, `Closed`). Tones: `neutral` (default), `live`. Rendered as a compact `rounded-md` pill.
+- **Badge**: A dynamic status or live count indicator (`Live · 2h 14m` with activity dot/spinner, `Draft`, `+13` diff, or a numeric count in a settings row). A caption that names rather than states ("Biggest winner") is neither: it's plain `text-muted` text.
 
 ## Money, BalanceLabel
 
@@ -146,7 +172,7 @@ Every amount goes through `Money`, the hero figures included, except the compact
 
 ## Chip
 
-A player's identity: `chip` comes from `chipOf(group, playerId)`. Pair it with the player's name. Size 28 in web rows, 30 in mobile rows, and smaller in dense lists and awards.
+A player's identity: `chip` comes from `chipOf(group, playerId)`. Pair it with the player's name. Size 28 in web rows, `28×28px` (`rounded-lg` monogram/color badge) in mobile feed and breakdown rows, and smaller in dense lists and awards.
 
 ## Page actions
 
@@ -172,7 +198,7 @@ Copies a link or code and confirms it. Use it instead of writing to the clipboar
 
 ## EmptyState
 
-`EmptyState` says what's missing and what to do: "No sessions on this trip yet", then a line on how to start. On mobile it takes an `action`; on web it sits beside the page's own action. Never "No data". It's in `Page.tsx` on web and `Surface.tsx` on mobile.
+`EmptyState` says what's missing and what to do: "No matching sessions" or "No sessions on this trip yet", then a `text-muted` sentence explaining what appears here or how to start. On mobile it centers vertically in the available viewport (`flex-1 items-center justify-center px-8`) with a bold sentence-case heading, muted body copy, and an optional pill `action`; on web it sits beside the page's own action. Never "No data". It's in `Page.tsx` on web and `Surface.tsx` on mobile.
 
 ## Loading
 
