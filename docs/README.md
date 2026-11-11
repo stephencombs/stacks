@@ -7,5 +7,7 @@ need no doc change; follow the [documentation rules](../AGENTS.md#documentation)
 - [Design system](../DESIGN.md): [foundations](./design/foundations.md) and
   [components](./design/components.md)
 - [Navigation](./internals/navigation.md): where content lives and how people move between it
+- [Claiming guest history](./internals/claims.md): how a guest's players link to an account, and
+  the two claim paths that stay apart
 - [Legacy migration](./internals/legacy-migration.md): how the Group-bound ledger maps to the player
   model, and what the preflight flags
