@@ -52,13 +52,14 @@ export function Screen({
         >
           <Content>{children}</Content>
           {/* The floating tab bar sits over the scene's foot on every platform, so the list ends clear of it. */}
-          <View style={{ height: (footer ? 0 : bar) + liveBarHeight }} />
+          <View style={{ height: (footer ? footerHeight : bar) + liveBarHeight }} />
         </ScrollView>
         {footer ? (
           <View
+            pointerEvents="box-none"
             onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
             style={{ paddingBottom: bar || Math.max(insets.bottom, 12) }}
-            className="border-t border-line bg-canvas"
+            className="absolute inset-x-0 bottom-0"
           >
             <View className="gap-2 px-4 py-3">
               <Content>{footer}</Content>

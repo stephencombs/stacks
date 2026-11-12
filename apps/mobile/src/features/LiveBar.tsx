@@ -7,6 +7,7 @@ import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "../components/ui/Icon";
+import { GlassSurface } from "../components/ui/GlassSurface";
 import { useGo } from "../lib/go";
 import { useStacks } from "../lib/stacks";
 
@@ -55,15 +56,21 @@ export function LiveBar({
         accessibilityLabel={`Back to your table at ${seat.venueName}, since ${formatTime(seat.startedAt)}`}
         accessibilityHint="Goes back to your table"
         onPress={() => go.session(seat.id)}
-        className="min-h-13 flex-row items-center gap-3 rounded-2xl border border-line-strong bg-surface px-4 py-3 shadow-md active:scale-[0.98] active:bg-sunken"
+        className="active:scale-[0.98]"
       >
-        <View className="size-2 rounded-full bg-live" />
-        <Text className="type-label text-live">Live</Text>
-        <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
-          {seat.venueName}
-        </Text>
-        <Text className="font-mono text-xs text-muted">since {formatTime(seat.startedAt)}</Text>
-        <Icon name="chevron-right" color="muted" size={16} />
+        <GlassSurface
+          radius={20}
+          className="min-h-13 flex-row items-center gap-3 rounded-2xl px-4 py-3"
+          fallbackClassName="border border-line-strong bg-surface shadow-md"
+        >
+          <View className="size-2 rounded-full bg-live" />
+          <Text className="type-label text-live">Live</Text>
+          <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
+            {seat.venueName}
+          </Text>
+          <Text className="font-mono text-xs text-muted">since {formatTime(seat.startedAt)}</Text>
+          <Icon name="chevron-right" color="muted" size={16} />
+        </GlassSurface>
       </Pressable>
     </View>
   );
