@@ -53,6 +53,21 @@ async function home(page: Page) {
 
 async function start(page: Page, amount: string) {
   await button(page, "Start session").click();
+  const keys = await Promise.all(
+    ["1", "2", "3", "4", "7", "0", "Delete"].map(async (key) => {
+      const bounds = await button(sheet(page), key).boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.width).toBeGreaterThanOrEqual(44);
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+      return bounds!;
+    }),
+  );
+  expect(keys[0]!.x).toBeLessThan(keys[1]!.x);
+  expect(keys[1]!.x).toBeLessThan(keys[2]!.x);
+  expect(keys[0]!.y).toBe(keys[2]!.y);
+  expect(keys[0]!.x).toBe(keys[3]!.x);
+  expect(keys[0]!.y).toBeLessThan(keys[3]!.y);
+  expect(keys[3]!.y).toBeLessThan(keys[4]!.y);
   await keypad(page, amount);
   await button(sheet(page), "Start session").click();
   await expect(sheet(page)).toHaveCount(0);

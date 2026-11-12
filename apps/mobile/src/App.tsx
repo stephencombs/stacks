@@ -13,11 +13,12 @@ import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
-import { Text, View, useWindowDimensions } from "react-native";
+import { Platform, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { Button } from "./components/ui/Button";
+import { HeaderTitle } from "./components/ui/HeaderTitle";
 import { TabBarHeight } from "./components/ui/Screen";
 import { Landing } from "./features/Landing";
 import { PersonalNav } from "./features/Personal";
@@ -47,8 +48,11 @@ import { SessionsScreen } from "./screens/Sessions";
 import { SettleUpScreen } from "./screens/SettleUp";
 
 const stackOptions = {
-  headerTransparent: false,
+  headerTransparent: Platform.OS === "ios",
   headerShadowVisible: false,
+  ...(Platform.OS === "ios"
+    ? { headerTitle: ({ children }: { children: string }) => <HeaderTitle title={children} /> }
+    : {}),
   headerBackButtonDisplayMode: "minimal",
   headerRight: () => <YouButton />,
 } as const;
@@ -56,7 +60,9 @@ const stackOptions = {
 /** A place's own page: the scope where a back button would be, and You beside it. */
 const placeOptions = {
   title: "",
-  headerLeft: () => <ScopeButton />,
+  ...(Platform.OS === "ios"
+    ? { headerTitle: ({ children }: { children: string }) => <ScopeButton title={children} /> }
+    : { headerLeft: () => <ScopeButton /> }),
   headerLeftBackgroundVisible: false,
 };
 
@@ -187,8 +193,11 @@ const RootStack = createNativeStackNavigator({
   initialRouteName: "Home",
   screenOptions: {
     title: "",
-    headerTransparent: false,
+    headerTransparent: Platform.OS === "ios",
     headerShadowVisible: false,
+    ...(Platform.OS === "ios"
+      ? { headerTitle: ({ children }: { children: string }) => <HeaderTitle title={children} /> }
+      : {}),
     headerBackButtonDisplayMode: "minimal",
     headerRight: () => <PersonalNav />,
   },

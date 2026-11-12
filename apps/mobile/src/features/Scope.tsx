@@ -3,11 +3,12 @@ import { StackActions, useNavigation } from "@react-navigation/native";
 import { scopeTrips, tripDates, unsettledAmount } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button, FilterPill } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
+import { HeaderTitle } from "../components/ui/HeaderTitle";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
 import { useGo } from "../lib/go";
@@ -17,7 +18,7 @@ import { useStacks } from "../lib/stacks";
 import { NoTrips, StartTripSheet } from "./Trips";
 
 /** Where you are: the group over the trip, at the top of every place. Tapping it switches. */
-export function ScopeButton() {
+export function ScopeButton({ title }: { title?: string } = {}) {
   const { scope } = useScope();
   const [open, setOpen] = useState(false);
   if (!scope)
@@ -33,14 +34,22 @@ export function ScopeButton() {
   const { item, trip } = scope;
   return (
     <>
-      <FilterPill
-        sublabel={item.group.name}
-        label={trip?.name ?? "No trips yet"}
-        accessibilityLabel={`${item.group.name}, ${trip?.name ?? "no trips yet"}`}
-        accessibilityHint="Switch to another trip or group"
-        trailing={<Icon name="chevron-down" color="muted" size={14} />}
-        onPress={() => setOpen(true)}
-      />
+      {Platform.OS === "ios" ? (
+        <HeaderTitle
+          title={title || trip?.name || item.group.name}
+          context={`${item.group.name} · ${trip?.name ?? "No trips yet"}`}
+          onExpand={() => setOpen(true)}
+        />
+      ) : (
+        <FilterPill
+          sublabel={item.group.name}
+          label={trip?.name ?? "No trips yet"}
+          accessibilityLabel={`${item.group.name}, ${trip?.name ?? "no trips yet"}`}
+          accessibilityHint="Switch to another trip or group"
+          trailing={<Icon name="chevron-down" color="muted" size={14} />}
+          onPress={() => setOpen(true)}
+        />
+      )}
       {open ? <ScopeSheet scope={scope} onClose={() => setOpen(false)} /> : null}
     </>
   );

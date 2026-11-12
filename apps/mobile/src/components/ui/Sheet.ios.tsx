@@ -61,7 +61,7 @@ export function Sheet({
     };
   }, []);
 
-  const fittedHeight = contentHeight + footerHeight + insets.bottom + 64;
+  const fittedHeight = contentHeight + insets.bottom + 64;
   const detent =
     contentHeight === 0 ? 0.5 : Math.min(0.9, Math.max(0.3, fittedHeight / screenHeight));
   const close = () => {
@@ -77,7 +77,7 @@ export function Sheet({
     if (!keyboardFrame.current) return;
     TextInput.State.currentlyFocusedInput()?.measureInWindow((_x, y, _width, height) => {
       const top = frame.current.y + 12;
-      const bottom = frame.current.y + frame.current.height - 12;
+      const bottom = frame.current.y + frame.current.height - footerHeight - 12;
       if (y < top) {
         scroll.current?.scrollTo({ y: Math.max(0, offset.current - (top - y)), animated: false });
       } else if (y + height > bottom) {
@@ -96,8 +96,8 @@ export function Sheet({
       onDismiss={dismissed}
       onNativeDismiss={onClose}
     >
-      <View collapsable={false} className="absolute inset-0 bg-canvas">
-        <ScreenStack style={{ flex: 1 }}>
+      <View collapsable={false} className="absolute inset-0 overflow-hidden bg-canvas">
+        <ScreenStack style={{ flex: 1, backgroundColor: canvas, overflow: "hidden" }}>
           <Screen
             activityState={2}
             enabled
@@ -119,43 +119,47 @@ export function Sheet({
                 });
               }}
             >
-              <ScrollView
-                ref={scroll}
-                className="flex-1"
-                contentInsetAdjustmentBehavior="automatic"
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="interactive"
-                contentContainerClassName="gap-5 px-4 pt-4 pb-6"
-                onContentSizeChange={(_width, height) => setContentHeight(height)}
-                onScroll={(event) => {
-                  offset.current = event.nativeEvent.contentOffset.y;
-                }}
-                scrollEventThrottle={32}
-                onLayout={(event) => {
-                  const target = event.target;
-                  if (typeof target !== "object" || target == null) return;
-                  target.measureInWindow((_x, y, _width, height) => {
-                    frame.current = { y, height };
-                    revealFocusedField();
-                  });
-                }}
-              >
-                {description ? (
-                  <Text className="px-1 type-callout text-muted">{description}</Text>
-                ) : null}
-                {children}
-              </ScrollView>
-              {footer ? (
-                <View
-                  className="gap-2 px-4 pt-2 pb-3"
-                  onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
+              <View className="flex-1 overflow-hidden">
+                <ScrollView
+                  ref={scroll}
+                  className="flex-1"
+                  contentInsetAdjustmentBehavior="automatic"
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="interactive"
+                  contentContainerClassName="gap-5 px-4 pt-4"
+                  contentContainerStyle={{ paddingBottom: footerHeight + 24 }}
+                  onContentSizeChange={(_width, height) => setContentHeight(height)}
+                  onScroll={(event) => {
+                    offset.current = event.nativeEvent.contentOffset.y;
+                  }}
+                  scrollEventThrottle={32}
+                  onLayout={(event) => {
+                    const target = event.target;
+                    if (typeof target !== "object" || target == null) return;
+                    target.measureInWindow((_x, y, _width, height) => {
+                      frame.current = { y, height };
+                      revealFocusedField();
+                    });
+                  }}
                 >
-                  {footer}
-                </View>
-              ) : null}
+                  {description ? (
+                    <Text className="px-1 type-callout text-muted">{description}</Text>
+                  ) : null}
+                  {children}
+                </ScrollView>
+                {footer ? (
+                  <View
+                    className="absolute right-0 bottom-0 left-0 gap-2 px-4 pt-2 pb-3"
+                    onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
+                  >
+                    {footer}
+                  </View>
+                ) : null}
+              </View>
             </View>
             <ScreenStackHeaderConfig
-              backgroundColor={canvas}
+              backgroundColor="transparent"
+              translucent
               color={ink}
               titleColor={ink}
               hideBackButton

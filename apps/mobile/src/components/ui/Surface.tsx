@@ -1,9 +1,10 @@
-import { NavigationContext } from "@react-navigation/native";
-import { use, useLayoutEffect, type ReactNode } from "react";
+import { NavigationContext, NavigationRouteContext } from "@react-navigation/native";
+import { use, useCallback, useLayoutEffect, type ReactNode } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 
 import { cn } from "./cn";
 import { Icon } from "./Icon";
+import { HeaderTitle } from "./HeaderTitle";
 
 export function Surface({ children, className }: { children: ReactNode; className?: string }) {
   return (
@@ -80,11 +81,22 @@ export function PageTitle({
   right?: ReactNode;
 }) {
   const navigation = use(NavigationContext);
+  const route = use(NavigationRouteContext);
   const nativeTitle = Platform.OS !== "web" && navigation !== undefined;
+  const headerTitle = useCallback(
+    () => <HeaderTitle title={children} context={context} />,
+    [children, context],
+  );
   useLayoutEffect(() => {
-    if (nativeTitle)
-      navigation?.setOptions({ title: children, headerLargeTitle: Platform.OS === "ios" });
-  }, [navigation, children, nativeTitle]);
+    if (!nativeTitle) return;
+    const scoped = ["Sessions", "Board", "SettleUp", "Group"].includes(route?.name ?? "");
+    navigation?.setOptions({
+      title: children,
+      headerLargeTitle: false,
+      ...(Platform.OS === "ios" && !scoped ? { headerTitle } : {}),
+    });
+  }, [navigation, children, headerTitle, nativeTitle, route?.name]);
+  if (nativeTitle && !tag && !right && !context) return null;
   return (
     <View className="gap-1">
       <View className="flex-row items-center justify-between gap-2">

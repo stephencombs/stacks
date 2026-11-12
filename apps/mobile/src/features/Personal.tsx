@@ -26,6 +26,7 @@ import { useNativeHeaderActions } from "./NativeHeaderActions";
  */
 export function PersonalScreen({ children, dock }: { children: ReactNode; dock?: ReactNode }) {
   const header = useNativeHeaderActions(true);
+  const [dockHeight, setDockHeight] = useState(0);
   const insets = useSafeAreaInsets();
   const sides = {
     paddingLeft: Math.max(16, insets.left),
@@ -42,10 +43,13 @@ export function PersonalScreen({ children, dock }: { children: ReactNode; dock?:
         contentContainerStyle={sides}
       >
         {children}
+        {dock ? <View style={{ height: dockHeight }} /> : null}
       </ScrollView>
       {dock ? (
         <View
-          className="gap-2 border-t border-line bg-canvas pt-3"
+          pointerEvents="box-none"
+          onLayout={(event) => setDockHeight(event.nativeEvent.layout.height)}
+          className="absolute inset-x-0 bottom-0 gap-2 pt-3"
           style={{ ...sides, paddingBottom: Math.max(insets.bottom, 12) }}
         >
           {dock}

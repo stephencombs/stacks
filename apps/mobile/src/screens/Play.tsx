@@ -17,11 +17,12 @@ import { MinorUnits, VisitId, type EntryId, type PlayEntry } from "@stacks/contr
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import { useLayoutEffect, useState, type ReactNode } from "react";
+import { useCallback, useLayoutEffect, useState, type ReactNode } from "react";
 import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
+import { HeaderTitle } from "../components/ui/HeaderTitle";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
@@ -56,15 +57,29 @@ function Title({
   children: string;
 }) {
   const navigation = useNavigation();
+  const headerTitle = useCallback(
+    () => <HeaderTitle title={children} context={context} />,
+    [children, context],
+  );
   useLayoutEffect(() => {
-    if (Platform.OS !== "web") navigation.setOptions({ title: children });
-  }, [navigation, children]);
+    if (Platform.OS !== "web")
+      navigation.setOptions({
+        title: children,
+        ...(Platform.OS === "ios"
+          ? {
+              headerTitle,
+            }
+          : {}),
+      });
+  }, [navigation, children, headerTitle]);
   return (
     <View className="gap-1">
       <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
-        <Text accessibilityRole="header" className="shrink type-title text-ink">
-          {children}
-        </Text>
+        {Platform.OS === "ios" ? null : (
+          <Text accessibilityRole="header" className="shrink type-title text-ink">
+            {children}
+          </Text>
+        )}
         {tag}
       </View>
       {context ? <Text className="text-sm text-muted">{context}</Text> : null}

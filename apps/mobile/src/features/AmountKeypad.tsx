@@ -5,7 +5,11 @@ import { Platform, Pressable, Text, View } from "react-native";
 import { Icon } from "../components/ui/Icon";
 import { holdBackspace } from "./holdBackspace";
 
-const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
+const digitRows = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+] as const;
 
 // A click can follow pointer-up as its own event. Remember the press-in delete
 // until that click arrives, so a tap doesn't remove a second character.
@@ -73,30 +77,38 @@ export function AmountKeypad({
   };
 
   return (
-    <View className="flex-row flex-wrap">
-      {[...digits, bottomLeft, "0", "back"].map((key) =>
-        key === null ? (
-          <View key="gap" className="h-16 basis-1/3" />
-        ) : (
-          <Pressable
-            key={key}
-            accessibilityRole="button"
-            accessibilityLabel={key === "back" ? "Delete" : key === "sign" ? "Plus or minus" : key}
-            // The sheet scrolls; a stolen press would stop a held delete.
-            cancelable={key === "back" ? false : undefined}
-            onPressIn={key === "back" ? pressDelete : undefined}
-            onPressOut={key === "back" ? releaseDelete : undefined}
-            onPress={key === "back" ? activateDelete : () => tap(key)}
-            className="h-16 basis-1/3 items-center justify-center rounded-full active:bg-fill"
-          >
-            {key === "back" ? (
-              <Icon name="delete" color="ink" size={24} />
+    <View className="w-full">
+      {[...digitRows, [bottomLeft, "0", "back"]].map((row) => (
+        <View key={row[1]} className="h-16 flex-row">
+          {row.map((key) =>
+            key === null ? (
+              <View key="gap" className="flex-1" />
             ) : (
-              <Text className="text-3xl font-medium text-ink">{key === "sign" ? "±" : key}</Text>
-            )}
-          </Pressable>
-        ),
-      )}
+              <Pressable
+                key={key}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  key === "back" ? "Delete" : key === "sign" ? "Plus or minus" : key
+                }
+                // The sheet scrolls; a stolen press would stop a held delete.
+                cancelable={key === "back" ? false : undefined}
+                onPressIn={key === "back" ? pressDelete : undefined}
+                onPressOut={key === "back" ? releaseDelete : undefined}
+                onPress={key === "back" ? activateDelete : () => tap(key)}
+                className="min-w-0 flex-1 items-center justify-center rounded-full active:bg-fill"
+              >
+                {key === "back" ? (
+                  <Icon name="delete" color="ink" size={24} />
+                ) : (
+                  <Text className="text-3xl font-medium text-ink">
+                    {key === "sign" ? "±" : key}
+                  </Text>
+                )}
+              </Pressable>
+            ),
+          )}
+        </View>
+      ))}
     </View>
   );
 }

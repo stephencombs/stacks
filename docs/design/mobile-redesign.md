@@ -6,9 +6,9 @@ Color Up keeps the same ledger meaning and destinations on web, iOS and Android.
 
 Keep React Navigation native-stack. iOS uses the native bottom tab navigator and SF Symbols; Android uses the standard bottom tab navigator with destination labels. The mobile web build keeps its floating capsule. Sessions, Board, Settle up and Group remain peer destinations; a group with no trips offers only Group.
 
-Use native iOS header items for Groups and You. Related items may share the system glass background. Native page titles must remain available after content scrolls. Scope belongs to the current group/trip and opens its richer selection sheet; it is never the back action.
+Use native iOS header items for Groups and You. Related items may share the system glass background. Keep the header transparent, with a centred native glass title capsule instead of a large body heading. The title expands into a popover with its full title and context; group destination titles open the group/trip selection sheet. Scope is never the back action.
 
-The live-session return strip stays above navigation. Scroll content must reserve its measured height as well as the tab bar, so the final row remains reachable.
+The live-session return strip and bottom actions float above content without a full-width background or divider. Scroll content must reserve their measured height as well as the tab bar, so the final row remains reachable. Only the individual controls carry a surface.
 
 ## Selection and forms
 
