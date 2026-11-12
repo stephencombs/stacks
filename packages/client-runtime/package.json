@@ -4,45 +4,73 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./telemetry": {
-      "types": "./src/telemetry.ts",
-      "import": "./src/telemetry.ts"
-    },
-    "./playerMoney": {
-      "types": "./src/playerMoney.ts",
-      "import": "./src/playerMoney.ts"
+    "./actorKeysIndexedDB": {
+      "types": "./src/actorKeysIndexedDB.ts",
+      "import": "./src/actorKeysIndexedDB.ts"
     },
     "./api": {
       "types": "./src/api.ts",
       "import": "./src/api.ts"
     },
+    "./chart": {
+      "types": "./src/chart.ts",
+      "import": "./src/chart.ts"
+    },
+    "./counterparties": {
+      "types": "./src/counterparties.ts",
+      "import": "./src/counterparties.ts"
+    },
     "./errors": {
       "types": "./src/errors.ts",
       "import": "./src/errors.ts"
-    },
-    "./ids": {
-      "types": "./src/ids.ts",
-      "import": "./src/ids.ts"
-    },
-    "./react": {
-      "types": "./src/react.tsx",
-      "import": "./src/react.tsx"
     },
     "./format": {
       "types": "./src/format.ts",
       "import": "./src/format.ts"
     },
-    "./chart": {
-      "types": "./src/chart.ts",
-      "import": "./src/chart.ts"
+    "./freshness": {
+      "types": "./src/freshness.ts",
+      "import": "./src/freshness.ts"
+    },
+    "./ids": {
+      "types": "./src/ids.ts",
+      "import": "./src/ids.ts"
+    },
+    "./outbox": {
+      "types": "./src/outbox.ts",
+      "import": "./src/outbox.ts"
+    },
+    "./react": {
+      "types": "./src/react.tsx",
+      "import": "./src/react.tsx"
+    },
+    "./recording": {
+      "types": "./src/recording.ts",
+      "import": "./src/recording.ts"
+    },
+    "./recordingReact": {
+      "types": "./src/recordingReact.tsx",
+      "import": "./src/recordingReact.tsx"
+    },
+    "./recordingStorage": {
+      "types": "./src/recordingStorage.ts",
+      "import": "./src/recordingStorage.ts"
+    },
+    "./recordingStorageIndexedDB": {
+      "types": "./src/recordingStorageIndexedDB.ts",
+      "import": "./src/recordingStorageIndexedDB.ts"
+    },
+    "./recordingView": {
+      "types": "./src/recordingView.ts",
+      "import": "./src/recordingView.ts"
+    },
+    "./sample": {
+      "types": "./src/sample.ts",
+      "import": "./src/sample.ts"
     },
     "./scope": {
       "types": "./src/scope.ts",
       "import": "./src/scope.ts"
-    },
-    "./trip": {
-      "types": "./src/trip.ts",
-      "import": "./src/trip.ts"
     },
     "./table": {
       "types": "./src/table.ts",
@@ -52,53 +80,17 @@
       "types": "./src/tableArt.ts",
       "import": "./src/tableArt.ts"
     },
+    "./telemetry": {
+      "types": "./src/telemetry.ts",
+      "import": "./src/telemetry.ts"
+    },
     "./theme": {
       "types": "./src/theme.ts",
       "import": "./src/theme.ts"
     },
-    "./outbox": {
-      "types": "./src/outbox.ts",
-      "import": "./src/outbox.ts"
-    },
-    "./limits": {
-      "types": "./src/limits.ts",
-      "import": "./src/limits.ts"
-    },
-    "./pay": {
-      "types": "./src/pay.ts",
-      "import": "./src/pay.ts"
-    },
-    "./sample": {
-      "types": "./src/sample.ts",
-      "import": "./src/sample.ts"
-    },
-    "./freshness": {
-      "types": "./src/freshness.ts",
-      "import": "./src/freshness.ts"
-    },
-    "./recordingStorage": {
-      "types": "./src/recordingStorage.ts",
-      "import": "./src/recordingStorage.ts"
-    },
-    "./actorKeysIndexedDB": {
-      "types": "./src/actorKeysIndexedDB.ts",
-      "import": "./src/actorKeysIndexedDB.ts"
-    },
-    "./recordingStorageIndexedDB": {
-      "types": "./src/recordingStorageIndexedDB.ts",
-      "import": "./src/recordingStorageIndexedDB.ts"
-    },
-    "./recording": {
-      "types": "./src/recording.ts",
-      "import": "./src/recording.ts"
-    },
-    "./recordingView": {
-      "types": "./src/recordingView.ts",
-      "import": "./src/recordingView.ts"
-    },
-    "./recordingReact": {
-      "types": "./src/recordingReact.tsx",
-      "import": "./src/recordingReact.tsx"
+    "./trip": {
+      "types": "./src/trip.ts",
+      "import": "./src/trip.ts"
     }
   },
   "scripts": {

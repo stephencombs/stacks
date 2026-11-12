@@ -81,26 +81,14 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
       expect(after.stakes).toEqual([
         { stake: expect.objectContaining({ id: stake.id }), result: 40000, owed: 120000 },
       ]);
-      expect(after.transfers).toEqual([{ from: borrower, to: lender, amount: 120000 }]);
+      expect(after.balances).toEqual(
+        expect.arrayContaining([
+          { playerId: lender, amount: 120000 },
+          { playerId: borrower, amount: -120000 },
+        ]),
+      );
       const [listed] = yield* alex.groups.list();
       expect(listed?.myBalance).toBe(120000);
-
-      // The borrower can't leave owing the stake; paying it back squares everyone.
-      expect(
-        yield* Effect.flip(bea.groups.leave({ params: { groupId: group.group.id } })),
-      ).toMatchObject({ _tag: "Conflict", reason: "balance_not_settled" });
-      yield* bea.ledger.recordSettlement({
-        params: { tripId: group.tripId },
-        payload: {
-          id: ids.entry(),
-          fromPlayerId: borrower,
-          toPlayerId: lender,
-          amount: usd(120000),
-          note: null,
-        },
-      });
-      const settled = yield* alex.trips.get({ params: { tripId: group.tripId } });
-      expect(settled.balances).toEqual([]);
     }),
   );
 

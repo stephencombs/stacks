@@ -56,7 +56,7 @@ const parseCsv = (csv: string): ReadonlyArray<ReadonlyArray<string>> => {
 
 layer(TestApi.layer)("Export", (it) => {
   it.effect(
-    "exports every entry including voids, replacements, settlements and RFC 4180 escaping for any member",
+    "exports every entry including voids, replacements and RFC 4180 escaping for any member",
     () =>
       Effect.gen(function* () {
         const { owner, bea } = yield* users("owner", "bea");
@@ -150,18 +150,6 @@ layer(TestApi.layer)("Export", (it) => {
           params: { entryId: adjustment.id },
           payload: { reason: 'Wrong "player", redo' },
         });
-        const settlement = yield* bea.ledger.recordSettlement({
-          params: { tripId: trip.id },
-          payload: {
-            id: ids.entry(),
-            fromPlayerId: beaPlayer!.id,
-            toPlayerId: alexPlayer!.id,
-            amount: usd(5_000),
-            occurredAt: DateTime.makeUnsafe("2026-10-21T22:00:00Z"),
-            note: "Zelle",
-          },
-        });
-
         // Non-admin member exports freely.
         const csv = yield* bea.groups.exportCsv({ params: { groupId } });
         const [header, ...rows] = parseCsv(csv);
@@ -184,7 +172,7 @@ layer(TestApi.layer)("Export", (it) => {
           "void_reason",
           "replaces_entry_id",
         ]);
-        expect(rows).toHaveLength(4);
+        expect(rows).toHaveLength(3);
 
         expect(rows[0]).toEqual([
           firstBuyIn.id,
@@ -238,24 +226,6 @@ layer(TestApi.layer)("Export", (it) => {
           "true",
           expect.stringMatching(/^20\d\d-/),
           'Wrong "player", redo',
-          "",
-        ]);
-        expect(rows[3]).toEqual([
-          settlement.id,
-          "2026-10-21T22:00:00.000Z",
-          'Fall "26", Vegas',
-          "",
-          "",
-          "",
-          "settlement",
-          "Bea, Jr.",
-          'Alex "Ace"',
-          "50.00",
-          "USD",
-          "Zelle",
-          "false",
-          "",
-          "",
           "",
         ]);
       }),

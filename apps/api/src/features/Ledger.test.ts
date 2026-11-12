@@ -4,8 +4,8 @@ import * as Effect from "effect/Effect";
 import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("a session from buy-in to settle up", (it) => {
-  it.effect("tracks results, debts and settlements", () =>
+it.layer(TestApi.layer, { timeout: "30 seconds" })("a session from buy-in to close", (it) => {
+  it.effect("tracks results and debts", () =>
     Effect.gen(function* () {
       const { alex, bea } = yield* users("alex", "bea");
       const group = yield* groupWith(alex, bea);
@@ -73,22 +73,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a session from buy-in to set
           { playerId: beaId, amount: 17000 },
         ]),
       );
-      expect(detail.transfers).toEqual([{ from: alexId, to: beaId, amount: 17000 }]);
-
-      yield* alex.ledger.recordSettlement({
-        params: { tripId: group.tripId },
-        payload: {
-          id: ids.entry(),
-          fromPlayerId: alexId,
-          toPlayerId: beaId,
-          amount: usd(17000),
-          note: "Venmo",
-        },
-      });
-      const settled = yield* bea.trips.get({ params: { tripId: group.tripId } });
-      expect(settled.balances).toEqual([]);
-      expect(settled.transfers).toEqual([]);
-      expect(settled.settlements).toHaveLength(1);
     }),
   );
 });
@@ -246,7 +230,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("ledger rules", (it) => {
 
   it.effect("rejects entries that break the ledger's rules", () =>
     Effect.gen(function* () {
-      const { alex, group, alexId, beaId, entry } = yield* setup;
+      const { alex, alexId, beaId, entry } = yield* setup;
       expect(
         yield* Effect.flip(
           entry(alex, { kind: "adjustment", playerId: alexId, amount: 100, counterpartyId: beaId }),
@@ -255,20 +239,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("ledger rules", (it) => {
       expect(
         yield* Effect.flip(
           entry(alex, { kind: "buy_in", playerId: alexId, amount: 100, counterpartyId: alexId }),
-        ),
-      ).toMatchObject({ _tag: "InvalidRequest" });
-      expect(
-        yield* Effect.flip(
-          alex.ledger.recordSettlement({
-            params: { tripId: group.tripId },
-            payload: {
-              id: ids.entry(),
-              fromPlayerId: alexId,
-              toPlayerId: alexId,
-              amount: usd(100),
-              note: null,
-            },
-          }),
         ),
       ).toMatchObject({ _tag: "InvalidRequest" });
     }),

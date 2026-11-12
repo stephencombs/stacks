@@ -25,7 +25,6 @@ export const placeTabsConfig = {
 const icons: Record<string, IconName> = {
   Sessions: "sessions",
   Board: "board",
-  "Settle up": "settle",
   Group: "group",
 };
 

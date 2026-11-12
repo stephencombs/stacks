@@ -16,13 +16,13 @@ export interface PlayerResult {
   readonly net: MinorUnits;
 }
 
-/** Each player's result across the given entries. Voided entries and settlements don't count. */
+/** Each player's result across the given entries. Voided entries don't count. */
 export const playerResults = (
   entries: Iterable<ResultEntry>,
 ): ReadonlyMap<PlayerId, PlayerResult> => {
   const totals = new Map<PlayerId, { buyIn: number; cashOut: number; adjustment: number }>();
   for (const entry of entries) {
-    if (entry.voidedAt !== null || entry.kind === "settlement") continue;
+    if (entry.voidedAt !== null) continue;
     const player = totals.get(entry.playerId) ?? { buyIn: 0, cashOut: 0, adjustment: 0 };
     if (entry.kind === "buy_in") player.buyIn += entry.amount;
     else if (entry.kind === "cash_out") player.cashOut += entry.amount;

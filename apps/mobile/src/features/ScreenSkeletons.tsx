@@ -141,8 +141,8 @@ function HeroSkeleton({
 }
 
 /*
- * The places. Board and Settle up draw their title (and the Board its This trip / All time
- * switch) before anything loads, so their skeletons start below it.
+ * The places. The Board draws its title and its This trip / All time
+ * switch before anything loads, so its skeleton starts below it.
  */
 
 /**
@@ -206,20 +206,6 @@ export function AllTimeSkeleton() {
         <SkeletonText size="sm" className="w-44" />
       </View>
       <Skeleton className="h-[190px] rounded-xl" />
-    </SkeletonScreen>
-  );
-}
-
-/** Settle up loading: your balance under its heading and Share, then who pays whom. */
-export function SettleUpSkeleton() {
-  return (
-    <SkeletonScreen label="Loading settle up">
-      <SectionSkeleton action>
-        <HeroSkeleton chart={false} tiles={false} />
-      </SectionSkeleton>
-      <SectionSkeleton>
-        <RowsSkeleton rows={3} chip meta={false} />
-      </SectionSkeleton>
     </SkeletonScreen>
   );
 }
@@ -359,7 +345,7 @@ export function PeopleSkeleton() {
   );
 }
 
-/** Group settings loading, titled by its header: payment apps, the ledger, and leaving. */
+/** Group settings loading, titled by its header: the ledger and leaving. */
 export function SettingsSkeleton() {
   return (
     <SkeletonScreen label="Loading settings">

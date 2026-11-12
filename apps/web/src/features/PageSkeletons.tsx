@@ -249,7 +249,7 @@ export function TripPageSkeleton({
   on,
   scope = "trip",
 }: {
-  on: "sessions" | "board" | "settle";
+  on: "sessions" | "board";
   scope?: "trip" | "all";
 }) {
   const params: { tripId?: string } = useParams({ strict: false });
@@ -268,27 +268,14 @@ export function TripPageSkeleton({
         </TripLayout>
       </SkeletonPage>
     );
-  if (on === "board")
-    return (
-      <SkeletonPage label="Loading the board">
-        <HeaderSkeleton title="w-28">
-          <Skeleton className="h-12 w-48 rounded-lg pointer-coarse:h-[52px]" />
-        </HeaderSkeleton>
-        <HeroSkeleton chart={scope === "trip" ? "race" : "line"} tiles={scope === "all"} />
-        <SectionSkeleton aside={scope === "trip"}>
-          <RowsSkeleton rows={5} chip />
-        </SectionSkeleton>
-      </SkeletonPage>
-    );
   return (
-    <SkeletonPage label="Loading settle up">
-      <HeaderSkeleton />
-      <HeroSkeleton chart={null} tiles={false} />
-      <SectionSkeleton>
-        <RowsSkeleton rows={2} chip />
-      </SectionSkeleton>
-      <SectionSkeleton>
-        <RowsSkeleton rows={5} chip meta={false} />
+    <SkeletonPage label="Loading the board">
+      <HeaderSkeleton title="w-28">
+        <Skeleton className="h-12 w-48 rounded-lg pointer-coarse:h-[52px]" />
+      </HeaderSkeleton>
+      <HeroSkeleton chart={scope === "trip" ? "race" : "line"} tiles={scope === "all"} />
+      <SectionSkeleton aside={scope === "trip"}>
+        <RowsSkeleton rows={5} chip />
       </SectionSkeleton>
     </SkeletonPage>
   );
@@ -406,7 +393,7 @@ export function GroupPageSkeleton({ on }: { on: "hub" | "people" | "settings" })
 }
 
 /** Fields at the height of real ones, each with its label. */
-export function FieldsSkeleton({ fields }: { fields: number }) {
+function FieldsSkeleton({ fields }: { fields: number }) {
   return (
     <div className="flex flex-col gap-5">
       {keys(fields).map((key) => (

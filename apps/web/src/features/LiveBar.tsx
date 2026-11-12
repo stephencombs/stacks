@@ -17,7 +17,7 @@ export function LiveBar({ inline = false }: { inline?: boolean }) {
   const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
   const seat = groups.flatMap((item) => (item.mySession ? [item.mySession] : []))[0];
   if (!seat) return null;
-  if (!inline && /^\/trips\/[^/]+\/(sessions\/new|settle)\/?$/.test(pathname)) return null;
+  if (!inline && /^\/trips\/[^/]+\/sessions\/new\/?$/.test(pathname)) return null;
   // The session itself, and its trip's Sessions, where the live card comes first, already show it.
   if (
     pathname === `/sessions/${seat.id}` ||

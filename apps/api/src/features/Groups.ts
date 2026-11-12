@@ -9,11 +9,9 @@ import {
   NotFound,
   type CreateGroupRequest,
   GroupId,
-  PlayerId,
   SessionId,
   TripId,
   type GroupListItem,
-  type SetPaymentHandlesRequest,
   type SetRoleRequest,
   UserId,
 } from "@stacks/contracts";
@@ -153,25 +151,10 @@ export const get = Effect.fn("Groups.get")(function* (groupId: GroupId) {
   return yield* Views.groupDetail(yield* Access.membership(groupId));
 });
 
-/** Whether the member still owes or is owed anything in any of the group's trips. */
-const unsettled = Effect.fn("Groups.unsettled")(function* (member: Access.Membership) {
-  const sql = yield* SqlClient.SqlClient;
-  const trips = yield* sql`select id from trips where group_id = ${member.groupId}`.pipe(
-    Effect.flatMap(Access.decodeRows(Schema.Struct({ id: TripId }))),
-  );
-  const ledgers = yield* Effect.forEach(trips, (trip) => Views.tripLedger(trip.id), {
-    concurrency: "unbounded",
-  });
-  return ledgers.some(({ owed }) => (owed.get(member.playerId) ?? 0) !== 0);
-});
-
 export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const member = yield* Access.membership(groupId);
-  if (yield* unsettled(member)) {
-    return yield* new Conflict({ reason: "balance_not_settled" });
-  }
   if (member.role === "owner") {
     const [others] = yield* sql`
       select count(*)::int as count from memberships
@@ -235,31 +218,4 @@ export const setRole = Effect.fn("Groups.setRole")(function* (
     where group_id = ${groupId} and user_id = ${targetUserId}
   `;
   return ok;
-});
-
-export const setPaymentHandles = Effect.fn("Groups.setPaymentHandles")(function* (
-  groupId: GroupId,
-  playerId: PlayerId,
-  request: typeof SetPaymentHandlesRequest.Type,
-) {
-  const sql = yield* SqlClient.SqlClient;
-  const member = yield* Access.membership(groupId);
-  const [target] = yield* sql`
-    select id, user_id from players where id = ${playerId} and group_id = ${groupId}
-  `.pipe(
-    Effect.flatMap(
-      Access.decodeRows(Schema.Struct({ id: PlayerId, userId: Schema.NullOr(UserId) })),
-    ),
-  );
-  if (!target) return yield* new NotFound({ resource: "player" });
-  if (target.id !== member.playerId) {
-    if (target.userId !== null) return yield* new Forbidden({ reason: "not_your_player" });
-    yield* Access.requireAdmin(member);
-  }
-  yield* sql`
-    update players
-    set venmo = ${request.venmo}, cash_app = ${request.cashApp}, paypal = ${request.paypal}
-    where id = ${playerId} and group_id = ${groupId}
-  `;
-  return yield* Views.groupDetail(member);
 });

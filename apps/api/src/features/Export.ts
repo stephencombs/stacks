@@ -77,9 +77,9 @@ export const forGroup = Effect.fn("Export.forGroup")(function* (groupId: GroupId
           e.void_reason,
           e.replaces_entry_id
         from entries e
-        left join sessions s on s.id = e.session_id
-        left join venues v on v.id = s.venue_id
-        left join trips t on t.id = coalesce(e.trip_id, s.trip_id)
+        join sessions s on s.id = e.session_id
+        join venues v on v.id = s.venue_id
+        join trips t on t.id = s.trip_id
         join players p on p.id = e.player_id
         left join players cp on cp.id = e.counterparty_id
         where e.group_id = ${groupId}

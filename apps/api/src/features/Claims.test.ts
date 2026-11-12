@@ -7,7 +7,6 @@ import { groupWith, ids, users } from "../testing/fixtures.ts";
 import {
   device,
   rebuy,
-  repay,
   seatNew,
   sharedTable,
   signedIn,
@@ -30,7 +29,6 @@ const footprint = Effect.fn("test.footprint")(function* (players: ReadonlyArray<
     tables: number;
     visits: number;
     entries: number;
-    repayments: number;
     operations: number;
   }>`
     select
@@ -39,8 +37,6 @@ const footprint = Effect.fn("test.footprint")(function* (players: ReadonlyArray<
       (select count(*) from personal_visits where player_id in ${mine})::int as visits,
       (select count(*) from personal_entries e join personal_visits v on v.id = e.visit_id
         where v.player_id in ${mine})::int as entries,
-      (select count(*) from repayments
-        where from_player_id in ${mine} or to_player_id in ${mine})::int as repayments,
       (select count(*) from personal_operations where player_id in ${mine})::int as operations
   `;
   return row!;
@@ -87,15 +83,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       const table = yield* sharedTable();
       const { starter, opened } = table;
       const { recorder: guest, player, sat } = yield* joined(table);
-      const repaid = yield* guest.push(
-        rebuy(guest.identity, sat.visitId),
-        repay(guest.identity, player.id, starter.identity.playerId, 2500),
-      );
-      expect(repaid).toEqual(["accepted", "accepted"]);
+      expect(yield* guest.push(rebuy(guest.identity, sat.visitId))).toEqual(["accepted"]);
 
       const players = [starter.identity.playerId, guest.identity.playerId, player.id];
       const before = yield* footprint(players);
-      expect(before).toMatchObject({ players: 3, tables: 1, visits: 2, entries: 3, repayments: 1 });
+      expect(before).toMatchObject({ players: 3, tables: 1, visits: 2, entries: 3 });
 
       const alex = yield* signedIn(handle("alex"), guest.identity);
       const result = yield* alex.client.claim.claimActor({ payload: guest.credential });
@@ -120,8 +112,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       ]);
       expect(history.visits.map((visit) => visit.id)).toEqual([sat.visitId]);
       expect(history.entries).toHaveLength(2);
-      const { pairs } = yield* alex.client.recording.balances();
-      expect(pairs.map((pair) => pair.counterparty.id)).toEqual([starter.identity.playerId]);
 
       // The account records as the player now; the table's other play isn't theirs.
       expect(yield* alex.push(rebuy(guest.identity, sat.visitId, 1))).toEqual(["accepted"]);
@@ -139,7 +129,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       const theirs = yield* stranger.client.recording.history();
       expect(theirs.tables.map((item) => item.id)).not.toContain(opened.tableId);
       expect(theirs.visits.map((visit) => visit.id)).not.toContain(sat.visitId);
-      expect((yield* stranger.client.recording.balances()).pairs).toEqual([]);
       expect(
         yield* stranger.client.recording
           .table({ params: { tableId: opened.tableId } })

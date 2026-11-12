@@ -31,7 +31,6 @@ import { PlayerName } from "~/features/Player";
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
 import { SeatHero, TableStats } from "~/features/SeatHero";
 import { TableMap } from "~/features/TableMap";
-import { LimitNotices } from "~/features/PersonalLimits";
 import { Tonight } from "~/features/TripBoard";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
@@ -214,23 +213,6 @@ export function SessionView({
       >
         {notes}
       </PageHeader>
-
-      <Loaded query={stacks.trip(session.tripId)} skeleton={<></>}>
-        {(trip) => (
-          <LimitNotices
-            group={group}
-            trip={trip}
-            local={{
-              sessionId: session.id,
-              status: session.status,
-              myJoinedAt: detail.myJoinedAt ?? null,
-              playing:
-                detail.playerIds.includes(group.myPlayerId) && !cashedOut.has(group.myPlayerId),
-              net: resultOf.get(group.myPlayerId)?.net ?? MinorUnits.make(0),
-            }}
-          />
-        )}
-      </Loaded>
 
       {heroPlayerId ? (
         <SeatHero
@@ -455,19 +437,17 @@ export function SessionView({
                     <Menu
                       label={`Actions for ${names.get(entry.playerId)} ${verbs[entry.kind]} ${formatMoney(entry.amount, currency)}`}
                     >
-                      {entry.kind !== "settlement" ? (
-                        <MenuItem
-                          onClick={() =>
-                            setDraft({
-                              kind: entry.kind as EntryDraft["kind"],
-                              playerId: entry.playerId,
-                              replaces: entry,
-                            })
-                          }
-                        >
-                          Correct
-                        </MenuItem>
-                      ) : null}
+                      <MenuItem
+                        onClick={() =>
+                          setDraft({
+                            kind: entry.kind as EntryDraft["kind"],
+                            playerId: entry.playerId,
+                            replaces: entry,
+                          })
+                        }
+                      >
+                        Correct
+                      </MenuItem>
                       <MenuItem tone="danger" onClick={() => setVoiding(entry)}>
                         Void
                       </MenuItem>
@@ -623,7 +603,6 @@ const verbs = {
   buy_in: "bought in",
   cash_out: "cashed out",
   adjustment: "adjusted",
-  settlement: "paid",
 } as const;
 
 function EntryRow({

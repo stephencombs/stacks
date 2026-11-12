@@ -1,6 +1,6 @@
 # Stacks
 
-A casino-session ledger for groups of friends: log buy-ins and cash-outs, see everyone's results, and settle up who owes whom. Web and native iOS/Android apps share one core. See `PLAN.md` for scope and phases.
+A casino-session ledger for groups of friends: log buy-ins and cash-outs, and see everyone's results and who owes whom. Web and native iOS/Android apps share one core. See `PLAN.md` for scope and phases.
 
 ## Layout
 
@@ -27,7 +27,7 @@ pnpm dev          # API on :8787 and web on :5173 (Vite proxies /api)
 pnpm dev:mobile   # Metro for the Expo dev client
 ```
 
-The seed builds one group with four players, 30 sessions and some settlements. `venues:import` loads every casino in OpenStreetMap (or `--file` with a saved Overpass export).
+The seed builds one group with four players, 30 sessions. `venues:import` loads every casino in OpenStreetMap (or `--file` with a saved Overpass export).
 
 In Clerk, add `name` and `picture` claims to the session token (Sessions → Customize session token: `{"name": "{{user.full_name}}", "picture": "{{user.image_url}}"}`) so the API knows what to call people.
 
@@ -57,7 +57,7 @@ The mobile `preview` build profile in `apps/mobile/eas.json` points at the deplo
 
 ## End-to-end test
 
-`pnpm --filter @stacks/web test:e2e` runs the whole loop in a browser against your Clerk development instance: two people make a group, invite each other, play a session, close it and settle up. It creates throwaway Clerk users (`+clerk_test` emails and 555-01XX numbers, which Clerk never messages) and deletes them afterwards. It starts the API and web dev servers itself, and needs Postgres running. Set `E2E_SCREENSHOT_DIR` to save desktop and phone screenshots, or `E2E_BASE_URL` to run it against a deployed site instead. CI runs the web and mobile suites on every push to `main` and nightly; that needs the repo secret `CLERK_SECRET_KEY`.
+`pnpm --filter @stacks/web test:e2e` runs the whole loop in a browser against your Clerk development instance: two people make a group, invite each other, play a session and close it. It creates throwaway Clerk users (`+clerk_test` emails and 555-01XX numbers, which Clerk never messages) and deletes them afterwards. It starts the API and web dev servers itself, and needs Postgres running. Set `E2E_SCREENSHOT_DIR` to save desktop and phone screenshots, or `E2E_BASE_URL` to run it against a deployed site instead. CI runs the web and mobile suites on every push to `main` and nightly; that needs the repo secret `CLERK_SECRET_KEY`.
 
 ## Check
 

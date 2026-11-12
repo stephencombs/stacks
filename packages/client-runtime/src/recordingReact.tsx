@@ -1,12 +1,4 @@
-import {
-  UserId,
-  type ActorId,
-  type PairHistory,
-  type PlayerBalances,
-  type PlayerId,
-  type TableId,
-  type VisitId,
-} from "@stacks/contracts";
+import { UserId, type ActorId, type PlayerId, type TableId, type VisitId } from "@stacks/contracts";
 import type {
   JoinedTable,
   PlayerAccess,
@@ -20,7 +12,6 @@ import * as Fiber from "effect/Fiber";
 import {
   createContext,
   use,
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -30,7 +21,6 @@ import {
 } from "react";
 
 import { describeError } from "./errors.ts";
-import { pendingPayments } from "./playerMoney.ts";
 import {
   makeRecordingStore,
   RecordingError,
@@ -52,7 +42,6 @@ import {
   canRetryRecording,
   claimLines,
   describeRecordingError,
-  paymentSyncView,
   PRIVATE_RECORDING_NAMESPACE,
   recordingHome,
   recordingSyncView,
@@ -496,91 +485,3 @@ const describeInviteError = (error: unknown) => {
 };
 
 export type { ActorKeyStorage } from "./recordingSync.ts";
-
-/** A server read: loading, failed with a sentence to show, or ready. */
-export type RemoteResult<A> =
-  | { readonly status: "loading" }
-  | { readonly status: "error"; readonly error: string }
-  | { readonly status: "ready"; readonly value: A };
-
-/**
- * Reads from the server through the recording sync, again whenever `key` changes or on `reload`.
- * With no sync (a device that never synced) it's `offline` at once: there's nobody to owe yet.
- */
-const useRemote = <A,>(read: (sync: RecordingSync) => Promise<A>, key: string, offline: A) => {
-  const sync = use(RecordingSyncContext);
-  const [round, setRound] = useState(0);
-  const request = `${key}:${round}`;
-  const [held, setHeld] = useState<{ request: string; result: RemoteResult<A> } | null>(null);
-  useEffect(() => {
-    if (!sync) return;
-    let current = true;
-    read(sync).then(
-      (value) => current && setHeld({ request, result: { status: "ready", value } }),
-      (cause) =>
-        current && setHeld({ request, result: { status: "error", error: describeError(cause) } }),
-    );
-    return () => {
-      current = false;
-    };
-  }, [sync, request, read]);
-  const result: RemoteResult<A> = !sync
-    ? { status: "ready", value: offline }
-    : held?.request === request
-      ? held.result
-      : { status: "loading" };
-  return { result, reload: () => setRound((n) => n + 1) };
-};
-
-const noBalances: PlayerBalances = { pairs: [] };
-const readBalances = (sync: RecordingSync) => sync.balances();
-
-/** What the device's players and the people they've shared a table with owe each other. */
-export const usePlayerBalances = () => useRemote(readBalances, "balances", noBalances);
-
-/**
- * Everything between this device's player and `playerId`, fetched again as this device's payments
- * sync. Null when there's nobody to settle with: the device never synced.
- */
-export const usePlayerPair = (playerId: PlayerId) => {
-  const store = useRecordingStore();
-  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  const read = useCallback((sync: RecordingSync) => sync.pair(playerId), [playerId]);
-  const remote = useRemote<PairHistory | null>(
-    read,
-    `${playerId}:${snapshot.state?.sync?.synced.length ?? 0}`,
-    null,
-  );
-  return { ...remote, state: snapshot.state };
-};
-
-/** Payments on this device the server hasn't confirmed, optionally with one counterparty. */
-export const usePendingPayments = (counterpartyId?: PlayerId) => {
-  const store = useRecordingStore();
-  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  return useMemo(
-    () => pendingPayments(snapshot.state, counterpartyId),
-    [snapshot.state, counterpartyId],
-  );
-};
-
-/** The sync line and refused payments, with the same record-again and discard as play. */
-export const usePaymentSync = () => {
-  const store = useRecordingStore();
-  const sync = use(RecordingSyncContext);
-  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  const status = useSyncExternalStore(sync?.subscribe ?? noSubscription, sync?.getStatus ?? idle);
-  const view = useMemo(() => paymentSyncView(snapshot.state, status), [snapshot.state, status]);
-  const [error, setError] = useState<string | null>(null);
-  const resolve =
-    (action: "recordAgain" | "discard") => async (operationId: RecordingOperationId) => {
-      if (!sync) return;
-      setError(null);
-      try {
-        await sync[action](operationId);
-      } catch (cause) {
-        setError(describeRecordingError(cause));
-      }
-    };
-  return { ...view, error, recordAgain: resolve("recordAgain"), discard: resolve("discard") };
-};

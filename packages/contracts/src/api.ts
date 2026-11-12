@@ -1,5 +1,4 @@
 import * as Schema from "effect/Schema";
-import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as HttpApi from "effect/http-api/HttpApi";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
@@ -26,7 +25,6 @@ import {
 import { Entry, Game, Seat, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import { PlayerIdentity } from "./players.ts";
-import { PairHistory, PlayerBalances } from "./relationships.ts";
 import {
   ActorCredential,
   ClaimActorRequest,
@@ -52,7 +50,6 @@ import {
   InvitePreview,
   SessionDetail,
   TripDetail,
-  UserLimits,
   Venue,
   VenueKind,
 } from "./views.ts";
@@ -66,30 +63,6 @@ export type HealthResponse = typeof HealthResponse.Type;
 const Name = (maxLength: number) =>
   Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(maxLength));
 const Note = Schema.String.check(Schema.isMaxLength(280));
-
-const normalizedHandle = (pattern: RegExp, stripPrefix: RegExp) =>
-  Schema.String.check(Schema.isPattern(pattern)).pipe(
-    Schema.decodeTo(
-      Schema.String,
-      SchemaTransformation.transform({
-        decode: (value) => value.trim().replace(stripPrefix, ""),
-        encode: (value) => value,
-      }),
-    ),
-  );
-
-export const VenmoHandleInput = normalizedHandle(/^\s*@?[A-Za-z0-9_-]{1,30}\s*$/, /^@/);
-export const CashAppHandleInput = normalizedHandle(/^\s*\$?[A-Za-z0-9_-]{1,20}\s*$/, /^\$/);
-export const PayPalHandleInput = normalizedHandle(
-  /^\s*(?:(?:https?:\/\/)?(?:www\.)?(?:paypal\.me|paypal\.com\/paypalme)\/|@)?[A-Za-z0-9_-]{1,30}\s*$/i,
-  /^(?:(?:https?:\/\/)?(?:www\.)?(?:paypal\.me|paypal\.com\/paypalme)\/|@)/i,
-);
-
-export const SetPaymentHandlesRequest = Schema.Struct({
-  venmo: Schema.NullOr(VenmoHandleInput),
-  cashApp: Schema.NullOr(CashAppHandleInput),
-  paypal: Schema.NullOr(PayPalHandleInput),
-});
 
 export const CreateGroupRequest = Schema.Struct({
   id: GroupId,
@@ -162,15 +135,6 @@ export const AddEntryRequest = Schema.Struct({
 });
 
 export const VoidEntryRequest = Schema.Struct({ reason: Schema.NullOr(Note) });
-
-export const RecordSettlementRequest = Schema.Struct({
-  id: EntryId,
-  fromPlayerId: PlayerId,
-  toPlayerId: PlayerId,
-  amount: MinorUnits.check(Schema.isGreaterThan(0)),
-  occurredAt: Schema.optionalKey(Schema.DateTimeUtc),
-  note: Schema.NullOr(Note),
-});
 
 export const MoveSessionRequest = Schema.Struct({ tripId: TripId });
 
@@ -273,18 +237,6 @@ const GroupsGroup = HttpApiGroup.make("groups")
       success: Ok,
       error: [Forbidden, NotFound, Conflict],
     }),
-  )
-  .add(
-    HttpApiEndpoint.post(
-      "setPaymentHandles",
-      "/groups/:groupId/players/:playerId/payment-handles",
-      {
-        params: Schema.Struct({ groupId: GroupId, playerId: PlayerId }),
-        payload: SetPaymentHandlesRequest,
-        success: GroupDetail,
-        error: [Forbidden, NotFound],
-      },
-    ),
   )
   .middleware(Authentication);
 
@@ -469,14 +421,6 @@ const LedgerGroup = HttpApiGroup.make("ledger")
       error: [Forbidden, NotFound, Conflict, InvalidRequest],
     }),
   )
-  .add(
-    HttpApiEndpoint.post("recordSettlement", "/trips/:tripId/settlements", {
-      params: tripParams,
-      payload: RecordSettlementRequest,
-      success: Entry,
-      error: [Forbidden, NotFound, Conflict, InvalidRequest],
-    }),
-  )
   .middleware(Authentication);
 
 const stakeParams = Schema.Struct({ stakeId: StakeId });
@@ -551,29 +495,6 @@ const TripsGroup = HttpApiGroup.make("trips")
       params: tripParams,
       success: Trip,
       error: [Forbidden, NotFound, Conflict],
-    }),
-  )
-  .middleware(Authentication);
-
-export const UpdateLimitsRequest = Schema.Struct({
-  lossLimit: Schema.NullOr(MinorUnits.check(Schema.isGreaterThan(0))),
-  sessionReminderMinutes: Schema.NullOr(Schema.Literals([120, 180, 240])),
-});
-
-const LimitsGroup = HttpApiGroup.make("limits")
-  .add(
-    HttpApiEndpoint.get("get", "/trips/:tripId/limits", {
-      params: tripParams,
-      success: UserLimits,
-      error: [Forbidden, NotFound],
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post("update", "/trips/:tripId/limits", {
-      params: tripParams,
-      payload: UpdateLimitsRequest,
-      success: UserLimits,
-      error: [Forbidden, NotFound],
     }),
   )
   .middleware(Authentication);
@@ -673,25 +594,6 @@ const RecordingGroup = HttpApiGroup.make("recording")
       error: [Conflict, NotFound, Unauthorized],
     }).annotate(OpenApi.Summary, "Records as the invited player from now on"),
   )
-  .add(
-    HttpApiEndpoint.get("balances", "/balances", {
-      success: PlayerBalances,
-      error: [Conflict, Unauthorized],
-    }).annotate(
-      OpenApi.Summary,
-      "What the caller's players and the people they've shared a table with owe each other",
-    ),
-  )
-  .add(
-    HttpApiEndpoint.get("pair", "/players/:playerId/pair", {
-      params: playerParams,
-      success: PairHistory,
-      error: [Conflict, NotFound, Unauthorized],
-    }).annotate(
-      OpenApi.Summary,
-      "The play and payments between the caller and someone they've shared a table with",
-    ),
-  )
   .middleware(RecordingAuthentication);
 
 /** Device actors register themselves, and share links are read without signing in. */
@@ -739,7 +641,6 @@ export class StacksApi extends HttpApi.make("stacks")
   .add(LedgerGroup)
   .add(StakesGroup)
   .add(TripsGroup)
-  .add(LimitsGroup)
   .add(RecordingGroup)
   .add(PublicRecordingGroup)
   .add(ClaimGroup)

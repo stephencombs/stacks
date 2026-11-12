@@ -1,18 +1,9 @@
 import { expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
-import {
-  CurrencyCode,
-  GroupId,
-  MinorUnits,
-  SessionId,
-  TripId,
-  UserId,
-  VenueId,
-} from "@stacks/contracts";
+import { CurrencyCode, GroupId, SessionId, TripId, UserId, VenueId } from "@stacks/contracts";
 
 import {
   awardLine,
-  balanceHeadline,
   boardMoney,
   localClock,
   makeLastTripStore,
@@ -25,7 +16,6 @@ import {
   streakLine,
   tripInScope,
   tripLines,
-  unsettledAmount,
 } from "./trip.ts";
 
 const usd = CurrencyCode.make("USD");
@@ -186,11 +176,6 @@ it("persists and notifies on last-viewed trip changes", () => {
   unsubscribe();
   store.set(first);
   expect(notifications).toBe(2);
-
-  expect(
-    unsettledAmount({ unsettled: [{ tripId: second, amount: MinorUnits.make(4500) }] }, second),
-  ).toBe(4500);
-  expect(unsettledAmount({ unsettled: [] }, second)).toBeNull();
 });
 
 it("names places on the board", () => {
@@ -221,20 +206,6 @@ it("says how far a trip climbed from its low, and how often it won", () => {
   expect(tripLines({ ...trip, low: 0 }, usd).climb).toBeNull();
   expect(tripLines({ ...trip, net: -12500 }, usd).climb).toBeNull();
   expect(tripLines({ ...trip, played: 0, won: 0 }, usd).winRate).toBe("–");
-});
-
-it("heads your balance by which way it runs and how many payments clear it", () => {
-  expect(balanceHeadline(18500, 1)).toEqual({
-    label: "You're owed",
-    tone: "win",
-    line: "One payment squares you up",
-  });
-  expect(balanceHeadline(-6000, 2)).toEqual({
-    label: "You owe",
-    tone: "loss",
-    line: "2 payments square you up",
-  });
-  expect(balanceHeadline(0, 0)).toEqual({ label: "You're square", tone: "accent", line: null });
 });
 
 it("leads the race with the gap to the next player, falling back to your result", () => {

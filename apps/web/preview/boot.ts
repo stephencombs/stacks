@@ -114,9 +114,7 @@ window.fetch = async (input, init) => {
             ? (joined = routes[url.pathname] as typeof joined)
             : (routes[url.pathname] ?? starterAnswer(url.pathname));
   // Stagger dependent queries a little, like a real network.
-  await new Promise((r) =>
-    setTimeout(r, delay + (url.pathname.endsWith("/limits") ? delay / 2 : 0)),
-  );
+  await new Promise((r) => setTimeout(r, delay));
   if (body === undefined)
     return new Response(JSON.stringify({ _tag: "NotFound" }), { status: 404 });
   return new Response(JSON.stringify(body), {

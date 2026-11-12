@@ -6,9 +6,7 @@ type BalanceEntry = Pick<Entry, "kind" | "playerId" | "counterpartyId" | "amount
  * What each player is owed (positive) or owes (negative), from non-voided entries:
  * - a buy-in someone else paid for: the player owes them the amount
  * - a cash-out someone else kept: they owe the player the amount
- * - a settlement: the payer's debt to the payee shrinks by the amount
- *
- * Players who are square are left out, so an empty map means everyone is settled.
+ * Players who are square are left out, so an empty map means everyone is square.
  * Balances always sum to zero.
  */
 export const balances = (entries: Iterable<BalanceEntry>): ReadonlyMap<PlayerId, MinorUnits> => {
@@ -22,33 +20,8 @@ export const balances = (entries: Iterable<BalanceEntry>): ReadonlyMap<PlayerId,
     if (entry.voidedAt !== null || entry.counterpartyId === null) continue;
     if (entry.kind === "buy_in") move(entry.playerId, entry.counterpartyId, entry.amount);
     else if (entry.kind === "cash_out") move(entry.counterpartyId, entry.playerId, entry.amount);
-    else if (entry.kind === "settlement") move(entry.counterpartyId, entry.playerId, entry.amount);
   }
 
-  const result = new Map<PlayerId, MinorUnits>();
-  for (const [playerId, total] of totals) {
-    if (total !== 0) result.set(playerId, MinorUnits.make(total));
-  }
-  return result;
-};
-
-/**
- * Balances after payments the server hasn't confirmed yet, so a screen can stop suggesting a
- * payment the moment it's recorded. Each payment moves `amount` of debt from `from` to `to`.
- */
-export const applyPayments = (
-  current: ReadonlyMap<PlayerId, MinorUnits>,
-  payments: Iterable<{
-    readonly from: PlayerId;
-    readonly to: PlayerId;
-    readonly amount: MinorUnits;
-  }>,
-): ReadonlyMap<PlayerId, MinorUnits> => {
-  const totals = new Map<PlayerId, number>(current);
-  for (const { from, to, amount } of payments) {
-    totals.set(from, (totals.get(from) ?? 0) + amount);
-    totals.set(to, (totals.get(to) ?? 0) - amount);
-  }
   const result = new Map<PlayerId, MinorUnits>();
   for (const [playerId, total] of totals) {
     if (total !== 0) result.set(playerId, MinorUnits.make(total));

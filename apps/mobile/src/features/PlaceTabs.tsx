@@ -23,7 +23,6 @@ export function useTabBarHeight() {
 const tabIcons: Record<string, IconName> = {
   SessionsTab: "sessions",
   BoardTab: "board",
-  SettleTab: "settle",
   GroupTab: "group",
 };
 

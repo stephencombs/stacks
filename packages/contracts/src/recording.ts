@@ -120,28 +120,6 @@ export const VisitRecording = Schema.Struct({
 );
 export type VisitRecording = typeof VisitRecording.Type;
 
-export const Repayment = Schema.Struct({
-  id: EntryId,
-  fromPlayerId: PlayerId,
-  toPlayerId: PlayerId,
-  amount: MinorUnits.check(Schema.isGreaterThan(0)),
-  currency: Schema.Literal("USD"),
-  occurredAt: Schema.DateTimeUtc,
-  note: Schema.NullOr(Schema.String),
-  /** Recording context, never an allocation of the payment against Trip debt. */
-  recordedFromTripId: Schema.NullOr(TripId),
-  ...auditFields,
-}).check(
-  Schema.makeFilter(
-    (repayment) =>
-      auditIssue(repayment) ??
-      (repayment.fromPlayerId === repayment.toPlayerId
-        ? { path: ["toPlayerId"], issue: "a repayment is between different players" }
-        : undefined),
-  ),
-);
-export type Repayment = typeof Repayment.Type;
-
 export const VisitTotals = Schema.Struct({
   buyIn: MinorUnits.check(Schema.isGreaterThanOrEqualTo(0)),
   cashOut: MinorUnits.check(Schema.isGreaterThanOrEqualTo(0)),

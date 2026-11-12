@@ -122,7 +122,6 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
     expect(step("Keep the casino trip honest.")?.getAttribute("data-hidden")).toBe("false");
     expect(step("Log it at the table.")?.getAttribute("data-hidden")).toBe("true");
     expect(step("Watch the board.")?.getAttribute("data-hidden")).toBe("true");
-    expect(step("Settle up once.")?.getAttribute("data-hidden")).toBe("true");
     expect(step("Start a group.")?.getAttribute("data-hidden")).toBe("true");
     expect(button("Create an account").closest("[data-hidden='true']")).not.toBeNull();
     expect(container.textContent).toContain("who owes whom");
@@ -138,7 +137,7 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          "[aria-label='Keep the casino trip honest., step 1 of 4']",
+          "[aria-label='Keep the casino trip honest., step 1 of 3']",
         )
         ?.click();
     });
@@ -147,8 +146,7 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
 
     await act(async () => button("Continue").click());
     await act(async () => button("Continue").click());
-    await act(async () => button("Continue").click());
-    expect(step("Settle up once.")?.getAttribute("data-hidden")).toBe("false");
+    expect(step("Watch the board.")?.getAttribute("data-hidden")).toBe("false");
     expect(button("Get started").textContent).toBe("Get started");
 
     await act(async () => button("Get started").click());
@@ -159,7 +157,7 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
 
     await act(async () => button("Back").click());
     expect(step("Start a group.")?.getAttribute("data-hidden")).toBe("true");
-    expect(step("Settle up once.")?.getAttribute("data-hidden")).toBe("false");
+    expect(step("Watch the board.")?.getAttribute("data-hidden")).toBe("false");
     expect(button("Skip").textContent).toBe("Skip");
   } finally {
     await act(async () => root.unmount());

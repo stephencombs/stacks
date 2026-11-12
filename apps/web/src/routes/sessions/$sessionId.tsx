@@ -13,24 +13,18 @@ function SessionPage() {
   return (
     <Loaded query={stacks.session(SessionId.make(sessionId))} skeleton={<SessionPageSkeleton />}>
       {(session) => (
-        // The page also shows the trip's limits, so it waits for those too rather than shifting,
-        // asking for everything at once.
+        // The page waits for the trip and group too rather than shifting, asking for everything at
+        // once.
         <>
           <Prefetch query={stacks.trip(session.session.tripId)} />
-          <Prefetch query={stacks.limits(session.session.tripId)} />
           <Prefetch query={stacks.group(session.session.groupId)} />
           <Settled query={stacks.trip(session.session.tripId)} skeleton={<SessionPageSkeleton />}>
-            <Settled
-              query={stacks.limits(session.session.tripId)}
+            <Loaded
+              query={stacks.group(session.session.groupId)}
               skeleton={<SessionPageSkeleton />}
             >
-              <Loaded
-                query={stacks.group(session.session.groupId)}
-                skeleton={<SessionPageSkeleton />}
-              >
-                {(group) => <SessionView session={session} group={group} />}
-              </Loaded>
-            </Settled>
+              {(group) => <SessionView session={session} group={group} />}
+            </Loaded>
           </Settled>
         </>
       )}

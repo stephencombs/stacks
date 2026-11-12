@@ -32,11 +32,9 @@ export function useGo() {
         },
       }),
     /** Puts a trip in scope and opens one of its places. */
-    trip: (tripId: TripId, place: "Sessions" | "Board" | "SettleUp" = "Sessions") => {
+    trip: (tripId: TripId, place: "Sessions" | "Board" = "Sessions") => {
       setTrip(tripId);
       if (place === "Board") places({ screen: "BoardTab", params: { screen: "Board" } });
-      else if (place === "SettleUp")
-        places({ screen: "SettleTab", params: { screen: "SettleUp" } });
       else places({ screen: "SessionsTab", params: { screen: "Sessions" } });
     },
     /** Puts a group in scope and opens its hub. */

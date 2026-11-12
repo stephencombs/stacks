@@ -1,5 +1,4 @@
 import { useClerk, useUser } from "@clerk/expo";
-import { useNavigation } from "@react-navigation/native";
 import { useAtomValue } from "@effect/atom-react";
 import type { GroupListItem } from "@stacks/contracts";
 import { themeChoices } from "@stacks/client-runtime/theme";
@@ -11,13 +10,11 @@ import { Pressable, Text, View } from "react-native";
 import { Button } from "../components/ui/Button";
 import { Choice } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
-import { Card, SectionHeading, Skeleton } from "../components/ui/Surface";
+import { Card } from "../components/ui/Surface";
 import { useScope } from "../lib/scope";
-import { Loaded, TripLoaded, useStacks } from "../lib/stacks";
+import { useStacks } from "../lib/stacks";
 import { setTheme, useTheme } from "../lib/theme";
 import { Chip } from "./Chip";
-import { SettleUpLink } from "./Personal";
-import { PlayLimits } from "./PersonalLimits";
 
 /** Your chip, top right of every screen: everything that's only about you opens from it. */
 export function YouButton() {
@@ -30,7 +27,7 @@ export function YouButton() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="You"
-        accessibilityHint="Your play limits, appearance and account"
+        accessibilityHint="Your appearance and account"
         onPress={() => setOpen(true)}
         hitSlop={6}
         className="size-11 items-center justify-center rounded-full border border-line bg-surface active:scale-[0.95]"
@@ -57,9 +54,7 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
   const { user } = useUser();
   const { signOut } = useClerk();
   const { scope } = useScope();
-  const stacks = useStacks();
   const theme = useTheme();
-  const navigation = useNavigation();
   const email = user?.primaryEmailAddress?.emailAddress;
   return (
     <Sheet
@@ -85,40 +80,6 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
           ) : null}
         </View>
       </Card>
-      <View className="gap-2">
-        <SectionHeading>Play limits</SectionHeading>
-        {scope?.trip ? (
-          <Text className="type-footnote text-muted">
-            {scope.item.group.name} · {scope.trip.name}
-          </Text>
-        ) : null}
-        {scope?.trip ? (
-          <TripLoaded tripId={scope.trip.id} skeleton={<Skeleton className="h-56 rounded-xl" />}>
-            {(trip, group) => (
-              <Loaded query={stacks.limits(trip.trip.id)} skeleton={<></>}>
-                {(limits) => (
-                  <PlayLimits
-                    key={`${limits.lossLimit}-${limits.currency}-${limits.sessionReminderMinutes}`}
-                    group={group}
-                    trip={trip}
-                    limits={limits}
-                  />
-                )}
-              </Loaded>
-            )}
-          </TripLoaded>
-        ) : (
-          <Text className="text-sm text-muted">
-            A loss limit belongs to a trip. Start one, and you can set yours here.
-          </Text>
-        )}
-      </View>
-      <SettleUpLink
-        onPress={() => {
-          onClose();
-          navigation.navigate("PlayerBalances");
-        }}
-      />
       <Choice label="Appearance" options={themeChoices} value={theme} onChange={setTheme} />
     </Sheet>
   );

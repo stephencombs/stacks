@@ -2,13 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import {
-  chipOf,
-  localClock,
-  scopeTrips,
-  tripDates,
-  unsettledAmount,
-} from "@stacks/client-runtime/trip";
+import { chipOf, localClock, scopeTrips, tripDates } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { Plus } from "lucide-react";
@@ -27,16 +21,15 @@ import { Chip } from "./Chip";
 const localDay = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
-/** The group's trips, going ones first, each with its leaders or what's left to settle. */
+/** The group's trips, going ones first, each with its leaders. */
 export function TripsSection({ detail, seatTripId }: { detail: GroupDetail; seatTripId?: TripId }) {
   const stacks = useStacks();
   if (detail.trips.length === 0) return <FirstTripSection detail={detail} />;
   return (
     <Section title="Trips" action={<StartTripButton detail={detail} />}>
       <List>
-        {scopeTrips(detail.trips).map((trip) => {
-          const left = unsettledAmount(detail, trip.id);
-          return trip.endedAt === null ? (
+        {scopeTrips(detail.trips).map((trip) =>
+          trip.endedAt === null ? (
             <RowLink key={trip.id} to="/trips/$tripId" params={{ tripId: trip.id }}>
               <span className="flex min-w-0 flex-1 flex-col gap-2">
                 <span className="flex items-center gap-3">
@@ -58,20 +51,11 @@ export function TripsSection({ detail, seatTripId }: { detail: GroupDetail; seat
               </span>
             </RowLink>
           ) : (
-            <RowLink
-              key={trip.id}
-              to={left !== null ? "/trips/$tripId/settle" : "/trips/$tripId"}
-              params={{ tripId: trip.id }}
-            >
+            <RowLink key={trip.id} to="/trips/$tripId" params={{ tripId: trip.id }}>
               <RowText title={trip.name} meta={tripDates(trip)} />
-              {left !== null ? (
-                <span className="shrink-0 text-sm font-medium text-accent-text">
-                  <Money amount={left} currency={detail.group.currency} /> left to settle
-                </span>
-              ) : null}
             </RowLink>
-          );
-        })}
+          ),
+        )}
       </List>
     </Section>
   );
@@ -141,7 +125,7 @@ export function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onCl
       open
       onOpenChange={(open) => (open ? undefined : onClose())}
       title="New trip"
-      description={`Sessions you start in it go on its board and settle up on their own, in ${detail.group.name}.`}
+      description={`Sessions you start in it go on its board, in ${detail.group.name}.`}
     >
       <TripForm
         detail={detail}

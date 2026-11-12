@@ -57,7 +57,6 @@ export const ConflictReason = Schema.Literals([
   "session_open",
   "players_not_cashed_out",
   "entry_voided",
-  "balance_not_settled",
   "stake_voided",
   "stake_ended",
   "stake_open",

@@ -81,18 +81,18 @@ An error beside one field goes in `error`. A failure of the whole form, such as 
 
 A row runs chip, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` (`font-semibold` for primary feed titles on mobile) text, not display type.
 
-On mobile, four specialized row/card patterns handle feeds, breakdowns, limits and settings:
+On mobile, four specialized row/card patterns handle feeds, breakdowns, backing and settings:
 
 1. **Feed & Status Rows (`screens/Home.tsx`, `screens/Sessions.tsx`, `features/SessionList.tsx`)**: Two-line rows with a `rounded-lg` player/venue monogram `Chip` on the left, sentence-case title + right-aligned relative timestamp or live badge (`Live · 2h 14m` with spinner/dot) on the top line, and venue/trip metadata + tabular `Money` result on the bottom line.
 2. **Proportional Breakdown Rows (`ProportionalBarRow` in `components/ui/Surface.tsx`, used by `features/TripBoard.tsx` and `features/AllTimeBoard.tsx`)**: Grouped inside a `rounded-2xl bg-surface` card under a muted `type-section` header. Each row displays a color dot or `Chip` + title on the left and tabular `Money` on the right, a thin (`4px` high, `rounded-full`) horizontal **progress** bar in the middle scaled to share of total, and a muted `type-footnote` line below (`64.9% of buy-ins · 8 sessions · +$52/hr`).
-3. **Quota & Pace Cards (`QuotaCard` in `components/ui/Surface.tsx`, used by `features/PersonalLimits.tsx`, `features/SettleUp.tsx`, `features/Backing.tsx`)**: A `rounded-2xl bg-surface p-5` card with a sentence-case title on the left, pace status (`Within limit`, `Ahead of pace`) on the right, a `type-hero` tabular readout (`87% left` or `$410 left`), a `24px`-high `rounded-md` progress bar combining a solid fill, diagonal SVG hatch stripes for the consumed/remaining portion, and a vertical `2px` pace tick mark (`|`), plus a reset or settlement metadata footer (`↻ Resets in 6d 14h`).
+3. **Quota & Pace Cards (`QuotaCard` in `components/ui/Surface.tsx`, used by `features/Backing.tsx`)**: A `rounded-2xl bg-surface p-5` card with a sentence-case title on the left, pace status on the right, a `type-hero` tabular readout (`87% left` or `$410 left`), a `24px`-high `rounded-md` progress bar combining a solid fill, diagonal SVG hatch stripes for the consumed/remaining portion, and a vertical `2px` pace tick mark (`|`), plus a metadata footer (`↻ Resets in 6d 14h`).
 4. **Grouped Settings Rows (`SettingsGroup` & `SettingsRow` in `components/ui/Surface.tsx`, used by `features/You.tsx`, `screens/Group.tsx`, `screens/GroupSettings.tsx`)**: Grouped `rounded-2xl bg-surface` cards beneath sentence-case `type-section` headers (`Account & sync`, `Preferences`, `Group & table`). Each `SettingsRow` (`min-h-[52px]`) pairs a `20px` outlined left icon, a `type-body` label, a right-aligned `text-muted` value, and a `text-faint` `chevron-right` disclosure indicator with inset `0.5px` dividers.
 
 Don't put a `Surface` inside a `Surface`. Use `bg-sunken` for a well.
 
 ## Hero cards: TripHero, BalanceHero, RaceHero
 
-A place can open on one hero card: the figure that place exists to show, big enough to read across a table. Sessions has `TripHero` (your trip total, your running line, win rate, best session, board place), Settle up `BalanceHero` (your balance), and the Board's This trip `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in gold). The Board's All time opens on the same `TripHero` across every trip ("All time with …"). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. When you're seated at a live session, Sessions opens on `LiveSessionCard`, above the hero, with "Back to the table" as the screen's primary action.
+A place can open on one hero card: the figure that place exists to show, big enough to read across a table. Sessions has `TripHero` (your trip total, your running line, win rate, best session, board place), and the Board's This trip `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in gold). The Board's All time opens on the same `TripHero` across every trip ("All time with …"). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. When you're seated at a live session, Sessions opens on `LiveSessionCard`, above the hero, with "Back to the table" as the screen's primary action.
 
 One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure.
 
@@ -115,7 +115,7 @@ Where content lives is decided in [docs/internals/navigation.md](../internals/na
 On web, every group and trip page except an invite or claim link sits in `AppShell` (`features/Shell.tsx`), which draws it from two parts in `ui/Nav.tsx`:
 
 - **`ScopeButton`** says where you are: the trip in scope, its group small above it, and a chevron. It's a real button, outlined like a secondary one, and opens the scope sheet (trips, New trip, the group, your other groups). A group with no trips shows its name alone.
-- **`PlaceLink`** is one of the four places, Sessions, Board, Settle up and Group, with a lucide icon. `layout="bar"` stacks icon over label in the bottom bar; `layout="side"` is a sidebar row. The current place is gold. A group with no trips offers only Group.
+- **`PlaceLink`** is one of the three places, Sessions, Board and Group, with a lucide icon. `layout="bar"` stacks icon over label in the bottom bar; `layout="side"` is a sidebar row. The current place is gold. A group with no trips offers only Group.
 
 On mobile, keep React Navigation native-stack. iOS uses native bottom tabs and grouped native header actions; Android uses the standard destination bar. Scope remains an explicit group/trip selection button. Its pill uses native glass when supported. Reserve the measured LiveBar height above navigation so the final content remains reachable.
 
@@ -125,7 +125,7 @@ Pages pushed onto a place, like a session onto Sessions or People onto Group, ta
 
 ## Wide screens: TripLayout, TripRail (web)
 
-Pages keep the 672px reading column beside the sidebar. Sessions is the one exception: from `xl` it widens to take a 320px rail through `TripLayout`, where `TripRail` shows the board and your balance with Settle up, a glance before going to either place. Below `xl` the rail drops away, and nothing moves into it that isn't also elsewhere.
+Pages keep the 672px reading column beside the sidebar. Sessions is the one exception: from `xl` it widens to take a 320px rail through `TripLayout`, where `TripRail` shows the board and your balance, a glance before going to Board. Below `xl` the rail drops away, and nothing moves into it that isn't also elsewhere.
 
 ## PageHeader, Section, Note (web); PageTitle, SectionHeading, AccordionSectionHeading (mobile)
 
@@ -192,8 +192,8 @@ Copies a link or code and confirms it. Use it instead of writing to the clipboar
 A page waits in its own shape, then appears once, whole, and nothing on it moves after.
 
 - **Skeletons are the page, unfilled.** Use the page skeletons in `PageSkeletons.tsx` (web) and `ScreenSkeletons.tsx` (mobile): the same header, cards, rows and gaps as the real page, with `SkeletonText` bars sitting in line boxes the height of the text they replace. Never one tall `Skeleton` block for a whole page; a page that doesn't have a skeleton yet gets one built from those parts.
-- **One wait, not a staircase.** A page that needs several queries passes the same skeleton to each stage. Trip pages use `TripLoaded`, which starts the trip, group and limits requests together and paints once they're all in. `Prefetch` starts a query early; `Settled` waits on one without failing the page when it fails.
-- **Nothing pops in above content.** Anything the page shows near the top waits with the page (limits do), rather than arriving after it and pushing everything down. Something that loads on its own further down reserves its height (`RowsSkeleton rows={1}` for a single row).
+- **One wait, not a staircase.** A page that needs several queries passes the same skeleton to each stage. Trip pages use `TripLoaded`, which starts the trip and group requests together and paints once they're all in. `Prefetch` starts a query early; `Settled` waits on one without failing the page when it fails.
+- **Nothing pops in above content.** Anything the page shows near the top waits with the page (the group does), rather than arriving after it and pushing everything down. Something that loads on its own further down reserves its height (`RowsSkeleton rows={1}` for a single row).
 - **Once loaded, never blank again.** Queries behave like TanStack Query's defaults: whatever a page loaded stays cached for five minutes after nothing shows it (`CACHE_MS`, the atom registry's default lifetime), so going back to a page shows it at once. Data older than 30 seconds (`STALE_MS`) refetches in the background when a page mounts, when the window regains focus or comes back online, and on mobile when the app returns to the foreground, while the old copy stays on screen. A refresh or a write's refetch keeps showing the previous data; only a first load ever shows a skeleton. `Loaded` does all of this; don't read a query's result without it unless you mean to.
 - **Slow loads only.** Web skeletons fade in after 300ms measured from the navigation, so a quick load goes straight from the last page to this one with no grey flash.
 - **Display type doesn't jump.** Until Barlow Condensed loads, web sets display text in a fallback face scaled to Barlow's width and line box (`Barlow Condensed Fallback` in `index.css`). If the display font changes, recalibrate it.

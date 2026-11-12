@@ -12,10 +12,6 @@
       "types": "./src/visits.ts",
       "import": "./src/visits.ts"
     },
-    "./pairBalances": {
-      "types": "./src/pairBalances.ts",
-      "import": "./src/pairBalances.ts"
-    },
     "./money": {
       "types": "./src/money.ts",
       "import": "./src/money.ts"
@@ -27,10 +23,6 @@
     "./balances": {
       "types": "./src/balances.ts",
       "import": "./src/balances.ts"
-    },
-    "./settleUp": {
-      "types": "./src/settleUp.ts",
-      "import": "./src/settleUp.ts"
     },
     "./stakes": {
       "types": "./src/stakes.ts",
@@ -51,10 +43,6 @@
     "./seats": {
       "types": "./src/seats.ts",
       "import": "./src/seats.ts"
-    },
-    "./limits": {
-      "types": "./src/limits.ts",
-      "import": "./src/limits.ts"
     }
   },
   "scripts": {

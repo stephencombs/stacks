@@ -1,17 +1,16 @@
 import { useClerk, useUser } from "@clerk/react";
 import { useAtomValue } from "@effect/atom-react";
-import { Link, useLocation, useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useLocation, useParams } from "@tanstack/react-router";
 import type { GroupId, GroupListItem, Trip, TripId } from "@stacks/contracts";
 import { formatTime } from "@stacks/client-runtime/format";
 import { resolveScope, tripIsLive } from "@stacks/client-runtime/scope";
 import { themeChoices } from "@stacks/client-runtime/theme";
-import { scopeTrips, tripDates, tripInScope, unsettledAmount } from "@stacks/client-runtime/trip";
+import { scopeTrips, tripDates, tripInScope } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { ArrowLeftRight, Check, Layers, Plus, TrendingUp, Users } from "lucide-react";
+import { Check, Layers, Plus, TrendingUp, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { BrandMark } from "~/components/BrandMark";
-import { Money } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { cn } from "~/components/ui/cn";
@@ -23,11 +22,10 @@ import { Loaded, useLastTrip, useStacks } from "~/lib/stacks";
 import { setTheme, useTheme } from "~/lib/theme";
 import { CreateGroupDialog } from "./GroupsList";
 import { LiveBar } from "./LiveBar";
-import { FieldsSkeleton, RowsSkeleton } from "./PageSkeletons";
-import { LimitsForm } from "./PersonalLimits";
+import { RowsSkeleton } from "./PageSkeletons";
 import { StartTripDialog } from "./Trips";
 
-type Place = "sessions" | "board" | "settle" | "group";
+type Place = "sessions" | "board" | "group";
 
 /** Which place a page belongs to. A session is pushed onto Sessions. */
 const placeOf = (pathname: string): Place | null =>
@@ -35,11 +33,9 @@ const placeOf = (pathname: string): Place | null =>
     ? "group"
     : /^\/trips\/[^/]+\/board/.test(pathname)
       ? "board"
-      : /^\/trips\/[^/]+\/settle/.test(pathname)
-        ? "settle"
-        : /^\/(trips|sessions)\//.test(pathname)
-          ? "sessions"
-          : null;
+      : /^\/(trips|sessions)\//.test(pathname)
+        ? "sessions"
+        : null;
 
 /**
  * The trip in scope, with its group. A trip's page sets it, and so does your table's session; any
@@ -115,7 +111,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ) : (
               <Wordmark />
             )}
-            <You layout="bar" scope={scope} />
+            <You layout="bar" />
           </header>
           <main
             id="main-content"
@@ -147,7 +143,6 @@ export function Wordmark() {
 const places = [
   { key: "sessions", label: "Sessions", icon: Layers, to: "/trips/$tripId" },
   { key: "board", label: "Board", icon: TrendingUp, to: "/trips/$tripId/board" },
-  { key: "settle", label: "Settle up", icon: ArrowLeftRight, to: "/trips/$tripId/settle" },
 ] as const;
 
 /** The four places. A group with no trips has only Group until its first trip starts. */
@@ -266,7 +261,7 @@ function Sidebar({ scope, place }: { scope: Scope; place: Place | null }) {
         </div>
       ) : null}
       <div className="mt-auto flex flex-col">
-        <You layout="side" scope={scope} />
+        <You layout="side" />
       </div>
     </aside>
   );
@@ -341,7 +336,7 @@ function ScopeSheet({
         }
       >
         {item.trips.length === 0 ? (
-          <Note>No trips yet. Start one, and its sessions, board and settle up open here.</Note>
+          <Note>No trips yet. Start one, and its sessions and board open here.</Note>
         ) : (
           <Loaded
             query={stacks.group(item.group.id)}
@@ -355,8 +350,6 @@ function ScopeSheet({
                     trip={trip}
                     current={trip.id === scope.trip?.id}
                     live={tripIsLive(item, trip)}
-                    left={unsettledAmount(detail, trip.id)}
-                    currency={item.group.currency}
                     onClose={onClose}
                   />
                 ))}
@@ -414,15 +407,11 @@ function ScopeTripRow({
   trip,
   current,
   live,
-  left,
-  currency,
   onClose,
 }: {
   trip: Trip;
   current: boolean;
   live: boolean;
-  left: ReturnType<typeof unsettledAmount>;
-  currency: GroupListItem["group"]["currency"];
   onClose: () => void;
 }) {
   return (
@@ -432,35 +421,19 @@ function ScopeTripRow({
       onClick={onClose}
       {...(current ? { "aria-current": "page" as const } : {})}
     >
-      <RowText
-        title={trip.name}
-        meta={
-          <>
-            {tripDates(trip)}
-            {left !== null ? (
-              <>
-                {" · "}
-                <Money amount={left} currency={currency} /> to settle
-              </>
-            ) : null}
-          </>
-        }
-      />
+      <RowText title={trip.name} meta={tripDates(trip)} />
       {live ? <Tag tone="live">Live</Tag> : trip.endedAt !== null ? <Tag>Ended</Tag> : null}
       {current ? <Check className="size-4 shrink-0 text-accent-text" aria-hidden /> : null}
     </RowLink>
   );
 }
 
-/** Your avatar, and behind it everything that's only about you: limits, appearance, account. */
-export function You({ layout, scope }: { layout: "bar" | "side"; scope?: Scope }) {
+/** Your avatar, and behind it everything that's only about you: appearance, account. */
+export function You({ layout }: { layout: "bar" | "side" }) {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
   const { user } = useUser();
   const clerk = useClerk();
   const theme = useTheme();
-  const stacks = useStacks();
-  const trip = scope?.trip;
   const avatar = (
     <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-fill text-sm font-semibold">
       {user?.imageUrl ? (
@@ -506,42 +479,6 @@ export function You({ layout, scope }: { layout: "bar" | "side"; scope?: Scope }
         description={user?.fullName ?? undefined}
       >
         <div className="flex flex-col gap-6">
-          <Section title="Play limits" aside={trip?.name}>
-            {trip && scope?.item ? (
-              <>
-                <Note>
-                  Only you see these. The loss limit is for this trip; the reminder counts on every
-                  trip.
-                </Note>
-                <Loaded query={stacks.limits(trip.id)} skeleton={<FieldsSkeleton fields={2} />}>
-                  {(limits) => (
-                    <LimitsForm
-                      key={`${trip.id}-${limits.lossLimit}-${limits.sessionReminderMinutes}`}
-                      limits={limits}
-                      tripId={trip.id}
-                      currency={scope.item!.group.currency}
-                    />
-                  )}
-                </Loaded>
-              </>
-            ) : (
-              <Note>Limits are set for a trip. Open one to set yours.</Note>
-            )}
-          </Section>
-          <Section title="Settle up">
-            <Note>
-              What you and the people you've played with owe each other, outside any trip.
-            </Note>
-            <Button
-              className="self-start"
-              onClick={() => {
-                setOpen(false);
-                void navigate({ to: "/you/settle" });
-              }}
-            >
-              Balances and payments
-            </Button>
-          </Section>
           <Section title="Appearance">
             <Segmented
               label="Appearance"

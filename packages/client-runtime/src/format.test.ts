@@ -23,9 +23,7 @@ it("sums up what the group has played", () => {
 });
 
 it("tells guests from former members", () => {
-  const handles = { venmo: null, cashApp: null, paypal: null };
   const guest = {
-    ...handles,
     id: PlayerId.make("0192e7a0-0000-7000-8000-000000000011"),
     displayName: "Cam",
     userId: null,
@@ -33,7 +31,6 @@ it("tells guests from former members", () => {
     claimCode: "CLAIM123",
   };
   const former = {
-    ...handles,
     id: PlayerId.make("0192e7a0-0000-7000-8000-000000000012"),
     displayName: "Kim",
     userId: UserId.make("user_kim"),

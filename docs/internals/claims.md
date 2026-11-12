@@ -2,7 +2,7 @@
 
 Signing up keeps a guest's identity and history. A claim **links** an existing player to the
 account (`players.user_id`, plus a `player_actors` binding for the account's actor). It never
-copies an entry, visit or payment, so a player has one history before and after.
+copies an entry or visit, so a player has one history before and after.
 
 ## Two paths that never cross
 

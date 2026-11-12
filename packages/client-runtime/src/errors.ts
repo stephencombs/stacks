@@ -23,7 +23,6 @@ const conflictMessages: Record<ConflictReason, string> = {
   session_open: "This session is still live.",
   players_not_cashed_out: "Everyone who bought in needs a cash-out first. Record $0 for a bust.",
   entry_voided: "That entry was already voided.",
-  balance_not_settled: "Settle up first: you can't leave while you owe or are owed.",
   last_owner: "Make someone else the owner or remove everyone else first.",
   recording_identity: "Your sessions on another device synced first. Trying again.",
   actor_taken: "This device's ID is already in use. Reinstall to get a new one.",
@@ -49,7 +48,7 @@ const forbiddenMessages: Record<Forbidden["reason"], string> = {
     "Only the backer, the player, whoever added it or an admin can change that stake.",
   not_your_trip: "Only whoever started the trip or an admin can delete it.",
   starter_only: "Only the player who started this table can do that.",
-  not_your_player: "You can only edit your own payment apps, or a guest's if you're an admin.",
+  not_your_player: "That player belongs to someone else.",
 };
 
 const isConflict = Schema.is(Conflict);

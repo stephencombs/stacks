@@ -1,13 +1,7 @@
 import { TripId, type GroupDetail, type GroupId, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import {
-  boardMoney,
-  chipOf,
-  localClock,
-  tripDates,
-  unsettledAmount,
-} from "@stacks/client-runtime/trip";
+import { boardMoney, chipOf, localClock, tripDates } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
@@ -76,19 +70,11 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
       {past.length > 0 ? (
         <List>
           {past.map((trip) => (
-            <Row
-              key={trip.id}
-              accessibilityHint="Opens the trip"
-              onPress={() =>
-                go.trip(trip.id, unsettledAmount(detail, trip.id) ? "SettleUp" : "Sessions")
-              }
-            >
+            <Row key={trip.id} accessibilityHint="Opens the trip" onPress={() => go.trip(trip.id)}>
               <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
                 {trip.name}
               </Text>
-              <Text className="text-sm text-muted">
-                {unsettledAmount(detail, trip.id) ? "Needs settling" : tripDates(trip)}
-              </Text>
+              <Text className="text-sm text-muted">{tripDates(trip)}</Text>
               <Icon name="chevron-right" color="faint" size={18} />
             </Row>
           ))}
@@ -113,7 +99,7 @@ export function NoTrips({ onStart }: { onStart: () => void }) {
       action={<Button label="Start a trip" variant="primary" onPress={onStart} className="mt-2" />}
     >
       Every session is part of a trip, like a weekend in Vegas or this month's home games. Start
-      one, and its sessions get their own leaderboard, awards and settle-up.
+      one, and its sessions get their own leaderboard and awards.
     </EmptyState>
   );
 }
@@ -143,7 +129,7 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
 }
 
 /**
- * Starts a trip and puts it in scope. A group's first trip brings Sessions, Board and Settle up
+ * Starts a trip and puts it in scope. A group's first trip brings Sessions and Board
  * into the tab bar, so that one stays put; any later one opens its sessions.
  */
 export function StartTripSheet({
@@ -193,7 +179,7 @@ export function StartTripSheet({
       open
       onClose={onClose}
       title="Start a trip"
-      description="Sessions you start in it go on its board and settle up on their own."
+      description="Sessions you start in it go on its board."
       footer={
         <Button
           label="Start trip"

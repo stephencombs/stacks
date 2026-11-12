@@ -1,5 +1,4 @@
 import {
-  ArrowLeftRight,
   ArrowRight,
   Check,
   ChartLine,
@@ -37,7 +36,6 @@ const icons = {
   "cloud-off": CloudOff,
   sessions: Club,
   board: ChartLine,
-  settle: ArrowLeftRight,
   group: Users,
   plus: Plus,
   search: Search,

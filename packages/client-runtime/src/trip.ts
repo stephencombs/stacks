@@ -122,18 +122,6 @@ export const tripLines = (trip: PlayerTrip<unknown>, currency: CurrencyCode) => 
   winRate: trip.played === 0 ? "–" : `${Math.round((trip.won / trip.played) * 100)}%`,
 });
 
-/** The words over your balance on settle up, and the line under it. The figure is the amount without its sign. */
-export const balanceHeadline = (balance: number, payments: number) => ({
-  label: balance > 0 ? "You're owed" : balance < 0 ? "You owe" : "You're square",
-  tone: balance > 0 ? ("win" as const) : balance < 0 ? ("loss" as const) : ("accent" as const),
-  line:
-    payments === 0
-      ? null
-      : payments === 1
-        ? "One payment squares you up"
-        : `${payments} payments square you up`,
-});
-
 /**
  * Where you stand on the board, led by the gap that matters: to the player just ahead, or when
  * you lead, to the one just behind. With no gap to show (tied, or alone on the board) the figure
@@ -264,8 +252,3 @@ export const scopeTrips = <T extends Pick<Trip, "endedAt">>(trips: ReadonlyArray
   ...trips.filter((trip) => trip.endedAt === null),
   ...trips.filter((trip) => trip.endedAt !== null),
 ];
-
-export const unsettledAmount = (
-  detail: Pick<GroupDetail, "unsettled">,
-  tripId: TripId,
-): MinorUnits | null => detail.unsettled.find((item) => item.tripId === tripId)?.amount ?? null;

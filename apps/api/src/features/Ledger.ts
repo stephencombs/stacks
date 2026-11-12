@@ -12,16 +12,13 @@ import {
   type AddEntryRequest,
   type CloseSessionRequest,
   type EntryId,
-  type RecordSettlementRequest,
   type SessionId,
-  type TripId,
   type VoidEntryRequest,
 } from "@stacks/contracts";
 
 import { EntryRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
 import * as Sessions from "./Sessions.ts";
-import * as Trips from "./Trips.ts";
 import * as Views from "./Views.ts";
 
 const loadEntry = Effect.fn("Ledger.loadEntry")(function* (entryId: EntryId) {
@@ -70,11 +67,10 @@ const validEntry = (candidate: typeof Entry.Type) =>
 const insertEntry = Effect.fn("Ledger.insertEntry")(function* (entry: typeof Entry.Type) {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`
-    insert into entries (id, group_id, session_id, trip_id, kind, player_id, counterparty_id,
+    insert into entries (id, group_id, session_id, kind, player_id, counterparty_id,
       amount, occurred_at, note, created_by, replaces_entry_id)
-    values (${entry.id}, ${entry.groupId}, ${entry.sessionId}, ${entry.tripId}, ${entry.kind},
-      ${entry.playerId},
-      ${entry.counterpartyId}, ${BigInt(entry.amount)}, ${DateTime.toDateUtc(entry.occurredAt)},
+    values (${entry.id}, ${entry.groupId}, ${entry.sessionId}, ${entry.kind},
+      ${entry.playerId}, ${entry.counterpartyId}, ${BigInt(entry.amount)}, ${DateTime.toDateUtc(entry.occurredAt)},
       ${entry.note}, ${entry.createdBy}, ${entry.replacesEntryId})
     on conflict (id) do nothing
   `;
@@ -110,7 +106,6 @@ export const addEntry = Effect.fn("Ledger.addEntry")(function* (
     id: request.id,
     groupId: session.groupId,
     sessionId,
-    tripId: null,
     kind: request.kind,
     playerId: request.playerId,
     counterpartyId: request.counterpartyId,
@@ -176,7 +171,6 @@ export const close = Effect.fn("Ledger.close")(function* (
       id: c.id,
       groupId: session.groupId,
       sessionId,
-      tripId: null,
       kind: "cash_out",
       playerId: c.playerId,
       counterpartyId: null,
@@ -243,41 +237,8 @@ export const voidEntry = Effect.fn("Ledger.voidEntry")(function* (
   const member = yield* Access.membership(entry.groupId);
   yield* requireCanVoid(member, entry);
   if (entry.voidedAt !== null) return yield* new Conflict({ reason: "entry_voided" });
-  if (entry.sessionId !== null) {
-    const session = yield* Views.loadSession(entry.sessionId);
-    if (session.status === "closed") return yield* new Conflict({ reason: "session_closed" });
-  }
+  const session = yield* Views.loadSession(entry.sessionId);
+  if (session.status === "closed") return yield* new Conflict({ reason: "session_closed" });
   yield* markVoided(entryId, request.reason);
   return yield* loadEntry(entryId);
-});
-
-/** A payment that squares up part of a trip. Settling after the trip has ended is the usual case. */
-export const recordSettlement = Effect.fn("Ledger.recordSettlement")(function* (
-  tripId: TripId,
-  request: typeof RecordSettlementRequest.Type,
-) {
-  const { userId } = yield* CurrentUser;
-  const { groupId } = yield* Trips.load(tripId);
-  yield* Access.membership(groupId);
-  yield* Access.requirePlayersInGroup(groupId, [request.fromPlayerId, request.toPlayerId]);
-  const now = yield* DateTime.now;
-  const entry = yield* validEntry({
-    id: request.id,
-    groupId,
-    sessionId: null,
-    tripId,
-    kind: "settlement",
-    playerId: request.fromPlayerId,
-    counterpartyId: request.toPlayerId,
-    amount: request.amount,
-    occurredAt: request.occurredAt ?? now,
-    note: request.note,
-    createdBy: userId,
-    createdAt: now,
-    voidedAt: null,
-    voidedBy: null,
-    voidReason: null,
-    replacesEntryId: null,
-  });
-  return yield* insertEntry(entry);
 });

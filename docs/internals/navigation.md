@@ -34,24 +34,16 @@ record for everyone (and, like the starter, see the whole table on their device)
 
 Groups and trips are a second, account-backed area, reached from **Groups** in the header (or the scope filter pill row on mobile). Inside
 it, the group and trip you're in are context, shown as a labeled scope button at the top of every
-screen on web and as a horizontal row of `rounded-full` filter pills (`FilterPillBar`) directly beneath `TopBar` on mobile (`Personal play ⌄` / `Group ⌄`, `All trips ⌄` / `Trip ⌄`). Under it, four places answer the questions people open a trip with:
+screen on web and as a horizontal row of `rounded-full` filter pills (`FilterPillBar`) directly beneath `TopBar` on mobile (`Personal play ⌄` / `Group ⌄`, `All trips ⌄` / `Trip ⌄`). Under it, three places answer the questions people open a trip with:
 
-| Place         | Question                     | Holds                                                                                                  |
-| ------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Sessions**  | What's being played?         | The live session first (`Playing now`), the trip card, then collapsible `Unsettled` and `Settled (N)`  |
-| **Board**     | Who's winning?               | Race chart, session bars, and proportional breakdown rows, scoped to _This trip_ or _All time_         |
-| **Settle up** | Who owes whom?               | Quota/pace cards (`QuotaCard`), suggested payments, balances, backing, payment history, play limits    |
-| **Group**     | Who's in it, and what trips? | Trips, People (members, guests, invites), Settings (payment apps, export; unified with **You** on iOS) |
+| Place        | Question                     | Holds                                                                                           |
+| ------------ | ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Sessions** | What's being played?         | The live session first (`Playing now`), the trip card, each night's sessions, backing           |
+| **Board**    | Who's winning?               | Race chart, session bars, and proportional breakdown rows, scoped to _This trip_ or _All time_  |
+| **Group**    | Who's in it, and what trips? | Trips, People (members, guests, invites), Settings (export, leave; unified with **You** on iOS) |
 
-Anything that's only about you (play limits, appearance, account, sign out) sits behind **You** (and is surfaced alongside Group configuration in the grouped **Settings** tab on mobile),
-and so does your own **Settle up**: `/you/settle` lists everyone you've shared a table with and
-what's owed between you, and `/you/settle/:playerId` shows one person's balance, Record a payment,
-and the history of covered buy-ins, held cash-outs and payments, with corrections, voids and who
-made them. These balances are between players, built from play and payments outside any trip. They
-are not a trip's Settle up, which stays a group place, and neither shows the other's numbers. A
-person you've never shared a table with has no page. Recording a payment saves on the device and
-syncs like play; the balances and history need the network.
-Web windows below `lg` draw the four places as a docked bottom bar and wide web windows draw them as
+Anything that's only about you (appearance, account, sign out) sits behind **You** (and is surfaced alongside Group configuration in the grouped **Settings** tab on mobile).
+Web windows below `lg` draw the three places as a docked bottom bar and wide web windows draw them as
 a left sidebar; mobile (`apps/mobile`) uses native tabs on iOS and the platform destination bar on Android. The mobile web build keeps its floating capsule. The places are the same on both. The wordmark goes back to your play.
 
 ## Why your play comes first
@@ -100,7 +92,7 @@ The scope is a trip, and its group comes with it. A page that names a trip or a 
 scope to that trip. A group page keeps the scope if it's already in that group; otherwise it picks
 the group's live or most recent trip. The last trip in scope is remembered per device.
 
-A group with no trips has nothing for Sessions, Board or Settle up to show, so only Group is
+A group with no trips has nothing for Sessions or Board to show, so only Group is
 offered until the first trip starts.
 
 The scope sheet lists the group's trips (live and unended first), offers New trip, links to the
@@ -118,10 +110,8 @@ the Board is one tap away mid-session.
 ## Addresses
 
 Web and mobile share addresses: `/` (your play), `/play/:visitId` (a personal session), `/t/:token`
-(a shared table, web only), `/invite/:token` (a personal invite, web only), `/you/settle` and
-`/you/settle/:playerId` (your Settle up, and one person in it),
-`/groups` (your groups), `/trips/:id` (Sessions), `/trips/:id/board` (`?scope=all` for All
-time), `/trips/:id/settle`, `/sessions/:id`, `/groups/:id` (the hub), `/groups/:id/people` and
+(a shared table, web only), `/invite/:token` (a personal invite, web only), `/groups` (your groups), `/trips/:id` (Sessions), `/trips/:id/board` (`?scope=all` for All
+time), `/sessions/:id`, `/groups/:id` (the hub), `/groups/:id/people` and
 `/groups/:id/settings`. Old addresses keep working: a trip's `/results` goes to its Board and a
 group's `/stats` to the Board's All time. A group's `/settings` used to mix people and settings; it
 now opens Settings, which links to People.

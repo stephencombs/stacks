@@ -288,7 +288,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("invites and recorders", (it)
           .invitePlayer({ params: { playerId: guest.id } })
           .pipe(Effect.flip),
       ).toMatchObject({ _tag: "NotFound" });
-      // Recording repayments isn't part of table recording yet, so there's nothing to refuse.
     }),
   );
 

@@ -43,14 +43,16 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
       });
       const inVegas = yield* startSession(alex, group, group.tripId);
       const inReno = yield* startSession(alex, group, reno.id);
-      yield* bea.ledger.recordSettlement({
-        params: { tripId: reno.id },
+      yield* alex.ledger.addEntry({
+        params: { sessionId: inReno },
         payload: {
           id: ids.entry(),
-          fromPlayerId: beaId,
-          toPlayerId: group.myPlayerId,
+          kind: "buy_in",
+          playerId: group.myPlayerId,
+          counterpartyId: beaId,
           amount: usd(500),
           note: null,
+          replacesEntryId: null,
         },
       });
 
@@ -61,18 +63,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
       expect(renoDetail.sessions.map((s) => [s.session.id, s.session.tripId])).toEqual([
         [inReno, reno.id],
       ]);
-      expect(renoDetail.settlements).toHaveLength(1);
       expect(renoDetail.balances).toEqual(
         expect.arrayContaining([
           { playerId: beaId, amount: 500 },
           { playerId: group.myPlayerId, amount: -500 },
         ]),
       );
-
-      // Any trip left unsettled keeps you from leaving the group.
-      expect(
-        yield* Effect.flip(alex.groups.leave({ params: { groupId: group.group.id } })),
-      ).toMatchObject({ _tag: "Conflict", reason: "balance_not_settled" });
     }),
   );
 
@@ -114,26 +110,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
           cashOuts: [{ id: ids.entry(), playerId: group.myPlayerId, amount: usd(0) }],
         },
       });
-      expect((yield* alex.groups.get({ params: { groupId: group.group.id } })).unsettled).toEqual(
-        [],
-      );
       yield* alex.trips.end({ params: { tripId: group.tripId }, payload: { endedAt: day(3) } });
-      expect((yield* alex.groups.get({ params: { groupId: group.group.id } })).unsettled).toEqual([
-        { tripId: group.tripId, amount: 8000 },
-      ]);
-      yield* alex.ledger.recordSettlement({
-        params: { tripId: group.tripId },
-        payload: {
-          id: ids.entry(),
-          fromPlayerId: group.myPlayerId,
-          toPlayerId: beaId,
-          amount: usd(8000),
-          note: null,
-        },
-      });
-      expect((yield* alex.groups.get({ params: { groupId: group.group.id } })).unsettled).toEqual(
-        [],
-      );
       const [after] = yield* alex.groups.list();
       expect(after).toMatchObject({ currentTripId: null, mySession: null });
     }),

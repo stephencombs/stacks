@@ -6,7 +6,6 @@ import {
   CurrentUser,
   GroupId,
   NotFound,
-  PaymentHandles,
   PlayerId,
   type AddGuestRequest,
   type ClaimPreview,
@@ -74,7 +73,7 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
     Effect.gen(function* () {
       const guest = yield* findClaim(code, true);
       const [own] = yield* sql`
-        select p.id, p.venmo, p.cash_app, p.paypal,
+        select p.id,
           exists (
             select 1 from entries e where e.player_id = p.id or e.counterparty_id = p.id
           ) or exists (select 1 from session_players sp where sp.player_id = p.id) as has_history
@@ -85,7 +84,6 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
             Schema.Struct({
               id: PlayerId,
               hasHistory: Schema.Boolean,
-              ...PaymentHandles.fields,
             }),
           ),
         ),
@@ -97,10 +95,7 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
         update players
         set user_id = ${userId},
           claim_code = null,
-          claimed_at = now(),
-          venmo = coalesce(players.venmo, ${own?.venmo ?? null}),
-          cash_app = coalesce(players.cash_app, ${own?.cashApp ?? null}),
-          paypal = coalesce(players.paypal, ${own?.paypal ?? null})
+          claimed_at = now()
         where id = ${guest.playerId}
       `;
       yield* sql`

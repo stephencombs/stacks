@@ -8,8 +8,8 @@ import { ActionBar } from "~/components/ui/ActionBar";
 import { Money } from "~/components/Money";
 import { ButtonLink } from "~/components/ui/Button";
 import { EmptyState, Section } from "~/components/ui/Page";
+import { BackingSection } from "~/features/Backing";
 import { LiveSessionCard, SessionList } from "~/features/SessionList";
-import { LimitNotices } from "~/features/PersonalLimits";
 import { TripHero } from "~/features/TripHero";
 import { TripHeader } from "~/features/TripHeader";
 import { TripLayout, TripRail } from "~/features/TripRail";
@@ -60,7 +60,6 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
         action={<div className="hidden lg:block">{startSession}</div>}
       />
       <TripLayout rail={<TripRail group={group} trip={trip} />}>
-        <LimitNotices group={group} trip={trip} />
         {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}
         {live.length > 0 ? (
           <Section title={mine ? "Other live sessions" : "Live sessions"}>
@@ -103,6 +102,7 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
               : "This trip ended before anyone played."}
           </EmptyState>
         ) : null}
+        <BackingSection detail={group} trip={trip} />
       </TripLayout>
       {startSession ? (
         <ActionBar className="lg:hidden">

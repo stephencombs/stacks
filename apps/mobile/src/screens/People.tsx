@@ -18,7 +18,6 @@ import { webUrl } from "../lib/config";
 import { useLinkedScope } from "../lib/scope";
 import { shareLink } from "../lib/share";
 import { Chip } from "../features/Chip";
-import { GuestPaymentHandlesAction, playerHandlesMeta } from "../features/PaymentHandles";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { InviteLinkSkeleton, PeopleSkeleton } from "../features/ScreenSkeletons";
 
@@ -67,7 +66,6 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
         <SectionHeading>Members</SectionHeading>
         <List>
           {members.map((player) => {
-            const handles = playerHandlesMeta(player);
             return (
               <Row
                 key={player.id}
@@ -86,11 +84,6 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
                       <Text className="text-muted"> (you)</Text>
                     ) : null}
                   </Text>
-                  {handles ? (
-                    <Text numberOfLines={1} className="text-xs text-muted">
-                      {handles}
-                    </Text>
-                  ) : null}
                 </View>
                 {player.role ? <Tag>{roleNames[player.role]}</Tag> : null}
               </Row>
@@ -119,20 +112,13 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
         ) : (
           <List>
             {guests.map((player) => {
-              const handles = playerHandlesMeta(player);
               return (
                 <Row key={player.id} className="flex-wrap">
                   <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
                   <View className="flex-1 basis-32">
                     <Text className="text-base text-ink">{player.displayName}</Text>
-                    {handles ? (
-                      <Text numberOfLines={1} className="text-xs text-muted">
-                        {handles}
-                      </Text>
-                    ) : null}
                   </View>
                   <View className="ml-auto flex-row items-center gap-2">
-                    <GuestPaymentHandlesAction detail={detail} player={player} />
                     {player.claimCode ? (
                       <Button
                         label={shared === player.id ? "Copied" : "Send claim link"}

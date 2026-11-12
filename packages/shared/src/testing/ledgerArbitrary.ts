@@ -31,7 +31,7 @@ export const money = (amount: number) => MinorUnits.make(amount);
  */
 export const RandomLedger = Schema.Array(
   Schema.Struct({
-    kind: Schema.Literals(["buy_in", "cash_out", "adjustment", "settlement"]),
+    kind: Schema.Literals(["buy_in", "cash_out", "adjustment"]),
     player: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 4 })),
     counterpartyOffset: Schema.NullOr(
       Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 4 })),
@@ -46,11 +46,9 @@ export const toEntries = (ledger: typeof RandomLedger.Type) =>
     const counterpartyId =
       kind === "adjustment"
         ? null
-        : kind === "settlement"
-          ? PLAYERS[(player + (counterpartyOffset ?? 1)) % 5]!
-          : counterpartyOffset === null
-            ? null
-            : PLAYERS[(player + counterpartyOffset) % 5]!;
+        : counterpartyOffset === null
+          ? null
+          : PLAYERS[(player + counterpartyOffset) % 5]!;
     return entry({
       kind,
       playerId: PLAYERS[player]!,

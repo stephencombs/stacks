@@ -11,12 +11,7 @@ const blocking = ["live_session", "broken_correction", "invalid_audit", "unsafe_
 /** Groups the import leaves on the legacy ledger until it supports their currency. */
 const excluded = ["non_usd_group"] as const;
 /** Facts the import keeps as they are, flagged for the people involved. */
-const reconcile = [
-  "routed_settlement",
-  "windowed_stake",
-  "overlapping_stake",
-  "ambiguous_player",
-] as const;
+const reconcile = ["windowed_stake", "overlapping_stake", "ambiguous_player"] as const;
 
 export const LegacyIssue = Schema.Struct({
   kind: Schema.Literals([...blocking, ...excluded, ...reconcile]),
@@ -41,7 +36,6 @@ interface ImportReport {
   readonly tables: number;
   readonly visits: number;
   readonly entries: number;
-  readonly repayments: number;
 }
 
 class DryRun extends Data.TaggedError("DryRun")<{ readonly report: ImportReport }> {}
@@ -82,15 +76,12 @@ const findIssues = Effect.fn("LegacyMigration.findIssues")(function* (scope: Leg
       case
         when r.voided_at is null then 'Replaces an entry that is still live.'
         when r.session_id is distinct from e.session_id then 'Replaces an entry elsewhere.'
-        when (r.kind = 'settlement') <> (e.kind = 'settlement')
-          then 'Replaces a payment with play, or play with a payment.'
         else 'Replaces an entry another correction already replaced.'
       end
     from entries e join entries r on r.id = e.replaces_entry_id
     where ${within("e.group_id")} and (
       r.voided_at is null
       or r.session_id is distinct from e.session_id
-      or (r.kind = 'settlement') <> (e.kind = 'settlement')
       or exists (select 1 from entries o where o.replaces_entry_id = r.id and o.id <> e.id)
     )
 
@@ -107,37 +98,6 @@ const findIssues = Effect.fn("LegacyMigration.findIssues")(function* (scope: Leg
     select 'unsafe_amount', k.group_id, k.id::text, 'Amount is too large to count exactly.'
     from stakes k
     where ${within("k.group_id")} and k.amount > ${MAX_SAFE}::bigint
-
-    union all
-    -- Per trip and pair of players: what one owes the other from play, then after payments.
-    -- A payment that turns a pair's debt around, or pays where there was none, settled someone
-    -- else's debt by net balance.
-    select 'routed_settlement', t.group_id, t.id::text,
-      'Payments between ' || pair.low || ' and ' || pair.high
-        || ' don''t follow what they owed each other.'
-    from (
-      select trip_id, low, high,
-        coalesce(sum(owed) filter (where not payment), 0) as before,
-        sum(owed) as after,
-        bool_or(payment) as paid
-      from (
-        select s.trip_id, least(e.player_id, e.counterparty_id) as low,
-          greatest(e.player_id, e.counterparty_id) as high, false as payment,
-          (case when e.kind = 'buy_in' then e.amount else -e.amount end)
-            * (case when e.player_id < e.counterparty_id then 1 else -1 end) as owed
-        from entries e join sessions s on s.id = e.session_id
-        where ${within("e.group_id")} and e.voided_at is null and e.counterparty_id is not null
-          and e.kind in ('buy_in', 'cash_out')
-        union all
-        select e.trip_id, least(e.player_id, e.counterparty_id),
-          greatest(e.player_id, e.counterparty_id), true,
-          -e.amount * (case when e.player_id < e.counterparty_id then 1 else -1 end)
-        from entries e
-        where ${within("e.group_id")} and e.voided_at is null and e.kind = 'settlement'
-      ) owing
-      group by trip_id, low, high
-    ) pair join trips t on t.id = pair.trip_id
-    where pair.paid and pair.after <> 0 and sign(pair.after) <> sign(pair.before)
 
     union all
     select 'windowed_stake', k.group_id, k.id::text,
@@ -290,30 +250,12 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       from entries e
       ${actor("made", "e.created_by")}
       ${actor("undone", "e.voided_by")}
-      where e.kind <> 'settlement' and ${within("e.group_id")}
+      where ${within("e.group_id")}
       on conflict (id) do update
         set voided_at = excluded.voided_at, voided_by = excluded.voided_by,
           void_reason = excluded.void_reason
         where personal_entries.voided_at is null and excluded.voided_at is not null
           and personal_entries.visit_id = excluded.visit_id
-      returning id
-    `;
-
-    const repayments = yield* sql`
-      insert into repayments (id, from_player_id, to_player_id, amount, occurred_at, note,
-        recorded_from_trip_id, created_by, created_at, voided_at, voided_by, void_reason,
-        replaces_entry_id)
-      select e.id, e.player_id, e.counterparty_id, e.amount, e.occurred_at, e.note, e.trip_id,
-        made.recording_actor_id, e.created_at, e.voided_at, undone.recording_actor_id,
-        e.void_reason, e.replaces_entry_id
-      from entries e
-      ${actor("made", "e.created_by")}
-      ${actor("undone", "e.voided_by")}
-      where e.kind = 'settlement' and ${within("e.group_id")}
-      on conflict (id) do update
-        set voided_at = excluded.voided_at, voided_by = excluded.voided_by,
-          void_reason = excluded.void_reason
-        where repayments.voided_at is null and excluded.voided_at is not null
       returning id
     `;
 
@@ -323,7 +265,6 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       tables: tables.length,
       visits: visits.length,
       entries: entries.length,
-      repayments: repayments.length,
     };
     if (options.dryRun) return yield* new DryRun({ report });
     return report;

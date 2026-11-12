@@ -3,7 +3,7 @@ import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
 import { Actor, PlayerIdentity } from "./players.ts";
-import { PlayEntry, Repayment, Table, Visit, VisitRecording, VisitSummary } from "./recording.ts";
+import { PlayEntry, Table, Visit, VisitRecording, VisitSummary } from "./recording.ts";
 import { ActorId, TableId, VisitId } from "./ids.ts";
 
 const ALEX = "0192e7a0-0000-7000-8000-000000000001";
@@ -129,31 +129,6 @@ describe("native recording contracts", () => {
       { voidedAt: "2026-11-05T20:00:00.000Z", voidedBy: ACTOR },
     ])
       expect(accepts(PlayEntry, { ...entry, ...fields })).toBe(false);
-  });
-
-  it("represents standalone repayments with distinct endpoints and no allocation requirement", () => {
-    const repayment = {
-      id: entry.id,
-      fromPlayerId: ALEX,
-      toPlayerId: BEA,
-      amount: 100,
-      currency: "USD",
-      occurredAt: AT,
-      note: null,
-      recordedFromTripId: null,
-      ...audit,
-    };
-    expect(accepts(Repayment, repayment)).toBe(true);
-    for (const fields of [
-      { amount: 0 },
-      { amount: -1 },
-      { amount: 1.1 },
-      { toPlayerId: ALEX },
-      { voidedAt: LATER },
-      { voidReason: "invalid" },
-      { replacesEntryId: repayment.id },
-    ])
-      expect(accepts(Repayment, { ...repayment, ...fields })).toBe(false);
   });
 
   it("distinguishes pending results from finished zero at the public boundary", () => {
