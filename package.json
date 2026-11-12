@@ -14,10 +14,13 @@
     "fmt:check": "vp fmt --check",
     "test": "vp test run scripts && vp run -r test",
     "knip": "knip",
+    "leanspec": "leanspec",
     "prepare": "vp config --hooks --no-agent",
     "deploy": "vp run --filter @stacks/web build && vp run --filter @stacks/api deploy"
   },
   "devDependencies": {
+    "@leanspec/cli": "0.3.0",
+    "@leanspec/mcp": "0.3.0",
     "@types/node": "catalog:",
     "knip": "catalog:",
     "typescript": "catalog:",
