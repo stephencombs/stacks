@@ -126,6 +126,8 @@ function BackDialog({
     const borrowerId = PlayerId.make(String(form.get("borrower")));
     const amount = Option.getOrNull(parseMoney(String(form.get("amount")), currency));
     const share = Number(String(form.get("share")).trim());
+    if (!players.some((player) => player.id === borrowerId))
+      return setProblem("Choose who is playing the stake.");
     if (lenderId === borrowerId) return setProblem("Pick two different people.");
     if (amount === null || amount <= 0) return setProblem("Enter how much they put up.");
     if (!Number.isInteger(share) || share < 0 || share > 100) {
@@ -168,11 +170,10 @@ function BackDialog({
         </Field>
         <Field label="Who's playing it">
           {(props) => (
-            <Select
-              {...props}
-              name="borrower"
-              defaultValue={players.find((p) => p.id !== detail.myPlayerId)?.id}
-            >
+            <Select {...props} name="borrower" defaultValue="" required>
+              <option value="" disabled>
+                Choose a player
+              </option>
               {players.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.displayName}

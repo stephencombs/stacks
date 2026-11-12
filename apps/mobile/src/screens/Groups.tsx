@@ -86,6 +86,7 @@ export function GroupsScreen() {
                       currency={item.group.currency}
                       subject="you"
                     />
+                    <Text className="type-footnote text-muted">Across all trips</Text>
                   </View>
                   <Icon name="chevron-right" color="faint" />
                 </Row>

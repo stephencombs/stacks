@@ -290,7 +290,7 @@ function PersonalYou() {
               yet, and signing in or out leaves them here.
             </Note>
           </Section>
-          <Section title="Settle up">
+          <Section title="Outside trips">
             <Note>
               What you and the people you've played with owe each other, outside any trip.
             </Note>

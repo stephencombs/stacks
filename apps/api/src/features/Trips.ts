@@ -10,6 +10,7 @@ import {
   type CreateTripRequest,
   type EndTripRequest,
   type GroupId,
+  type PlayerId,
   type TripId,
 } from "@stacks/contracts";
 
@@ -94,4 +95,14 @@ export const remove = Effect.fn("Trips.remove")(function* (tripId: TripId) {
   if (used.length > 0) return yield* new Conflict({ reason: "trip_not_empty" });
   yield* sql`delete from trips where id = ${tripId}`;
   return trip;
+});
+
+export const balance = Effect.fn("Trips.balance")(function* (tripId: TripId, playerId: PlayerId) {
+  const trip = yield* load(tripId);
+  yield* Access.membership(trip.groupId);
+  const sql = yield* SqlClient.SqlClient;
+  const [player] =
+    yield* sql`select id from players where id = ${playerId} and group_id = ${trip.groupId}`;
+  if (!player) return yield* new NotFound({ resource: "player" });
+  return yield* Views.tripBalance(tripId, playerId);
 });

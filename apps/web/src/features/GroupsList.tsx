@@ -54,11 +54,14 @@ export function GroupsList() {
                   <RowText
                     title={item.group.name}
                     meta={
-                      <BalanceLabel
-                        amount={item.myBalance}
-                        currency={item.group.currency}
-                        subject="you"
-                      />
+                      <span className="flex flex-col gap-1">
+                        <BalanceLabel
+                          amount={item.myBalance}
+                          currency={item.group.currency}
+                          subject="you"
+                        />
+                        <span>Across all trips</span>
+                      </span>
                     }
                   />
                   {item.liveSessionCount > 0 ? <Tag tone="live">Live</Tag> : null}

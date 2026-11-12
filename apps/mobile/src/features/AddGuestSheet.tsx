@@ -2,7 +2,6 @@ import { PlayerId, type GroupDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { useState } from "react";
 
-import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
 import { useAction, useStacks } from "../lib/stacks";
@@ -45,15 +44,7 @@ export function AddGuestSheet({
       onClose={onClose}
       title="Add a guest"
       description="For a friend who isn't on Color Up yet. They can claim their history when they sign up."
-      footer={
-        <Button
-          label="Add guest"
-          variant="primary"
-          size="lg"
-          pending={add.pending}
-          onPress={() => void submit()}
-        />
-      }
+      confirm={{ label: "Add", pending: add.pending, onPress: () => void submit() }}
     >
       <TextField
         label="Name"

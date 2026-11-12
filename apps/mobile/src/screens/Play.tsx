@@ -22,6 +22,8 @@ import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
+import { ActionMenu } from "../components/ui/ActionMenu";
+import { ToastHost } from "../components/ui/Toast";
 import { HeaderTitle } from "../components/ui/HeaderTitle";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
@@ -44,7 +46,7 @@ type Props = StaticScreenProps<{ visitId: string }>;
 /** One session of your own play, saved on this device. */
 export function PlayScreen({ route }: Props) {
   const id = Option.getOrNull(VisitId.makeOption(route.params.visitId));
-  return id ? <Visit visitId={id} /> : <Missing />;
+  return <ToastHost>{id ? <Visit visitId={id} /> : <Missing />}</ToastHost>;
 }
 
 function Title({
@@ -162,70 +164,46 @@ function Visit({ visitId }: { visitId: VisitId }) {
       (item) => item.player.id === player.player.id && item.visit.finishedAt === null,
     );
   return (
-    <PersonalScreen
-      dock={
-        live ? (
-          <View className="flex-row gap-2">
-            <Button
-              key="rebuy"
-              label="Rebuy"
-              size="lg"
-              haptic
-              className="flex-1"
-              onPress={() => setOpen({ type: "rebuy" })}
-            />
-            <Button
-              key="cash-out"
-              label="Cash out"
-              variant="primary"
-              size="lg"
-              haptic
-              className="flex-1"
-              onPress={() => setOpen({ type: "cash_out" })}
-            />
-          </View>
-        ) : !own || table?.role === "participant" ? (
-          <>
-            {canReturn ? (
-              <Button
-                key="return"
-                label="Back at the table"
-                variant="primary"
-                size="lg"
-                onPress={() => setOpen({ type: "return" })}
-              />
-            ) : null}
-            <Button
-              key="reopen"
-              label="Fix accidental finish"
-              variant={canReturn ? "ghost" : "secondary"}
-              size="lg"
-              onPress={() => setOpen({ type: "reopen" })}
-            />
-          </>
-        ) : (
-          <>
-            <Button
-              key="start"
-              label="Start another session"
-              variant="primary"
-              size="lg"
-              onPress={() => setOpen({ type: "start" })}
-            />
-            <Button
-              key="reopen"
-              label="Fix accidental finish"
-              variant="ghost"
-              size="lg"
-              onPress={() => setOpen({ type: "reopen" })}
-            />
-          </>
-        )
-      }
-    >
+    <PersonalScreen>
       <View className="gap-2">
         <Title
-          tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Finished"}</Tag>}
+          tag={
+            <View className="flex-1 flex-row items-center justify-between gap-2">
+              <Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Finished"}</Tag>
+              <ActionMenu
+                label="Session actions"
+                actions={
+                  live
+                    ? [
+                        { label: "Record a buy-in…", onPress: () => setOpen({ type: "rebuy" }) },
+                        { label: "Cash out…", onPress: () => setOpen({ type: "cash_out" }) },
+                      ]
+                    : [
+                        ...(canReturn
+                          ? [
+                              {
+                                label: "Back at the table",
+                                onPress: () => setOpen({ type: "return" }),
+                              },
+                            ]
+                          : []),
+                        ...(own && table?.role !== "participant"
+                          ? [
+                              {
+                                label: "Start another session",
+                                onPress: () => setOpen({ type: "start" }),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: "Fix accidental finish…",
+                          onPress: () => setOpen({ type: "reopen" }),
+                        },
+                      ]
+                }
+              />
+            </View>
+          }
           context={
             live
               ? `Started ${formatDay(start)}, ${formatTime(start)}`
@@ -238,7 +216,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
         </Title>
         <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
       </View>
-      <VisitHero visit={visit} />
+      {!live ? <VisitHero visit={visit} /> : null}
       {saved ? (
         <View
           accessibilityLiveRegion="polite"

@@ -135,24 +135,8 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
         currency={currency}
       />
 
-      {awards.length > 0 ? (
-        <Section title="Awards">
-          <List>
-            {awards.map((award) => (
-              <Row key={award.key}>
-                <Chip chip={chipOf(detail, award.playerId)} name={name(award.playerId)} size={28} />
-                <RowText
-                  title={awardTitles[award.key]}
-                  meta={`${name(award.playerId)} · ${awardLine(award, currency)}`}
-                />
-              </Row>
-            ))}
-          </List>
-        </Section>
-      ) : null}
-
       <Breakdown
-        title="By casino"
+        title="Group results by casino"
         rows={byNet(
           [...venues.values()].map((sessions) => ({
             id: sessions[0]!.venue.id,
@@ -164,7 +148,28 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
         currency={currency}
       />
 
-      <TripNumbers detail={detail} trip={trip} total={standings.reduce((n, s) => n + s.net, 0)} />
+      <details>
+        <summary className="min-h-11 cursor-pointer py-3 text-lg font-semibold">
+          Trip numbers
+        </summary>
+        <TripNumbers detail={detail} trip={trip} total={standings.reduce((n, s) => n + s.net, 0)} />
+      </details>
+      {awards.length > 0 ? (
+        <details className="group">
+          <summary className="min-h-11 cursor-pointer py-3 text-lg font-semibold">Awards</summary>
+          <List>
+            {awards.map((award) => (
+              <Row key={award.key}>
+                <Chip chip={chipOf(detail, award.playerId)} name={name(award.playerId)} size={28} />
+                <RowText
+                  title={awardTitles[award.key]}
+                  meta={`${name(award.playerId)} · ${awardLine(award, currency)}`}
+                />
+              </Row>
+            ))}
+          </List>
+        </details>
+      ) : null}
     </>
   );
 }

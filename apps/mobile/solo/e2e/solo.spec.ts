@@ -75,15 +75,20 @@ async function start(page: Page, amount: string) {
   await expect(visible(page.getByRole("heading", { name: "Session" }))).toBeVisible();
 }
 
+async function sessionAction(page: Page, label: string) {
+  await button(page, "Session actions").click();
+  await button(sheet(page), label).click();
+}
+
 async function rebuy(page: Page, amount: string) {
-  await button(page, "Rebuy").click();
+  await sessionAction(page, "Record a buy-in…");
   await keypad(page, amount);
   await button(sheet(page), "Record rebuy").click();
   await expect(sheet(page)).toHaveCount(0);
 }
 
 async function cashOut(page: Page, amount: string, after: "Keep playing" | "Finish playing") {
-  await button(page, "Cash out").click();
+  await sessionAction(page, "Cash out…");
   await keypad(page, amount);
   await visible(sheet(page).getByRole("radio", { name: after })).click();
   await button(
@@ -93,27 +98,18 @@ async function cashOut(page: Page, amount: string, after: "Keep playing" | "Fini
   await expect(sheet(page)).toHaveCount(0);
 }
 
-const hero = (page: Page) =>
-  visible(page.getByText(/^(Total in|Final result)$/))
-    .first()
-    .locator("xpath=ancestor::div[2]");
-
 async function expectLive(page: Page, totalIn: string, totalOut: string) {
-  await expect(
-    visible(page.getByRole("heading", { name: "Session", exact: true }))
-      .locator("..")
-      .getByText("Live", { exact: true }),
-  ).toBeVisible();
-  await expect(text(page, "Final result pending until you finish playing.")).toBeVisible();
-  await expect(hero(page)).toContainText(`Total in${totalIn}`);
-  await expect(hero(page)).toContainText(`Total out${totalOut}`);
+  await expect(text(page, "Live").first()).toBeVisible();
+  const status = `In ${totalIn} · ${totalOut === "$0" ? "" : `Out ${totalOut} · `}playing`;
+  await expect(text(page, status)).toBeVisible();
+  await expect(text(page, "Final result pending until you finish playing.")).toHaveCount(0);
 }
 
 async function expectFinished(page: Page, result: string, amounts: string) {
   await expect(text(page, "Finished")).toBeVisible();
   await expect(text(page, "Final result")).toBeVisible();
   await expect(text(page, result).first()).toBeVisible();
-  await expect(text(page, amounts)).toBeVisible();
+  await expect(text(page, amounts).first()).toBeVisible();
   await expect(text(page, "Saved on this device")).toBeVisible();
 }
 
@@ -147,7 +143,7 @@ test("records the milestone session through reloads without an account", async (
   await expect(text(page, "Finished results")).toHaveCount(0);
   await button(page, /^Session, live/).click();
 
-  await button(page, "Cash out").click();
+  await sessionAction(page, "Cash out…");
   await expect(text(sheet(page), "Just this cash-out. Earlier ones total $100.")).toBeVisible();
   await button(sheet(page), "Close").click();
   await expect(sheet(page)).toHaveCount(0);
@@ -158,7 +154,9 @@ test("records the milestone session through reloads without an account", async (
   await expectFinished(page, "+$50", "In $300 · Out $350");
   await page.reload();
   await expectFinished(page, "+$50", "In $300 · Out $350");
-  await expect(button(page, "Start another session")).toBeVisible();
+  await button(page, "Session actions").click();
+  await expect(button(sheet(page), "Start another session")).toBeVisible();
+  await button(sheet(page), "Close").click();
   await expect(button(page, "Rebuy")).toHaveCount(0);
 
   await back(page);
@@ -176,14 +174,14 @@ test("corrects, voids and fixes an accidental finish, and the audit survives rel
   const api = await isolate(context);
   await home(page);
   await start(page, "200");
-  await button(page, "Cash out").click();
+  await sessionAction(page, "Cash out…");
   await button(sheet(page), "Nothing to cash out · $0").click();
   await visible(sheet(page).getByRole("radio", { name: "Finish playing" })).click();
   await button(sheet(page), "Cash out and finish").click();
   await expect(sheet(page)).toHaveCount(0);
   await expectFinished(page, "-$200", "In $200 · Out $0");
 
-  await button(page, "Fix accidental finish").click();
+  await sessionAction(page, "Fix accidental finish…");
   await button(sheet(page), "Reopen session").click();
   await expect(text(sheet(page), "Say what happened.")).toBeVisible();
   await expect(
@@ -319,5 +317,21 @@ test("groups and trips wait for sign-in, and your play stays a tap away", async 
   await expect(text(page, "This session isn't on this device")).toBeVisible();
   await button(page, "Back to your play").click();
   await expect(text(page, "No sessions yet")).toBeVisible();
+  expect(api).toEqual([]);
+});
+
+test("rebuys from the roster offline and undoes without changing screens", async ({
+  page,
+  context,
+}) => {
+  const api = await isolate(context);
+  await home(page);
+  await start(page, "200");
+  await button(page, /^Rebuy for /).click();
+  await expectLive(page, "$400", "$0");
+  await button(page, "Undo").click();
+  await expectLive(page, "$200", "$0");
+  await page.reload();
+  await expectLive(page, "$200", "$0");
   expect(api).toEqual([]);
 });

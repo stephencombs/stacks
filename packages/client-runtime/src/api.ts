@@ -4,7 +4,7 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
-import type { GroupId, SessionId, TripId } from "@stacks/contracts";
+import type { GroupId, PlayerId, SessionId, TripId } from "@stacks/contracts";
 import type { ActorCredential } from "@stacks/contracts/recordingCommands";
 import { StacksApi } from "@stacks/contracts";
 
@@ -123,6 +123,8 @@ export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => 
     stats: (groupId: GroupId) =>
       StacksClient.query("groups", "stats", { params: { groupId }, ...keys }),
     trip: (tripId: TripId) => StacksClient.query("trips", "get", { params: { tripId }, ...keys }),
+    balance: (tripId: TripId, playerId: PlayerId) =>
+      StacksClient.query("trips", "balance", { params: { tripId, playerId }, ...keys }),
     session: (sessionId: SessionId) =>
       StacksClient.query("sessions", "get", { params: { sessionId }, ...keys }),
     invites: (groupId: GroupId) =>

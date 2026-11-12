@@ -149,7 +149,7 @@ export function SectionHeading({
         accessibilityRole="button"
         accessibilityState={{ expanded: !collapsed }}
         onPress={onToggle}
-        className="active:opacity-70"
+        className="min-h-11 justify-center active:opacity-70"
       >
         {content}
       </Pressable>

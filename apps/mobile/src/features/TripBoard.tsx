@@ -38,6 +38,8 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const tonight = nights.at(-1);
   const total = standings.reduce((sum, s) => sum + s.net, 0);
   const played = standings.some((s) => s.playerId === detail.myPlayerId);
+  const [numbersOpen, setNumbersOpen] = useState(false);
+  const [awardsOpen, setAwardsOpen] = useState(false);
   const [picked, setPicked] = useState(played ? detail.myPlayerId : standings[0]?.playerId);
   const shown = standings.find((s) => s.playerId === picked) ?? standings[0];
   const maxAbsNet =
@@ -56,7 +58,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
           </Text>
         </View>
         <View className="items-end">
-          <Text className={cn(label, "text-muted")}>Table</Text>
+          <Text className={cn(label, "text-muted")}>Table total · everyone</Text>
           <Text className={cn("font-mono", "text-lg", tone(total))}>
             {boardMoney(total, currency)}
           </Text>
@@ -133,33 +135,52 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 
       <TripRoute detail={detail} trip={trip} />
 
-      {closed.length > 0 ? <TripNumbers detail={detail} trip={trip} /> : null}
+      {closed.length > 0 ? (
+        <View className="gap-2">
+          <SectionHeading
+            collapsible
+            collapsed={!numbersOpen}
+            onToggle={() => setNumbersOpen(!numbersOpen)}
+          >
+            Trip numbers
+          </SectionHeading>
+          {numbersOpen ? <TripNumbers detail={detail} trip={trip} /> : null}
+        </View>
+      ) : null}
 
       {awards.length > 0 ? (
         <View className="gap-2">
-          <SectionHeading>Awards</SectionHeading>
-          <View className="flex-row flex-wrap gap-2">
-            {awards.map((award) => (
-              <View
-                key={award.key}
-                accessible
-                className="grow basis-[48%] gap-2 rounded-2xl border border-line bg-surface p-3"
-              >
-                <Text className={cn(label, "text-muted")}>{awardTitles[award.key]}</Text>
-                <View className="flex-row items-center gap-2">
-                  <Chip
-                    chip={chipOf(detail, award.playerId)}
-                    name={name(award.playerId)}
-                    size={22}
-                  />
-                  <Text numberOfLines={1} className="shrink text-base font-medium text-ink">
-                    {name(award.playerId)}
-                  </Text>
+          <SectionHeading
+            collapsible
+            collapsed={!awardsOpen}
+            onToggle={() => setAwardsOpen(!awardsOpen)}
+          >
+            Awards
+          </SectionHeading>
+          {awardsOpen ? (
+            <View className="flex-row flex-wrap gap-2">
+              {awards.map((award) => (
+                <View
+                  key={award.key}
+                  accessible
+                  className="grow basis-[48%] gap-2 rounded-2xl border border-line bg-surface p-3"
+                >
+                  <Text className={cn(label, "text-muted")}>{awardTitles[award.key]}</Text>
+                  <View className="flex-row items-center gap-2">
+                    <Chip
+                      chip={chipOf(detail, award.playerId)}
+                      name={name(award.playerId)}
+                      size={22}
+                    />
+                    <Text numberOfLines={1} className="shrink text-base font-medium text-ink">
+                      {name(award.playerId)}
+                    </Text>
+                  </View>
+                  <Text className="text-xs text-muted">{awardLine(award, currency)}</Text>
                 </View>
-                <Text className="text-xs text-muted">{awardLine(award, currency)}</Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
     </>

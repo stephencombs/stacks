@@ -21,6 +21,7 @@ import { Button } from "./components/ui/Button";
 import { HeaderTitle } from "./components/ui/HeaderTitle";
 import { TabBarHeight } from "./components/ui/Screen";
 import { Landing } from "./features/Landing";
+import { LiveAccessoryProvider } from "./lib/liveAccessory";
 import { PersonalNav } from "./features/Personal";
 import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./features/PlaceTabs";
 import { ScopeButton } from "./features/Scope";
@@ -69,12 +70,15 @@ const placeOptions = {
 const SessionsStack = createNativeStackNavigator({
   screenOptions: stackOptions,
   screens: {
-    Sessions: { screen: SessionsScreen, options: placeOptions, linking: "trips/:tripId" },
-    Session: { screen: SessionScreen, options: { title: "" }, linking: "sessions/:sessionId" },
-    NewSession: {
-      screen: NewSessionScreen,
-      options: { title: "Start a session" },
-      linking: "trips/:tripId/sessions/new",
+    Sessions: {
+      screen: SessionsScreen,
+      options: { ...placeOptions, title: "Sessions" },
+      linking: "trips/:tripId",
+    },
+    Session: {
+      screen: SessionScreen,
+      options: { title: "Session" },
+      linking: "sessions/:sessionId",
     },
   },
 });
@@ -84,7 +88,7 @@ const BoardStack = createNativeStackNavigator({
   screens: {
     Board: {
       screen: BoardScreen,
-      options: placeOptions,
+      options: { ...placeOptions, title: "Board" },
       // A trip's old Results page and a group's old Stats page are the Board now.
       linking: {
         path: "trips/:tripId/board",
@@ -97,14 +101,22 @@ const BoardStack = createNativeStackNavigator({
 const SettleStack = createNativeStackNavigator({
   screenOptions: stackOptions,
   screens: {
-    SettleUp: { screen: SettleUpScreen, options: placeOptions, linking: "trips/:tripId/settle" },
+    SettleUp: {
+      screen: SettleUpScreen,
+      options: { ...placeOptions, title: "Settle up" },
+      linking: "trips/:tripId/settle",
+    },
   },
 });
 
 const GroupStack = createNativeStackNavigator({
   screenOptions: stackOptions,
   screens: {
-    Group: { screen: GroupScreen, options: placeOptions, linking: "groups/:groupId" },
+    Group: {
+      screen: GroupScreen,
+      options: { ...placeOptions, title: "Group" },
+      linking: "groups/:groupId",
+    },
     People: {
       screen: PeopleScreen,
       options: { title: "People" },
@@ -132,7 +144,9 @@ function PlacesLayout({ children }: { children: ReactNode }) {
         </>
       ) : null}
       <NoGroups>
-        <TabBarHeight value={bar}>{children}</TabBarHeight>
+        <LiveAccessoryProvider>
+          <TabBarHeight value={bar}>{children}</TabBarHeight>
+        </LiveAccessoryProvider>
       </NoGroups>
     </>
   );
@@ -178,6 +192,11 @@ const AccountStack = createNativeStackNavigator({
   layout: ({ state, children }) => <AccountGate state={state}>{children}</AccountGate>,
   screens: {
     Places: { screen: Places, options: { headerShown: false } },
+    NewSession: {
+      screen: NewSessionScreen,
+      options: { title: "New session", presentation: "modal" },
+      linking: "trips/:tripId/sessions/new",
+    },
     Groups: { screen: GroupsScreen, options: { title: "Your groups" }, linking: "groups" },
     Join: { screen: JoinScreen, options: { title: "Join a group" }, linking: "join/:code" },
     Claim: {

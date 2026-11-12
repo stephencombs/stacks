@@ -20,12 +20,14 @@ import {
   useStacks,
   useLastTrip,
   useRevalidate,
+  useQueryRetry,
   useSignedInOutbox,
 } from "@stacks/client-runtime/react";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, type ReactNode } from "react";
-import { AppState, Platform } from "react-native";
+import { AppState, Platform, View } from "react-native";
 
+import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
 import { useAccount } from "./account";
@@ -102,24 +104,42 @@ export function Loaded<A, E>({
 }: {
   query: Atom.Atom<AsyncResult.AsyncResult<A, E>>;
   skeleton?: ReactNode;
-  renderError?: (message: string) => ReactNode;
+  renderError?: (message: string, recovery: ReactNode) => ReactNode;
   children: (value: A) => ReactNode;
 }) {
   const result = useAtomValue(query);
   useRevalidate(query, result, onWake);
+  const retry = useQueryRetry(query);
   const settled = !AsyncResult.isInitial(result);
   useEffect(() => {
     if (settled) markStartup("query_settled");
   }, [settled]);
   return AsyncResult.match(result, {
     onInitial: () => skeleton ?? <Skeleton className="h-32" />,
-    // A failed refresh keeps showing what was there before.
     onFailure: (failure) =>
       Option.match(failure.previousSuccess, {
-        onSome: (previous) => children(previous.value),
+        onSome: (previous) => (
+          <>
+            <View className="gap-2">
+              <FormError>Couldn't update. Showing previous data.</FormError>
+              <Button label="Retry" onPress={retry} pending={failure.waiting} size="sm" />
+            </View>
+            {children(previous.value)}
+          </>
+        ),
         onNone: () => {
           const message = describeError(Cause.squash(failure.cause));
-          return renderError ? renderError(message) : <FormError>{message}</FormError>;
+          const recovery = (
+            <Button label="Retry" onPress={retry} pending={failure.waiting} size="sm" />
+          );
+          return renderError ? (
+            renderError(message, recovery)
+          ) : (
+            <View className="gap-2">
+              <FormError>{message}</FormError>
+              {recovery}
+            </View>
+          );
         },
       }),
     onSuccess: (success) => children(success.value),
@@ -178,7 +198,7 @@ export function TripLoaded({
 }: {
   tripId: TripId;
   skeleton: ReactNode;
-  renderError?: (message: string) => ReactNode;
+  renderError?: (message: string, recovery: ReactNode) => ReactNode;
   children: (trip: TripDetail, group: GroupDetail) => ReactNode;
 }) {
   const stacks = useStacks();

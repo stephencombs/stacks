@@ -1,7 +1,15 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 
-import { around, barTrack, labelWidth, lineScale, placeLabel, spreadLabels } from "./chart.ts";
+import {
+  around,
+  barTrack,
+  labelWidth,
+  lineScale,
+  placeLabel,
+  shortNames,
+  spreadLabels,
+} from "./chart.ts";
 
 describe("barTrack", () => {
   it("puts zero where the losses end and scales bars to the full range", () => {
@@ -190,4 +198,31 @@ describe("placeLabel", () => {
   it("pins a label that runs off the right to the end", () => {
     expect(placeLabel(380, 40, bounds)).toEqual({ x: 390, anchor: "end" });
   });
+});
+
+it("labels chart players by distinguishable names rather than shared initials", () => {
+  expect([
+    ...shortNames(
+      new Map([
+        ["a", "Bruce"],
+        ["b", "Brad"],
+      ]),
+    ).values(),
+  ]).toEqual(["Bruce", "Brad"]);
+  expect([
+    ...shortNames(
+      new Map([
+        ["a", "Brad Park"],
+        ["b", "Brad Kim"],
+      ]),
+    ).values(),
+  ]).toEqual(["Brad Park", "Brad Kim"]);
+  const labels = shortNames(
+    new Map([
+      ["a", "Brad"],
+      ["b", "Brad"],
+      ["c", "Brad (1)"],
+    ]),
+  );
+  expect(new Set(labels.values()).size).toBe(3);
 });

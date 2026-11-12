@@ -8,8 +8,8 @@ type PlacesParams = NonNullable<
 >;
 
 /**
- * Ways into the places from anywhere. A session and a new session push onto Sessions, and a
- * group's people and settings onto Group, each over its place so back lands there.
+ * Ways into the places from anywhere. New sessions open above the tabs; existing sessions,
+ * people and settings keep their destination underneath them.
  */
 export function useGo() {
   const navigation = useNavigation();
@@ -23,13 +23,9 @@ export function useGo() {
         params: { screen: "Session", params: { sessionId }, initial: false },
       }),
     newSession: (tripId: TripId, from?: SessionId) =>
-      places({
-        screen: "SessionsTab",
-        params: {
-          screen: "NewSession",
-          params: { tripId, ...(from ? { from } : {}) },
-          initial: false,
-        },
+      navigation.navigate("Account", {
+        screen: "NewSession",
+        params: { tripId, ...(from ? { from } : {}) },
       }),
     /** Puts a trip in scope and opens one of its places. */
     trip: (tripId: TripId, place: "Sessions" | "Board" | "SettleUp" = "Sessions") => {

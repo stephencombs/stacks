@@ -1,6 +1,7 @@
 // Preview only: one realistic group, encoded through the real contract schemas.
 import { JoinedTable, PlayerInvitePreview, TableView } from "@stacks/contracts/recordingCommands";
 import {
+  BalanceExplanation,
   PairHistory,
   PlayerBalances,
   GroupDetail,
@@ -435,7 +436,35 @@ const check = <S extends Schema.Top>(schema: S, value: unknown) => {
   const json = Schema.toCodecJson(schema as never);
   return Schema.encodeSync(json)(Schema.decodeUnknownSync(json)(value));
 };
+const balanceRoutes = Object.fromEntries(
+  [ids.trip, ids.oldTrip].flatMap((tripId) =>
+    P.map((playerId) => {
+      const lines = tripDetail.transfers.flatMap((transfer, index) => {
+        const lender = transfer.to === playerId;
+        if (!lender && transfer.from !== playerId) return [];
+        return [
+          {
+            kind: "covered_buy_in",
+            entryId: u(700 + index),
+            counterpartyId: lender ? transfer.from : transfer.to,
+            amount: lender ? transfer.amount : -transfer.amount!,
+            occurredAt: at(22, 20),
+            sessionId: summaries[0]!.session.id,
+          },
+        ];
+      });
+      return [
+        `/api/trips/${tripId}/players/${playerId}/balance`,
+        check(BalanceExplanation, {
+          lines,
+          total: lines.reduce((sum, line) => sum + line.amount!, 0),
+        }),
+      ];
+    }),
+  ),
+);
 export const routes: Record<string, unknown> = {
+  ...balanceRoutes,
   "/api/recording": {
     identity: null,
     commands: [],

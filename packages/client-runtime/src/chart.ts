@@ -131,3 +131,29 @@ export const placeLabel = (
   if (at + width / 2 > bounds.max) return { x: bounds.max, anchor: "end" };
   return { x: at, anchor: "middle" };
 };
+
+/** Use first names when unique, full names on collision, and numbered names for duplicates. */
+export const shortNames = <Id>(names: ReadonlyMap<Id, string>): ReadonlyMap<Id, string> => {
+  const players = [...names].map(([id, name]) => ({ id, name: name.trim() || "Someone" }));
+  const first = (name: string) => name.split(/\s+/)[0]!;
+  const candidates = players.map(({ name }) =>
+    players.filter((player) => first(player.name) === first(name)).length === 1
+      ? first(name)
+      : name,
+  );
+  const reserved = new Set(candidates);
+  const used = new Set<string>();
+  return new Map(
+    players.map(({ id }, i) => {
+      const base = candidates[i]!;
+      let label = base;
+      if (used.has(label)) {
+        let suffix = 2;
+        while (reserved.has(`${base} (${suffix})`) || used.has(`${base} (${suffix})`)) suffix++;
+        label = `${base} (${suffix})`;
+      }
+      used.add(label);
+      return [id, label];
+    }),
+  );
+};

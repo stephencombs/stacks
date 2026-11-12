@@ -5,9 +5,10 @@ import {
   lineScale,
   placeLabel,
   spreadLabels,
+  shortNames,
 } from "@stacks/client-runtime/chart";
 import { playerNames } from "@stacks/client-runtime/format";
-import { localClock, raceHeadline } from "@stacks/client-runtime/trip";
+import { boardMoney, localClock, raceHeadline } from "@stacks/client-runtime/trip";
 import { runningTotals } from "@stacks/shared/stats";
 import { tripStandings } from "@stacks/shared/trips";
 import { useState } from "react";
@@ -20,12 +21,12 @@ import { cn } from "../components/ui/cn";
 
 const HEIGHT = 128;
 const PAD = { x: 16, y: 12 };
-/** Room past the last point for each line's initial. */
-const LABEL = 30;
+/** Leave room for names beside the last point. */
+const LABEL = 100;
 const LETTER = 12;
 const INSET = 8;
 
-/** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in gold. */
+/** Your trip result and the group's running totals, with yours in gold. */
 export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const [accent, accentText, muted, ring] = useCSSVariable([
     "--color-accent",
@@ -37,9 +38,11 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
   const currency = detail.group.currency;
   const names = playerNames(detail);
   const me = detail.myPlayerId;
+  const chartNames = shortNames(names);
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
   const standings = tripStandings(closed, localClock);
   const head = raceHeadline(standings, me, names, currency);
+  const rank = standings.find((standing) => standing.playerId === me)?.rank;
   if (!head || closed.length === 0) return null;
 
   const lines = standings
@@ -67,20 +70,25 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
     <View className="overflow-hidden rounded-2xl border border-line bg-surface">
       <View className="px-5 pt-5">
         <Text accessibilityRole="header" className="type-label text-muted">
-          {head.label}
+          Your trip result
         </Text>
         <Money
-          amount={MinorUnits.make(head.gap ?? head.net)}
+          amount={MinorUnits.make(head.net)}
           currency={currency}
-          tone={head.gap === null ? "result" : "plain"}
+          tone="result"
           fit
           className={cn(
-            head.tone === "win" && "text-win",
-            head.tone === "loss" && "text-loss",
+            head.net > 0 && "text-win",
+            head.net < 0 && "text-loss",
             "mt-1.5 type-hero",
           )}
         />
-        {head.line ? <Text className="mt-1 type-footnote text-muted">{head.line}</Text> : null}
+        <Text className="mt-1 type-footnote text-muted">
+          #{rank} of {standings.length} ·{" "}
+          {head.gap === null
+            ? head.label
+            : `${head.label} by ${boardMoney(head.gap, currency, false)}`}
+        </Text>
       </View>
       <View
         accessibilityElementsHidden
@@ -107,7 +115,7 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
               const off = plot.clipped(line.at(-1)!);
               const color = yours ? accent : muted;
               const initial =
-                (names.get(playerId) ?? "?").slice(0, 1).toUpperCase() +
+                (chartNames.get(playerId) ?? "Someone") +
                 (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
               const seatWidth = labelWidth(initial, LETTER);
               const seat = placeLabel(end.x + 9 + seatWidth / 2, seatWidth, edges);

@@ -402,7 +402,7 @@ export function PlayerSheet({
       value: <span className="font-semibold tabular-nums">{runs.longestWinningRun}</span>,
     },
     {
-      title: "Best casino",
+      title: "Personal best casino",
       meta: sheet.bestVenue
         ? `${sheet.bestVenue.name} · ${sheet.bestVenue.sessions} ${sheet.bestVenue.sessions === 1 ? "session" : "sessions"}`
         : "Still looking",

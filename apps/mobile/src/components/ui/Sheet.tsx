@@ -15,7 +15,27 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "./Icon";
+import { Button } from "./Button";
 import { keyboardOverlap, sheetBottomEdge } from "./keyboardInset";
+
+export type FormAction = {
+  label: string;
+  onPress: () => void;
+  pending?: boolean;
+  disabled?: boolean;
+  destructive?: boolean;
+};
+
+export type SheetProps = {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  footer?: ReactNode;
+  confirm?: FormAction;
+  busy?: boolean;
+  children?: ReactNode;
+};
 
 /**
  * A form or confirmation that slides up over the current screen, laid out like an iOS sheet: a
@@ -27,19 +47,11 @@ export function Sheet({
   title,
   description,
   footer,
+  confirm,
   busy = false,
   children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  description?: string;
-  /** The sheet's main action, kept above the keyboard and the home indicator. */
-  footer?: ReactNode;
-  /** While a save is in flight, neither the close button nor Android's back closes it. */
-  busy?: boolean;
-  children?: ReactNode;
-}) {
+}: SheetProps) {
+  const saving = busy || confirm?.pending === true;
   const insets = useSafeAreaInsets();
   const [keyboard, setKeyboard] = useState(0);
   const sheetBottom = useRef(0);
@@ -82,7 +94,7 @@ export function Sheet({
       visible={open}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={busy ? () => {} : onClose}
+      onRequestClose={saving ? () => {} : onClose}
     >
       <View
         className="flex-1 bg-canvas"
@@ -112,8 +124,8 @@ export function Sheet({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close"
-              accessibilityState={{ disabled: busy }}
-              disabled={busy}
+              accessibilityState={{ disabled: saving }}
+              disabled={saving}
               onPress={onClose}
               hitSlop={8}
               className="size-11 items-center justify-center"
@@ -148,7 +160,20 @@ export function Sheet({
             ) : null}
             {children}
           </ScrollView>
-          {footer ? <View className="gap-2 px-4 pt-2 pb-3">{footer}</View> : null}
+          {confirm ? (
+            <View className="px-4 pt-2 pb-3">
+              <Button
+                label={confirm.label}
+                variant={confirm.destructive ? "danger" : "primary"}
+                size="lg"
+                pending={confirm.pending}
+                disabled={confirm.disabled}
+                onPress={confirm.onPress}
+              />
+            </View>
+          ) : footer ? (
+            <View className="gap-2 px-4 pt-2 pb-3">{footer}</View>
+          ) : null}
         </View>
       </View>
     </Modal>

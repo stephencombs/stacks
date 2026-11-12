@@ -2,13 +2,21 @@ import { formatTime } from "@stacks/client-runtime/format";
 import {
   usePlayerInvite,
   useRecordingSubmit,
+  useRecordingVisit,
   useRecordingTable,
   useServerTable,
   useTableSharing,
 } from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
-import type { PlayerId, PlayerIdentity, TableId, VisitId } from "@stacks/contracts";
+import {
+  MinorUnits,
+  type PlayerId,
+  type PlayerIdentity,
+  type TableId,
+  type VisitId,
+} from "@stacks/contracts";
 import { useState } from "react";
+import { formatMoney } from "@stacks/shared/money";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
@@ -20,7 +28,9 @@ import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { useAccount } from "../lib/account";
 import { webUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
-import { AddPlayerSheet } from "./RecordingForms";
+import { AddPlayerSheet, CashOutSheet, RebuySheet } from "./RecordingForms";
+import { TableRosterRow } from "./TableRoster";
+import { useToast } from "../components/ui/Toast";
 
 /**
  * Everyone recorded at this visit's table, each opening their own visit. Whoever started the
@@ -46,27 +56,13 @@ export function TableSection({
       <SectionHeading>At this table</SectionHeading>
       <List>
         {table.visits.map((item) => (
-          <Row
+          <PersonalRosterRow
             key={item.visit.id}
-            onPress={() => onOpen(item.visit.id)}
-            accessibilityHint="Opens their session"
-          >
-            <View className="min-w-0 flex-1 gap-0.5">
-              <Text className="font-medium text-ink">
-                {item.isSelf ? "You" : item.player.displayName}
-              </Text>
-              <Text className="text-sm text-muted">
-                {item.finalResult === null
-                  ? `Playing since ${formatTime(item.visit.startedAt)}`
-                  : `Finished ${formatTime(item.visit.finishedAt!)}`}
-              </Text>
-            </View>
-            {item.finalResult === null ? (
-              <Tag tone="live">Live</Tag>
-            ) : (
-              <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
-            )}
-          </Row>
+            visitId={item.visit.id}
+            name={item.player.displayName}
+            you={item.isSelf}
+            onOpen={() => onOpen(item.visit.id)}
+          />
         ))}
       </List>
       <View className="flex-row flex-wrap gap-2">
@@ -102,6 +98,92 @@ export function TableSection({
         <ShareSheet tableId={tableId} onClose={() => setOpen(null)} />
       ) : open === "settings" ? (
         <TableSettingsSheet tableId={tableId} onClose={() => setOpen(null)} />
+      ) : null}
+    </View>
+  );
+}
+
+function PersonalRosterRow({
+  visitId,
+  name,
+  you,
+  onOpen,
+}: {
+  visitId: VisitId;
+  name: string;
+  you: boolean;
+  onOpen: () => void;
+}) {
+  const { visit } = useRecordingVisit(visitId);
+  const save = useRecordingSubmit();
+  const toast = useToast();
+  const [open, setOpen] = useState<"rebuy" | "cash_out" | null>(null);
+  if (!visit) return null;
+  const live = visit.visit.finishedAt === null;
+  const last = visit.entries.findLast(
+    (entry) => entry.kind === "buy_in" && entry.voidedAt === null && entry.counterpartyId === null,
+  );
+  const rebuy = async () => {
+    if (!last) return setOpen("rebuy");
+    const receipt = await save.submit({
+      type: "add",
+      visitId,
+      kind: "buy_in",
+      amount: last.amount,
+    });
+    if (receipt?.command.type !== "add") return;
+    const entryId = receipt.command.entryId;
+    toast({
+      message: `${you ? "You" : name} bought in ${formatMoney(last.amount, RECORDING_CURRENCY)}`,
+      action: {
+        label: "Undo",
+        onPress: () => {
+          void save.submit({
+            type: "correct",
+            visitId,
+            entryId,
+            reason: "Undone",
+            replacement: null,
+          });
+        },
+      },
+    });
+  };
+  return (
+    <View>
+      <TableRosterRow
+        name={name}
+        you={you}
+        status={`In ${formatMoney(visit.totals.buyIn, RECORDING_CURRENCY)} · ${live ? `${visit.totals.cashOut > 0 ? `Out ${formatMoney(visit.totals.cashOut, RECORDING_CURRENCY)} · ` : ""}playing` : `Out ${formatMoney(visit.totals.cashOut, RECORDING_CURRENCY)}`}`}
+        onPress={live ? () => setOpen("cash_out") : onOpen}
+        accessibilityHint={
+          live ? "Record a cash-out for this player" : "Opens this player's session and history"
+        }
+        trailing={
+          live ? (
+            <Button
+              label={last ? `Rebuy ${formatMoney(last.amount, RECORDING_CURRENCY)}` : "Rebuy"}
+              accessibilityLabel={`Rebuy for ${name}`}
+              size="sm"
+              variant="tint"
+              haptic
+              pending={save.pending}
+              onPress={() => void rebuy()}
+            />
+          ) : (
+            <Money
+              amount={visit.finalResult ?? MinorUnits.make(0)}
+              currency={RECORDING_CURRENCY}
+              tone="result"
+            />
+          )
+        }
+      />
+      {save.error ? <FormError>{save.error}</FormError> : null}
+      {open === "cash_out" ? (
+        <CashOutSheet visit={visit} onClose={() => setOpen(null)} onSaved={() => setOpen(null)} />
+      ) : open === "rebuy" ? (
+        <RebuySheet visit={visit} onClose={() => setOpen(null)} onSaved={() => setOpen(null)} />
       ) : null}
     </View>
   );
@@ -219,28 +301,38 @@ function JoinedTableSection({
     <View className="gap-2">
       <SectionHeading>At this table</SectionHeading>
       <List>
-        {rows.map((item) => (
-          <Row
-            key={item.visit.id}
-            {...(item.mine
-              ? { onPress: () => onOpen(item.visit.id), accessibilityHint: "Opens your session" }
-              : {})}
-          >
-            <View className="min-w-0 flex-1 gap-0.5">
-              <Text className="font-medium text-ink">{item.name}</Text>
-              <Text className="text-sm text-muted">
-                {item.finalResult === null
-                  ? `Playing since ${formatTime(item.visit.startedAt)}`
-                  : `Finished ${formatTime(item.visit.finishedAt!)}`}
-              </Text>
-            </View>
-            {item.finalResult === null ? (
-              <Tag tone="live">Live</Tag>
-            ) : (
-              <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
-            )}
-          </Row>
-        ))}
+        {rows.map((item) =>
+          item.mine ? (
+            <PersonalRosterRow
+              key={item.visit.id}
+              visitId={item.visit.id}
+              name={table.you.player.displayName}
+              you
+              onOpen={() => onOpen(item.visit.id)}
+            />
+          ) : (
+            <Row
+              key={item.visit.id}
+              {...(item.mine
+                ? { onPress: () => onOpen(item.visit.id), accessibilityHint: "Opens your session" }
+                : {})}
+            >
+              <View className="min-w-0 flex-1 gap-0.5">
+                <Text className="font-medium text-ink">{item.name}</Text>
+                <Text className="text-sm text-muted">
+                  {item.finalResult === null
+                    ? `Playing since ${formatTime(item.visit.startedAt)}`
+                    : `Finished ${formatTime(item.visit.finishedAt!)}`}
+                </Text>
+              </View>
+              {item.finalResult === null ? (
+                <Tag tone="live">Live</Tag>
+              ) : (
+                <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
+              )}
+            </Row>
+          ),
+        )}
       </List>
       <Text className="text-sm text-muted">
         {server === null

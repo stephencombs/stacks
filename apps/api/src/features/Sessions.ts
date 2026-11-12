@@ -218,7 +218,8 @@ export const reopen = Effect.fn("Sessions.reopen")(function* (sessionId: Session
   const { member } = yield* access(sessionId);
   yield* Access.requireAdmin(member);
   yield* sql`
-    update sessions set status = 'live', ended_at = null, closed_by = null, reopened_at = now()
+    update sessions set previous_ended_at = ended_at,
+      status = 'live', ended_at = null, closed_by = null, reopened_at = now()
     where id = ${sessionId} and status = 'closed'
   `;
   return yield* Views.sessionDetail(sessionId);

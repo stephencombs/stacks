@@ -65,7 +65,7 @@ export const describeError = (error: unknown): string => {
   if (isNotFound(error)) return "That doesn't exist anymore.";
   if (isInvalid(error)) return error.message;
   if (isUnauthorized(error)) return "Your sign-in expired. Sign in again.";
-  return "Couldn't reach Color Up. Check your connection and try again.";
+  return "Color Up couldn't complete that request. Try again.";
 };
 
 /**

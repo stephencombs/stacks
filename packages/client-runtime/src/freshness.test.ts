@@ -28,3 +28,12 @@ it("refetches data loaded before the last ledger write, however fresh", () => {
   expect(shouldRevalidate(loaded(10), at, undefined, at - 20)).toBe(false);
   expect(shouldRevalidate(loaded(10), at, at - 1, at - 5)).toBe(false);
 });
+
+it("recovers failed queries on mount or wake without retrying a pending request", () => {
+  expect(shouldRevalidate(AsyncResult.fail("offline"), at, undefined)).toBe(true);
+  expect(shouldRevalidate(AsyncResult.fail("offline"), at, at - 10)).toBe(false);
+  expect(shouldRevalidate(AsyncResult.fail("offline"), at, at - DEDUPE_MS)).toBe(true);
+  expect(shouldRevalidate(AsyncResult.fail("offline", { waiting: true }), at, undefined)).toBe(
+    false,
+  );
+});

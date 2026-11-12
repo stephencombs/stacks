@@ -1,6 +1,7 @@
 import * as DateTime from "effect/DateTime";
 import {
   MinorUnits,
+  type BalanceLine,
   type GroupDetail,
   type Player,
   type PlayerId,
@@ -108,3 +109,17 @@ export const canChangeStake = (detail: GroupDetail, { stake }: StakeView, userId
   stake.createdBy === userId ||
   stake.lenderId === detail.myPlayerId ||
   stake.borrowerId === detail.myPlayerId;
+
+export const balanceLineLabel = (line: BalanceLine, player: string, other: string) => {
+  const positive = line.amount > 0;
+  switch (line.kind) {
+    case "covered_buy_in":
+      return positive ? `${player} paid ${other}'s buy-in` : `${other} paid ${player}'s buy-in`;
+    case "held_cash_out":
+      return positive ? `${other} kept ${player}'s cash-out` : `${player} kept ${other}'s cash-out`;
+    case "settlement":
+      return positive ? `${player} paid ${other}` : `${other} paid ${player}`;
+    case "stake":
+      return positive ? `${player} backed ${other}` : `${other} backed ${player}`;
+  }
+};

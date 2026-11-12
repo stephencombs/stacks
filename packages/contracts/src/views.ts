@@ -1,6 +1,16 @@
 import * as Schema from "effect/Schema";
 
-import { EntryId, GroupId, InviteId, PlayerId, SessionId, TripId, UserId, VenueId } from "./ids.ts";
+import {
+  EntryId,
+  GroupId,
+  InviteId,
+  PlayerId,
+  SessionId,
+  StakeId,
+  TripId,
+  UserId,
+  VenueId,
+} from "./ids.ts";
 import { Entry, Game, Seat, Seating, Session, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 
@@ -47,6 +57,34 @@ export type Player = typeof Player.Type;
 
 export const Balance = Schema.Struct({ playerId: PlayerId, amount: MinorUnits });
 export type Balance = typeof Balance.Type;
+
+export const BalanceLine = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literals(["covered_buy_in", "held_cash_out", "settlement"]),
+    entryId: EntryId,
+    counterpartyId: PlayerId,
+    amount: MinorUnits,
+    occurredAt: Schema.DateTimeUtc,
+    sessionId: Schema.NullOr(SessionId),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("stake"),
+    stakeId: StakeId,
+    counterpartyId: PlayerId,
+    amount: MinorUnits,
+    principal: MinorUnits,
+    lenderShare: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+    result: MinorUnits,
+    occurredAt: Schema.DateTimeUtc,
+  }),
+]);
+export type BalanceLine = typeof BalanceLine.Type;
+
+export const BalanceExplanation = Schema.Struct({
+  lines: Schema.Array(BalanceLine),
+  total: MinorUnits,
+});
+export type BalanceExplanation = typeof BalanceExplanation.Type;
 
 export const Transfer = Schema.Struct({ from: PlayerId, to: PlayerId, amount: MinorUnits });
 export type Transfer = typeof Transfer.Type;

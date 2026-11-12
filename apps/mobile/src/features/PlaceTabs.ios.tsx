@@ -7,7 +7,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export const createPlaceTabs = createNativeBottomTabNavigator;
 
 export const placeTabsConfig = {
-  screenOptions: { headerShown: false },
+  screenOptions: {
+    headerShown: false,
+  },
 };
 
 export const placeTab = (

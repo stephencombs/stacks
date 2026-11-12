@@ -108,6 +108,7 @@ const trips = HttpApiBuilder.group(StacksApi, "trips", (handlers) =>
   handlers
     .handle("create", ({ params, payload }) => serve(Trips.create(params.groupId, payload)))
     .handle("get", ({ params }) => serve(Trips.get(params.tripId)))
+    .handle("balance", ({ params }) => serve(Trips.balance(params.tripId, params.playerId)))
     .handle("end", ({ params, payload }) => serve(Trips.end(params.tripId, payload)))
     .handle("reopen", ({ params }) => serve(Trips.reopen(params.tripId)))
     .handle("delete", ({ params }) => serve(Trips.remove(params.tripId))),

@@ -127,7 +127,7 @@ export function ScopeLoaded({
   children,
 }: {
   skeleton: ReactNode;
-  renderError?: (message: string) => ReactNode;
+  renderError?: (message: string, recovery: ReactNode) => ReactNode;
   children: (scope: Scope) => ReactNode;
 }) {
   const stacks = useStacks();

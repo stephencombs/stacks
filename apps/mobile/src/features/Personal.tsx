@@ -265,11 +265,11 @@ export function PersonalYou({ onClose }: { onClose: () => void }) {
 export function SettleUpLink({ onPress }: { onPress: () => void }) {
   return (
     <View className="gap-2">
-      <SectionHeading>Settle up</SectionHeading>
+      <SectionHeading>Outside trips</SectionHeading>
       <Text className="text-base text-muted">
         Who owes whom between you and the people you've played with, outside any trip.
       </Text>
-      <Button label="Settle up" onPress={onPress} />
+      <Button label="Outside trips" onPress={onPress} />
     </View>
   );
 }

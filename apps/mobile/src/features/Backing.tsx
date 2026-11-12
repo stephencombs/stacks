@@ -3,6 +3,7 @@ import {
   PlayerId,
   StakeId,
   UserId,
+  type CurrencyCode,
   type GroupDetail,
   type StakeView,
   type TripDetail,
@@ -14,7 +15,7 @@ import * as Option from "effect/Option";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
-import { confirmAction } from "../components/ui/confirmAction";
+import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
@@ -85,6 +86,7 @@ export function BackingSection({ detail, trip }: { detail: GroupDetail; trip: Tr
       {managing ? (
         <StakeSheet
           view={managing}
+          currency={detail.group.currency}
           title={stakeLines(managing, names, detail.group.currency).title}
           onClose={() => setManaging(null)}
         />
@@ -108,17 +110,20 @@ function BackSheet({
     .filter((p) => p.role !== null || p.userId === null)
     .map((p) => ({ value: p.id, label: p.displayName }));
   const [lender, setLender] = useState<PlayerId>(detail.myPlayerId);
-  const [borrower, setBorrower] = useState<PlayerId>(
-    people.find((p) => p.value !== detail.myPlayerId)?.value ?? detail.myPlayerId,
-  );
+  const [borrower, setBorrower] = useState<PlayerId | "">("");
   const [amount, setAmount] = useState("");
   const [share, setShare] = useState("50");
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  const principal = Option.getOrNull(parseMoney(amount, detail.group.currency));
+  const percent = Number(share.trim());
+  const borrowerName = people.find((person) => person.value === borrower)?.label;
+  const lenderName = people.find((person) => person.value === lender)?.label;
 
   const submit = async () => {
     const value = Option.getOrNull(parseMoney(amount, detail.group.currency));
     const percent = Number(share.trim());
+    if (borrower === "") return setProblem("Choose who is playing the stake.");
     if (lender === borrower) return setProblem("Pick two different people.");
     if (value === null || value <= 0) return setProblem("Enter how much they put up.");
     if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
@@ -145,15 +150,11 @@ function BackSheet({
       onClose={onClose}
       title="Back a player"
       description="From now until it's ended, the player's results go to the stake."
-      footer={
-        <Button
-          label="Back them"
-          variant="primary"
-          size="lg"
-          pending={create.pending}
-          onPress={() => void submit()}
-        />
-      }
+      confirm={{
+        label: borrowerName ? `Back ${borrowerName}` : "Back player",
+        pending: create.pending,
+        onPress: () => void submit(),
+      }}
     >
       <Choice
         label="Who's putting up the money"
@@ -161,7 +162,13 @@ function BackSheet({
         value={lender}
         onChange={setLender}
       />
-      <Choice label="Who's playing it" options={people} value={borrower} onChange={setBorrower} />
+      <Choice
+        label="Who's playing it"
+        presentation="menu"
+        options={[{ value: "" as const, label: "Choose a player" }, ...people]}
+        value={borrower}
+        onChange={setBorrower}
+      />
       <TextField
         label="Amount"
         value={amount}
@@ -177,6 +184,25 @@ function BackSheet({
         hint="If the player loses, the backer gets back what's left of the stake."
       />
       <TextField label="Note (optional)" value={note} onChangeText={setNote} maxLength={280} />
+      {borrowerName &&
+      lenderName &&
+      principal !== null &&
+      principal > 0 &&
+      Number.isInteger(percent) &&
+      percent >= 0 &&
+      percent <= 100 &&
+      lender !== borrower ? (
+        <View className="gap-2 rounded-xl bg-surface p-4">
+          <Text className="type-body text-ink">
+            {lenderName} puts up <Money amount={principal} currency={detail.group.currency} /> for{" "}
+            {borrowerName}.
+          </Text>
+          <Text className="type-footnote text-muted">
+            {lenderName} gets the principal back plus {percent}% of this stake's winnings. Losses
+            reduce the amount returned, down to zero. {borrowerName} keeps the remaining winnings.
+          </Text>
+        </View>
+      ) : null}
       {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
     </Sheet>
   );
@@ -184,10 +210,12 @@ function BackSheet({
 
 function StakeSheet({
   view,
+  currency,
   title,
   onClose,
 }: {
   view: StakeView;
+  currency: CurrencyCode;
   title: string;
   onClose: () => void;
 }) {
@@ -196,10 +224,37 @@ function StakeSheet({
   const reopen = useAction(stacks.Client.mutation("stakes", "reopen"));
   const voidStake = useAction(stacks.Client.mutation("stakes", "void"));
   const [reason, setReason] = useState("");
+  const [voiding, setVoiding] = useState(false);
   const params = { stakeId: view.stake.id };
   const done = (ok: unknown) => (ok ? onClose() : undefined);
   const error = end.error ?? reopen.error ?? voidStake.error;
 
+  if (voiding)
+    return (
+      <Sheet
+        open
+        onClose={() => setVoiding(false)}
+        title="Void this stake?"
+        busy={voidStake.pending}
+        description="It stays in the history, crossed out, and stops counting toward balances."
+        confirm={{
+          label: "Void stake",
+          destructive: true,
+          pending: voidStake.pending,
+          onPress: () =>
+            void voidStake.run({ params, payload: { reason: reason.trim() || null } }).then(done),
+        }}
+      >
+        <Text className="type-body text-ink">{title}</Text>
+        <TextField
+          label="Reason for voiding (optional)"
+          value={reason}
+          onChangeText={setReason}
+          maxLength={280}
+        />
+        {voidStake.error ? <FormError>{voidStake.error}</FormError> : null}
+      </Sheet>
+    );
   return (
     <Sheet
       open
@@ -232,29 +287,29 @@ function StakeSheet({
       <Text className="type-footnote text-muted">
         {view.stake.endedAt === null ? "Open stake" : "Ended stake"}
       </Text>
-      <Text className="text-sm text-muted">
-        Voided stakes stay listed, crossed out, and stop counting toward balances.
-      </Text>
-      <TextField
-        label="Reason for voiding (optional)"
-        value={reason}
-        onChangeText={setReason}
-        maxLength={280}
-      />
+      <List>
+        <Row>
+          <Text className="flex-1 type-body text-muted">Principal</Text>
+          <Money amount={view.stake.amount} currency={currency} />
+        </Row>
+        <Row>
+          <Text className="flex-1 type-body text-muted">Backer's share of winnings</Text>
+          <Text className="type-body text-ink">{view.stake.lenderShare}%</Text>
+        </Row>
+        <Row>
+          <Text className="flex-1 type-body text-muted">Result allocated to this stake</Text>
+          <Money amount={view.result} currency={currency} tone="result" />
+        </Row>
+        <Row>
+          <Text className="flex-1 type-body text-muted">Owed back now</Text>
+          <Money amount={view.owed} currency={currency} />
+        </Row>
+      </List>
       <Button
-        label="Void stake"
-        variant="danger"
-        disabled={end.pending || reopen.pending || voidStake.pending}
-        onPress={() =>
-          confirmAction(
-            "Void this stake?",
-            "It will stay in the history but stop counting toward balances.",
-            "Void stake",
-            () => {
-              void voidStake.run({ params, payload: { reason: reason.trim() || null } }).then(done);
-            },
-          )
-        }
+        label="Void stake…"
+        variant="ghost"
+        disabled={end.pending || reopen.pending}
+        onPress={() => setVoiding(true)}
       />
       {error ? <FormError>{error}</FormError> : null}
     </Sheet>

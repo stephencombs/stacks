@@ -62,7 +62,10 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const colorScheme = theme === "dark" ? "DARK" : "LIGHT";
   return (
     <View className="gap-2">
-      <SectionHeading>By casino</SectionHeading>
+      <SectionHeading>Group results by casino</SectionHeading>
+      <Text className="type-footnote text-muted">
+        In order first visited. Totals include everyone on this trip.
+      </Text>
       {canDrawMap && camera ? (
         <View
           className="h-72 overflow-hidden rounded-xl border border-line"
@@ -119,16 +122,13 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
           <Pressable
             key={stop.venue.id}
             accessibilityRole="link"
-            accessibilityLabel={`${stop.number}. ${stop.venue.name}, directions`}
+            accessibilityLabel={`${stop.venue.name}, directions`}
             onPress={() => void Linking.openURL(directions(stop.venue))}
             className={cn(
               "flex-row items-center gap-3 px-3 py-3 active:bg-fill",
               index > 0 && "border-t border-line",
             )}
           >
-            <View className="size-7 items-center justify-center rounded-full bg-accent">
-              <Text className="font-mono text-sm text-accent-ink">{stop.number}</Text>
-            </View>
             <View className="flex-1">
               <Text numberOfLines={1} className="text-base text-ink">
                 {stop.venue.name}

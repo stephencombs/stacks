@@ -16,7 +16,7 @@ import {
   type TripId,
   type VenueId,
 } from "@stacks/contracts";
-import { balances } from "@stacks/shared/balances";
+import { balanceBreakdown, balances } from "@stacks/shared/balances";
 import { resultsBy } from "@stacks/shared/results";
 import { leftToSettle, settleUp } from "@stacks/shared/settleUp";
 import { stakeOutcomes, withStakes } from "@stacks/shared/stakes";
@@ -204,6 +204,7 @@ export const tripLedger = Effect.fn("Views.tripLedger")(function* (tripId: TripI
       sql`
         select e.* from entries e left join sessions s on s.id = e.session_id
         where e.voided_at is null and (e.trip_id = ${tripId} or s.trip_id = ${tripId})
+        order by e.occurred_at, e.created_at, e.id
       `.pipe(Effect.flatMap(decodeRows(EntryRow))),
       sql`select * from stakes where trip_id = ${tripId} order by started_at, created_at`.pipe(
         Effect.flatMap(decodeRows(StakeRow)),
@@ -220,7 +221,21 @@ export const tripLedger = Effect.fn("Views.tripLedger")(function* (tripId: TripI
     sessions,
     entries.filter((entry) => entry.sessionId !== null),
   );
-  return { owed: withStakes(balances(entries), stakes, outcomes), stakes, outcomes, sessions };
+  return {
+    owed: withStakes(balances(entries), stakes, outcomes),
+    entries,
+    stakes,
+    outcomes,
+    sessions,
+  };
+});
+
+export const tripBalance = Effect.fn("Views.tripBalance")(function* (
+  tripId: TripId,
+  playerId: PlayerId,
+) {
+  const { entries, stakes, outcomes } = yield* tripLedger(tripId);
+  return balanceBreakdown(entries, stakes, outcomes, playerId);
 });
 
 export const tripDetail = Effect.fn("Views.tripDetail")(function* (trip: typeof TripRow.Type) {

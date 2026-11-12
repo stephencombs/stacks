@@ -36,8 +36,8 @@ export function ScopeButton({ title }: { title?: string } = {}) {
     <>
       {Platform.OS === "ios" ? (
         <HeaderTitle
-          title={title || trip?.name || item.group.name}
-          context={`${item.group.name} · ${trip?.name ?? "No trips yet"}`}
+          title={trip ? `${trip.name}${trip.endedAt ? " · Ended" : ""}` : item.group.name}
+          context={`${title ? `${title} · ` : ""}${item.group.name} · ${trip?.name ?? "No trips yet"}`}
           onExpand={() => setOpen(true)}
         />
       ) : (

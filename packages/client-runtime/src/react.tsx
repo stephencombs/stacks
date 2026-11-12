@@ -273,6 +273,17 @@ const ledgerChanged = () => {
   ledgerChangedAt = Date.now();
 };
 
+/** Retry reads the registry so two presses before the next render still start one request. */
+export function useQueryRetry<A, E>(query: Atom.Atom<AsyncResult.AsyncResult<A, E>>) {
+  const registry = use(RegistryContext);
+  const refresh = useAtomRefresh(query);
+  return () => {
+    if (registry.get(query).waiting) return;
+    lastRevalidated.set(query, Date.now());
+    refresh();
+  };
+}
+
 /**
  * Keeps a shown query fresh without ever blanking it: when the screen mounts, and whenever
  * `onWake` reports the app coming back (focus, reconnect, foreground), stale data refetches in the
@@ -284,14 +295,14 @@ export function useRevalidate<A, E>(
   onWake: (revalidate: () => void) => () => void,
 ) {
   const refresh = useAtomRefresh(query);
-  const revalidate = useEffectEvent(() => {
+  const revalidate = useEffectEvent((shown: typeof query) => {
     const now = Date.now();
-    if (!shouldRevalidate(result, now, lastRevalidated.get(query), ledgerChangedAt)) return;
-    lastRevalidated.set(query, now);
+    if (!shouldRevalidate(result, now, lastRevalidated.get(shown), ledgerChangedAt)) return;
+    lastRevalidated.set(shown, now);
     refresh();
   });
   useEffect(() => {
-    revalidate();
-    return onWake(() => revalidate());
-  }, [onWake]);
+    revalidate(query);
+    return onWake(() => revalidate(query));
+  }, [onWake, query]);
 }

@@ -6,13 +6,13 @@ Color Up keeps the same ledger meaning and destinations on web, iOS and Android.
 
 Keep React Navigation native-stack. iOS uses the native bottom tab navigator and SF Symbols; Android uses the standard bottom tab navigator with destination labels. The mobile web build keeps its floating capsule. Sessions, Board, Settle up and Group remain peer destinations; a group with no trips offers only Group.
 
-Use native iOS header items for Groups and You. Related items may share the system glass background. Keep the header transparent, with a centred native glass title capsule instead of a large body heading. The title expands into a popover with its full title and context; group destination titles open the group/trip selection sheet. Scope is never the back action.
+Use native iOS header items for Groups and You. Related items may share the system glass background. Keep the header transparent. Trip destinations use a centred native glass capsule naming the trip; it opens the group/trip selector. Detail titles disclose useful context, while titles with nothing to disclose stay static. Scope is never the back action.
 
-The live-session return strip and bottom actions float above content without a full-width background or divider. Scroll content must reserve their measured height as well as the tab bar, so the final row remains reachable. Only the individual controls carry a surface.
+On iOS 26 and later, the live-session return belongs in the native tab bar's bottom accessory; older iOS, Android and web retain a compact floating return control. Hide it when the current screen already shows that session. Let native scroll insets account for the native tab bar and accessory; reserve measured space for custom controls without counting native insets twice. The session roster carries recording actions on its rows; avoid a second persistent action bar above the tabs.
 
 ## Selection and forms
 
-Use Choice for an exclusive value. On native platforms it selects a system segmented control only when the labels fit; longer labels and larger collections use native menu pickers. Use presentation="menu" when the task needs a compact selection row regardless of option count. Participant inclusion is a checklist, not an exclusive picker.
+Use Choice for an exclusive value. On native platforms it selects a system segmented control only when the labels fit; longer labels and larger collections use native menu pickers. Use presentation="menu" when the task needs a compact selection row regardless of option count. Participant inclusion is a checklist with a visible unselected indicator, not an exclusive picker. Session creation summarizes Venue and Players in rows that open dedicated selection sheets.
 
 Use DateTimeField for calendar dates and times. Keep an unset time visibly unset until the user confirms it. Display dates in the device locale while preserving local date/time semantics in the form's existing validation. A session may cross midnight.
 
@@ -22,7 +22,7 @@ TextField already uses a native text input. Give it the appropriate keyboard. Mi
 
 Use ActionMenu for short contextual choices, such as trip options. A destructive action opens a confirmation that names its consequence. If a correction needs a reason, retain the reason form rather than replacing it with a reasonless alert.
 
-Sheet on iOS uses native form-sheet detents, a native grabber and native title/close chrome. Short content should open at an appropriate height; long forms can expand. Pass busy while saving to block both explicit close and native dismissal. Keep drafts and errors visible until a successful write.
+Sheet on iOS uses stable native form-sheet detents, a grabber and native title chrome. Text forms put Cancel and confirmation in the native navigation bar so the keyboard cannot cover submission; other platforms keep an in-flow confirm button. Custom amount-keypad sheets keep their keypad and action in an in-flow footer. One keyboard avoidance mechanism owns layout; never resize detents from keyboard frames. Pass busy while saving to block explicit and native dismissal. Keep drafts and errors visible until a successful write.
 
 Settings use native grouped form sections on iOS. A row that opens a page or editor gets a disclosure affordance; it should not look like a large submit button. Keep destructive actions in a separate section.
 
@@ -36,7 +36,7 @@ Keep app theme and native control appearance in sync. Verify Dynamic Type, Voice
 
 Custom charts remain appropriate. Explain what each bar measures; participation share must not look like a winnings comparison. Distinguish people with readable labels. Narrow chart bars need a generous alternative selection path and an accessible description of the selected session.
 
-A result can come from adjustments without buy-ins or cash-outs. State that provenance rather than implying the visible in/out totals explain the result.
+Lead the Board with your signed result and keep race gaps neutral. Label personal and group metrics explicitly; casino route numbers describe visit order, not rank. A result can come from adjustments without buy-ins or cash-outs. State that provenance rather than implying the visible in/out totals explain the result. Balance explanations come from covered buy-ins, held cash-outs, payments and stake obligations; table results are not an extra balance component.
 
 ## Reference
 

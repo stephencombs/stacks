@@ -160,42 +160,53 @@ export const close = Effect.fn("Ledger.close")(function* (
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const { session } = yield* Sessions.access(sessionId);
-  if (session.status === "closed") return yield* Views.sessionDetail(sessionId);
-  const now = yield* DateTime.now;
-  const endedAt = request.endedAt ?? now;
-  if (DateTime.isLessThan(endedAt, session.startedAt)) {
-    return yield* new InvalidRequest({ message: "A session can't end before it starts." });
-  }
   const cashOuts = request.cashOuts ?? [];
-  yield* Access.requirePlayersInGroup(
-    session.groupId,
-    cashOuts.map((c) => c.playerId),
-  );
-  const entries = yield* Effect.forEach(cashOuts, (c) =>
-    validEntry({
-      id: c.id,
-      groupId: session.groupId,
-      sessionId,
-      tripId: null,
-      kind: "cash_out",
-      playerId: c.playerId,
-      counterpartyId: null,
-      amount: c.amount,
-      occurredAt: endedAt,
-      note: null,
-      createdBy: userId,
-      createdAt: now,
-      voidedAt: null,
-      voidedBy: null,
-      voidReason: null,
-      replacesEntryId: null,
-    }),
-  );
 
   yield* sql.withTransaction(
     Effect.gen(function* () {
-      const [locked] = yield* sql`select status from sessions where id = ${sessionId} for update`;
+      const [locked] = yield* sql`
+        select status, previous_ended_at from sessions where id = ${sessionId} for update
+      `.pipe(
+        Effect.flatMap(
+          Access.decodeRows(
+            Schema.Struct({
+              status: Schema.Literals(["live", "closed"]),
+              previousEndedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+            }),
+          ),
+        ),
+      );
       if (locked?.status === "closed") return;
+      yield* Access.requirePlayersInGroup(
+        session.groupId,
+        cashOuts.map((c) => c.playerId),
+      );
+      const now = yield* DateTime.now;
+      // Reopening for a correction must not turn the intervening days into playing time.
+      const endedAt = request.endedAt ?? locked?.previousEndedAt ?? now;
+      if (DateTime.isLessThan(endedAt, session.startedAt)) {
+        return yield* new InvalidRequest({ message: "A session can't end before it starts." });
+      }
+      const entries = yield* Effect.forEach(cashOuts, (c) =>
+        validEntry({
+          id: c.id,
+          groupId: session.groupId,
+          sessionId,
+          tripId: null,
+          kind: "cash_out",
+          playerId: c.playerId,
+          counterpartyId: null,
+          amount: c.amount,
+          occurredAt: endedAt,
+          note: null,
+          createdBy: userId,
+          createdAt: now,
+          voidedAt: null,
+          voidedBy: null,
+          voidReason: null,
+          replacesEntryId: null,
+        }),
+      );
       // A cash-out recorded elsewhere meanwhile already settled that player; a second would count
       // their chips twice.
       if (cashOuts.length > 0) {
@@ -227,7 +238,7 @@ export const close = Effect.fn("Ledger.close")(function* (
       if (stillPlaying.length > 0) return yield* new Conflict({ reason: "players_not_cashed_out" });
       yield* sql`
         update sessions set status = 'closed', ended_at = ${DateTime.toDateUtc(endedAt)},
-          closed_by = ${userId}
+          previous_ended_at = null, closed_by = ${userId}
         where id = ${sessionId}
       `;
     }),

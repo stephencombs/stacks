@@ -431,7 +431,7 @@ export function PlayerSheet({
           : "Wins in a row",
     },
     {
-      title: "Best casino",
+      title: "Personal best casino",
       value: sheet.bestVenue ? money(sheet.bestVenue.net) : "—",
       line: sheet.bestVenue
         ? `${sheet.bestVenue.name} · ${sheet.bestVenue.sessions} ${sheet.bestVenue.sessions === 1 ? "session" : "sessions"}`
@@ -439,7 +439,7 @@ export function PlayerSheet({
       tone: sheet.bestVenue?.net,
     },
     {
-      title: "Avg buy-in",
+      title: "Personal avg buy-in",
       value: sheet.averageBuyIn === null ? "—" : money(sheet.averageBuyIn, false),
       line: "Per session with a buy-in, including rebuys",
     },

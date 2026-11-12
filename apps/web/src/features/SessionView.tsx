@@ -113,7 +113,12 @@ export function SessionView({
     );
   const record = (input: EntryInput) => {
     const id = EntryId.make(newId());
-    void outbox.add(session.id, { ...input, id, occurredAt: DateTime.nowUnsafe() });
+    const original = detail.entries.find((entry) => entry.id === input.replacesEntryId);
+    void outbox.add(session.id, {
+      ...input,
+      id,
+      occurredAt: original?.occurredAt ?? DateTime.nowUnsafe(),
+    });
     return id;
   };
   // The last quick rebuy can be taken back for a few seconds, from a bar away from the Rebuy

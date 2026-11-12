@@ -12,7 +12,7 @@ import { newId } from "@stacks/client-runtime/ids";
 import { barTrack } from "@stacks/client-runtime/chart";
 import { balanceHeadline, chipOf } from "@stacks/client-runtime/trip";
 import { applyPayments } from "@stacks/shared/balances";
-import { parseMoney } from "@stacks/shared/money";
+import { formatDecimal, parseMoney } from "@stacks/shared/money";
 import { settleUp } from "@stacks/shared/settleUp";
 import * as Option from "effect/Option";
 import { useState } from "react";
@@ -25,6 +25,7 @@ import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, PageTitle, Row, SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
+import { BalanceExplanationSheet } from "./BalanceExplanation";
 import { BackingSection } from "./Backing";
 import { Chip } from "./Chip";
 import { PayLinks, ShareSettleUpButton } from "./PayLinks";
@@ -45,6 +46,7 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
   const recordSettlement = useAction(stacks.Client.mutation("ledger", "recordSettlement"));
   const [pending, setPending] = useState<ReadonlyArray<Payment>>([]);
   const [paying, setPaying] = useState<Transfer | null | "custom">(null);
+  const [explaining, setExplaining] = useState<PlayerId | null>(null);
   const [voiding, setVoiding] = useState<Entry | null>(null);
 
   // A payment counts the moment it's recorded, so its suggestion can't be marked paid twice.
@@ -105,19 +107,11 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
       },
     });
     if (!saved) setPending((all) => all.filter((p) => p.id !== id));
+    return saved !== null;
   };
 
   return (
-    <Screen
-      renderFooter={() => (
-        <Button
-          label="Record a payment"
-          variant={transfers.length > 0 ? "primary" : "secondary"}
-          size="lg"
-          onPress={() => setPaying("custom")}
-        />
-      )}
-    >
+    <Screen>
       <PageTitle>Settle up</PageTitle>
       <View className="gap-2">
         <SectionHeading
@@ -144,6 +138,14 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
               )}
             />
             {head.line ? <Text className="mt-1 type-footnote text-muted">{head.line}</Text> : null}
+            <Button
+              label="Why this balance?"
+              variant="ghost"
+              size="sm"
+              disabled={unsaved.length > 0}
+              onPress={() => setExplaining(me)}
+              className="mt-2 self-start"
+            />
           </View>
           {mine.map(transferRow)}
         </View>
@@ -175,13 +177,26 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
           {detail.players
             .toSorted((a, b) => Number(b.id === me) - Number(a.id === me))
             .map((player) => (
-              <Row key={player.id}>
+              <Row
+                key={player.id}
+                {...((player.id === me || isAdmin(detail)) && unsaved.length === 0
+                  ? {
+                      onPress: () => setExplaining(player.id),
+                      accessibilityHint: "Explain this balance",
+                    }
+                  : {})}
+              >
                 <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-                <Text numberOfLines={1} className="flex-1 text-base text-ink">
-                  {player.displayName}
-                  {player.id === me ? <Text className="text-muted"> (you)</Text> : null}
-                  {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
-                </Text>
+                <View className="flex-1">
+                  <Text numberOfLines={1} className="text-base text-ink">
+                    {player.displayName}
+                    {player.id === me ? <Text className="text-muted"> (you)</Text> : null}
+                    {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
+                  </Text>
+                  {(player.id === me || isAdmin(detail)) && unsaved.length === 0 ? (
+                    <Text className="type-footnote text-muted">Why this balance?</Text>
+                  ) : null}
+                </View>
                 <BalanceBar balance={balanceOf.get(player.id) ?? 0} track={track} />
                 <BalanceLabel
                   amount={balanceOf.get(player.id) ?? MinorUnits.make(0)}
@@ -196,7 +211,18 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
       <BackingSection detail={detail} trip={trip} />
 
       <View className="gap-2">
-        <SectionHeading>Payments</SectionHeading>
+        <SectionHeading
+          action={
+            <Button
+              label="Record a payment"
+              size="sm"
+              variant="ghost"
+              onPress={() => setPaying("custom")}
+            />
+          }
+        >
+          Payments
+        </SectionHeading>
         {trip.settlements.length === 0 && unsaved.length === 0 ? (
           <Text className="text-sm text-muted">Payments you record show up here.</Text>
         ) : (
@@ -246,8 +272,18 @@ export function SettleView({ detail, trip }: { detail: GroupDetail; trip: TripDe
         <PaymentSheet
           detail={detail}
           transfer={paying === "custom" ? null : paying}
-          onRecord={(payment) => void record(payment)}
+          onRecord={record}
+          pending={recordSettlement.pending}
+          error={recordSettlement.error}
           onClose={() => setPaying(null)}
+        />
+      ) : null}
+      {explaining ? (
+        <BalanceExplanationSheet
+          detail={detail}
+          trip={trip}
+          playerId={explaining}
+          onClose={() => setExplaining(null)}
         />
       ) : null}
       {voiding ? <VoidPaymentSheet entry={voiding} onClose={() => setVoiding(null)} /> : null}
@@ -260,10 +296,14 @@ function PaymentSheet({
   transfer,
   onRecord,
   onClose,
+  pending,
+  error,
 }: {
   detail: GroupDetail;
   transfer: Transfer | null;
-  onRecord: (payment: Omit<Payment, "id">) => void;
+  pending: boolean;
+  error: string | null;
+  onRecord: (payment: Omit<Payment, "id">) => Promise<boolean>;
   onClose: () => void;
 }) {
   const names = playerNames(detail);
@@ -272,18 +312,17 @@ function PaymentSheet({
   const [to, setTo] = useState<PlayerId>(
     transfer?.to ?? detail.players.find((p) => p.id !== detail.myPlayerId)?.id ?? detail.myPlayerId,
   );
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(
+    transfer ? formatDecimal(transfer.amount, detail.group.currency) : "",
+  );
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
 
-  const submit = () => {
-    const value = transfer
-      ? transfer.amount
-      : Option.getOrNull(parseMoney(amount, detail.group.currency));
+  const submit = async () => {
+    const value = Option.getOrNull(parseMoney(amount, detail.group.currency));
     if (from === to) return setProblem("Pick two different people.");
     if (value === null || value <= 0) return setProblem("Enter how much was paid.");
-    onRecord({ from, to, amount: value, note: note.trim() || null });
-    onClose();
+    if (await onRecord({ from, to, amount: value, note: note.trim() || null })) onClose();
   };
 
   return (
@@ -296,23 +335,22 @@ function PaymentSheet({
           ? `${names.get(transfer.from)} paid ${names.get(transfer.to)}.`
           : "For money that changed hands outside a session."
       }
-      footer={<Button label="Record payment" variant="primary" size="lg" haptic onPress={submit} />}
+      confirm={{ label: "Record payment", pending, onPress: () => void submit() }}
     >
-      {transfer ? (
-        <Money amount={transfer.amount} currency={detail.group.currency} className="text-3xl" />
-      ) : (
+      {transfer ? null : (
         <>
           <Choice label="Who paid" options={people} value={from} onChange={setFrom} />
           <Choice label="Paid to" options={people} value={to} onChange={setTo} />
-          <TextField
-            label="Amount"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="decimal-pad"
-            inputClassName="tabular-nums"
-          />
         </>
       )}
+      <TextField
+        label="Amount paid"
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="decimal-pad"
+        inputClassName="tabular-nums"
+        hint="Part of what's owed is fine."
+      />
       <TextField
         label="Note (optional)"
         value={note}
@@ -321,6 +359,7 @@ function PaymentSheet({
         maxLength={280}
       />
       {problem ? <FormError>{problem}</FormError> : null}
+      {error ? <FormError>{error}</FormError> : null}
     </Sheet>
   );
 }
@@ -344,15 +383,12 @@ function VoidPaymentSheet({ entry, onClose }: { entry: Entry; onClose: () => voi
       onClose={onClose}
       title="Void this payment?"
       description="It stays in the history, crossed out, and stops counting."
-      footer={
-        <Button
-          label="Void payment"
-          variant="danger"
-          size="lg"
-          pending={voidEntry.pending}
-          onPress={() => void confirm()}
-        />
-      }
+      confirm={{
+        label: "Void payment",
+        destructive: true,
+        pending: voidEntry.pending,
+        onPress: () => void confirm(),
+      }}
     >
       <TextField
         label="Reason (optional)"

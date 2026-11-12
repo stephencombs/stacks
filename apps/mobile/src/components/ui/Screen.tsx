@@ -1,10 +1,14 @@
-import { createContext, use, useState, type ReactNode } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { createContext, use, useCallback, useState, type ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { LiveBar, type ShowsTable } from "../../features/LiveBar";
+import { LiveBar, useLiveAccessory, type ShowsTable } from "../../features/LiveBar";
 import { useNativeHeaderActions } from "../../features/NativeHeaderActions";
+import { LiveAccessoryContext } from "../../lib/liveAccessory";
 import { FormError } from "./Field";
+import { Button } from "./Button";
+import type { FormAction } from "./Sheet";
 import { ToastHost, useToast, type Toast } from "./Toast";
 
 /** How tall the tab bar is under the current screen: zero outside the places. */
@@ -26,14 +30,43 @@ export function Screen({
   children,
   shows,
   renderFooter,
+  confirm,
+  onCancel,
+  hideLiveReturn = false,
 }: {
   children: Content;
   shows?: ShowsTable;
   renderFooter?: (toast: (toast: Toast) => void) => ReactNode;
+  confirm?: FormAction;
+  onCancel?: () => void;
+  hideLiveReturn?: boolean;
 }) {
-  const footer = renderFooter;
-  const header = useNativeHeaderActions();
+  const footer =
+    confirm && Platform.OS !== "ios"
+      ? () => (
+          <Button
+            label={confirm.label}
+            pending={confirm.pending}
+            disabled={confirm.disabled}
+            variant={confirm.destructive ? "danger" : "primary"}
+            size="xl"
+            onPress={confirm.onPress}
+          />
+        )
+      : renderFooter;
+  const header = useNativeHeaderActions(false, confirm, onCancel);
   const bar = use(TabBarHeight);
+  const accessory = use(LiveAccessoryContext);
+  useLiveAccessory(shows);
+  const setShows = accessory?.setShows;
+  const session = shows && "session" in shows ? shows.session : undefined;
+  const trip = shows && "trip" in shows ? shows.trip : undefined;
+  useFocusEffect(
+    useCallback(() => {
+      setShows?.(session ? { session } : trip ? { trip } : undefined);
+      return () => setShows?.(undefined);
+    }, [setShows, session, trip]),
+  );
   const insets = useSafeAreaInsets();
   const [footerHeight, setFooterHeight] = useState(0);
   const [liveBarHeight, setLiveBarHeight] = useState(0);
@@ -48,11 +81,16 @@ export function Screen({
           contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
           className="flex-1"
-          contentContainerClassName="gap-6 px-4 pt-4 pb-24"
+          contentContainerClassName="gap-6 px-4 pt-4 pb-6"
         >
           <Content>{children}</Content>
-          {/* The floating tab bar sits over the scene's foot on every platform, so the list ends clear of it. */}
-          <View style={{ height: (footer ? footerHeight : bar) + liveBarHeight }} />
+          <View
+            style={{
+              height:
+                (footer ? Math.max(0, footerHeight - (accessory ? bar : 0)) : accessory ? 0 : bar) +
+                liveBarHeight,
+            }}
+          />
         </ScrollView>
         {footer ? (
           <View
@@ -67,19 +105,22 @@ export function Screen({
           </View>
         ) : null}
       </ToastHost>
-      <LiveBar
-        onHeightChange={setLiveBarHeight}
-        {...(shows ? { shows } : {})}
-        {...(footer ? { bottom: footerHeight } : bar ? { bottom: bar } : {})}
-      />
+      {hideLiveReturn ? null : (
+        <LiveBar
+          onHeightChange={setLiveBarHeight}
+          {...(shows ? { shows } : {})}
+          {...(footer ? { bottom: footerHeight } : bar ? { bottom: bar } : {})}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
 
-export function screenError(message: string) {
+export function screenError(message: string, recovery?: ReactNode) {
   return (
     <Screen>
       <FormError>{message}</FormError>
+      {recovery}
     </Screen>
   );
 }

@@ -5,9 +5,10 @@ import {
   lineScale,
   placeLabel,
   spreadLabels,
+  shortNames,
 } from "@stacks/client-runtime/chart";
 import { playerNames } from "@stacks/client-runtime/format";
-import { localClock, raceHeadline } from "@stacks/client-runtime/trip";
+import { boardMoney, localClock, raceHeadline } from "@stacks/client-runtime/trip";
 import { runningTotals } from "@stacks/shared/stats";
 import { tripStandings } from "@stacks/shared/trips";
 
@@ -18,19 +19,21 @@ import { useWidth } from "~/lib/useWidth";
 
 const HEIGHT = 128;
 const PAD = { x: 16, y: 12 };
-/** Room past the last point for each line's initial. */
-const LABEL = 30;
+/** Leave room for names beside the last point. */
+const LABEL = 100;
 const LETTER = 12;
 const INSET = 8;
 
-/** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in gold. */
+/** Your trip result and the group's running totals, with yours in gold. */
 export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const currency = detail.group.currency;
   const names = playerNames(detail);
   const me = detail.myPlayerId;
+  const chartNames = shortNames(names);
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
   const standings = tripStandings(closed, localClock);
   const head = raceHeadline(standings, me, names, currency);
+  const rank = standings.find((standing) => standing.playerId === me)?.rank;
   const [box, width] = useWidth<HTMLDivElement>();
   if (!head || closed.length === 0) return null;
 
@@ -57,20 +60,25 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
 
   return (
     <Surface className="relative overflow-hidden">
-      <Glow tone={head.tone} />
+      <Glow tone={head.net > 0 ? "win" : head.net < 0 ? "loss" : "accent"} />
       <div className="relative flex flex-col px-4 pt-4">
-        <h2 className="text-sm font-medium text-muted">{head.label}</h2>
+        <h2 className="text-sm font-medium text-muted">Your trip result</h2>
         <Money
-          amount={head.gap ?? head.net}
+          amount={head.net}
           currency={currency}
-          tone={head.gap === null ? "result" : "plain"}
+          tone="result"
           className={cn(
-            head.tone === "win" && "text-win",
-            head.tone === "loss" && "text-loss",
+            head.net > 0 && "text-win",
+            head.net < 0 && "text-loss",
             "mt-2 font-display text-5xl leading-none tracking-[-0.01em] sm:text-6xl",
           )}
         />
-        {head.line ? <p className="mt-1.5 text-sm text-muted">{head.line}</p> : null}
+        <p className="mt-1.5 text-sm text-muted">
+          #{rank} of {standings.length} ·{" "}
+          {head.gap === null
+            ? head.label
+            : `${head.label} by ${boardMoney(head.gap, currency, false)}`}
+        </p>
       </div>
       <div ref={box} aria-hidden className="relative mt-3 mb-4" style={{ height: HEIGHT }}>
         {width > 0 ? (
@@ -89,7 +97,7 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
               const off = plot.clipped(line.at(-1)!);
               const color = yours ? "var(--color-accent)" : "var(--color-muted)";
               const initial =
-                (names.get(playerId) ?? "?").slice(0, 1).toUpperCase() +
+                (chartNames.get(playerId) ?? "Someone") +
                 (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
               const seatWidth = labelWidth(initial, LETTER);
               const seat = placeLabel(end.x + 9 + seatWidth / 2, seatWidth, edges);

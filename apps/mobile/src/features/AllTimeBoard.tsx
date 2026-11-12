@@ -84,9 +84,9 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
         empty="Stats count closed sessions, so close one to see how everyone's doing."
       />
       <View className="gap-2">
-        <SectionHeading>By game</SectionHeading>
+        <SectionHeading>Group results by game</SectionHeading>
         <Text className="type-footnote text-muted">
-          Bars show share of sessions; amounts show total result.
+          Bars show share of sessions; amounts show everyone's total result.
         </Text>
         <List>
           {byNet(stats.byGame).map((row) => {
@@ -108,9 +108,9 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
         </List>
       </View>
       <View className="gap-2">
-        <SectionHeading>By casino</SectionHeading>
+        <SectionHeading>Group results by casino</SectionHeading>
         <Text className="type-footnote text-muted">
-          Bars show share of sessions; amounts show total result.
+          Bars show share of sessions; amounts show everyone's total result.
         </Text>
         <List>
           {byNet(stats.byVenue).map((row) => {
@@ -135,7 +135,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
         <View className="gap-2">
           <SectionHeading>By blackjack seat</SectionHeading>
           <Text className="type-footnote text-muted">
-            Bars show share of all sessions; amounts show total result.
+            Bars show share of all sessions; amounts show everyone's total result.
           </Text>
           <List>
             {stats.bySeat.map((row) => {

@@ -145,7 +145,7 @@ export function VenuePicker({
     };
   }, [selected]);
 
-  const searching = q !== "" || near !== null;
+  const searching = q !== "";
   return (
     <View className="gap-3">
       <TextField
@@ -172,12 +172,7 @@ export function VenuePicker({
       ) : null}
       <View accessibilityRole="radiogroup" className="-mx-3">
         {searching ? (
-          <SearchResults
-            groupId={groupId}
-            search={near && q === "" ? { q, near } : { q }}
-            selected={selected}
-            onSelect={onSelect}
-          />
+          <SearchResults groupId={groupId} search={{ q }} selected={selected} onSelect={onSelect} />
         ) : recent.length > 0 ? (
           <>
             <Text className="px-3 pb-1 text-sm text-muted">Recent</Text>
@@ -195,6 +190,17 @@ export function VenuePicker({
             Search for where you're playing, or add it.
           </Text>
         )}
+        {!searching && near ? (
+          <>
+            <Text className="px-3 pt-3 pb-1 text-sm text-muted">Nearby</Text>
+            <SearchResults
+              groupId={groupId}
+              search={{ q: "", near }}
+              selected={selected}
+              onSelect={onSelect}
+            />
+          </>
+        ) : null}
         {selected && !searching && !recent.some((venue) => venue.id === selected.id) ? (
           <VenueOption venue={selected} selected onSelect={() => onSelect(selected)} />
         ) : null}
@@ -257,16 +263,8 @@ function AddVenueSheet({
       open
       onClose={onClose}
       title="Add a venue"
-      description="Casinos you add are shared with everyone on Stacks. Home games stay private to this group."
-      footer={
-        <Button
-          label="Add venue"
-          variant="primary"
-          size="lg"
-          pending={create.pending}
-          onPress={() => void submit()}
-        />
-      }
+      description="Casinos you add are shared with everyone on Color Up. Home games stay private to this group."
+      confirm={{ label: "Add", pending: create.pending, onPress: () => void submit() }}
     >
       <Choice
         label="Kind"

@@ -18,9 +18,9 @@ it("explains API errors in plain words", () => {
   ).toBe("A session can't end before it starts.");
 });
 
-it("blames the connection for anything else", () => {
+it("offers recovery without attributing unknown failures to the connection", () => {
   expect(describeError(new Error("fetch failed"))).toBe(
-    "Couldn't reach Color Up. Check your connection and try again.",
+    "Color Up couldn't complete that request. Try again.",
   );
 });
 

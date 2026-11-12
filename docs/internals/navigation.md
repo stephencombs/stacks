@@ -32,9 +32,10 @@ Table settings is the starter's alone: it also appoints **Recorders**, players w
 record for everyone (and, like the starter, see the whole table on their device), and holds
 **Stop sharing**. A recorder never sees Share or Table settings.
 
-Groups and trips are a second, account-backed area, reached from **Groups** in the header (or the scope filter pill row on mobile). Inside
-it, the group and trip you're in are context, shown as a labeled scope button at the top of every
-screen on web and as a horizontal row of `rounded-full` filter pills (`FilterPillBar`) directly beneath `TopBar` on mobile (`Personal play ⌄` / `Group ⌄`, `All trips ⌄` / `Trip ⌄`). Under it, four places answer the questions people open a trip with:
+Groups and trips are a second, account-backed area, reached from **Groups** in the header on mobile). Inside
+it, the group and trip you're in are context, shown as a labeled scope button on web and a native
+centre title capsule on iOS. The capsule names the trip and opens the group/trip selector; the
+selected tab names the place. Android keeps a labeled scope control. Four places answer the questions people open a trip with:
 
 | Place         | Question                     | Holds                                                                                                  |
 | ------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -44,7 +45,7 @@ screen on web and as a horizontal row of `rounded-full` filter pills (`FilterPil
 | **Group**     | Who's in it, and what trips? | Trips, People (members, guests, invites), Settings (payment apps, export; unified with **You** on iOS) |
 
 Anything that's only about you (play limits, appearance, account, sign out) sits behind **You** (and is surfaced alongside Group configuration in the grouped **Settings** tab on mobile),
-and so does your own **Settle up**: `/you/settle` lists everyone you've shared a table with and
+and so does **Outside trips**, your personal balances and payments: `/you/settle` lists everyone you've shared a table with and
 what's owed between you, and `/you/settle/:playerId` shows one person's balance, Record a payment,
 and the history of covered buy-ins, held cash-outs and payments, with corrections, voids and who
 made them. These balances are between players, built from play and payments outside any trip. They
@@ -80,8 +81,8 @@ scorecard), and the platform guidance that tab bars hold peer places, never acti
 
 ## Rules
 
-1. **Every screen says where you are.** A page title is always visible (`TopBar` on mobile, `PageHeader` on web), and inside groups and
-   trips so is the scope selector (`ScopeButton` on web, `FilterPillBar` on mobile).
+1. **Every screen says where you are.** A page title is always visible (the native header on mobile, `PageHeader` on web), and inside groups and
+   trips so is the scope selector. On iOS trip destinations the title capsule is the scope, with the native tab identifying the place.
    Nothing is reachable only through an unlabeled menu, and the back slot only ever goes back.
 2. **One row of peer navigation per screen.** A pill segmented control (`Choice` on mobile, `Segmented` on web) inside a place may change the scope or measure
    of the same data (`This trip | All time`, `Money | % of buy-in`, `24h | 7d | 30d | All`). It may not switch to different content; that's a new
@@ -110,10 +111,10 @@ group, and lists your other groups only when you have some.
 
 A running session is the one thing that outranks the current place. While you're in one, the
 LiveBar floats above the navigation on every screen except two: the session itself, and Sessions,
-where the live card is already first. On mobile, `LiveBar` floats as a compact pill card (`rounded-2xl`) directly above the floating capsule `PlaceTabs` bar; on wide web windows the sidebar carries it instead.
+where the live card is already first. On iOS 26 and later, the return control uses the native tab bar's bottom accessory; other mobile platforms retain a compact floating `LiveBar`. It names the live table's trip when it differs from the one being browsed. On wide web windows the sidebar carries it instead.
 
 The session page is pushed onto Sessions with a real back button, and the places stay visible, so
-the Board is one tap away mid-session.
+the Board is one tap away mid-session. Live sessions lead with the actionable roster; seating art and table settings are secondary. Closed sessions lead with results and history, with correction as a secondary action. New-session setup is a focused modal over the places, so its keyboard and confirmation do not compete with trip navigation.
 
 ## Addresses
 

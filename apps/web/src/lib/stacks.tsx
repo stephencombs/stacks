@@ -19,6 +19,7 @@ import {
   usePending,
   useRememberTrip,
   useRevalidate,
+  useQueryRetry,
   useUnsaved,
   useStacks,
 } from "@stacks/client-runtime/react";
@@ -26,6 +27,7 @@ import type { LastTripStorage } from "@stacks/client-runtime/trip";
 import type { GroupDetail, TripDetail, TripId } from "@stacks/contracts";
 import type { ReactNode } from "react";
 
+import { Button } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
 import { Skeleton } from "~/components/ui/Surface";
 import { useAccount } from "./account";
@@ -127,13 +129,30 @@ export function Loaded<A, E>({
 }) {
   const result = useAtomValue(query);
   useRevalidate(query, result, onWake);
+  const retry = useQueryRetry(query);
   return AsyncResult.match(result, {
     onInitial: () => skeleton ?? <Skeleton className="h-32 w-full" />,
-    // A failed refresh keeps showing what was there before.
     onFailure: (failure) =>
       Option.match(failure.previousSuccess, {
-        onSome: (previous) => children(previous.value),
-        onNone: () => <FormError>{describeError(Cause.squash(failure.cause))}</FormError>,
+        onSome: (previous) => (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <FormError>Couldn't update. Showing previous data.</FormError>
+              <Button onClick={retry} pending={failure.waiting} size="sm">
+                Retry
+              </Button>
+            </div>
+            {children(previous.value)}
+          </>
+        ),
+        onNone: () => (
+          <div className="flex flex-wrap items-center gap-2">
+            <FormError>{describeError(Cause.squash(failure.cause))}</FormError>
+            <Button onClick={retry} pending={failure.waiting} size="sm">
+              Retry
+            </Button>
+          </div>
+        ),
       }),
     onSuccess: (success) => children(success.value),
   });

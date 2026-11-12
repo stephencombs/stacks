@@ -34,6 +34,7 @@ import { Platform, Pressable, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
+import { ActionMenu } from "../components/ui/ActionMenu";
 import { FormError, TextField } from "../components/ui/Field";
 import { Screen, screenError } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
@@ -41,7 +42,7 @@ import { Badge, List, PageTitle, Row, SectionHeading, Tag } from "../components/
 import type { Toast } from "../components/ui/Toast";
 import { cn } from "../components/ui/cn";
 import { AddGuestSheet } from "../features/AddGuestSheet";
-import { Chip } from "../features/Chip";
+import { TableRosterRow } from "../features/TableRoster";
 import { Reveal } from "../features/Reveal";
 import { SeatHero } from "../features/SeatHero";
 import { TableMap } from "../features/TableMap";
@@ -142,6 +143,19 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   const [refused, setRefused] = useState<{ id: EntryId; reason: string } | null>(null);
   const [closing, setClosing] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
+  const [showSeats, setShowSeats] = useState(false);
+  const toggleSeats = () => setShowSeats((shown) => !shown);
+  const highLimit = useAction(stacks.Client.mutation("sessions", "setHighLimit"));
+  const highLimitAction = {
+    label: session.highLimit ? "Use standard table limits" : "Mark high-limit table",
+    onPress: () =>
+      void highLimit.run({
+        params: { sessionId: session.id },
+        payload: { highLimit: !session.highLimit },
+      }),
+    disabled: highLimit.pending,
+  };
+  const reopen = useAction(stacks.Client.mutation("sessions", "reopen"));
 
   // Entries recorded here count as if they were already saved until this screen has them back
   // from the server, except ones it refused.
@@ -181,7 +195,12 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
   /** Records an entry at once; the outbox sends it now, or when there's signal again. */
   const record = (input: EntryInput) => {
     const id = EntryId.make(newId());
-    void outbox.add(session.id, { ...input, id, occurredAt: DateTime.nowUnsafe() });
+    const original = detail.entries.find((entry) => entry.id === input.replacesEntryId);
+    void outbox.add(session.id, {
+      ...input,
+      id,
+      occurredAt: original?.occurredAt ?? DateTime.nowUnsafe(),
+    });
     return id;
   };
 
@@ -250,54 +269,16 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
       DateTime.toEpochMillis(b.entry.occurredAt) - DateTime.toEpochMillis(a.entry.occurredAt),
   );
 
-  const heroBought = heroPlayerId !== undefined && (results.get(heroPlayerId)?.buyIn ?? 0) > 0;
-  const heroRebuyAmount = heroPlayerId === undefined ? undefined : lastBuyIn(heroPlayerId)?.amount;
-  const heroBuyInLabel = !heroBought
-    ? "Buy in"
-    : heroRebuyAmount === undefined
-      ? "Rebuy"
-      : `Rebuy ${formatMoney(heroRebuyAmount, currency)}`;
+  const tableTotals = [...results.values()].reduce(
+    (total, result) => ({
+      buyIn: total.buyIn + result.buyIn,
+      cashOut: total.cashOut + result.cashOut,
+    }),
+    { buyIn: 0, cashOut: 0 },
+  );
 
   return (
-    <Screen
-      shows={{ session: session.id }}
-      renderFooter={
-        live && heroPlayerId && !cashedOut.has(heroPlayerId)
-          ? (toast) => (
-              <>
-                <Text className="text-sm text-muted">
-                  {names.get(heroPlayerId) ?? "Player"}
-                  {heroPlayerId === group.myPlayerId ? " · you" : ""}
-                </Text>
-                <View className="flex-row gap-3">
-                  <Button
-                    haptic
-                    label={heroBuyInLabel}
-                    accessibilityLabel={`${heroBuyInLabel} for ${names.get(heroPlayerId) ?? "Player"}`}
-                    variant="primary"
-                    size="lg"
-                    className="flex-1"
-                    onPress={() => {
-                      const last = lastBuyIn(heroPlayerId);
-                      if (last) rebuy(heroPlayerId, last.amount, toast);
-                      else setDraft({ kind: "buy_in", playerId: heroPlayerId });
-                    }}
-                  />
-                  {heroBought ? (
-                    <Button
-                      label="Cash out"
-                      accessibilityLabel={`Cash out for ${names.get(heroPlayerId) ?? "Player"}`}
-                      size="lg"
-                      className="flex-1"
-                      onPress={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
-                    />
-                  ) : null}
-                </View>
-              </>
-            )
-          : undefined
-      }
-    >
+    <Screen shows={{ session: session.id }}>
       {(toast) => (
         <>
           {live ? <KeepAwake /> : null}
@@ -323,50 +304,66 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
             </PageTitle>
             <View className="flex-row items-center gap-2">
               {live ? <Badge tone="live">Live</Badge> : <Tag>Closed</Tag>}
-              <HighLimitToggle detail={detail} />
-              <Text className="flex-1 text-sm text-muted">
+              <Text className="flex-1 type-footnote text-muted">
                 {formatTime(session.startedAt)}
-                {/* Imported sessions end when they start: no length was recorded. */}
                 {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
-                  ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
+                  ? ` to ${formatTime(session.endedAt)} · ${formatDuration(session.startedAt, session.endedAt)}`
                   : ""}
               </Text>
+              <ActionMenu
+                label="Session actions"
+                disabled={reopen.pending}
+                actions={
+                  live
+                    ? [
+                        { label: "Add player", onPress: () => setAddingPlayer(true) },
+                        ...(seatCount(session)
+                          ? [
+                              {
+                                label: "Seats and table settings",
+                                onPress: toggleSeats,
+                              },
+                            ]
+                          : []),
+                        highLimitAction,
+                        { label: "Close session…", onPress: () => setClosing(true) },
+                      ]
+                    : [
+                        ...(isAdmin(group)
+                          ? [
+                              {
+                                label: "Correct this session…",
+                                onPress: () =>
+                                  void reopen.run({ params: { sessionId: session.id } }),
+                              },
+                            ]
+                          : []),
+                        ...(group.trips.some(
+                          (trip) => trip.id === session.tripId && trip.endedAt === null,
+                        )
+                          ? [
+                              {
+                                label: "Start another session here",
+                                onPress: () => go.newSession(session.tripId, session.id),
+                              },
+                            ]
+                          : []),
+                        highLimitAction,
+                        { label: "See the board", onPress: () => go.trip(session.tripId, "Board") },
+                      ]
+                }
+              />
             </View>
-            {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
+            {live ? (
+              <Text className="type-footnote text-muted tabular-nums">
+                {detail.playerIds.length} players · In{" "}
+                {formatMoney(MinorUnits.make(tableTotals.buyIn), currency)} · Out{" "}
+                {formatMoney(MinorUnits.make(tableTotals.cashOut), currency)}
+              </Text>
+            ) : null}
+            {reopen.error ? <FormError>{reopen.error}</FormError> : null}
+            {highLimit.error ? <FormError>{highLimit.error}</FormError> : null}
           </View>
-
-          {heroPlayerId ? (
-            <SeatHero
-              name={names.get(heroPlayerId) ?? "Player"}
-              chip={chipOf(group, heroPlayerId)}
-              seat={seatsNow(detail.seatings).get(heroPlayerId)}
-              you={heroPlayerId === group.myPlayerId}
-              result={results.get(heroPlayerId)}
-              live={live}
-              out={cashedOut.has(heroPlayerId)}
-              currency={currency}
-            />
-          ) : null}
-          {seatCount(session) ? (
-            <TableMap
-              detail={detail}
-              seats={seatCount(session)!}
-              view={tableView({
-                closed: !live,
-                seats: seatsNow(detail.seatings),
-                results,
-                cashedOut,
-              })}
-              currency={currency}
-              names={names}
-              chipOf={(playerId) => chipOf(group, playerId)}
-            />
-          ) : null}
-          <TicketStub
-            players={detail.playerIds.length}
-            results={[...results.values()]}
-            currency={currency}
-          />
 
           <View className="gap-3">
             <SectionHeading
@@ -398,55 +395,24 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                     ? `in ${formatMoney(result.buyIn, currency)}, playing`
                     : "no buy-in yet";
                 return (
-                  <View
+                  <TableRosterRow
                     key={playerId}
-                    className="flex-row items-center gap-3 border-t border-line pr-3"
-                  >
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`${name}, ${status}`}
-                      accessibilityHint={
-                        live ? "Record a buy-in, cash-out or adjustment" : undefined
-                      }
-                      disabled={!live}
-                      onPress={() =>
-                        setDraft({ kind: bought && !out ? "cash_out" : "buy_in", playerId })
-                      }
-                      className="min-h-16 flex-1 flex-row items-center gap-3 py-3 pl-4 active:bg-sunken"
-                    >
-                      <Chip chip={chipOf(group, playerId)} name={name} size={30} />
-                      <View className="flex-1 gap-0.5">
-                        <Text numberOfLines={1} className="text-base font-medium text-ink">
-                          {name}
-                          {playerId === group.myPlayerId ? (
-                            <Text className="font-sans text-sm tracking-normal text-muted normal-case">
-                              {" "}
-                              you
-                            </Text>
-                          ) : null}
-                        </Text>
-                        <Text className="text-sm text-muted tabular-nums">
-                          {result && result.buyIn === 0 && result.cashOut === 0 ? null : result ? (
-                            <>
-                              In{" "}
-                              <Money
-                                amount={result.buyIn}
-                                currency={currency}
-                                className="text-muted"
-                              />{" "}
-                              · Out{" "}
-                              <Money
-                                amount={result.cashOut}
-                                currency={currency}
-                                className="text-muted"
-                              />
-                            </>
-                          ) : (
-                            "No buy-ins yet"
-                          )}
-                        </Text>
-                      </View>
-                      {final ? (
+                    name={name}
+                    chip={chipOf(group, playerId)}
+                    you={playerId === group.myPlayerId}
+                    status={
+                      bought
+                        ? `In ${formatMoney(result!.buyIn, currency)} · ${final ? `Out ${formatMoney(result!.cashOut, currency)}` : "playing"}`
+                        : status
+                    }
+                    onPress={
+                      live
+                        ? () => setDraft({ kind: bought && !out ? "cash_out" : "buy_in", playerId })
+                        : undefined
+                    }
+                    accessibilityHint={live ? "Record a buy-in, cash-out or adjustment" : undefined}
+                    trailing={
+                      final ? (
                         <Reveal
                           key={live ? "live" : "closed"}
                           animate={live ? !settledAtOpen.has(playerId) : !closedAtOpen}
@@ -459,28 +425,25 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                             className="text-xl"
                           />
                         </Reveal>
-                      ) : null}
-                    </Pressable>
-                    {!live || out || playerId === heroPlayerId ? null : lastRebuy ? (
-                      <Button
-                        label={`Rebuy ${formatMoney(lastRebuy.amount, currency)}`}
-                        accessibilityLabel={`Rebuy ${formatMoney(lastRebuy.amount, currency)} for ${name}`}
-                        variant="tint"
-                        size="sm"
-                        className="min-w-20"
-                        haptic
-                        onPress={() => rebuy(playerId, lastRebuy.amount, toast)}
-                      />
-                    ) : (
-                      <Button
-                        label="Buy in"
-                        accessibilityLabel={`Buy in for ${name}`}
-                        size="sm"
-                        className="min-w-20"
-                        onPress={() => setDraft({ kind: "buy_in", playerId })}
-                      />
-                    )}
-                  </View>
+                      ) : !live || out ? undefined : lastRebuy ? (
+                        <Button
+                          label={`Rebuy ${formatMoney(lastRebuy.amount, currency)}`}
+                          accessibilityLabel={`Rebuy ${formatMoney(lastRebuy.amount, currency)} for ${name}`}
+                          variant="tint"
+                          size="sm"
+                          haptic
+                          onPress={() => rebuy(playerId, lastRebuy.amount, toast)}
+                        />
+                      ) : (
+                        <Button
+                          label="Buy in"
+                          accessibilityLabel={`Buy in for ${name}`}
+                          size="sm"
+                          onPress={() => setDraft({ kind: "buy_in", playerId })}
+                        />
+                      )
+                    }
+                  />
                 );
               })}
             </List>
@@ -491,22 +454,52 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
             ) : null}
           </View>
 
-          {!live ? (
-            <View className="flex-row gap-2">
-              {group.trips.some((trip) => trip.id === session.tripId && trip.endedAt === null) ? (
-                <Button
-                  label="Start another session"
-                  className="flex-1"
-                  onPress={() => go.newSession(session.tripId, session.id)}
-                />
-              ) : null}
+          {live && seatCount(session) ? (
+            <View className="gap-3">
               <Button
-                label="See the board"
-                className="flex-1"
-                onPress={() => go.trip(session.tripId, "Board")}
+                label={showSeats ? "Hide seats" : "Seats and table settings"}
+                variant="ghost"
+                onPress={toggleSeats}
               />
+              {showSeats ? (
+                <>
+                  {heroPlayerId ? (
+                    <SeatHero
+                      name={names.get(heroPlayerId) ?? "Player"}
+                      chip={chipOf(group, heroPlayerId)}
+                      seat={seatsNow(detail.seatings).get(heroPlayerId)}
+                      you={heroPlayerId === group.myPlayerId}
+                      result={results.get(heroPlayerId)}
+                      live
+                      out={cashedOut.has(heroPlayerId)}
+                      currency={currency}
+                    />
+                  ) : null}
+                  <TableMap
+                    detail={detail}
+                    seats={seatCount(session)!}
+                    view={tableView({
+                      closed: false,
+                      seats: seatsNow(detail.seatings),
+                      results,
+                      cashedOut,
+                    })}
+                    currency={currency}
+                    names={names}
+                    chipOf={(playerId) => chipOf(group, playerId)}
+                  />
+                </>
+              ) : null}
             </View>
           ) : null}
+          {!live ? (
+            <TicketStub
+              players={detail.playerIds.length}
+              results={[...results.values()]}
+              currency={currency}
+            />
+          ) : null}
+          {session.notes ? <Text className="type-footnote text-muted">{session.notes}</Text> : null}
           <View className="gap-2">
             <SectionHeading>History</SectionHeading>
             {history.length === 0 ? (
@@ -619,8 +612,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
             )}
           </View>
 
-          <StatusActions detail={detail} group={group} onClose={() => setClosing(true)} />
-
           {draft ? (
             <EntrySheet
               detail={group}
@@ -709,36 +700,6 @@ const verbs = {
   settlement: "paid",
 } as const;
 
-function StatusActions({
-  detail,
-  group,
-  onClose,
-}: {
-  detail: SessionDetail;
-  group: GroupDetail;
-  onClose: () => void;
-}) {
-  const stacks = useStacks();
-  const reopen = useAction(stacks.Client.mutation("sessions", "reopen"));
-  if (detail.session.status === "live") {
-    return <Button label="Close session" size="lg" onPress={onClose} />;
-  }
-  if (!isAdmin(group)) return null;
-  return (
-    <View className="gap-2">
-      <Button
-        label="Reopen session"
-        pending={reopen.pending}
-        onPress={() => void reopen.run({ params: { sessionId: detail.session.id } })}
-      />
-      <Text className="text-sm text-muted">
-        Reopen to fix a mistake. Closed sessions can't be edited.
-      </Text>
-      {reopen.error ? <FormError>{reopen.error}</FormError> : null}
-    </View>
-  );
-}
-
 function EntryActionsSheet({
   entry,
   onClose,
@@ -795,30 +756,6 @@ function EntryActionsSheet({
  * next table with the same people.
  */
 /** Marks the table high limit or not; anyone in the group can, even after it closes. */
-function HighLimitToggle({ detail }: { detail: SessionDetail }) {
-  const stacks = useStacks();
-  const set = useAction(stacks.Client.mutation("sessions", "setHighLimit"));
-  const on = detail.session.highLimit;
-  return (
-    <Pressable
-      accessibilityRole="switch"
-      accessibilityLabel="High-limit table"
-      accessibilityState={{ checked: on, disabled: set.pending }}
-      disabled={set.pending}
-      hitSlop={10}
-      onPress={() =>
-        void set.run({ params: { sessionId: detail.session.id }, payload: { highLimit: !on } })
-      }
-      className={cn(
-        "h-6 justify-center rounded-md px-2",
-        on ? "bg-accent/20" : "border border-line-strong",
-      )}
-    >
-      <Text className={cn("type-label", on ? "text-accent-text" : "text-muted")}>High limit</Text>
-    </Pressable>
-  );
-}
-
 function CashOutField({
   name,
   value,

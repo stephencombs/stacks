@@ -28,9 +28,10 @@ export function GroupSettingsScreen({ route }: Props) {
           <SettingsSkeleton />
         </Screen>
       }
-      renderError={(message) => (
+      renderError={(message, recovery) => (
         <Screen>
           <FormError>{message}</FormError>
+          {recovery}
         </Screen>
       )}
     >

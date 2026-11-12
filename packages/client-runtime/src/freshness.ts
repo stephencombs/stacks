@@ -21,7 +21,7 @@ export const STALE_MS = 30_000;
 export const DEDUPE_MS = 1_000;
 
 /**
- * Whether a query should refetch now: it has data, isn't already fetching, and that data is stale.
+ * Whether a query should refetch on mount or wake: it failed, or its data is stale.
  * A write refetches only the queries on screen, so anything cached from before `ledgerChangedAt`
  * is stale however young it is.
  */
@@ -31,7 +31,8 @@ export const shouldRevalidate = <A, E>(
   lastRevalidatedAt: number | undefined,
   ledgerChangedAt = 0,
 ) =>
-  AsyncResult.isSuccess(result) &&
   !result.waiting &&
-  (now - result.timestamp >= STALE_MS || result.timestamp < ledgerChangedAt) &&
+  (AsyncResult.isFailure(result) ||
+    (AsyncResult.isSuccess(result) &&
+      (now - result.timestamp >= STALE_MS || result.timestamp < ledgerChangedAt))) &&
   (lastRevalidatedAt === undefined || now - lastRevalidatedAt >= DEDUPE_MS);

@@ -43,7 +43,9 @@ export function PeopleScreen({ route }: Props) {
 const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 
 function PeopleView({ detail }: { detail: GroupDetail }) {
+  const [inviting, setInviting] = useState(false);
   const [addingGuest, setAddingGuest] = useState(false);
+  const [guest, setGuest] = useState<Player | null>(null);
   const [managing, setManaging] = useState<Player | null>(null);
   const [shared, setShared] = useState<string | null>(null);
   const { userId } = useAuth();
@@ -62,9 +64,14 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
 
   return (
     <>
-      <InviteSection detail={detail} />
       <View className="gap-2">
-        <SectionHeading>Members</SectionHeading>
+        <SectionHeading
+          action={
+            <Button label="Invite" size="sm" variant="ghost" onPress={() => setInviting(true)} />
+          }
+        >
+          Members
+        </SectionHeading>
         <List>
           {members.map((player) => {
             const handles = playerHandlesMeta(player);
@@ -121,7 +128,11 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
             {guests.map((player) => {
               const handles = playerHandlesMeta(player);
               return (
-                <Row key={player.id} className="flex-wrap">
+                <Row
+                  key={player.id}
+                  onPress={() => setGuest(player)}
+                  accessibilityHint="Show guest actions"
+                >
                   <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
                   <View className="flex-1 basis-32">
                     <Text className="text-base text-ink">{player.displayName}</Text>
@@ -129,22 +140,6 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
                       <Text numberOfLines={1} className="text-xs text-muted">
                         {handles}
                       </Text>
-                    ) : null}
-                  </View>
-                  <View className="ml-auto flex-row items-center gap-2">
-                    <GuestPaymentHandlesAction detail={detail} player={player} />
-                    {player.claimCode ? (
-                      <Button
-                        label={shared === player.id ? "Copied" : "Send claim link"}
-                        size="sm"
-                        onPress={() =>
-                          void share(
-                            `${webUrl}/claim/${player.claimCode}`,
-                            `Claim your Color Up history in ${detail.group.name}:`,
-                            player.id,
-                          )
-                        }
-                      />
                     ) : null}
                   </View>
                 </Row>
@@ -162,6 +157,31 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
           </Text>
         </View>
       ) : null}
+      {guest ? (
+        <Sheet open title={guest.displayName} onClose={() => setGuest(null)}>
+          <Text className="type-footnote text-muted">
+            Guest · their recorded history stays with them when they claim it.
+          </Text>
+          <View className="flex-row flex-wrap items-center gap-2">
+            <GuestPaymentHandlesAction detail={detail} player={guest} />
+            {guest.claimCode ? (
+              <Button
+                label={shared === guest.id ? "Copied" : "Send claim link"}
+                size="sm"
+                onPress={() =>
+                  void share(
+                    `${webUrl}/claim/${guest.claimCode}`,
+                    `Claim your Color Up history in ${detail.group.name}:`,
+                    guest.id,
+                  )
+                }
+              />
+            ) : null}
+          </View>
+        </Sheet>
+      ) : null}
+      <Button label="Manage invite links" variant="ghost" onPress={() => setInviting(true)} />
+      {inviting ? <InviteSection detail={detail} onClose={() => setInviting(false)} /> : null}
       <AddGuestSheet detail={detail} open={addingGuest} onClose={() => setAddingGuest(false)} />
       {managing ? (
         <ManageMemberSheet detail={detail} player={managing} onClose={() => setManaging(null)} />
@@ -170,87 +190,87 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
   );
 }
 
-function InviteSection({ detail }: { detail: GroupDetail }) {
+function InviteSection({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("invites", "create"));
   const revoke = useAction(stacks.Client.mutation("invites", "revoke"));
   const [copied, setCopied] = useState<string | null>(null);
   return (
-    <View className="gap-2">
-      <SectionHeading
-        action={
-          <Button
-            label="New invite link"
-            size="sm"
-            pending={create.pending}
-            onPress={() =>
-              void create.run({
-                params: { groupId: detail.group.id },
-                payload: { id: InviteId.make(newId()), maxUses: null },
-              })
-            }
-          />
-        }
-      >
-        Invite links
-      </SectionHeading>
-      <Loaded query={stacks.invites(detail.group.id)} skeleton={<InviteLinkSkeleton />}>
-        {(invites) =>
-          invites.length === 0 ? (
-            <Text className="text-sm text-muted">
-              Make a link and send it to anyone you want in the group. Links last a week.
-            </Text>
-          ) : (
-            <List>
-              {invites.map((invite) => {
-                const url = `${webUrl}/join/${invite.code}`;
-                return (
-                  <Row key={invite.id} className="flex-col items-stretch gap-2">
-                    <Text selectable numberOfLines={1} className="font-mono text-sm text-ink">
-                      {url}
-                    </Text>
-                    <Text className="text-sm text-muted">
-                      Expires {formatDay(invite.expiresAt)} · used {invite.uses}{" "}
-                      {invite.uses === 1 ? "time" : "times"}
-                    </Text>
-                    <View className="flex-row gap-2">
-                      <Button
-                        label={copied === invite.id ? "Copied" : "Share"}
-                        size="sm"
-                        className="flex-1"
-                        onPress={() =>
-                          void shareLink(url, `Join ${detail.group.name} on Color Up:`).then(
-                            (how) => (how === "copied" ? setCopied(invite.id) : undefined),
-                          )
-                        }
-                      />
-                      <Button
-                        label="Revoke"
-                        size="sm"
-                        variant="ghost"
-                        pending={revoke.pending}
-                        onPress={() =>
-                          confirmAction(
-                            "Revoke this invite link?",
-                            "Anyone who has not joined yet will need a new link.",
-                            "Revoke link",
-                            () => {
-                              void revoke.run({ params: { inviteId: invite.id } });
-                            },
-                          )
-                        }
-                      />
-                    </View>
-                  </Row>
-                );
-              })}
-            </List>
-          )
-        }
-      </Loaded>
-      {create.error ? <FormError>{create.error}</FormError> : null}
-      {revoke.error ? <FormError>{revoke.error}</FormError> : null}
-    </View>
+    <Sheet open title="Invite links" onClose={onClose}>
+      <View className="gap-2">
+        <SectionHeading
+          action={
+            <Button
+              label="New invite link"
+              size="sm"
+              pending={create.pending}
+              onPress={() =>
+                void create.run({
+                  params: { groupId: detail.group.id },
+                  payload: { id: InviteId.make(newId()), maxUses: null },
+                })
+              }
+            />
+          }
+        >
+          Invite links
+        </SectionHeading>
+        <Loaded query={stacks.invites(detail.group.id)} skeleton={<InviteLinkSkeleton />}>
+          {(invites) =>
+            invites.length === 0 ? (
+              <Text className="text-sm text-muted">
+                Make a link and send it to anyone you want in the group. Links last a week.
+              </Text>
+            ) : (
+              <List>
+                {invites.map((invite) => {
+                  const url = `${webUrl}/join/${invite.code}`;
+                  return (
+                    <Row key={invite.id} className="flex-col items-stretch gap-2">
+                      <Text className="type-body text-ink">Join {detail.group.name}</Text>
+                      <Text className="text-sm text-muted">
+                        Expires {formatDay(invite.expiresAt)} · used {invite.uses}{" "}
+                        {invite.uses === 1 ? "time" : "times"}
+                      </Text>
+                      <View className="flex-row gap-2">
+                        <Button
+                          label={copied === invite.id ? "Copied" : "Share"}
+                          size="sm"
+                          className="flex-1"
+                          onPress={() =>
+                            void shareLink(url, `Join ${detail.group.name} on Color Up:`).then(
+                              (how) => (how === "copied" ? setCopied(invite.id) : undefined),
+                            )
+                          }
+                        />
+                        <Button
+                          label="Revoke"
+                          size="sm"
+                          variant="ghost"
+                          pending={revoke.pending}
+                          onPress={() =>
+                            confirmAction(
+                              "Revoke this invite link?",
+                              "Anyone who has not joined yet will need a new link.",
+                              "Revoke link",
+                              () => {
+                                void revoke.run({ params: { inviteId: invite.id } });
+                              },
+                            )
+                          }
+                        />
+                      </View>
+                    </Row>
+                  );
+                })}
+              </List>
+            )
+          }
+        </Loaded>
+        {create.error ? <FormError>{create.error}</FormError> : null}
+        {revoke.error ? <FormError>{revoke.error}</FormError> : null}
+      </View>
+    </Sheet>
   );
 }
 

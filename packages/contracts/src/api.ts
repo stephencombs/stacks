@@ -44,6 +44,7 @@ import {
   TableView,
 } from "./recordingCommands.ts";
 import {
+  BalanceExplanation,
   ClaimPreview,
   GroupDetail,
   GroupListItem,
@@ -528,6 +529,13 @@ const TripsGroup = HttpApiGroup.make("trips")
     HttpApiEndpoint.get("get", "/trips/:tripId", {
       params: tripParams,
       success: TripDetail,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("balance", "/trips/:tripId/players/:playerId/balance", {
+      params: Schema.Struct({ tripId: TripId, playerId: PlayerId }),
+      success: BalanceExplanation,
       error: [Forbidden, NotFound],
     }),
   )

@@ -14,7 +14,7 @@ import { formatDay, isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { applyPayments } from "@stacks/shared/balances";
-import { formatMoney, parseMoney } from "@stacks/shared/money";
+import { formatDecimal, formatMoney, parseMoney } from "@stacks/shared/money";
 import { settleUp } from "@stacks/shared/settleUp";
 import * as Option from "effect/Option";
 import { useId, useState, type FormEvent } from "react";
@@ -29,6 +29,7 @@ import { Menu, MenuItem } from "~/components/ui/Menu";
 import { EmptyState, Note, Section } from "~/components/ui/Page";
 import { List, Row, RowText } from "~/components/ui/Surface";
 import { BalanceBar, BalanceHero } from "~/features/BalanceHero";
+import { BalanceExplanationDialog } from "~/features/BalanceExplanation";
 import { BackingSection } from "~/features/Backing";
 import { Chip } from "~/features/Chip";
 import { VoidEntryDialog } from "~/features/EntryDialogs";
@@ -66,6 +67,7 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
   const [pending, setPending] = useState<ReadonlyArray<Payment>>([]);
   const [paying, setPaying] = useState<Transfer | null>(null);
   const [recording, setRecording] = useState(false);
+  const [explaining, setExplaining] = useState<PlayerId | null>(null);
   const [voiding, setVoiding] = useState<Entry | null>(null);
 
   const unsaved = pending.filter(
@@ -99,6 +101,7 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
       },
     });
     if (!saved) setPending((all) => all.filter((p) => p.id !== id));
+    return saved !== null;
   };
 
   return (
@@ -109,6 +112,15 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
         payments={transfers.filter(involvesMe).length}
         currency={currency}
       />
+      <Button
+        variant="ghost"
+        size="sm"
+        className="self-start"
+        disabled={unsaved.length > 0}
+        onClick={() => setExplaining(me)}
+      >
+        Why this balance?
+      </Button>
 
       {transfers.length === 0 ? (
         <EmptyState title="Everyone's square">
@@ -147,6 +159,21 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
               <Row key={player.id}>
                 <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
                 <RowText
+                  className="basis-28"
+                  meta={
+                    player.id === me || isAdmin(detail) ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="-ml-3 self-start"
+                        disabled={unsaved.length > 0}
+                        onClick={() => setExplaining(player.id)}
+                        aria-label={`Explain ${player.displayName}'s balance`}
+                      >
+                        Why?
+                      </Button>
+                    ) : undefined
+                  }
                   title={
                     <PlayerName
                       name={names.get(player.id) ?? player.displayName}
@@ -249,7 +276,9 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
 
       {paying ? (
         <RecordPaymentDialog
-          onRecord={(payment) => void record(payment)}
+          onRecord={record}
+          pending={recordSettlement.pending}
+          error={recordSettlement.error}
           key={`${paying.from}:${paying.to}`}
           detail={detail}
           transfer={paying}
@@ -260,8 +289,18 @@ function SettleUpView({ detail, trip }: { detail: GroupDetail; trip: TripDetail 
         <RecordPaymentDialog
           detail={detail}
           transfer={null}
-          onRecord={(payment) => void record(payment)}
+          onRecord={record}
+          pending={recordSettlement.pending}
+          error={recordSettlement.error}
           onClose={() => setRecording(false)}
+        />
+      ) : null}
+      {explaining ? (
+        <BalanceExplanationDialog
+          detail={detail}
+          trip={trip}
+          playerId={explaining}
+          onClose={() => setExplaining(null)}
         />
       ) : null}
       <VoidEntryDialog entry={voiding} onClose={() => setVoiding(null)} />
@@ -274,10 +313,14 @@ function RecordPaymentDialog({
   transfer,
   onRecord,
   onClose,
+  pending,
+  error,
 }: {
   detail: GroupDetail;
   transfer: Transfer | null;
-  onRecord: (payment: Omit<Payment, "id">) => void;
+  pending: boolean;
+  error: string | null;
+  onRecord: (payment: Omit<Payment, "id">) => Promise<boolean>;
   onClose: () => void;
 }) {
   const formId = useId();
@@ -285,25 +328,22 @@ function RecordPaymentDialog({
   const currency = detail.group.currency;
   const [problem, setProblem] = useState<string | null>(null);
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const from = transfer?.from ?? PlayerId.make(String(form.get("from")));
     const to = transfer?.to ?? PlayerId.make(String(form.get("to")));
-    const amount = transfer
-      ? transfer.amount
-      : Option.getOrNull(parseMoney(String(form.get("amount")), currency));
+    const amount = Option.getOrNull(parseMoney(String(form.get("amount")), currency));
     if (from === to) return setProblem("Pick two different people.");
     if (amount === null || amount <= 0) return setProblem("Enter how much was paid.");
     const note = String(form.get("note") ?? "").trim();
-    onRecord({ from, to, amount, note: note || null });
-    onClose();
+    if (await onRecord({ from, to, amount, note: note || null })) onClose();
   };
 
   return (
     <Dialog
       open
-      onOpenChange={(open) => (open ? undefined : onClose())}
+      onOpenChange={(open) => (open || pending ? undefined : onClose())}
       title={transfer ? "Mark as paid" : "Record a payment"}
       description={
         transfer ? (
@@ -318,7 +358,15 @@ function RecordPaymentDialog({
       footer={
         <div className="flex flex-col gap-2">
           {problem ? <FormError>{problem}</FormError> : null}
-          <Button type="submit" form={formId} variant="primary" size="lg" className="w-full">
+          {error ? <FormError>{error}</FormError> : null}
+          <Button
+            pending={pending}
+            type="submit"
+            form={formId}
+            variant="primary"
+            size="lg"
+            className="w-full"
+          >
             Record payment
           </Button>
         </div>
@@ -353,19 +401,20 @@ function RecordPaymentDialog({
                 </Select>
               )}
             </Field>
-            <Field label="Amount">
-              {(props) => (
-                <Input
-                  {...props}
-                  name="amount"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  className="tabular-nums"
-                />
-              )}
-            </Field>
           </>
         )}
+        <Field label="Amount paid" hint="Part of what's owed is fine.">
+          {(props) => (
+            <Input
+              {...props}
+              name="amount"
+              inputMode="decimal"
+              autoComplete="off"
+              className="tabular-nums"
+              defaultValue={transfer ? formatDecimal(transfer.amount, currency) : ""}
+            />
+          )}
+        </Field>
         <Field label="Note (optional)" hint="Like “Venmo” or “cash at the airport”.">
           {(props) => <Input {...props} name="note" maxLength={280} autoComplete="off" />}
         </Field>

@@ -49,6 +49,21 @@ describe("outbox", () => {
     expect(relaunched.pending()).toEqual([]);
   });
 
+  it("keeps a historical correction's event time and replacement across an offline restart", async () => {
+    const storage = memory();
+    const original = entry(10000);
+    const correction = {
+      ...entry(12000),
+      occurredAt: original.occurredAt,
+      replacesEntryId: original.id,
+    };
+    const first = makeOutbox(storage, offline);
+    await first.add(session, correction);
+    const { received, send } = server();
+    await makeOutbox(memory(storage.read()), send).flush();
+    expect(received).toEqual([{ sessionId: session, entry: correction, failed: null }]);
+  });
+
   it("remembers what the server confirmed, so screens count it until they refetch", async () => {
     const { send } = server();
     const outbox = makeOutbox(memory(), send);
