@@ -6,6 +6,7 @@ const startupStages = [
   "auth_ready",
   "navigation_ready",
   "landing_ready",
+  "query_started",
   "query_settled",
   "initial_url_timeout",
 ] as const;

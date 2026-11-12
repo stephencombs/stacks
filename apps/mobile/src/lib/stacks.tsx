@@ -108,6 +108,9 @@ export function Loaded<A, E>({
   const result = useAtomValue(query);
   useRevalidate(query, result, onWake);
   const settled = !AsyncResult.isInitial(result);
+  // Personal play opens first, so the first account query starts when someone opens a group or
+  // signs in. Its start splits their wait from the query's own time.
+  useEffect(() => markStartup("query_started"), []);
   useEffect(() => {
     if (settled) markStartup("query_settled");
   }, [settled]);
