@@ -47,10 +47,6 @@ const steps = [
     title: "Watch the board.",
     body: "Follow your trip result, session by session, and see where you stand.",
   },
-  {
-    title: "Settle up once.",
-    body: "The fewest payments that square everyone. Color Up never moves money.",
-  },
 ] as const;
 
 const accountCopy = {

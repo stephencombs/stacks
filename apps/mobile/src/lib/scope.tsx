@@ -69,7 +69,7 @@ export function useScope() {
   };
 }
 
-/** Whether there's a trip for Sessions, Board and Settle up to show. Assumed while groups load. */
+/** Whether there's a trip for Sessions and Board to show. Assumed while groups load. */
 export const useScopeHasTrip = () => {
   const { scope } = useScope();
   return scope === undefined || scope === null || scope.trip !== undefined;

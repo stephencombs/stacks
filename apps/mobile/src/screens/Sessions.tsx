@@ -9,7 +9,7 @@ import { Button } from "../components/ui/Button";
 import { cn } from "../components/ui/cn";
 import { Screen, screenError } from "../components/ui/Screen";
 import { EmptyState, PageTitle, SectionHeading } from "../components/ui/Surface";
-import { LimitNotices } from "../features/PersonalLimits";
+import { BackingSection } from "../features/Backing";
 import { SessionsSkeleton } from "../features/ScreenSkeletons";
 import { LiveSessionCard, SessionList } from "../features/SessionList";
 import { ReopenTrip, TripOptionsButton } from "../features/TripOptions";
@@ -97,7 +97,6 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
         <TripOptionsButton trip={trip} group={group} />
       </View>
       {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}
-      <LimitNotices group={group} trip={trip} />
       <TripHero currency={group.group.currency} me={group.myPlayerId} sessions={closed} />
       {!going ? (
         <View className="gap-3">
@@ -131,6 +130,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
           <SessionList sessions={night.sessions.toReversed()} detail={group} />
         </View>
       ))}
+      <BackingSection detail={group} trip={trip} />
       {trip.sessions.length === 0 ? (
         <EmptyState centered title="No sessions on this trip yet">
           {going

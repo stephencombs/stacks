@@ -17,7 +17,6 @@ import * as Option from "effect/Option";
 
 import { gameNames } from "./format.ts";
 import {
-  isPairCommand,
   type RecordingCommand,
   type RecordingOperationId,
 } from "@stacks/contracts/recordingCommands";
@@ -381,23 +380,7 @@ export const describeRecordingRejection = ({ command, reason }: RecordingRejecti
                   ? "Reopening a session"
                   : command.type === "appoint_recorder"
                     ? "Letting a player record for everyone"
-                    : command.type === "revoke_recorder"
-                      ? "Stopping a recorder"
-                      : command.type === "repay"
-                        ? `A ${money(command.amount)} payment`
-                        : command.type === "correct_repayment"
-                          ? "Correcting a payment"
-                          : "Voiding a payment";
-  if (isPairCommand(command))
-    return `${what} didn't sync. ${
-      reason === "conflict"
-        ? "Payments between you changed on another device."
-        : reason === "operation_reused"
-          ? "Your account already has it with different details."
-          : reason === "forbidden"
-            ? "Only the two people in a payment can record it, with someone they've played with."
-            : "It doesn't fit the payments as your account has them."
-    }`;
+                    : "Stopping a recorder";
   const why =
     reason === "conflict"
       ? "The session changed on another device."
@@ -465,12 +448,6 @@ export const recordingSyncView = (
     sync,
     (command) => visitId === undefined || ("visitId" in command && command.visitId === visitId),
   );
-
-/** The sync line and refusals for payments between players only. */
-export const paymentSyncView = (
-  state: RecordingState | null,
-  sync: SyncPhase | null,
-): RecordingSyncView => syncView(state, sync, isPairCommand);
 
 const syncView = (
   state: RecordingState | null,

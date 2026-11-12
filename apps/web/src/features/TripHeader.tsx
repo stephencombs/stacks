@@ -12,7 +12,7 @@ import { PageHeader } from "~/components/ui/Page";
 import { Tag } from "~/components/ui/Surface";
 import { useAction, useLastTrip, useRememberTrip, useStacks } from "~/lib/stacks";
 
-const titles = { sessions: "Sessions", board: "Board", settle: "Settle up" } as const;
+const titles = { sessions: "Sessions", board: "Board" } as const;
 
 /**
  * A trip place's title. The scope button already names the trip, so the title is the place.
@@ -32,7 +32,6 @@ export function TripHeader({
   children?: ReactNode;
 }) {
   const stacks = useStacks();
-  const navigate = useNavigate();
   const { userId } = useAuth();
   useRememberTrip(trip.trip.id);
   const end = useAction(stacks.Client.mutation("trips", "end"));
@@ -50,14 +49,7 @@ export function TripHeader({
       {ended ? (
         <MenuItem onClick={() => void reopen.run({ params })}>Reopen trip</MenuItem>
       ) : (
-        <MenuItem
-          onClick={async () => {
-            if (await end.run({ params, payload: {} }))
-              void navigate({ to: "/trips/$tripId/settle", params });
-          }}
-        >
-          End trip
-        </MenuItem>
+        <MenuItem onClick={() => void end.run({ params, payload: {} })}>End trip</MenuItem>
       )}
       {canDelete ? (
         <MenuItem tone="danger" onClick={() => setDeleting(true)}>

@@ -180,7 +180,6 @@ describe("stakeOutcomes", () => {
             (e) =>
               e.playerId === borrower &&
               e.voidedAt === null &&
-              e.kind !== "settlement" &&
               covered.some((sess) => sess.id === e.sessionId),
           )
           .reduce((sum, e) => sum + (e.kind === "buy_in" ? -e.amount : e.amount), 0);

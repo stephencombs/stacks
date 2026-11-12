@@ -16,9 +16,8 @@ Neither changes what the app reads or writes; that is the cutover, which comes l
 | Session                              | A historical table whose ID is the session ID. Its trip, venue, game and high-limit flag stay on the session.                                                                                              |
 | A player's part in a session         | One historical participation: a `personal_visits` row with `legacy_session_id` set, owned by the legacy player, from the session's start to its close.                                                     |
 | Buy-in, cash-out, adjustment         | A `personal_entries` row with the same ID, amount, counterparty, times, note, void and `replaces_entry_id`.                                                                                                |
-| Settlement                           | A `repayments` row with the same ID: a payment between two players, with its trip kept only as `recorded_from_trip_id`.                                                                                    |
 | Stake                                | Stays in `stakes` as legacy terms, permanently. Whole-Trip backing applies only to agreements made after the cutover.                                                                                      |
-| Group, membership, trip              | Unchanged. Access to a historical table or repayment goes through the legacy group, as it does today.                                                                                                      |
+| Group, membership, trip              | Unchanged. Access to a historical table goes through the legacy group, as it does today.                                                                                                                   |
 | Group in a currency other than USD   | Not imported. It stays on the legacy ledger until the new model supports its currency.                                                                                                                     |
 
 Users who created or voided entries are audit actors in the new model, so each also gets a personal
@@ -36,13 +35,6 @@ and take no recording commands, because their owner is a group player and the re
 loads visits owned by the account's personal player. Replay in `packages/shared/src/recording.ts`
 never sees them, so they need no synthetic command.
 
-## Payments routed by net settle-up
-
-Legacy settle-up suggested payments from net balances, so someone could pay a player they didn't
-owe. The import keeps each payment exactly as recorded, between the two players who made it. It
-doesn't reassign debt or add balancing payments. The pair's balance then shows what's left between
-those two people, and they settle it themselves. The preflight lists every such pair.
-
 ## Running it
 
 The import runs on one repeatable-read snapshot in one transaction. It refuses to write while the
@@ -55,8 +47,7 @@ rolls back. At the cutover, freeze legacy writes, close every open session and r
 Blocking issues stop the import:
 
 - `live_session`: an open session. Its play may still change, so it blocks the cutover until closed.
-- `broken_correction`: a correction that replaces a live entry, an entry elsewhere, the other kind
-  of fact, or an entry another correction already replaced.
+- `broken_correction`: a correction that replaces a live entry, an entry elsewhere, or an entry another correction already replaced.
 - `invalid_audit`: an entry voided before it was created.
 - `unsafe_amount`: an amount past what integer minor units count exactly.
 
@@ -66,8 +57,6 @@ Excluded groups don't block. The import skips them, and their open sessions don'
 
 The import keeps these as they are and flags them for the people involved:
 
-- `routed_settlement`: a pair whose payments turned their debt around or paid where nothing was
-  owed.
 - `windowed_stake` and `overlapping_stake`: stakes that cover part of a trip, or the same borrower
   twice. They stay legacy.
 - `ambiguous_player`: players in one group with the same name. They stay separate until someone

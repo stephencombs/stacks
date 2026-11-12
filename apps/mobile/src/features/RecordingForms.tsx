@@ -9,7 +9,7 @@ import {
 } from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
 import type { RecordingInput, RecordingReceipt } from "@stacks/client-runtime/recording";
-import { counterpartiesAt } from "@stacks/client-runtime/playerMoney";
+import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import { useRecordingSubmit, useServerTable } from "@stacks/client-runtime/recordingReact";
 import {
   amountInputText,

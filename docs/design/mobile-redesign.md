@@ -4,7 +4,7 @@ Color Up keeps the same ledger meaning and destinations on web, iOS and Android.
 
 ## Navigation
 
-Keep React Navigation native-stack. iOS uses the native bottom tab navigator and SF Symbols; Android uses the standard bottom tab navigator with destination labels. The mobile web build keeps its floating capsule. Sessions, Board, Settle up and Group remain peer destinations; a group with no trips offers only Group.
+Keep React Navigation native-stack. iOS uses the native bottom tab navigator and SF Symbols; Android uses the standard bottom tab navigator with destination labels. The mobile web build keeps its floating capsule. Sessions, Board and Group remain peer destinations; a group with no trips offers only Group.
 
 Use native iOS header items for Groups and You. Related items may share the system glass background. Keep the header transparent, with a centred native glass title capsule instead of a large body heading. The title expands into a popover with its full title and context; group destination titles open the group/trip selection sheet. Scope is never the back action.
 

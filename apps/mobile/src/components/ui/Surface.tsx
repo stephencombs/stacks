@@ -89,7 +89,7 @@ export function PageTitle({
   );
   useLayoutEffect(() => {
     if (!nativeTitle) return;
-    const scoped = ["Sessions", "Board", "SettleUp", "Group"].includes(route?.name ?? "");
+    const scoped = ["Sessions", "Board", "Group"].includes(route?.name ?? "");
     navigation?.setOptions({
       title: children,
       headerLargeTitle: false,

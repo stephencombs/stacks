@@ -50,7 +50,7 @@ export const get = Effect.fn("Trips.get")(function* (tripId: TripId) {
   return yield* Views.tripDetail(trip);
 });
 
-/** Ending a trip stops new sessions going in. Its balances can still be settled. */
+/** Ending a trip stops new sessions going in. */
 export const end = Effect.fn("Trips.end")(function* (
   tripId: TripId,
   request: typeof EndTripRequest.Type,
@@ -87,7 +87,6 @@ export const remove = Effect.fn("Trips.remove")(function* (tripId: TripId) {
   }
   const used = yield* sql`
     select 1 from sessions where trip_id = ${tripId}
-    union all select 1 from entries where trip_id = ${tripId}
     union all select 1 from stakes where trip_id = ${tripId}
     limit 1
   `;

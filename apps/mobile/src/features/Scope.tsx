@@ -1,11 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation } from "@react-navigation/native";
-import { scopeTrips, tripDates, unsettledAmount } from "@stacks/client-runtime/trip";
+import { scopeTrips, tripDates } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useState } from "react";
 import { Platform, Text, View } from "react-native";
 
-import { Money } from "../components/Money";
 import { Button, FilterPill } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { HeaderTitle } from "../components/ui/HeaderTitle";
@@ -62,8 +61,6 @@ function ScopeSheet({ scope, onClose }: { scope: Scope; onClose: () => void }) {
   const { setTrip, setGroup } = useScope();
   const { item } = scope;
   const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
-  // Open balances come with the group, which the places load anyway; rows don't wait for it.
-  const detail = AsyncResult.getOrElse(useAtomValue(stacks.group(item.group.id)), () => null);
   const others = groups.filter((other) => other.group.id !== item.group.id);
   const [starting, setStarting] = useState(false);
   const then = (next: () => void) => () => {
@@ -93,7 +90,6 @@ function ScopeSheet({ scope, onClose }: { scope: Scope; onClose: () => void }) {
           <List>
             {scopeTrips(item.trips).map((trip) => {
               const here = trip.id === scope.trip?.id;
-              const open = detail ? unsettledAmount(detail, trip.id) : null;
               return (
                 <Row
                   key={trip.id}
@@ -109,12 +105,6 @@ function ScopeSheet({ scope, onClose }: { scope: Scope; onClose: () => void }) {
                     </View>
                     <Text numberOfLines={1} className="text-sm text-muted">
                       {tripDates(trip)}
-                      {open ? (
-                        <>
-                          {" · "}
-                          <Money amount={open} currency={item.group.currency} /> to settle
-                        </>
-                      ) : null}
                     </Text>
                   </View>
                   {here ? <Icon name="check" color="accent-text" size={18} /> : null}

@@ -26,7 +26,7 @@ describe("playerResults", () => {
     expect(results.get(BEA)?.net).toBe(-19999);
   });
 
-  it("ignores voided entries and settlements", () => {
+  it("ignores voided entries", () => {
     const results = playerResults([
       entry({ kind: "buy_in", playerId: ALEX, amount: money(10000) }),
       entry({
@@ -35,11 +35,9 @@ describe("playerResults", () => {
         amount: money(10000),
         voidedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
       }),
-      entry({ kind: "settlement", playerId: ALEX, amount: money(4000), counterpartyId: BEA }),
     ]);
 
     expect(results.get(ALEX)?.net).toBe(-10000);
-    expect(results.has(BEA)).toBe(false);
   });
 });
 
@@ -58,10 +56,6 @@ describe("resultsBy", () => {
     },
     { ...entry({ kind: "buy_in", playerId: ALEX, amount: money(5000) }), sessionId: craps.id },
     { ...entry({ kind: "buy_in", playerId: ALEX, amount: money(99900) }), sessionId: lastYear.id },
-    {
-      ...entry({ kind: "settlement", playerId: ALEX, amount: money(1), counterpartyId: BEA }),
-      sessionId: null,
-    },
   ];
 
   it("splits results by the key and counts only the given sessions", () => {

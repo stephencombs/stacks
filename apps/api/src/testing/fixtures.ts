@@ -93,3 +93,37 @@ export const catalogVenue = Effect.fn("fixtures.catalogVenue")(function* (client
     },
   });
 });
+
+/** A live session where `debtor` buys in with `creditor`'s money, so the debtor owes the creditor. */
+export const owe = Effect.fn("fixtures.owe")(function* (
+  client: Client,
+  group: TestGroup,
+  debtor: PlayerId,
+  creditor: PlayerId,
+  amount: number,
+) {
+  const venue = yield* catalogVenue(client);
+  const sessionId = ids.session();
+  yield* client.sessions.create({
+    params: { tripId: group.tripId },
+    payload: {
+      id: sessionId,
+      venueId: venue.id,
+      game: "blackjack",
+      playerIds: [debtor],
+      notes: null,
+    },
+  });
+  yield* client.ledger.addEntry({
+    params: { sessionId },
+    payload: {
+      id: ids.entry(),
+      kind: "buy_in",
+      playerId: debtor,
+      counterpartyId: creditor,
+      amount: usd(amount),
+      note: null,
+      replacesEntryId: null,
+    },
+  });
+});

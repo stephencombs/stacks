@@ -23,7 +23,6 @@ import { tableView } from "@stacks/client-runtime/table";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { decimalSeparator, formatMoney, minorUnitDigits } from "@stacks/shared/money";
 import { playerResults } from "@stacks/shared/results";
-import { LimitNotices } from "../features/PersonalLimits";
 import { seatCount, seatsNow } from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import * as DateTime from "effect/DateTime";
@@ -77,11 +76,8 @@ export function SessionScreen({ route }: Props) {
       }
     >
       {(session) => (
-        // The screen also shows the trip's limits, so it waits for those too rather than
-        // shifting, asking for everything at once.
         <>
           <Prefetch query={stacks.trip(session.session.tripId)} />
-          <Prefetch query={stacks.limits(session.session.tripId)} />
           <Prefetch query={stacks.group(session.session.groupId)} />
           <Settled
             query={stacks.trip(session.session.tripId)}
@@ -91,26 +87,17 @@ export function SessionScreen({ route }: Props) {
               </Screen>
             }
           >
-            <Settled
-              query={stacks.limits(session.session.tripId)}
+            <Loaded
+              renderError={screenError}
+              query={stacks.group(session.session.groupId)}
               skeleton={
                 <Screen>
                   <SessionScreenSkeleton />
                 </Screen>
               }
             >
-              <Loaded
-                renderError={screenError}
-                query={stacks.group(session.session.groupId)}
-                skeleton={
-                  <Screen>
-                    <SessionScreenSkeleton />
-                  </Screen>
-                }
-              >
-                {(group) => <SessionView detail={session} group={group} />}
-              </Loaded>
-            </Settled>
+              {(group) => <SessionView detail={session} group={group} />}
+            </Loaded>
           </Settled>
         </>
       )}
@@ -301,22 +288,6 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
       {(toast) => (
         <>
           {live ? <KeepAwake /> : null}
-          <Loaded query={stacks.trip(session.tripId)} skeleton={<></>}>
-            {(trip) => (
-              <LimitNotices
-                group={group}
-                trip={trip}
-                local={{
-                  sessionId: session.id,
-                  status: session.status,
-                  myJoinedAt: detail.myJoinedAt ?? null,
-                  playing:
-                    detail.playerIds.includes(group.myPlayerId) && !cashedOut.has(group.myPlayerId),
-                  net: results.get(group.myPlayerId)?.net ?? MinorUnits.make(0),
-                }}
-              />
-            )}
-          </Loaded>
           <View className="gap-3">
             <PageTitle context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
               {venue.name}
@@ -639,12 +610,11 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
               onClose={() => setSelected(null)}
               onCorrect={() => {
                 setSelected(null);
-                if (selected.kind !== "settlement")
-                  setDraft({
-                    kind: selected.kind,
-                    playerId: selected.playerId,
-                    replaces: selected,
-                  });
+                setDraft({
+                  kind: selected.kind,
+                  playerId: selected.playerId,
+                  replaces: selected,
+                });
               }}
             />
           ) : null}
@@ -706,7 +676,6 @@ const verbs = {
   buy_in: "bought in",
   cash_out: "cashed out",
   adjustment: "adjusted",
-  settlement: "paid",
 } as const;
 
 function StatusActions({
@@ -776,9 +745,7 @@ function EntryActionsSheet({
         />
       }
     >
-      {entry.kind !== "settlement" ? (
-        <Button label="Correct the amount or who paid" size="lg" onPress={onCorrect} />
-      ) : null}
+      <Button label="Correct the amount or who paid" size="lg" onPress={onCorrect} />
       <TextField
         label="Reason for voiding (optional)"
         value={reason}

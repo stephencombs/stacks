@@ -6,6 +6,5 @@ export * from "./ledger.ts";
 export * from "./money.ts";
 export * from "./players.ts";
 export * from "./recording.ts";
-export * from "./relationships.ts";
 export * from "./views.ts";
 export * from "./recordingCommands.ts";

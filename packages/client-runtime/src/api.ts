@@ -78,9 +78,6 @@ export const makeRecordingTransport = ({
       Effect.flatMap(client(actor), (api) =>
         api.recording.redeemInvite({ params: { token }, payload }),
       ),
-    balances: (actor) => Effect.flatMap(client(actor), (api) => api.recording.balances()),
-    pair: (playerId, actor) =>
-      Effect.flatMap(client(actor), (api) => api.recording.pair({ params: { playerId } })),
   };
 };
 
@@ -115,8 +112,6 @@ export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => 
   const keys = { reactivityKeys: LEDGER_KEYS };
   return {
     Client: StacksClient,
-    limits: (tripId: TripId) =>
-      StacksClient.query("limits", "get", { params: { tripId }, ...keys }),
     groups: StacksClient.query("groups", "list", keys),
     group: (groupId: GroupId) =>
       StacksClient.query("groups", "get", { params: { groupId }, ...keys }),

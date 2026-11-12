@@ -1,20 +1,18 @@
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { playerNames } from "@stacks/client-runtime/format";
-import { balanceHeadline, chipOf, localClock } from "@stacks/client-runtime/trip";
+import { chipOf, localClock } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Money } from "~/components/Money";
-import { ButtonLink } from "~/components/ui/Button";
 import { cn } from "~/components/ui/cn";
 import { Glow, Surface } from "~/components/ui/Surface";
 import { Chip } from "./Chip";
 
 /**
  * Sessions on a screen with room beside it: the trip's sessions on the left, and on the right who's
- * winning and where you stand, a glance before going to Board or Settle up. Below `xl` the rail
+ * winning and where you stand, a glance before going to Board. Below `xl` the rail
  * drops away and the page is one column.
  */
 export function TripLayout({ children, rail }: { children: ReactNode; rail: ReactNode }) {
@@ -95,8 +93,10 @@ function RailBoard({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
 function RailBalance({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
   const me = group.myPlayerId;
   const balance = trip.balances.find((b) => b.playerId === me)?.amount ?? 0;
-  const payments = trip.transfers.filter((t) => t.from === me || t.to === me).length;
-  const head = balanceHeadline(balance, payments);
+  const head = {
+    label: balance > 0 ? "You're owed" : balance < 0 ? "You owe" : "You're square",
+    tone: balance > 0 ? ("win" as const) : balance < 0 ? ("loss" as const) : ("accent" as const),
+  };
   return (
     <Surface className="relative overflow-hidden">
       <Glow tone={head.tone} />
@@ -110,15 +110,6 @@ function RailBalance({ group, trip }: { group: GroupDetail; trip: TripDetail }) 
             balance > 0 ? "text-win" : balance < 0 ? "text-loss" : "text-muted",
           )}
         />
-        {head.line ? <p className="mt-1.5 text-sm text-muted">{head.line}</p> : null}
-        <ButtonLink
-          to="/trips/$tripId/settle"
-          params={{ tripId: trip.trip.id }}
-          className="mt-4 pr-3.5"
-        >
-          Settle up
-          <ArrowRight className="size-4" aria-hidden />
-        </ButtonLink>
       </div>
     </Surface>
   );

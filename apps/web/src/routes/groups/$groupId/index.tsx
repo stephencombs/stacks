@@ -85,7 +85,7 @@ function GroupHomeView({ detail }: { detail: GroupDetail }) {
       <Section title="Settings">
         <List>
           <RowLink to="/groups/$groupId/settings" params={params}>
-            <RowText title="Payment apps and export" meta="Also where you leave the group" />
+            <RowText title="Export and leave" meta="Your ledger as a CSV, and leaving the group" />
           </RowLink>
         </List>
       </Section>

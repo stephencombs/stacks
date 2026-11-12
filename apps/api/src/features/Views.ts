@@ -18,7 +18,6 @@ import {
 } from "@stacks/contracts";
 import { balances } from "@stacks/shared/balances";
 import { resultsBy } from "@stacks/shared/results";
-import { leftToSettle, settleUp } from "@stacks/shared/settleUp";
 import { stakeOutcomes, withStakes } from "@stacks/shared/stakes";
 
 import {
@@ -99,9 +98,7 @@ const summaries = Effect.fn("Views.summaries")(function* (
         .filter((entry) => entry.sessionId === session.id)
         .map((entry) => entry.id),
       myLedgerEntries: entries.flatMap((entry) =>
-        entry.sessionId === session.id &&
-        entry.playerId === mySeat?.playerId &&
-        entry.kind !== "settlement"
+        entry.sessionId === session.id && entry.playerId === mySeat?.playerId
           ? [{ id: entry.id, kind: entry.kind, amount: entry.amount, voidedAt: entry.voidedAt }]
           : [],
       ),
@@ -196,14 +193,14 @@ export const groupBalances = Effect.fn("Views.groupBalances")(function* (groupId
   return { owed: withStakes(balances(entries), stakes, outcomes), stakes, outcomes };
 });
 
-/** A trip's own ledger: who owes whom from its entries, settlements and stakes. */
-export const tripLedger = Effect.fn("Views.tripLedger")(function* (tripId: TripId) {
+/** A trip's own ledger: who owes whom from its entries and stakes. */
+const tripLedger = Effect.fn("Views.tripLedger")(function* (tripId: TripId) {
   const sql = yield* SqlClient.SqlClient;
   const [entries, stakes, sessions] = yield* Effect.all(
     [
       sql`
-        select e.* from entries e left join sessions s on s.id = e.session_id
-        where e.voided_at is null and (e.trip_id = ${tripId} or s.trip_id = ${tripId})
+        select e.* from entries e join sessions s on s.id = e.session_id
+        where e.voided_at is null and s.trip_id = ${tripId}
       `.pipe(Effect.flatMap(decodeRows(EntryRow))),
       sql`select * from stakes where trip_id = ${tripId} order by started_at, created_at`.pipe(
         Effect.flatMap(decodeRows(StakeRow)),
@@ -215,32 +212,16 @@ export const tripLedger = Effect.fn("Views.tripLedger")(function* (tripId: TripI
     { concurrency: "unbounded" },
   );
   const live = stakes.filter((stake) => stake.voidedAt === null);
-  const outcomes = stakeOutcomes(
-    live,
-    sessions,
-    entries.filter((entry) => entry.sessionId !== null),
-  );
+  const outcomes = stakeOutcomes(live, sessions, entries);
   return { owed: withStakes(balances(entries), stakes, outcomes), stakes, outcomes, sessions };
 });
 
 export const tripDetail = Effect.fn("Views.tripDetail")(function* (trip: typeof TripRow.Type) {
-  const sql = yield* SqlClient.SqlClient;
-  const [{ owed, stakes, outcomes, sessions }, settlements] = yield* Effect.all(
-    [
-      tripLedger(trip.id),
-      sql`
-        select * from entries where trip_id = ${trip.id} and kind = 'settlement'
-        order by occurred_at desc, created_at desc
-      `.pipe(Effect.flatMap(decodeRows(EntryRow))),
-    ],
-    { concurrency: "unbounded" },
-  );
+  const { owed, stakes, outcomes, sessions } = yield* tripLedger(trip.id);
   return {
     trip,
     sessions: yield* summaries(sessions),
     balances: Array.from(owed, ([playerId, amount]) => ({ playerId, amount })),
-    transfers: settleUp(owed),
-    settlements,
     stakes: stakes.map((stake) => ({
       stake,
       result: outcomes.get(stake.id)?.result ?? MinorUnits.make(0),
@@ -259,8 +240,7 @@ export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Mem
         Effect.flatMap(decodeRows(GroupRow)),
       ),
       sql`
-        select p.id, p.display_name, p.user_id, m.role, p.claim_code,
-          p.venmo, p.cash_app, p.paypal
+        select p.id, p.display_name, p.user_id, m.role, p.claim_code
         from players p
         left join memberships m
           on m.group_id = p.group_id and m.user_id = p.user_id and m.left_at is null
@@ -273,27 +253,11 @@ export const groupDetail = Effect.fn("Views.groupDetail")(function* (member: Mem
     ],
     { concurrency: "unbounded" },
   );
-  const ended = trips.filter((trip) => trip.endedAt !== null);
-  const unsettled =
-    ended.length === 0
-      ? []
-      : (yield* Effect.forEach(
-          ended,
-          (trip) =>
-            tripLedger(trip.id).pipe(
-              Effect.map(({ owed }) => ({
-                tripId: trip.id,
-                amount: leftToSettle(settleUp(owed)),
-              })),
-            ),
-          { concurrency: "unbounded" },
-        )).filter((item) => item.amount > 0);
   return {
     group: group!,
     role: member.role,
     myPlayerId: member.playerId,
     players,
     trips,
-    unsettled,
   } satisfies GroupDetail;
 });

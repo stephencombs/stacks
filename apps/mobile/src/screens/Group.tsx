@@ -92,7 +92,7 @@ function GroupHub({ detail }: { detail: GroupDetail }) {
         <SettingsRow
           icon={<Icon name="settings" color="ink" size={16} />}
           title="Group settings"
-          subtitle="Your payment apps, the ledger, leaving"
+          subtitle="The ledger, leaving"
           accessibilityHint="Opens the group's settings"
           onPress={() => go.settings(groupId)}
         />

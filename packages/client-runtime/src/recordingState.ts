@@ -3,7 +3,6 @@ import {
   PlayEntry,
   PlayerId,
   PlayerIdentity,
-  Repayment,
   Table,
   TableId,
   UserId,
@@ -11,12 +10,10 @@ import {
   type EntryId,
 } from "@stacks/contracts";
 import {
-  isPairCommand,
   isTableCommand,
   RecordingCommand,
   RecordingOperationId,
   RecordingRejectionReason,
-  type PairCommand,
   type VisitCommand,
 } from "@stacks/contracts/recordingCommands";
 import {
@@ -75,8 +72,6 @@ export const RecordingState = Schema.Struct({
   tables: Schema.Array(Table),
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
-  /** Payments between its players and others, as their commands left them. */
-  repayments: Schema.Array(Repayment),
   receipts: Schema.Array(RecordingReceipt),
   sync: Schema.optionalKey(RecordingSync),
 });
@@ -111,7 +106,6 @@ export const recordingBase = (state: RecordingState): RecordingState => {
     tables: state.tables.filter((table) => table.starterPlayerId !== state.self.id),
     visits: [],
     entries: [],
-    repayments: [],
     receipts: [],
   };
 };
@@ -119,11 +113,7 @@ export const recordingBase = (state: RecordingState): RecordingState => {
 const validateRecordingState = (state: RecordingState) => {
   requireValid(state.actor.userId === null, "Private recording has a local actor.");
   requireValid(
-    unique(state.players) &&
-      unique(state.tables) &&
-      unique(state.visits) &&
-      unique(state.entries) &&
-      unique(state.repayments),
+    unique(state.players) && unique(state.tables) && unique(state.visits) && unique(state.entries),
     "Duplicate record ID.",
   );
   const players = new Map(state.players.map((player) => [player.id, player]));
@@ -221,35 +211,6 @@ const validateRecordingState = (state: RecordingState) => {
     );
     createdEntries.add(id);
   };
-  const repayments = new Map(state.repayments.map((repayment) => [repayment.id, repayment]));
-  const createdRepayments = new Set<EntryId>();
-  const repaymentVoids = new Set<EntryId>();
-  const verifyRepayment = (
-    command: PairCommand,
-    id: EntryId,
-    ends: Pick<Repayment, "fromPlayerId" | "toPlayerId">,
-    details: Pick<Repayment, "amount" | "occurredAt" | "note">,
-    replacesEntryId: EntryId | null,
-  ) => {
-    const repayment = repayments.get(id);
-    requireValid(
-      repayment && !createdRepayments.has(id),
-      "Receipt payment is missing or duplicated.",
-    );
-    requireValid(
-      repayment.fromPlayerId === ends.fromPlayerId &&
-        repayment.toPlayerId === ends.toPlayerId &&
-        repayment.amount === details.amount &&
-        ms(repayment.occurredAt) === ms(details.occurredAt) &&
-        repayment.note === details.note &&
-        repayment.replacesEntryId === replacesEntryId &&
-        repayment.recordedFromTripId === null &&
-        repayment.createdBy === command.actorId &&
-        ms(repayment.createdAt) === ms(command.preparedAt),
-      "Payment differs from its command receipt.",
-    );
-    createdRepayments.add(id);
-  };
   for (const [index, receipt] of state.receipts.entries()) {
     const command = receipt.command;
     // Another actor's command (the starter's, or a joiner's) comes only from the server.
@@ -260,33 +221,6 @@ const validateRecordingState = (state: RecordingState) => {
       "Invalid command receipt.",
     );
     operations.add(command.operationId);
-    if (isPairCommand(command)) {
-      if (command.type === "repay") {
-        verifyRepayment(command, command.repaymentId, command, command, null);
-        continue;
-      }
-      const original = repayments.get(command.repaymentId);
-      requireValid(
-        original &&
-          createdRepayments.has(original.id) &&
-          !repaymentVoids.has(original.id) &&
-          original.voidedAt !== null &&
-          ms(original.voidedAt) === ms(command.preparedAt) &&
-          original.voidedBy === command.actorId &&
-          original.voidReason === command.reason,
-        "Invalid payment correction history.",
-      );
-      repaymentVoids.add(original.id);
-      if (command.type === "correct_repayment")
-        verifyRepayment(
-          command,
-          command.replacement.id,
-          original,
-          command.replacement,
-          original.id,
-        );
-      continue;
-    }
     if (isTableCommand(command)) {
       const key = `${command.tableId}:${command.playerId}`;
       requireValid(
@@ -457,13 +391,6 @@ const validateRecordingState = (state: RecordingState) => {
       (entry.voidedAt !== null) === voids.has(entry.id),
       "Void has no correction receipt.",
     );
-  requireValid(
-    createdRepayments.size === repayments.size &&
-      state.repayments.every(
-        (repayment) => (repayment.voidedAt !== null) === repaymentVoids.has(repayment.id),
-      ),
-    "Payments differ from their receipts.",
-  );
   for (const visit of state.visits) {
     const history = lifecycle.get(visit.id);
     requireValid(
@@ -541,11 +468,10 @@ type VersionOne = {
   readonly receipts: ReadonlyArray<{ readonly command: Command }>;
   readonly sync?: { readonly rejected: ReadonlyArray<{ readonly command: Command }> };
 };
-// Documents from before joining had no participants, from before appointing no recorders, and
-// from before payments no repayments.
+// Documents from before joining had no participants, and from before appointing no recorders.
 const withParticipants = (document: unknown) =>
   typeof document === "object" && document !== null
-    ? { participants: [], recorders: [], repayments: [], ...document }
+    ? { participants: [], recorders: [], ...document }
     : document;
 
 // Version 1 held one player, so its tables and starts were all its own.

@@ -13,10 +13,6 @@ const steps = [
     title: "Watch the board",
     body: "Everyone's running total, session by session, with your line in gold. Win rate, best session and who's on a heater come for free.",
   },
-  {
-    title: "Settle up once",
-    body: "Covered buy-ins and held chips turn into the fewest payments that square everyone, with links to pay however your group already does.",
-  },
 ];
 
 function Ctas() {

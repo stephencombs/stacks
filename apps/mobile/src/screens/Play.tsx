@@ -1,7 +1,7 @@
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { formatDay, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
-import { counterpartiesAt } from "@stacks/client-runtime/playerMoney";
+import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import {
   useRecordingTable,
   useRecordingVisit,

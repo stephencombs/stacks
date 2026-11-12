@@ -17,7 +17,6 @@ const symbols: Record<IconName, SFSymbol> = {
   "cloud-off": "icloud.slash",
   sessions: "suit.club",
   board: "chart.line.uptrend.xyaxis",
-  settle: "arrow.left.arrow.right",
   group: "person.2",
   plus: "plus",
   search: "magnifyingglass",

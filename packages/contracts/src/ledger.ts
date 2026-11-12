@@ -72,17 +72,14 @@ export type Seating = typeof Seating.Type;
  * - `cash_out`: chips cashed by `playerId`, zero for a bust. A counterparty kept the cash, so they
  *   owe the player.
  * - `adjustment`: a signed correction to the player's result. Never creates a debt.
- * - `settlement`: `playerId` paid `counterpartyId` back outside the app.
  */
-export const EntryKind = Schema.Literals(["buy_in", "cash_out", "adjustment", "settlement"]);
+export const EntryKind = Schema.Literals(["buy_in", "cash_out", "adjustment"]);
 export type EntryKind = typeof EntryKind.Type;
 
 export const Entry = Schema.Struct({
   id: EntryId,
   groupId: GroupId,
-  sessionId: Schema.NullOr(SessionId),
-  /** Set only on a settlement; a session's entries belong to the session's trip. */
-  tripId: Schema.NullOr(TripId),
+  sessionId: SessionId,
   kind: EntryKind,
   playerId: PlayerId,
   counterpartyId: Schema.NullOr(PlayerId),
@@ -100,25 +97,10 @@ export type Entry = typeof Entry.Type;
 
 function entryShapeIssue(entry: {
   readonly kind: EntryKind;
-  readonly sessionId: SessionId | null;
-  readonly tripId: TripId | null;
   readonly playerId: PlayerId;
   readonly counterpartyId: PlayerId | null;
   readonly amount: number;
 }) {
-  if (entry.kind === "settlement") {
-    if (entry.sessionId !== null)
-      return { path: ["sessionId"], issue: "settlements aren't part of a session" };
-    if (entry.tripId === null) return { path: ["tripId"], issue: "a settlement squares up a trip" };
-    if (entry.counterpartyId === null || entry.counterpartyId === entry.playerId) {
-      return { path: ["counterpartyId"], issue: "a settlement is paid to another player" };
-    }
-    return entry.amount > 0 ? undefined : { path: ["amount"], issue: "must be positive" };
-  }
-  if (entry.sessionId === null)
-    return { path: ["sessionId"], issue: "required for session entries" };
-  if (entry.tripId !== null)
-    return { path: ["tripId"], issue: "a session's entries belong to the session's trip" };
   if (entry.kind === "adjustment") {
     if (entry.counterpartyId !== null) {
       return { path: ["counterpartyId"], issue: "adjustments don't involve another player" };
@@ -162,7 +144,7 @@ export type Stake = typeof Stake.Type;
 
 /**
  * A trip: a group's weekend in Vegas, or any run of play. Every session belongs to one, and each
- * trip keeps its own balances and settles up on its own. An ended trip takes no new sessions.
+ * trip keeps its own balances. An ended trip takes no new sessions.
  */
 export const Trip = Schema.Struct({
   id: TripId,

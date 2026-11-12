@@ -9,7 +9,6 @@ import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
 import { BackLink } from "~/components/ui/Nav";
 import { Note, PageHeader, Section } from "~/components/ui/Page";
-import { PaymentAppsSection } from "~/features/PaymentHandles";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 import { GroupPageSkeleton } from "~/features/PageSkeletons";
 
@@ -45,14 +44,12 @@ function SettingsView({ detail }: { detail: GroupDetail }) {
         title="Settings"
         documentTitle={`Settings · ${detail.group.name}`}
       />
-      <PaymentAppsSection detail={detail} />
       <ExportSection detail={detail} />
       <Section title="Leave the group">
         <div className="flex flex-col items-start gap-2">
           <Button variant="danger" onClick={() => setLeaving(true)}>
             Leave group
           </Button>
-          <Note>You can only leave once you're settled up.</Note>
         </div>
       </Section>
       <LeaveDialog detail={detail} open={leaving} onOpenChange={setLeaving} />
@@ -80,7 +77,7 @@ function ExportSection({ detail }: { detail: GroupDetail }) {
           <Download className="size-4" aria-hidden />
           Export CSV
         </Button>
-        <Note>Every buy-in, cash-out, adjustment, settlement and void in this group.</Note>
+        <Note>Every buy-in, cash-out, adjustment and void in this group.</Note>
         {exportCsv.error ? <FormError>{exportCsv.error}</FormError> : null}
       </div>
     </Section>

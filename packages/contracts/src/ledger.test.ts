@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
-import { SetPaymentHandlesRequest } from "./api.ts";
 import { Entry, Session } from "./ledger.ts";
 
 const ALEX = "0192e7a0-0000-7000-8000-000000000001";
@@ -14,7 +13,6 @@ const encodedEntry = (fields: Record<string, unknown>) => ({
   id: "0192e7a0-0000-7000-8000-0000000000e1",
   groupId: "0192e7a0-0000-7000-8000-0000000000f1",
   sessionId: SESSION,
-  tripId: null,
   kind: "buy_in",
   playerId: ALEX,
   counterpartyId: null,
@@ -40,9 +38,6 @@ describe("Entry", () => {
     expect(accepts({ kind: "buy_in", counterpartyId: BEA })).toBe(true);
     expect(accepts({ kind: "cash_out", amount: 1 })).toBe(true);
     expect(accepts({ kind: "adjustment", amount: -250 })).toBe(true);
-    expect(
-      accepts({ kind: "settlement", sessionId: null, tripId: TRIP, counterpartyId: BEA }),
-    ).toBe(true);
   });
 
   it("rejects amounts that aren't whole minor units", () => {
@@ -58,15 +53,6 @@ describe("Entry", () => {
     expect(accepts({ kind: "buy_in", amount: 0 })).toBe(false);
     expect(accepts({ kind: "cash_out", amount: -5 })).toBe(false);
     expect(accepts({ kind: "adjustment", amount: 0 })).toBe(false);
-    expect(
-      accepts({
-        kind: "settlement",
-        sessionId: null,
-        tripId: TRIP,
-        counterpartyId: BEA,
-        amount: -5,
-      }),
-    ).toBe(false);
   });
 
   it("keeps the player's own money as an empty counterparty", () => {
@@ -76,23 +62,6 @@ describe("Entry", () => {
 
   it("keeps adjustments between the player and the table", () => {
     expect(accepts({ kind: "adjustment", amount: 100, counterpartyId: BEA })).toBe(false);
-  });
-
-  it("requires a session for table entries and none for settlements", () => {
-    expect(accepts({ kind: "buy_in", sessionId: null })).toBe(false);
-    expect(accepts({ kind: "settlement", counterpartyId: BEA })).toBe(false);
-  });
-
-  it("puts a settlement on a trip, and a table entry on its session's trip instead", () => {
-    expect(accepts({ kind: "settlement", sessionId: null, counterpartyId: BEA })).toBe(false);
-    expect(accepts({ kind: "buy_in", tripId: TRIP })).toBe(false);
-  });
-
-  it("requires a settlement to be paid to someone else", () => {
-    expect(accepts({ kind: "settlement", sessionId: null })).toBe(false);
-    expect(
-      accepts({ kind: "settlement", sessionId: null, tripId: TRIP, counterpartyId: ALEX }),
-    ).toBe(false);
   });
 });
 
@@ -119,52 +88,6 @@ describe("Session", () => {
     expect(Exit.isSuccess(decodeSession(session(ended)))).toBe(true);
     expect(Exit.isSuccess(decodeSession(session({ status: "closed" })))).toBe(false);
     expect(Exit.isSuccess(decodeSession(session({ endedAt: "2026-10-28T01:00:00.000Z" })))).toBe(
-      false,
-    );
-  });
-});
-
-describe("SetPaymentHandlesRequest", () => {
-  const decode = Schema.decodeUnknownSync(SetPaymentHandlesRequest);
-  const acceptsHandles = (input: unknown) =>
-    Exit.isSuccess(Schema.decodeUnknownExit(SetPaymentHandlesRequest)(input));
-
-  it("strips prefixes and whitespace from clean handles", () => {
-    expect(
-      decode({
-        venmo: "  @alex_smith-1  ",
-        cashApp: " $AlexCash99 ",
-        paypal: " https://paypal.me/AlexPay ",
-      }),
-    ).toEqual({
-      venmo: "alex_smith-1",
-      cashApp: "AlexCash99",
-      paypal: "AlexPay",
-    });
-    expect(decode({ venmo: null, cashApp: null, paypal: "@alex" })).toEqual({
-      venmo: null,
-      cashApp: null,
-      paypal: "alex",
-    });
-  });
-
-  it("rejects empty, malformed, or unsafe handles", () => {
-    for (const bad of [
-      "",
-      "   ",
-      "@",
-      "$",
-      "@@alex",
-      "$$alex",
-      "alex smith",
-      "alex/evil",
-      "alex?x=1",
-      "a".repeat(31),
-    ]) {
-      expect(acceptsHandles({ venmo: bad, cashApp: null, paypal: null })).toBe(false);
-    }
-    expect(acceptsHandles({ venmo: null, cashApp: "a".repeat(21), paypal: null })).toBe(false);
-    expect(acceptsHandles({ venmo: null, cashApp: null, paypal: "https://evil.com/alex" })).toBe(
       false,
     );
   });

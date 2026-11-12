@@ -1,15 +1,12 @@
 // Preview only: one realistic group, encoded through the real contract schemas.
 import { JoinedTable, PlayerInvitePreview, TableView } from "@stacks/contracts/recordingCommands";
 import {
-  PairHistory,
-  PlayerBalances,
   GroupDetail,
   GroupListItem,
   GroupStats,
   Invite,
   SessionDetail,
   TripDetail,
-  UserLimits,
 } from "@stacks/contracts";
 import * as Schema from "effect/Schema";
 
@@ -18,7 +15,6 @@ const at = (day: number, hour: number) => new Date(Date.UTC(2026, 9, day, hour))
 const ids = { group: u(1), trip: u(2), oldTrip: u(3), live: u(50) };
 const P = [u(101), u(102), u(103), u(104), u(105), u(106)];
 const names = ["Maya", "Priya", "Alexandria Montgomery-Vance", "Dev", "Jonah", "Sam"];
-const handles = { venmo: null, cashApp: null, paypal: null };
 const players = P.map((id, i) => ({
   id,
   displayName: names[i],
@@ -26,7 +22,6 @@ const players = P.map((id, i) => ({
   // Jonah is a guest; Sam left the group.
   role: i === 0 ? "owner" : i >= 4 ? null : "member",
   claimCode: i === 4 ? "JONAH-CLAIM" : null,
-  ...handles,
 }));
 const venue = (n: number, name: string) => ({
   id: u(300 + n),
@@ -144,13 +139,6 @@ const tripDetail = {
     [3, -1500],
     [4, -20500],
   ].map(([p, a]) => ({ playerId: P[p!], amount: a })),
-  transfers: [
-    [4, 0, 18500],
-    [4, 1, 2000],
-    [2, 1, 2500],
-    [3, 1, 1500],
-  ].map(([f, t, a]) => ({ from: P[f!], to: P[t!], amount: a })),
-  settlements: [],
   stakes: [],
 };
 const groupDetail = {
@@ -159,7 +147,6 @@ const groupDetail = {
   myPlayerId: P[0],
   players,
   trips: [trip, oldTrip],
-  unsettled: [{ tripId: ids.oldTrip, amount: 4500 }],
 };
 const groupList: Array<unknown> = [
   {
@@ -191,7 +178,6 @@ const workDetail = {
   myPlayerId: P[0],
   players: players.slice(0, 2),
   trips: [work.trip],
-  unsettled: [],
 };
 groupList.push({
   group: work.group,
@@ -215,7 +201,6 @@ const fresh = {
   myPlayerId: P[0],
   players: players.slice(0, 1),
   trips: [],
-  unsettled: [],
 };
 groupList.push({
   group: fresh.group,
@@ -289,7 +274,6 @@ const stats = {
     results: s.results,
   })),
 };
-const limits = { lossLimit: 50000, currency: "USD", sessionReminderMinutes: 120 };
 const invites = [
   {
     id: u(800),
@@ -352,84 +336,6 @@ const sharedTable = {
 /** Joining the shared table through its link, as Cal. */
 const joinedAs = { id: shared(12), displayName: "Cal" };
 
-/** Money between players outside trips: Priya owes you, you owe Dev, Jonah is square. */
-const me = u(950);
-const meActor = u(951);
-const priyaActor = u(952);
-const priya = { id: P[1]!, displayName: "Priya" };
-const playerBalances = {
-  pairs: [
-    {
-      playerId: me,
-      counterparty: priya,
-      balance: { debtorId: P[1], creditorId: me, amount: 8500 },
-    },
-    {
-      playerId: me,
-      counterparty: { id: P[3]!, displayName: "Dev" },
-      balance: { debtorId: me, creditorId: P[3], amount: 4000 },
-    },
-    { playerId: me, counterparty: { id: P[4]!, displayName: "Jonah" }, balance: null },
-  ],
-};
-const fact = (createdBy: string, createdAt: string) => ({
-  currency: "USD",
-  note: null,
-  createdBy,
-  createdAt,
-  voidedAt: null,
-  voidedBy: null,
-  voidReason: null,
-  replacesEntryId: null,
-});
-const priyaPair = {
-  pair: playerBalances.pairs[0],
-  revision: 2,
-  play: [
-    {
-      playerId: P[1],
-      tableId: shared(1),
-      entry: {
-        id: u(960),
-        visitId: shared(21),
-        kind: "buy_in",
-        counterpartyId: me,
-        amount: 10000,
-        occurredAt: "2026-11-07T21:10:00.000Z",
-        ...fact(meActor, "2026-11-07T21:10:00.000Z"),
-      },
-    },
-  ],
-  repayments: [
-    {
-      id: u(961),
-      fromPlayerId: P[1],
-      toPlayerId: me,
-      amount: 5000,
-      occurredAt: "2026-11-08T10:00:00.000Z",
-      recordedFromTripId: null,
-      ...fact(priyaActor, "2026-11-08T10:00:00.000Z"),
-      voidedAt: "2026-11-08T11:00:00.000Z",
-      voidedBy: meActor,
-      voidReason: "It was $15",
-    },
-    {
-      id: u(962),
-      fromPlayerId: P[1],
-      toPlayerId: me,
-      amount: 1500,
-      occurredAt: "2026-11-08T10:00:00.000Z",
-      recordedFromTripId: null,
-      ...fact(meActor, "2026-11-08T11:00:00.000Z"),
-      replacesEntryId: u(961),
-    },
-  ],
-  actors: [
-    { actorId: meActor, displayName: "Maya" },
-    { actorId: priyaActor, displayName: "Priya" },
-  ],
-};
-
 // Decoding first checks every fixture against the contract, so a wrong field fails loudly here.
 const check = <S extends Schema.Top>(schema: S, value: unknown) => {
   const json = Schema.toCodecJson(schema as never);
@@ -455,8 +361,6 @@ export const routes: Record<string, unknown> = {
     viewerRole: "participant",
     viewerPlayerId: joinedAs.id,
   }),
-  "/api/balances": check(PlayerBalances, playerBalances),
-  [`/api/players/${P[1]}/pair`]: check(PairHistory, priyaPair),
   "/api/groups": check(Schema.Array(GroupListItem), groupList),
   [`/api/groups/${ids.group}`]: check(GroupDetail, groupDetail),
   [`/api/groups/${ids.group}/stats`]: check(GroupStats, stats),
@@ -475,13 +379,8 @@ export const routes: Record<string, unknown> = {
     trip: work.trip,
     sessions: [],
     balances: [],
-    transfers: [],
-    settlements: [],
     stakes: [],
   }),
-  [`/api/trips/${work.trip.id}/limits`]: check(UserLimits, limits),
-  [`/api/trips/${ids.trip}/limits`]: check(UserLimits, limits),
-  [`/api/trips/${ids.oldTrip}/limits`]: check(UserLimits, limits),
   [`/api/sessions/${ids.live}`]: check(SessionDetail, sessionDetail),
   "/api/shared/preview-token": check(TableView, sharedTable),
   "/api/invites/preview-invite": check(PlayerInvitePreview, {

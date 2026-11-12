@@ -15,22 +15,6 @@ export const Group = Schema.Struct({
 });
 export type Group = typeof Group.Type;
 
-export const VenmoHandle = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,30}$/));
-export type VenmoHandle = typeof VenmoHandle.Type;
-
-export const CashAppHandle = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,20}$/));
-export type CashAppHandle = typeof CashAppHandle.Type;
-
-export const PayPalHandle = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,30}$/));
-export type PayPalHandle = typeof PayPalHandle.Type;
-
-export const PaymentHandles = Schema.Struct({
-  venmo: Schema.NullOr(VenmoHandle),
-  cashApp: Schema.NullOr(CashAppHandle),
-  paypal: Schema.NullOr(PayPalHandle),
-});
-export type PaymentHandles = typeof PaymentHandles.Type;
-
 /**
  * Everyone who can appear in the ledger. A guest carries the `claimCode` that lets them claim it;
  * a former member keeps their history with no `role` and no `claimCode`.
@@ -41,15 +25,11 @@ export const Player = Schema.Struct({
   userId: Schema.NullOr(UserId),
   role: Schema.NullOr(MemberRole),
   claimCode: Schema.NullOr(Schema.String),
-  ...PaymentHandles.fields,
 });
 export type Player = typeof Player.Type;
 
 export const Balance = Schema.Struct({ playerId: PlayerId, amount: MinorUnits });
 export type Balance = typeof Balance.Type;
-
-export const Transfer = Schema.Struct({ from: PlayerId, to: PlayerId, amount: MinorUnits });
-export type Transfer = typeof Transfer.Type;
 
 export const PlayerResult = Schema.Struct({
   playerId: PlayerId,
@@ -150,7 +130,6 @@ export const GroupDetail = Schema.Struct({
   players: Schema.Array(Player),
   /** Newest first. */
   trips: Schema.Array(Trip),
-  unsettled: Schema.Array(Schema.Struct({ tripId: TripId, amount: MinorUnits })),
 });
 export type GroupDetail = typeof GroupDetail.Type;
 
@@ -159,8 +138,6 @@ export const TripDetail = Schema.Struct({
   trip: Trip,
   sessions: Schema.Array(SessionSummary),
   balances: Schema.Array(Balance),
-  transfers: Schema.Array(Transfer),
-  settlements: Schema.Array(Entry),
   stakes: Schema.Array(StakeView),
 });
 export type TripDetail = typeof TripDetail.Type;
@@ -218,10 +195,3 @@ export const GroupStats = Schema.Struct({
   ),
 });
 export type GroupStats = typeof GroupStats.Type;
-
-export const UserLimits = Schema.Struct({
-  lossLimit: Schema.NullOr(MinorUnits.check(Schema.isGreaterThan(0))),
-  currency: CurrencyCode,
-  sessionReminderMinutes: Schema.NullOr(Schema.Literals([120, 180, 240])),
-});
-export type UserLimits = typeof UserLimits.Type;

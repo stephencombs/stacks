@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
-import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
+import { catalogVenue, groupWith, ids, owe, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
@@ -18,16 +18,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
       const guest = withGuest.players.find((player) => player.id === guestId)!;
       expect(guest).toMatchObject({ userId: null, role: null });
 
-      yield* alex.ledger.recordSettlement({
-        params: { tripId: group.tripId },
-        payload: {
-          id: ids.entry(),
-          fromPlayerId: group.myPlayerId,
-          toPlayerId: guestId,
-          amount: usd(4000),
-          note: null,
-        },
-      });
+      yield* owe(alex, group, guestId, group.myPlayerId, 4000);
       expect(yield* gus.guests.previewClaim({ params: { code: guest.claimCode! } })).toMatchObject({
         playerId: guestId,
         displayName: "Gus",

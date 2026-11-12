@@ -3,7 +3,7 @@ import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import type { VisitId } from "@stacks/contracts";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import {
   CircleAlert,
   CloudCheck,
@@ -270,7 +270,6 @@ function SaveLine({
 /** You, for anyone: what's on this device, appearance, and sign-in when this build has it. */
 function PersonalYou() {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
   const theme = useTheme();
   return (
     <>
@@ -289,20 +288,6 @@ function PersonalYou() {
               Sessions you record are saved on this device only. They aren't backed up or shared
               yet, and signing in or out leaves them here.
             </Note>
-          </Section>
-          <Section title="Settle up">
-            <Note>
-              What you and the people you've played with owe each other, outside any trip.
-            </Note>
-            <Button
-              className="self-start"
-              onClick={() => {
-                setOpen(false);
-                void navigate({ to: "/you/settle" });
-              }}
-            >
-              Balances and payments
-            </Button>
           </Section>
           <Section title="Appearance">
             <Segmented

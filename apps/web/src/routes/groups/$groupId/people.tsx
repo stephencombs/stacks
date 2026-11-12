@@ -23,7 +23,6 @@ import { Note, PageHeader, Section } from "~/components/ui/Page";
 import { List, Row, RowText, Tag } from "~/components/ui/Surface";
 import { AddGuestDialog } from "~/features/AddGuestDialog";
 import { Chip } from "~/features/Chip";
-import { GuestPaymentHandlesAction, playerHandlesMeta } from "~/features/PaymentHandles";
 import { PlayerName } from "~/features/Player";
 import { formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/format";
 import { Loaded, Prefetch, useAction, useStacks } from "~/lib/stacks";
@@ -113,7 +112,6 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
                 title={
                   <PlayerName name={player.displayName} you={player.id === detail.myPlayerId} />
                 }
-                meta={playerHandlesMeta(player)}
               />
               {player.role === "owner" || player.role === "admin" ? (
                 <Tag>{roleNames[player.role]}</Tag>
@@ -144,13 +142,8 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
             {guests.map((player) => (
               <Row key={player.id} className="flex-wrap">
                 <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
-                <RowText
-                  title={player.displayName}
-                  meta={playerHandlesMeta(player)}
-                  className="basis-40"
-                />
+                <RowText title={player.displayName} className="basis-40" />
                 <span className="ml-auto flex items-center gap-1">
-                  <GuestPaymentHandlesAction detail={detail} player={player} />
                   {player.claimCode ? (
                     <CopyButton
                       text={`${origin}/claim/${player.claimCode}`}

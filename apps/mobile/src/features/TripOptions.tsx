@@ -30,7 +30,7 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
           label: "End trip",
           onPress: () => {
             void end.run({ params, payload: {} }).then((ok) => {
-              if (ok) go.trip(trip.trip.id, "SettleUp");
+              if (ok) go.trip(trip.trip.id);
             });
           },
         }

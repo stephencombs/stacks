@@ -134,7 +134,6 @@ Effect.gen(function* () {
   // session at the table.
   const trips = ["Vegas in March", "Reno", "Vegas in the fall"];
   const sessionCount = 10;
-  let settlementCount = 0;
   for (const [t, name] of trips.entries()) {
     const current = t === trips.length - 1;
     const tripId = TripId.make(uuid());
@@ -196,27 +195,16 @@ Effect.gen(function* () {
     }
 
     if (current) continue;
-    // Past trips end, and somebody pays back the biggest debt afterwards.
-    const ended = DateTime.add(tripStart, { days: 3 });
-    if (trip.endedAt === null) yield* Trips.end(tripId, { endedAt: ended }).pipe(as(owner));
-    const transfer = (yield* Trips.get(tripId).pipe(as(owner))).transfers[0];
-    if (transfer) {
-      settlementCount += 1;
-      yield* Ledger.recordSettlement(tripId, {
-        id: EntryId.make(uuid()),
-        fromPlayerId: transfer.from,
-        toPlayerId: transfer.to,
-        amount: transfer.amount,
-        occurredAt: DateTime.add(ended, { days: 2 }),
-        note: "Venmo",
-      }).pipe(as(owner));
+    // Past trips end.
+    if (trip.endedAt === null) {
+      yield* Trips.end(tripId, { endedAt: DateTime.add(tripStart, { days: 3 }) }).pipe(as(owner));
     }
   }
 
   const final = yield* Groups.get(groupId).pipe(as(owner));
   yield* Console.log(
     `Seeded "${group.group.name}" (${groupId}) with ${final.players.length} players, ` +
-      `${trips.length} trips of ${sessionCount} sessions and ${settlementCount} settlements. ` +
+      `${trips.length} trips of ${sessionCount} sessions. ` +
       `Owner: ${ownerId}`,
   );
 }).pipe(Effect.provide(Database.layer(url)), NodeRuntime.runMain);

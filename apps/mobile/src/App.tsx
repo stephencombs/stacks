@@ -42,10 +42,8 @@ import { GroupsScreen, NoGroups } from "./screens/Groups";
 import { NewSessionScreen } from "./screens/NewSession";
 import { PeopleScreen } from "./screens/People";
 import { PlayScreen } from "./screens/Play";
-import { PlayerBalancesScreen, PlayerPairScreen } from "./screens/PlayerMoney";
 import { SessionScreen } from "./screens/Session";
 import { SessionsScreen } from "./screens/Sessions";
-import { SettleUpScreen } from "./screens/SettleUp";
 
 const stackOptions = {
   headerTransparent: Platform.OS === "ios",
@@ -94,13 +92,6 @@ const BoardStack = createNativeStackNavigator({
   },
 });
 
-const SettleStack = createNativeStackNavigator({
-  screenOptions: stackOptions,
-  screens: {
-    SettleUp: { screen: SettleUpScreen, options: placeOptions, linking: "trips/:tripId/settle" },
-  },
-});
-
 const GroupStack = createNativeStackNavigator({
   screenOptions: stackOptions,
   screens: {
@@ -128,7 +119,6 @@ function PlacesLayout({ children }: { children: ReactNode }) {
       {lastTripId ? (
         <>
           <Prefetch query={stacks.trip(lastTripId)} />
-          <Prefetch query={stacks.limits(lastTripId)} />
         </>
       ) : null}
       <NoGroups>
@@ -154,11 +144,6 @@ const Places = createPlaceTabs({
       screen: BoardStack,
       if: useScopeHasTrip,
       options: placeTab("Board", "chart.line.uptrend.xyaxis"),
-    },
-    SettleTab: {
-      screen: SettleStack,
-      if: useScopeHasTrip,
-      options: placeTab("Settle up", "arrow.left.arrow.right"),
     },
     GroupTab: {
       screen: GroupStack,
@@ -204,9 +189,7 @@ const RootStack = createNativeStackNavigator({
   screens: {
     Home: { screen: HomeScreen, linking: "" },
     Play: { screen: PlayScreen, linking: "play/:visitId" },
-    // Money between players lives under You, apart from any trip's Settle up.
-    PlayerBalances: { screen: PlayerBalancesScreen, linking: "you/settle" },
-    PlayerPair: { screen: PlayerPairScreen, linking: "you/settle/:playerId" },
+    // Money between players lives under You, apart from any trip.
     Account: {
       screen: AccountStack,
       options: { headerShown: false },

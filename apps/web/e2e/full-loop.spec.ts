@@ -33,7 +33,7 @@ test.describe.serial("a group's first night out", () => {
     await deleteUsers(users);
   });
 
-  test("create, invite, play, close and settle up", async ({ browser }) => {
+  test("create, invite, play and close", async ({ browser }) => {
     test.slow();
     const [alexUser, beaUser] = users;
     const alex = await (await browser.newContext()).newPage();
@@ -181,7 +181,7 @@ test.describe.serial("a group's first night out", () => {
     await shoot(alex, "session-live");
 
     // Away from the table it's one tap away: the live bar, or on a wide screen the sidebar.
-    await place("Settle up").click();
+    await place("Board").click();
     await alex.getByRole("link", { name: /^Back to (your|the) table/ }).click();
     await expect(alex.getByRole("button", { name: "Close session" })).toBeVisible();
 
@@ -213,43 +213,24 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByRole("heading", { name: /^Day 1 · / })).toBeVisible();
     await shoot(alex, "trip-sessions");
 
-    // Alex owes Bea $50 for the buy-in and Gus $120 for the cash he kept.
-    await place("Settle up").click();
-    await expect(alex.getByRole("heading", { name: "You owe" })).toBeVisible();
-    await expect(alex.getByText("2 payments square you up")).toBeVisible();
-    await expect(alex.getByText("Owes $170")).toBeVisible();
-    await expect(alex.getByText("Owed $50")).toBeVisible();
-    await expect(alex.getByText("Owed $120")).toBeVisible();
-    await expect(alex.getByRole("button", { name: "Mark paid" })).toHaveCount(2);
-    await shoot(alex, "settle-up");
-    for (let i = 0; i < 2; i++) {
-      await alex.getByRole("button", { name: "Mark paid" }).first().click();
-      await alex.getByRole("button", { name: "Record payment" }).click();
-      await expect(alex.getByRole("dialog")).toBeHidden();
-    }
-    await expect(alex.getByText("Everyone's square")).toBeVisible();
-
-    // Alex backs Bea: Settle up asks for the stake back until it's voided.
+    // Alex backs Bea; the stake stays listed until it's voided.
+    await place("Sessions").click();
     await alex.getByRole("button", { name: "Back a player" }).click();
     await alex.getByLabel("Who's playing it").selectOption({ label: "Bea" });
     await alex.getByLabel("Amount").fill("100");
     await alex.getByRole("button", { name: "Back them" }).click();
     await expect(alex.getByText("Alex backed Bea $100 · 50% of winnings")).toBeVisible();
     await expect(alex.getByText("Bea is even · owes back $100")).toBeVisible();
-    await expect(alex.getByRole("button", { name: "Mark paid" })).toHaveCount(1);
     await shoot(alex, "backing");
     await alex.getByRole("button", { name: /^Actions for Alex backed Bea/ }).click();
     await alex.getByRole("menuitem", { name: "Void" }).click();
     await alex.getByRole("button", { name: "Void stake" }).click();
-    await expect(alex.getByText("Everyone's square")).toBeVisible();
     await expect(alex.getByText("Voided")).toBeVisible();
 
     // The trip ends and reopens from its Sessions; a trip with nothing in it can be deleted.
     await place("Sessions").click();
     await alex.getByRole("button", { name: "Actions for Vegas weekend" }).click();
     await alex.getByRole("menuitem", { name: "End trip" }).click();
-    await expect(alex.getByRole("heading", { name: "Settle up" })).toBeVisible();
-    await place("Sessions").click();
     await expect(alex.getByText("Ended", { exact: true })).toBeVisible();
     await alex.getByRole("button", { name: "Actions for Vegas weekend" }).click();
     await alex.getByRole("menuitem", { name: "Reopen trip" }).click();
@@ -264,13 +245,6 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByRole("heading", { name: "Vegas crew" })).toBeVisible();
     await shoot(alex, "group-home");
 
-    // Bea sees the same ledger.
-    await bea.reload();
-    await bea
-      .getByRole("navigation", { name: "Places" })
-      .getByRole("link", { name: "Settle up" })
-      .click();
-    await expect(bea.getByText("Square", { exact: true })).toHaveCount(3);
     // The board's All time races every trip; the stat sheet opens on you, and anyone else is a tap away.
     await place("Board").click();
     await alex.getByRole("button", { name: "All time" }).click();

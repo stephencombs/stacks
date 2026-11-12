@@ -8,10 +8,8 @@ import * as Groups from "../features/Groups.ts";
 import * as Guests from "../features/Guests.ts";
 import * as Invites from "../features/Invites.ts";
 import * as Ledger from "../features/Ledger.ts";
-import * as Limits from "../features/Limits.ts";
 import * as PlayerInvites from "../features/PlayerInvites.ts";
 import * as Recording from "../features/Recording.ts";
-import * as Relationships from "../features/Relationships.ts";
 import * as Sessions from "../features/Sessions.ts";
 import * as Stakes from "../features/Stakes.ts";
 import * as Trips from "../features/Trips.ts";
@@ -39,9 +37,6 @@ const groups = HttpApiBuilder.group(StacksApi, "groups", (handlers) =>
     )
     .handle("setRole", ({ params, payload }) =>
       serve(Groups.setRole(params.groupId, params.userId, payload)),
-    )
-    .handle("setPaymentHandles", ({ params, payload }) =>
-      serve(Groups.setPaymentHandles(params.groupId, params.playerId, payload)),
     ),
 );
 
@@ -90,10 +85,7 @@ const sessions = HttpApiBuilder.group(StacksApi, "sessions", (handlers) =>
 const ledger = HttpApiBuilder.group(StacksApi, "ledger", (handlers) =>
   handlers
     .handle("addEntry", ({ params, payload }) => serve(Ledger.addEntry(params.sessionId, payload)))
-    .handle("voidEntry", ({ params, payload }) => serve(Ledger.voidEntry(params.entryId, payload)))
-    .handle("recordSettlement", ({ params, payload }) =>
-      serve(Ledger.recordSettlement(params.tripId, payload)),
-    ),
+    .handle("voidEntry", ({ params, payload }) => serve(Ledger.voidEntry(params.entryId, payload))),
 );
 
 const stakes = HttpApiBuilder.group(StacksApi, "stakes", (handlers) =>
@@ -113,12 +105,6 @@ const trips = HttpApiBuilder.group(StacksApi, "trips", (handlers) =>
     .handle("delete", ({ params }) => serve(Trips.remove(params.tripId))),
 );
 
-const limits = HttpApiBuilder.group(StacksApi, "limits", (handlers) =>
-  handlers
-    .handle("get", ({ params }) => serve(Limits.get(params.tripId)))
-    .handle("update", ({ params, payload }) => serve(Limits.update(params.tripId, payload))),
-);
-
 const recording = HttpApiBuilder.group(StacksApi, "recording", (handlers) =>
   handlers
     .handle("history", () => serve(Recording.history()))
@@ -135,9 +121,7 @@ const recording = HttpApiBuilder.group(StacksApi, "recording", (handlers) =>
     .handle("revokeInvite", ({ params }) => serve(PlayerInvites.revoke(params.inviteId)))
     .handle("redeemInvite", ({ params, payload }) =>
       serve(PlayerInvites.redeem(params.token, payload)),
-    )
-    .handle("balances", () => serve(Relationships.balances()))
-    .handle("pair", ({ params }) => serve(Relationships.pair(params.playerId))),
+    ),
 );
 
 const publicRecording = HttpApiBuilder.group(StacksApi, "publicRecording", (handlers) =>
@@ -162,7 +146,6 @@ export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openap
     ledger,
     stakes,
     trips,
-    limits,
     recording,
     publicRecording,
     claim,

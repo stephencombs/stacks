@@ -42,7 +42,7 @@ test.describe.serial("live mode on a phone", () => {
     await deleteUsers(users);
   });
 
-  test("create, invite, play, close and settle up", async ({ browser }) => {
+  test("create, invite, play and close", async ({ browser }) => {
     const [alexUser, beaUser] = users;
     const contextOptions = test.info().project.use;
     const alex = await hermesLike(await browser.newContext(contextOptions)).newPage();
@@ -204,7 +204,7 @@ test.describe.serial("live mode on a phone", () => {
     await shoot(alex, "session-live");
 
     // Away from the table it's still one tap back.
-    await place(alex, "Settle up").click();
+    await place(alex, "Board").click();
     await backToTable();
     await expect(visible(alex.getByRole("button", { name: "Close session" }))).toBeVisible();
 
@@ -236,31 +236,11 @@ test.describe.serial("live mode on a phone", () => {
 
     // What's only yours sits behind your chip, on every screen.
     await visible(alex.getByRole("button", { name: "You", exact: true })).click();
-    await expect(alex.getByText("Play limits").filter({ visible: true })).toBeVisible();
+    await expect(alex.getByText("Appearance").filter({ visible: true }).first()).toBeVisible();
     await expect(visible(alex.getByRole("radiogroup", { name: "Appearance" }))).toBeVisible();
     await expect(visible(alex.getByRole("button", { name: "Sign out" }))).toBeVisible();
     await shoot(alex, "you");
     await visible(alex.getByRole("button", { name: "Close", exact: true })).click();
-
-    // Alex owes Bea $50 for the buy-in and Gus $220 for the cash he kept.
-    await place(alex, "Settle up").click();
-    const settlePath = await at(alex, `${tripPath}/settle`);
-    await expect(alex.getByText("Owes $270").filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("Owed $50").filter({ visible: true })).toBeVisible();
-    await expect(alex.getByText("Owed $220").filter({ visible: true })).toBeVisible();
-    await expect(visible(alex.getByRole("button", { name: "Mark paid" }))).toHaveCount(2);
-    await shoot(alex, "settle-up");
-    for (let i = 0; i < 2; i++) {
-      await visible(alex.getByRole("button", { name: "Mark paid" }))
-        .first()
-        .click();
-      await visible(alex.getByRole("button", { name: "Record payment" })).click();
-    }
-    await expect(alex.getByText("Everyone's square").filter({ visible: true })).toBeVisible();
-
-    // Settle up has its own address, so a link opens straight on it, for Bea too.
-    await bea.goto(settlePath);
-    await expect(bea.getByText("Square", { exact: true }).filter({ visible: true })).toHaveCount(3);
 
     // The Board's All time races every trip; the stat sheet opens on you, anyone else a tap away.
     await place(alex, "Board").click();
@@ -298,11 +278,10 @@ test.describe.serial("live mode on a phone", () => {
     await at(alex, `${groupPath}/settings`);
     await expect(visible(alex.getByRole("button", { name: "Export CSV" }))).toBeVisible();
 
-    // The trip ends from its Sessions, which lands on Settle up, and reopens.
+    // The trip ends from its Sessions, and reopens.
     await place(alex, "Sessions").click();
     await visible(alex.getByRole("button", { name: "Trip options" })).click();
     await visible(alex.getByRole("button", { name: "End trip" })).click();
-    await expect(visible(alex.getByRole("heading", { name: "Settle up" }))).toBeVisible();
     await place(alex, "Sessions").click();
     await expect(
       alex.getByText("This trip has ended. Reopen it to play more.").filter({ visible: true }),

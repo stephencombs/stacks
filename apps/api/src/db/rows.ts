@@ -12,7 +12,6 @@ import {
   InviteId,
   MemberRole,
   MinorUnits,
-  PaymentHandles,
   PlayerId,
   Seat,
   SeatingId,
@@ -56,7 +55,6 @@ export const PlayerRow = Schema.Struct({
   userId: Schema.NullOr(UserId),
   role: Schema.NullOr(MemberRole),
   claimCode: Schema.NullOr(Schema.String),
-  ...PaymentHandles.fields,
 });
 
 export const InviteRow = Schema.Struct({
@@ -107,8 +105,7 @@ export const SeatingRow = Schema.Struct({
 export const EntryRow = Schema.Struct({
   id: EntryId,
   groupId: GroupId,
-  sessionId: Schema.NullOr(SessionId),
-  tripId: Schema.NullOr(TripId),
+  sessionId: SessionId,
   kind: EntryKind,
   playerId: PlayerId,
   counterpartyId: Schema.NullOr(PlayerId),
@@ -149,12 +146,6 @@ export const TripRow = Schema.Struct({
   endedAt: Schema.NullOr(Timestamp),
   createdBy: UserId,
   createdAt: Timestamp,
-});
-
-export const UserLimitsRow = Schema.Struct({
-  lossLimit: Schema.NullOr(Amount),
-  currency: CurrencyCode,
-  sessionReminderMinutes: Schema.NullOr(Schema.Literals([120, 180, 240])),
 });
 
 export const RecordingIdentityRow = Schema.Struct({
@@ -202,22 +193,6 @@ export const PersonalEntryRow = Schema.Struct({
   voidReason: Schema.NullOr(Schema.String),
   replacesEntryId: Schema.NullOr(EntryId),
   counterpartyId: Schema.NullOr(PlayerId),
-});
-
-export const RepaymentRow = Schema.Struct({
-  id: EntryId,
-  fromPlayerId: PlayerId,
-  toPlayerId: PlayerId,
-  amount: Amount,
-  occurredAt: Timestamp,
-  note: Schema.NullOr(Schema.String),
-  recordedFromTripId: Schema.NullOr(TripId),
-  createdBy: ActorId,
-  createdAt: Timestamp,
-  voidedAt: Schema.NullOr(Timestamp),
-  voidedBy: Schema.NullOr(ActorId),
-  voidReason: Schema.NullOr(Schema.String),
-  replacesEntryId: Schema.NullOr(EntryId),
 });
 
 export const PersonalOperationRow = Schema.Struct({

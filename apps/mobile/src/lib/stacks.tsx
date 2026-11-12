@@ -166,9 +166,9 @@ export function Prefetch<A, E>({ query }: { query: Atom.Atom<AsyncResult.AsyncRe
 }
 
 /**
- * A trip screen's data: the trip, its group, and your limits for it, behind one skeleton. The group
- * and limits requests start alongside the trip's when your groups already say which group it is,
- * and the screen paints once with everything it shows.
+ * A trip screen's data: the trip and its group, behind one skeleton. The group request starts
+ * alongside the trip's when your groups already say which group it is, and the screen paints once
+ * with everything it shows.
  */
 export function TripLoaded({
   tripId,
@@ -187,7 +187,6 @@ export function TripLoaded({
   return (
     <>
       {groupId ? <Prefetch query={stacks.group(groupId)} /> : null}
-      <Prefetch query={stacks.limits(tripId)} />
       <Loaded query={stacks.trip(tripId)} skeleton={skeleton} renderError={renderError}>
         {(trip) => (
           <Loaded
@@ -195,11 +194,7 @@ export function TripLoaded({
             skeleton={skeleton}
             renderError={renderError}
           >
-            {(group) => (
-              <Settled query={stacks.limits(tripId)} skeleton={skeleton}>
-                {children(trip, group)}
-              </Settled>
-            )}
+            {(group) => children(trip, group)}
           </Loaded>
         )}
       </Loaded>

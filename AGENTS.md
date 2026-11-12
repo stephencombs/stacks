@@ -10,12 +10,11 @@ Fight for the smallest model that makes the correct behavior unsurprising. Don't
 - **member**: a user in a group, with the role owner, admin or member.
 - **guest**: a player in a group who hasn't signed up yet. A guest can later claim their history by signing up.
 - **session**: one sitting at a venue, either live or closed.
-- **trip**: a run of play inside a group, like a weekend in Vegas. Every session belongs to one trip, and each trip keeps its own balances, stakes, board and settle-up. An ended trip takes no new sessions but can still be settled.
-- **entry**: one ledger row: a buy-in, cash-out, adjustment or settlement. Entries are never edited; a correction voids the old one and adds a new one.
+- **trip**: a run of play inside a group, like a weekend in Vegas. Every session belongs to one trip, and each trip keeps its own balances, stakes and board. An ended trip takes no new sessions.
+- **entry**: one ledger row: a buy-in, cash-out or adjustment. Entries are never edited; a correction voids the old one and adds a new one.
 - **counterparty**: whose money paid for a buy-in, or who received a cash-out. Debts come from counterparties.
 - **result**: a player's win or loss (cash-outs minus buy-ins). A result is separate from a balance.
 - **balance**: what a member is owed (positive) or owes (negative) inside a trip.
-- **settlement**: a recorded payment between two members that squares up part of a trip. Stacks never moves money.
 - **stake**: money one player (the backer) gives another to play with. While it's open, the player's results go to it: the backer gets the stake back plus their share of the winnings, or what's left after losses. What the player owes back counts in balances.
 
 ## Hit every surface
@@ -40,7 +39,7 @@ A change that works on the path you tested and is missing everywhere else is the
 ## Verifying
 
 - Run the checks CI runs, scoped to what you touched: `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, `pnpm test`.
-- Test meaningful logic and observable behavior. Ledger math (`results`, `balances`, `settleUp`) gets thorough unit and property tests.
+- Test meaningful logic and observable behavior. Ledger math (`results`, `balances`) gets thorough unit and property tests.
 - Effect tests use `it.effect` on the `TestClock`. No sleeps, no polling loops, no retries. A test that needs a timeout to pass is wrong.
 - A bug fix in logic, data or protocol starts with a failing test.
 - See UI changes in the real app before calling them done. `pnpm --filter @stacks/web dev:preview` runs the web app signed in, against fixture data, with no Clerk or database; the `preview-color-up` skill covers routes, fixtures and screenshots.
@@ -55,7 +54,7 @@ A change that works on the path you tested and is missing everywhere else is the
 - `apps/web/e2e` holds the Playwright test of the full loop against the real Clerk development instance (`pnpm --filter @stacks/web test:e2e`). Run it after changing a flow it covers.
 - `apps/mobile`: Expo with a dev client, React Navigation native-stack (static config), Uniwind. Expo, EAS, and React Native API work follows [Expo](#expo).
 - `packages/contracts`: Effect Schema types and the `StacksApi` definition. No runtime logic.
-- `packages/shared`: pure ledger logic shared by the API and clients: `money`, `results`, `balances`, `settleUp`. Import a subpath; there's no root export.
+- `packages/shared`: pure ledger logic shared by the API and clients: `money`, `results`, `balances`. Import a subpath; there's no root export.
 - `packages/client-runtime`: client code shared by web and mobile. Import an explicit subpath (`@stacks/client-runtime/api`); there's no root export.
 - Charts, the T3Code way, with no chart library: shape the data in `packages/shared`, take scales from `@stacks/client-runtime/chart`, and draw it per platform: SVG on web, `react-native-svg` and plain views on mobile.
 - New web components are copied from shadcn/ui's Base UI versions (coss ui if shadcn lacks one) and adapted to our tokens; no `shadcn init`. Watch the names: our `accent` is the brand gold and our `muted` is text, so shadcn's `bg-accent` and `bg-muted` compile but mean something else.

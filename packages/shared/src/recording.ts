@@ -2,19 +2,13 @@ import {
   Actor,
   PlayEntry,
   PlayerIdentity,
-  Repayment,
   Table,
   Visit,
   type EntryId,
   type PlayerId,
   type TableId,
 } from "@stacks/contracts";
-import {
-  isPairCommand,
-  isTableCommand,
-  RecordingCommand,
-  type PairCommand,
-} from "@stacks/contracts/recordingCommands";
+import { isTableCommand, RecordingCommand } from "@stacks/contracts/recordingCommands";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
@@ -45,8 +39,6 @@ export interface RecordingLedger {
   readonly tables: ReadonlyArray<Table>;
   readonly visits: ReadonlyArray<Visit>;
   readonly entries: ReadonlyArray<PlayEntry>;
-  /** Payments between its players and others, whoever recorded them. */
-  readonly repayments: ReadonlyArray<Repayment>;
   readonly receipts: ReadonlyArray<RecordingReceipt>;
 }
 
@@ -130,127 +122,6 @@ export const createdEntryIds = (command: RecordingCommand): ReadonlyArray<EntryI
           ? [command.replacement.id]
           : [];
 
-/** The repayments a command creates. */
-export const createdRepaymentIds = (command: RecordingCommand): ReadonlyArray<EntryId> =>
-  command.type === "repay"
-    ? [command.repaymentId]
-    : command.type === "correct_repayment"
-      ? [command.replacement.id]
-      : [];
-
-/** The two players a payment command is between, in canonical order, once its payment is known. */
-export const pairOf = (
-  repayments: ReadonlyArray<Repayment>,
-  command: PairCommand,
-): readonly [PlayerId, PlayerId] | null => {
-  const ends =
-    command.type === "repay"
-      ? command
-      : repayments.find((repayment) => repayment.id === command.repaymentId);
-  if (!ends) return null;
-  const { fromPlayerId: a, toPlayerId: b } = ends;
-  return a < b ? [a, b] : [b, a];
-};
-
-/** How many payment commands the pair has applied: what its next one expects. */
-export const pairRevision = (
-  state: Pick<RecordingLedger, "repayments" | "receipts">,
-  pair: readonly [PlayerId, PlayerId],
-) =>
-  state.receipts.filter(({ command }) => {
-    if (!isPairCommand(command)) return false;
-    const other = pairOf(state.repayments, command);
-    return other !== null && other[0] === pair[0] && other[1] === pair[1];
-  }).length;
-
-/**
- * Applies a payment between two players. Only an actor holding one of them may record, correct or
- * void it: never a recorder on someone else's behalf.
- */
-const applyPairCommand = <S extends RecordingLedger>(
-  state: S,
-  command: PairCommand,
-  actorPlayers: ReadonlyArray<PlayerId> | null,
-  receipts: ReadonlyArray<RecordingReceipt>,
-): S => {
-  const pair = pairOf(state.repayments, command);
-  requireValid(pair, "Payment does not exist.");
-  requireValid(pair[0] !== pair[1], "A payment is between two different players.");
-  if (actorPlayers !== null && !actorPlayers.includes(pair[0]) && !actorPlayers.includes(pair[1]))
-    throw new RecordingError("forbidden", "Only the two players in a payment can record it.");
-  if (pairRevision(state, pair) !== command.expectedRevision)
-    throw new RecordingError(
-      "conflict",
-      "Payments between these players changed. Review them before recording another.",
-    );
-  const unused = (id: EntryId) =>
-    requireValid(
-      !state.repayments.some((repayment) => repayment.id === id),
-      "Payment ID is already used.",
-    );
-  const audit = {
-    currency: "USD" as const,
-    recordedFromTripId: null,
-    createdBy: command.actorId,
-    createdAt: command.preparedAt,
-    voidedAt: null,
-    voidedBy: null,
-    voidReason: null,
-  };
-  if (command.type === "repay") {
-    unused(command.repaymentId);
-    return {
-      ...state,
-      repayments: [
-        ...state.repayments,
-        Repayment.make({
-          ...audit,
-          id: command.repaymentId,
-          fromPlayerId: command.fromPlayerId,
-          toPlayerId: command.toPlayerId,
-          amount: command.amount,
-          occurredAt: command.occurredAt,
-          note: command.note,
-          replacesEntryId: null,
-        }),
-      ],
-      receipts,
-    };
-  }
-  const original = state.repayments.find((repayment) => repayment.id === command.repaymentId)!;
-  requireValid(original.voidedAt === null, "This payment is already voided.");
-  requireValid(original.recordedFromTripId === null, "Imported history is read-only.");
-  requireValid(
-    ms(command.preparedAt) >= ms(original.createdAt),
-    "Correction predates the original audit.",
-  );
-  const voided = Repayment.make({
-    ...original,
-    voidedAt: command.preparedAt,
-    voidedBy: command.actorId,
-    voidReason: command.reason,
-  });
-  const repayments = state.repayments.map((repayment) =>
-    repayment.id === original.id ? voided : repayment,
-  );
-  if (command.type === "correct_repayment") {
-    unused(command.replacement.id);
-    repayments.push(
-      Repayment.make({
-        ...audit,
-        id: command.replacement.id,
-        fromPlayerId: original.fromPlayerId,
-        toPlayerId: original.toPlayerId,
-        amount: command.replacement.amount,
-        occurredAt: command.replacement.occurredAt,
-        note: command.replacement.note,
-        replacesEntryId: original.id,
-      }),
-    );
-  }
-  return { ...state, repayments, receipts };
-};
-
 /**
  * Applies one command. `actorPlayers` are the players bound to the command's actor: on a device,
  * its own players; on the server, what the database binds to the authenticated actor. `null`
@@ -274,7 +145,6 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       throw new RecordingError("forbidden", "You can record only your own play at this table.");
   };
   const receipts = [...state.receipts, { command, revision: state.receipts.length + 2 }];
-  if (isPairCommand(command)) return applyPairCommand(state, command, actorPlayers, receipts);
   if (isTableCommand(command)) {
     const table = state.tables.find((table) => table.id === command.tableId);
     requireValid(table, "Table does not exist.");

@@ -9,7 +9,6 @@ import {
   type VenueId,
 } from "@stacks/contracts";
 import { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
-import { pairRevision } from "@stacks/shared/recording";
 import { projectVisit } from "@stacks/shared/visits";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
@@ -83,24 +82,7 @@ export type RecordingInput =
     }
   | { readonly type: "reopen"; readonly visitId: VisitId; readonly reason: string }
   | { readonly type: "appoint_recorder"; readonly tableId: TableId; readonly playerId: PlayerId }
-  | { readonly type: "revoke_recorder"; readonly tableId: TableId; readonly playerId: PlayerId }
-  | ({
-      readonly type: "repay";
-      readonly fromPlayerId: PlayerId;
-      readonly toPlayerId: PlayerId;
-    } & PaymentInput)
-  | ({
-      readonly type: "correct_repayment";
-      readonly repaymentId: EntryId;
-      readonly reason: string;
-    } & PaymentInput)
-  | { readonly type: "void_repayment"; readonly repaymentId: EntryId; readonly reason: string };
-
-type PaymentInput = {
-  readonly amount: number;
-  readonly occurredAt?: DateTime.Utc;
-  readonly note?: string;
-};
+  | { readonly type: "revoke_recorder"; readonly tableId: TableId; readonly playerId: PlayerId };
 
 const withCounterparty = (counterpartyId: PlayerId | undefined) =>
   counterpartyId === undefined ? {} : { counterpartyId };
@@ -174,48 +156,6 @@ export const prepareRecordingCommand = (
       ...withCounterparty(input.counterpartyId),
     });
   }
-  if (input.type === "repay") {
-    const pair =
-      input.fromPlayerId < input.toPlayerId
-        ? ([input.fromPlayerId, input.toPlayerId] as const)
-        : ([input.toPlayerId, input.fromPlayerId] as const);
-    return RecordingCommand.make({
-      ...common,
-      type: "repay",
-      expectedRevision: pairRevision(state, pair),
-      repaymentId: EntryId.make(newId()),
-      fromPlayerId: input.fromPlayerId,
-      toPlayerId: input.toPlayerId,
-      amount: MinorUnits.make(input.amount),
-      occurredAt: input.occurredAt ?? preparedAt,
-      note: input.note?.trim() || null,
-    });
-  }
-  if (input.type === "correct_repayment" || input.type === "void_repayment") {
-    const original = state.repayments.find((repayment) => repayment.id === input.repaymentId);
-    if (!original) throw new RecordingError("invalid", "Payment does not exist.");
-    const { fromPlayerId: a, toPlayerId: b } = original;
-    const paired = { ...common, expectedRevision: pairRevision(state, a < b ? [a, b] : [b, a]) };
-    return input.type === "void_repayment"
-      ? RecordingCommand.make({
-          ...paired,
-          type: "void_repayment",
-          repaymentId: original.id,
-          reason: input.reason,
-        })
-      : RecordingCommand.make({
-          ...paired,
-          type: "correct_repayment",
-          repaymentId: original.id,
-          reason: input.reason,
-          replacement: {
-            id: EntryId.make(newId()),
-            amount: MinorUnits.make(input.amount),
-            occurredAt: input.occurredAt ?? original.occurredAt,
-            note: input.note === undefined ? original.note : input.note.trim() || null,
-          },
-        });
-  }
   if (input.type === "appoint_recorder" || input.type === "revoke_recorder")
     return RecordingCommand.make({
       ...common,
@@ -282,17 +222,13 @@ const freezeState = (state: RecordingState): RecordingState => {
     state.tables,
     state.visits,
     state.entries,
-    state.repayments,
     state.receipts,
   ]) {
     for (const record of records) Object.freeze(record);
     Object.freeze(records);
   }
   for (const receipt of state.receipts) {
-    if (
-      (receipt.command.type === "correct" || receipt.command.type === "correct_repayment") &&
-      receipt.command.replacement
-    )
+    if (receipt.command.type === "correct" && receipt.command.replacement)
       Object.freeze(receipt.command.replacement);
     if (receipt.command.type === "join_table" && receipt.command.newPlayer)
       Object.freeze(receipt.command.newPlayer);
@@ -351,7 +287,6 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         tables: [],
         visits: [],
         entries: [],
-        repayments: [],
         receipts: [],
       };
       try {

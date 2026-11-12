@@ -1,6 +1,6 @@
 import { CurrencyCode, MinorUnits } from "@stacks/contracts";
 import { themeChoices } from "@stacks/client-runtime/theme";
-import { ArrowLeftRight, Layers, Moon, Plus, Sun, Trash2, TrendingUp, Users } from "lucide-react";
+import { Layers, Moon, Plus, Sun, Trash2, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
 
 import { BalanceLabel, Money } from "~/components/Money";
@@ -47,7 +47,6 @@ const roles = [
 const places = [
   { label: "Sessions", icon: Layers },
   { label: "Board", icon: TrendingUp },
-  { label: "Settle up", icon: ArrowLeftRight },
   { label: "Group", icon: Users },
 ];
 const players = [

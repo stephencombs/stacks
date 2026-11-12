@@ -163,53 +163,6 @@ export const recorderCommand = (
   playerId: PlayerId,
 ) => RecordingCommand.make({ type, ...common(identity, 1), tableId, playerId });
 
-export const repay = (
-  identity: RecordingIdentity,
-  fromPlayerId: PlayerId,
-  toPlayerId: PlayerId,
-  amount: number,
-  expectedRevision = 0,
-) =>
-  RecordingCommand.make({
-    type: "repay",
-    ...common(identity, 40),
-    expectedRevision,
-    repaymentId: EntryId.make(uuid()),
-    fromPlayerId,
-    toPlayerId,
-    amount: usd(amount),
-    occurredAt: at(40),
-    note: null,
-  }) as Extract<RecordingCommand, { type: "repay" }>;
-
-export const correctRepayment = (
-  identity: RecordingIdentity,
-  repaymentId: EntryId,
-  amount: number,
-  expectedRevision: number,
-) =>
-  RecordingCommand.make({
-    type: "correct_repayment",
-    ...common(identity, 45),
-    expectedRevision,
-    repaymentId,
-    reason: "Wrong amount",
-    replacement: { id: EntryId.make(uuid()), amount: usd(amount), occurredAt: at(40), note: null },
-  }) as Extract<RecordingCommand, { type: "correct_repayment" }>;
-
-export const voidRepayment = (
-  identity: RecordingIdentity,
-  repaymentId: EntryId,
-  expectedRevision: number,
-) =>
-  RecordingCommand.make({
-    type: "void_repayment",
-    ...common(identity, 50),
-    expectedRevision,
-    repaymentId,
-    reason: "Never happened",
-  });
-
 /** A starter's open, shared table. */
 export const sharedTable = Effect.fn("test.sharedTable")(function* () {
   const starter = yield* device();
