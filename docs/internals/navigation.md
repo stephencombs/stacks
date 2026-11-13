@@ -1,117 +1,54 @@
 # Navigation
 
-Color Up opens on **your play**: `/` on web and the first screen on mobile. It lists sessions in
-play first, then finished ones with their results, and offers Start session and Add past session.
-A personal session lives at `/play/:visitId` (mobile `play/:visitId`), with Rebuy and Cash out
-while it's live. Both are on this device and need no account, group, trip or network: they never
-wait for sign-in, and sign-in failing or not being configured leaves them working.
+Color Up has four tabs and a You sheet. Each tab answers one question:
 
-A personal session is one player's visit to a table. Its page lists everyone at the table, and
-whoever started the table adds players (someone new by name, or a player saved on this device) and
-records for each of them on that player's own `/play/:visitId`. There is no separate table page to
-record from: a table is reached through any visit at it. The starter's Share sheet makes a link,
-`/t/:token`, which opens on the web with no account and shows that one table and nothing else.
+| Tab       | Question                          | Holds                                                                            |
+| --------- | --------------------------------- | -------------------------------------------------------------------------------- |
+| **Play**  | Am I playing, and how's it going? | This month's result, the live session or Start session, recent sessions, history |
+| **Stats** | How do I do, broken down?         | Result, hours, hourly, win rate, filtered by time, game, venue and trip          |
+| **Map**   | Where have I played?              | Venues as pins colored by result, and a day or trip drawn as a path between them |
+| **Crew**  | What are my friends doing?        | Activity from your groups, newest first, with the current trip pinned on top     |
 
-The same page offers **Join this table**. It asks only for a name and always creates a new player
-on this device, so a link can never be used to record as someone already there. Joining needs the
-network once; the buy-in that follows, and everything after it, records offline on the joiner's
-own `/play/:visitId`, which lists "You" plus the others (fetched from the server, so only online).
-A participant's controls act only on their own visits; the starter's act on everyone's. When a
-visit finishes, **Back at the table** starts a new visit for the same player at the same table.
-Revoking the link stops new joins; people who joined keep their table through their play.
-Mobile sends the web address, since the link must work for people without the app, and has no
-`/t/:token` deep link yet: joining happens on the web, and mobile shows joined tables it syncs.
+**You** opens from the avatar on every tab: account, recording defaults, display (cents, privacy mode, theme) and export. It is a sheet, not a tab, because nobody opens the app to change a setting.
 
-A table link only ever makes a new player. To record as a player already at the table (someone
-the starter added by name, or the same guest on a second phone), the starter opens **Table
-settings** from the table and picks **Invite this player**, or a device already recording as that
-player makes one from its own table. The link, `/invite/:token`, opens on the web, says whose play
-it records and works once; taking it up binds this device to that player, who then records only
-their own play. The same sheet lists the devices recording as the player and stops any of them.
-Table settings is the starter's alone: it also appoints **Recorders**, players with an account who
-record for everyone (and, like the starter, see the whole table on their device), and holds
-**Stop sharing**. A recorder never sees Share or Table settings.
+Mobile draws the tabs as native tabs on iOS and the platform destination bar on Android. Web draws them as a bottom bar below `lg` and a left sidebar above it. The tabs and their names are the same everywhere.
 
-Groups and trips are a second, account-backed area, reached from **Groups** in the header (or the scope filter pill row on mobile). Inside
-it, the group and trip you're in are context, shown as a labeled scope button at the top of every
-screen on web and as a horizontal row of `rounded-full` filter pills (`FilterPillBar`) directly beneath `TopBar` on mobile (`Personal play ⌄` / `Group ⌄`, `All trips ⌄` / `Trip ⌄`). Under it, three places answer the questions people open a trip with:
+## Play
 
-| Place        | Question                     | Holds                                                                                           |
-| ------------ | ---------------------------- | ----------------------------------------------------------------------------------------------- |
-| **Sessions** | What's being played?         | The live session first (`Playing now`), the trip card, each night's sessions, backing           |
-| **Board**    | Who's winning?               | Race chart, session bars, and proportional breakdown rows, scoped to _This trip_ or _All time_  |
-| **Group**    | Who's in it, and what trips? | Trips, People (members, guests, invites), Settings (export, leave; unified with **You** on iOS) |
+Play is `/` on web and the first tab on mobile. It works with no account, group, trip or network: it never waits for sign-in, and sign-in failing or not being configured leaves it working. Personal addresses carry no query string, because the offline web shell only serves queryless navigations.
 
-Anything that's only about you (appearance, account, sign out) sits behind **You** (and is surfaced alongside Group configuration in the grouped **Settings** tab on mobile).
-Web windows below `lg` draw the three places as a docked bottom bar and wide web windows draw them as
-a left sidebar; mobile (`apps/mobile`) uses native tabs on iOS and the platform destination bar on Android. The mobile web build keeps its floating capsule. The places are the same on both. The wordmark goes back to your play.
+The `+` button offers **Start live session** and **Add past session**. Recent sessions link to **All sessions** at `/history`, grouped by month (`/history/2026-11`) or year (`/history/2026`), each group headed by its result, hours and session count.
 
-## Why your play comes first
+A personal session lives at `/play/:visitId`. While it's live it fills the screen: elapsed time, buy-in total, game and venue, a row of rebuy amounts with undo, **Edit** and **Cash out**. Edit opens one sheet per field (buy-in, start time, game, venue); the buy-in sheet adds, subtracts or sets the total. Cashing out takes the amount and end time and finishes the visit with no further choice. A finished session shows its result, duration, hourly, the venue on a map and the others at the table.
 
-Recording your own session is the job people open the app for, and it can't depend on anything
-that may be missing at a casino table: a signal, a working sign-in, or a group someone else set
-up. Groups and trips stay one tap away rather than being the way in. Personal addresses carry no
-query string, because the offline web shell only serves queryless navigations.
+While a session is live, a LiveBar floats above the tabs on every screen except the session itself, and tapping it returns there.
 
-Personal sessions are a different record from a group's `/sessions/:id`: that address names a
-whole shared table, so it keeps resolving its original record and is never read as a visit.
+## Shared tables
 
-## Why groups use scope
+A personal session is one player's visit to a table. Its page lists everyone at the table, and whoever started the table adds players (someone new by name, or a player saved on this device) and records for each of them on that player's own `/play/:visitId`. There is no separate table page to record from: a table is reached through any visit at it. The table closes once every player at it has cashed out.
 
-Almost everyone belongs to one group and plays one trip at a time, and both change every few
-months. Earlier versions gave the group and the trip a row of tabs each, styled alike, and put the
-only route between them in the back slot of the header. People couldn't tell which level they were
-on, and the group's pages were effectively hidden. Treating group and trip as _scope_ rather than
-destinations removes a level, and leaves the tabs for the questions that recur within a trip.
+The starter's Share sheet makes a link, `/t/:token`, which opens on the web with no account and shows that one table and nothing else. The same page offers **Join this table**. It asks only for a name and always creates a new player on this device, so a link can never be used to record as someone already there. Joining needs the network once; everything after it records offline on the joiner's own `/play/:visitId`. A participant's controls act only on their own visits; the starter's act on everyone's. When a visit finishes, **Back at the table** starts a new visit for the same player at the same table. Revoking the link stops new joins. Mobile sends the web address, since the link must work for people without the app, and has no `/t/:token` deep link yet.
 
-The model borrows from shared-expense ledgers (Splitwise and Tricount keep the log and the money
-apart), sports trackers built around a live activity (Strava's You tab, 18Birdies' shared
-scorecard), and the platform guidance that tab bars hold peer places, never actions
-([Apple HIG](https://developer.apple.com/design/human-interface-guidelines/tab-bars),
-[Material adaptive navigation](https://developer.android.com/develop/ui/compose/layouts/adaptive/build-adaptive-navigation)).
+To record as a player already at the table, the starter opens **Table settings** and picks **Invite this player**. The link, `/invite/:token`, opens on the web, says whose play it records and works once. Table settings is the starter's alone: it also lists and stops the devices recording as each player, appoints **Recorders** (account holders who record for everyone) and holds **Stop sharing**. A recorder never sees Share or Table settings.
+
+## Crew
+
+Crew needs an account. It opens on activity from every group you're in: who is playing where right now, sessions that finished, trips that started. Each row opens that session or trip. It is private to your groups; there are no likes, comments or profiles of strangers, because a player's identity must never become a way to discover their sessions.
+
+The current trip is pinned above the list, showing who's live and the top of its board. A trip, `/trips/:id`, holds its sessions and its board (`/trips/:id/board`, This trip | All time). A group, `/groups/:id`, holds its trips and people, and its settings at `/groups/:id/settings`.
+
+## Why it changed
+
+The previous design treated group and trip as a scope chosen at the top of every screen, with Sessions, Board and Group as tabs inside that scope, and personal play outside any tabs. That put the thing people do most, recording their own play, outside the app's main structure, and spent the tab bar on one trip at a time. The current design follows single-player trackers such as CasinoIQ (play, stats, map, feed): personal play is the app, and friends are one tab of it, shown as activity instead of a scope you have to switch.
 
 ## Rules
 
-1. **Every screen says where you are.** A page title is always visible (`TopBar` on mobile, `PageHeader` on web), and inside groups and
-   trips so is the scope selector (`ScopeButton` on web, `FilterPillBar` on mobile).
-   Nothing is reachable only through an unlabeled menu, and the back slot only ever goes back.
-2. **One row of peer navigation per screen.** A pill segmented control (`Choice` on mobile, `Segmented` on web) inside a place may change the scope or measure
-   of the same data (`This trip | All time`, `Money | % of buy-in`, `24h | 7d | 30d | All`). It may not switch to different content; that's a new
-   place or a link.
-3. **One home per thing.** If two screens need the same chart or list, one of them links to the
-   other.
-4. **File things by whose they are.** Yours goes in You, the group's in Group, this trip's in its
-   places.
-5. **Places are not actions.** Start a session (`IconButton` compose in `TopBar` or primary button), New trip and Invite are buttons inside places.
-6. **Same places on every surface.** Web and mobile differ in their container, never in their
-   destinations or their names.
-
-## Scope
-
-The scope is a trip, and its group comes with it. A page that names a trip or a session sets the
-scope to that trip. A group page keeps the scope if it's already in that group; otherwise it picks
-the group's live or most recent trip. The last trip in scope is remembered per device.
-
-A group with no trips has nothing for Sessions or Board to show, so only Group is
-offered until the first trip starts.
-
-The scope sheet lists the group's trips (live and unended first), offers New trip, links to the
-group, and lists your other groups only when you have some.
-
-## The live session
-
-A running session is the one thing that outranks the current place. While you're in one, the
-LiveBar floats above the navigation on every screen except two: the session itself, and Sessions,
-where the live card is already first. On mobile, `LiveBar` floats as a compact pill card (`rounded-2xl`) directly above the floating capsule `PlaceTabs` bar; on wide web windows the sidebar carries it instead.
-
-The session page is pushed onto Sessions with a real back button, and the places stay visible, so
-the Board is one tap away mid-session.
+1. **Every screen says where you are.** A title is always visible, and the back slot only ever goes back.
+2. **One row of peer navigation per screen.** A segmented control may change the scope or measure of the same data (`By month | By year`, `This trip | All time`). It may not switch to different content; that's a link.
+3. **One home per thing.** If two screens need the same chart or list, one links to the other.
+4. **Tabs are not actions.** Starting a session, a new trip and invites are buttons inside tabs.
+5. **Same tabs on every surface.** Web and mobile differ in their container, never in their destinations or names.
 
 ## Addresses
 
-Web and mobile share addresses: `/` (your play), `/play/:visitId` (a personal session), `/t/:token`
-(a shared table, web only), `/invite/:token` (a personal invite, web only), `/groups` (your groups), `/trips/:id` (Sessions), `/trips/:id/board` (`?scope=all` for All
-time), `/sessions/:id`, `/groups/:id` (the hub), `/groups/:id/people` and
-`/groups/:id/settings`. Old addresses keep working: a trip's `/results` goes to its Board and a
-group's `/stats` to the Board's All time. A group's `/settings` used to mix people and settings; it
-now opens Settings, which links to People.
+`/` (Play), `/history`, `/history/:year`, `/history/:year-:month`, `/play/:visitId`, `/stats`, `/map`, `/crew`, `/t/:token` and `/invite/:token` (web only), `/trips/:id`, `/trips/:id/board`, `/sessions/:id` (a group's shared table), `/groups/:id`, `/groups/:id/settings`. Stats and Map keep their filters in screen state, not the address, so they work offline. Old addresses keep working: `/groups` goes to Crew, a trip's `/results` to its board, a group's `/stats` to its board's All time and `/groups/:id/people` to the group.

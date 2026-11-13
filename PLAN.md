@@ -10,9 +10,9 @@ A personal session is one player's visit to one table: buy in, play with any reb
 
 A shared table view brings players' personal sessions together. If a player finishes, leaves and returns while friends continue, their return is a new session in their history. Their friends keep recording uninterrupted in the same shared view. There is no table-number field.
 
-Starting your own live session requires only an initial buy-in. Start time defaults to now. Game and venue can be added immediately or later. Seat tracking and high-limit tracking are optional. USD is the only currency initially.
+Starting your own live session requires only an initial buy-in. Start time defaults to now. Game and venue can be added immediately or later. During play the buy-in is changed as one total (add, subtract or set it); the ledger records the change as a correction, and the screen shows only the total. Seat tracking and high-limit tracking are optional. USD is the only currency initially.
 
-Partial cash-outs do not end play. Recording a cash-out offers "Keep playing" or "Finish playing." Finishing ends that player's participation, while other players may continue. A zero cash-out records finishing with nothing returned. Mistaken completion must be reversible without treating a genuine return visit as the same session.
+Cashing out finishes that player's visit, with no further choice; partial cash-outs are later work. A table with one player closes when that player cashes out. A shared table stays open while anyone at it is still playing and closes once every player has cashed out. A zero cash-out records finishing with nothing returned. Mistaken completion must be reversible without treating a genuine return visit as the same session.
 
 During play, show total in and total out with final win/loss pending. After finishing, the result is cash-outs plus result adjustments minus buy-ins. Do not present an initial buy-in as a finalized loss. Do not track chip inventories, chip-count snapshots or cash-versus-chips holdings; entries record dollar amounts.
 
@@ -119,9 +119,9 @@ Reconcile contracts, pure ledger calculations and database relationships with th
 
 ### 2. Independent recording and review
 
-Implement the real signed-out solo flow on web and mobile using shared client-runtime behavior. Starting, rebuying, partial cash-outs, finishing, corrections and reviewing history work offline and survive relaunch.
+Implement the real signed-out solo flow on web and mobile using shared client-runtime behavior. Starting, rebuying, changing the buy-in total, cashing out, corrections and reviewing history work offline and survive relaunch.
 
-The first milestone is $200 in, a $100 rebuy, $100 out while continuing, then a final $250 out. Review shows $300 in, $350 out and a finalized $50 gain. No account, Trip or Group is needed. Before finishing, final win/loss remains pending.
+The first milestone is $200 in and a $100 rebuy, then the buy-in total corrected to $250 and a $350 cash-out that finishes the session. Before the cash-out, the screen shows $250 in with final win/loss pending. Review shows $250 in, $350 out and a finalized $100 gain, with the corrected buy-in still visible in history. No account, Trip or Group is needed.
 
 ### 3. Shared tables and player relationships
 
