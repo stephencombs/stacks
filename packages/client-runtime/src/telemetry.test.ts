@@ -21,6 +21,10 @@ it("keeps startup stages and timings without opening arbitrary telemetry fields"
   });
 });
 
+it.each(["query_started", "query_settled"])("keeps the %s stage", (startup_stage) => {
+  expect(sanitizeTelemetry({ startup_stage })).toHaveProperty("startup_stage", startup_stage);
+});
+
 it("drops arbitrary environment labels", () => {
   expect(sanitizeTelemetry({ startup_environment: "private note" })).not.toHaveProperty(
     "startup_environment",
