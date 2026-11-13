@@ -297,10 +297,7 @@ test("explains invalid amounts beside the keypad and keeps what was typed", asyn
   await expect(page).toHaveURL(/\/play\//);
 });
 
-test("groups and trips wait for sign-in, and your play stays a tap away", async ({
-  page,
-  context,
-}) => {
+test("Crew waits for sign-in, and your play stays a tap away", async ({ page, context }) => {
   const api = await isolate(context);
   await home(page);
   await button(page, "You").click();
@@ -309,7 +306,8 @@ test("groups and trips wait for sign-in, and your play stays a tap away", async 
   await visible(sheet(page).getByRole("radio", { name: "Light" })).click();
   await button(sheet(page), "Close").click();
 
-  await button(page, "Groups").click();
+  // Crew is a tab like the others; without sign-in it says why, and Play is a tap away.
+  await visible(page.getByRole("tab", { name: "Crew" })).click();
   await expect(text(page, /^Groups and trips need sign-in/)).toBeVisible();
   await button(page, "Back to your play").click();
   await expect(visible(page.getByRole("heading", { name: "Play", exact: true }))).toBeVisible();
