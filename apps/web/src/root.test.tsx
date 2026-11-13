@@ -1,5 +1,8 @@
 // @vitest-environment happy-dom
 import { makeOutbox } from "@stacks/client-runtime/outbox";
+import { makeRecordingStore } from "@stacks/client-runtime/recording";
+import { RecordingProvider } from "@stacks/client-runtime/recordingReact";
+import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
 import { EntryId, MinorUnits, PlayerId, SessionId } from "@stacks/contracts";
 import {
   RouterProvider,
@@ -59,6 +62,20 @@ const tree = root.addChildren([
   createRoute({ getParentRoute: () => root, path: "/", component: YourPlay }),
 ]);
 
+/** A device with nothing recorded on it. */
+const emptyRecordingStore = () => {
+  let document: RecordingStorageDocument = { revision: 0 };
+  return makeRecordingStore({
+    load: async () => document,
+    commit: async (expected, payload) => {
+      document = { revision: expected + 1, payload };
+      return document.revision;
+    },
+    subscribe: () => () => undefined,
+    close: async () => undefined,
+  });
+};
+
 const roots: ReturnType<typeof createRoot>[] = [];
 async function open(path: string) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -69,7 +86,13 @@ async function open(path: string) {
   const host = document.createElement("div");
   const view = createRoot(host);
   roots.push(view);
-  await act(async () => view.render(<RouterProvider router={router} />));
+  await act(async () =>
+    view.render(
+      <RecordingProvider store={emptyRecordingStore()}>
+        <RouterProvider router={router} />
+      </RecordingProvider>,
+    ),
+  );
   return host;
 }
 
@@ -129,7 +152,7 @@ function offline() {
 it("shows your play while sign-in loads, and keeps it in place once you're signed in", async () => {
   const network = offline();
   const host = await open("/");
-  expect(host.textContent).toBe("Your play");
+  expect(host.querySelector("main")?.textContent).toBe("Your play");
   const page = host.querySelector("main");
 
   await act(async () => account.set(SIGNED_IN));
@@ -147,7 +170,7 @@ it("keeps retrying a signed-in buy-in that's waiting for signal while you're on 
 
   const first = network.attempted();
   const host = await open("/");
-  expect(host.textContent).toBe("Your play");
+  expect(host.querySelector("main")?.textContent).toBe("Your play");
   await act(() => first);
   expect(network.sent).toEqual([entries]);
 

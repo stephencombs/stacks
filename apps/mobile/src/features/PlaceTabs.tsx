@@ -21,9 +21,10 @@ export function useTabBarHeight() {
 }
 
 const tabIcons: Record<string, IconName> = {
-  SessionsTab: "sessions",
-  BoardTab: "board",
-  GroupTab: "group",
+  PlayTab: "sessions",
+  StatsTab: "stats",
+  MapTab: "map",
+  CrewTab: "group",
 };
 
 function FloatingCapsuleTabBar({ state, descriptors, navigation }: BottomTabBarProps) {

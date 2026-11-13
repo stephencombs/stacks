@@ -56,7 +56,7 @@ On native mobile, `Choice` uses SwiftUI or Compose controls and accounts for lab
 
 A form value from a few short options, where the choice deserves weight, is `RadioCards` on web: `kind` of an entry or venue, the game of a session. Set columns with `className`.
 
-Moving between places is the app's navigation (see Navigation below; `PlaceTabs` on mobile), never `Segmented` or `Choice`. The same data at another scope or measure is `Segmented`: the Board's This trip / All time, the race's Money / % of buy-in.
+Moving between tabs and pages is the app's navigation (see Navigation below; `PlaceTabs` on mobile), never `Segmented` or `Choice`. The same data at another scope or measure is `Segmented`: the Board's This trip / All time, the race's Money / % of buy-in.
 
 ## Field, Input, Select (web), TextField (mobile)
 
@@ -108,20 +108,17 @@ Players at very different stakes would flatten each other, so:
 - **A race can compare stakes fairly.** The All time race has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
 - **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
 
-## Navigation: AppShell, ScopeButton, PlaceLink (web); TopBar, FilterPillBar, PlaceTabs (mobile)
+## Navigation: AppShell, TabLink, LiveBar (web); PlaceTabs, LiveBar (mobile)
 
-Where content lives is decided in [docs/internals/navigation.md](../internals/navigation.md). Your play and personal sessions sit in `PersonalFrame` (`features/Personal.tsx`): the wordmark, Groups and You, with no places and nothing read from an account. Their main actions go in its `Dock`, pinned above the home indicator on a phone and in the page's flow from `sm` up, and their save state is `SaveStatus`, which only ever says "Saved on this device" after the device has it.
+Where content lives is decided in [docs/internals/navigation.md](../internals/navigation.md). Every page sits in the four tabs, Play, Stats, Map and Crew, except the ones that fill the screen: a live session, a shared table's links and an invitation. Those use `PersonalFrame` (`features/Personal.tsx`): the wordmark and You, with nothing read from an account. A full-screen page's main actions go in its `Dock`, pinned above the home indicator on a phone and in the page's flow from `sm` up. Save state is `SaveStatus`, which only ever says "Saved on this device" after the device has it.
 
-On web, every group and trip page except an invite or claim link sits in `AppShell` (`features/Shell.tsx`), which draws it from two parts in `ui/Nav.tsx`:
+On web, `AppShell` (`features/Shell.tsx`) draws the tabs with **`TabLink`** (`ui/Nav.tsx`): `layout="bar"` stacks icon over label in the bottom bar below `lg`; `layout="side"` is a sidebar row above it. The current tab is gold. The shell reads nothing from an account or the network, so it opens offline and signed out; Crew asks for sign-in inside the tab. A tab page's main actions go in an `ActionBar`, which sits above the bottom bar. You opens from the avatar. `LiveBar` floats above the tabs while you're playing: your own session first, and on Crew's pages your seat at a group's table.
 
-- **`ScopeButton`** says where you are: the trip in scope, its group small above it, and a chevron. It's a real button, outlined like a secondary one, and opens the scope sheet (trips, New trip, the group, your other groups). A group with no trips shows its name alone.
-- **`PlaceLink`** is one of the three places, Sessions, Board and Group, with a lucide icon. `layout="bar"` stacks icon over label in the bottom bar; `layout="side"` is a sidebar row. The current place is gold. A group with no trips offers only Group.
-
-On mobile, keep React Navigation native-stack. iOS uses native bottom tabs and grouped native header actions; Android uses the standard destination bar. Scope remains an explicit group/trip selection button. Its pill uses native glass when supported. Reserve the measured LiveBar height above navigation so the final content remains reachable.
+On mobile, keep React Navigation native-stack, one stack per tab. iOS uses native bottom tabs and grouped native header actions; Android uses the standard destination bar. Screens learn the tab bar's height from `TabBarHeight` and keep their content and docks clear of it, and reserve the measured LiveBar height above it.
 
 See [mobile controls](mobile-redesign.md) for platform selection, native sheet sizing and chart interaction.
 
-Pages pushed onto a place, like a session onto Sessions or People onto Group, take a `BackLink` in `PageHeader`'s `back` (or the stack's back button on mobile). The back slot only ever goes back; it never switches scope.
+Groups, trips and sessions are pushed onto Crew. They take a `BackLink` in `PageHeader`'s `back` (or the stack's back button on mobile). The back slot only ever goes back.
 
 ## Wide screens: TripLayout, TripRail (web)
 
@@ -129,7 +126,7 @@ Pages keep the 672px reading column beside the sidebar. Sessions is the one exce
 
 ## PageHeader, Section, Note (web); PageTitle, SectionHeading, AccordionSectionHeading (mobile)
 
-One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `children` for what sits under the title (a session's notes, the Board's `Segmented`), and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip place's title is the place, through `TripHeader`, since the scope button already names the trip; Sessions carries the trip's ⋯ menu.
+One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `children` for what sits under the title (a session's notes, the Board's `Segmented`), and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip's sessions are titled with the trip, through `TripHeader`, which carries the trip's ⋯ menu and a link to its Board; the Board goes back to the trip.
 
 Each group of content is a `Section` on web (`title`, plus an `action` or a quiet `aside`) and a `SectionHeading` on mobile (`components/ui/Surface.tsx`). Mobile `SectionHeading` has two variants:
 
@@ -197,4 +194,4 @@ A page waits in its own shape, then appears once, whole, and nothing on it moves
 - **Once loaded, never blank again.** Queries behave like TanStack Query's defaults: whatever a page loaded stays cached for five minutes after nothing shows it (`CACHE_MS`, the atom registry's default lifetime), so going back to a page shows it at once. Data older than 30 seconds (`STALE_MS`) refetches in the background when a page mounts, when the window regains focus or comes back online, and on mobile when the app returns to the foreground, while the old copy stays on screen. A refresh or a write's refetch keeps showing the previous data; only a first load ever shows a skeleton. `Loaded` does all of this; don't read a query's result without it unless you mean to.
 - **Slow loads only.** Web skeletons fade in after 300ms measured from the navigation, so a quick load goes straight from the last page to this one with no grey flash.
 - **Display type doesn't jump.** Until Barlow Condensed loads, web sets display text in a fallback face scaled to Barlow's width and line box (`Barlow Condensed Fallback` in `index.css`). If the display font changes, recalibrate it.
-- **The frame stays put.** `AppShell` renders once and never waits on a page: the scope button holds its place with a skeleton until your groups arrive, and page skeletons cover the content column only.
+- **The frame stays put.** `AppShell` renders once and never waits on a page, and page skeletons cover the content column only.

@@ -27,7 +27,10 @@ test.describe.serial("seats at a blackjack table", () => {
       await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true })
     ).newPage();
     await signIn(page, users[0]!.emailAddress);
-    await page.getByRole("link", { name: "Groups", exact: true }).click();
+    await page
+      .getByRole("navigation", { name: "Tabs" })
+      .getByRole("link", { name: "Crew" })
+      .click();
     await page.getByRole("button", { name: "New group" }).click();
     await page.getByLabel("Group name").fill("Table crew");
     await page.getByRole("button", { name: "Create group" }).click();
