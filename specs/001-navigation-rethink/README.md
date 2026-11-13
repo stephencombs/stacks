@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-13
 priority: high
 tags:
@@ -8,7 +8,10 @@ tags:
   - mobile
   - api
 created_at: 2026-11-13T03:32:31.830953888Z
-updated_at: 2026-11-13T03:32:31.830953888Z
+updated_at: 2026-11-13T04:25:05.274586219Z
+transitions:
+  - status: in-progress
+    at: 2026-11-13T04:25:05.274586219Z
 ---
 
 # Navigation rethink: Play, Stats, Map, Crew
