@@ -11,6 +11,10 @@
     },
     "expo": {
       "httpUrl": "https://mcp.expo.dev/mcp"
+    },
+    "leanspec": {
+      "command": "pnpm",
+      "args": ["exec", "leanspec-mcp"]
     }
   }
 }

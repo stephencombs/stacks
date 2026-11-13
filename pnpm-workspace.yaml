@@ -9,6 +9,15 @@ onlyBuiltDependencies:
   - "@tsc-rs/typescript"
   - esbuild
   - workerd
+  # npm tarballs drop the executable bit; the postinstall only chmods the binary.
+  - "@leanspec/cli-darwin-arm64"
+  - "@leanspec/cli-darwin-x64"
+  - "@leanspec/cli-linux-x64"
+  - "@leanspec/cli-windows-x64"
+  - "@leanspec/mcp-darwin-arm64"
+  - "@leanspec/mcp-darwin-x64"
+  - "@leanspec/mcp-linux-x64"
+  - "@leanspec/mcp-windows-x64"
 
 # Shared versions. Packages depend on `catalog:` so web, mobile and api never drift.
 catalog:

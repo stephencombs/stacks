@@ -88,9 +88,9 @@ Most changes need no doc change. Agents can read the code.
 
 ## Plans and work artifacts
 
-- `PLAN.md` is the product scope and its phases. Don't commit other plans, research notes or agent scratch files; keep working material outside the worktree.
+- `PLAN.md` is the product scope and its phases. A change that needs a spec before the code is a LeanSpec in `specs/`. Create and update those with `pnpm leanspec` (`create`, `update`, `search`, `board`). Don't add spec files by hand, and don't edit their frontmatter by hand. Load the `leanspec` skill first. Other plans, research notes and agent scratch files stay outside the worktree.
 - Research that leads to a decision lands as the decision, in `docs/internals/`, with a link or two to its strongest sources.
-- A merged PR is the implementation record. Don't keep a second checklist in the repo.
+- A merged PR is the implementation record. Mark the spec complete when the work lands; don't add another checklist beside it.
 
 ## Expo
 

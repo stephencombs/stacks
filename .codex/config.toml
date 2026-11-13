@@ -9,3 +9,7 @@ url = "https://mcp.neon.tech/mcp"
 
 [mcp_servers.expo]
 url = "https://mcp.expo.dev/mcp"
+
+[mcp_servers.leanspec]
+command = "pnpm"
+args = ["exec", "leanspec-mcp"]
