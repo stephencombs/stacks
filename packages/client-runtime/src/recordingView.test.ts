@@ -9,7 +9,9 @@ import {
   type RecordingStorageDocument,
 } from "./recordingStorage.ts";
 import {
+  localTimeText,
   parsePastSessionTimes,
+  parseTimeNear,
   parseRecordingAmount,
   PRIVATE_RECORDING_NAMESPACE,
   recordingHome,
@@ -187,6 +189,30 @@ describe("parsePastSessionTimes", () => {
     [{ date: "2026-11-08", start: "11:00", finish: "13:00" }, "finish"],
   ] as const)("rejects %j at %s", (input, field) => {
     expect(parsePastSessionTimes(input, now)).toMatchObject({ field });
+  });
+});
+
+describe("parseTimeNear", () => {
+  const local = (hours: number, minutes = 0, day = 7) =>
+    DateTime.makeUnsafe(new Date(2026, 10, day, hours, minutes));
+
+  it("reads a time as the moment nearest the reference, before or after it", () => {
+    expect(parseTimeNear("20:15", local(21, 30))).toEqual(local(20, 15));
+    expect(parseTimeNear("21:45", local(21, 30))).toEqual(local(21, 45));
+  });
+
+  it("crosses midnight to the nearer day", () => {
+    expect(parseTimeNear("23:10", local(1, 5, 8))).toEqual(local(23, 10, 7));
+    expect(parseTimeNear("00:20", local(23, 50, 7))).toEqual(local(0, 20, 8));
+  });
+
+  it("refuses what isn't a time", () => {
+    for (const text of ["", "9pm", "24:00", "12:60"])
+      expect(parseTimeNear(text, local(12))).toBeNull();
+  });
+
+  it("writes a moment back the way a time field holds it", () => {
+    expect(localTimeText(local(9, 5))).toBe("09:05");
   });
 });
 

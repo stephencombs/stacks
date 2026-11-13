@@ -391,6 +391,32 @@ export const parsePastSessionTimes = (
   };
 };
 
+/**
+ * Reads a time of day ("21:30") as the moment nearest `reference`, in local time: within twelve
+ * hours either side, so an evening time read just after midnight is the night before. Null if it
+ * isn't a time.
+ */
+export const parseTimeNear = (time: string, reference: DateTime.Utc) => {
+  const clock = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!clock) return null;
+  const [hours, minutes] = [Number(clock[1]), Number(clock[2])];
+  if (hours > 23 || minutes > 59) return null;
+  const around = new Date(DateTime.toEpochMillis(reference));
+  const value = new Date(around);
+  value.setHours(hours, minutes, 0, 0);
+  const half = 12 * 60 * 60 * 1000;
+  if (value.getTime() - around.getTime() > half) value.setDate(value.getDate() - 1);
+  else if (around.getTime() - value.getTime() > half) value.setDate(value.getDate() + 1);
+  return DateTime.makeUnsafe(value);
+};
+
+/** A moment as a time field holds it: "21:30", in local time. */
+export const localTimeText = (at: DateTime.Utc) => {
+  const value = new Date(DateTime.toEpochMillis(at));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(value.getHours())}:${pad(value.getMinutes())}`;
+};
+
 /** Today as a date field holds it: "2026-11-07", in local time. */
 export const localDateText = (now = new Date()) =>
   `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;

@@ -27,6 +27,10 @@ import { AddPlayerDialog } from "./RecordingForms";
  * table, and the recorders it appointed, record for all of them; only the starter shares it and
  * changes its settings.
  */
+/** How many played here, and whether the table has closed: it closes once nobody is playing. */
+const players = (count: number, closed: boolean) =>
+  `${count === 1 ? "1 player" : `${count} players`}${closed ? " · Closed" : ""}`;
+
 export function TableSection({
   tableId,
   visitId,
@@ -47,7 +51,10 @@ export function TableSection({
   return (
     <Section
       title="At this table"
-      aside={table.visits.length === 1 ? "1 player" : `${table.visits.length} players`}
+      aside={players(
+        table.visits.length,
+        table.visits.every((item) => item.visit.finishedAt !== null),
+      )}
     >
       <List as="ul" label="Players at this table">
         {table.visits.map((item) => (
@@ -134,7 +141,13 @@ function JoinedTableSection({ tableId, visitId }: { tableId: TableId; visitId: V
   );
   const count = table.visits.length + others.length;
   return (
-    <Section title="At this table" aside={count === 1 ? "1 player" : `${count} players`}>
+    <Section
+      title="At this table"
+      aside={players(
+        count,
+        [...table.visits, ...others].every((item) => item.visit.finishedAt !== null),
+      )}
+    >
       <List as="ul" label="Players at this table">
         {table.visits.map((item) => (
           <li key={item.visit.id}>
