@@ -6,13 +6,14 @@ import {
   RecordingCommand,
   RecordingOperationId,
   type RecordingIdentity,
+  type TableDetails,
 } from "@stacks/contracts/recordingCommands";
 
 import { usd } from "./fixtures.ts";
 import { TestApi } from "./TestApi.ts";
 
 export const uuid = () => crypto.randomUUID();
-const at = (minutes: number) => DateTime.makeUnsafe(Date.UTC(2026, 10, 7, 20, minutes));
+export const at = (minutes: number) => DateTime.makeUnsafe(Date.UTC(2026, 10, 7, 20, minutes));
 const secret = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) =>
     byte.toString(16).padStart(2, "0"),
@@ -154,6 +155,21 @@ export const correct = (
     entryId,
     reason: "Wrong amount",
     replacement: { id: EntryId.make(uuid()), amount: usd(9000), occurredAt: at(5), note: null },
+  });
+
+/** Changes a visit's start, or its table's details, after the fact. */
+export const edit = (
+  identity: RecordingIdentity,
+  visitId: VisitId,
+  expectedRevision: number,
+  change: { startedAt?: DateTime.Utc; table?: TableDetails },
+) =>
+  RecordingCommand.make({
+    type: "edit_visit",
+    ...common(identity, 40),
+    visitId,
+    expectedRevision,
+    ...change,
   });
 
 export const recorderCommand = (

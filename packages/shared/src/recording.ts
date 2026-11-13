@@ -311,7 +311,43 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       );
     requireValid(visit.revision < Number.MAX_SAFE_INTEGER, "Visit revision overflow.");
     let finishedAt = visit.finishedAt;
-    if (command.type === "add" || command.type === "finish") {
+    let startedAt = visit.startedAt;
+    if (command.type === "edit_visit") {
+      requireValid(
+        command.startedAt !== undefined || command.table !== undefined,
+        "Change the start time, game or venue.",
+      );
+      if (command.startedAt !== undefined) {
+        const start = command.startedAt;
+        requireValid(
+          finishedAt === null || ms(start) <= ms(finishedAt),
+          "The start time can't be after the session finished.",
+        );
+        requireValid(
+          entries.every((entry) => entry.visitId !== visit.id || ms(entry.occurredAt) >= ms(start)),
+          "The start time can't be after the first buy-in.",
+        );
+        startedAt = start;
+      }
+      if (command.table !== undefined) {
+        if (
+          actorPlayers !== null &&
+          !authorize(
+            table,
+            actorPlayers,
+            table.starterPlayerId,
+            state.participants,
+            state.recorders,
+          )
+        )
+          throw new RecordingError(
+            "forbidden",
+            "Only whoever records for everyone at this table can change its game or venue.",
+          );
+        const index = tables.findIndex((item) => item.id === table.id);
+        tables[index] = Table.make({ ...table, ...command.table });
+      }
+    } else if (command.type === "add" || command.type === "finish") {
       requireValid(
         visit.finishedAt === null,
         "This visit has finished. Start a new visit when returning.",
@@ -400,7 +436,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     }
     visits = visits.map((item) =>
       item.id === visit.id
-        ? Visit.make({ ...visit, finishedAt, revision: visit.revision + 1 })
+        ? Visit.make({ ...visit, startedAt, finishedAt, revision: visit.revision + 1 })
         : item,
     );
   }

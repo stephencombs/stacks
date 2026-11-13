@@ -10,16 +10,23 @@ import {
 import { gameNames } from "@stacks/client-runtime/format";
 import type { RecordingInput, RecordingReceipt } from "@stacks/client-runtime/recording";
 import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
-import { useRecordingSubmit, useServerTable } from "@stacks/client-runtime/recordingReact";
+import {
+  useBuyInTotal,
+  useRecordingSubmit,
+  useServerTable,
+} from "@stacks/client-runtime/recordingReact";
 import {
   amountInputText,
   localDateText,
+  localTimeText,
   parsePastSessionTimes,
   parseRecordingAmount,
+  parseTimeNear,
   RECORDING_CURRENCY,
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
 import { decimalSeparator, formatMoney } from "@stacks/shared/money";
+import * as DateTime from "effect/DateTime";
 import { useState, type ReactNode } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
 
@@ -198,7 +205,7 @@ function RecordingSheet({
   submitLabel: string;
   submitVariant?: "primary" | "danger";
   cancelLabel?: string;
-  save: ReturnType<typeof useRecordingSubmit>;
+  save: { readonly pending: boolean; readonly error: string | null };
   onSubmit: () => void;
   onClose: () => void;
   children: ReactNode;
@@ -240,7 +247,7 @@ const games: ReadonlyArray<{ value: GameChoice; label: string }> = [
   ...Game.literals.map((game) => ({ value: game, label: gameNames[game] })),
 ];
 
-function DetailsFields({
+function GameFields({
   game,
   highLimit,
   onGame,
@@ -254,8 +261,7 @@ function DetailsFields({
   const [choosing, setChoosing] = useState(false);
   const gameLabel = games.find((option) => option.value === game)!.label;
   return (
-    <View className="gap-1.5">
-      <Text className="px-1 type-footnote font-medium text-muted">Details (optional)</Text>
+    <>
       <View className="overflow-hidden rounded-xl bg-surface">
         <Pressable
           accessibilityRole="button"
@@ -290,6 +296,15 @@ function DetailsFields({
           }}
         />
       ) : null}
+    </>
+  );
+}
+
+function DetailsFields(props: Parameters<typeof GameFields>[0]) {
+  return (
+    <View className="gap-1.5">
+      <Text className="px-1 type-footnote font-medium text-muted">Details (optional)</Text>
+      <GameFields {...props} />
     </View>
   );
 }
@@ -509,11 +524,54 @@ export function RebuySheet({
   );
 }
 
-const afterOptions = [
-  { value: "keep", label: "Keep playing" },
-  { value: "finish", label: "Finish playing" },
-] as const;
+/**
+ * A time field for when something happened, between `earliest` and `latest`. Left as it opened,
+ * it keeps `initial` to the second, so finishing in the minute a session started still follows it.
+ */
+function useClock(initial: DateTime.Utc) {
+  const [text, setText] = useState(() => localTimeText(initial));
+  const [error, setError] = useState<string | null>(null);
+  return {
+    text,
+    error,
+    set: (next: string) => {
+      setText(next);
+      setError(null);
+    },
+    /** The moment, or null after showing why it can't be saved. */
+    read: (
+      latest: { readonly at: DateTime.Utc; readonly error: string },
+      earliest: { readonly at: DateTime.Utc; readonly error: string } | null,
+    ) => {
+      const value = text === localTimeText(initial) ? initial : parseTimeNear(text, latest.at);
+      const ms = value && DateTime.toEpochMillis(value);
+      const problem =
+        ms === null
+          ? "Enter a time like 21:30."
+          : ms > DateTime.toEpochMillis(latest.at)
+            ? latest.error
+            : earliest !== null && ms < DateTime.toEpochMillis(earliest.at)
+              ? earliest.error
+              : null;
+      setError(problem);
+      return problem === null ? value : null;
+    },
+  };
+}
 
+function ClockField({ label, clock }: { label: string; clock: ReturnType<typeof useClock> }) {
+  return (
+    <DateTimeField
+      label={label}
+      kind="time"
+      value={clock.text}
+      onChange={clock.set}
+      error={clock.error}
+    />
+  );
+}
+
+/** Cashing out finishes the visit: what they left with, and when. */
 export function CashOutSheet({
   visit,
   onClose,
@@ -525,31 +583,33 @@ export function CashOutSheet({
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 0);
-  const [after, setAfter] = useState<"keep" | "finish">("keep");
+  const [now] = useState(() => DateTime.makeUnsafe(Date.now()));
+  const clock = useClock(now);
   const paid = usePaidBy(visit);
   const previous = visit.totals.cashOut;
   return (
     <RecordingSheet
       title="Cash out"
-      submitLabel={after === "finish" ? "Cash out and finish" : "Record cash-out"}
+      description="This finishes the session and works out its result."
+      submitLabel="Cash out"
       save={save}
       onClose={onClose}
       onSubmit={async () => {
         const value = amount.read();
-        if (value === null) return;
-        const input =
-          after === "finish"
-            ? ({ type: "finish", visitId: visit.visit.id, amount: value, ...paid.input() } as const)
-            : ({
-                type: "add",
-                visitId: visit.visit.id,
-                kind: "cash_out",
-                amount: value,
-                ...paid.input(),
-              } as const);
+        const finishedAt = clock.read(
+          { at: DateTime.makeUnsafe(Date.now()), error: "The session can't finish in the future." },
+          { at: visit.visit.startedAt, error: "The session can't finish before it started." },
+        );
+        if (value === null || finishedAt === null) return;
+        const input = {
+          type: "finish",
+          visitId: visit.visit.id,
+          amount: value,
+          finishedAt,
+          ...paid.input(),
+        } as const;
         const receipt = await save.submit(input);
-        if (receipt?.command.type === "add" || receipt?.command.type === "finish")
-          onSaved(receipt.command.entryId, input);
+        if (receipt?.command.type === "finish") onSaved(receipt.command.entryId, input);
       }}
     >
       <KeypadAmount
@@ -558,7 +618,7 @@ export function CashOutSheet({
         hint={
           previous > 0 ? (
             <>
-              Just this cash-out. Earlier ones total{" "}
+              Earlier cash-outs total{" "}
               <Money
                 amount={previous}
                 currency={RECORDING_CURRENCY}
@@ -577,19 +637,169 @@ export function CashOutSheet({
           onPress={() => amount.set(amountInputText(0))}
         />
       </View>
+      <ClockField label="Finished at" clock={clock} />
       <PaidField label="Paid to" paid={paid} />
+    </RecordingSheet>
+  );
+}
+
+const totalModes = [
+  { value: "add", label: "Add" },
+  { value: "subtract", label: "Subtract" },
+  { value: "set", label: "Set total" },
+] as const;
+
+/**
+ * The buy-in as one total: add to it, take from it, or set it. Behind it, a buy-in or corrections
+ * keep every amount in the history.
+ */
+export function BuyInTotalSheet({
+  visit,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const save = useBuyInTotal(visit.visit.id);
+  const [mode, setMode] = useState<(typeof totalModes)[number]["value"]>("add");
+  const amount = useAmount("", 1);
+  const current = visit.totals.buyIn;
+  const typed = parseRecordingAmount(amount.text, 1);
+  const total =
+    typed.error !== null
+      ? null
+      : mode === "add"
+        ? current + typed.amount
+        : mode === "subtract"
+          ? current - typed.amount
+          : typed.amount;
+  return (
+    <RecordingSheet
+      title="Buy-in"
+      description={`Now ${money(current)} in.`}
+      submitLabel="Save buy-in"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const value = amount.read();
+        if (value === null || total === null) return;
+        if (await save.set(total)) onSaved();
+      }}
+    >
       <Choice
-        label="After this cash-out"
-        options={afterOptions}
-        value={after}
-        onChange={setAfter}
+        label="Change"
+        options={totalModes}
+        value={mode}
+        onChange={(next) => {
+          setMode(next);
+          save.clearError();
+        }}
       />
-      {after === "finish" ? (
-        <Text className="px-1 type-footnote text-muted">
-          Finishing ends your play in this session and works out its final result. Coming back later
-          starts a new session.
-        </Text>
-      ) : null}
+      <KeypadAmount
+        label={mode === "set" ? "New total" : "Amount"}
+        amount={amount}
+        hint={
+          total === null ? undefined : total > 0 ? (
+            <>
+              New total{" "}
+              <Money
+                amount={MinorUnits.make(total)}
+                currency={RECORDING_CURRENCY}
+                className="type-footnote text-muted"
+              />
+            </>
+          ) : (
+            "The buy-in total must be more than zero."
+          )
+        }
+      />
+    </RecordingSheet>
+  );
+}
+
+/** When the visit started. It can move earlier, or later up to the first buy-in. */
+export function StartTimeSheet({
+  visit,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const save = useRecordingSubmit();
+  const clock = useClock(visit.visit.startedAt);
+  const [now] = useState(() => DateTime.makeUnsafe(Date.now()));
+  const first = visit.entries.reduce(
+    (earliest, entry) =>
+      DateTime.toEpochMillis(entry.occurredAt) < DateTime.toEpochMillis(earliest)
+        ? entry.occurredAt
+        : earliest,
+    visit.visit.finishedAt ?? now,
+  );
+  return (
+    <RecordingSheet
+      title="Start time"
+      description="When you sat down. It can't be after your first buy-in."
+      submitLabel="Save start time"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const startedAt = clock.read(
+          { at: first, error: "The start can't be after your first buy-in." },
+          null,
+        );
+        if (startedAt === null) return;
+        const receipt = await save.submit({
+          type: "edit_visit",
+          visitId: visit.visit.id,
+          startedAt,
+        });
+        if (receipt) onSaved();
+      }}
+    >
+      <ClockField label="Started at" clock={clock} />
+    </RecordingSheet>
+  );
+}
+
+/** The table's game and whether it's high limit. */
+export function GameSheet({
+  visit,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const save = useRecordingSubmit();
+  const [game, setGame] = useState<GameChoice>(visit.table.game ?? "none");
+  const [highLimit, setHighLimit] = useState(visit.table.highLimit);
+  return (
+    <RecordingSheet
+      title="Game"
+      submitLabel="Save game"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const receipt = await save.submit({
+          type: "edit_visit",
+          visitId: visit.visit.id,
+          table: {
+            game: game === "none" ? null : game,
+            venueId: visit.table.venueId,
+            highLimit,
+          },
+        });
+        if (receipt) onSaved();
+      }}
+    >
+      <View className="gap-1.5">
+        <GameFields game={game} highLimit={highLimit} onGame={setGame} onHighLimit={setHighLimit} />
+      </View>
     </RecordingSheet>
   );
 }

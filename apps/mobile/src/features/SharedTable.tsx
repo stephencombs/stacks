@@ -22,6 +22,10 @@ import { webUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
 import { AddPlayerSheet } from "./RecordingForms";
 
+/** How many played here, and whether the table has closed: it closes once nobody is playing. */
+const players = (count: number, closed: boolean) =>
+  `${count === 1 ? "1 player" : `${count} players`}${closed ? " · Closed" : ""}`;
+
 /**
  * Everyone recorded at this visit's table, each opening their own visit. Whoever started the
  * table, and the recorders it appointed, record for all of them; only the starter shares it and
@@ -43,7 +47,14 @@ export function TableSection({
   const signedOut = account.available && account.isLoaded && !account.isSignedIn;
   return (
     <View className="gap-2">
-      <SectionHeading>At this table</SectionHeading>
+      <SectionHeading
+        count={players(
+          table.visits.length,
+          table.visits.every((item) => item.visit.finishedAt !== null),
+        )}
+      >
+        At this table
+      </SectionHeading>
       <List>
         {table.visits.map((item) => (
           <Row
@@ -217,7 +228,14 @@ function JoinedTableSection({
   ];
   return (
     <View className="gap-2">
-      <SectionHeading>At this table</SectionHeading>
+      <SectionHeading
+        count={players(
+          rows.length,
+          rows.every((item) => item.visit.finishedAt !== null),
+        )}
+      >
+        At this table
+      </SectionHeading>
       <List>
         {rows.map((item) => (
           <Row
