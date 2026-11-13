@@ -1,19 +1,21 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-13
 priority: high
 tags:
-  - recording
-  - web
-  - mobile
-  - api
+- recording
+- web
+- mobile
+- api
 depends_on:
-  - "002"
-parent: "001"
+- '002'
+parent: '001'
 created_at: 2026-11-13T04:24:59.125611136Z
-updated_at: 2026-11-13T04:24:59.125611136Z
+updated_at: 2026-11-13T05:26:32.385377986Z
+transitions:
+- status: in-progress
+  at: 2026-11-13T05:26:32.385377986Z
 ---
-
 # Live session: full screen, buy-in total and cash out
 
 ## Overview

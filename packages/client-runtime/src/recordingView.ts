@@ -21,6 +21,7 @@ import {
   type RecordingOperationId,
 } from "@stacks/contracts/recordingCommands";
 
+import type { RecordingInput } from "./recording.ts";
 import { RecordingError, type RecordingRejection, type RecordingState } from "./recordingState.ts";
 import { RecordingStorageConflict, RecordingStorageError } from "./recordingStorage.ts";
 import {
@@ -236,6 +237,43 @@ export const recordingVisit = (
   };
 };
 
+/**
+ * The next change that brings a visit's buy-ins to `total`: one more buy-in for the difference, or
+ * a correction to the newest buy-in still standing when the total goes down. Corrections void the
+ * buy-in, or replace it with what's left of it, so history keeps every amount. Null once the total
+ * matches. Apply it, then ask again: a smaller total can take several corrections.
+ */
+export const nextBuyInChange = (
+  visit: RecordingVisitView,
+  total: number,
+): RecordingInput | null => {
+  if (!Number.isSafeInteger(total) || total <= 0)
+    throw new RecordingError("invalid", "The buy-in total must be more than zero.");
+  const current = visit.totals.buyIn;
+  if (total === current) return null;
+  if (total > current)
+    return { type: "add", visitId: visit.visit.id, kind: "buy_in", amount: total - current };
+  const newest = visit.entries
+    .filter((entry) => entry.kind === "buy_in" && entry.voidedAt === null)
+    .toSorted(
+      (a, b) => ms(b.occurredAt) - ms(a.occurredAt) || ms(b.createdAt) - ms(a.createdAt),
+    )[0]!;
+  const remaining = newest.amount - (current - total);
+  return {
+    type: "correct",
+    visitId: visit.visit.id,
+    entryId: newest.id,
+    reason: "Buy-in total changed",
+    replacement:
+      remaining > 0
+        ? {
+            amount: remaining,
+            ...(newest.counterpartyId === null ? {} : { counterpartyId: newest.counterpartyId }),
+          }
+        : null,
+  };
+};
+
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
 
 /**
@@ -378,9 +416,11 @@ export const describeRecordingRejection = ({ command, reason }: RecordingRejecti
                 ? "A correction"
                 : command.type === "reopen"
                   ? "Reopening a session"
-                  : command.type === "appoint_recorder"
-                    ? "Letting a player record for everyone"
-                    : "Stopping a recorder";
+                  : command.type === "edit_visit"
+                    ? "Changing a session's details"
+                    : command.type === "appoint_recorder"
+                      ? "Letting a player record for everyone"
+                      : "Stopping a recorder";
   const why =
     reason === "conflict"
       ? "The session changed on another device."

@@ -385,6 +385,16 @@ const save = Effect.fn("Recording.save")(function* (
         ${table.highLimit})
     `;
   }
+  // An edit replaces its table's record; every other table comes back as it was.
+  for (const table of after.tables) {
+    const previous = before.tables.find((item) => item.id === table.id);
+    if (previous && previous !== table)
+      yield* sql`
+        update tables
+        set game = ${table.game}, venue_id = ${table.venueId}, high_limit = ${table.highLimit}
+        where id = ${table.id}
+      `;
+  }
   for (const player of after.players.filter((player) => !before.players.includes(player))) {
     yield* sql`
       insert into players (id, display_name, created_by_actor)
@@ -403,7 +413,8 @@ const save = Effect.fn("Recording.save")(function* (
   } else {
     yield* sql`
       update personal_visits
-      set finished_at = ${visit.finishedAt ? date(visit.finishedAt) : null},
+      set started_at = ${date(visit.startedAt)},
+        finished_at = ${visit.finishedAt ? date(visit.finishedAt) : null},
         revision = ${visit.revision}
       where id = ${visit.id}
     `;

@@ -348,6 +348,13 @@ const settled = (
     );
   const finishedAt = (at: DateTime.Utc) =>
     visit.finishedAt !== null && ms(visit.finishedAt) === ms(at);
+  // An edit since changed where the visit started and what its table is.
+  const edited = ledger.receipts.some(
+    (receipt) =>
+      receipt.command.type === "edit_visit" &&
+      receipt.command.visitId === visit.id &&
+      receipt.command.operationId !== command.operationId,
+  );
   switch (command.type) {
     case "start":
     case "record_completed": {
@@ -355,10 +362,11 @@ const settled = (
       return (
         table !== undefined &&
         table.id === command.tableId &&
-        table.game === command.game &&
-        table.venueId === command.venueId &&
-        table.highLimit === command.highLimit &&
-        ms(visit.startedAt) === ms(command.startedAt) &&
+        (edited ||
+          (table.game === command.game &&
+            table.venueId === command.venueId &&
+            table.highLimit === command.highLimit &&
+            ms(visit.startedAt) === ms(command.startedAt))) &&
         entry(command.buyInId, "buy_in", command.buyIn, command.startedAt) &&
         (command.type === "start" ||
           (entry(command.cashOutId, "cash_out", command.cashOut, command.finishedAt) &&
@@ -369,7 +377,7 @@ const settled = (
       return (
         visit.tableId === command.tableId &&
         visit.playerId === command.playerId &&
-        ms(visit.startedAt) === ms(command.startedAt) &&
+        (edited || ms(visit.startedAt) === ms(command.startedAt)) &&
         entry(command.buyInId, "buy_in", command.buyIn, command.startedAt)
       );
     case "add":
@@ -398,6 +406,7 @@ const settled = (
       );
     }
     case "reopen":
+    case "edit_visit":
       return false;
   }
 };
@@ -527,6 +536,13 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
       };
     case "reopen":
       return { type: "reopen", visitId, reason: command.reason };
+    case "edit_visit":
+      return {
+        type: "edit_visit",
+        visitId,
+        ...optional("startedAt", command.startedAt ?? null),
+        ...optional("table", command.table ?? null),
+      };
   }
 };
 
