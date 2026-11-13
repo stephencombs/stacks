@@ -43,6 +43,7 @@ import {
 } from "./recordingCommands.ts";
 import {
   ClaimPreview,
+  CrewActivityPage,
   GroupDetail,
   GroupListItem,
   GroupStats,
@@ -236,6 +237,19 @@ const GroupsGroup = HttpApiGroup.make("groups")
       payload: SetRoleRequest,
       success: Ok,
       error: [Forbidden, NotFound, Conflict],
+    }),
+  )
+  .middleware(Authentication);
+
+export const CrewActivityQuery = Schema.Struct({ cursor: Schema.optionalKey(Schema.String) });
+
+/** Activity across every group the caller is in, for the Crew tab. */
+const CrewGroup = HttpApiGroup.make("crew")
+  .add(
+    HttpApiEndpoint.get("activity", "/crew/activity", {
+      query: CrewActivityQuery,
+      success: CrewActivityPage,
+      error: InvalidRequest,
     }),
   )
   .middleware(Authentication);
@@ -634,6 +648,7 @@ const ClaimGroup = HttpApiGroup.make("claim")
 export class StacksApi extends HttpApi.make("stacks")
   .add(HealthGroup)
   .add(GroupsGroup)
+  .add(CrewGroup)
   .add(InvitesGroup)
   .add(GuestsGroup)
   .add(VenuesGroup)
