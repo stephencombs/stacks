@@ -75,7 +75,7 @@ export function GroupsList() {
 
 const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "MXN", "JPY"] as const;
 
-export function CreateGroupDialog({
+function CreateGroupDialog({
   open,
   onOpenChange,
 }: {

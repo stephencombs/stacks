@@ -1,11 +1,8 @@
 import { useUser } from "@clerk/expo";
-import { useAtomValue } from "@effect/atom-react";
 import { CurrencyCode, GroupId } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
-import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BalanceLabel } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -14,7 +11,6 @@ import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, PageTitle, Row, Tag } from "../components/ui/Surface";
-import { YouButton } from "../features/You";
 import { useGo } from "../lib/go";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
@@ -23,21 +19,6 @@ import { RowsSkeleton } from "../features/ScreenSkeletons";
  * The places once you're in a group; until then, a way to start one. Join and claim links still
  * open over this, so a friend's invite is the other way in.
  */
-export function NoGroups({ children }: { children: ReactNode }) {
-  const stacks = useStacks();
-  const insets = useSafeAreaInsets();
-  const groups = useAtomValue(stacks.groups);
-  if (!AsyncResult.isSuccess(groups) || groups.value.length > 0) return children;
-  return (
-    <View className="flex-1 bg-canvas" style={{ paddingTop: insets.top }}>
-      <View className="flex-row justify-end px-2">
-        <YouButton />
-      </View>
-      <GroupsScreen />
-    </View>
-  );
-}
-
 /** Every group you're in, and a new one. */
 export function GroupsScreen() {
   const stacks = useStacks();

@@ -67,14 +67,14 @@ Amounts are `Money` with a weight or size beside it, such as `font-semibold` in 
 
 ## Radius
 
-| Class          | Use it for                                                                                                                                                                     |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `rounded-md`   | Static tags (`BETA`), web selected segment, quota progress bars (`24px` h)                                                                                                     |
-| `rounded-lg`   | Web buttons and inputs, menu items, skeletons, mobile row avatar `Chip`                                                                                                        |
-| `rounded-xl`   | Web cards and menus, mobile sunken wells inside a `rounded-2xl` `Surface`                                                                                                      |
-| `rounded-2xl`  | Mobile `Surface` cards (`20px`), grouped settings lists, hero cards, web dialogs                                                                                               |
-| `rounded-3xl`  | Mobile bottom sheets (`rounded-t-3xl`)                                                                                                                                         |
-| `rounded-full` | Floating capsule tab bar, active tab thumb, pill segmented controls (`Choice`), horizontal filter pills (`FilterPill`), circular top-bar `IconButton` (`44×44px`), status dots |
+| Class          | Use it for                                                                                                                             |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `rounded-md`   | Static tags (`BETA`), web selected segment, quota progress bars (`24px` h)                                                             |
+| `rounded-lg`   | Web buttons and inputs, menu items, skeletons, mobile row avatar `Chip`                                                                |
+| `rounded-xl`   | Web cards and menus, mobile sunken wells inside a `rounded-2xl` `Surface`                                                              |
+| `rounded-2xl`  | Mobile `Surface` cards (`20px`), grouped settings lists, hero cards, web dialogs                                                       |
+| `rounded-3xl`  | Mobile bottom sheets (`rounded-t-3xl`)                                                                                                 |
+| `rounded-full` | Floating capsule tab bar, active tab thumb, pill segmented controls (`Choice`), circular top-bar `IconButton` (`44×44px`), status dots |
 
 Nested radii are concentric (`innerRadius = outerRadius - padding`): `Menu` is `rounded-xl` with `p-1` around `rounded-lg` (12 − 4 = 8); the mobile floating tab bar and `Choice` segmented control are `rounded-full` tracks with `p-1` / `p-1.5` around a `rounded-full` active thumb. Never copy a non-pill parent's radius onto a child without subtracting padding.
 
@@ -119,7 +119,7 @@ Motion says what just happened. If it doesn't, cut it. Web uses CSS transitions 
 | Board rows reordering (`useReorder`) | 450ms | none  | in-out                    |
 
 - Animate only `transform`, `opacity`, colors, and `box-shadow` on a control's own hover or focus. Name the properties: `transition-[scale,opacity]`, never `transition-all`.
-- On mobile, every interactive surface (`Button`, `IconButton`, `FilterPill`, floating tab items, pressable `Card` and `Row`) gives immediate tactile press feedback (`scale(0.97)` on `onPressIn` with **ease-out**, springing back on release) paired with selection/impact haptics where appropriate.
+- On mobile, every interactive surface (`Button`, `IconButton`, floating tab items, pressable `Card` and `Row`) gives immediate tactile press feedback (`scale(0.97)` on `onPressIn` with **ease-out**, springing back on release) paired with selection/impact haptics where appropriate.
 - Signal active selection on tabs and segmented controls with surface (`bg-surface` / `bg-fill`) and color (`text-ink` / `text-felt`) plus **filled vs. outlined** icon swaps—never by changing font weight alone in a way that reflows layout.
 - Paired parts share timing: a dialog and its backdrop use the same duration and easing.
 - Menus scale from their trigger with `origin-[var(--transform-origin)]`.

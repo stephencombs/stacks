@@ -23,9 +23,10 @@ export const placeTabsConfig = {
 };
 
 const icons: Record<string, IconName> = {
-  Sessions: "sessions",
-  Board: "board",
-  Group: "group",
+  Play: "sessions",
+  Stats: "stats",
+  Map: "map",
+  Crew: "group",
 };
 
 export const placeTab = (title: string, _symbol: string): BottomTabNavigationOptions => ({
