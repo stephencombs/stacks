@@ -1,7 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as TestClock from "effect/testing/TestClock";
 import type { CrewActivityItem, EntryId, PlayerId, SessionId, TripId } from "@stacks/contracts";
 
 import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
@@ -10,9 +9,6 @@ import { TestApi } from "../testing/TestApi.ts";
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
 const day = (n: number) => DateTime.makeUnsafe(Date.UTC(2026, 9, 20 + n, 20));
-
-// Trips created without a start time start now, so now must come after every day(n) a test uses.
-const afterTheseDays = TestClock.setTime(Date.UTC(2026, 10, 1));
 
 const startSession = Effect.fn("test.startSession")(function* (
   client: Client,
@@ -69,7 +65,6 @@ const itemTime = (item: CrewActivityItem) =>
 it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
   it.effect("gathers every group you're in, newest first", () =>
     Effect.gen(function* () {
-      yield* afterTheseDays;
       const { alex, bea, cal } = yield* users("alex", "bea", "cal");
       const vegas = yield* groupWith(alex, bea);
       const reno = yield* groupWith(cal, alex);
@@ -97,7 +92,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
       );
       const times = items.map(itemTime);
       expect(times).toEqual([...times].sort((a, b) => b - a));
-      expect(items.slice(-2).map(itemId)).toEqual([live, finished]);
+      // groupWith's trips start at the TestClock's now, so only the sessions' order is fixed here.
+      expect(items.map(itemId).filter((id) => id === live || id === finished)).toEqual([
+        live,
+        finished,
+      ]);
 
       expect(items.find((item) => itemId(item) === live)).toMatchObject({
         kind: "session_live",
@@ -126,7 +125,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
 
   it.effect("pages without skipping or repeating, even when items share a time", () =>
     Effect.gen(function* () {
-      yield* afterTheseDays;
       const { alex } = yield* users("alex");
       const group = yield* groupWith(alex);
       // Three trips at each time, so pages split between items that tie.
@@ -141,10 +139,9 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
       expect(first.items).toHaveLength(50);
       expect(first.nextCursor).not.toBeNull();
       // Something newer arriving doesn't shift the older pages.
-      yield* TestClock.adjust("1 hour");
       yield* alex.trips.create({
         params: { groupId: group.group.id },
-        payload: { id: ids.trip(), name: "Late" },
+        payload: { id: ids.trip(), name: "Late", startedAt: day(1) },
       });
       const second = yield* feed(alex, first.nextCursor!);
       expect(second.items).toHaveLength(5);
