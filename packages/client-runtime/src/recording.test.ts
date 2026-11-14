@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
+import type { VisitId } from "@stacks/contracts";
 import { RecordingCommand } from "@stacks/contracts/recordingCommands";
 
 import { makeRecordingStore, type RecordingStore } from "./recording.ts";
@@ -10,6 +11,7 @@ import {
   type RecordingStorageChange,
   type RecordingStorageDocument,
 } from "./recordingStorage.ts";
+import { nextBuyInChange, recordingVisit } from "./recordingView.ts";
 
 const at = (hour: number) =>
   DateTime.makeUnsafe(`2026-11-06T${hour.toString().padStart(2, "0")}:00:00.000Z`);
@@ -748,6 +750,97 @@ describe("correcting one entry", () => {
     ).rejects.toThrow("Schema validation failed");
     expect(db.document).toEqual(before);
     expect(store.review(id).entries).toHaveLength(1);
+    await store.close();
+  });
+});
+
+describe("editing a session after the fact", () => {
+  it("moves the start earlier and sets the game and venue, surviving a reload", async () => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(start(store));
+    const id = visitId(store);
+    await save(store, {
+      type: "edit_visit",
+      visitId: id,
+      startedAt: at(8),
+      table: { game: "blackjack", venueId: null, highLimit: true },
+    });
+    store = await reload(store, db);
+    const state = store.getSnapshot().state!;
+    expect(state.visits[0]).toMatchObject({ startedAt: at(8), revision: 1 });
+    expect(state.tables[0]).toMatchObject({ game: "blackjack", highLimit: true });
+    await store.close();
+  });
+
+  it("refuses a start after the first buy-in or after the finish", async () => {
+    const store = await open(memory());
+    await store.execute(start(store));
+    const id = visitId(store);
+    await expect(
+      save(store, { type: "edit_visit", visitId: id, startedAt: at(11) }),
+    ).rejects.toThrow("The start time can't be after the first buy-in.");
+    await expect(save(store, { type: "edit_visit", visitId: id })).rejects.toThrow(
+      "Change the start time, game or venue.",
+    );
+    expect(store.getSnapshot().state!.visits[0]!.startedAt).toEqual(at(10));
+    await store.close();
+  });
+});
+
+describe("setting the buy-in total", () => {
+  const setTotal = async (store: RecordingStore, id: VisitId, total: number) => {
+    for (;;) {
+      const next = nextBuyInChange(recordingVisit(store.getSnapshot().state!, id)!, total);
+      if (next === null) return;
+      await save(store, next);
+    }
+  };
+  const buyIns = (store: RecordingStore, id: VisitId) =>
+    recordingVisit(store.getSnapshot().state!, id)!.entries.filter(
+      (entry) => entry.kind === "buy_in",
+    );
+
+  it("adds the difference as one buy-in when the total goes up", async () => {
+    const store = await open(memory());
+    await store.execute(start(store));
+    const id = visitId(store);
+    await setTotal(store, id, 35000);
+    expect(store.review(id).summary.totals.buyIn).toBe(35000);
+    expect(buyIns(store, id).map((entry) => entry.amount)).toEqual([20000, 15000]);
+    await store.close();
+  });
+
+  it("corrects the newest buy-ins when the total goes down, keeping every amount in history", async () => {
+    const store = await open(memory());
+    await store.execute(start(store));
+    const id = visitId(store);
+    await save(store, {
+      type: "add",
+      visitId: id,
+      kind: "buy_in",
+      amount: 10000,
+      occurredAt: at(11),
+    });
+    await setTotal(store, id, 15000);
+    expect(store.review(id).summary.totals.buyIn).toBe(15000);
+    const entries = buyIns(store, id);
+    // The $100 rebuy is voided, and the $200 start is replaced by $150.
+    expect(entries.filter((entry) => entry.voidedAt !== null).map((entry) => entry.amount)).toEqual(
+      expect.arrayContaining([10000, 20000]),
+    );
+    expect(entries.filter((entry) => entry.voidedAt === null).map((entry) => entry.amount)).toEqual(
+      [15000],
+    );
+    expect(nextBuyInChange(recordingVisit(store.getSnapshot().state!, id)!, 15000)).toBeNull();
+    await store.close();
+  });
+
+  it("refuses a total of zero", async () => {
+    const store = await open(memory());
+    await store.execute(start(store));
+    const visit = recordingVisit(store.getSnapshot().state!, visitId(store))!;
+    expect(() => nextBuyInChange(visit, 0)).toThrow("The buy-in total must be more than zero.");
     await store.close();
   });
 });

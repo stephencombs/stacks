@@ -1,8 +1,9 @@
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { formatDay, formatTime } from "@stacks/client-runtime/format";
+import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
 import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import {
+  useRecordingSubmit,
   useRecordingTable,
   useRecordingVisit,
   useServerTable,
@@ -17,11 +18,13 @@ import { MinorUnits, VisitId, type EntryId, type PlayEntry } from "@stacks/contr
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import { useCallback, useLayoutEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
+import { ActionMenu } from "../components/ui/ActionMenu";
 import { Button } from "../components/ui/Button";
+import { FormError } from "../components/ui/Field";
 import { HeaderTitle } from "../components/ui/HeaderTitle";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
@@ -29,12 +32,15 @@ import { cn } from "../components/ui/cn";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { useRecordingState } from "../lib/recording";
 import {
+  BuyInTotalSheet,
   CashOutSheet,
   CorrectSheet,
+  GameSheet,
   RebuySheet,
   SitDownSheet,
   ReopenSheet,
   StartSheet,
+  StartTimeSheet,
   VoidSheet,
 } from "../features/RecordingForms";
 import { TableSection } from "../features/SharedTable";
@@ -111,7 +117,17 @@ function Missing() {
 }
 
 type Open =
-  | { readonly type: "rebuy" | "cash_out" | "reopen" | "start" | "return" }
+  | {
+      readonly type:
+        | "rebuy"
+        | "cash_out"
+        | "reopen"
+        | "start"
+        | "return"
+        | "buy_in"
+        | "start_time"
+        | "game";
+    }
   | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId };
 
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
@@ -120,7 +136,13 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const { visit, status, error, retryLoad } = useRecordingVisit(visitId);
   const navigation = useNavigation();
   const [open, setOpen] = useState<Open | null>(null);
-  const [saved, setSaved] = useState<{ entryId: EntryId; text: string } | null>(null);
+  const [saved, setSaved] = useState<{
+    entryId: EntryId;
+    text: string;
+    undo?: boolean;
+  } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const quick = useRecordingSubmit();
   const table = useRecordingTable(visit?.visit.tableId ?? null);
   if (visit === null) return <Missing />;
   if (visit === undefined)
@@ -138,6 +160,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const entry = (id: EntryId) => visit.entries.find((item) => item.id === id)!;
   const recorded = (entryId: EntryId, input: RecordingInput) => {
     close();
+    setNotice(null);
     setSaved({
       entryId,
       text:
@@ -147,9 +170,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
             ? "Correction saved."
             : input.type === "add" && input.kind === "buy_in"
               ? `Rebuy of ${money(input.amount)} recorded.`
-              : input.type === "add"
-                ? `Cash-out of ${money(input.amount)} recorded. You're still playing.`
-                : "Saved.",
+              : "Saved.",
     });
   };
   const start = visit.visit.startedAt;
@@ -163,29 +184,46 @@ function Visit({ visitId }: { visitId: VisitId }) {
     !table.visits.some(
       (item) => item.player.id === player.player.id && item.visit.finishedAt === null,
     );
+  // Whoever records for everyone at the table changes its game; a player who joined it can't.
+  const canEditTable = table?.role !== "participant";
+  const rebuy = async (amount: number) => {
+    const receipt = await quick.submit({ type: "add", visitId, kind: "buy_in", amount });
+    if (receipt?.command.type === "add") {
+      setNotice(null);
+      setSaved({
+        entryId: receipt.command.entryId,
+        text: `Rebuy of ${money(amount)} recorded.`,
+        undo: true,
+      });
+    }
+  };
+  const undo = async (entryId: EntryId) => {
+    const receipt = await quick.submit({
+      type: "correct",
+      visitId,
+      entryId,
+      reason: "Undone",
+      replacement: null,
+    });
+    if (receipt) setSaved({ entryId, text: "Rebuy undone. It stays in the history, voided." });
+  };
+  const edited = (text: string) => {
+    close();
+    setSaved(null);
+    setNotice(text);
+  };
   return (
     <PersonalScreen
       dock={
         live ? (
-          <View className="flex-row gap-2">
-            <Button
-              key="rebuy"
-              label="Rebuy"
-              size="lg"
-              haptic
-              className="flex-1"
-              onPress={() => setOpen({ type: "rebuy" })}
-            />
-            <Button
-              key="cash-out"
-              label="Cash out"
-              variant="primary"
-              size="lg"
-              haptic
-              className="flex-1"
-              onPress={() => setOpen({ type: "cash_out" })}
-            />
-          </View>
+          <Button
+            key="cash-out"
+            label="Cash out"
+            variant="primary"
+            size="lg"
+            haptic
+            onPress={() => setOpen({ type: "cash_out" })}
+          />
         ) : !own || table?.role === "participant" ? (
           <>
             {canReturn ? (
@@ -240,19 +278,69 @@ function Visit({ visitId }: { visitId: VisitId }) {
         </Title>
         <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
       </View>
-      <VisitHero visit={visit} />
+      {live ? (
+        <LiveHero visit={visit} canEditTable={canEditTable} onEdit={(type) => setOpen({ type })} />
+      ) : (
+        <VisitHero visit={visit} />
+      )}
+      {live ? (
+        <View className="gap-2">
+          <SectionHeading>Rebuy</SectionHeading>
+          <View
+            className="flex-row flex-wrap gap-2"
+            accessibilityRole="toolbar"
+            accessibilityLabel="Rebuy amounts"
+          >
+            {visit.presets.map((preset) => (
+              <Button
+                key={preset}
+                label={`+ ${money(preset)}`}
+                size="lg"
+                haptic
+                disabled={quick.pending}
+                className="min-w-24 flex-1"
+                onPress={() => void rebuy(preset)}
+              />
+            ))}
+            <Button
+              label="Other amount"
+              variant="ghost"
+              size="lg"
+              className="min-w-24 flex-1"
+              onPress={() => setOpen({ type: "rebuy" })}
+            />
+          </View>
+          {quick.error ? <FormError>{quick.error}</FormError> : null}
+        </View>
+      ) : null}
+      {notice ? (
+        <View accessibilityLiveRegion="polite" className="rounded-xl bg-sunken px-4 py-2.5">
+          <Text className="text-sm text-ink">{notice}</Text>
+        </View>
+      ) : null}
       {saved ? (
         <View
           accessibilityLiveRegion="polite"
           className="flex-row flex-wrap items-center justify-between gap-2 rounded-xl bg-sunken py-1.5 pr-1.5 pl-4"
         >
           <Text className="min-w-0 flex-1 text-sm text-ink">{saved.text}</Text>
-          <Button
-            label="View entry"
-            variant="ghost"
-            size="sm"
-            onPress={() => setOpen({ type: "inspect", entryId: saved.entryId })}
-          />
+          <View className="flex-row gap-1">
+            {saved.undo ? (
+              <Button
+                label="Undo"
+                variant="ghost"
+                size="sm"
+                pending={quick.pending}
+                onPress={() => void undo(saved.entryId)}
+              />
+            ) : null}
+            <Button
+              label="View entry"
+              variant="ghost"
+              size="sm"
+              onPress={() => setOpen({ type: "inspect", entryId: saved.entryId })}
+            />
+          </View>
         </View>
       ) : null}
       <TableSection
@@ -268,6 +356,12 @@ function Visit({ visitId }: { visitId: VisitId }) {
         <RebuySheet visit={visit} onClose={close} onSaved={recorded} />
       ) : open?.type === "cash_out" ? (
         <CashOutSheet visit={visit} onClose={close} onSaved={recorded} />
+      ) : open?.type === "buy_in" ? (
+        <BuyInTotalSheet visit={visit} onClose={close} onSaved={() => edited("Buy-in saved.")} />
+      ) : open?.type === "start_time" ? (
+        <StartTimeSheet visit={visit} onClose={close} onSaved={() => edited("Start time saved.")} />
+      ) : open?.type === "game" ? (
+        <GameSheet visit={visit} onClose={close} onSaved={() => edited("Game saved.")} />
       ) : open?.type === "reopen" ? (
         <ReopenSheet
           visit={visit}
@@ -331,26 +425,70 @@ function Visit({ visitId }: { visitId: VisitId }) {
 
 const FIGURE = "type-hero";
 
+/** Now, ticking every 30 seconds, for a live session's clock. */
+function useMinuteClock() {
+  const [now, setNow] = useState(() => DateTime.nowUnsafe());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(DateTime.nowUnsafe()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+type EditField = "buy_in" | "start_time" | "game";
+
+/** A live session at a glance: how long, how much in, what game, and a way to fix any of it. */
+function LiveHero({
+  visit,
+  canEditTable,
+  onEdit,
+}: {
+  visit: RecordingVisitView;
+  canEditTable: boolean;
+  onEdit: (field: EditField) => void;
+}) {
+  const now = useMinuteClock();
+  const game = visit.table.game ? gameNames[visit.table.game] : null;
+  return (
+    <View className="gap-3 overflow-hidden rounded-2xl border border-line bg-surface p-5">
+      <View className="flex-row items-start gap-4">
+        <View className="min-w-0 flex-1 gap-1">
+          <Text className="type-label text-muted">Playing for</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit className={cn(FIGURE, "text-ink")}>
+            {formatDuration(visit.visit.startedAt, now)}
+          </Text>
+        </View>
+        <View className="min-w-0 flex-1 gap-1">
+          <Text className="type-label text-muted">In</Text>
+          <Money amount={visit.totals.buyIn} currency={RECORDING_CURRENCY} fit className={FIGURE} />
+        </View>
+        <ActionMenu
+          label="Edit session"
+          actions={[
+            { label: "Buy-in", onPress: () => onEdit("buy_in") },
+            { label: "Start time", onPress: () => onEdit("start_time") },
+            ...(canEditTable ? [{ label: "Game", onPress: () => onEdit("game") }] : []),
+          ]}
+        />
+      </View>
+      <Text className="type-footnote text-muted">
+        {[
+          game ?? "Game not set",
+          visit.table.highLimit ? "High limit" : null,
+          `since ${formatTime(visit.visit.startedAt)}`,
+          visit.totals.cashOut > 0 ? `${money(visit.totals.cashOut)} out` : null,
+          "result pending",
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </Text>
+    </View>
+  );
+}
+
 function VisitHero({ visit }: { visit: RecordingVisitView }) {
   const { totals, finalResult } = visit;
-  if (finalResult === null)
-    return (
-      <View className="overflow-hidden rounded-2xl border border-line bg-surface p-5">
-        <View className="flex-row gap-4">
-          <View className="min-w-0 flex-1 gap-1">
-            <Text className="type-label text-muted">Total in</Text>
-            <Money amount={totals.buyIn} currency={RECORDING_CURRENCY} fit className={FIGURE} />
-          </View>
-          <View className="min-w-0 flex-1 gap-1">
-            <Text className="type-label text-muted">Total out</Text>
-            <Money amount={totals.cashOut} currency={RECORDING_CURRENCY} fit className={FIGURE} />
-          </View>
-        </View>
-        <Text className="mt-3 type-footnote text-muted">
-          Final result pending until you finish playing.
-        </Text>
-      </View>
-    );
+  if (finalResult === null) return null;
   return (
     <View className="overflow-hidden rounded-2xl border border-line bg-surface p-5">
       <View className="gap-1">

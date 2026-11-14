@@ -837,9 +837,6 @@ function CloseSessionDialog({
           >
             Close and move tables
           </Button>
-          <Button variant="ghost" size="lg" onClick={() => onOpenChange(false)}>
-            Keep playing
-          </Button>
         </div>
       </form>
     </Dialog>

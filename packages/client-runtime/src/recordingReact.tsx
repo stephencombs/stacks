@@ -46,6 +46,7 @@ import {
   recordingHome,
   recordingSyncView,
   recordingTable,
+  nextBuyInChange,
   recordingVisit,
 } from "./recordingView.ts";
 
@@ -288,6 +289,43 @@ export const useRecordingSubmit = () => {
     }
   };
   return { ...state, submit, clearError: () => setState((s) => ({ ...s, error: null })) };
+};
+
+/**
+ * Sets a live visit's buy-in total from one form: a buy-in for more, corrections for less, each
+ * saved before the next is worked out. Submitting again after a failure picks up where it stopped.
+ */
+export const useBuyInTotal = (visitId: VisitId) => {
+  const store = useRecordingStore();
+  const [submission] = useState(() => makeRecordingSubmission(store));
+  const busy = useRef(false);
+  const [state, setState] = useState<{ pending: boolean; error: string | null }>({
+    pending: false,
+    error: null,
+  });
+  const set = async (total: number) => {
+    if (busy.current) return false;
+    busy.current = true;
+    setState({ pending: true, error: null });
+    try {
+      for (;;) {
+        const ledger = store.getSnapshot().state;
+        const visit = ledger ? recordingVisit(ledger, visitId) : null;
+        if (!visit) throw new RecordingError("invalid", "Visit does not exist.");
+        const next = nextBuyInChange(visit, total);
+        if (next === null) break;
+        await submission(next);
+      }
+      setState({ pending: false, error: null });
+      return true;
+    } catch (error) {
+      setState({ pending: false, error: describeRecordingError(error) });
+      return false;
+    } finally {
+      busy.current = false;
+    }
+  };
+  return { ...state, set, clearError: () => setState((s) => ({ ...s, error: null })) };
 };
 
 /** A table and everyone recorded at it. `table` is undefined while loading, null if missing. */

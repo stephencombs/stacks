@@ -5,8 +5,10 @@ import { PlayerId } from "@stacks/contracts";
 import { RecordingCommand } from "@stacks/contracts/recordingCommands";
 
 import {
+  at,
   correct,
   device,
+  edit,
   finish,
   rebuy,
   sharedTable,
@@ -62,6 +64,46 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       expect(view.viewerRole).toBe("participant");
       expect(view.viewerPlayerId).toBe(joined.player.id);
       expect(view.visits).toHaveLength(2);
+    }),
+  );
+
+  it.effect("lets the starter change the table's details and a joiner only their own start", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { starter, opened, token } = yield* sharedTable();
+      const bea = yield* device();
+      const joined = yield* bea.join(token);
+      const sat = sitDown(bea.identity, opened.tableId, joined.player.id);
+      expect(yield* bea.push(sat)).toEqual(["accepted"]);
+
+      const details = { game: "craps", venueId: null, highLimit: true } as const;
+      expect(
+        yield* starter.push(edit(starter.identity, opened.visitId, 0, { table: details })),
+      ).toEqual(["accepted"]);
+      // A joiner may move their own start, never the table's game or venue.
+      expect(
+        yield* bea.push(
+          edit(bea.identity, sat.visitId, 0, { table: { ...details, game: "roulette" } }),
+          edit(bea.identity, sat.visitId, 0, { startedAt: at(1) }),
+        ),
+      ).toEqual(["forbidden", "accepted"]);
+      // A start after the first buy-in is refused.
+      expect(yield* bea.push(edit(bea.identity, sat.visitId, 1, { startedAt: at(30) }))).toEqual([
+        "invalid",
+      ]);
+
+      const [table] = yield* sql<{ game: string }>`
+        select game from tables where id = ${opened.tableId}
+      `;
+      expect(table?.game).toBe("craps");
+      const history = yield* starter.client.recording.history();
+      expect(history.tables).toMatchObject([
+        { id: opened.tableId, game: "craps", highLimit: true },
+      ]);
+      expect(history.visits.find((visit) => visit.id === sat.visitId)).toMatchObject({
+        startedAt: at(1),
+        revision: 1,
+      });
     }),
   );
 

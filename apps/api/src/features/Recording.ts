@@ -378,12 +378,25 @@ const save = Effect.fn("Recording.save")(function* (
     `;
     return;
   }
-  for (const table of after.tables.filter((table) => !before.tables.includes(table))) {
+  // By ID: an edit replaces its table's record with a new object, which is not a new table.
+  for (const table of after.tables.filter(
+    (table) => !before.tables.some((item) => item.id === table.id),
+  )) {
     yield* sql`
       insert into tables (id, starter_player_id, game, venue_id, high_limit)
       values (${table.id}, ${table.starterPlayerId}, ${table.game}, ${table.venueId},
         ${table.highLimit})
     `;
+  }
+  // An edit replaces its table's record; every other table comes back as it was.
+  for (const table of after.tables) {
+    const previous = before.tables.find((item) => item.id === table.id);
+    if (previous && previous !== table)
+      yield* sql`
+        update tables
+        set game = ${table.game}, venue_id = ${table.venueId}, high_limit = ${table.highLimit}
+        where id = ${table.id}
+      `;
   }
   for (const player of after.players.filter((player) => !before.players.includes(player))) {
     yield* sql`
@@ -403,7 +416,8 @@ const save = Effect.fn("Recording.save")(function* (
   } else {
     yield* sql`
       update personal_visits
-      set finished_at = ${visit.finishedAt ? date(visit.finishedAt) : null},
+      set started_at = ${date(visit.startedAt)},
+        finished_at = ${visit.finishedAt ? date(visit.finishedAt) : null},
         revision = ${visit.revision}
       where id = ${visit.id}
     `;

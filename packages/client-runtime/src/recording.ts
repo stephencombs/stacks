@@ -8,7 +8,11 @@ import {
   type Game,
   type VenueId,
 } from "@stacks/contracts";
-import { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
+import {
+  RecordingCommand,
+  RecordingOperationId,
+  type TableDetails,
+} from "@stacks/contracts/recordingCommands";
 import { projectVisit } from "@stacks/shared/visits";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
@@ -81,6 +85,12 @@ export type RecordingInput =
       } | null;
     }
   | { readonly type: "reopen"; readonly visitId: VisitId; readonly reason: string }
+  | {
+      readonly type: "edit_visit";
+      readonly visitId: VisitId;
+      readonly startedAt?: DateTime.Utc;
+      readonly table?: TableDetails;
+    }
   | { readonly type: "appoint_recorder"; readonly tableId: TableId; readonly playerId: PlayerId }
   | { readonly type: "revoke_recorder"; readonly tableId: TableId; readonly playerId: PlayerId };
 
@@ -211,6 +221,13 @@ export const prepareRecordingCommand = (
     }
     case "reopen":
       return RecordingCommand.make({ ...existing, type: "reopen", reason: input.reason });
+    case "edit_visit":
+      return RecordingCommand.make({
+        ...existing,
+        type: "edit_visit",
+        ...(input.startedAt === undefined ? {} : { startedAt: input.startedAt }),
+        ...(input.table === undefined ? {} : { table: input.table }),
+      });
   }
 };
 
@@ -232,6 +249,8 @@ const freezeState = (state: RecordingState): RecordingState => {
       Object.freeze(receipt.command.replacement);
     if (receipt.command.type === "join_table" && receipt.command.newPlayer)
       Object.freeze(receipt.command.newPlayer);
+    if (receipt.command.type === "edit_visit" && receipt.command.table)
+      Object.freeze(receipt.command.table);
     Object.freeze(receipt.command);
   }
   Object.freeze(state.self);
@@ -354,6 +373,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
     });
     Object.freeze(command);
     if (command.type === "correct" && command.replacement) Object.freeze(command.replacement);
+    if (command.type === "edit_visit" && command.table) Object.freeze(command.table);
     return serialize(async (): Promise<RecordingReceipt> => {
       try {
         const state = snapshot.state;

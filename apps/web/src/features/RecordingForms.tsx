@@ -9,16 +9,19 @@ import {
 } from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
 import type { RecordingInput, RecordingReceipt } from "@stacks/client-runtime/recording";
-import { useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
+import { useBuyInTotal, useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
 import {
   amountInputText,
   localDateText,
+  localTimeText,
   parsePastSessionTimes,
   parseRecordingAmount,
+  parseTimeNear,
   RECORDING_CURRENCY,
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
 import { formatMoney } from "@stacks/shared/money";
+import * as DateTime from "effect/DateTime";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
@@ -27,6 +30,7 @@ import { Checkbox } from "~/components/ui/Checkbox";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, RadioCards, Select } from "~/components/ui/Field";
 import { Note } from "~/components/ui/Page";
+import { Segmented } from "~/components/ui/Segmented";
 
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
 
@@ -126,7 +130,7 @@ function RecordingDialog({
   submitLabel: string;
   submitVariant?: "primary" | "danger";
   cancelLabel?: string;
-  save: ReturnType<typeof useRecordingSubmit>;
+  save: { readonly pending: boolean; readonly error: string | null };
   onSubmit: () => void;
   onClose: () => void;
   children: ReactNode;
@@ -166,7 +170,7 @@ function RecordingDialog({
 
 const games = Game.literals.map((game) => ({ value: game, label: gameNames[game] }));
 
-function DetailsFields({
+function GameFields({
   game,
   highLimit,
   onGame,
@@ -178,8 +182,7 @@ function DetailsFields({
   onHighLimit: (highLimit: boolean) => void;
 }) {
   return (
-    <fieldset className="flex flex-col gap-3">
-      <legend className="mb-1.5 text-sm font-medium text-muted">Details (optional)</legend>
+    <>
       <Field label="Game">
         {(props) => (
           <Select
@@ -200,6 +203,15 @@ function DetailsFields({
         <Checkbox checked={highLimit} onCheckedChange={onHighLimit} />
         High limit
       </label>
+    </>
+  );
+}
+
+function DetailsFields(props: Parameters<typeof GameFields>[0]) {
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-1.5 text-sm font-medium text-muted">Details (optional)</legend>
+      <GameFields {...props} />
     </fieldset>
   );
 }
@@ -427,11 +439,58 @@ export function RebuyDialog({
   );
 }
 
-const afterOptions = [
-  { value: "keep", label: "Keep playing" },
-  { value: "finish", label: "Finish playing" },
-] as const;
+/**
+ * A time field for when something happened, between `earliest` and `latest`. Left as it opened,
+ * it keeps `initial` to the second, so finishing in the minute a session started still follows it.
+ */
+function useClock(initial: DateTime.Utc) {
+  const [text, setText] = useState(() => localTimeText(initial));
+  const [error, setError] = useState<string | null>(null);
+  return {
+    text,
+    error,
+    set: (next: string) => {
+      setText(next);
+      setError(null);
+    },
+    /** The moment, or null after showing why it can't be saved. */
+    read: (
+      latest: { readonly at: DateTime.Utc; readonly error: string },
+      earliest: { readonly at: DateTime.Utc; readonly error: string } | null,
+    ) => {
+      const value = text === localTimeText(initial) ? initial : parseTimeNear(text, latest.at);
+      const ms = value && DateTime.toEpochMillis(value);
+      const problem =
+        ms === null
+          ? "Enter a time like 21:30."
+          : ms > DateTime.toEpochMillis(latest.at)
+            ? latest.error
+            : earliest !== null && ms < DateTime.toEpochMillis(earliest.at)
+              ? earliest.error
+              : null;
+      setError(problem);
+      return problem === null ? value : null;
+    },
+  };
+}
 
+function ClockField({ label, clock }: { label: string; clock: ReturnType<typeof useClock> }) {
+  return (
+    <Field label={label} error={clock.error}>
+      {(props) => (
+        <Input
+          {...props}
+          type="time"
+          value={clock.text}
+          onChange={(event) => clock.set(event.target.value)}
+          className="max-w-40 tabular-nums"
+        />
+      )}
+    </Field>
+  );
+}
+
+/** Cashing out finishes the visit: what they left with, and when. */
 export function CashOutDialog({
   visit,
   counterparties = noCounterparties,
@@ -445,36 +504,33 @@ export function CashOutDialog({
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 0);
+  const [now] = useState(() => DateTime.makeUnsafe(Date.now()));
+  const clock = useClock(now);
   const [paidTo, setPaidTo] = useState("");
-  const [after, setAfter] = useState<"keep" | "finish">("keep");
   const previous = visit.totals.cashOut;
   return (
     <RecordingDialog
       title="Cash out"
-      submitLabel={after === "finish" ? "Cash out and finish" : "Record cash-out"}
+      description="This finishes the session and works out its result."
+      submitLabel="Cash out"
       save={save}
       onClose={onClose}
       onSubmit={async () => {
         const value = amount.read();
-        if (value === null) return;
-        const input =
-          after === "finish"
-            ? ({
-                type: "finish",
-                visitId: visit.visit.id,
-                amount: value,
-                ...counterparty(paidTo),
-              } as const)
-            : ({
-                type: "add",
-                visitId: visit.visit.id,
-                kind: "cash_out",
-                amount: value,
-                ...counterparty(paidTo),
-              } as const);
+        const finishedAt = clock.read(
+          { at: DateTime.makeUnsafe(Date.now()), error: "The session can't finish in the future." },
+          { at: visit.visit.startedAt, error: "The session can't finish before it started." },
+        );
+        if (value === null || finishedAt === null) return;
+        const input = {
+          type: "finish",
+          visitId: visit.visit.id,
+          amount: value,
+          finishedAt,
+          ...counterparty(paidTo),
+        } as const;
         const receipt = await save.submit(input);
-        if (receipt?.command.type === "add" || receipt?.command.type === "finish")
-          onSaved(receipt.command.entryId, input);
+        if (receipt?.command.type === "finish") onSaved(receipt.command.entryId, input);
       }}
     >
       <AmountField
@@ -484,8 +540,7 @@ export function CashOutDialog({
         hint={
           previous > 0 ? (
             <>
-              Just this cash-out. Earlier ones total{" "}
-              <Money amount={previous} currency={RECORDING_CURRENCY} />.
+              Earlier cash-outs total <Money amount={previous} currency={RECORDING_CURRENCY} />.
             </>
           ) : undefined
         }
@@ -493,25 +548,166 @@ export function CashOutDialog({
       <Button className="self-start" onClick={() => amount.set(amountInputText(0))}>
         {previous > 0 ? "Nothing more" : "Nothing to cash out"} · {money(0)}
       </Button>
+      <ClockField label="Finished at" clock={clock} />
       <CounterpartyField
         label="Paid to"
         counterparties={counterparties}
         value={paidTo}
         onChange={setPaidTo}
       />
-      <RadioCards
-        label="After this cash-out"
-        options={afterOptions}
-        value={after}
-        onChange={setAfter}
-        className="grid-cols-2"
+    </RecordingDialog>
+  );
+}
+
+const totalModes = [
+  { value: "add", label: "Add" },
+  { value: "subtract", label: "Subtract" },
+  { value: "set", label: "Set total" },
+] as const;
+
+/**
+ * The buy-in as one total: add to it, take from it, or set it. Behind it, a buy-in or corrections
+ * keep every amount in the history.
+ */
+export function BuyInTotalDialog({
+  visit,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const save = useBuyInTotal(visit.visit.id);
+  const [mode, setMode] = useState<(typeof totalModes)[number]["value"]>("add");
+  const amount = useAmount("", 1);
+  const current = visit.totals.buyIn;
+  const typed = parseRecordingAmount(amount.text, 1);
+  const total =
+    typed.error !== null
+      ? null
+      : mode === "add"
+        ? current + typed.amount
+        : mode === "subtract"
+          ? current - typed.amount
+          : typed.amount;
+  return (
+    <RecordingDialog
+      title="Buy-in"
+      description={
+        <>
+          Now <Money amount={current} currency={RECORDING_CURRENCY} /> in.
+        </>
+      }
+      submitLabel="Save buy-in"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const value = amount.read();
+        if (value === null || total === null) return;
+        if (await save.set(total)) onSaved();
+      }}
+    >
+      <Segmented
+        label="Change"
+        options={totalModes}
+        value={mode}
+        onChange={(next) => {
+          setMode(next);
+          save.clearError();
+        }}
       />
-      {after === "finish" ? (
-        <Note>
-          Finishing ends your play in this session and works out its final result. Coming back later
-          starts a new session.
-        </Note>
+      <AmountField label={mode === "set" ? "New total" : "Amount"} amount={amount} first />
+      {total !== null ? (
+        <p role="status" className="text-sm text-muted">
+          {total > 0 ? (
+            <>
+              New total <Money amount={total} currency={RECORDING_CURRENCY} />
+            </>
+          ) : (
+            "The buy-in total must be more than zero."
+          )}
+        </p>
       ) : null}
+    </RecordingDialog>
+  );
+}
+
+/** When the visit started. It can move earlier, or later up to the first buy-in. */
+export function StartTimeDialog({
+  visit,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const save = useRecordingSubmit();
+  const clock = useClock(visit.visit.startedAt);
+  const [now] = useState(() => DateTime.makeUnsafe(Date.now()));
+  const first = visit.entries.reduce(
+    (earliest, entry) =>
+      DateTime.toEpochMillis(entry.occurredAt) < DateTime.toEpochMillis(earliest)
+        ? entry.occurredAt
+        : earliest,
+    visit.visit.finishedAt ?? now,
+  );
+  return (
+    <RecordingDialog
+      title="Start time"
+      description="When you sat down. It can't be after your first buy-in."
+      submitLabel="Save start time"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const startedAt = clock.read(
+          { at: first, error: "The start can't be after your first buy-in." },
+          null,
+        );
+        if (startedAt === null) return;
+        const receipt = await save.submit({
+          type: "edit_visit",
+          visitId: visit.visit.id,
+          startedAt,
+        });
+        if (receipt) onSaved();
+      }}
+    >
+      <ClockField label="Started at" clock={clock} />
+    </RecordingDialog>
+  );
+}
+
+/** The table's game and whether it's high limit. */
+export function GameDialog({
+  visit,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const save = useRecordingSubmit();
+  const [game, setGame] = useState<Game | "">(visit.table.game ?? "");
+  const [highLimit, setHighLimit] = useState(visit.table.highLimit);
+  return (
+    <RecordingDialog
+      title="Game"
+      submitLabel="Save game"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        const receipt = await save.submit({
+          type: "edit_visit",
+          visitId: visit.visit.id,
+          table: { game: game === "" ? null : game, venueId: visit.table.venueId, highLimit },
+        });
+        if (receipt) onSaved();
+      }}
+    >
+      <GameFields game={game} highLimit={highLimit} onGame={setGame} onHighLimit={setHighLimit} />
     </RecordingDialog>
   );
 }

@@ -27,30 +27,34 @@ async function start(page: Page, amount: string) {
 }
 
 async function rebuy(page: Page, amount: string) {
-  await dock(page, "Rebuy").click();
+  await page.getByRole("button", { name: "Other amount" }).click();
   await dialog(page).getByRole("textbox", { name: "Amount" }).fill(amount);
   await dialog(page).getByRole("button", { name: "Record rebuy" }).click();
   await expect(dialog(page)).toBeHidden();
 }
 
-async function cashOut(page: Page, amount: string, after: "Keep playing" | "Finish playing") {
+/** Cashing out finishes the session: there is nothing else to choose. */
+async function cashOut(page: Page, amount: string) {
   await dock(page, "Cash out").click();
   await dialog(page).getByRole("textbox", { name: "Amount" }).fill(amount);
-  await dialog(page).getByText(after, { exact: true }).click();
-  await dialog(page)
-    .getByRole("button", {
-      name: after === "Keep playing" ? "Record cash-out" : "Cash out and finish",
-    })
-    .click();
+  await dialog(page).getByRole("button", { name: "Cash out", exact: true }).click();
   await expect(dialog(page)).toBeHidden();
 }
 
-async function expectLive(page: Page, totalIn: string, totalOut: string) {
-  await expect(page.getByText("Live", { exact: true })).toBeVisible();
-  await expect(page.getByText("Final result pending until you finish playing.")).toBeVisible();
-  const totals = page.getByRole("definition");
-  await expect(totals.nth(0)).toHaveText(totalIn);
-  await expect(totals.nth(1)).toHaveText(totalOut);
+/** The buy-in as one total, from the session's Edit menu. */
+async function setBuyIn(page: Page, change: "Add" | "Subtract" | "Set total", amount: string) {
+  await page.getByRole("button", { name: "Edit session" }).click();
+  await page.getByRole("menuitem", { name: "Buy-in" }).click();
+  await dialog(page).getByRole("button", { name: change }).click();
+  await dialog(page).getByRole("textbox").fill(amount);
+  await dialog(page).getByRole("button", { name: "Save buy-in" }).click();
+  await expect(dialog(page)).toBeHidden();
+}
+
+async function expectLive(page: Page, totalIn: string) {
+  await expect(page.getByText("Live", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/result pending/)).toBeVisible();
+  await expect(page.getByRole("definition").nth(1)).toHaveText(totalIn);
 }
 
 async function expectFinished(page: Page, result: string, amounts: string) {
@@ -67,47 +71,42 @@ test("records the milestone session through reloads without an account", async (
 }) => {
   const api = await isolate(context);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Your play" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Play" })).toBeVisible();
   await expect(page.getByText("No sessions yet")).toBeVisible();
   await expect(page.getByText("Saved on this device", { exact: true })).toBeVisible();
 
   await start(page, "200");
-  await expectLive(page, "$200", "$0");
+  await expectLive(page, "$200");
   await rebuy(page, "100");
   await expect(
     page.getByRole("status").filter({ hasText: "Rebuy of $100 recorded." }),
   ).toBeVisible();
-  await cashOut(page, "100", "Keep playing");
-  await expect(
-    page
-      .getByRole("status")
-      .filter({ hasText: "Cash-out of $100 recorded. You're still playing." }),
-  ).toBeVisible();
-  await expectLive(page, "$300", "$100");
+  await expectLive(page, "$300");
+  // The buy-in was really $250: set as one total, with a correction behind it.
+  await setBuyIn(page, "Set total", "250");
+  await expectLive(page, "$250");
 
   await page.reload();
-  await expectLive(page, "$300", "$100");
+  await expectLive(page, "$250");
   await page.getByRole("link", { name: "Your play" }).click();
   await expect(page.getByText("Playing now")).toBeVisible();
-  await expect(page.getByText(/In \$300 · Out \$100 · Result pending/)).toBeVisible();
+  await expect(page.getByText(/In \$250 · Out \$0 · Result pending/)).toBeVisible();
   await expect(page.getByText("Finished results")).toBeHidden();
   await page.getByRole("link", { name: /Session/ }).click();
 
-  await dock(page, "Cash out").click();
-  await expect(dialog(page).getByText("Earlier ones total $100.")).toBeVisible();
-  await dialog(page).getByRole("button", { name: "Close" }).click();
-  await cashOut(page, "250", "Finish playing");
-  await expectFinished(page, "+$50", "In $300 · Out $350");
+  await cashOut(page, "350");
+  await expectFinished(page, "+$100", "In $250 · Out $350");
+  await expect(page.getByRole("button", { name: /^Buy-in, \$100.*voided/ })).toBeVisible();
   await page.reload();
-  await expectFinished(page, "+$50", "In $300 · Out $350");
+  await expectFinished(page, "+$100", "In $250 · Out $350");
   await expect(dock(page, "Start another session")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Rebuy" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Other amount" })).toHaveCount(0);
 
   await page.getByRole("link", { name: "Your play" }).click();
   await expect(page.getByText("Playing now")).toBeHidden();
   await expect(page.getByText("Finished results")).toBeVisible();
   await expect(page.getByText("1 finished session.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Session.*\+\$50/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Session.*\+\$100/ })).toBeVisible();
   expect(api).toEqual([]);
 });
 
@@ -118,7 +117,7 @@ test("corrects, voids and fixes an accidental finish, and the audit survives rel
   const api = await isolate(context);
   await page.goto("/");
   await start(page, "200");
-  await cashOut(page, "0", "Finish playing");
+  await cashOut(page, "0");
   await expectFinished(page, "-$200", "In $200 · Out $0");
 
   await dock(page, "Fix accidental finish").click();
@@ -130,7 +129,7 @@ test("corrects, voids and fixes an accidental finish, and the audit survives rel
   await dialog(page).getByLabel("What happened").fill("Tapped finish by mistake");
   await dialog(page).getByRole("button", { name: "Reopen session" }).click();
   await expect(dialog(page)).toBeHidden();
-  await expectLive(page, "$200", "$0");
+  await expectLive(page, "$200");
   await expect(page.getByText("Reopened: Tapped finish by mistake")).toBeVisible();
   await expect(page.getByText("Finished playing")).toBeVisible();
 
@@ -141,10 +140,10 @@ test("corrects, voids and fixes an accidental finish, and the audit survives rel
   await dialog(page).getByLabel("What was wrong").fill("Miscounted");
   await dialog(page).getByRole("button", { name: "Save correction" }).click();
   await expect(dialog(page)).toBeHidden();
-  await expectLive(page, "$150", "$0");
+  await expectLive(page, "$150");
 
   await page.reload();
-  await expectLive(page, "$150", "$0");
+  await expectLive(page, "$150");
   await page.getByRole("button", { name: /^Buy-in, \$200.*voided/ }).click();
   await expect(dialog(page).getByText("Miscounted")).toBeVisible();
   await dialog(page).getByRole("button", { name: "View correction" }).click();
@@ -155,7 +154,7 @@ test("corrects, voids and fixes an accidental finish, and the audit survives rel
   await expect(page.getByRole("button", { name: /^Final cash-out, \$0.*voided/ })).toBeVisible();
 
   await rebuy(page, "100");
-  await cashOut(page, "0", "Finish playing");
+  await cashOut(page, "0");
   await expectFinished(page, "-$250", "In $250 · Out $0");
 
   await page.getByRole("button", { name: /^Buy-in, \$100/ }).click();
@@ -296,7 +295,6 @@ test("dialogs take and return focus from the keyboard", async ({ page, context, 
   await dock(page, "Cash out").focus();
   await page.keyboard.press("Enter");
   await page.keyboard.type("0");
-  await dialog(page).getByText("Finish playing", { exact: true }).click();
   await dialog(page).getByRole("textbox", { name: "Amount" }).press("Enter");
   await expect(dialog(page)).toBeHidden();
   // The Cash out button is gone once play finishes; focus lands on what was saved instead.
@@ -318,7 +316,6 @@ test("reopens Home and a live session with all networking off, then finishes it"
   expect(cached.some((path) => path.endsWith(".woff2"))).toBe(true);
   await start(page, "200");
   await rebuy(page, "100");
-  await cashOut(page, "100", "Keep playing");
   const visit = new URL(page.url()).pathname;
   await page.close();
 
@@ -327,15 +324,15 @@ test("reopens Home and a live session with all networking off, then finishes it"
   const navigation = await home.goto("/");
   expect(navigation?.fromServiceWorker()).toBe(true);
   await expect(home.getByText("Playing now")).toBeVisible();
-  await expect(home.getByText(/In \$300 · Out \$100 · Result pending/)).toBeVisible();
+  await expect(home.getByText(/In \$300 · Out \$0 · Result pending/)).toBeVisible();
   await expect(home.getByText("Saved on this device", { exact: true })).toBeVisible();
   await home.close();
 
   const live = await context.newPage();
   const deepLink = await live.goto(visit);
   expect(deepLink?.fromServiceWorker()).toBe(true);
-  await expectLive(live, "$300", "$100");
-  await cashOut(live, "250", "Finish playing");
+  await expectLive(live, "$300");
+  await cashOut(live, "350");
   await expectFinished(live, "+$50", "In $300 · Out $350");
   await live.reload();
   await expectFinished(live, "+$50", "In $300 · Out $350");

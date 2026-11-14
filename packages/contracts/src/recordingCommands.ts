@@ -51,6 +51,13 @@ export const RecordingReplacement = Schema.Struct({
 });
 export type RecordingReplacement = typeof RecordingReplacement.Type;
 
+export const TableDetails = Schema.Struct({
+  game: Schema.NullOr(Game),
+  venueId: Schema.NullOr(VenueId),
+  highLimit: Schema.Boolean,
+});
+export type TableDetails = typeof TableDetails.Type;
+
 // The actor is checked against the push's credential; the rules decide what it may record.
 export const RecordingCommand = Schema.Union([
   Schema.Struct({ type: Schema.Literal("start"), ...start }),
@@ -99,6 +106,14 @@ export const RecordingCommand = Schema.Union([
     replacement: Schema.NullOr(RecordingReplacement),
   }),
   Schema.Struct({ type: Schema.Literal("reopen"), ...existing, reason: Schema.NonEmptyString }),
+  // Changes when a visit started, or its table's game, venue and high-limit, after the fact.
+  // Only whoever records for everyone at the table changes the table.
+  Schema.Struct({
+    type: Schema.Literal("edit_visit"),
+    ...existing,
+    startedAt: Schema.optionalKey(Schema.DateTimeUtc),
+    table: Schema.optionalKey(TableDetails),
+  }),
   // The starter lets a player at the table record for everyone, or stops them. These belong to
   // the table, not a visit, and are ordered with its play.
   Schema.Struct({ type: Schema.Literal("appoint_recorder"), ...recorder }),

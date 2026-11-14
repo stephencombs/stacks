@@ -191,7 +191,9 @@ test.describe.serial("live mode on a phone", () => {
         .getByText("Enter what each of them cashed out, 0 if they busted.")
         .filter({ visible: true }),
     ).toBeVisible();
-    await visible(alex.getByRole("button", { name: "Keep playing" })).click();
+    await visible(
+      alex.getByRole("dialog").getByRole("button", { name: "Close", exact: true }),
+    ).click();
 
     await record("Cash out", "Alex", "320");
     await record("Cash out", "Gus", "220", "Alex");

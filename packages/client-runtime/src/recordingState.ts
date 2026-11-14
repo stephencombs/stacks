@@ -14,6 +14,7 @@ import {
   RecordingCommand,
   RecordingOperationId,
   RecordingRejectionReason,
+  type TableDetails,
   type VisitCommand,
 } from "@stacks/contracts/recordingCommands";
 import {
@@ -185,6 +186,9 @@ const validateRecordingState = (state: RecordingState) => {
   const createdTables = new Set<Table["id"]>();
   const createdPlayers = new Set<PlayerIdentity["id"]>();
   const recorders = new Set<string>();
+  // Where each visit started and what each table is, as its receipts left them: edits change both.
+  const starts = new Map<Visit["id"], DateTime.Utc>();
+  const details = new Map<Table["id"], TableDetails>();
   const verifyEntry = (
     command: VisitCommand,
     id: EntryId,
@@ -250,11 +254,10 @@ const validateRecordingState = (state: RecordingState) => {
         createdPlayers.add(command.playerId);
       }
       requireValid(
-        visit.tableId === table.id &&
-          visit.playerId === command.playerId &&
-          ms(visit.startedAt) === ms(command.startedAt),
+        visit.tableId === table.id && visit.playerId === command.playerId,
         "Join records differ from the receipt.",
       );
+      starts.set(visit.id, command.startedAt);
       verifyEntry(
         command,
         command.buyInId,
@@ -273,15 +276,16 @@ const validateRecordingState = (state: RecordingState) => {
         "Duplicate or missing start records.",
       );
       requireValid(
-        visit.tableId === table.id &&
-          visit.playerId === command.playerId &&
-          ms(visit.startedAt) === ms(command.startedAt) &&
-          table.game === command.game &&
-          table.venueId === command.venueId &&
-          table.highLimit === command.highLimit,
+        visit.tableId === table.id && visit.playerId === command.playerId,
         "Start records differ from the receipt.",
       );
       createdTables.add(table.id);
+      starts.set(visit.id, command.startedAt);
+      details.set(table.id, {
+        game: command.game,
+        venueId: command.venueId,
+        highLimit: command.highLimit,
+      });
       verifyEntry(command, command.buyInId, "buy_in", command.buyIn, command.startedAt);
       if (command.type === "record_completed") {
         requireValid(
@@ -331,6 +335,9 @@ const validateRecordingState = (state: RecordingState) => {
           );
           previous.finishedAt = command.finishedAt;
         }
+      } else if (command.type === "edit_visit") {
+        if (command.startedAt !== undefined) starts.set(visit.id, command.startedAt);
+        if (command.table !== undefined) details.set(visit.tableId, command.table);
       } else if (command.type === "reopen") {
         requireValid(previous.finishedAt !== null, "Receipt reopens a live visit.");
         previous.finishedAt = null;
@@ -400,6 +407,23 @@ const validateRecordingState = (state: RecordingState) => {
           ? visit.finishedAt === null
           : visit.finishedAt !== null && ms(history.finishedAt) === ms(visit.finishedAt)),
       "Visit differs from its lifecycle receipts.",
+    );
+  }
+  for (const visit of state.visits) {
+    const start = starts.get(visit.id);
+    requireValid(
+      start !== undefined && ms(start) === ms(visit.startedAt),
+      "Visit start differs from its receipts.",
+    );
+  }
+  for (const [tableId, expected] of details) {
+    const table = tables.get(tableId);
+    requireValid(
+      table &&
+        table.game === expected.game &&
+        table.venueId === expected.venueId &&
+        table.highLimit === expected.highLimit,
+      "Table differs from its receipts.",
     );
   }
   requireValid(

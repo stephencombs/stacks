@@ -944,7 +944,6 @@ function CloseSheet({
         pending={closing === "move"}
         onPress={() => void confirm(true)}
       />
-      <Button label="Keep playing" variant="ghost" onPress={onClose} />
     </Sheet>
   );
 }
