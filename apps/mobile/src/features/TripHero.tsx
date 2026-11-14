@@ -30,8 +30,8 @@ export function TripHero({
   span?: string;
 }) {
   const mine = playerTrip(closed, me);
-  const tone = mine.net > 0 ? "win" : mine.net < 0 ? "loss" : "accent";
-  const [color, ring] = useCSSVariable([`--color-${tone}`, "--color-line-strong"]).map(String);
+  const tone = mine.net > 0 ? "win" : mine.net < 0 ? "loss" : "ink";
+  const [color, ring] = useCSSVariable([`--color-${tone}`, "--color-fill-strong"]).map(String);
   const [width, setWidth] = useState(0);
   if (mine.played === 0) return null;
   const standings = tripStandings(closed, localClock);

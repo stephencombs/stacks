@@ -17,9 +17,9 @@ const storage = {
 const read = (): ThemeChoice => {
   try {
     const saved = storage.get();
-    return saved === "light" || saved === "system" ? saved : "dark";
+    return saved === "light" || saved === "dark" ? saved : "system";
   } catch {
-    return "dark";
+    return "system";
   }
 };
 

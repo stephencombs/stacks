@@ -16,7 +16,7 @@ export function FieldChoice<A extends string>({
 }: FieldChoiceProps<A>) {
   const { width, fontScale } = useWindowDimensions();
   const { theme } = useUniwind();
-  const accent = useCSSVariable("--color-accent-text");
+  const tint = useCSSVariable("--color-ink");
   const segmentWidth = (width - 64) / Math.max(1, options.length);
   const segmented =
     presentation !== "menu" &&
@@ -30,7 +30,7 @@ export function FieldChoice<A extends string>({
       <Host
         matchContents={{ vertical: true }}
         colorScheme={theme === "dark" ? "dark" : "light"}
-        seedColor={typeof accent === "string" ? accent : undefined}
+        seedColor={typeof tint === "string" ? tint : undefined}
       >
         {segmented ? (
           <SingleChoiceSegmentedButtonRow modifiers={[fillMaxWidth()]}>

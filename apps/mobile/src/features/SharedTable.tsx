@@ -145,7 +145,7 @@ function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: () => voi
           </>
         ) : url ? (
           <>
-            <Text selectable className="rounded-lg bg-sunken px-3 py-2 font-mono text-sm text-ink">
+            <Text selectable className="rounded-lg bg-fill px-3 py-2 font-mono text-sm text-ink">
               {url}
             </Text>
             <Button
@@ -419,7 +419,7 @@ function InviteSheet({ player, onClose }: { player: PlayerIdentity; onClose: () 
       <View className="gap-3">
         {url ? (
           <>
-            <Text selectable className="rounded-lg bg-sunken px-3 py-2 font-mono text-sm text-ink">
+            <Text selectable className="rounded-lg bg-fill px-3 py-2 font-mono text-sm text-ink">
               {url}
             </Text>
             <Button

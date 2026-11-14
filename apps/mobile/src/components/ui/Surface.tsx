@@ -59,7 +59,7 @@ export function Row({
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       onPress={onPress}
-      className={cn(classes, "active:bg-sunken")}
+      className={cn(classes, "active:bg-fill")}
     >
       {children}
     </Pressable>
@@ -159,12 +159,12 @@ export function SectionHeading({
   return content;
 }
 
-type Tone = "neutral" | "live" | "accent" | "win" | "loss";
+type Tone = "neutral" | "live" | "ink" | "win" | "loss";
 
 const toneStyles: Record<Tone, { container: string; text: string }> = {
-  neutral: { container: "bg-sunken", text: "text-muted" },
-  live: { container: "bg-live/15", text: "text-live" },
-  accent: { container: "bg-accent/15", text: "text-accent-text" },
+  neutral: { container: "bg-fill", text: "text-muted" },
+  live: { container: "bg-felt", text: "text-felt-ink" },
+  ink: { container: "bg-ink", text: "text-ink-inverse" },
   win: { container: "bg-win/15", text: "text-win" },
   loss: { container: "bg-loss/15", text: "text-loss" },
 };
@@ -178,7 +178,7 @@ export function Tag({ tone = "neutral", children }: { tone?: Tone; children: str
         style.container,
       )}
     >
-      {tone === "live" ? <View className="size-1.5 rounded-full bg-live" /> : null}
+      {tone === "live" ? <View className="size-1.5 rounded-full bg-felt-ink" /> : null}
       <Text className={cn("text-xs font-medium", style.text)}>{children}</Text>
     </View>
   );
@@ -194,7 +194,7 @@ export function Badge({ tone = "neutral", children }: { tone?: Tone; children: s
         style.container,
       )}
     >
-      {tone === "live" ? <View className="size-1.5 rounded-full bg-live" /> : null}
+      {tone === "live" ? <View className="size-1.5 rounded-full bg-felt-ink" /> : null}
       <Text className={cn("text-xs font-medium", style.text)}>{children}</Text>
     </View>
   );
@@ -234,8 +234,8 @@ export function Skeleton({ className }: { className?: string }) {
   return <View accessibilityElementsHidden className={cn("rounded-md bg-fill", className)} />;
 }
 
-const barTone: Record<"accent" | "win" | "loss" | "muted", string> = {
-  accent: "bg-accent",
+const barTone: Record<"ink" | "win" | "loss" | "muted", string> = {
+  ink: "bg-ink",
   win: "bg-win",
   loss: "bg-loss",
   muted: "bg-muted",
@@ -248,7 +248,7 @@ export function ProportionalBarRow({
   subtitle,
   right,
   share,
-  tone = "accent",
+  tone = "ink",
   selected = false,
   accessibilityLabel,
   accessibilityHint,
@@ -260,7 +260,7 @@ export function ProportionalBarRow({
   right: ReactNode;
   /** 0 to 1 proportion for the 4px horizontal bar. */
   share: number;
-  tone?: "accent" | "win" | "loss" | "muted";
+  tone?: "ink" | "win" | "loss" | "muted";
   selected?: boolean;
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -301,7 +301,7 @@ export function ProportionalBarRow({
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       onPress={onPress}
-      className={cn(classes, "active:bg-sunken")}
+      className={cn(classes, "active:bg-fill")}
     >
       {content}
     </Pressable>
@@ -310,24 +310,23 @@ export function ProportionalBarRow({
   );
 }
 
-const quotaTone: Record<"accent" | "win" | "loss" | "danger", string> = {
-  accent: "bg-accent",
+const quotaTone: Record<"ink" | "win" | "loss", string> = {
+  ink: "bg-ink",
   win: "bg-win",
   loss: "bg-loss",
-  danger: "bg-danger",
 };
 
 /** @public */
 export function QuotaBar({
   remainingShare,
   paceShare,
-  tone = "accent",
+  tone = "ink",
 }: {
   /** 0 to 1 share remaining (or settled). */
   remainingShare: number;
   /** Optional 0 to 1 pace marker tick position. */
   paceShare?: number;
-  tone?: "accent" | "win" | "loss" | "danger";
+  tone?: "ink" | "win" | "loss";
 }) {
   const remainingPct = Math.max(
     0,
@@ -339,7 +338,7 @@ export function QuotaBar({
       : undefined;
 
   return (
-    <View className="relative h-6 w-full flex-row overflow-hidden rounded-md border border-line bg-sunken">
+    <View className="relative h-6 w-full flex-row overflow-hidden rounded-md border border-line bg-fill">
       {remainingPct > 0 ? (
         <View style={{ width: `${remainingPct}%` }} className={cn("h-full", quotaTone[tone])} />
       ) : null}
@@ -347,7 +346,7 @@ export function QuotaBar({
       {pacePct !== undefined ? (
         <View
           style={{ left: `${pacePct}%` }}
-          className="absolute top-0 bottom-0 -ml-px w-0.5 bg-ink"
+          className="absolute top-0 bottom-0 -ml-0.5 w-1 border-x border-ink bg-ink-inverse"
         />
       ) : null}
     </View>
@@ -361,7 +360,7 @@ export function QuotaCard({
   figure,
   remainingShare,
   paceShare,
-  tone = "accent",
+  tone = "ink",
   footer,
   children,
 }: {
@@ -370,7 +369,7 @@ export function QuotaCard({
   figure: ReactNode;
   remainingShare: number;
   paceShare?: number;
-  tone?: "accent" | "win" | "loss" | "danger";
+  tone?: "ink" | "win" | "loss";
   footer?: ReactNode;
   children?: ReactNode;
 }) {

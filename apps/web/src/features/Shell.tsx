@@ -141,7 +141,7 @@ export function You({ layout }: { layout: "bar" | "side" }) {
           aria-label="You"
           aria-haspopup="dialog"
           onClick={() => setOpen(true)}
-          className="flex h-12 shrink-0 items-center gap-3 rounded-lg px-2 text-left text-sm transition-[background-color,scale] duration-150 hover:bg-sunken active:scale-[0.96]"
+          className="flex h-12 shrink-0 items-center gap-3 rounded-lg px-2 text-left text-sm transition-[background-color,scale] duration-150 hover:bg-fill active:scale-[0.96]"
         >
           {signedIn ? <SignedInAvatar /> : <Avatar />}
           <span className="flex min-w-0 flex-col">

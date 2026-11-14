@@ -25,7 +25,7 @@ export function Menu({
       {trigger ? (
         <BaseMenu.Trigger
           aria-label={label}
-          className="-ml-2 inline-flex min-h-10 max-w-full items-center gap-1 self-start rounded-lg px-2 text-sm font-medium text-muted transition-colors duration-150 hover:bg-sunken hover:text-ink data-[popup-open]:bg-sunken data-[popup-open]:text-ink pointer-coarse:min-h-11"
+          className="-ml-2 inline-flex min-h-10 max-w-full items-center gap-1 self-start rounded-lg px-2 text-sm font-medium text-muted transition-colors duration-150 hover:bg-fill hover:text-ink data-[popup-open]:bg-fill data-[popup-open]:text-ink pointer-coarse:min-h-11"
         >
           <span className="truncate">{trigger}</span>
           <ChevronDown className="size-4 shrink-0" aria-hidden />
@@ -33,7 +33,7 @@ export function Menu({
       ) : (
         <BaseMenu.Trigger
           aria-label={label}
-          className="inline-flex size-10 items-center pointer-coarse:size-11 justify-center rounded-lg text-muted transition-colors duration-150 hover:bg-sunken hover:text-ink data-[popup-open]:bg-sunken"
+          className="inline-flex size-10 items-center pointer-coarse:size-11 justify-center rounded-lg text-muted transition-colors duration-150 hover:bg-fill hover:text-ink data-[popup-open]:bg-fill"
         >
           {icon}
         </BaseMenu.Trigger>
@@ -66,8 +66,8 @@ export function MenuItem({
     <BaseMenu.Item
       onClick={onClick}
       className={cn(
-        "flex h-9 cursor-default pointer-coarse:h-11 items-center justify-between gap-3 rounded-lg px-3 text-sm outline-none select-none data-[highlighted]:bg-sunken",
-        tone === "danger" ? "text-danger" : "text-ink",
+        "flex h-9 cursor-default pointer-coarse:h-11 items-center justify-between gap-3 rounded-lg px-3 text-sm outline-none select-none data-[highlighted]:bg-fill",
+        tone === "danger" ? "text-loss" : "text-ink",
       )}
     >
       {children}
@@ -91,11 +91,11 @@ export function MenuChoice<Value extends string>({
         <BaseMenu.RadioItem
           key={option.value}
           value={option.value}
-          className="flex h-9 cursor-default pointer-coarse:h-11 items-center gap-2 rounded-lg px-3 text-sm text-ink outline-none select-none data-[highlighted]:bg-sunken"
+          className="flex h-9 cursor-default pointer-coarse:h-11 items-center gap-2 rounded-lg px-3 text-sm text-ink outline-none select-none data-[highlighted]:bg-fill"
         >
           <span className="flex size-4 items-center justify-center">
             <BaseMenu.RadioItemIndicator>
-              <Check className="size-4 text-accent-text" aria-hidden />
+              <Check className="size-4 text-ink" aria-hidden />
             </BaseMenu.RadioItemIndicator>
           </span>
           {option.label}

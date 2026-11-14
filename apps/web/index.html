@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <meta name="theme-color" content="#030407" />
+    <meta name="theme-color" content="#f2f2f6" />
     <meta
       name="description"
       content="Log buy-ins and cash-outs as you play. Color Up works out everyone's results and who owes whom. You pay each other however you like."
@@ -24,27 +24,28 @@
     <!-- The canvas color before the stylesheet arrives, so a load never flashes white. -->
     <style>
       html {
-        background: #030407;
-        color-scheme: dark;
-      }
-      html[data-theme="light"] {
-        background: #f2f3f6;
+        background: #f2f2f6;
         color-scheme: light;
       }
+      html[data-theme="dark"] {
+        background: #000000;
+        color-scheme: dark;
+      }
     </style>
-    <!-- Applies the saved theme before first paint, so a light-mode reload never flashes dark.
+    <!-- Applies the theme before first paint, so a dark reload never flashes light.
          Keep in step with src/lib/theme.ts. -->
     <script>
+      var choice = null;
       try {
-        var choice = localStorage.getItem("stacks-theme");
-        if (
-          choice === "light" ||
-          (choice === "system" && matchMedia("(prefers-color-scheme: light)").matches)
-        ) {
-          document.documentElement.dataset.theme = "light";
-          document.querySelector('meta[name="theme-color"]').content = "#f2f3f6";
-        }
+        choice = localStorage.getItem("stacks-theme");
       } catch {}
+      if (
+        choice === "dark" ||
+        (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
+      ) {
+        document.documentElement.dataset.theme = "dark";
+        document.querySelector('meta[name="theme-color"]').content = "#000000";
+      }
     </script>
   </head>
   <body>

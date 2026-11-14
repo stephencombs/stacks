@@ -19,7 +19,7 @@ const shoot = async (page: Page, name: string) => {
   await phonePage.goto(page.url());
   await expect(phonePage.locator("main h1")).toBeVisible();
   // Skeletons, not the pulsing live dots.
-  await expect(phonePage.locator(".animate-pulse.bg-sunken")).toHaveCount(0);
+  await expect(phonePage.locator(".animate-skeleton.bg-fill")).toHaveCount(0);
   await phonePage.screenshot({ path: `${SCREENSHOTS}/${name}-phone.png`, fullPage: true });
   await phone.close();
 };

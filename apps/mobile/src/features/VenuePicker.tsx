@@ -37,18 +37,18 @@ function VenueOption({
       accessibilityLabel={venue.name}
       accessibilityState={{ checked: selected }}
       onPress={onSelect}
-      className={cn("rounded-xl px-3 py-2.5", selected ? "bg-accent" : "active:bg-sunken")}
+      className={cn("rounded-xl px-3 py-2.5", selected ? "bg-ink" : "active:bg-fill")}
     >
       <Text
         numberOfLines={1}
-        className={cn("text-base font-medium", selected ? "text-accent-ink" : "text-ink")}
+        className={cn("text-base font-medium", selected ? "text-ink-inverse" : "text-ink")}
       >
         {venue.name}
       </Text>
       {detail ? (
         <Text
           numberOfLines={1}
-          className={cn("text-sm", selected ? "text-accent-ink/70" : "text-muted")}
+          className={cn("text-sm", selected ? "text-ink-inverse/70" : "text-muted")}
         >
           {detail}
         </Text>

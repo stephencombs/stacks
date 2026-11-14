@@ -32,12 +32,7 @@ const icons: Record<string, IconName> = {
 export const placeTab = (title: string, _symbol: string): BottomTabNavigationOptions => ({
   title,
   tabBarIcon: ({ focused, size }) => (
-    <Icon
-      name={icons[title]!}
-      color={focused ? "accent-text" : "muted"}
-      size={size}
-      filled={focused}
-    />
+    <Icon name={icons[title]!} color={focused ? "ink" : "muted"} size={size} filled={focused} />
   ),
 });
 

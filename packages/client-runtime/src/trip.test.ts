@@ -243,13 +243,13 @@ it("leads the race with the gap to the next player, falling back to your result"
   expect(raceHeadline(tied, me!, names, usd)).toMatchObject({
     label: "Tied for the lead with Priya",
     gap: null,
-    tone: "accent",
+    tone: "ink",
   });
   expect(raceHeadline([{ playerId: me!, net: 500, rank: 1 }], me!, names, usd)).toEqual({
     label: "You lead",
     gap: null,
     net: 500,
-    tone: "accent",
+    tone: "ink",
     line: null,
   });
   expect(raceHeadline(board, "nobody" as never, names, usd)).toBeNull();

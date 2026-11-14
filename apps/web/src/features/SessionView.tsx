@@ -321,7 +321,7 @@ export function SessionView({
                     onClick={() =>
                       setDraft({ kind: bought && !out ? "cash_out" : "buy_in", playerId })
                     }
-                    className="flex min-w-0 flex-1 items-center gap-3 self-stretch py-3 pl-4 text-left transition-colors duration-150 hover:bg-sunken focus-visible:-outline-offset-2"
+                    className="flex min-w-0 flex-1 items-center gap-3 self-stretch py-3 pl-4 text-left transition-colors duration-150 hover:bg-fill focus-visible:-outline-offset-2"
                   >
                     {row}
                   </button>
@@ -408,7 +408,7 @@ export function SessionView({
                   }
                   meta={
                     failed ? (
-                      <span className="text-danger">{failed}</span>
+                      <span className="text-loss">{failed}</span>
                     ) : (
                       "Saved in this browser, sending"
                     )
@@ -686,7 +686,7 @@ function HighLimitToggle({ detail }: { detail: SessionDetail }) {
   const on = detail.session.highLimit;
   return (
     <div className="flex flex-col items-end">
-      <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-medium transition-colors duration-150 hover:bg-sunken pointer-coarse:min-h-11">
+      <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-medium transition-colors duration-150 hover:bg-fill pointer-coarse:min-h-11">
         <Checkbox
           checked={on}
           disabled={set.pending}

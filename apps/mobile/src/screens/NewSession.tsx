@@ -193,7 +193,7 @@ function NewSessionForm({
                 accessibilityLabel={player.displayName}
                 accessibilityState={{ checked }}
                 onPress={() => toggle(player.id)}
-                className="min-h-11 flex-row items-center gap-3 border-t border-line px-4 py-3.5 active:bg-sunken"
+                className="min-h-11 flex-row items-center gap-3 border-t border-line px-4 py-3.5 active:bg-fill"
               >
                 <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={28} />
                 <Text className="flex-1 type-body text-ink">
@@ -203,7 +203,7 @@ function NewSessionForm({
                   ) : null}
                   {player.userId === null ? <Text className="text-muted"> · guest</Text> : null}
                 </Text>
-                {checked ? <Icon name="check" color="accent-text" size={18} /> : null}
+                {checked ? <Icon name="check" color="ink" size={18} /> : null}
               </Pressable>
             );
           })}

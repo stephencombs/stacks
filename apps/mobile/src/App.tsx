@@ -229,11 +229,10 @@ function BackToYourPlay() {
 /** Headers and screen backgrounds in the palette, so navigation follows the theme too. */
 function useNavigationTheme() {
   const { theme } = useUniwind();
-  const [canvas, ink, line, accent, loss] = useCSSVariable([
+  const [canvas, ink, line, loss] = useCSSVariable([
     "--color-canvas",
     "--color-ink",
     "--color-line",
-    "--color-accent-text",
     "--color-loss",
   ]).map(String);
   const base = theme === "light" ? DefaultTheme : DarkTheme;
@@ -245,7 +244,7 @@ function useNavigationTheme() {
       card: canvas!,
       text: ink!,
       border: line!,
-      primary: accent!,
+      primary: ink!,
       notification: loss!,
     },
     fonts: {

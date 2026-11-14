@@ -213,7 +213,7 @@ function Race<S extends RaceSession>({
                 x2={width - LABEL}
                 y1={plot.zero}
                 y2={plot.zero}
-                stroke="var(--color-line-strong)"
+                stroke="var(--color-fill-strong)"
                 strokeDasharray="3 4"
               />
               {marks.map((mark) => {
@@ -239,11 +239,11 @@ function Race<S extends RaceSession>({
                 x2={plot.x(point)}
                 y1={PAD.y / 2}
                 y2={HEIGHT - PAD.y / 2}
-                stroke="var(--color-line-strong)"
+                stroke="var(--color-fill-strong)"
               />
               {drawn.map(({ playerId, name, line, values }, i) => {
                 const yours = playerId === picked;
-                const color = yours ? "var(--color-accent)" : "var(--color-muted)";
+                const color = yours ? "var(--color-ink)" : "var(--color-muted)";
                 const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
                 const now = { x: plot.x(point), y: plot.y(line[point]!) };
                 const off = plot.clipped(line[point]!);
@@ -279,9 +279,7 @@ function Race<S extends RaceSession>({
                       y={labels[i]}
                       textAnchor={seat.anchor}
                       dominantBaseline="central"
-                      className={
-                        yours ? "fill-accent-text text-xs font-semibold" : "fill-muted text-xs"
-                      }
+                      className={yours ? "fill-ink text-xs font-semibold" : "fill-muted text-xs"}
                     >
                       {initial}
                     </text>
@@ -312,8 +310,8 @@ function Race<S extends RaceSession>({
               aria-pressed={p.playerId === picked}
               onClick={() => onPick(p.playerId)}
               className={cn(
-                "block w-full text-left transition-colors duration-150 hover:bg-sunken focus-visible:-outline-offset-2",
-                p.playerId === picked && "shadow-[inset_3px_0_0_var(--color-accent)]",
+                "block w-full text-left transition-colors duration-150 hover:bg-fill focus-visible:-outline-offset-2",
+                p.playerId === picked && "shadow-[inset_3px_0_0_var(--color-ink)]",
               )}
             >
               <Row as="span">

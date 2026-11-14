@@ -11,7 +11,7 @@ const steps = [
   },
   {
     title: "Watch the board",
-    body: "Everyone's running total, session by session, with your line in gold. Win rate, best session and who's on a heater come for free.",
+    body: "Everyone's running total, session by session, with your line picked out. Win rate, best session and who's on a heater come for free.",
   },
 ];
 

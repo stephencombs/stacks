@@ -21,37 +21,59 @@
   line-gap-override: 0%;
 }
 
-/* Keep in step with apps/mobile/global.css; src/design/tokens.test.ts fails when they drift. Dark is
-   the default; light is a saved choice (data-theme on <html>, set by index.html before first paint). */
+/* The Color Up palette from docs/design/tokens.json, light by default. Keep in step with
+   apps/mobile/global.css; src/design/tokens.test.ts fails when either drifts from the tokens. Dark is
+   data-theme="dark" on <html>, set by index.html before first paint: it follows the system unless the
+   You sheet saved a choice. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-display:
     "Barlow Condensed", "Barlow Condensed Fallback", ui-sans-serif, system-ui, sans-serif;
   --ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
   --animate-rack: rack 320ms var(--ease-snap) both;
-
-  --color-canvas: oklch(0.11 0.008 260);
-  --color-surface: oklch(0.215 0.008 260);
-  --color-sunken: oklch(0.16 0.008 260);
-  --color-fill: oklch(0.285 0.008 260);
-  --color-raised: oklch(0.4 0.01 260);
-  --color-ink: oklch(0.96 0 0);
-  --color-muted: oklch(0.7 0.01 260);
-  --color-faint: oklch(0.54 0.01 260);
-  --color-line: oklch(0.285 0.008 260);
-  --color-line-strong: oklch(0.36 0.008 260);
-  --color-accent: oklch(0.83 0.148 75);
-  --color-accent-ink: oklch(0.2 0.02 75);
-  --color-accent-text: oklch(0.83 0.148 75);
-  --color-win: oklch(0.8 0.17 150);
-  --color-loss: oklch(0.7 0.19 25);
-  --color-live: oklch(0.83 0.148 75);
-  --color-danger: oklch(0.7 0.19 25);
-  --color-disabled: oklch(0.285 0.008 260);
 }
 
-/* Player chips, in joining order: casino chip colors. Chips read these through var(), so they're
-   emitted even though no utility class names them. */
+/* Static, so a color only read through var() is still defined in light. */
+@theme static {
+  --color-canvas: oklch(0.962 0.005 286.3);
+  --color-surface: oklch(1 0 0);
+  --color-raised: oklch(1 0 0);
+  --color-fill: oklch(0.935 0.007 286.3);
+  --color-fill-strong: oklch(0.887 0.008 286.2);
+  --color-line: oklch(0.179 0.006 285.8 / 0.08);
+  --color-ink: oklch(0.179 0.006 285.8);
+  --color-ink-inverse: oklch(1 0 0);
+  --color-muted: oklch(0.485 0.013 285.9);
+  --color-faint: oklch(0.643 0.012 286.1);
+  --color-win: oklch(0.505 0.137 150.1);
+  --color-loss: oklch(0.545 0.209 29.5);
+  --color-win-tint: oklch(0.953 0.026 154.5);
+  --color-loss-tint: oklch(0.947 0.023 24.1);
+  --color-felt: oklch(0.515 0.113 155.3);
+  --color-felt-deep: oklch(0.435 0.095 155.9);
+  --color-felt-ink: oklch(1 0 0);
+  --color-felt-soft: oklch(1 0 0 / 0.76);
+  --color-live: oklch(0.515 0.113 155.3);
+  --color-chip-red: oklch(0.602 0.202 24.6);
+  --color-chip-blue: oklch(0.563 0.182 260.6);
+  --color-chip-green: oklch(0.614 0.15 152.3);
+  --color-chip-black: oklch(0.292 0.011 285.7);
+  --color-chip-purple: oklch(0.539 0.188 297.9);
+  --color-chip-orange: oklch(0.703 0.161 57);
+  --color-chip-grey: oklch(0.643 0.012 286.1);
+  --color-tint-purple: oklch(0.94 0.028 303.9);
+  --color-tint-blue: oklch(0.947 0.021 261.8);
+  --color-tint-orange: oklch(0.956 0.028 70.9);
+  --color-glass: oklch(0.986 0.003 286.4 / 0.78);
+  --color-scrim: oklch(0.179 0.006 285.8 / 0.32);
+  --color-focus: oklch(0.563 0.182 260.6);
+}
+
+/* Player chips, in joining order, for the server's chip numbers 1 to 8. Not in tokens.json: they're
+   a player's identity, the same in both themes. Chips read these through var(), so they're emitted
+   even though no utility class names them. */
 @theme static {
   --color-chip-1: oklch(0.5 0.19 10);
   --color-chip-1-ink: oklch(0.98 0 0);
@@ -74,50 +96,58 @@
 
 /* Elevation switches with the theme, so these sit outside @theme: Tailwind inlines --shadow-* values
    into its utilities, and an inlined value can't flip. Read them with shadow-(--elevation-card).
-   Depth doesn't show on dark grounds, so resting surfaces there are a ring with a faint top edge,
-   the way light catches a raised card. */
+   Card, popover and sheet are the tokens' shadow-card, shadow-float and shadow-sheet. */
 :root {
-  --elevation-control: inset 0 0 0 1px var(--color-line-strong);
-  --elevation-card: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 0 0 1px var(--color-line);
-  --elevation-popover:
-    inset 0 1px 0 rgb(255 255 255 / 0.06), 0 0 0 1px var(--color-line-strong),
-    0 8px 24px -4px rgb(0 0 0 / 0.5);
-  --elevation-sheet: 0 0 0 1px var(--color-line), 0 24px 48px -12px rgb(0 0 0 / 0.5);
+  color-scheme: light;
+  --elevation-control: inset 0 0 0 1px var(--color-fill-strong);
+  --elevation-card: 0 1px 2px rgb(17 17 20 / 0.04);
+  --elevation-popover: 0 10px 30px rgb(17 17 20 / 0.14);
+  --elevation-sheet: 0 -8px 40px rgb(17 17 20 / 0.16);
 }
 
-:root[data-theme="light"] {
-  color-scheme: light;
-  --elevation-card:
-    0 0 0 1px var(--color-line), 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px -2px rgb(0 0 0 / 0.05);
-  --elevation-popover:
-    0 0 0 1px var(--color-line-strong), 0 4px 12px -2px rgb(0 0 0 / 0.08),
-    0 12px 32px -8px rgb(0 0 0 / 0.12);
-  --elevation-sheet:
-    0 0 0 1px var(--color-line), 0 8px 16px -4px rgb(0 0 0 / 0.08),
-    0 24px 48px -12px rgb(0 0 0 / 0.18);
-  --color-canvas: oklch(0.965 0.004 260);
-  --color-surface: oklch(0.995 0.002 260);
-  --color-sunken: oklch(0.935 0.006 260);
-  --color-fill: oklch(0.91 0.006 260);
-  --color-raised: oklch(1 0 0);
-  --color-ink: oklch(0.2 0.015 260);
-  --color-muted: oklch(0.48 0.015 260);
-  --color-faint: oklch(0.62 0.01 260);
-  --color-line: oklch(0.2 0.015 260 / 0.1);
-  --color-line-strong: oklch(0.2 0.015 260 / 0.18);
-  --color-accent: oklch(0.8 0.16 75);
-  --color-accent-ink: oklch(0.2 0.02 75);
-  --color-accent-text: oklch(0.5 0.112 65);
-  --color-win: oklch(0.48 0.13 150);
-  --color-loss: oklch(0.52 0.19 25);
-  --color-live: oklch(0.5 0.112 65);
-  --color-danger: oklch(0.52 0.19 25);
-  --color-disabled: oklch(0.86 0.005 260);
+/* A shadow doesn't show on a black ground, so dark popovers and sheets keep a hairline edge until
+   they move to glass. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --elevation-card: none;
+  --elevation-popover: 0 0 0 1px var(--color-line), 0 10px 30px rgb(0 0 0 / 0.6);
+  --elevation-sheet: 0 0 0 1px var(--color-line), 0 -8px 40px rgb(0 0 0 / 0.7);
+  --color-canvas: oklch(0 0 0);
+  --color-surface: oklch(0.228 0.006 285.9);
+  --color-raised: oklch(0.287 0.007 285.9);
+  --color-fill: oklch(0.307 0.009 285.9);
+  --color-fill-strong: oklch(0.362 0.01 285.9);
+  --color-line: oklch(1 0 0 / 0.1);
+  --color-ink: oklch(0.971 0.003 286.4);
+  --color-ink-inverse: oklch(0.179 0.006 285.8);
+  --color-muted: oklch(0.712 0.013 286.1);
+  --color-faint: oklch(0.568 0.012 286);
+  --color-win: oklch(0.73 0.194 147.4);
+  --color-loss: oklch(0.707 0.185 25.9);
+  --color-win-tint: oklch(0.306 0.06 154.1);
+  --color-loss-tint: oklch(0.266 0.063 26.6);
+  --color-felt: oklch(0.422 0.092 155.6);
+  --color-felt-deep: oklch(0.337 0.072 156);
+  --color-felt-ink: oklch(0.988 0.017 159.1);
+  --color-felt-soft: oklch(0.988 0.017 159.1 / 0.72);
+  --color-live: oklch(0.79 0.166 154.9);
+  --color-chip-red: oklch(0.692 0.198 22.5);
+  --color-chip-blue: oklch(0.677 0.17 262.2);
+  --color-chip-green: oklch(0.758 0.175 152.7);
+  --color-chip-black: oklch(0.835 0.011 286.2);
+  --color-chip-purple: oklch(0.722 0.165 296.9);
+  --color-chip-orange: oklch(0.798 0.147 62.7);
+  --color-chip-grey: oklch(0.568 0.012 286);
+  --color-tint-purple: oklch(0.276 0.057 299);
+  --color-tint-blue: oklch(0.27 0.051 261.4);
+  --color-tint-orange: oklch(0.295 0.043 66.2);
+  --color-glass: oklch(0.262 0.007 285.9 / 0.78);
+  --color-scrim: oklch(0 0 0 / 0.56);
+  --color-focus: oklch(0.677 0.17 262.2);
 }
 
 @layer base {
   html {
-    color-scheme: dark;
     font-synthesis: none;
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
@@ -127,11 +157,11 @@
     min-height: 100dvh;
   }
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
   ::selection {
-    background: color-mix(in oklch, var(--color-accent) 35%, transparent);
+    background: color-mix(in oklch, var(--color-focus) 30%, transparent);
   }
   h1,
   h2,

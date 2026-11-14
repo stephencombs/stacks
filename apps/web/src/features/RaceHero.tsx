@@ -23,7 +23,7 @@ const LABEL = 30;
 const LETTER = 12;
 const INSET = 8;
 
-/** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in gold. */
+/** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in ink. */
 export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const currency = detail.group.currency;
   const names = playerNames(detail);
@@ -80,14 +80,14 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
               x2={width - LABEL}
               y1={plot.zero}
               y2={plot.zero}
-              stroke="var(--color-line-strong)"
+              stroke="var(--color-fill-strong)"
               strokeDasharray="3 4"
             />
             {drawn.map(({ playerId, line }, i) => {
               const yours = playerId === me;
               const end = { x: plot.x(line.length - 1), y: plot.y(line.at(-1)!) };
               const off = plot.clipped(line.at(-1)!);
-              const color = yours ? "var(--color-accent)" : "var(--color-muted)";
+              const color = yours ? "var(--color-ink)" : "var(--color-muted)";
               const initial =
                 (names.get(playerId) ?? "?").slice(0, 1).toUpperCase() +
                 (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
@@ -113,9 +113,7 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
                     y={labels[i]}
                     textAnchor={seat.anchor}
                     dominantBaseline="central"
-                    className={
-                      yours ? "fill-accent-text text-xs font-semibold" : "fill-muted text-xs"
-                    }
+                    className={yours ? "fill-ink text-xs font-semibold" : "fill-muted text-xs"}
                   >
                     {initial}
                   </text>

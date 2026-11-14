@@ -19,13 +19,12 @@ import type { SettingsLayoutProps } from "./SettingsLayout";
 export function SettingsLayout({ groupName, currency, sections, children }: SettingsLayoutProps) {
   const header = useNativeHeaderActions();
   const { theme } = useUniwind();
-  const [canvas, surface, ink, muted, danger, accent] = useCSSVariable([
+  const [canvas, surface, ink, muted, loss] = useCSSVariable([
     "--color-canvas",
     "--color-surface",
     "--color-ink",
     "--color-muted",
-    "--color-danger",
-    "--color-accent-text",
+    "--color-loss",
   ]).map(String);
   const bar = use(TabBarHeight);
   const [liveBarHeight, setLiveBarHeight] = useState(0);
@@ -36,7 +35,7 @@ export function SettingsLayout({ groupName, currency, sections, children }: Sett
       <Host
         style={{ flex: 1, paddingBottom: bar }}
         colorScheme={theme === "dark" ? "dark" : "light"}
-        seedColor={accent}
+        seedColor={ink}
       >
         <FieldGroup modifiers={[scrollContentBackground("hidden")]}>
           <FieldGroup.Section title={groupName}>
@@ -64,14 +63,14 @@ export function SettingsLayout({ groupName, currency, sections, children }: Sett
                     ) : undefined
                   }
                 >
-                  <Text textStyle={{ color: row.destructive ? danger : ink }}>
+                  <Text textStyle={{ color: row.destructive ? loss : ink }}>
                     {row.pending ? "Exporting…" : row.label}
                   </Text>
                 </ListItem>
               ))}
               {section.footer || section.error ? (
                 <FieldGroup.SectionFooter>
-                  <Text textStyle={{ color: section.error ? danger : muted }}>
+                  <Text textStyle={{ color: section.error ? loss : muted }}>
                     {section.error ?? section.footer}
                   </Text>
                 </FieldGroup.SectionFooter>

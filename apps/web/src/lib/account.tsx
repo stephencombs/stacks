@@ -27,15 +27,15 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       appearance={{
         // The palette's variables switch with the theme, so Clerk follows it too.
         variables: {
-          colorPrimary: "var(--color-accent)",
-          colorPrimaryForeground: "var(--color-accent-ink)",
+          colorPrimary: "var(--color-ink)",
+          colorPrimaryForeground: "var(--color-ink-inverse)",
           colorBackground: "var(--color-surface)",
           colorForeground: "var(--color-ink)",
           colorMutedForeground: "var(--color-muted)",
           colorNeutral: "var(--color-ink)",
           colorInput: "var(--color-surface)",
           colorInputForeground: "var(--color-ink)",
-          colorDanger: "var(--color-danger)",
+          colorDanger: "var(--color-loss)",
           borderRadius: "0.625rem",
           fontFamily: "ui-sans-serif, system-ui, sans-serif",
         },

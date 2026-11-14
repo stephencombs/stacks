@@ -103,7 +103,7 @@ export function TableSection({
       {signedOut && others ? (
         <Note>
           This table is on this device and syncs from it.{" "}
-          <Link to="/" className="font-medium text-accent-text underline">
+          <Link to="/" className="font-medium text-ink underline">
             Sign in to keep this table
           </Link>{" "}
           if you lose the device.
@@ -222,7 +222,7 @@ function ShareDialog({ tableId, onClose }: { tableId: TableId; onClose: () => vo
           </>
         ) : url ? (
           <>
-            <p className="rounded-lg bg-sunken px-3 py-2 font-mono text-sm wrap-anywhere">{url}</p>
+            <p className="rounded-lg bg-fill px-3 py-2 font-mono text-sm wrap-anywhere">{url}</p>
             <div className="flex flex-wrap gap-2">
               <CopyButton text={url} />
               <Button
@@ -395,7 +395,7 @@ function InviteDialog({ player, onClose }: { player: PlayerIdentity; onClose: ()
       <div className="flex flex-col gap-4">
         {url ? (
           <>
-            <p className="rounded-lg bg-sunken px-3 py-2 font-mono text-sm wrap-anywhere">{url}</p>
+            <p className="rounded-lg bg-fill px-3 py-2 font-mono text-sm wrap-anywhere">{url}</p>
             <div className="flex flex-wrap gap-2">
               <CopyButton text={url} />
               <Button

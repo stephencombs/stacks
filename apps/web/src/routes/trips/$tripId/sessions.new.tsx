@@ -175,7 +175,7 @@ function NewSessionForm({
         {inviting ? <InlineInvite detail={detail} /> : null}
         <List>
           {players.map((player) => (
-            <label key={player.id} className="block cursor-pointer hover:bg-sunken">
+            <label key={player.id} className="block cursor-pointer hover:bg-fill">
               <Row as="span">
                 <Checkbox
                   checked={playerIds.has(player.id)}

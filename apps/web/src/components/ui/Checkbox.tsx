@@ -4,9 +4,9 @@ import { Check } from "lucide-react";
 import { cn } from "./cn";
 
 const base =
-  "inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-surface text-accent-ink " +
+  "inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-surface text-ink-inverse " +
   "shadow-[inset_0_0_0_1px_var(--color-faint)] transition-[background-color,box-shadow] duration-150 " +
-  "data-[checked]:bg-accent data-[checked]:shadow-none";
+  "data-[checked]:bg-ink data-[checked]:shadow-none";
 
 /** Wrap it in a `<label>`: that's where its accessible name and larger tap target come from. */
 export function Checkbox({

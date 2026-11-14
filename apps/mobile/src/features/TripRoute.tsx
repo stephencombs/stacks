@@ -52,7 +52,7 @@ const canDrawMap = Platform.OS === "ios" || (Platform.OS === "android" && google
 export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const currency = detail.group.currency;
   const { theme } = useUniwind();
-  const accent = String(useCSSVariable("--color-accent"));
+  const ink = String(useCSSVariable("--color-ink"));
   const route = tripRoute(trip.sessions.filter((s) => s.session.status === "closed"));
   if (route.stops.length === 0) return null;
   const onMap = route.stops.filter((s) => placed(s.venue));
@@ -81,10 +81,10 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
                 },
                 title: s.venue.name,
                 systemImage: s.number <= 50 ? `${s.number}.circle.fill` : "circle.fill",
-                tintColor: accent,
+                tintColor: ink,
               }))}
               polylines={
-                line.length > 1 ? [{ id: "route", coordinates: line, color: accent, width: 4 }] : []
+                line.length > 1 ? [{ id: "route", coordinates: line, color: ink, width: 4 }] : []
               }
             />
           ) : (
@@ -102,7 +102,7 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
                 snippet: boardMoney(s.net, currency),
               }))}
               polylines={
-                line.length > 1 ? [{ id: "route", coordinates: line, color: accent, width: 8 }] : []
+                line.length > 1 ? [{ id: "route", coordinates: line, color: ink, width: 8 }] : []
               }
             />
           )}
@@ -126,8 +126,8 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
               index > 0 && "border-t border-line",
             )}
           >
-            <View className="size-7 items-center justify-center rounded-full bg-accent">
-              <Text className="font-mono text-sm text-accent-ink">{stop.number}</Text>
+            <View className="size-7 items-center justify-center rounded-full bg-ink">
+              <Text className="font-mono text-sm text-ink-inverse">{stop.number}</Text>
             </View>
             <View className="flex-1">
               <Text numberOfLines={1} className="text-base text-ink">

@@ -6,19 +6,20 @@ const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
 const script = html.match(/<script>([\s\S]*?)<\/script>/)![1]!;
 
 it.each([
-  { saved: "light", systemLight: false, theme: "light", chrome: "#f2f3f6" },
-  { saved: "system", systemLight: true, theme: "light", chrome: "#f2f3f6" },
-  { saved: "system", systemLight: false, theme: undefined, chrome: "#030407" },
-  { saved: "dark", systemLight: true, theme: undefined, chrome: "#030407" },
-  { saved: null, systemLight: true, theme: undefined, chrome: "#030407" },
+  { saved: null, systemDark: false, theme: undefined, chrome: "#f2f2f6" },
+  { saved: null, systemDark: true, theme: "dark", chrome: "#000000" },
+  { saved: "system", systemDark: true, theme: "dark", chrome: "#000000" },
+  { saved: "system", systemDark: false, theme: undefined, chrome: "#f2f2f6" },
+  { saved: "light", systemDark: true, theme: undefined, chrome: "#f2f2f6" },
+  { saved: "dark", systemDark: false, theme: "dark", chrome: "#000000" },
 ])(
-  "restores $saved with system light=$systemLight before paint",
-  ({ saved, systemLight, theme, chrome }) => {
+  "restores $saved with system dark=$systemDark before paint",
+  ({ saved, systemDark, theme, chrome }) => {
     const dataset: Record<string, string> = {};
-    const meta = { content: "#030407" };
+    const meta = { content: "#f2f2f6" };
     runInNewContext(script, {
       localStorage: { getItem: () => saved },
-      matchMedia: () => ({ matches: systemLight }),
+      matchMedia: () => ({ matches: systemDark }),
       document: {
         documentElement: { dataset },
         querySelector: () => meta,

@@ -110,8 +110,8 @@ function KeypadAmount({
       </View>
       {amount.error ? (
         <View accessibilityLiveRegion="polite" className="flex-row justify-center gap-1.5 px-1">
-          <Icon name="alert" color="danger" size={14} />
-          <Text className="type-footnote text-danger">{amount.error}</Text>
+          <Icon name="alert" color="loss" size={14} />
+          <Text className="type-footnote text-loss">{amount.error}</Text>
         </View>
       ) : hint ? (
         <Text className="px-1 text-center type-footnote text-muted">{hint}</Text>
@@ -269,8 +269,8 @@ function GameFields({
           accessibilityState={{ expanded: choosing }}
           onPress={() => setChoosing((open) => !open)}
           className={cn(
-            "min-h-12 flex-row items-center gap-3 px-4 active:bg-sunken",
-            choosing && "bg-sunken",
+            "min-h-12 flex-row items-center gap-3 px-4 active:bg-fill",
+            choosing && "bg-fill",
           )}
         >
           <Text className="type-body text-ink">Game</Text>

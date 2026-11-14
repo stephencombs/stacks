@@ -383,7 +383,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                       onPress={() =>
                         setDraft({ kind: bought && !out ? "cash_out" : "buy_in", playerId })
                       }
-                      className="min-h-16 flex-1 flex-row items-center gap-3 py-3 pl-4 active:bg-sunken"
+                      className="min-h-16 flex-1 flex-row items-center gap-3 py-3 pl-4 active:bg-fill"
                     >
                       <Chip chip={chipOf(group, playerId)} name={name} size={30} />
                       <View className="flex-1 gap-0.5">
@@ -566,7 +566,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                         accessibilityRole="button"
                         accessibilityHint="Try saving it again or discard it"
                         onPress={() => setRefused({ id: entry.id, reason })}
-                        className="flex-row items-center gap-3 border-t border-line bg-danger/10 px-4 py-3 active:bg-sunken"
+                        className="flex-row items-center gap-3 border-t border-line bg-loss/10 px-4 py-3 active:bg-fill"
                       >
                         {content}
                       </Pressable>
@@ -578,7 +578,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                       accessibilityRole="button"
                       accessibilityHint="Correct or void this entry"
                       onPress={() => setSelected(item.entry)}
-                      className="flex-row items-center gap-3 border-t border-line px-4 py-3 active:bg-sunken"
+                      className="flex-row items-center gap-3 border-t border-line px-4 py-3 active:bg-fill"
                     >
                       {content}
                     </Pressable>
@@ -778,10 +778,10 @@ function HighLimitToggle({ detail }: { detail: SessionDetail }) {
       }
       className={cn(
         "h-6 justify-center rounded-md px-2",
-        on ? "bg-accent/20" : "border border-line-strong",
+        on ? "bg-ink" : "border border-fill-strong",
       )}
     >
-      <Text className={cn("type-label", on ? "text-accent-text" : "text-muted")}>High limit</Text>
+      <Text className={cn("type-label", on ? "text-ink-inverse" : "text-muted")}>High limit</Text>
     </Pressable>
   );
 }
@@ -810,8 +810,8 @@ function CashOutField({
         onPress={onPress}
         className={cn(
           "min-h-12 justify-center rounded-xl border bg-surface px-4 py-3",
-          selected ? "border-accent" : "border-transparent active:bg-fill",
-          invalid && "border-danger",
+          selected ? "border-ink" : "border-transparent active:bg-fill",
+          invalid && "border-loss",
         )}
       >
         <Text className={cn("font-mono type-body", value ? "text-ink" : "text-muted")}>

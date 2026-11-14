@@ -149,7 +149,7 @@ function FinishedRow({ item }: { item: RecordedVisit }) {
 function FinishedHero({ result, count }: { result: number; count: number }) {
   return (
     <Surface className="relative overflow-hidden p-4">
-      <Glow tone={result > 0 ? "win" : result < 0 ? "loss" : "accent"} />
+      <Glow tone={result > 0 ? "win" : result < 0 ? "loss" : "ink"} />
       <div className="relative flex flex-col gap-1">
         <p className="text-sm font-medium text-muted">Finished results</p>
         <Money

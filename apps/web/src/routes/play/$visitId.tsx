@@ -235,14 +235,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
         </Section>
       ) : null}
       {notice ? (
-        <p role="status" className="rounded-xl bg-sunken px-4 py-2.5 text-sm">
+        <p role="status" className="rounded-xl bg-fill px-4 py-2.5 text-sm">
           {notice}
         </p>
       ) : null}
       {saved ? (
         <div
           role="status"
-          className="flex items-center justify-between gap-3 rounded-xl bg-sunken py-2 pr-2 pl-4"
+          className="flex items-center justify-between gap-3 rounded-xl bg-fill py-2 pr-2 pl-4"
         >
           <p className="min-w-0 text-sm text-pretty">{saved.text}</p>
           <div className="flex shrink-0 gap-1">
@@ -440,7 +440,7 @@ function LiveHero({
   const game = visit.table.game ? gameNames[visit.table.game] : null;
   return (
     <Surface className="relative overflow-hidden p-4">
-      <Glow tone="accent" />
+      <Glow tone="felt" />
       <div className="relative flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <dl className="grid flex-1 grid-cols-2 gap-4">
@@ -494,7 +494,7 @@ function VisitHero({ visit }: { visit: RecordingVisitView }) {
   if (finalResult === null)
     return (
       <Surface className="relative overflow-hidden p-4">
-        <Glow tone="accent" />
+        <Glow tone="felt" />
         <dl className="relative grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
             <dt className="text-sm font-medium text-muted">Total in</dt>
@@ -524,7 +524,7 @@ function VisitHero({ visit }: { visit: RecordingVisitView }) {
     );
   return (
     <Surface className="relative overflow-hidden p-4">
-      <Glow tone={finalResult > 0 ? "win" : finalResult < 0 ? "loss" : "accent"} />
+      <Glow tone={finalResult > 0 ? "win" : finalResult < 0 ? "loss" : "ink"} />
       <div className="relative flex flex-col gap-1">
         <p className="text-sm font-medium text-muted">Final result</p>
         <Money
@@ -598,7 +598,7 @@ function History({
                 type="button"
                 onClick={() => onInspect(line.entry.id)}
                 aria-label={`${entryName(visit, line.entry)}, ${money(line.entry.amount)}, ${formatTime(line.entry.occurredAt)}${line.entry.voidedAt ? ", voided" : ""}${line.entry.replacesEntryId ? ", correction" : ""}`}
-                className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-sunken active:bg-sunken focus-visible:outline-offset-[-2px]"
+                className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-fill active:bg-fill focus-visible:outline-offset-[-2px]"
               >
                 <RowText
                   struck={line.entry.voidedAt !== null}

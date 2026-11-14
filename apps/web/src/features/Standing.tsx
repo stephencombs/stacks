@@ -8,7 +8,7 @@ import { Chip } from "./Chip";
 
 /**
  * One player's place on a board: rank, chip, name and result. No `net` is no result yet. With
- * `onPick` the row is a button that picks the player, marked in gold while picked.
+ * `onPick` the row is a button that picks the player, marked in ink while picked.
  */
 export function Standing({
   rowRef,
@@ -53,8 +53,8 @@ export function Standing({
           aria-pressed={picked}
           onClick={onPick}
           className={cn(
-            "block w-full text-left transition-colors duration-150 hover:bg-sunken focus-visible:-outline-offset-2",
-            picked && "shadow-[inset_3px_0_0_var(--color-accent)]",
+            "block w-full text-left transition-colors duration-150 hover:bg-fill focus-visible:-outline-offset-2",
+            picked && "shadow-[inset_3px_0_0_var(--color-ink)]",
           )}
         >
           {row}

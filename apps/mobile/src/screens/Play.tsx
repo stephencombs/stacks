@@ -314,14 +314,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
         </View>
       ) : null}
       {notice ? (
-        <View accessibilityLiveRegion="polite" className="rounded-xl bg-sunken px-4 py-2.5">
+        <View accessibilityLiveRegion="polite" className="rounded-xl bg-fill px-4 py-2.5">
           <Text className="text-sm text-ink">{notice}</Text>
         </View>
       ) : null}
       {saved ? (
         <View
           accessibilityLiveRegion="polite"
-          className="flex-row flex-wrap items-center justify-between gap-2 rounded-xl bg-sunken py-1.5 pr-1.5 pl-4"
+          className="flex-row flex-wrap items-center justify-between gap-2 rounded-xl bg-fill py-1.5 pr-1.5 pl-4"
         >
           <Text className="min-w-0 flex-1 text-sm text-ink">{saved.text}</Text>
           <View className="flex-row gap-1">

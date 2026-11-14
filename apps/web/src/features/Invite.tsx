@@ -14,7 +14,7 @@ export function InlineInvite({ detail }: { detail: GroupDetail }) {
   const create = useAction(stacks.Client.mutation("invites", "create"));
   const origin = window.location.origin;
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-sunken p-3">
+    <div className="flex flex-col gap-2 rounded-xl bg-fill p-3">
       <Loaded
         query={stacks.invites(detail.group.id)}
         skeleton={

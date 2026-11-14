@@ -1,7 +1,7 @@
 import { ClerkFailed, SignInButton, SignUpButton } from "@clerk/react";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { Outlet, createRootRoute, useLocation, useRouterState } from "@tanstack/react-router";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, SunMoon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button, ButtonLink } from "~/components/ui/Button";
@@ -102,7 +102,7 @@ function Frame({ tools, children }: { tools?: ReactNode; children?: ReactNode })
 
 function ThemeMenu() {
   const theme = useTheme();
-  const Icon = theme === "light" ? Sun : Moon;
+  const Icon = { system: SunMoon, light: Sun, dark: Moon }[theme];
   return (
     <Menu label="Theme" icon={<Icon className="size-5" aria-hidden />}>
       <MenuChoice options={themeChoices} value={theme} onChange={setTheme} />

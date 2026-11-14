@@ -65,7 +65,7 @@ function RailBoard({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
               key={s.playerId}
               className={cn(
                 "flex min-h-12 items-center gap-3 px-4",
-                you && "shadow-[inset_3px_0_0_var(--color-accent)]",
+                you && "shadow-[inset_3px_0_0_var(--color-ink)]",
               )}
             >
               <span className="w-4 shrink-0 text-center text-sm text-muted tabular-nums">
@@ -95,7 +95,7 @@ function RailBalance({ group, trip }: { group: GroupDetail; trip: TripDetail }) 
   const balance = trip.balances.find((b) => b.playerId === me)?.amount ?? 0;
   const head = {
     label: balance > 0 ? "You're owed" : balance < 0 ? "You owe" : "You're square",
-    tone: balance > 0 ? ("win" as const) : balance < 0 ? ("loss" as const) : ("accent" as const),
+    tone: balance > 0 ? ("win" as const) : balance < 0 ? ("loss" as const) : ("ink" as const),
   };
   return (
     <Surface className="relative overflow-hidden">

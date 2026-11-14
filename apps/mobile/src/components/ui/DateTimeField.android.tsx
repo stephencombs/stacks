@@ -45,7 +45,7 @@ export function DateTimeField({
         />
       ) : null}
       {error ? (
-        <Text accessibilityRole="alert" className="px-1 type-footnote text-danger">
+        <Text accessibilityRole="alert" className="px-1 type-footnote text-loss">
           {error}
         </Text>
       ) : null}

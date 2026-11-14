@@ -41,9 +41,7 @@ export function SettingsLayout({ groupName, currency, sections, children }: Sett
                 onPress={row.pending ? undefined : row.onPress}
                 accessibilityHint={row.pending ? "Exporting ledger" : undefined}
               >
-                <Text
-                  className={`flex-1 type-body ${row.destructive ? "text-danger" : "text-ink"}`}
-                >
+                <Text className={`flex-1 type-body ${row.destructive ? "text-loss" : "text-ink"}`}>
                   {row.pending ? "Exporting…" : row.label}
                 </Text>
                 {row.value ? (
@@ -57,7 +55,7 @@ export function SettingsLayout({ groupName, currency, sections, children }: Sett
             <Text className="px-1 type-footnote text-muted">{section.footer}</Text>
           ) : null}
           {section.error ? (
-            <Text accessibilityRole="alert" className="px-1 type-footnote text-danger">
+            <Text accessibilityRole="alert" className="px-1 type-footnote text-loss">
               {section.error}
             </Text>
           ) : null}

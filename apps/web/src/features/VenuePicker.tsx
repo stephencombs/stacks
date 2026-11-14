@@ -34,13 +34,10 @@ function VenueOption({
       aria-pressed={selected}
       className={cn(
         "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150",
-        selected ? "bg-accent/15" : "hover:bg-sunken",
+        selected ? "bg-fill" : "hover:bg-fill",
       )}
     >
-      <Icon
-        className={cn("size-4 shrink-0", selected ? "text-accent-text" : "text-muted")}
-        aria-hidden
-      />
+      <Icon className={cn("size-4 shrink-0", selected ? "text-ink" : "text-muted")} aria-hidden />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-medium">{venue.name}</span>
         <span className="truncate text-sm text-muted">
@@ -53,7 +50,7 @@ function VenueOption({
             .join(" · ")}
         </span>
       </span>
-      {selected ? <Check className="size-4 shrink-0 text-accent-text" aria-hidden /> : null}
+      {selected ? <Check className="size-4 shrink-0 text-ink" aria-hidden /> : null}
     </button>
   );
 }

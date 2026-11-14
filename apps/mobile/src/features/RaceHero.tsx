@@ -25,13 +25,12 @@ const LABEL = 30;
 const LETTER = 12;
 const INSET = 8;
 
-/** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in gold. */
+/** The trip as a race, led by your gap to the next player, with everyone's running totals and yours in ink. */
 export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
-  const [accent, accentText, muted, ring] = useCSSVariable([
-    "--color-accent",
-    "--color-accent-text",
+  const [ink, muted, ring] = useCSSVariable([
+    "--color-ink",
     "--color-muted",
-    "--color-line-strong",
+    "--color-fill-strong",
   ]).map(String);
   const [width, setWidth] = useState(0);
   const currency = detail.group.currency;
@@ -105,7 +104,7 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
               const yours = playerId === me;
               const end = { x: plot.x(line.length - 1), y: plot.y(line.at(-1)!) };
               const off = plot.clipped(line.at(-1)!);
-              const color = yours ? accent : muted;
+              const color = yours ? ink : muted;
               const initial =
                 (names.get(playerId) ?? "?").slice(0, 1).toUpperCase() +
                 (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
@@ -132,7 +131,7 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
                     textAnchor={seat.anchor}
                     fontSize={LETTER}
                     fontWeight={yours ? "600" : "400"}
-                    fill={yours ? accentText : muted}
+                    fill={yours ? ink : muted}
                   >
                     {initial}
                   </SvgText>

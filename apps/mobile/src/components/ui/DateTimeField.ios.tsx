@@ -19,14 +19,14 @@ export function DateTimeField({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => fieldDate(value, kind) ?? new Date());
   const { theme } = useUniwind();
-  const accent = useCSSVariable("--color-accent-text");
+  const tint = useCSSVariable("--color-ink");
   return (
     <View className="gap-1.5">
       <Text className="px-1 type-footnote font-medium text-muted">{label}</Text>
       <Host
         style={{ height: 48 }}
         colorScheme={theme === "dark" ? "dark" : "light"}
-        seedColor={typeof accent === "string" ? accent : undefined}
+        seedColor={typeof tint === "string" ? tint : undefined}
       >
         <Popover isPresented={open} onIsPresentedChange={setOpen}>
           <Popover.Trigger>
@@ -65,7 +65,7 @@ export function DateTimeField({
         </Popover>
       </Host>
       {error ? (
-        <Text accessibilityRole="alert" className="px-1 type-footnote text-danger">
+        <Text accessibilityRole="alert" className="px-1 type-footnote text-loss">
           {error}
         </Text>
       ) : null}
