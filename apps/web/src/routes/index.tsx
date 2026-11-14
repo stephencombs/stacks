@@ -10,10 +10,11 @@ import type { VisitId } from "@stacks/contracts";
 import { useState } from "react";
 
 import { Money } from "~/components/Money";
+import { ActionBar } from "~/components/ui/ActionBar";
 import { Button } from "~/components/ui/Button";
 import { EmptyState, PageHeader, Section } from "~/components/ui/Page";
 import { Glow, List, RowLink, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
-import { Dock, focusMain, PersonalFrame, SaveStatus, useDialogFocus } from "~/features/Personal";
+import { focusMain, SaveStatus, useDialogFocus } from "~/features/Personal";
 import { PastSessionDialog, StartDialog } from "~/features/RecordingForms";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -38,8 +39,8 @@ function Home() {
   };
   const playing = (home?.active.length ?? 0) > 0;
   return (
-    <PersonalFrame onClickCapture={focus.capture}>
-      <PageHeader title="Your play">
+    <div onClickCapture={focus.capture} className="contents">
+      <PageHeader title="Play">
         <SaveStatus status={status} error={error} onRetry={retryLoad} />
       </PageHeader>
       {home === null ? (
@@ -82,27 +83,29 @@ function Home() {
           ) : null}
         </>
       )}
-      <Dock>
-        <Button
-          variant={playing ? "secondary" : "primary"}
-          size="lg"
-          disabled={home === null}
-          onClick={() => setDialog("start")}
-        >
-          Start session
-        </Button>
-        <Button
-          variant="ghost"
-          size="lg"
-          disabled={home === null}
-          onClick={() => setDialog("past")}
-        >
-          Add past session
-        </Button>
-      </Dock>
+      <ActionBar>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            variant={playing ? "secondary" : "primary"}
+            size="lg"
+            disabled={home === null}
+            onClick={() => setDialog("start")}
+          >
+            Start session
+          </Button>
+          <Button
+            variant="ghost"
+            size="lg"
+            disabled={home === null}
+            onClick={() => setDialog("past")}
+          >
+            Add past session
+          </Button>
+        </div>
+      </ActionBar>
       {dialog === "start" ? <StartDialog onClose={close} onStarted={open} /> : null}
       {dialog === "past" ? <PastSessionDialog onClose={close} onAdded={open} /> : null}
-    </PersonalFrame>
+    </div>
   );
 }
 

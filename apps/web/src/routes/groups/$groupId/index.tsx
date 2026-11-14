@@ -9,6 +9,7 @@ import { useState } from "react";
 
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
+import { BackLink } from "~/components/ui/Nav";
 import { PageHeader, Section } from "~/components/ui/Page";
 import { List, RowLink, RowText } from "~/components/ui/Surface";
 import { Chip } from "~/features/Chip";
@@ -50,6 +51,7 @@ function GroupHomeView({ detail }: { detail: GroupDetail }) {
   return (
     <>
       <PageHeader
+        back={<BackLink to="/crew">Crew</BackLink>}
         title={detail.group.name}
         context={`${people} · plays in ${detail.group.currency}`}
       />

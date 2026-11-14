@@ -69,12 +69,6 @@ export function useScope() {
   };
 }
 
-/** Whether there's a trip for Sessions and Board to show. Assumed while groups load. */
-export const useScopeHasTrip = () => {
-  const { scope } = useScope();
-  return scope === undefined || scope === null || scope.trip !== undefined;
-};
-
 /**
  * A screen opened at an address that names a trip or group puts it in scope before it paints.
  * Moving around inside the app sets the scope directly, so only links carry these params.

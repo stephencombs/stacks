@@ -92,9 +92,19 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
           : undefined
       }
     >
-      <View className="flex-row items-center justify-between gap-3">
-        <PageTitle>Sessions</PageTitle>
-        <TripOptionsButton trip={trip} group={group} />
+      <View className="gap-3">
+        <PageTitle
+          context={group.group.name}
+          right={<TripOptionsButton trip={trip} group={group} />}
+        >
+          {trip.trip.name}
+        </PageTitle>
+        <Button
+          label="Board"
+          variant="secondary"
+          className="self-start"
+          onPress={() => go.trip(trip.trip.id, "Board")}
+        />
       </View>
       {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}
       <TripHero currency={group.group.currency} me={group.myPlayerId} sessions={closed} />

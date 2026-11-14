@@ -1,10 +1,9 @@
 import { useClerk, useUser } from "@clerk/expo";
-import { useNavigation } from "@react-navigation/native";
 import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import type { VisitId } from "@stacks/contracts";
-import { useState, type ReactNode } from "react";
+import { use, useState, type ReactNode } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,21 +11,34 @@ import { Button } from "../components/ui/Button";
 import { Choice } from "../components/ui/Field";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
+import { TabBarHeight } from "../components/ui/Screen";
 import { SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useAccount } from "../lib/account";
 import { setTheme, useTheme } from "../lib/theme";
 import { SignInButton } from "./SignInButton";
+import { PersonalLiveBar } from "./LiveBar";
 import { useNativeHeaderActions } from "./NativeHeaderActions";
 
 /**
  * A screen of your own play: it scrolls under the header, and its main actions sit in a dock
- * within thumb reach above the home indicator, stacked unless the caller puts them in a row. It reads nothing from an account or the network,
- * so it has no live bar.
+ * within thumb reach above the tab bar or the home indicator, stacked unless the caller puts them
+ * in a row. It reads nothing from an account or the network. With `live`, your own live session
+ * floats above the tab bar.
  */
-export function PersonalScreen({ children, dock }: { children: ReactNode; dock?: ReactNode }) {
+export function PersonalScreen({
+  children,
+  dock,
+  live = false,
+}: {
+  children: ReactNode;
+  dock?: ReactNode;
+  live?: boolean;
+}) {
   const header = useNativeHeaderActions(true);
+  const bar = use(TabBarHeight);
   const [dockHeight, setDockHeight] = useState(0);
+  const [liveBarHeight, setLiveBarHeight] = useState(0);
   const insets = useSafeAreaInsets();
   const sides = {
     paddingLeft: Math.max(16, insets.left),
@@ -43,17 +55,23 @@ export function PersonalScreen({ children, dock }: { children: ReactNode; dock?:
         contentContainerStyle={sides}
       >
         {children}
-        {dock ? <View style={{ height: dockHeight }} /> : null}
+        <View style={{ height: (dock ? dockHeight : bar) + liveBarHeight }} />
       </ScrollView>
       {dock ? (
         <View
           pointerEvents="box-none"
           onLayout={(event) => setDockHeight(event.nativeEvent.layout.height)}
           className="absolute inset-x-0 bottom-0 gap-2 pt-3"
-          style={{ ...sides, paddingBottom: Math.max(insets.bottom, 12) }}
+          style={{ ...sides, paddingBottom: bar || Math.max(insets.bottom, 12) }}
         >
           {dock}
         </View>
+      ) : null}
+      {live ? (
+        <PersonalLiveBar
+          onHeightChange={setLiveBarHeight}
+          {...(dock ? { bottom: dockHeight } : bar ? { bottom: bar } : {})}
+        />
       ) : null}
     </View>
   );
@@ -212,21 +230,14 @@ function SaveLine({
   );
 }
 
-/** The personal header's right side: a way to groups and trips, and You for anyone. */
-export function PersonalNav() {
-  const navigation = useNavigation();
+/** You, top right of your own play's screens, for anyone signed in or not. */
+export function PersonalYouButton() {
   const [open, setOpen] = useState(false);
   return (
-    <View className="flex-row items-center">
-      <Button
-        label="Groups"
-        variant="ghost"
-        size="sm"
-        onPress={() => navigation.navigate("Account", { screen: "Groups" })}
-      />
+    <>
       <Button label="You" variant="ghost" size="sm" onPress={() => setOpen(true)} />
       {open ? <PersonalYou onClose={() => setOpen(false)} /> : null}
-    </View>
+    </>
   );
 }
 

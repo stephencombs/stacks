@@ -258,7 +258,7 @@ export function TripPageSkeleton({
   if (on === "sessions")
     return (
       <SkeletonPage label="Loading the trip">
-        <HeaderSkeleton action menu />
+        <HeaderSkeleton back action menu />
         <TripLayout rail={<RailSkeleton />}>
           {seated ? <LiveCardSkeleton /> : null}
           <HeroSkeleton />
@@ -270,7 +270,7 @@ export function TripPageSkeleton({
     );
   return (
     <SkeletonPage label="Loading the board">
-      <HeaderSkeleton title="w-28">
+      <HeaderSkeleton back title="w-28">
         <Skeleton className="h-12 w-48 rounded-lg pointer-coarse:h-[52px]" />
       </HeaderSkeleton>
       <HeroSkeleton chart={scope === "trip" ? "race" : "line"} tiles={scope === "all"} />

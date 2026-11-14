@@ -12,17 +12,6 @@ export function useNativeHeaderActions(personal = false) {
   useLayoutEffect(() => {
     navigation.setOptions({
       unstable_headerRightItems: () => [
-        ...(personal
-          ? [
-              {
-                type: "button" as const,
-                label: "Groups",
-                icon: { type: "sfSymbol" as const, name: "person.2" as const },
-                sharesBackground: true,
-                onPress: () => navigation.navigate("Account", { screen: "Groups" }),
-              },
-            ]
-          : []),
         {
           type: "button",
           label: "You",
@@ -33,7 +22,7 @@ export function useNativeHeaderActions(personal = false) {
         },
       ],
     } satisfies NativeStackNavigationOptions);
-  }, [navigation, personal]);
+  }, [navigation]);
 
   if (!open) return null;
   return personal ? (

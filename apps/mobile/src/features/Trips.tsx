@@ -92,7 +92,7 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
 }
 
 /** A group with no trips yet: what a trip is, and the way to start the first. */
-export function NoTrips({ onStart }: { onStart: () => void }) {
+function NoTrips({ onStart }: { onStart: () => void }) {
   return (
     <EmptyState
       title="No trips yet"
@@ -132,7 +132,7 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
  * Starts a trip and puts it in scope. A group's first trip brings Sessions and Board
  * into the tab bar, so that one stays put; any later one opens its sessions.
  */
-export function StartTripSheet({
+function StartTripSheet({
   groupId,
   first,
   onClose,

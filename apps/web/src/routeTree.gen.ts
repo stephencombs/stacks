@@ -10,6 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CrewRouteImport } from './routes/crew'
+import { Route as MapRouteImport } from './routes/map'
+import { Route as StatsRouteImport } from './routes/stats'
 import { Route as ClaimCodeRouteImport } from './routes/claim/$code'
 import { Route as GroupsIndexRouteImport } from './routes/groups/index'
 import { Route as InviteTokenRouteImport } from './routes/invite/$token'
@@ -29,6 +32,21 @@ import { Route as TripsTripIdSessionsNewRouteImport } from './routes/trips/$trip
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CrewRoute = CrewRouteImport.update({
+  id: '/crew',
+  path: '/crew',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapRoute = MapRouteImport.update({
+  id: '/map',
+  path: '/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatsRoute = StatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClaimCodeRoute = ClaimCodeRouteImport.update({
@@ -109,6 +127,9 @@ const TripsTripIdSessionsNewRoute = TripsTripIdSessionsNewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/crew': typeof CrewRoute
+  '/map': typeof MapRoute
+  '/stats': typeof StatsRoute
   '/claim/$code': typeof ClaimCodeRoute
   '/invite/$token': typeof InviteTokenRoute
   '/join/$code': typeof JoinCodeRoute
@@ -127,6 +148,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/crew': typeof CrewRoute
+  '/map': typeof MapRoute
+  '/stats': typeof StatsRoute
   '/claim/$code': typeof ClaimCodeRoute
   '/invite/$token': typeof InviteTokenRoute
   '/join/$code': typeof JoinCodeRoute
@@ -146,6 +170,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/crew': typeof CrewRoute
+  '/map': typeof MapRoute
+  '/stats': typeof StatsRoute
   '/claim/$code': typeof ClaimCodeRoute
   '/invite/$token': typeof InviteTokenRoute
   '/join/$code': typeof JoinCodeRoute
@@ -166,6 +193,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/crew'
+    | '/map'
+    | '/stats'
     | '/claim/$code'
     | '/invite/$token'
     | '/join/$code'
@@ -184,6 +214,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/crew'
+    | '/map'
+    | '/stats'
     | '/claim/$code'
     | '/invite/$token'
     | '/join/$code'
@@ -202,6 +235,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/crew'
+    | '/map'
+    | '/stats'
     | '/claim/$code'
     | '/invite/$token'
     | '/join/$code'
@@ -221,6 +257,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CrewRoute: typeof CrewRoute
+  MapRoute: typeof MapRoute
+  StatsRoute: typeof StatsRoute
   ClaimCodeRoute: typeof ClaimCodeRoute
   InviteTokenRoute: typeof InviteTokenRoute
   JoinCodeRoute: typeof JoinCodeRoute
@@ -245,6 +284,27 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crew': {
+      id: '/crew'
+      path: '/crew'
+      fullPath: '/crew'
+      preLoaderRoute: typeof CrewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/map': {
+      id: '/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof MapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stats': {
+      id: '/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof StatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/claim/$code': {
@@ -357,6 +417,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CrewRoute: CrewRoute,
+  MapRoute: MapRoute,
+  StatsRoute: StatsRoute,
   ClaimCodeRoute: ClaimCodeRoute,
   InviteTokenRoute: InviteTokenRoute,
   JoinCodeRoute: JoinCodeRoute,

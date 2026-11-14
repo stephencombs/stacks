@@ -1,13 +1,13 @@
-import { ClerkFailed } from "@clerk/react";
+import { ClerkFailed, SignInButton, SignUpButton } from "@clerk/react";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { Outlet, createRootRoute, useLocation, useRouterState } from "@tanstack/react-router";
 import { Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { ButtonLink } from "~/components/ui/Button";
+import { Button, ButtonLink } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuChoice } from "~/components/ui/Menu";
-import { Note } from "~/components/ui/Page";
+import { EmptyState, Note, PageHeader } from "~/components/ui/Page";
 import { Landing } from "~/features/Landing";
 import { AppShell, Wordmark, You } from "~/features/Shell";
 import { useAccount } from "~/lib/account";
@@ -16,15 +16,17 @@ import { setTheme, useTheme } from "~/lib/theme";
 
 export const Route = createRootRoute({ component: Root });
 
-/** Opening an invite or claim link happens before you're in the group, so it has no places yet. */
+/** Opening an invite or claim link happens before you're in the group, so it has no tabs yet. */
 const invitation = /^\/(join|claim)\//;
+
+/** Pages that fill the screen, outside the tabs: a live session and a shared table's links. */
+const fullScreen = /^\/(play|t|invite)\//;
 
 /** Your own play: it lives on this device, so it never waits for sign-in or the network. */
 const personal = (pathname: string) =>
   pathname === "/" ||
-  pathname.startsWith("/play/") ||
-  pathname.startsWith("/t/") ||
-  pathname.startsWith("/invite/") ||
+  fullScreen.test(pathname) ||
+  /^\/(stats|map|history)(\/|$)/.test(pathname) ||
   pathname.startsWith("/you/");
 
 function Root() {
@@ -34,28 +36,49 @@ function Root() {
     select: (state) => state.matches.at(-1)?.pathname ?? state.location.pathname,
   });
   // Your play keeps this same element signed in or out, so sign-in never remounts it.
-  return <SignedInProvider>{personal(pathname) ? <Outlet /> : <Accounts />}</SignedInProvider>;
+  return (
+    <SignedInProvider>
+      {fullScreen.test(pathname) ? (
+        <Outlet />
+      ) : invitation.test(pathname) ? (
+        <Accounts framed />
+      ) : (
+        <AppShell>{personal(pathname) ? <Outlet /> : <Accounts />}</AppShell>
+      )}
+    </SignedInProvider>
+  );
 }
 
-/** Groups, trips and their sessions belong to an account, so they need one signed in. */
-function Accounts() {
+/**
+ * Groups, trips and their sessions belong to an account, so they need one signed in. Inside the
+ * tabs, the reason they wait shows where they would; an invitation has its own frame.
+ */
+function Accounts({ framed = false }: { framed?: boolean }) {
   const account = useAccount();
   const { pathname } = useLocation();
-  if (!account.available) return <NoSignIn />;
-  if (!account.isLoaded) return <Loading />;
-  if (!account.isSignedIn || !account.userId) return <SignedOut />;
+  const signedIn = account.available && account.isLoaded && account.isSignedIn;
+  if (!signedIn || !account.userId) {
+    const waiting = !account.available ? (
+      <NoSignIn />
+    ) : !account.isLoaded ? (
+      <Loading />
+    ) : framed ? (
+      <Landing invited={invitation.test(pathname)} />
+    ) : (
+      <SignedOut />
+    );
+    return framed ? <Frame tools={<ThemeMenu />}>{waiting}</Frame> : waiting;
+  }
   return (
     <StacksProvider key={account.userId}>
-      {invitation.test(pathname) ? (
+      {framed ? (
         <Frame tools={<You layout="bar" />}>
           <main className="flex w-full flex-1 flex-col gap-8 pt-2 pb-16 lg:mx-auto lg:max-w-2xl">
             <Outlet />
           </main>
         </Frame>
       ) : (
-        <AppShell>
-          <Outlet />
-        </AppShell>
+        <Outlet />
       )}
     </StacksProvider>
   );
@@ -97,38 +120,45 @@ function BackToYourPlay() {
 
 function Loading() {
   return (
-    <Frame>
-      <ClerkFailed>
-        <main className="flex flex-col gap-4 pt-16">
-          <FormError>
-            Couldn't load sign-in. Check your connection and reload the page. Your sessions on this
-            device still work.
-          </FormError>
-          <BackToYourPlay />
-        </main>
-      </ClerkFailed>
-    </Frame>
+    <ClerkFailed>
+      <div className="flex flex-col gap-4 pt-16">
+        <FormError>
+          Couldn't load sign-in. Check your connection and reload the page. Your sessions on this
+          device still work.
+        </FormError>
+        <BackToYourPlay />
+      </div>
+    </ClerkFailed>
   );
 }
 
 function NoSignIn() {
   return (
-    <Frame tools={<ThemeMenu />}>
-      <main className="flex flex-col gap-4 pt-16">
-        <Note>
-          Groups and trips need sign-in, and this copy of Color Up doesn't have it set up.
-        </Note>
-        <BackToYourPlay />
-      </main>
-    </Frame>
+    <div className="flex flex-col gap-4 pt-16">
+      <Note>Groups and trips need sign-in, and this copy of Color Up doesn't have it set up.</Note>
+      <BackToYourPlay />
+    </div>
   );
 }
 
+/** Crew, signed out: what it is, and the way in. Your own play never needs this. */
 function SignedOut() {
-  const { pathname } = useLocation();
   return (
-    <Frame tools={<ThemeMenu />}>
-      <Landing invited={invitation.test(pathname)} />
-    </Frame>
+    <>
+      <PageHeader title="Crew" />
+      <EmptyState title="See what your friends are playing">
+        Groups and trips with friends need an account. Your own sessions keep working without one.
+      </EmptyState>
+      <div className="flex flex-wrap gap-3">
+        <SignUpButton mode="modal">
+          <Button variant="primary" size="lg">
+            Create an account
+          </Button>
+        </SignUpButton>
+        <SignInButton mode="modal">
+          <Button size="lg">Sign in</Button>
+        </SignInButton>
+      </div>
+    </>
   );
 }

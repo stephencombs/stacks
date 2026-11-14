@@ -69,7 +69,7 @@ export function HomeScreen() {
       }
     >
       <View className="gap-2">
-        <PageTitle>Your play</PageTitle>
+        <PageTitle>Play</PageTitle>
         <SaveStatus status={status} error={error} onRetry={retryLoad} />
       </View>
       {home === null ? (

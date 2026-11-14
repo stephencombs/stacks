@@ -3,54 +3,39 @@ import type { GroupId, SessionId, TripId } from "@stacks/contracts";
 
 import { useScope } from "./scope";
 
-type PlacesParams = NonNullable<
-  Extract<ReactNavigation.RootParamList["Account"], { screen: "Places" }>["params"]
+type CrewParams = NonNullable<
+  Extract<ReactNavigation.RootParamList["Tabs"], { screen: "CrewTab" }>["params"]
 >;
 
 /**
- * Ways into the places from anywhere. A session and a new session push onto Sessions, and a
- * group's people and settings onto Group, each over its place so back lands there.
+ * Ways into groups and trips from anywhere. Each is pushed onto Crew over its list of groups, so
+ * back always lands somewhere in Crew.
  */
 export function useGo() {
   const navigation = useNavigation();
   const { setTrip, setGroup } = useScope();
-  const places = (params: PlacesParams) =>
-    navigation.navigate("Account", { screen: "Places", params });
+  const crew = (params: CrewParams) => navigation.navigate("Tabs", { screen: "CrewTab", params });
   return {
     session: (sessionId: SessionId) =>
-      places({
-        screen: "SessionsTab",
-        params: { screen: "Session", params: { sessionId }, initial: false },
-      }),
+      crew({ screen: "Session", params: { sessionId }, initial: false }),
     newSession: (tripId: TripId, from?: SessionId) =>
-      places({
-        screen: "SessionsTab",
-        params: {
-          screen: "NewSession",
-          params: { tripId, ...(from ? { from } : {}) },
-          initial: false,
-        },
+      crew({
+        screen: "NewSession",
+        params: { tripId, ...(from ? { from } : {}) },
+        initial: false,
       }),
-    /** Puts a trip in scope and opens one of its places. */
-    trip: (tripId: TripId, place: "Sessions" | "Board" = "Sessions") => {
+    /** Puts a trip in scope and opens its sessions or its board. */
+    trip: (tripId: TripId, page: "Sessions" | "Board" = "Sessions") => {
       setTrip(tripId);
-      if (place === "Board") places({ screen: "BoardTab", params: { screen: "Board" } });
-      else places({ screen: "SessionsTab", params: { screen: "Sessions" } });
+      crew({ screen: page, params: { tripId }, initial: false });
     },
-    /** Puts a group in scope and opens its hub. */
+    /** Puts a group in scope and opens it. */
     group: (groupId: GroupId) => {
       setGroup(groupId);
-      places({ screen: "GroupTab", params: { screen: "Group" } });
+      crew({ screen: "Group", params: { groupId }, initial: false });
     },
-    people: (groupId: GroupId) =>
-      places({
-        screen: "GroupTab",
-        params: { screen: "People", params: { groupId }, initial: false },
-      }),
+    people: (groupId: GroupId) => crew({ screen: "People", params: { groupId }, initial: false }),
     settings: (groupId: GroupId) =>
-      places({
-        screen: "GroupTab",
-        params: { screen: "GroupSettings", params: { groupId }, initial: false },
-      }),
+      crew({ screen: "GroupSettings", params: { groupId }, initial: false }),
   };
 }

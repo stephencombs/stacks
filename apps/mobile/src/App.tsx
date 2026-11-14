@@ -1,10 +1,9 @@
 import {
   DarkTheme,
   DefaultTheme,
-  StackActions,
+  CommonActions,
   createStaticNavigation,
   useNavigation,
-  type NavigationState,
   type StaticParamList,
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -21,81 +20,73 @@ import { Button } from "./components/ui/Button";
 import { HeaderTitle } from "./components/ui/HeaderTitle";
 import { TabBarHeight } from "./components/ui/Screen";
 import { Landing } from "./features/Landing";
-import { PersonalNav } from "./features/Personal";
+import { PersonalYouButton } from "./features/Personal";
 import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./features/PlaceTabs";
-import { ScopeButton } from "./features/Scope";
 import { YouButton } from "./features/You";
 import { AccountProvider, useAccount } from "./lib/account";
 import { markStartup, reportStartupError } from "./lib/diagnostics";
 import { useAppFonts } from "./lib/fonts";
 import { getInitialURL } from "./lib/initialUrl";
 import { recordingStore } from "./lib/recording";
-import { ScopeProvider, useScopeHasTrip } from "./lib/scope";
-import { Prefetch, SignedInProvider, StacksProvider, useLastTrip, useStacks } from "./lib/stacks";
+import { ScopeProvider } from "./lib/scope";
+import { SignedInProvider, StacksProvider } from "./lib/stacks";
 import "./lib/theme";
 import { BoardScreen } from "./screens/Board";
 import { HomeScreen } from "./screens/Home";
+import { MapScreen } from "./screens/Map";
 import { ClaimScreen, JoinScreen } from "./screens/Invites";
 import { GroupScreen } from "./screens/Group";
 import { GroupSettingsScreen } from "./screens/GroupSettings";
-import { GroupsScreen, NoGroups } from "./screens/Groups";
+import { GroupsScreen } from "./screens/Groups";
 import { NewSessionScreen } from "./screens/NewSession";
 import { PeopleScreen } from "./screens/People";
 import { PlayScreen } from "./screens/Play";
 import { SessionScreen } from "./screens/Session";
 import { SessionsScreen } from "./screens/Sessions";
+import { StatsScreen } from "./screens/Stats";
 
-const stackOptions = {
+const headerOptions = {
   headerTransparent: Platform.OS === "ios",
   headerShadowVisible: false,
   ...(Platform.OS === "ios"
     ? { headerTitle: ({ children }: { children: string }) => <HeaderTitle title={children} /> }
     : {}),
   headerBackButtonDisplayMode: "minimal",
-  headerRight: () => <YouButton />,
 } as const;
 
-/** A place's own page: the scope where a back button would be, and You beside it. */
-const placeOptions = {
-  title: "",
-  ...(Platform.OS === "ios"
-    ? { headerTitle: ({ children }: { children: string }) => <ScopeButton title={children} /> }
-    : { headerLeft: () => <ScopeButton /> }),
-  headerLeftBackgroundVisible: false,
-};
+/** Your own play: You for anyone, signed in or not. */
+const personalOptions = { ...headerOptions, title: "", headerRight: () => <PersonalYouButton /> };
 
-const SessionsStack = createNativeStackNavigator({
-  screenOptions: stackOptions,
-  screens: {
-    Sessions: { screen: SessionsScreen, options: placeOptions, linking: "trips/:tripId" },
-    Session: { screen: SessionScreen, options: { title: "" }, linking: "sessions/:sessionId" },
-    NewSession: {
-      screen: NewSessionScreen,
-      options: { title: "Start a session" },
-      linking: "trips/:tripId/sessions/new",
-    },
-  },
+/** Groups and trips: You with your chip in the group in scope. */
+const crewOptions = { ...headerOptions, headerRight: () => <YouButton /> };
+
+const PlayStack = createNativeStackNavigator({
+  screenOptions: personalOptions,
+  screens: { Home: { screen: HomeScreen, linking: "" } },
 });
 
-const BoardStack = createNativeStackNavigator({
-  screenOptions: stackOptions,
-  screens: {
-    Board: {
-      screen: BoardScreen,
-      options: placeOptions,
-      // A trip's old Results page and a group's old Stats page are the Board now.
-      linking: {
-        path: "trips/:tripId/board",
-        alias: ["trips/:tripId/results", "groups/:groupId/stats"],
-      },
-    },
-  },
+const StatsStack = createNativeStackNavigator({
+  screenOptions: personalOptions,
+  screens: { Stats: { screen: StatsScreen, linking: "stats" } },
 });
 
-const GroupStack = createNativeStackNavigator({
-  screenOptions: stackOptions,
+const MapStack = createNativeStackNavigator({
+  screenOptions: personalOptions,
+  screens: { Map: { screen: MapScreen, linking: "map" } },
+});
+
+/**
+ * Groups, trips and their sessions belong to an account. One gate in front of them all: they wait
+ * for sign-in, and share one API client and cache for whoever is signed in. Each is pushed onto
+ * your groups, so back always lands in Crew.
+ */
+const CrewStack = createNativeStackNavigator({
+  initialRouteName: "Crew",
+  screenOptions: crewOptions,
+  layout: ({ children }) => <AccountGate>{children}</AccountGate>,
   screens: {
-    Group: { screen: GroupScreen, options: placeOptions, linking: "groups/:groupId" },
+    Crew: { screen: GroupsScreen, options: { title: "" }, linking: "crew" },
+    Group: { screen: GroupScreen, options: { title: "" }, linking: "groups/:groupId" },
     People: {
       screen: PeopleScreen,
       options: { title: "People" },
@@ -106,64 +97,49 @@ const GroupStack = createNativeStackNavigator({
       options: { title: "Settings" },
       linking: "groups/:groupId/settings",
     },
+    Sessions: { screen: SessionsScreen, options: { title: "" }, linking: "trips/:tripId" },
+    Board: { screen: BoardScreen, options: { title: "" }, linking: "trips/:tripId/board" },
+    // Old addresses. A linking alias here would leave every screen in this stack without typed
+    // params, so each is a screen of its own: your groups, a trip's Results and a group's Stats.
+    Groups: { screen: GroupsScreen, options: { title: "" }, linking: "groups" },
+    Results: { screen: BoardScreen, options: { title: "" }, linking: "trips/:tripId/results" },
+    GroupStats: { screen: BoardScreen, options: { title: "" }, linking: "groups/:groupId/stats" },
+    Session: { screen: SessionScreen, options: { title: "" }, linking: "sessions/:sessionId" },
+    NewSession: {
+      screen: NewSessionScreen,
+      options: { title: "Start a session" },
+      linking: "trips/:tripId/sessions/new",
+    },
   },
 });
 
-/** Around the tabs: the last trip's requests start early, and screens learn the bar's height. */
-function PlacesLayout({ children }: { children: ReactNode }) {
-  const stacks = useStacks();
-  const { lastTripId } = useLastTrip();
+/** Around the tabs: screens learn the bar's height, to keep clear of it. */
+function TabsLayout({ children }: { children: ReactNode }) {
   const bar = useTabBarHeight();
-  return (
-    <>
-      {lastTripId ? (
-        <>
-          <Prefetch query={stacks.trip(lastTripId)} />
-        </>
-      ) : null}
-      <NoGroups>
-        <TabBarHeight value={bar}>{children}</TabBarHeight>
-      </NoGroups>
-    </>
-  );
+  return <TabBarHeight value={bar}>{children}</TabBarHeight>;
 }
 
-const Places = createPlaceTabs({
+const Tabs = createPlaceTabs({
   ...placeTabsConfig,
-  initialRouteName: "SessionsTab",
-  layout: ({ children }) => <PlacesLayout>{children}</PlacesLayout>,
+  initialRouteName: "PlayTab",
+  layout: ({ children }) => <TabsLayout>{children}</TabsLayout>,
   screens: {
-    // A group with no trips has nothing for the first three places, so only Group is offered.
-    SessionsTab: {
-      screen: SessionsStack,
-      if: useScopeHasTrip,
-      options: placeTab("Sessions", "suit.club.fill"),
-      linking: { initialRouteName: "Sessions" },
-    },
-    BoardTab: {
-      screen: BoardStack,
-      if: useScopeHasTrip,
-      options: placeTab("Board", "chart.line.uptrend.xyaxis"),
-    },
-    GroupTab: {
-      screen: GroupStack,
-      options: placeTab("Group", "person.2"),
-      linking: { initialRouteName: "Group" },
+    PlayTab: { screen: PlayStack, options: placeTab("Play", "suit.club.fill") },
+    StatsTab: { screen: StatsStack, options: placeTab("Stats", "chart.bar.fill") },
+    MapTab: { screen: MapStack, options: placeTab("Map", "map.fill") },
+    CrewTab: {
+      screen: CrewStack,
+      options: placeTab("Crew", "person.2.fill"),
+      linking: { initialRouteName: "Crew" },
     },
   },
 });
 
-/**
- * Groups, trips and their sessions belong to an account. One gate in front of them all: they wait
- * for sign-in, and share one API client and cache for whoever is signed in.
- */
-const AccountStack = createNativeStackNavigator({
-  initialRouteName: "Places",
-  screenOptions: stackOptions,
-  layout: ({ state, children }) => <AccountGate state={state}>{children}</AccountGate>,
+/** Opening an invite or claim link happens before you're in the group, so it has no tabs. */
+const InvitesStack = createNativeStackNavigator({
+  screenOptions: crewOptions,
+  layout: ({ children }) => <AccountGate invited>{children}</AccountGate>,
   screens: {
-    Places: { screen: Places, options: { headerShown: false } },
-    Groups: { screen: GroupsScreen, options: { title: "Your groups" }, linking: "groups" },
     Join: { screen: JoinScreen, options: { title: "Join a group" }, linking: "join/:code" },
     Claim: {
       screen: ClaimScreen,
@@ -173,29 +149,14 @@ const AccountStack = createNativeStackNavigator({
   },
 });
 
-/** Your own play opens first and lives on this device, so it never waits for sign-in. */
+/** The tabs, and above them the pages that fill the screen: a live session and invitations. */
 const RootStack = createNativeStackNavigator({
-  initialRouteName: "Home",
-  screenOptions: {
-    title: "",
-    headerTransparent: Platform.OS === "ios",
-    headerShadowVisible: false,
-    ...(Platform.OS === "ios"
-      ? { headerTitle: ({ children }: { children: string }) => <HeaderTitle title={children} /> }
-      : {}),
-    headerBackButtonDisplayMode: "minimal",
-    headerRight: () => <PersonalNav />,
-  },
+  initialRouteName: "Tabs",
+  screenOptions: personalOptions,
   screens: {
-    Home: { screen: HomeScreen, linking: "" },
+    Tabs: { screen: Tabs, options: { headerShown: false } },
     Play: { screen: PlayScreen, linking: "play/:visitId" },
-    // Money between players lives under You, apart from any trip.
-    Account: {
-      screen: AccountStack,
-      options: { headerShown: false },
-      // A link straight to a session or an invite still has the places to go back to.
-      linking: { initialRouteName: "Places" },
-    },
+    Invites: { screen: InvitesStack, options: { headerShown: false } },
   },
 });
 
@@ -210,8 +171,8 @@ const Navigation = createStaticNavigation(RootStack);
 const linking = {
   enabled: "auto" as const,
   prefixes: [Linking.createURL("/")],
-  // Back from any link lands on your play.
-  config: { initialRouteName: "Home" as const },
+  // Back from any link lands on the tabs.
+  config: { initialRouteName: "Tabs" as const },
   getInitialURL: () =>
     getInitialURL(
       () => Linking.getInitialURL(),
@@ -239,13 +200,11 @@ function Root() {
  * Account screens once someone is signed in. Until then, the reason they wait, and a way back to
  * your play. An invite or claim link keeps its place, so it opens once sign-in finishes.
  */
-function AccountGate({ state, children }: { state: NavigationState; children: ReactNode }) {
+function AccountGate({ invited = false, children }: { invited?: boolean; children: ReactNode }) {
   const account = useAccount();
-  const route = state.routes[state.index]?.name;
   if (!account.available) return <NoSignIn />;
   if (!account.isLoaded) return <Starting />;
-  if (!account.isSignedIn || !account.userId)
-    return <SignedOut invited={route === "Join" || route === "Claim"} />;
+  if (!account.isSignedIn || !account.userId) return <SignedOut invited={invited} />;
   return (
     <StacksProvider key={account.userId}>
       <ScopeProvider>{children}</ScopeProvider>
@@ -253,14 +212,17 @@ function AccountGate({ state, children }: { state: NavigationState; children: Re
   );
 }
 
+/** Your own play, from anywhere: the Play tab at its start. */
+const toPlay = () =>
+  CommonActions.navigate({
+    name: "Tabs",
+    params: { screen: "PlayTab", params: { screen: "Home" } },
+  });
+
 function BackToYourPlay() {
   const navigation = useNavigation();
   return (
-    <Button
-      label="Back to your play"
-      size="lg"
-      onPress={() => navigation.dispatch(StackActions.popTo("Home"))}
-    />
+    <Button label="Back to your play" size="lg" onPress={() => navigation.dispatch(toPlay())} />
   );
 }
 
@@ -344,9 +306,7 @@ function Opening() {
 function SignedOut({ invited }: { invited: boolean }) {
   const navigation = useNavigation();
   useEffect(() => markStartup("landing_ready"), []);
-  return (
-    <Landing invited={invited} onRecord={() => navigation.dispatch(StackActions.popTo("Home"))} />
-  );
+  return <Landing invited={invited} onRecord={() => navigation.dispatch(toPlay())} />;
 }
 
 export default function App() {

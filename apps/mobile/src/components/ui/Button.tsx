@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, Text } from "react-native";
 
 import { cn } from "./cn";
-import { GlassSurface } from "./GlassSurface";
 
 type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg" | "xl";
@@ -140,59 +139,6 @@ export function IconButton({
       )}
     >
       {icon}
-    </Pressable>
-  );
-}
-
-export function FilterPill({
-  label,
-  sublabel,
-  active = false,
-  leading,
-  trailing,
-  accessibilityLabel,
-  accessibilityHint,
-  onPress,
-  className,
-}: {
-  label: string;
-  sublabel?: string;
-  active?: boolean;
-  leading?: ReactNode;
-  trailing?: ReactNode;
-  accessibilityLabel?: string;
-  accessibilityHint?: string;
-  onPress: () => void;
-  className?: string;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? (sublabel ? `${sublabel}, ${label}` : label)}
-      accessibilityHint={accessibilityHint}
-      onPress={onPress}
-      className={cn("max-w-64 rounded-full active:scale-[0.97]", className)}
-    >
-      <GlassSurface
-        className="min-h-11 flex-row items-center gap-1.5 rounded-full px-3.5 py-2"
-        fallbackClassName={
-          active ? "border border-line-strong bg-fill" : "border border-line bg-surface"
-        }
-      >
-        {leading}
-        {sublabel ? (
-          <Text numberOfLines={1} className="type-footnote text-muted">
-            {sublabel} ·
-          </Text>
-        ) : null}
-        <Text
-          numberOfLines={1}
-          className={cn("shrink type-callout", active ? "font-semibold text-ink" : "text-ink")}
-        >
-          {label}
-        </Text>
-        {trailing}
-      </GlassSurface>
     </Pressable>
   );
 }

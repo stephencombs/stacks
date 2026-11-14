@@ -12,7 +12,7 @@ type Metrics = {
   insets: { top: number; right: number; bottom: number; left: number };
 } | null;
 type StackConfig = {
-  initialRouteName: string;
+  initialRouteName?: string;
   layout?: ComponentType<{
     state: { index: number; routes: { name: string }[] };
     children?: ReactNode;
@@ -126,7 +126,7 @@ async function load({
   vi.doMock("@react-navigation/native", () => ({
     DarkTheme: { colors: {}, fonts: {} },
     DefaultTheme: { colors: {}, fonts: {} },
-    StackActions: { popTo: (name: string) => ({ type: "POP_TO", payload: { name } }) },
+    CommonActions: { navigate: (payload: object) => ({ type: "NAVIGATE", payload }) },
     useNavigation: () => ({ dispatch }),
     // Draws the root stack's first screen under the real providers, as the native stack would.
     createStaticNavigation: ({ config }: { config: StackConfig }) =>
@@ -134,7 +134,13 @@ async function load({
         navigation(props);
         useEffect(() => void navigationMounts++, []);
         const { top, right, bottom, left } = useSafeAreaInsets();
-        const first = config.screens[config.initialRouteName]!.screen as ComponentType;
+        // Nested navigators open on their own first screens, down to a component.
+        const open = (stack: StackConfig): ComponentType => {
+          const screen = stack.screens[stack.initialRouteName ?? Object.keys(stack.screens)[0]!]!
+            .screen as ComponentType | { config: StackConfig };
+          return "config" in screen ? open(screen.config) : screen;
+        };
+        const first = open(config);
         return createElement(
           "div",
           { "data-insets": [top, right, bottom, left].join(",") },
@@ -149,7 +155,10 @@ async function load({
     },
   }));
   vi.doMock("./features/PlaceTabs", () => ({
-    createPlaceTabs: vi.fn(),
+    createPlaceTabs: (config: StackConfig) => {
+      stacks.push(config);
+      return { config };
+    },
     placeTab: vi.fn(),
     placeTabsConfig: {},
     useTabBarHeight: vi.fn(),
@@ -166,20 +175,21 @@ async function load({
     "./components/ui/Field": ["FormError"],
     "./components/ui/Screen": ["TabBarHeight"],
     "./components/ui/Surface": ["Skeleton"],
-    "./features/Personal": ["PersonalNav"],
-    "./features/Scope": ["ScopeButton"],
+    "./features/Personal": ["PersonalYouButton"],
     "./features/You": ["YouButton"],
-    "./lib/scope": ["ScopeProvider", "useScopeHasTrip"],
+    "./lib/scope": ["ScopeProvider"],
     "./screens/Board": ["BoardScreen"],
     "./screens/Invites": ["ClaimScreen", "JoinScreen"],
     "./screens/Group": ["GroupScreen"],
     "./screens/GroupSettings": ["GroupSettingsScreen"],
-    "./screens/Groups": ["GroupsScreen", "NoGroups"],
+    "./screens/Groups": ["GroupsScreen"],
+    "./screens/Map": ["MapScreen"],
     "./screens/NewSession": ["NewSessionScreen"],
     "./screens/People": ["PeopleScreen"],
     "./screens/Play": ["PlayScreen"],
     "./screens/Session": ["SessionScreen"],
     "./screens/Sessions": ["SessionsScreen"],
+    "./screens/Stats": ["StatsScreen"],
   }))
     vi.doMock(module, () => Object.fromEntries(names.map((name) => [name, Container])));
 
@@ -201,10 +211,13 @@ async function load({
       auth = next;
       view.root!.render(view.element);
     });
-  const root = stacks.find((stack) => "Home" in stack.screens)!;
-  const account = stacks.find((stack) => "Places" in stack.screens)!;
-  /** The account area's gate with `route` in front, inside the app's sign-in. */
-  const gate = (route = "Places") =>
+  const stack = (screen: string) => stacks.find((config) => screen in config.screens)!;
+  const root = stack("Tabs");
+  const tabs = stack("PlayTab");
+  const crew = stack("Crew");
+  const invites = stack("Join");
+  /** Crew's gate, or with `route` an invitation's, inside the app's sign-in. */
+  const gate = (route?: "Join" | "Claim") =>
     render(
       createElement(
         AccountProvider,
@@ -213,9 +226,9 @@ async function load({
           SignedInProvider,
           null,
           createElement(
-            account.layout!,
-            { state: { index: 0, routes: [{ name: route }] } },
-            "Places",
+            (route ? invites : crew).layout!,
+            { state: { index: 0, routes: [{ name: route ?? "Crew" }] } },
+            route ?? "Crew",
           ),
         ),
       ),
@@ -226,7 +239,10 @@ async function load({
     authChanges,
     gate,
     root,
-    account,
+    tabs,
+    crew,
+    invites,
+    stack,
     navigation,
     navigationMounts: () => navigationMounts,
     markStartup,
@@ -299,7 +315,7 @@ it.each([
   expect(host.querySelector("[data-clerk]") !== null).toBe(key !== "");
 
   const { linking, onReady } = app.navigation.mock.calls[0]![0];
-  expect(linking.config.initialRouteName).toBe("Home");
+  expect(linking.config.initialRouteName).toBe("Tabs");
   vi.useFakeTimers();
   const url = linking.getInitialURL();
   await vi.advanceTimersByTimeAsync(1_500);
@@ -309,15 +325,26 @@ it.each([
   expect(app.markStartup).toHaveBeenCalledWith("navigation_ready");
 });
 
-it("keeps every address: your play at the root, groups and invites behind the account gate", async () => {
-  const { root, account } = await load();
-  expect(root.initialRouteName).toBe("Home");
-  expect(root.screens.Home!.linking).toBe("");
+it("keeps every address: your play in the first tab, groups in Crew, invites above the tabs", async () => {
+  const { root, tabs, crew, invites, stack } = await load();
+  expect(root.initialRouteName).toBe("Tabs");
+  expect(root.screens.Tabs!.screen).toEqual({ config: tabs });
   expect(root.screens.Play!.linking).toBe("play/:visitId");
-  expect(root.screens.Account!.screen).toEqual({ config: account });
-  expect(account.screens.Groups!.linking).toBe("groups");
-  expect(account.screens.Join!.linking).toBe("join/:code");
-  expect(account.screens.Claim!.linking).toBe("claim/:code");
+  expect(root.screens.Invites!.screen).toEqual({ config: invites });
+  expect(Object.keys(tabs.screens)).toEqual(["PlayTab", "StatsTab", "MapTab", "CrewTab"]);
+  expect(tabs.initialRouteName).toBe("PlayTab");
+  expect(tabs.screens.PlayTab!.screen).toEqual({ config: stack("Home") });
+  expect(stack("Home").screens.Home!.linking).toBe("");
+  expect(stack("Stats").screens.Stats!.linking).toBe("stats");
+  expect(stack("Map").screens.Map!.linking).toBe("map");
+  expect(tabs.screens.CrewTab!.screen).toEqual({ config: crew });
+  expect(crew.screens.Crew!.linking).toBe("crew");
+  // Old addresses still open: your groups, a trip's Results and a group's Stats.
+  expect(crew.screens.Groups!.linking).toBe("groups");
+  expect(crew.screens.Results!.linking).toBe("trips/:tripId/results");
+  expect(crew.screens.GroupStats!.linking).toBe("groups/:groupId/stats");
+  expect(invites.screens.Join!.linking).toBe("join/:code");
+  expect(invites.screens.Claim!.linking).toBe("claim/:code");
 });
 
 it.each([
@@ -348,7 +375,7 @@ it("holds account screens until sign-in loads, then says it can't reach it", asy
   await act(() => vi.advanceTimersByTimeAsync(10_000));
   expect(host.textContent).toContain("Can't sign in yet");
   expect(host.textContent).toContain("Back to your play");
-  expect(host.textContent).not.toContain("Places");
+  expect(host.textContent).not.toContain("Crew");
 });
 
 it("asks a signed-out visitor to sign in, naming the invitation on a join link", async () => {
@@ -363,15 +390,18 @@ it("explains groups need sign-in when this build has none", async () => {
   const app = await load({ key: "" });
   const host = await app.gate("Join");
   expect(host.textContent).toContain("Groups and trips need sign-in");
-  expect(host.textContent).not.toContain("Places");
+  expect(host.textContent).not.toContain("Crew");
   await act(async () => host.querySelector("button")!.click());
-  expect(app.dispatch).toHaveBeenCalledWith({ type: "POP_TO", payload: { name: "Home" } });
+  expect(app.dispatch).toHaveBeenCalledWith({
+    type: "NAVIGATE",
+    payload: { name: "Tabs", params: { screen: "PlayTab", params: { screen: "Home" } } },
+  });
 });
 
 it("opens account screens for whoever is signed in", async () => {
   const app = await load({ auth: SIGNED_IN });
   const host = await app.gate();
-  expect(host.textContent).toBe("Places");
+  expect(host.textContent).toBe("Crew");
 });
 
 it("keeps your play and its navigation in place when sign-in finishes", async () => {

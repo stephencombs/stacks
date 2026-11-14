@@ -1,5 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { GroupsList } from "~/features/GroupsList";
-
-export const Route = createFileRoute("/groups/")({ component: GroupsList });
+/** Your groups live in Crew now. */
+export const Route = createFileRoute("/groups/")({
+  beforeLoad: () => {
+    throw redirect({ to: "/crew", replace: true });
+  },
+});

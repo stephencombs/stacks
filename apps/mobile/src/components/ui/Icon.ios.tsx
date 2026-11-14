@@ -18,6 +18,8 @@ const symbols: Record<IconName, SFSymbol> = {
   sessions: "suit.club",
   board: "chart.line.uptrend.xyaxis",
   group: "person.2",
+  stats: "chart.bar",
+  map: "map",
   plus: "plus",
   search: "magnifyingglass",
   filter: "line.3.horizontal.decrease",
@@ -29,6 +31,8 @@ const symbols: Record<IconName, SFSymbol> = {
 const filledSymbols: Partial<Record<IconName, SFSymbol>> = {
   sessions: "suit.club.fill",
   group: "person.2.fill",
+  stats: "chart.bar.fill",
+  map: "map.fill",
   settings: "gearshape.fill",
 };
 

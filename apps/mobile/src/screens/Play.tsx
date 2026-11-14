@@ -98,7 +98,9 @@ function Missing() {
           <Button
             label="Back to your play"
             className="mt-2 self-start"
-            onPress={() => navigation.dispatch(StackActions.popTo("Home"))}
+            onPress={() =>
+              navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } })
+            }
           />
         }
       >

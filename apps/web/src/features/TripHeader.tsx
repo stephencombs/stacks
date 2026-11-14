@@ -2,12 +2,14 @@ import { useAuth } from "@clerk/react";
 import { useNavigate } from "@tanstack/react-router";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
+import { TrendingUp } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
-import { Button } from "~/components/ui/Button";
+import { Button, ButtonLink } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
+import { BackLink } from "~/components/ui/Nav";
 import { PageHeader } from "~/components/ui/Page";
 import { Tag } from "~/components/ui/Surface";
 import { useAction, useLastTrip, useRememberTrip, useStacks } from "~/lib/stacks";
@@ -15,8 +17,9 @@ import { useAction, useLastTrip, useRememberTrip, useStacks } from "~/lib/stacks
 const titles = { sessions: "Sessions", board: "Board" } as const;
 
 /**
- * A trip place's title. The scope button already names the trip, so the title is the place.
- * Sessions, the trip's home, also says when the trip has ended and holds the trip's own menu.
+ * A trip page's title. The trip's home, its sessions, is named for the trip and goes back to its
+ * group, with a link to the Board; the Board goes back to the trip. The home also says when the
+ * trip has ended and holds the trip's own menu.
  */
 export function TripHeader({
   group,
@@ -42,7 +45,7 @@ export function TripHeader({
   const home = place === "sessions";
   const canDelete =
     trip.sessions.length === 0 && (isAdmin(group) || trip.trip.createdBy === userId);
-  const title = titles[place];
+  const title = home ? trip.trip.name : titles[place];
 
   const menu = (
     <Menu label={`Actions for ${trip.trip.name}`}>
@@ -62,12 +65,27 @@ export function TripHeader({
   return (
     <>
       <PageHeader
+        back={
+          home ? (
+            <BackLink to="/groups/$groupId" params={{ groupId: group.group.id }}>
+              {group.group.name}
+            </BackLink>
+          ) : (
+            <BackLink to="/trips/$tripId" params={params}>
+              {trip.trip.name}
+            </BackLink>
+          )
+        }
         title={title}
-        documentTitle={`${title} · ${trip.trip.name}`}
+        documentTitle={`${titles[place]} · ${trip.trip.name}`}
         tag={home && ended ? <Tag>Ended</Tag> : null}
         action={
           home ? (
             <div className="flex items-center gap-2">
+              <ButtonLink to="/trips/$tripId/board" params={params} variant="ghost">
+                <TrendingUp className="size-4" aria-hidden />
+                Board
+              </ButtonLink>
               {action}
               {menu}
             </div>

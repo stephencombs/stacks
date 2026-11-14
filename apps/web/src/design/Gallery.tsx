@@ -1,6 +1,6 @@
 import { CurrencyCode, MinorUnits } from "@stacks/contracts";
 import { themeChoices } from "@stacks/client-runtime/theme";
-import { Layers, Moon, Plus, Sun, Trash2, TrendingUp, Users } from "lucide-react";
+import { ChartColumn, Club, MapPinned, Moon, Plus, Sun, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 
 import { BalanceLabel, Money } from "~/components/Money";
@@ -10,7 +10,7 @@ import { Dialog } from "~/components/ui/Dialog";
 import { Checkbox } from "~/components/ui/Checkbox";
 import { Field, FormError, Input, RadioCards, Select } from "~/components/ui/Field";
 import { Menu, MenuChoice, MenuItem } from "~/components/ui/Menu";
-import { BackLink, PlaceLink, ScopeButton } from "~/components/ui/Nav";
+import { BackLink, TabLink } from "~/components/ui/Nav";
 import { EmptyState, Note, PageHeader, Section } from "~/components/ui/Page";
 import { Segmented } from "~/components/ui/Segmented";
 import { List, Row, RowLink, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
@@ -44,10 +44,11 @@ const roles = [
   ["type-title", "Vegas weekend"],
   ["type-callout", "Section heading"],
 ];
-const places = [
-  { label: "Sessions", icon: Layers },
-  { label: "Board", icon: TrendingUp },
-  { label: "Group", icon: Users },
+const tabs = [
+  { label: "Play", icon: Club },
+  { label: "Stats", icon: ChartColumn },
+  { label: "Map", icon: MapPinned },
+  { label: "Crew", icon: Users },
 ];
 const players = [
   { chip: 1, name: "Stephen", you: true, in: 400, out: 1125 },
@@ -195,16 +196,9 @@ export function Gallery() {
 
       <Section title="Navigation">
         <Surface className="flex flex-col gap-4 p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <ScopeButton context="Thursday crew" label="Vegas weekend" />
-            <ScopeButton label="Thursday crew" />
-          </div>
-          <Note>
-            The scope button: the trip in scope under its group, or a group with no trips yet.
-          </Note>
           <div className="flex overflow-hidden rounded-lg bg-surface shadow-(--elevation-card)">
-            {places.map((place, i) => (
-              <PlaceLink
+            {tabs.map((place, i) => (
+              <TabLink
                 key={place.label}
                 to="/"
                 icon={<place.icon className="size-5" aria-hidden />}
@@ -215,8 +209,8 @@ export function Gallery() {
             ))}
           </div>
           <div className="flex w-60 flex-col gap-0.5 rounded-lg bg-canvas p-3">
-            {places.map((place, i) => (
-              <PlaceLink
+            {tabs.map((place, i) => (
+              <TabLink
                 key={place.label}
                 to="/"
                 icon={<place.icon className="size-5" aria-hidden />}
@@ -226,7 +220,7 @@ export function Gallery() {
               />
             ))}
           </div>
-          <Note>The four places: the bottom bar on narrow screens, the sidebar on wide ones.</Note>
+          <Note>The four tabs: the bottom bar on narrow screens, the sidebar on wide ones.</Note>
           <Segmented
             label="Board scope"
             options={[

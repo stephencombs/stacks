@@ -117,7 +117,7 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   );
 }
 
-export function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
+function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
   const navigate = useNavigate();
   const { setLastTripId } = useLastTrip();
   return (

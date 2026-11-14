@@ -1,9 +1,6 @@
-import { ClerkFailed, SignInButton, SignUpButton, useClerk, useUser } from "@clerk/react";
 import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
-import { themeChoices } from "@stacks/client-runtime/theme";
 import type { VisitId } from "@stacks/contracts";
-import { Link } from "@tanstack/react-router";
 import {
   CircleAlert,
   CloudCheck,
@@ -11,21 +8,15 @@ import {
   CloudUpload,
   HardDrive,
   LoaderCircle,
-  Users,
 } from "lucide-react";
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 
 import { Button } from "~/components/ui/Button";
-import { Dialog } from "~/components/ui/Dialog";
-import { Note, Section } from "~/components/ui/Page";
-import { Segmented } from "~/components/ui/Segmented";
-import { useAccount } from "~/lib/account";
-import { setTheme, useTheme } from "~/lib/theme";
-import { Wordmark } from "./Shell";
+import { Wordmark, You } from "./Shell";
 
 /**
- * The frame for your own play: the wordmark, a way to groups and trips, and You. It reads nothing
- * from an account or the network, so it opens offline and signed out.
+ * The frame for a page that fills the screen outside the tabs, such as a live session: the wordmark
+ * and You. It reads nothing from an account or the network, so it opens offline and signed out.
  */
 export function PersonalFrame({
   onClickCapture,
@@ -48,16 +39,7 @@ export function PersonalFrame({
       >
         <header className="flex h-16 shrink-0 items-center justify-between gap-3">
           <Wordmark />
-          <nav aria-label="Account" className="-mr-1.5 flex items-center gap-1">
-            <Link
-              to="/groups"
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
-            >
-              <Users className="size-4" aria-hidden />
-              Groups
-            </Link>
-            <PersonalYou />
-          </nav>
+          <You layout="bar" />
         </header>
         <main
           id="main-content"
@@ -264,95 +246,5 @@ function SaveLine({
       {icon}
       {text}
     </p>
-  );
-}
-
-/** You, for anyone: what's on this device, appearance, and sign-in when this build has it. */
-function PersonalYou() {
-  const [open, setOpen] = useState(false);
-  const theme = useTheme();
-  return (
-    <>
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-        className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-muted transition-[background-color,color,scale] duration-150 hover:bg-sunken hover:text-ink active:scale-[0.96]"
-      >
-        You
-      </button>
-      <Dialog open={open} onOpenChange={setOpen} title="You">
-        <div className="flex flex-col gap-6">
-          <Section title="Your sessions">
-            <Note>
-              Sessions you record are saved on this device only. They aren't backed up or shared
-              yet, and signing in or out leaves them here.
-            </Note>
-          </Section>
-          <Section title="Appearance">
-            <Segmented
-              label="Appearance"
-              options={themeChoices}
-              value={theme}
-              onChange={setTheme}
-            />
-          </Section>
-          <Section title="Account">
-            <AccountActions onClose={() => setOpen(false)} />
-          </Section>
-        </div>
-      </Dialog>
-    </>
-  );
-}
-
-function AccountActions({ onClose }: { onClose: () => void }) {
-  const account = useAccount();
-  if (!account.available)
-    return <Note>Sign-in isn't set up in this copy of Color Up. Recording works without it.</Note>;
-  if (!account.isLoaded)
-    return (
-      <Note>
-        <ClerkFailed>Couldn't reach sign-in. </ClerkFailed>
-        Recording on this device works without it.
-      </Note>
-    );
-  if (!account.isSignedIn)
-    return (
-      <div className="flex flex-col gap-3">
-        <Note>An account opens groups and trips with friends.</Note>
-        <div className="flex flex-wrap gap-2">
-          <SignInButton mode="modal">
-            <Button onClick={onClose}>Sign in</Button>
-          </SignInButton>
-          <SignUpButton mode="modal">
-            <Button variant="ghost" onClick={onClose}>
-              Create an account
-            </Button>
-          </SignUpButton>
-        </div>
-      </div>
-    );
-  return <SignedInActions onClose={onClose} />;
-}
-
-function SignedInActions({ onClose }: { onClose: () => void }) {
-  const { user } = useUser();
-  const clerk = useClerk();
-  return (
-    <div className="flex flex-col gap-3">
-      {user?.fullName ? <Note>Signed in as {user.fullName}.</Note> : null}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          onClick={() => {
-            onClose();
-            clerk.openUserProfile();
-          }}
-        >
-          Manage account
-        </Button>
-        <Button onClick={() => void clerk.signOut()}>Sign out</Button>
-      </div>
-    </div>
   );
 }
