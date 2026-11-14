@@ -346,7 +346,7 @@ export function QuotaBar({
       {pacePct !== undefined ? (
         <View
           style={{ left: `${pacePct}%` }}
-          className="absolute top-0 bottom-0 -ml-px w-0.5 bg-ink"
+          className="absolute top-0 bottom-0 -ml-0.5 w-1 border-x border-ink bg-ink-inverse"
         />
       ) : null}
     </View>

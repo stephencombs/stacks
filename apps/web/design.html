@@ -5,14 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Stacks design system</title>
     <script>
+      var choice = null;
       try {
-        var choice = localStorage.getItem("stacks-theme");
-        if (
-          choice === "dark" ||
-          (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
-        )
-          document.documentElement.dataset.theme = "dark";
+        choice = localStorage.getItem("stacks-theme");
       } catch {}
+      if (
+        choice === "dark" ||
+        (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
+      )
+        document.documentElement.dataset.theme = "dark";
     </script>
   </head>
   <body>

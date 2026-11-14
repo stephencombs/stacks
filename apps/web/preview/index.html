@@ -35,16 +35,17 @@
     <!-- Applies the theme before first paint, so a dark reload never flashes light.
          Keep in step with src/lib/theme.ts. -->
     <script>
+      var choice = null;
       try {
-        var choice = localStorage.getItem("stacks-theme");
-        if (
-          choice === "dark" ||
-          (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
-        ) {
-          document.documentElement.dataset.theme = "dark";
-          document.querySelector('meta[name="theme-color"]').content = "#000000";
-        }
+        choice = localStorage.getItem("stacks-theme");
       } catch {}
+      if (
+        choice === "dark" ||
+        (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
+      ) {
+        document.documentElement.dataset.theme = "dark";
+        document.querySelector('meta[name="theme-color"]').content = "#000000";
+      }
     </script>
   </head>
   <body>

@@ -23,8 +23,8 @@
       --color-ink-inverse: oklch(1 0 0);
       --color-muted: oklch(0.485 0.013 285.9);
       --color-faint: oklch(0.643 0.012 286.1);
-      --color-win: oklch(0.527 0.137 150.1);
-      --color-loss: oklch(0.576 0.209 29.5);
+      --color-win: oklch(0.505 0.137 150.1);
+      --color-loss: oklch(0.545 0.209 29.5);
       --color-win-tint: oklch(0.953 0.026 154.5);
       --color-loss-tint: oklch(0.947 0.023 24.1);
       --color-felt: oklch(0.515 0.113 155.3);
