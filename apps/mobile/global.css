@@ -7,31 +7,46 @@
   --font-mono: "JetBrainsMono-Medium";
 }
 
-/* Keep in step with apps/web/src/index.css; its src/design/tokens.test.ts fails when they drift. Dark
-   is the default; see lib/theme.ts. */
+/* The Color Up palette from docs/design/tokens.json. Keep in step with apps/web/src/index.css; its
+   src/design/tokens.test.ts fails when either drifts from the tokens. The theme follows the system
+   unless the You sheet saved a choice; see lib/theme.ts. */
 @layer theme {
   :root {
     @variant light {
-      --color-canvas: oklch(0.965 0.004 260);
-      --color-surface: oklch(0.995 0.002 260);
-      --color-sunken: oklch(0.935 0.006 260);
-      --color-fill: oklch(0.91 0.006 260);
+      --color-canvas: oklch(0.962 0.005 286.3);
+      --color-surface: oklch(1 0 0);
       --color-raised: oklch(1 0 0);
-      --color-ink: oklch(0.2 0.015 260);
-      --color-muted: oklch(0.48 0.015 260);
-      --color-faint: oklch(0.62 0.01 260);
-      --color-line: oklch(0.2 0.015 260 / 0.1);
-      --color-line-strong: oklch(0.2 0.015 260 / 0.18);
-      --color-accent: oklch(0.8 0.16 75);
-      --color-accent-ink: oklch(0.2 0.02 75);
-      --color-accent-text: oklch(0.5 0.112 65);
-      --color-win: oklch(0.48 0.13 150);
-      --color-loss: oklch(0.52 0.19 25);
-      --color-live: oklch(0.5 0.112 65);
-      --color-danger: oklch(0.52 0.19 25);
-      --color-disabled: oklch(0.86 0.005 260);
+      --color-fill: oklch(0.935 0.007 286.3);
+      --color-fill-strong: oklch(0.887 0.008 286.2);
+      --color-line: oklch(0.179 0.006 285.8 / 0.08);
+      --color-ink: oklch(0.179 0.006 285.8);
+      --color-ink-inverse: oklch(1 0 0);
+      --color-muted: oklch(0.485 0.013 285.9);
+      --color-faint: oklch(0.643 0.012 286.1);
+      --color-win: oklch(0.527 0.137 150.1);
+      --color-loss: oklch(0.576 0.209 29.5);
+      --color-win-tint: oklch(0.953 0.026 154.5);
+      --color-loss-tint: oklch(0.947 0.023 24.1);
+      --color-felt: oklch(0.515 0.113 155.3);
+      --color-felt-deep: oklch(0.435 0.095 155.9);
+      --color-felt-ink: oklch(1 0 0);
+      --color-felt-soft: oklch(1 0 0 / 0.76);
+      --color-live: oklch(0.515 0.113 155.3);
+      --color-chip-red: oklch(0.602 0.202 24.6);
+      --color-chip-blue: oklch(0.563 0.182 260.6);
+      --color-chip-green: oklch(0.614 0.15 152.3);
+      --color-chip-black: oklch(0.292 0.011 285.7);
+      --color-chip-purple: oklch(0.539 0.188 297.9);
+      --color-chip-orange: oklch(0.703 0.161 57);
+      --color-chip-grey: oklch(0.643 0.012 286.1);
+      --color-tint-purple: oklch(0.94 0.028 303.9);
+      --color-tint-blue: oklch(0.947 0.021 261.8);
+      --color-tint-orange: oklch(0.956 0.028 70.9);
+      --color-glass: oklch(0.986 0.003 286.4 / 0.78);
+      --color-scrim: oklch(0.179 0.006 285.8 / 0.32);
+      --color-focus: oklch(0.563 0.182 260.6);
 
-      /* Player chips, in joining order: casino chip colors. */
+      /* Player chips, in joining order, for the server's chip numbers 1 to 8. Not in tokens.json. */
       --color-chip-1: oklch(0.5 0.19 10);
       --color-chip-1-ink: oklch(0.98 0 0);
       --color-chip-2: oklch(0.5 0.15 255);
@@ -51,26 +66,40 @@
       --color-chip-edge: oklch(0.97 0.01 90);
     }
     @variant dark {
-      --color-canvas: oklch(0.11 0.008 260);
-      --color-surface: oklch(0.215 0.008 260);
-      --color-sunken: oklch(0.16 0.008 260);
-      --color-fill: oklch(0.285 0.008 260);
-      --color-raised: oklch(0.4 0.01 260);
-      --color-ink: oklch(0.96 0 0);
-      --color-muted: oklch(0.7 0.01 260);
-      --color-faint: oklch(0.54 0.01 260);
-      --color-line: oklch(0.285 0.008 260);
-      --color-line-strong: oklch(0.36 0.008 260);
-      --color-accent: oklch(0.83 0.148 75);
-      --color-accent-ink: oklch(0.2 0.02 75);
-      --color-accent-text: oklch(0.83 0.148 75);
-      --color-win: oklch(0.8 0.17 150);
-      --color-loss: oklch(0.7 0.19 25);
-      --color-live: oklch(0.83 0.148 75);
-      --color-danger: oklch(0.7 0.19 25);
-      --color-disabled: oklch(0.285 0.008 260);
+      --color-canvas: oklch(0 0 0);
+      --color-surface: oklch(0.228 0.006 285.9);
+      --color-raised: oklch(0.287 0.007 285.9);
+      --color-fill: oklch(0.307 0.009 285.9);
+      --color-fill-strong: oklch(0.362 0.01 285.9);
+      --color-line: oklch(1 0 0 / 0.1);
+      --color-ink: oklch(0.971 0.003 286.4);
+      --color-ink-inverse: oklch(0.179 0.006 285.8);
+      --color-muted: oklch(0.712 0.013 286.1);
+      --color-faint: oklch(0.568 0.012 286);
+      --color-win: oklch(0.73 0.194 147.4);
+      --color-loss: oklch(0.707 0.185 25.9);
+      --color-win-tint: oklch(0.306 0.06 154.1);
+      --color-loss-tint: oklch(0.266 0.063 26.6);
+      --color-felt: oklch(0.422 0.092 155.6);
+      --color-felt-deep: oklch(0.337 0.072 156);
+      --color-felt-ink: oklch(0.988 0.017 159.1);
+      --color-felt-soft: oklch(0.988 0.017 159.1 / 0.72);
+      --color-live: oklch(0.79 0.166 154.9);
+      --color-chip-red: oklch(0.692 0.198 22.5);
+      --color-chip-blue: oklch(0.677 0.17 262.2);
+      --color-chip-green: oklch(0.758 0.175 152.7);
+      --color-chip-black: oklch(0.835 0.011 286.2);
+      --color-chip-purple: oklch(0.722 0.165 296.9);
+      --color-chip-orange: oklch(0.798 0.147 62.7);
+      --color-chip-grey: oklch(0.568 0.012 286);
+      --color-tint-purple: oklch(0.276 0.057 299);
+      --color-tint-blue: oklch(0.27 0.051 261.4);
+      --color-tint-orange: oklch(0.295 0.043 66.2);
+      --color-glass: oklch(0.262 0.007 285.9 / 0.78);
+      --color-scrim: oklch(0 0 0 / 0.56);
+      --color-focus: oklch(0.677 0.17 262.2);
 
-      /* Player chips, in joining order: casino chip colors. */
+      /* Player chips, in joining order, for the server's chip numbers 1 to 8. Not in tokens.json. */
       --color-chip-1: oklch(0.5 0.19 10);
       --color-chip-1-ink: oklch(0.98 0 0);
       --color-chip-2: oklch(0.5 0.15 255);

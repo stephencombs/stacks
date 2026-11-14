@@ -3,15 +3,15 @@ import { useSyncExternalStore } from "react";
 
 // index.html reads the same key before first paint.
 const KEY = "stacks-theme";
-const lightQuery = matchMedia("(prefers-color-scheme: light)");
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
 const listeners = new Set<() => void>();
 
 const read = (): ThemeChoice => {
   try {
     const saved = localStorage.getItem(KEY);
-    return saved === "light" || saved === "system" ? saved : "dark";
+    return saved === "light" || saved === "dark" ? saved : "system";
   } catch {
-    return "dark";
+    return "system";
   }
 };
 
@@ -19,18 +19,18 @@ let choice = read();
 
 const apply = () => {
   const root = document.documentElement;
-  const light = choice === "light" || (choice === "system" && lightQuery.matches);
+  const dark = choice === "dark" || (choice === "system" && darkQuery.matches);
   // Without this, every button would fade into its new color.
   root.dataset.themeSwitching = "";
-  if (light) root.dataset.theme = "light";
+  if (dark) root.dataset.theme = "dark";
   else delete root.dataset.theme;
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", light ? "#f2f3f6" : "#030407");
+    ?.setAttribute("content", dark ? "#000000" : "#f2f2f6");
   requestAnimationFrame(() => requestAnimationFrame(() => delete root.dataset.themeSwitching));
 };
 
-lightQuery.addEventListener("change", () => {
+darkQuery.addEventListener("change", () => {
   if (choice === "system") apply();
 });
 

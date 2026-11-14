@@ -8,25 +8,25 @@ type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg" | "xl";
 
 const surfaces: Record<Variant, string> = {
-  primary: "bg-accent active:opacity-85",
-  tint: "bg-accent/15 active:bg-accent/25",
+  primary: "bg-ink active:opacity-85",
+  tint: "bg-fill-strong active:opacity-70",
   secondary: "bg-fill active:opacity-70",
   ghost: "active:bg-fill",
   danger: "bg-fill active:opacity-70",
 };
 const spinners: Record<Variant, string> = {
-  primary: "accent-accent-ink",
-  tint: "accent-accent-text",
+  primary: "accent-ink-inverse",
+  tint: "accent-ink",
   secondary: "accent-ink",
   ghost: "accent-ink",
-  danger: "accent-danger",
+  danger: "accent-loss",
 };
 const labels: Record<Variant, string> = {
-  primary: "text-accent-ink",
-  tint: "text-accent-text",
+  primary: "text-ink-inverse",
+  tint: "text-ink",
   secondary: "text-ink",
   ghost: "text-ink",
-  danger: "text-danger",
+  danger: "text-loss",
 };
 // Minimum heights, so larger accessibility text sizes grow the button instead of clipping it.
 const sizes: Record<Size, string> = {
@@ -83,7 +83,7 @@ export function Button({
         "flex-row items-center justify-center gap-2 active:scale-[0.97]",
         surfaces[variant],
         sizes[size],
-        disabled && !pending && (variant === "ghost" ? "bg-transparent" : "bg-disabled"),
+        disabled && !pending && (variant === "ghost" ? "bg-transparent" : "bg-fill"),
         className,
       )}
     >

@@ -60,7 +60,7 @@ export function Dialog({
             </div>
             <BaseDialog.Close
               aria-label="Close"
-              className="-mt-1 -mr-2 inline-flex size-10 items-center pointer-coarse:size-11 justify-center rounded-lg text-muted hover:bg-sunken hover:text-ink"
+              className="-mt-1 -mr-2 inline-flex size-10 items-center pointer-coarse:size-11 justify-center rounded-lg text-muted hover:bg-fill hover:text-ink"
             >
               <X className="size-5" aria-hidden />
             </BaseDialog.Close>

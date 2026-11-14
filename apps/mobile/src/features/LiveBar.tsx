@@ -124,7 +124,7 @@ function Bar({
         <GlassSurface
           radius={20}
           className="min-h-13 flex-row items-center gap-3 rounded-2xl px-4 py-3"
-          fallbackClassName="border border-line-strong bg-surface shadow-md"
+          fallbackClassName="border border-fill-strong bg-surface shadow-md"
         >
           <View className="size-2 rounded-full bg-live" />
           <Text className="type-label text-live">Live</Text>

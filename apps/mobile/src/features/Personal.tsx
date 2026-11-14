@@ -105,7 +105,7 @@ export function SaveStatus({
     <View className="gap-2">
       <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />
       {sync.canLink ? (
-        <View className="gap-3 rounded-lg bg-sunken px-3 py-2.5">
+        <View className="gap-3 rounded-lg bg-fill px-3 py-2.5">
           <Text className="text-sm text-muted">
             Link them to your account to keep them there. They stay separate players, and nothing is
             merged.
@@ -120,20 +120,17 @@ export function SaveStatus({
           key={line.kind}
           accessibilityRole={line.kind === "refused" ? "alert" : undefined}
           accessibilityLiveRegion="polite"
-          className="gap-3 rounded-lg bg-sunken px-3 py-2.5"
+          className="gap-3 rounded-lg bg-fill px-3 py-2.5"
         >
           <View className="min-w-0 flex-row gap-2">
             <Icon
               name={line.kind === "refused" ? "alert" : "cloud-check"}
-              color={line.kind === "refused" ? "danger" : "muted"}
+              color={line.kind === "refused" ? "loss" : "muted"}
               size={16}
             />
             <Text
               selectable
-              className={cn(
-                "flex-1 text-sm",
-                line.kind === "refused" ? "text-danger" : "text-muted",
-              )}
+              className={cn("flex-1 text-sm", line.kind === "refused" ? "text-loss" : "text-muted")}
             >
               {line.text}
             </Text>
@@ -147,11 +144,11 @@ export function SaveStatus({
         <View
           key={item.operationId}
           accessibilityRole="alert"
-          className="gap-3 rounded-lg bg-sunken px-3 py-2.5"
+          className="gap-3 rounded-lg bg-fill px-3 py-2.5"
         >
           <View className="min-w-0 flex-row gap-2">
-            <Icon name="alert" color="danger" size={16} />
-            <Text selectable className="flex-1 text-sm text-danger">
+            <Icon name="alert" color="loss" size={16} />
+            <Text selectable className="flex-1 text-sm text-loss">
               {item.sentence}
             </Text>
           </View>
@@ -165,7 +162,7 @@ export function SaveStatus({
           </View>
         </View>
       ))}
-      {sync.error ? <Text className="text-sm text-danger">{sync.error}</Text> : null}
+      {sync.error ? <Text className="text-sm text-loss">{sync.error}</Text> : null}
     </View>
   );
 }
@@ -193,11 +190,11 @@ function SaveLine({
     return (
       <View
         accessibilityRole="alert"
-        className="flex-row flex-wrap items-center justify-between gap-3 rounded-lg bg-sunken px-3 py-2.5"
+        className="flex-row flex-wrap items-center justify-between gap-3 rounded-lg bg-fill px-3 py-2.5"
       >
         <View className="min-w-0 flex-1 flex-row gap-2">
-          <Icon name="alert" color="danger" size={16} />
-          <Text selectable className="flex-1 text-sm text-danger">
+          <Icon name="alert" color="loss" size={16} />
+          <Text selectable className="flex-1 text-sm text-loss">
             {error}
           </Text>
         </View>
@@ -221,11 +218,11 @@ function SaveLine({
       ) : (
         <Icon
           name={failed ? "alert" : syncIcons[sync.kind]}
-          color={failed ? "danger" : "muted"}
+          color={failed ? "loss" : "muted"}
           size={14}
         />
       )}
-      <Text className={cn("text-sm", failed ? "text-danger" : "text-muted")}>{text}</Text>
+      <Text className={cn("text-sm", failed ? "text-loss" : "text-muted")}>{text}</Text>
     </View>
   );
 }

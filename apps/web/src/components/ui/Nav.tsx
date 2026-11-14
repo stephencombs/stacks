@@ -38,11 +38,11 @@ export function TabLink({
           : "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium pointer-coarse:h-11",
         current
           ? layout === "bar"
-            ? "text-accent-text"
-            : "bg-surface text-ink shadow-(--elevation-card) [&_svg]:text-accent-text"
+            ? "text-ink"
+            : "bg-surface text-ink shadow-(--elevation-card)"
           : layout === "bar"
             ? "text-muted hover:text-ink"
-            : "text-muted hover:bg-sunken hover:text-ink",
+            : "text-muted hover:bg-fill hover:text-ink",
       )}
       {...props}
     >

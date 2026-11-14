@@ -11,7 +11,7 @@ const base =
   "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap select-none " +
   "transition-[background-color,color,scale,box-shadow] duration-150 active:scale-[0.96] disabled:pointer-events-none " +
   // A pending button keeps its look, so a save in flight doesn't read as one that's unavailable.
-  "disabled:not-aria-busy:bg-disabled disabled:not-aria-busy:text-muted disabled:not-aria-busy:shadow-none";
+  "disabled:not-aria-busy:bg-fill disabled:not-aria-busy:text-muted disabled:not-aria-busy:shadow-none";
 
 // Disabled, an outline stays an outline: a filled block would outweigh the enabled buttons beside it.
 const outlined =
@@ -19,11 +19,11 @@ const outlined =
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-accent text-accent-ink shadow-[inset_0_-2px_0_rgb(0_0_0/0.18)] hover:bg-[color-mix(in_oklch,var(--color-accent)_88%,white)]",
-  tint: "bg-accent/15 text-accent-text hover:bg-accent/25",
-  secondary: `bg-surface text-ink hover:bg-sunken ${outlined}`,
-  ghost: "text-ink hover:bg-sunken disabled:not-aria-busy:bg-transparent",
-  danger: `bg-surface text-danger hover:bg-sunken ${outlined}`,
+    "bg-ink text-ink-inverse shadow-[inset_0_-2px_0_rgb(0_0_0/0.18)] hover:bg-[color-mix(in_oklch,var(--color-ink)_88%,var(--color-canvas))]",
+  tint: "bg-fill text-ink hover:bg-fill-strong",
+  secondary: `bg-surface text-ink hover:bg-fill ${outlined}`,
+  ghost: "text-ink hover:bg-fill disabled:not-aria-busy:bg-transparent",
+  danger: `bg-surface text-loss hover:bg-fill ${outlined}`,
 };
 
 const sizes: Record<Size, string> = {

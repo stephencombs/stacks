@@ -32,7 +32,7 @@ export function TripHero({
   const standings = tripStandings(closed, localClock);
   const rank = standings.find((s) => s.playerId === me)?.rank;
   const lines = tripLines(mine, currency);
-  const tone = mine.net > 0 ? "win" : mine.net < 0 ? "loss" : "accent";
+  const tone = mine.net > 0 ? "win" : mine.net < 0 ? "loss" : "ink";
 
   return (
     <Surface className="relative overflow-hidden">
@@ -85,13 +85,7 @@ function Tile({ label, children }: { label: string; children: ReactNode }) {
 const HEIGHT = 96;
 
 /** The running total as a line from zero, filled to break-even, ending on a dot. */
-function TripLine({
-  line,
-  tone,
-}: {
-  line: ReadonlyArray<number>;
-  tone: "win" | "loss" | "accent";
-}) {
+function TripLine({ line, tone }: { line: ReadonlyArray<number>; tone: "win" | "loss" | "ink" }) {
   const [box, width] = useWidth<HTMLDivElement>();
   const plot = lineScale([line], { width, height: HEIGHT }, { x: 16, y: 10 });
   const points = plot.points(line);
@@ -113,7 +107,7 @@ function TripLine({
             x2={width}
             y1={plot.zero}
             y2={plot.zero}
-            stroke="var(--color-line-strong)"
+            stroke="var(--color-fill-strong)"
             strokeDasharray="3 4"
           />
           <polygon

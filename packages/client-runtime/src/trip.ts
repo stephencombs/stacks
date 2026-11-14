@@ -149,7 +149,7 @@ export const raceHeadline = (
           : `Tied with ${name(tied.playerId)}`,
       gap: null,
       net: mine.net,
-      tone: "accent" as const,
+      tone: "ink" as const,
       line: place,
     };
   if (above)
@@ -168,7 +168,7 @@ export const raceHeadline = (
       tone: "win" as const,
       line: place,
     };
-  return { label: "You lead", gap: null, net: mine.net, tone: "accent" as const, line: null };
+  return { label: "You lead", gap: null, net: mine.net, tone: "ink" as const, line: null };
 };
 
 const percent = new Intl.NumberFormat("en-US", {

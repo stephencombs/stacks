@@ -65,7 +65,7 @@ export function LiveSessionCard({
   const mine = results.find((result) => result.playerId === detail.myPlayerId);
   return (
     <Surface className="relative overflow-hidden">
-      <Glow tone="accent" />
+      <Glow tone="felt" />
       <div className="relative flex flex-col gap-4 p-4">
         <div className="flex items-center justify-between gap-3">
           <Tag tone="live">Live · {formatDuration(session.startedAt, DateTime.nowUnsafe())}</Tag>

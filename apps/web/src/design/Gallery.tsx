@@ -1,6 +1,16 @@
 import { CurrencyCode, MinorUnits } from "@stacks/contracts";
 import { themeChoices } from "@stacks/client-runtime/theme";
-import { ChartColumn, Club, MapPinned, Moon, Plus, Sun, Trash2, Users } from "lucide-react";
+import {
+  ChartColumn,
+  Club,
+  MapPinned,
+  Moon,
+  Plus,
+  Sun,
+  SunMoon,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 
 import { BalanceLabel, Money } from "~/components/Money";
@@ -26,19 +36,18 @@ const sizes = ["sm", "md", "lg"] as const;
 const surfaces = [
   ["canvas", "bg-canvas"],
   ["surface", "bg-surface"],
-  ["sunken", "bg-sunken"],
-  ["fill", "bg-fill"],
   ["raised", "bg-raised"],
+  ["fill", "bg-fill"],
+  ["fill-strong", "bg-fill-strong"],
+  ["felt", "bg-felt"],
 ];
 const inks = [
   ["ink", "text-ink"],
   ["muted", "text-muted"],
   ["faint", "text-faint"],
-  ["accent-text", "text-accent-text"],
   ["win", "text-win"],
   ["loss", "text-loss"],
   ["live", "text-live"],
-  ["danger", "text-danger"],
 ];
 const roles = [
   ["type-title", "Vegas weekend"],
@@ -58,7 +67,7 @@ const players = [
 
 function ThemeMenu() {
   const theme = useTheme();
-  const Icon = theme === "light" ? Sun : Moon;
+  const Icon = { system: SunMoon, light: Sun, dark: Moon }[theme];
   return (
     <Menu label="Theme" icon={<Icon className="size-5" aria-hidden />}>
       <MenuChoice options={themeChoices} value={theme} onChange={setTheme} />

@@ -4,6 +4,9 @@ import { describe, expect, it } from "vite-plus/test";
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const web = read("../index.css");
 const mobile = read("../../../mobile/global.css");
+const tokens: {
+  color: { tokens: ReadonlyArray<{ name: string; value: { light: string; dark: string } }> };
+} = JSON.parse(read("../../../../docs/design/tokens.json"));
 
 /** The `--color-*` declarations in a piece of CSS. */
 const colors = (css: string) =>
@@ -22,11 +25,23 @@ const block = (css: string, start: string) => {
   throw new Error(`No block at ${start}`);
 };
 
-const webDark = colors(web.slice(0, web.indexOf(":root[data-theme")));
+const webLight = colors(web.slice(0, web.indexOf(':root[data-theme="dark"]')));
 const themes = {
-  dark: webDark,
-  light: { ...webDark, ...colors(block(web, ':root[data-theme="light"]')) },
+  light: webLight,
+  dark: { ...webLight, ...colors(block(web, ':root[data-theme="dark"]')) },
 };
+
+// The code kept its Tailwind names where they mean the same as a token.
+const cssName: Record<string, string> = {
+  ground: "canvas",
+  card: "surface",
+  "card-raised": "raised",
+  hairline: "line",
+  "live-text": "live",
+};
+const variable = (token: string) => `--color-${cssName[token] ?? token}`;
+// Player chips are a player's identity, numbered by the server, and aren't design tokens.
+const playerChip = /^--color-chip-(\d(-ink)?|edge)$/;
 
 const linearRgb = (color: string) => {
   const [l, c, h] = color.match(/[\d.]+/g)!.map(Number) as [number, number, number];
@@ -42,6 +57,23 @@ const linearRgb = (color: string) => {
   ] as const;
 };
 
+const encode = (v: number) => {
+  const c = Math.min(1, Math.max(0, v));
+  return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+};
+
+/** An `oklch()` color as 8-bit sRGB channels and its alpha. */
+const rgba = (color: string) => [
+  ...linearRgb(color).map((v) => 255 * encode(v)),
+  Number(color.match(/\/\s*([\d.]+)/)?.[1] ?? 1),
+];
+
+/** A tokens.json color, `#rrggbb` or `rgba(r, g, b, a)`, the same way. */
+const parse = (color: string) =>
+  color.startsWith("#")
+    ? [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)).concat(1)
+    : color.match(/[\d.]+/g)!.map(Number);
+
 const luminance = (color: string) => {
   const [r, g, b] = linearRgb(color).map((v) => Math.min(1, Math.max(0, v))) as [
     number,
@@ -51,40 +83,22 @@ const luminance = (color: string) => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
-/** The ground a `bg-color/15` pill paints: alpha composites in gamma sRGB, not in OKLCH. */
-const tinted = (color: string, ground: string, alpha: number) => {
-  const encode = (v: number) => {
-    const c = Math.min(1, Math.max(0, v));
-    return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
-  };
-  const decode = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  const [r, g, b] = linearRgb(color).map(encode) as [number, number, number];
-  const [x, y, z] = linearRgb(ground).map(encode) as [number, number, number];
-  const mix = (over: number, under: number) => decode(alpha * over + (1 - alpha) * under);
-  return 0.2126 * mix(r, x) + 0.7152 * mix(g, y) + 0.0722 * mix(b, z);
-};
-
 const hex = (color: string) =>
   `#${linearRgb(color)
-    .map((v) => {
-      const c = Math.min(1, Math.max(0, v));
-      const encoded = c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
-      return Math.round(255 * encoded)
+    .map((v) =>
+      Math.round(255 * encode(v))
         .toString(16)
-        .padStart(2, "0");
-    })
+        .padStart(2, "0"),
+    )
     .join("")}`;
 
 const ratio = (one: number, other: number) =>
   (Math.max(one, other) + 0.05) / (Math.min(one, other) + 0.05);
 
-const contrast = (one: string, other: string) => {
-  const [hi, lo] = [luminance(one), luminance(other)].sort((a, b) => b - a) as [number, number];
-  return (hi + 0.05) / (lo + 0.05);
-};
+const contrast = (one: string, other: string) => ratio(luminance(one), luminance(other));
 
 // The page behind the app, the scrollbar gutter and the phone's status bar are painted before the
-// stylesheet loads, in hex; they must be the canvas, or a strip of another dark shows at the edges.
+// stylesheet loads, in hex; they must be the canvas, or a strip of another color shows at the edges.
 it.each(["../../index.html", "../../preview/index.html", "../lib/theme.ts"])(
   "%s paints the browser chrome in the canvas color",
   (path) => {
@@ -110,32 +124,41 @@ describe("the shared palette", () => {
     expect(roles(mobile)).toEqual(expect.arrayContaining(roles(web)));
   });
 
-  describe.each(Object.entries(themes))("%s", (_, theme) => {
-    const text = ["ink", "muted", "accent-text", "win", "loss", "live", "danger"];
-    const grounds = ["canvas", "surface", "sunken", "fill"];
-
-    it.each(text.flatMap((fg) => grounds.map((bg) => [fg, bg] as const)))(
-      "%s on %s passes AA",
-      (fg, bg) => {
-        const ratio = contrast(theme[`--color-${fg}`]!, theme[`--color-${bg}`]!);
-        expect(ratio).toBeGreaterThanOrEqual(4.5);
+  describe.each(Object.entries(themes))("%s", (name, theme) => {
+    it.each(tokens.color.tokens.map((token) => [token.name, token.value] as const))(
+      "%s matches docs/design/tokens.json",
+      (token, value) => {
+        const css = theme[variable(token)];
+        expect(css, variable(token)).toBeDefined();
+        const expected = parse(value[name as keyof typeof value]);
+        // Within one step of 255 per channel, and the same alpha.
+        const off = rgba(css!).map(
+          (channel, i) => Math.abs(channel - expected[i]!) / (i < 3 ? 1 : 0.001),
+        );
+        expect(Math.max(...off)).toBeLessThanOrEqual(1);
       },
     );
 
-    it("accent-ink passes AA on accent", () => {
-      expect(
-        contrast(theme["--color-accent-ink"]!, theme["--color-accent"]!),
-      ).toBeGreaterThanOrEqual(4.5);
+    it("has no color outside the tokens but the player chips", () => {
+      const known = new Set(tokens.color.tokens.map((token) => variable(token.name)));
+      expect(Object.keys(theme).filter((v) => !known.has(v) && !playerChip.test(v))).toEqual([]);
     });
 
     it.each([
-      ["live", "live", "canvas"],
-      ["live", "live", "surface"],
-      ["accent-text", "accent", "canvas"],
-      ["accent-text", "accent", "surface"],
-    ])("%s passes AA on a %s tint over %s", (fg, tint, ground) => {
-      const paint = tinted(theme[`--color-${tint}`]!, theme[`--color-${ground}`]!, 0.15);
-      expect(ratio(luminance(theme[`--color-${fg}`]!), paint)).toBeGreaterThanOrEqual(4.5);
+      ["ink", "canvas"],
+      ["ink", "surface"],
+      ["muted", "canvas"],
+      ["muted", "surface"],
+      ["win", "surface"],
+      ["loss", "surface"],
+      ["live", "canvas"],
+      ["live", "surface"],
+      ["ink-inverse", "ink"],
+      ["felt-ink", "felt"],
+    ])("%s on %s passes AA", (fg, bg) => {
+      expect(contrast(theme[`--color-${fg}`]!, theme[`--color-${bg}`]!)).toBeGreaterThanOrEqual(
+        4.5,
+      );
     });
 
     it("stays inside sRGB, so no screen clips a color differently", () => {

@@ -18,7 +18,7 @@ export function Segmented<Value extends string | number>({
     <div
       role="group"
       aria-label={label}
-      className="flex flex-wrap gap-1 self-start rounded-lg bg-sunken p-1"
+      className="flex flex-wrap gap-1 self-start rounded-lg bg-fill p-1"
     >
       {options.map((option) => (
         <button

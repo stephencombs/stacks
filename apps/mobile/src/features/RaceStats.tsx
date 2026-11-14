@@ -141,11 +141,10 @@ function Race<S extends RaceSession>({
   const setAt = (next: number) => setPinned(next >= last ? null : next);
   const [measure, setMeasure] = useState<RaceMeasure>("money");
   const [width, setWidth] = useState(0);
-  const [accent, accentText, muted, ring] = useCSSVariable([
-    "--color-accent",
-    "--color-accent-text",
+  const [ink, muted, ring] = useCSSVariable([
+    "--color-ink",
     "--color-muted",
-    "--color-line-strong",
+    "--color-fill-strong",
   ]).map(String);
 
   const lines = raceLines(
@@ -305,7 +304,7 @@ function Race<S extends RaceSession>({
             />
             {drawn.map(({ playerId, line }, i) => {
               const yours = playerId === picked;
-              const color = yours ? accent : muted;
+              const color = yours ? ink : muted;
               const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
               const now = { x: plot.x(point), y: plot.y(line[point]!) };
               const off = plot.clipped(line[point]!);
@@ -342,7 +341,7 @@ function Race<S extends RaceSession>({
                     textAnchor={seat.anchor}
                     fontSize={LETTER}
                     fontWeight={yours ? "600" : "400"}
-                    fill={yours ? accentText : muted}
+                    fill={yours ? ink : muted}
                   >
                     {chartName}
                   </SvgText>
@@ -363,9 +362,9 @@ function Race<S extends RaceSession>({
             accessibilityHint="Shows their stats"
             onPress={() => onPick(p.playerId)}
             className={cn(
-              "min-h-12 flex-row items-center gap-3 px-3 py-2.5 active:bg-sunken",
+              "min-h-12 flex-row items-center gap-3 px-3 py-2.5 active:bg-fill",
               place > 0 && "border-t border-line",
-              p.playerId === picked && "border-l-[3px] border-l-accent",
+              p.playerId === picked && "border-l-[3px] border-l-ink",
             )}
           >
             <Text className="min-w-6 text-center font-mono text-lg leading-7 text-muted">

@@ -81,9 +81,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                   key={s.playerId}
                   leading={
                     <View className="flex-row items-center gap-1.5">
-                      <Text className="min-w-6 text-center type-number text-accent-text">
-                        {s.rank}
-                      </Text>
+                      <Text className="min-w-6 text-center type-number text-ink">{s.rank}</Text>
                       <Text
                         className={cn(
                           "min-w-5 type-footnote",
@@ -93,7 +91,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
                         {s.moved === 0 ? "" : `${s.moved > 0 ? "▲" : "▼"}${Math.abs(s.moved)}`}
                       </Text>
                       <Chip chip={chipOf(detail, s.playerId)} name={name(s.playerId)} size={28} />
-                      {s.hot ? <Badge tone="accent">Hot</Badge> : null}
+                      {s.hot ? <Badge tone="ink">Hot</Badge> : null}
                     </View>
                   }
                   title={name(s.playerId)}

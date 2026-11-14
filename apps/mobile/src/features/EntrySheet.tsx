@@ -176,10 +176,7 @@ export function EntrySheet({
                 })}
           </Text>
           {amountError ? (
-            <Text
-              accessibilityLiveRegion="polite"
-              className="text-center type-footnote text-danger"
-            >
+            <Text accessibilityLiveRegion="polite" className="text-center type-footnote text-loss">
               {amountError}
             </Text>
           ) : null}
@@ -234,7 +231,7 @@ export function EntrySheet({
               accessibilityRole="button"
               accessibilityLabel="Add a note"
               onPress={() => setNoting(true)}
-              className="min-h-12 flex-row items-center gap-3 rounded-xl bg-surface px-4 active:bg-sunken"
+              className="min-h-12 flex-row items-center gap-3 rounded-xl bg-surface px-4 active:bg-fill"
             >
               <Text className="flex-1 type-body text-ink">Note</Text>
               <Text className="type-body text-muted">Add</Text>

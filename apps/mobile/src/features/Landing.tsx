@@ -359,7 +359,7 @@ export function Landing({
                           <View
                             className={cn(
                               "h-2 rounded-full",
-                              i === index ? "w-6 bg-accent" : "w-2 bg-fill",
+                              i === index ? "w-6 bg-ink" : "w-2 bg-fill",
                             )}
                           />
                         </Pressable>

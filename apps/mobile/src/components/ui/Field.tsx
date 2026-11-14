@@ -43,15 +43,15 @@ export function TextField({
         placeholderTextColorClassName="accent-muted"
         className={cn(
           "min-h-12 rounded-2xl border border-line bg-surface px-4 py-3 type-body text-ink",
-          error && "border-danger",
+          error && "border-loss",
           inputClassName,
         )}
         {...props}
       />
       {error ? (
         <View accessibilityLiveRegion="polite" className="flex-row gap-1.5 px-1">
-          <Icon name="alert" color="danger" size={14} />
-          <Text className="flex-1 type-footnote text-danger">{error}</Text>
+          <Icon name="alert" color="loss" size={14} />
+          <Text className="flex-1 type-footnote text-loss">{error}</Text>
         </View>
       ) : hint ? (
         <Text className="px-1 type-footnote text-muted">{hint}</Text>
@@ -63,9 +63,9 @@ export function TextField({
 /** A form-level failure, such as the API refusing the request. */
 export function FormError({ children }: { children: ReactNode }) {
   return (
-    <View accessibilityRole="alert" className="flex-row gap-2 rounded-lg bg-sunken px-3 py-2.5">
-      <Icon name="alert" color="danger" size={16} />
-      <Text className="flex-1 text-sm text-danger">{children}</Text>
+    <View accessibilityRole="alert" className="flex-row gap-2 rounded-lg bg-fill px-3 py-2.5">
+      <Icon name="alert" color="loss" size={16} />
+      <Text className="flex-1 text-sm text-loss">{children}</Text>
     </View>
   );
 }
@@ -148,7 +148,7 @@ export function Choice<A extends string>({
               accessibilityLabel={option.label}
               accessibilityState={{ checked: selected }}
               onPress={() => onChange(option.value)}
-              className="min-h-12 flex-row items-center pl-4 active:bg-sunken"
+              className="min-h-12 flex-row items-center pl-4 active:bg-fill"
             >
               <View
                 className={cn(
@@ -157,7 +157,7 @@ export function Choice<A extends string>({
                 )}
               >
                 <Text className="type-body text-ink">{option.label}</Text>
-                {selected ? <Icon name="check" color="accent-text" size={18} /> : null}
+                {selected ? <Icon name="check" color="ink" size={18} /> : null}
               </View>
             </Pressable>
           );

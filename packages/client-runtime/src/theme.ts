@@ -1,8 +1,8 @@
-/** Stacks is dark by default; light and following the system are saved choices. */
-export type ThemeChoice = "dark" | "light" | "system";
+/** Color Up follows the system by default; light and dark are saved choices. */
+export type ThemeChoice = "system" | "light" | "dark";
 
 export const themeChoices = [
-  { value: "dark", label: "Dark" },
-  { value: "light", label: "Light" },
   { value: "system", label: "Match system" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
 ] as const satisfies ReadonlyArray<{ value: ThemeChoice; label: string }>;

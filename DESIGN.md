@@ -1,5 +1,7 @@
 # Stacks design system
 
+> **The palette is now Color Up** ([`docs/design/tokens.json`](docs/design/tokens.json)): light and dark following the system, ink for the next step, felt green for live play, and no gold `accent`. Where this file or `docs/design/` still says otherwise, the tokens and `apps/web/src/design/tokens.test.ts` win. The full rewrite comes in spec 007's second PR.
+
 A ledger you read at a casino table, often at night. Dark by default with a crisp daylight counterpart, gold (`accent`) for the one thing to do next and what's in play, tight-tracked sentence-case titles on mobile (`40px` condensed display on web), and steady `tabular-nums` figures for money. Tinted neutral canvases (`bg-canvas`) elevate clean, glow-free `bg-surface` cards (`rounded-2xl` on mobile, `rounded-xl` on web). Everything else recedes.
 
 Before building UI, read the file for what you're touching:

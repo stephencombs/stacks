@@ -98,7 +98,7 @@ export function Sheet({
       >
         <View className="flex-1">
           <View className="items-center pt-2">
-            <View className="h-[5px] w-9 rounded-full bg-line-strong" />
+            <View className="h-[5px] w-9 rounded-full bg-fill-strong" />
           </View>
           <View className="min-h-14 flex-row items-center px-4">
             <View className="w-11" />

@@ -8,10 +8,10 @@
       try {
         var choice = localStorage.getItem("stacks-theme");
         if (
-          choice === "light" ||
-          (choice === "system" && matchMedia("(prefers-color-scheme: light)").matches)
+          choice === "dark" ||
+          (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
         )
-          document.documentElement.dataset.theme = "light";
+          document.documentElement.dataset.theme = "dark";
       } catch {}
     </script>
   </head>

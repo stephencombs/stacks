@@ -32,7 +32,7 @@ export function List({
 
 const row = "flex min-h-14 items-center gap-3 px-4 py-3";
 const pressable =
-  "transition-colors duration-150 hover:bg-sunken active:bg-sunken focus-visible:outline-offset-[-2px]";
+  "transition-colors duration-150 hover:bg-fill active:bg-fill focus-visible:outline-offset-[-2px]";
 
 export function Row({
   as: Tag = "div",
@@ -98,10 +98,10 @@ export function Tag({
     <span
       className={cn(
         "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium tabular-nums",
-        tone === "live" ? "bg-live/15 text-live" : "bg-sunken text-muted",
+        tone === "live" ? "bg-felt text-felt-ink" : "bg-fill text-muted",
       )}
     >
-      {tone === "live" ? <span className="size-1.5 rounded-full bg-live" aria-hidden /> : null}
+      {tone === "live" ? <span className="size-1.5 rounded-full bg-felt-ink" aria-hidden /> : null}
       {children}
     </span>
   );
@@ -115,13 +115,13 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 /** A soft light behind a hero card's figure, in the color of how it's going. Put it first inside a `relative overflow-hidden` card. */
-export function Glow({ tone }: { tone: "win" | "loss" | "accent" }) {
+export function Glow({ tone }: { tone: "win" | "loss" | "ink" | "felt" }) {
   return (
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none absolute -top-24 -right-20 size-72 rounded-full blur-3xl [[data-theme=light]_&]:opacity-50",
-        tone === "win" ? "bg-win/20" : tone === "loss" ? "bg-loss/15" : "bg-accent/15",
+        "pointer-events-none absolute -top-24 -right-20 size-72 rounded-full opacity-50 blur-3xl dark:opacity-100",
+        { win: "bg-win/20", loss: "bg-loss/15", ink: "bg-ink/10", felt: "bg-felt/25" }[tone],
       )}
     />
   );

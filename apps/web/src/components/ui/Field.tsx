@@ -6,8 +6,8 @@ import { cn } from "./cn";
 const control =
   "w-full rounded-lg bg-surface px-3 text-base text-ink shadow-(--elevation-control) " +
   "transition-shadow duration-150 placeholder:text-muted hover:shadow-[inset_0_0_0_1px_var(--color-faint)] " +
-  "focus:shadow-[inset_0_0_0_2px_var(--color-ink)] focus:outline-none aria-invalid:shadow-[inset_0_0_0_2px_var(--color-danger)] " +
-  "disabled:bg-sunken disabled:text-muted";
+  "focus:shadow-[inset_0_0_0_2px_var(--color-ink)] focus:outline-none aria-invalid:shadow-[inset_0_0_0_2px_var(--color-loss)] " +
+  "disabled:bg-fill disabled:text-muted";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(control, "h-11", className)} {...props} />;
@@ -66,7 +66,7 @@ export function Field({
         </p>
       ) : null}
       {error ? (
-        <p id={errorId} className="flex items-center gap-1.5 text-sm text-danger">
+        <p id={errorId} className="flex items-center gap-1.5 text-sm text-loss">
           <CircleAlert className="size-4 shrink-0" aria-hidden />
           {error}
         </p>
@@ -80,7 +80,7 @@ export function FormError({ children }: { children: ReactNode }) {
   return (
     <p
       role="alert"
-      className="flex items-start gap-2 rounded-lg bg-sunken px-3 py-2.5 text-sm text-danger"
+      className="flex items-start gap-2 rounded-lg bg-fill px-3 py-2.5 text-sm text-loss"
     >
       <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>{children}</span>
@@ -113,8 +113,8 @@ export function RadioCards<Value extends string>({
             className={cn(
               "flex h-11 cursor-pointer items-center justify-center rounded-lg px-2 text-center text-sm font-medium outline-offset-2 outline-ink transition-colors duration-150 has-[:focus-visible]:outline-2",
               option.value === value
-                ? "bg-accent/15 text-accent-text"
-                : "shadow-(--elevation-control) hover:bg-sunken",
+                ? "bg-ink text-ink-inverse"
+                : "shadow-(--elevation-control) hover:bg-fill",
             )}
           >
             <input

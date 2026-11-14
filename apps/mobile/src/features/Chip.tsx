@@ -10,7 +10,7 @@ export function Chip({ chip, name, size = 32 }: { chip: number; name: string; si
     `--color-chip-${chip}`,
     `--color-chip-${chip}-ink`,
     "--color-chip-edge",
-    "--color-line-strong",
+    "--color-fill-strong",
   ]);
   const r = size / 2;
   return (

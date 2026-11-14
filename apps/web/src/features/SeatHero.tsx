@@ -65,7 +65,7 @@ export function SeatHero({
 
   return (
     <Surface className="relative overflow-hidden">
-      <Glow tone={final ? (net > 0 ? "win" : net < 0 ? "loss" : "accent") : "accent"} />
+      <Glow tone={final ? (net > 0 ? "win" : net < 0 ? "loss" : "ink") : "felt"} />
       <div className="relative flex flex-col p-4">
         <div className="flex items-center gap-3">
           <Chip chip={chip} name={name} size={40} />
