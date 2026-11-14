@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { VenueId } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
 import { makeRecordingStore, type RecordingInput, type RecordingStore } from "./recording.ts";
@@ -16,6 +17,8 @@ import {
   PRIVATE_RECORDING_NAMESPACE,
   recordingHome,
   recordingVisit,
+  venueChoices,
+  venuePlace,
 } from "./recordingView.ts";
 
 const at = (hour: number) =>
@@ -137,6 +140,51 @@ describe("recordingVisit", () => {
     expect(view.totals.buyIn).toBe(10000);
     expect(view.presets).toEqual([10000, 20000]);
     expect(recordingVisit(state(store), replacement.id as never)).toBeNull();
+  });
+});
+
+describe("venueChoices", () => {
+  const venue = (n: number, name: string, city: string | null) => ({
+    id: VenueId.make(`0192e7a0-0000-7000-8000-00000000000${n}`),
+    name,
+    kind: "casino" as const,
+    city,
+    region: city ? "NV" : null,
+    country: "US",
+    lat: null,
+    lng: null,
+  });
+  const bellagio = venue(1, "Bellagio", "Las Vegas");
+  const aria = venue(2, "Aria", "Las Vegas");
+  const borgata = venue(3, "Borgata", "Atlantic City");
+  const cached = [bellagio, aria, borgata];
+
+  it("lists the cached venues, newest first, before anything is searched", () => {
+    expect(venueChoices(cached, "", false, undefined)).toEqual({
+      status: "saved",
+      venues: [borgata, aria, bellagio],
+    });
+  });
+
+  it("offers cached venues matching the name or city while searching or offline", () => {
+    expect(venueChoices(cached, "las veg", true, undefined)).toEqual({
+      status: "searching",
+      venues: [aria, bellagio],
+    });
+    expect(venueChoices(cached, "BORG", true, null)).toEqual({
+      status: "offline",
+      venues: [borgata],
+    });
+  });
+
+  it("shows what the server found once it answers, even nothing", () => {
+    expect(venueChoices(cached, "aria", true, [aria])).toEqual({ status: "found", venues: [aria] });
+    expect(venueChoices(cached, "nowhere", true, [])).toEqual({ status: "found", venues: [] });
+  });
+
+  it("says where a venue is, or what kind it is without a city", () => {
+    expect(venuePlace(bellagio)).toBe("Las Vegas, NV");
+    expect(venuePlace({ ...bellagio, city: null, region: null, kind: "online" })).toBe("Online");
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
-import type { VisitId } from "@stacks/contracts";
+import { VenueId, type VisitId } from "@stacks/contracts";
 import { RecordingCommand } from "@stacks/contracts/recordingCommands";
 
 import { makeRecordingStore, type RecordingStore } from "./recording.ts";
@@ -11,7 +11,7 @@ import {
   type RecordingStorageChange,
   type RecordingStorageDocument,
 } from "./recordingStorage.ts";
-import { nextBuyInChange, recordingVisit } from "./recordingView.ts";
+import { nextBuyInChange, recordingHome, recordingVisit } from "./recordingView.ts";
 
 const at = (hour: number) =>
   DateTime.makeUnsafe(`2026-11-06T${hour.toString().padStart(2, "0")}:00:00.000Z`);
@@ -69,6 +69,16 @@ const open = async (db: ReturnType<typeof memory>) => {
 };
 const start = (store: RecordingStore) =>
   store.prepare({ type: "start", buyIn: 20000, startedAt: at(10) });
+const bellagio = {
+  id: VenueId.make("0192e7a0-0000-7000-8000-0000000000b1"),
+  name: "Bellagio",
+  kind: "casino" as const,
+  city: "Las Vegas",
+  region: "NV",
+  country: "US",
+  lat: 36.1126,
+  lng: -115.1767,
+};
 const visitId = (store: RecordingStore) => store.getSnapshot().state!.visits[0]!.id;
 const save = (store: RecordingStore, input: Parameters<RecordingStore["prepare"]>[0]) =>
   store.execute(store.prepare(input));
@@ -549,6 +559,7 @@ describe("persisted document validation", () => {
     "receipt_amount",
     "receipt_revision",
     "missing_receipt",
+    "duplicate_venue",
   ])("surfaces %s damage without empty-history fallback", async (damage) => {
     const db = memory();
     const store = await open(db);
@@ -566,6 +577,7 @@ describe("persisted document validation", () => {
     if (damage === "receipt_amount") value.receipts[0].command.buyIn = 12345;
     if (damage === "receipt_revision") value.visits[0].revision = 8;
     if (damage === "missing_receipt") value.receipts = [];
+    if (damage === "duplicate_venue") value.venues = [bellagio, bellagio];
     if (damage === "credentials") value.secret = "should not live in the financial document";
     db.document = {
       revision: document.revision,
@@ -784,6 +796,85 @@ describe("editing a session after the fact", () => {
       "Change the start time, game or venue.",
     );
     expect(store.getSnapshot().state!.visits[0]!.startedAt).toEqual(at(10));
+    await store.close();
+  });
+});
+
+describe("the venue cache", () => {
+  it("loads a document saved before the cache with no venues, and saves one with them", async () => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(start(store));
+    await store.close();
+    const { venues: _, ...legacy } = JSON.parse(db.document.payload!);
+    db.document = { revision: db.document.revision, payload: JSON.stringify(legacy) };
+    store = await open(db);
+    expect(store.getSnapshot()).toMatchObject({ status: "saved", state: { venues: [] } });
+    const id = visitId(store);
+    await store.execute(
+      store.prepare({
+        type: "edit_visit",
+        visitId: id,
+        table: { game: null, venueId: bellagio.id, highLimit: false },
+      }),
+      [bellagio],
+    );
+    store = await reload(store, db);
+    expect(store.getSnapshot().state!.venues).toEqual([bellagio]);
+    expect(recordingHome(store.getSnapshot().state!).active[0]!.venue).toEqual(bellagio);
+    await store.close();
+  });
+
+  it("sets and clears a venue without the network, and both survive a reload", async () => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(start(store));
+    const id = visitId(store);
+    const table = (venueId: VenueId | null) => ({
+      type: "edit_visit" as const,
+      visitId: id,
+      table: { game: "blackjack" as const, venueId, highLimit: false },
+    });
+    // A venue that came with a search keeps only what the device needs.
+    const searched = { ...bellagio, verified: true, groupId: null };
+    await store.execute(store.prepare(table(bellagio.id)), [searched]);
+    // Each save adds one receipt: the venue rides with the edit, so the ledger still loads.
+    expect(db.document.revision).toBe(store.getSnapshot().state!.receipts.length + 1);
+    store = await reload(store, db);
+    expect(recordingVisit(store.getSnapshot().state!, id)).toMatchObject({
+      table: { venueId: bellagio.id },
+      venue: bellagio,
+    });
+
+    await store.execute(store.prepare(table(null)));
+    store = await reload(store, db);
+    const cleared = recordingVisit(store.getSnapshot().state!, id)!;
+    expect(cleared).toMatchObject({ table: { venueId: null, game: "blackjack" }, venue: null });
+    // The cache keeps it, so picking it again works offline.
+    expect(store.getSnapshot().state!.venues).toEqual([bellagio]);
+
+    await store.execute(store.prepare(table(bellagio.id)));
+    store = await reload(store, db);
+    expect(recordingVisit(store.getSnapshot().state!, id)!.venue).toEqual(bellagio);
+    await store.close();
+  });
+
+  it("replaces an older copy of a venue instead of keeping two", async () => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(start(store), [bellagio]);
+    const id = visitId(store);
+    const renamed = { ...bellagio, name: "Bellagio Las Vegas" };
+    await store.execute(
+      store.prepare({
+        type: "edit_visit",
+        visitId: id,
+        table: { game: null, venueId: bellagio.id, highLimit: false },
+      }),
+      [renamed],
+    );
+    store = await reload(store, db);
+    expect(store.getSnapshot().state!.venues).toEqual([renamed]);
     await store.close();
   });
 });

@@ -23,13 +23,15 @@ import {
   decodeRecordingState,
   encodeRecordingState,
   RecordingError,
+  rememberVenues,
+  type CachedVenue,
   type RecordingReceipt,
   type RecordingState,
 } from "./recordingState.ts";
 import { RecordingStorageConflict, type RecordingStorage } from "./recordingStorage.ts";
 
 export { RecordingError } from "./recordingState.ts";
-export type { RecordingReceipt, RecordingState } from "./recordingState.ts";
+export type { CachedVenue, RecordingReceipt, RecordingState } from "./recordingState.ts";
 
 type StartInput = {
   readonly buyIn: number;
@@ -240,6 +242,7 @@ const freezeState = (state: RecordingState): RecordingState => {
     state.visits,
     state.entries,
     state.receipts,
+    state.venues,
   ]) {
     for (const record of records) Object.freeze(record);
     Object.freeze(records);
@@ -307,6 +310,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         visits: [],
         entries: [],
         receipts: [],
+        venues: [],
       };
       try {
         const revision = await storage.commit(0, encodeRecordingState(state));
@@ -366,7 +370,11 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
     } else if (change.revision > snapshot.revision) void refresh().catch(() => undefined);
   });
   const ready = refresh();
-  const execute = (prepared: RecordingCommand) => {
+  /**
+   * Saves a command, and caches `venues` in the same write: a device that hasn't synced saves
+   * exactly one receipt per write, so a venue it picks can't be cached on its own.
+   */
+  const execute = (prepared: RecordingCommand, venues: ReadonlyArray<CachedVenue> = []) => {
     // Copy/validate now, so a caller cannot mutate queued or failed work.
     const command = Schema.decodeUnknownSync(commandCodec)(JSON.parse(commandText(prepared)), {
       onExcessProperty: "error",
@@ -391,7 +399,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
           update({ status: "saved", error: null, failedCommand: null });
           return receipt;
         }
-        const committed = applyRecordingCommand(state, command);
+        const committed = rememberVenues(applyRecordingCommand(state, command), venues);
         const saved = committed.receipts[committed.receipts.length - 1]!;
         const payload = encodeRecordingState(committed);
         update({ status: "saving", error: null, failedCommand: null });

@@ -22,7 +22,12 @@ import {
 } from "@stacks/contracts/recordingCommands";
 
 import type { RecordingInput } from "./recording.ts";
-import { RecordingError, type RecordingRejection, type RecordingState } from "./recordingState.ts";
+import {
+  RecordingError,
+  type CachedVenue,
+  type RecordingRejection,
+  type RecordingState,
+} from "./recordingState.ts";
 import { RecordingStorageConflict, RecordingStorageError } from "./recordingStorage.ts";
 import {
   pendingRecordingCommands,
@@ -41,7 +46,11 @@ export const RECORDING_CURRENCY = CurrencyCode.make("USD");
 
 const ms = DateTime.toEpochMillis;
 
-export type RecordedVisit = VisitSummary & { readonly table: Table };
+export type RecordedVisit = VisitSummary & {
+  readonly table: Table;
+  /** The table's venue as this device cached it; null when it has none or isn't cached yet. */
+  readonly venue: CachedVenue | null;
+};
 
 export type RecordingHome = {
   /** Every visit still in play, newest first. There can be more than one. */
@@ -59,14 +68,52 @@ export const visitTitle = (table: Table) =>
 const tableOf = (state: RecordingState, tableId: Table["id"]) =>
   state.tables.find((table) => table.id === tableId)!;
 
+const venueOf = (state: RecordingState, table: Table) =>
+  state.venues.find((venue) => venue.id === table.venueId) ?? null;
+
+/** Where a venue is, for a line under its name: "Las Vegas, NV", or its kind when it has no city. */
+export const venuePlace = (venue: CachedVenue) =>
+  [venue.city, venue.region].filter(Boolean).join(", ") ||
+  (venue.kind === "online" ? "Online" : venue.kind === "home" ? "Home game" : "");
+
+export type VenueChoices = {
+  /**
+   * `saved` lists the venues this device has cached, before any search. `searching` and `offline`
+   * list the cached venues matching the search while the server answers, or when it can't be
+   * reached; `found` lists what the server found.
+   */
+  readonly status: "saved" | "searching" | "found" | "offline";
+  readonly venues: ReadonlyArray<CachedVenue>;
+};
+
+/**
+ * What a venue search shows. `found` is the server's answer: undefined while it's asked, null if it
+ * couldn't be reached. Nothing is asked without a name or a location (`searching` false).
+ */
+export const venueChoices = (
+  cached: ReadonlyArray<CachedVenue>,
+  q: string,
+  searching: boolean,
+  found: ReadonlyArray<CachedVenue> | null | undefined,
+): VenueChoices => {
+  if (searching && found) return { status: "found", venues: found };
+  const text = q.trim().toLocaleLowerCase();
+  const venues = cached
+    .filter((venue) =>
+      [venue.name, venue.city ?? ""].some((field) => field.toLocaleLowerCase().includes(text)),
+    )
+    .toReversed();
+  return { status: !searching ? "saved" : found === null ? "offline" : "searching", venues };
+};
+
 export const recordingHome = (state: RecordingState): RecordingHome => {
   // Other players' visits at your tables are theirs; they show on the table, not in your play.
   const mine = new Set(ownPlayers(state));
   const own = state.visits.filter((visit) => mine.has(visit.playerId));
-  const visits = own.map((visit) => ({
-    ...visitSummary(visit, state.entries),
-    table: tableOf(state, visit.tableId),
-  }));
+  const visits = own.map((visit) => {
+    const table = tableOf(state, visit.tableId);
+    return { ...visitSummary(visit, state.entries), table, venue: venueOf(state, table) };
+  });
   const active = visits
     .filter((item) => item.finalResult === null)
     .toSorted((a, b) => ms(b.visit.startedAt) - ms(a.visit.startedAt));
@@ -222,9 +269,11 @@ export const recordingVisit = (
     if (entry.replacesEntryId !== null) replacedBy.set(entry.replacesEntryId, entry.id);
   const finalCashOut =
     entries.find((entry) => entry.id === finalCashOutId && entry.voidedAt === null) ?? null;
+  const table = tableOf(state, visit.tableId);
   return {
     ...summary,
-    table: tableOf(state, visit.tableId),
+    table,
+    venue: venueOf(state, table),
     entries,
     events,
     replacedBy,
