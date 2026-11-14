@@ -1,5 +1,7 @@
-import type { PlayerId } from "@stacks/contracts";
+import type { PlayerId, Table, VisitSummary } from "@stacks/contracts";
+import * as DateTime from "effect/DateTime";
 
+import { checkedMinorUnits } from "./exactMoney.ts";
 import { sessionRuns, type SessionRuns } from "./results.ts";
 
 /** A closed session as stats see it, oldest first. */
@@ -111,5 +113,129 @@ export const statSheet = <S extends StatsSession>(
       : null,
     bestVenue: bestVenue.net > 0 ? bestVenue : null,
     venues: byVenue.size,
+  };
+};
+
+type PersonalStatsSession = Pick<VisitSummary, "visit" | "finalResult"> & {
+  readonly table: Pick<Table, "game" | "venueId">;
+};
+
+type PersonalStatsFilters = {
+  readonly year?: number | undefined;
+  readonly game?: Table["game"] | undefined;
+  readonly venueId?: Table["venueId"] | undefined;
+};
+
+const compareKey = (a: string | null, b: string | null) =>
+  a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1;
+
+const hours = (milliseconds: bigint) => Number((milliseconds + 18_000n) / 36_000n) / 100;
+
+// Divide exact minor units by elapsed hours, rounding halves away from zero.
+const hourlyResult = (result: number, milliseconds: bigint) => {
+  if (milliseconds === 0n) return checkedMinorUnits(0n);
+  const numerator = BigInt(result) * 3_600_000n;
+  const magnitude = numerator < 0n ? -numerator : numerator;
+  const rounded = (magnitude * 2n + milliseconds) / (milliseconds * 2n);
+  return checkedMinorUnits(numerator < 0n ? -rounded : rounded);
+};
+
+/**
+ * Personal visits from the recording view; live visits never count. An omitted year means
+ * all time; omitted game/venue filters mean all, while null selects unset games/venues.
+ * Options come from all finished visits, so filtering never hides the current selection.
+ * Hours round the summed elapsed time to two decimals; hourly result uses unrounded time.
+ */
+export const personalStats = (
+  sessions: ReadonlyArray<PersonalStatsSession>,
+  timeZone: DateTime.TimeZone,
+  filters: PersonalStatsFilters = {},
+) => {
+  const finished = sessions.flatMap(({ visit, table, finalResult }) =>
+    visit.finishedAt === null || finalResult === null
+      ? []
+      : [
+          {
+            sessionId: visit.id,
+            finishedAt: visit.finishedAt,
+            year: DateTime.toParts(DateTime.setZone(visit.finishedAt, timeZone)).year,
+            milliseconds:
+              BigInt(DateTime.toEpochMillis(visit.finishedAt)) -
+              BigInt(DateTime.toEpochMillis(visit.startedAt)),
+            result: finalResult,
+            game: table.game,
+            venueId: table.venueId,
+          },
+        ],
+  );
+  const filtered = finished
+    .filter(
+      (session) =>
+        (filters.year === undefined || session.year === filters.year) &&
+        (filters.game === undefined || session.game === filters.game) &&
+        (filters.venueId === undefined || session.venueId === filters.venueId),
+    )
+    .toSorted(
+      (a, b) =>
+        DateTime.toEpochMillis(a.finishedAt) - DateTime.toEpochMillis(b.finishedAt) ||
+        compareKey(a.sessionId, b.sessionId),
+    );
+
+  const measure = (items: typeof filtered) => {
+    let result = 0n;
+    let milliseconds = 0n;
+    for (const item of items) {
+      result += BigInt(item.result);
+      milliseconds += item.milliseconds;
+    }
+    return {
+      result: checkedMinorUnits(result),
+      sessions: items.length,
+      hours: hours(milliseconds),
+      milliseconds,
+    };
+  };
+  const { milliseconds, ...summary } = measure(filtered);
+  const runs = sessionRuns(filtered.map((item) => item.result));
+
+  const breakdown = <K extends string | null>(key: (session: (typeof filtered)[number]) => K) => {
+    const groups = new Map<K, typeof filtered>();
+    for (const session of filtered) {
+      const groupKey = key(session);
+      const group = groups.get(groupKey) ?? [];
+      group.push(session);
+      groups.set(groupKey, group);
+    }
+    return [...groups]
+      .map(([key, group]) => {
+        const { milliseconds: _milliseconds, ...row } = measure(group);
+        return { key, ...row };
+      })
+      .toSorted((a, b) =>
+        a.result === b.result ? compareKey(a.key, b.key) : a.result > b.result ? -1 : 1,
+      );
+  };
+
+  let total = 0n;
+  return {
+    summary: {
+      ...summary,
+      hourlyResult: hourlyResult(summary.result, milliseconds),
+      winRate: { wins: runs.wins, sessions: runs.sessions },
+    },
+    runningResult: filtered.map(({ sessionId, finishedAt, result }) => {
+      total += BigInt(result);
+      return { sessionId, finishedAt, result, total: checkedMinorUnits(total) };
+    }),
+    byGame: breakdown((session) => session.game).map(({ key, ...row }) => ({ game: key, ...row })),
+    byCasino: breakdown((session) => session.venueId).map(({ key, ...row }) => ({
+      venueId: key,
+      ...row,
+    })),
+    options: {
+      years: [...new Set(finished.map((session) => session.year))].toSorted((a, b) => b - a),
+      games: [...new Set(finished.map((session) => session.game))].toSorted(compareKey),
+      venueIds: [...new Set(finished.map((session) => session.venueId))].toSorted(compareKey),
+    },
   };
 };
