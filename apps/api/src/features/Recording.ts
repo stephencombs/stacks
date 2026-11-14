@@ -378,7 +378,10 @@ const save = Effect.fn("Recording.save")(function* (
     `;
     return;
   }
-  for (const table of after.tables.filter((table) => !before.tables.includes(table))) {
+  // By ID: an edit replaces its table's record with a new object, which is not a new table.
+  for (const table of after.tables.filter(
+    (table) => !before.tables.some((item) => item.id === table.id),
+  )) {
     yield* sql`
       insert into tables (id, starter_player_id, game, venue_id, high_limit)
       values (${table.id}, ${table.starterPlayerId}, ${table.game}, ${table.venueId},
