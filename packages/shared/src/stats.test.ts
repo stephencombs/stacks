@@ -1,9 +1,19 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { PlayerId } from "@stacks/contracts";
+import { Game, MinorUnits, VenueId, VisitId, type PlayerId } from "@stacks/contracts";
+import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
-import { ALEX, BEA, CAL } from "./testing/ledgerArbitrary.ts";
-import { raceLines, runningReturns, runningTotals, statSheet, type StatsSession } from "./stats.ts";
+import { ALEX, BEA, CAL, RandomLedger, toEntries } from "./testing/ledgerArbitrary.ts";
+import { visit } from "./testing/recording.ts";
+import { playerResults } from "./results.ts";
+import {
+  personalStats,
+  raceLines,
+  runningReturns,
+  runningTotals,
+  statSheet,
+  type StatsSession,
+} from "./stats.ts";
 
 const palazzo = { id: "palazzo", name: "The Palazzo" };
 const wynn = { id: "wynn", name: "Wynn" };
@@ -108,4 +118,339 @@ describe("statSheet", () => {
     expect(sheet.bestVenue).toBeNull();
     expect(sheet.averageBuyIn).toBeNull();
   });
+});
+
+const zone = DateTime.zoneMakeNamedUnsafe("America/Los_Angeles");
+const casino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c1");
+const otherCasino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c2");
+const missingCasino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c3");
+const personalSession = (
+  id: number,
+  result: number,
+  fields: {
+    startedAt?: string;
+    finishedAt?: string | null;
+    game?: typeof Game.Type | null;
+    venueId?: VenueId | null;
+  } = {},
+) => ({
+  visit: {
+    ...visit,
+    id: VisitId.make(`0192e7a0-0000-7000-8000-${id.toString(16).padStart(12, "0")}`),
+    startedAt: DateTime.makeUnsafe(fields.startedAt ?? "2026-11-06T20:00:00Z"),
+    finishedAt:
+      fields.finishedAt === null
+        ? null
+        : DateTime.makeUnsafe(fields.finishedAt ?? "2026-11-06T21:00:00Z"),
+  },
+  finalResult: fields.finishedAt === null ? null : MinorUnits.make(result),
+  table: {
+    game: fields.game === undefined ? ("blackjack" as const) : fields.game,
+    venueId: fields.venueId === undefined ? casino : fields.venueId,
+  },
+});
+
+describe("personalStats", () => {
+  it("counts ahead, behind and break-even sessions, excluding live play everywhere", () => {
+    const stats = personalStats(
+      [
+        personalSession(1, 100),
+        personalSession(2, -40),
+        personalSession(3, 0),
+        personalSession(4, 900, { finishedAt: null, game: "slots", venueId: otherCasino }),
+      ],
+      zone,
+    );
+    expect(stats.summary).toEqual({
+      result: 60,
+      sessions: 3,
+      hours: 3,
+      hourlyResult: 20,
+      winRate: { wins: 1, sessions: 3 },
+    });
+    expect(stats.runningResult.map((point) => point.sessionId)).toHaveLength(3);
+    expect(stats.byGame).toEqual([{ game: "blackjack", sessions: 3, hours: 3, result: 60 }]);
+    expect(stats.byCasino).toEqual([{ venueId: casino, sessions: 3, hours: 3, result: 60 }]);
+    expect(stats.options).toEqual({ years: [2026], games: ["blackjack"], venueIds: [casino] });
+  });
+
+  it("returns zero summaries and empty rows for no history, live-only history and no matches", () => {
+    for (const sessions of [
+      [],
+      [personalSession(1, 100, { finishedAt: null })],
+      [personalSession(2, 100)],
+    ]) {
+      const stats = personalStats(sessions, zone, { year: 2024 });
+      expect(stats.summary).toEqual({
+        result: 0,
+        sessions: 0,
+        hours: 0,
+        hourlyResult: 0,
+        winRate: { wins: 0, sessions: 0 },
+      });
+      expect(stats.runningResult).toEqual([]);
+      expect(stats.byGame).toEqual([]);
+      expect(stats.byCasino).toEqual([]);
+      expect(stats.options.years).toEqual(
+        sessions[0]?.finalResult !== null && sessions.length > 0 ? [2026] : [],
+      );
+    }
+  });
+
+  it("uses the finish's calendar year in the caller's zone at both year boundaries", () => {
+    const sessions = [
+      personalSession(1, 10, {
+        startedAt: "2025-12-31T23:00:00Z",
+        finishedAt: "2026-01-01T07:59:59.999Z",
+      }),
+      personalSession(2, 20, {
+        startedAt: "2025-12-31T23:00:00Z",
+        finishedAt: "2026-01-01T08:00:00Z",
+      }),
+      personalSession(3, 30, {
+        startedAt: "2026-12-31T23:00:00Z",
+        finishedAt: "2027-01-01T07:59:59.999Z",
+      }),
+      personalSession(4, 40, {
+        startedAt: "2026-12-31T23:00:00Z",
+        finishedAt: "2027-01-01T08:00:00Z",
+      }),
+    ];
+    expect(personalStats(sessions, zone, { year: 2026 }).summary.result).toBe(50);
+    expect(personalStats(sessions, zone, { year: 2025 }).summary.result).toBe(10);
+    expect(personalStats(sessions, zone).options.years).toEqual([2027, 2026, 2025]);
+    expect(
+      personalStats(sessions, DateTime.zoneMakeNamedUnsafe("UTC"), { year: 2026 }).summary.result,
+    ).toBe(30);
+  });
+
+  it("composes year, game and casino filters, including unset values", () => {
+    const sessions = [
+      personalSession(1, 100),
+      personalSession(2, 200, { game: "slots" }),
+      personalSession(3, 300, { venueId: otherCasino }),
+      personalSession(4, 400, {
+        startedAt: "2025-01-01T20:00:00Z",
+        finishedAt: "2025-01-01T21:00:00Z",
+      }),
+      personalSession(5, 500, { game: null, venueId: null }),
+    ];
+    const filtered = personalStats(sessions, zone, {
+      year: 2026,
+      game: "blackjack",
+      venueId: casino,
+    });
+    expect(filtered.summary.result).toBe(100);
+    expect(personalStats(sessions, zone, { game: null, venueId: null }).summary.result).toBe(500);
+    expect(
+      personalStats(sessions, zone, { game: "slots", venueId: otherCasino }).summary.sessions,
+    ).toBe(0);
+    expect(filtered.options).toEqual({
+      years: [2026, 2025],
+      games: ["blackjack", "slots", null],
+      venueIds: [casino, otherCasino, null],
+    });
+    expect(personalStats(sessions, zone, { year: 2024 }).options).toEqual(filtered.options);
+  });
+
+  it("sorts chart points by finish, then session ID, without changing the input", () => {
+    const sessions = Object.freeze([
+      personalSession(3, -40, { finishedAt: "2026-11-06T23:00:00Z" }),
+      personalSession(2, 0),
+      personalSession(1, 100),
+    ]);
+    const stats = personalStats(sessions, zone);
+    expect(stats.runningResult).toEqual([
+      {
+        sessionId: sessions[2]!.visit.id,
+        finishedAt: sessions[2]!.visit.finishedAt,
+        result: 100,
+        total: 100,
+      },
+      {
+        sessionId: sessions[1]!.visit.id,
+        finishedAt: sessions[1]!.visit.finishedAt,
+        result: 0,
+        total: 100,
+      },
+      {
+        sessionId: sessions[0]!.visit.id,
+        finishedAt: sessions[0]!.visit.finishedAt,
+        result: -40,
+        total: 60,
+      },
+    ]);
+    expect(personalStats(sessions.toReversed(), zone)).toEqual(stats);
+  });
+
+  it("keeps no-casino and unset-game rows and orders ties by game or venue ID", () => {
+    const stats = personalStats(
+      [
+        personalSession(1, -50, { game: "slots", venueId: null }),
+        personalSession(2, 100, { game: "roulette", venueId: otherCasino }),
+        personalSession(3, 60),
+        personalSession(4, 40),
+        personalSession(5, -100, { game: null, venueId: null }),
+      ],
+      zone,
+    );
+    expect(stats.byGame).toEqual([
+      { game: "blackjack", result: 100, sessions: 2, hours: 2 },
+      { game: "roulette", result: 100, sessions: 1, hours: 1 },
+      { game: "slots", result: -50, sessions: 1, hours: 1 },
+      { game: null, result: -100, sessions: 1, hours: 1 },
+    ]);
+    expect(stats.byCasino).toEqual([
+      { venueId: casino, result: 100, sessions: 2, hours: 2 },
+      { venueId: otherCasino, result: 100, sessions: 1, hours: 1 },
+      { venueId: null, result: -150, sessions: 2, hours: 2 },
+    ]);
+  });
+
+  it("rounds summed hours once and computes hourly result from the full elapsed time", () => {
+    const short = (id: number, result: number) =>
+      personalSession(id, result, {
+        startedAt: "2026-11-06T20:00:00Z",
+        finishedAt: "2026-11-06T20:00:18Z",
+      });
+    const single = personalStats([short(1, 1)], zone);
+    expect(single.summary.hours).toBe(0.01);
+    expect(single.summary.hourlyResult).toBe(200);
+    const summed = personalStats([short(1, 1), short(2, 1)], zone);
+    expect(summed.summary.hours).toBe(0.01);
+    expect(summed.byGame[0]!.hours).toBe(0.01);
+    expect(summed.byCasino[0]!.hours).toBe(0.01);
+    expect(summed.summary.hourlyResult).toBe(200);
+    const tiny = personalStats(
+      [personalSession(1, 1, { finishedAt: "2026-11-06T20:00:00.001Z" })],
+      zone,
+    );
+    expect(tiny.summary.hours).toBe(0);
+    expect(tiny.summary.hourlyResult).toBe(3_600_000);
+  });
+
+  it("rounds hourly halves away from zero and returns zero for zero elapsed time", () => {
+    for (const [result, expected] of [
+      [1, 1],
+      [-1, -1],
+      [3, 2],
+      [-3, -2],
+    ] as const) {
+      expect(
+        personalStats([personalSession(1, result, { finishedAt: "2026-11-06T22:00:00Z" })], zone)
+          .summary.hourlyResult,
+      ).toBe(expected);
+    }
+    const instant = personalSession(1, 10, { finishedAt: "2026-11-06T20:00:00Z" });
+    expect(personalStats([instant], zone).summary).toEqual({
+      result: 10,
+      sessions: 1,
+      hours: 0,
+      hourlyResult: 0,
+      winRate: { wins: 1, sessions: 1 },
+    });
+  });
+
+  it("measures elapsed time across a daylight-saving change", () => {
+    const stats = personalStats(
+      [
+        personalSession(1, 200, {
+          startedAt: "2026-11-01T08:30:00Z",
+          finishedAt: "2026-11-01T10:30:00Z",
+        }),
+      ],
+      zone,
+    );
+    expect(stats.summary.hours).toBe(2);
+    expect(stats.summary.hourlyResult).toBe(100);
+  });
+
+  it("preserves safe-integer money and rejects overflowing totals, chart points and rates", () => {
+    const max = Number.MAX_SAFE_INTEGER;
+    const sessions = [personalSession(1, max), personalSession(2, -max), personalSession(3, 2)];
+    expect(personalStats(sessions, zone).summary.result).toBe(2);
+    expect(personalStats([sessions[0]!], zone).summary.hourlyResult).toBe(max);
+    expect(() => personalStats([personalSession(1, max), personalSession(2, 1)], zone)).toThrow(
+      RangeError,
+    );
+    expect(() =>
+      personalStats(
+        [personalSession(1, max), personalSession(2, 1), personalSession(3, -max)],
+        zone,
+      ),
+    ).toThrow(RangeError);
+    expect(() =>
+      personalStats([personalSession(1, max, { finishedAt: "2026-11-06T20:30:00Z" })], zone),
+    ).toThrow(RangeError);
+    for (const fields of [{ game: "slots" as const }, { venueId: otherCasino }]) {
+      expect(() =>
+        personalStats(
+          [personalSession(1, max), personalSession(2, -max, fields), personalSession(3, 1)],
+          zone,
+        ),
+      ).toThrow(RangeError);
+    }
+  });
+
+  it.prop(
+    "conserves results across every combination of filters and breakdowns",
+    [
+      Schema.Array(
+        Schema.Struct({
+          ledger: RandomLedger,
+          year: Schema.Literals([2024, 2025, 2026]),
+          game: Schema.NullOr(Game),
+          venueId: Schema.NullOr(Schema.Literals([casino, otherCasino])),
+          minutes: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 480 })),
+          live: Schema.Boolean,
+        }),
+      ),
+    ],
+    ([records]) => {
+      const sessions = records.map((record, index) => {
+        const finish = DateTime.makeUnsafe(`${record.year}-06-01T12:00:00Z`);
+        return personalSession(
+          index + 1,
+          playerResults(toEntries(record.ledger)).get(ALEX)?.net ?? 0,
+          {
+            startedAt: DateTime.formatIso(
+              DateTime.makeUnsafe(DateTime.toEpochMillis(finish) - record.minutes * 60_000),
+            ),
+            finishedAt: record.live ? null : DateTime.formatIso(finish),
+            game: record.game,
+            venueId: record.venueId,
+          },
+        );
+      });
+      for (const year of [undefined, 2024, 2025, 2026, 2030]) {
+        for (const game of [undefined, ...Game.literals, null]) {
+          for (const venueId of [undefined, casino, otherCasino, missingCasino, null]) {
+            const expected = sessions.filter(
+              (session, index) =>
+                !records[index]!.live &&
+                (year === undefined || records[index]!.year === year) &&
+                (game === undefined || session.table.game === game) &&
+                (venueId === undefined || session.table.venueId === venueId),
+            );
+            const sum = expected.reduce(
+              (total, session) => total + BigInt(session.finalResult!),
+              0n,
+            );
+            const stats = personalStats(sessions, zone, { year, game, venueId });
+            expect(stats.summary.result).toBe(Number(sum));
+            expect(stats.summary.sessions).toBe(expected.length);
+            expect(stats.summary.winRate).toEqual({
+              wins: expected.filter((session) => session.finalResult! > 0).length,
+              sessions: expected.length,
+            });
+            for (const rows of [stats.byGame, stats.byCasino]) {
+              expect(rows.reduce((total, row) => total + BigInt(row.result), 0n)).toBe(sum);
+              expect(rows.reduce((total, row) => total + row.sessions, 0)).toBe(expected.length);
+            }
+            expect(stats.runningResult.at(-1)?.total ?? 0).toBe(Number(sum));
+          }
+        }
+      }
+    },
+  );
 });
