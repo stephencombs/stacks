@@ -113,6 +113,12 @@ export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => 
   return {
     Client: StacksClient,
     groups: StacksClient.query("groups", "list", keys),
+    /** A page of activity from all your groups, newest first; pass `nextCursor` for older. */
+    crewActivity: (cursor?: string) =>
+      StacksClient.query("crew", "activity", {
+        query: cursor === undefined ? {} : { cursor },
+        ...keys,
+      }),
     group: (groupId: GroupId) =>
       StacksClient.query("groups", "get", { params: { groupId }, ...keys }),
     stats: (groupId: GroupId) =>

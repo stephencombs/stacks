@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { StacksApi } from "@stacks/contracts";
 
+import * as Crew from "../features/Crew.ts";
 import * as Export from "../features/Export.ts";
 import * as Groups from "../features/Groups.ts";
 import * as Guests from "../features/Guests.ts";
@@ -38,6 +39,10 @@ const groups = HttpApiBuilder.group(StacksApi, "groups", (handlers) =>
     .handle("setRole", ({ params, payload }) =>
       serve(Groups.setRole(params.groupId, params.userId, payload)),
     ),
+);
+
+const crew = HttpApiBuilder.group(StacksApi, "crew", (handlers) =>
+  handlers.handle("activity", ({ query }) => serve(Crew.activity(query))),
 );
 
 const invites = HttpApiBuilder.group(StacksApi, "invites", (handlers) =>
@@ -139,6 +144,7 @@ export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openap
   Layer.provide([
     health,
     groups,
+    crew,
     invites,
     guests,
     venues,
