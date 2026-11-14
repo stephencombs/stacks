@@ -91,6 +91,12 @@ export const SearchVenuesQuery = Schema.Struct({
   lng: Schema.optionalKey(Schema.FiniteFromString),
 });
 
+export const SearchPublicVenuesQuery = Schema.Struct({
+  q: SearchVenuesQuery.fields.q,
+  lat: SearchVenuesQuery.fields.lat,
+  lng: SearchVenuesQuery.fields.lng,
+});
+
 export const CreateVenueRequest = Schema.Struct({
   id: VenueId,
   name: Name(80),
@@ -342,6 +348,21 @@ const VenuesGroup = HttpApiGroup.make("venues")
     }),
   )
   .middleware(Authentication);
+
+const PublicVenuesGroup = HttpApiGroup.make("publicVenues")
+  .add(
+    HttpApiEndpoint.get("search", "/public/venues", {
+      query: SearchPublicVenuesQuery,
+      success: Schema.Array(Venue),
+    }),
+  )
+  .add(
+    HttpApiEndpoint.get("get", "/public/venues/:venueId", {
+      params: Schema.Struct({ venueId: VenueId }),
+      success: Venue,
+      error: NotFound,
+    }),
+  );
 
 const tripParams = Schema.Struct({ tripId: TripId });
 
@@ -652,6 +673,7 @@ export class StacksApi extends HttpApi.make("stacks")
   .add(InvitesGroup)
   .add(GuestsGroup)
   .add(VenuesGroup)
+  .add(PublicVenuesGroup)
   .add(SessionsGroup)
   .add(LedgerGroup)
   .add(StakesGroup)

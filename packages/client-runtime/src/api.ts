@@ -4,7 +4,13 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
-import type { GroupId, SessionId, TripId } from "@stacks/contracts";
+import type {
+  GroupId,
+  SearchPublicVenuesQuery,
+  SessionId,
+  TripId,
+  VenueId,
+} from "@stacks/contracts";
 import type { ActorCredential } from "@stacks/contracts/recordingCommands";
 import { StacksApi } from "@stacks/contracts";
 
@@ -98,6 +104,24 @@ export const fetchSharedTable = (
 ) =>
   HttpApiClient.make(StacksApi, { baseUrl }).pipe(
     Effect.flatMap((api) => api.publicRecording.shared({ params: { token } })),
+    Effect.provide(FetchHttpClient.layer),
+  );
+
+export const searchPublicVenues = (
+  { baseUrl }: Pick<StacksClientOptions, "baseUrl">,
+  query: typeof SearchPublicVenuesQuery.Type,
+) =>
+  HttpApiClient.make(StacksApi, { baseUrl }).pipe(
+    Effect.flatMap((api) => api.publicVenues.search({ query })),
+    Effect.provide(FetchHttpClient.layer),
+  );
+
+export const fetchPublicVenue = (
+  { baseUrl }: Pick<StacksClientOptions, "baseUrl">,
+  venueId: VenueId,
+) =>
+  HttpApiClient.make(StacksApi, { baseUrl }).pipe(
+    Effect.flatMap((api) => api.publicVenues.get({ params: { venueId } })),
     Effect.provide(FetchHttpClient.layer),
   );
 

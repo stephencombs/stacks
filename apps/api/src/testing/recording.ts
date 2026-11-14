@@ -170,7 +170,7 @@ export const edit = (
     visitId,
     expectedRevision,
     ...change,
-  });
+  }) as Extract<RecordingCommand, { type: "edit_visit" }>;
 
 export const recorderCommand = (
   type: "appoint_recorder" | "revoke_recorder",

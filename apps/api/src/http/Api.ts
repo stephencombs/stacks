@@ -68,6 +68,12 @@ const venues = HttpApiBuilder.group(StacksApi, "venues", (handlers) =>
     .handle("create", ({ payload }) => serve(Venues.create(payload))),
 );
 
+const publicVenues = HttpApiBuilder.group(StacksApi, "publicVenues", (handlers) =>
+  handlers
+    .handle("search", ({ query }) => serve(Venues.searchPublic(query)))
+    .handle("get", ({ params }) => serve(Venues.getPublic(params.venueId))),
+);
+
 const sessions = HttpApiBuilder.group(StacksApi, "sessions", (handlers) =>
   handlers
     .handle("create", ({ params, payload }) => serve(Sessions.create(params.tripId, payload)))
@@ -148,6 +154,7 @@ export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openap
     invites,
     guests,
     venues,
+    publicVenues,
     sessions,
     ledger,
     stakes,

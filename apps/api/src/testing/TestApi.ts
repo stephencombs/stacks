@@ -41,7 +41,9 @@ const testUser = (credential: Redacted.Redacted) => {
 const layerTestAuthentication = Layer.mergeAll(
   Layer.succeed(Authentication, {
     bearer: (httpEffect, { credential }) =>
-      Effect.provideService(httpEffect, CurrentUser, testUser(credential)),
+      Redacted.value(credential) === ""
+        ? Effect.fail(new Unauthorized())
+        : Effect.provideService(httpEffect, CurrentUser, testUser(credential)),
   }),
   Layer.succeed(RecordingAuthentication, {
     // Without a bearer token, fail like Clerk does so the actor scheme gets its turn.
