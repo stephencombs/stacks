@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-14
 priority: medium
 tags:
@@ -11,7 +11,10 @@ depends_on:
   - "003"
 parent: "001"
 created_at: 2026-11-14T20:15:30.759235709Z
-updated_at: 2026-11-14T20:21:31.297983954Z
+updated_at: 2026-11-14T21:33:28.806422587Z
+transitions:
+  - status: in-progress
+    at: 2026-11-14T21:28:45.380575121Z
 ---
 
 # Venues for personal play
@@ -32,8 +35,8 @@ Every design shows a venue, but venue search needs an account today, so signed-o
 
 ## Plan
 
-- [ ] Public venue search and read-by-id endpoints, with tests
-- [ ] Recording API refuses a home venue on a table
+- [x] Public venue search and read-by-id endpoints, with tests
+- [x] Recording API refuses a home venue on a table
 - [ ] Venue cache in the recording store
 - [ ] Venue picker on web and mobile; set and change a session's venue offline
 

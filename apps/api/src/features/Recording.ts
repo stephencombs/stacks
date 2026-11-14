@@ -52,6 +52,7 @@ import {
   TableRow,
 } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as Venues from "./Venues.ts";
 
 class Rejected extends Data.TaggedError("Rejected")<{
   readonly reason: RecordingRejectionReason;
@@ -527,6 +528,23 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
           : Effect.die(error),
       ),
     );
+    const venueId =
+      command.type === "start" || command.type === "record_completed"
+        ? command.venueId
+        : command.type === "edit_visit"
+          ? command.table?.venueId
+          : null;
+    if (venueId)
+      yield* Venues.getPublic(venueId).pipe(
+        Effect.catchTag("NotFound", () =>
+          Effect.fail(
+            new Rejected({
+              reason: "invalid",
+              message: "Choose a public venue or leave the venue empty.",
+            }),
+          ),
+        ),
+      );
     yield* save(self, before, after, command);
   });
   return yield* sql.withTransaction(apply).pipe(

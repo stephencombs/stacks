@@ -1,11 +1,87 @@
 import { expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as SqlClient from "effect/sql/SqlClient";
 
 import { catalogVenue, groupWith, ids, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
+  it.effect("searches and reads only public venues without signing in", () =>
+    Effect.gen(function* () {
+      const { owner } = yield* users("owner");
+      const group = yield* groupWith(owner);
+      const venue = yield* catalogVenue(owner);
+      const home = yield* owner.venues.create({
+        payload: {
+          id: ids.venue(),
+          name: venue.name,
+          kind: "home",
+          city: null,
+          region: null,
+          country: null,
+          groupId: group.group.id,
+        },
+      });
+      const anonymous = yield* (yield* TestApi).asActor(null);
+      const found = yield* anonymous.publicVenues.search({ query: { q: venue.name } });
+      expect(found).toEqual([venue]);
+      const withGroup = { q: venue.name, groupId: group.group.id };
+      expect(
+        yield* anonymous.publicVenues.search({
+          query: withGroup,
+        }),
+      ).toEqual([venue]);
+      expect(yield* anonymous.publicVenues.get({ params: { venueId: venue.id } })).toEqual(venue);
+      for (const venueId of [home.id, ids.venue()]) {
+        expect(
+          yield* anonymous.publicVenues.get({ params: { venueId } }).pipe(Effect.flip),
+        ).toMatchObject({ _tag: "NotFound", resource: "venue" });
+      }
+      expect(
+        yield* owner.publicVenues.get({ params: { venueId: home.id } }).pipe(Effect.flip),
+      ).toMatchObject({ _tag: "NotFound", resource: "venue" });
+      expect(
+        yield* anonymous.venues.search({ query: { q: venue.name } }).pipe(Effect.flip),
+      ).toMatchObject({ _tag: "Unauthorized" });
+    }),
+  );
+
+  it.effect("finds nearby public venues without exposing a home venue", () =>
+    Effect.gen(function* () {
+      const { owner } = yield* users("owner");
+      const group = yield* groupWith(owner);
+      const venue = yield* catalogVenue(owner);
+      const home = yield* owner.venues.create({
+        payload: {
+          id: ids.venue(),
+          name: `Home ${crypto.randomUUID()}`,
+          kind: "home",
+          city: null,
+          region: null,
+          country: null,
+          groupId: group.group.id,
+        },
+      });
+      const near = { lat: 40 + Math.random(), lng: -115 + Math.random() };
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`
+        update venues set lat = ${near.lat}, lng = ${near.lng}
+        where id in ${sql.in([venue.id, home.id])}
+      `;
+      const anonymous = yield* (yield* TestApi).asActor(null);
+      const found = yield* anonymous.publicVenues.search({ query: near });
+      expect(found[0]?.id).toBe(venue.id);
+      expect(found.length).toBeLessThanOrEqual(20);
+      expect(found.every((item) => item.groupId === null)).toBe(true);
+      expect(found.map((item) => item.id)).not.toContain(home.id);
+      expect(yield* anonymous.publicVenues.get({ params: { venueId: venue.id } })).toEqual({
+        ...venue,
+        ...near,
+      });
+    }),
+  );
+
   it.effect("shares casinos with everyone, unverified until reviewed", () =>
     Effect.gen(function* () {
       const { alex, bea } = yield* users("alex", "bea");

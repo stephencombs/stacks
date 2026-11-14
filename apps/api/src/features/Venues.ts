@@ -7,6 +7,7 @@ import {
   type CreateVenueRequest,
   type GroupId,
   type SearchVenuesQuery,
+  type SearchPublicVenuesQuery,
   type VenueId,
 } from "@stacks/contracts";
 
@@ -16,13 +17,11 @@ import { venueColumns } from "./Views.ts";
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
-/**
- * Catalog venues plus the group's own home venues. With a location and no search text, the
- * nearest come first; otherwise verified venues come first.
- */
-export const search = Effect.fn("Venues.search")(function* (query: typeof SearchVenuesQuery.Type) {
+const searchVisible = Effect.fn("Venues.searchVisible")(function* (
+  query: typeof SearchPublicVenuesQuery.Type,
+  groupId?: GroupId,
+) {
   const sql = yield* SqlClient.SqlClient;
-  if (query.groupId) yield* Access.membership(query.groupId);
   const text = query.q?.trim();
   const pattern = text ? `%${escapeLike(text)}%` : null;
   const near =
@@ -31,7 +30,7 @@ export const search = Effect.fn("Venues.search")(function* (query: typeof Search
   return yield* sql`
     select ${venueColumns(sql)} from venues v
     where v.merged_into_id is null
-      and (v.group_id is null ${query.groupId ? sql`or v.group_id = ${query.groupId}` : sql``})
+      and (v.group_id is null ${groupId ? sql`or v.group_id = ${groupId}` : sql``})
       ${pattern ? sql`and (v.name ilike ${pattern} or v.city ilike ${pattern})` : sql``}
     order by ${
       near && !pattern
@@ -41,6 +40,21 @@ export const search = Effect.fn("Venues.search")(function* (query: typeof Search
     }
     limit 20
   `.pipe(Effect.flatMap(Access.decodeRows(VenueRow)));
+});
+
+/**
+ * Catalog venues plus the group's own home venues. With a location and no search text, the
+ * nearest come first; otherwise verified venues come first.
+ */
+export const search = Effect.fn("Venues.search")(function* (query: typeof SearchVenuesQuery.Type) {
+  if (query.groupId) yield* Access.membership(query.groupId);
+  return yield* searchVisible(query, query.groupId);
+});
+
+export const searchPublic = Effect.fn("Venues.searchPublic")(function* (
+  query: typeof SearchPublicVenuesQuery.Type,
+) {
+  return yield* searchVisible(query);
 });
 
 export const recent = Effect.fn("Venues.recent")(function* (groupId: GroupId) {
@@ -68,6 +82,10 @@ export const findVisible = Effect.fn("Venues.findVisible")(function* (
   `.pipe(Effect.flatMap(Access.decodeRows(VenueRow)));
   if (!venue) return yield* new NotFound({ resource: "venue" });
   return venue;
+});
+
+export const getPublic = Effect.fn("Venues.getPublic")(function* (venueId: VenueId) {
+  return yield* findVisible(venueId, null);
 });
 
 /**
