@@ -115,6 +115,51 @@ export const GroupListItem = Schema.Struct({
 });
 export type GroupListItem = typeof GroupListItem.Type;
 
+const ActivityGroup = Schema.Struct({ id: GroupId, name: Schema.String, currency: CurrencyCode });
+const ActivityTrip = Schema.Struct({ id: TripId, name: Schema.String });
+const ActivityPlayer = Schema.Struct({ playerId: PlayerId, displayName: Schema.String });
+
+/**
+ * One row of the Crew feed. A session appears once, as it stands now: live from when it started,
+ * finished from when it closed.
+ */
+export const CrewActivityItem = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("session_live"),
+    group: ActivityGroup,
+    trip: ActivityTrip,
+    sessionId: SessionId,
+    venue: Venue,
+    /** Everyone seated, in the order they sat down. */
+    players: Schema.Array(ActivityPlayer),
+    startedAt: Schema.DateTimeUtc,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("session_finished"),
+    group: ActivityGroup,
+    trip: ActivityTrip,
+    sessionId: SessionId,
+    venue: Venue,
+    /** Everyone seated, in the order they sat down, with what they won or lost. */
+    players: Schema.Array(Schema.Struct({ ...ActivityPlayer.fields, net: MinorUnits })),
+    endedAt: Schema.DateTimeUtc,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("trip_started"),
+    group: ActivityGroup,
+    trip: ActivityTrip,
+    startedAt: Schema.DateTimeUtc,
+  }),
+]);
+export type CrewActivityItem = typeof CrewActivityItem.Type;
+
+/** Newest first. Pass `nextCursor` back for older items; it's null on the last page. */
+export const CrewActivityPage = Schema.Struct({
+  items: Schema.Array(CrewActivityItem),
+  nextCursor: Schema.NullOr(Schema.String),
+});
+export type CrewActivityPage = typeof CrewActivityPage.Type;
+
 /** A stake and where it stands: the borrower's result so far and what they'd hand back now. */
 export const StakeView = Schema.Struct({
   stake: Stake,
