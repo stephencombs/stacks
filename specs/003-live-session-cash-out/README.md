@@ -11,7 +11,7 @@ depends_on:
   - "002"
 parent: "001"
 created_at: 2026-11-13T04:24:59.125611136Z
-updated_at: 2026-11-14T20:15:11.525417631Z
+updated_at: 2026-11-14T21:22:56.014718237Z
 transitions:
   - status: in-progress
     at: 2026-11-13T05:26:32.385377986Z
@@ -36,13 +36,13 @@ The recording rules behind the live session, shipped in PR #87: cash out finishe
 - [x] Cash out finishes the visit; table closes after the last player
 - [x] Interim live session screen and edit sheets, web and mobile
 - [x] Remove Keep playing everywhere
-- [ ] Fix the failing API test (`apps/api/src/features/JoinTables.test.ts`, "lets the starter change the table's details and a joiner only their own start": gets `conflict`, expects `accepted`)
+- [x] Fix the failing API test (`apps/api/src/features/JoinTables.test.ts`, "lets the starter change the table's details and a joiner only their own start": gets `conflict`, expects `accepted`)
 
 ## Test
 
 - [x] The `PLAN.md` phase 2 milestone passes end to end, offline, on web and mobile
 - [x] Buy-in total changes keep void history visible; result math unchanged (unit and property tests)
-- [ ] API tests: the starter edits a table's game, a joiner only their own start, and a start after the first buy-in is refused
+- [x] API tests: the starter edits a table's game, a joiner only their own start, and a start after the first buy-in is refused
 - [x] Mistaken cash-out can be undone without merging a real return visit
 
 ## Notes
