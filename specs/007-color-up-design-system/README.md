@@ -3,12 +3,12 @@ status: planned
 created: 2026-11-14
 priority: high
 tags:
-- design
-- web
-- mobile
+  - design
+  - web
+  - mobile
 depends_on:
-- '002'
-parent: '001'
+  - "002"
+parent: "001"
 created_at: 2026-11-14T20:15:30.022549421Z
 updated_at: 2026-11-14T21:46:38.323910353Z
 ---
