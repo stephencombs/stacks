@@ -8,7 +8,7 @@ tags:
   - client-runtime
 parent: "001"
 created_at: 2026-11-13T04:24:59.515886103Z
-updated_at: 2026-11-13T04:24:59.515886103Z
+updated_at: 2026-11-14T20:14:54.661634912Z
 ---
 
 # Crew activity API
@@ -27,10 +27,10 @@ Crew opens on activity from every group you're in. This adds the read endpoint a
 
 ## Plan
 
-- [ ] Contract schema and endpoint
-- [ ] Service and handler
-- [ ] Client-runtime query
-- [ ] API tests
+- [x] Contract schema and endpoint
+- [x] Service and handler
+- [x] Client-runtime query
+- [x] API tests
 
 ## Test
 

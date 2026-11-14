@@ -8,7 +8,7 @@ tags:
   - mobile
   - api
 created_at: 2026-11-13T03:32:31.830953888Z
-updated_at: 2026-11-13T04:25:05.274586219Z
+updated_at: 2026-11-14T20:21:29.848396571Z
 transitions:
   - status: in-progress
     at: 2026-11-13T04:25:05.274586219Z
@@ -18,48 +18,45 @@ transitions:
 
 ## Overview
 
-Personal play is what people do most, yet it sits outside the app's tabs. The tab bar is spent on one trip at a time (Sessions, Board, Group). Replace that with four tabs that hold a player's own play first and their friends second, on web and mobile alike. The target is described in `docs/internals/navigation.md`; this spec is the work to get there.
+Personal play is what people do most, yet it sat outside the app's tabs, and the tab bar was spent on one trip at a time. This umbrella replaces that with four tabs, Play, Stats, Map and Crew, on web and mobile, and brings the screens in line with the Color Up design canvas. `docs/internals/navigation.md` describes the target; each child spec below is one shippable piece of it.
 
-## Design
+## Children
 
-- **Tabs:** Play · Stats · Map · Crew. The avatar opens a **You** sheet (account, recording defaults, cents, privacy mode, theme, export).
-- **Containers:** mobile uses native tabs (`apps/mobile/src/features/PlaceTabs` replaces its trip tabs); web uses a bottom bar below `lg` and a left sidebar above it (`apps/web/src/routes/__root.tsx`).
-- **LiveBar:** floats above the tabs while a session is live, everywhere except the session itself.
-- **Play `/`:** month result, live card or Start session, `+` (Start live session, Add past session), recent sessions → `/history`, `/history/:year`, `/history/:year-:month`. Personal addresses take no query string (offline shell).
-- **Live session `/play/:visitId`:** full screen: elapsed time, buy-in total, game, venue, rebuy chips with undo, Edit (one sheet each for buy-in, start time, game, venue), Cash out.
-  - Buy-in sheet adds, subtracts or sets one total; the ledger records a void and replacement.
-  - Cash out takes amount and end time and finishes the visit. No Keep playing / Finish choice.
-  - A shared table closes once every player at it has cashed out.
-- **Stats `/stats`:** result, hours, hourly, win rate; filters for time, game, venue and trip held in screen state.
-- **Map `/map`:** venue pins colored by result, pin → that venue's sessions, a day or trip drawn as a path. Mobile uses `expo-maps` (already used by `apps/mobile/src/features/TripRoute.tsx`).
-- **Crew `/crew`:** account only. Activity from your groups, newest first, current trip pinned on top. Trip `/trips/:id` (Sessions, Board); group `/groups/:id` (trips, people, settings).
-- **Redirects:** `/groups` → `/crew`; `/trips/:id/results` → `/trips/:id/board`; `/groups/:id/stats` → that board's All time; `/groups/:id/people` → `/groups/:id`.
+- 002 Navigation shell: four tabs, You sheet, LiveBar
+- 003 Live session data: buy-in total, edits, cash out finishes the visit
+- 004 Crew activity API
+- 005 Stats: Just me
+- 006 Crew tab, trip and group pages
+- 007 Color Up design system: tokens, light and dark, glass, motion
+- 008 Live screen: the solo felt screen, Finished and delete
+- 009 Venues for personal play
+- 010 Shared table on the live screen
+- 011 Group stats in Stats
+- 012 Map
+- 013 A table's trip: group play recorded from Play
+- 014 iOS Live Activity
+- 015 Group reads from tables in trips
+- 016 Retire the older group sessions
+- 017 Delete a session
 
-Shared logic (history grouping, stats breakdowns, map pins and paths, buy-in total changes) lives in `packages/shared` or `packages/client-runtime`, not per app.
+## Order
 
-## Plan
+1. Land this spec breakdown first, then 004, 002 and 003 (PRs #85, #86, #87), dropping their own spec edits.
+2. The design system (007), so every later screen is built once in the new look.
+3. 009, then 008 and 017: the core recording loop.
+4. Stats Just me (005).
+5. 013, then 015, then 011 and 006, which read group play from tables. 010 can run alongside, after 008.
+6. Retire the older group sessions (016) once 015 has shipped.
+7. Map (012), then the Live Activity (014).
 
-- [ ] Shell: four tabs, You sheet and LiveBar on web and mobile; old routes redirect
-- [ ] Play home and history (`/history`, by month and by year)
-- [ ] Live session: full screen, per-field edit sheets, buy-in as a total
-- [ ] Cash out finishes the visit; shared table closes when the last player cashes out (client-runtime and API)
-- [ ] Remove the Keep playing choice from `RecordingForms` and `SessionView` (web) and `RecordingForms` and `Session` (mobile)
-- [ ] Stats tab with filters
-- [ ] Map tab on mobile with `expo-maps`; web shows a placeholder or list until its map is chosen
-- [ ] Crew activity: new contract and API endpoint scoped to the caller's groups, then the Crew list with pinned trip
-- [ ] Trip and group pages reached from Crew; retire the Sessions/Board/Group tabs
+## Decisions that span children
+
+- Group play is recorded from Play: a shared table can belong to one trip (013). The older group session screens are retired, not restyled.
+- The app says "Stats", never "Board". "Result", never "Profit".
+- A live session shows in the LiveBar above the tab bar, never at the top of a tab. Tab roots have no large title.
+- Deferred, not in any child: strategy tools, the share-your-win card, debts and balances UI, partial cash-outs, a web map, lock-screen actions.
 
 ## Test
 
-- [ ] Play, history and a live session work signed out and offline on web and mobile, and survive relaunch
-- [ ] Changing the buy-in total records a void and replacement; result math is unchanged (unit tests in `packages/shared`)
-- [ ] Cash out on a one-player table closes it; on a shared table it closes only after the last player cashes out (API tests on the seeded test database)
-- [ ] Crew activity returns only sessions and trips from the caller's groups (API authorization test)
-- [ ] Every old address redirects to its new home
-- [ ] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, `pnpm test` pass; e2e updated for the new flow
-- [ ] Screenshots of each tab on web (preview server) and on iOS and Android
-
-## Notes
-
-- Inspired by CasinoIQ screenshots (play, stats, map, feed), reviewed 2026-11-12.
-- Out of scope: strategy tools (blackjack strategy, dice probabilities), the share-your-win card, debts and balances UI, partial cash-outs, web map details.
+- [ ] Every child spec is complete
+- [ ] Screenshots of each tab and the live session on web (preview server), iOS and Android, light and dark
