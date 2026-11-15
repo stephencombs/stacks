@@ -36,6 +36,10 @@
       "types": "./src/ids.ts",
       "import": "./src/ids.ts"
     },
+    "./motion": {
+      "types": "./src/motion.ts",
+      "import": "./src/motion.ts"
+    },
     "./outbox": {
       "types": "./src/outbox.ts",
       "import": "./src/outbox.ts"

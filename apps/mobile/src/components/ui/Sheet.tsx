@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "./Icon";
 import { keyboardOverlap, sheetBottomEdge } from "./keyboardInset";
+import { useReducedMotion } from "./motion";
 
 /**
  * A form or confirmation that slides up over the current screen, laid out like an iOS sheet: a
@@ -41,6 +42,7 @@ export function Sheet({
   children?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const [keyboard, setKeyboard] = useState(0);
   const sheetBottom = useRef(0);
   const keyboardFrame = useRef<{ screenY: number; height: number } | null>(null);
@@ -80,7 +82,7 @@ export function Sheet({
   return (
     <Modal
       visible={open}
-      animationType="slide"
+      animationType={reducedMotion ? "none" : "slide"}
       presentationStyle="pageSheet"
       onRequestClose={busy ? () => {} : onClose}
     >
@@ -138,7 +140,12 @@ export function Sheet({
                 scrollFrame.current = { y, height: measured };
                 if (!revealAfterLayout.current) return;
                 revealAfterLayout.current = false;
-                revealFocusedField(scroll.current, scrollOffset.current, scrollFrame.current);
+                revealFocusedField(
+                  scroll.current,
+                  scrollOffset.current,
+                  scrollFrame.current,
+                  !reducedMotion,
+                );
               });
             }}
             contentContainerClassName="gap-5 px-4 pt-2 pb-8"
@@ -167,15 +174,16 @@ function revealFocusedField(
   scroll: ScrollViewInstance | null,
   offsetY: number,
   frame: { readonly y: number; readonly height: number },
+  animated: boolean,
 ) {
   if (!scroll || frame.height <= 0) return;
   TextInput.State.currentlyFocusedInput()?.measureInWindow((_x, y, _width, height) => {
     const margin = 12;
     const viewBottom = frame.y + frame.height;
     if (y < frame.y + margin) {
-      scroll.scrollTo({ y: Math.max(0, offsetY - (frame.y + margin - y)), animated: true });
+      scroll.scrollTo({ y: Math.max(0, offsetY - (frame.y + margin - y)), animated });
     } else if (y + height > viewBottom - margin) {
-      scroll.scrollTo({ y: offsetY + (y + height - (viewBottom - margin)), animated: true });
+      scroll.scrollTo({ y: offsetY + (y + height - (viewBottom - margin)), animated });
     }
   });
 }

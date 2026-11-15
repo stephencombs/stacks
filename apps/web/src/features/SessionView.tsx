@@ -585,7 +585,7 @@ function UndoBar({
       {rebought ? (
         <div
           key={rebought.id}
-          className="pointer-events-auto mx-auto flex min-h-14 w-full max-w-[40rem] items-center gap-3 rounded-xl bg-surface py-2 pr-2 pl-4 shadow-(--elevation-popover) transition-[translate,opacity] duration-200 ease-snap starting:translate-y-2 starting:opacity-0 motion-reduce:transition-none motion-reduce:starting:translate-y-0"
+          className="pointer-events-auto mx-auto flex min-h-14 w-full max-w-[40rem] items-center gap-3 rounded-xl bg-surface py-2 shadow-(--elevation-float) pr-2 pl-4 transition-[translate,opacity] duration-(--duration-toast-in) ease-enter starting:translate-y-2 starting:opacity-0"
         >
           <span className="min-w-0 flex-1 font-medium">
             {name} bought in <Money amount={rebought.amount} currency={currency} />

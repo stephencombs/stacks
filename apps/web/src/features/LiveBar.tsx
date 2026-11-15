@@ -91,7 +91,7 @@ function Bar({
       <Link
         {...link}
         aria-label={label}
-        className="pointer-events-auto mx-auto flex min-h-14 w-full max-w-[40rem] items-center gap-3 rounded-xl bg-surface px-4 py-3 shadow-(--elevation-popover) transition-[background-color,scale] duration-150 hover:bg-fill active:scale-[0.96]"
+        className="glass pressable pointer-events-auto mx-auto flex min-h-14 w-full max-w-[40rem] items-center gap-3 rounded-xl px-4 py-3"
       >
         <Tag tone="live">Live</Tag>
         <span className="min-w-0 flex-1 truncate font-medium">{title}</span>

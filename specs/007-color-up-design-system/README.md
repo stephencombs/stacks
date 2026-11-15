@@ -10,7 +10,7 @@ depends_on:
   - "002"
 parent: "001"
 created_at: 2026-11-14T20:15:30.022549421Z
-updated_at: 2026-11-14T21:46:38.323910353Z
+updated_at: 2026-11-15T02:56:24.748322334Z
 ---
 
 # Color Up design system: tokens, light and dark, glass and motion
@@ -43,14 +43,14 @@ First PR, tokens and theme:
 
 Second PR, glass, motion and docs:
 
-- [ ] Glass and motion primitives on web and mobile
-- [ ] Rewrite `DESIGN.md` and `docs/design/*`
+- [x] Glass and motion primitives on web and mobile
+- [x] Rewrite `DESIGN.md` and `docs/design/*`
 
 ## Test
 
 - [x] Web and mobile token values match `docs/design/tokens.json` for both themes (a test reads both CSS files)
 - [x] Text and money colors pass 4.5:1 on ground and card in both themes
-- [ ] Reduced motion turns off every animation
+- [x] Reduced motion turns off every animation
 - [ ] Screenshots of each tab in light and dark on web, iOS and Android
 
 ## Notes

@@ -1,6 +1,8 @@
 import { createContext, use, useEffect, useRef, useState, type ReactNode } from "react";
-import { AccessibilityInfo, Animated, Easing, Pressable, Text, View } from "react-native";
+import { AccessibilityInfo, Animated, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { animate, duration, ease, useReducedMotion } from "./motion";
 
 export type Toast = {
   readonly message: string;
@@ -16,6 +18,8 @@ const VISIBLE_MS = 6000;
 
 /** `above` keeps toasts clear of something pinned to the bottom, such as a tab bar. */
 export function ToastHost({ children, above }: { children: ReactNode; above?: number }) {
+  // Mounted with the app, so the Reduce Motion setting is known before anything animates.
+  useReducedMotion();
   const [current, setCurrent] = useState<(Toast & { readonly id: number }) | null>(null);
   const nextId = useRef(0);
   const [show] = useState(() => (toast: Toast) => setCurrent({ ...toast, id: nextId.current++ }));
@@ -46,40 +50,19 @@ function ToastView({
 }) {
   const insets = useSafeAreaInsets();
   const [shown] = useState(() => new Animated.Value(0));
-  // Settled before anything moves; with Reduce Motion on, the toast appears and leaves at once.
-  const reduced = useRef<boolean | null>(null);
   const closing = useRef(false);
   const [close] = useState(() => () => {
     if (closing.current) return;
     closing.current = true;
-    if (reduced.current) return onClosed();
-    Animated.timing(shown, {
-      toValue: 0,
-      duration: 150,
-      easing: Easing.in(Easing.quad),
-      useNativeDriver: true,
-    }).start(({ finished }) => (finished ? onClosed() : undefined));
+    animate(shown, { toValue: 0, duration: duration.toastOut, easing: ease.exit }, (finished) =>
+      finished ? onClosed() : undefined,
+    );
   });
 
   useEffect(() => {
-    let live = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
-      if (!live) return;
-      reduced.current = reduce;
-      if (reduce) shown.setValue(1);
-      else
-        Animated.timing(shown, {
-          toValue: 1,
-          duration: 200,
-          easing: Easing.bezier(0.32, 0.72, 0, 1),
-          useNativeDriver: true,
-        }).start();
-    });
+    animate(shown, { toValue: 1, duration: duration.toastIn, easing: ease.enter });
     const hide = setTimeout(close, VISIBLE_MS);
-    return () => {
-      live = false;
-      clearTimeout(hide);
-    };
+    return () => clearTimeout(hide);
   }, [shown, close]);
 
   return (

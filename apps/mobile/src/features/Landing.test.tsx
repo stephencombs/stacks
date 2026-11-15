@@ -91,6 +91,7 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
       },
       View,
       timing: () => ({ start() {} }),
+      createAnimatedComponent: <Component,>(component: Component) => component,
     },
     Easing: { bezier: () => () => 0 },
     Platform: { OS: "ios" },

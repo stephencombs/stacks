@@ -2,97 +2,121 @@
 
 ## Color
 
-Components name these tokens as Tailwind colors (`bg-surface`, `text-muted`). Values flip with the theme, so never write `dark:` or `light:` overrides.
+Components name colors as Tailwind colors (`bg-surface`, `text-muted`). Values flip with the theme, so never write `dark:` or `light:` overrides. The code kept Tailwind's names where they mean the same as a token: `canvas` is the tokens' `ground`, `surface` is `card`, `raised` is `card-raised`, `line` is `hairline`, and `live` is `live-text`. Each token's `usage` in `tokens.json` says where it goes; the trees below are the common calls.
 
 ```
 What is this background?
  ├── The page → bg-canvas
- ├── A card, sheet or menu → bg-surface
- ├── A well inside a card, a tag, or a hover on a card → bg-sunken
- ├── A mobile control's resting fill → bg-fill
- └── The selected segment in Segmented or Choice → bg-raised
+ ├── A card or grouped list → bg-surface
+ ├── A card on a card: a field in a sheet, a selected row → bg-raised
+ ├── A quiet control at rest: a chip, a segmented track, a keypad key → bg-fill
+ ├── The selected segment, or a pressed quiet control → bg-fill-strong
+ ├── The primary pill → bg-ink
+ ├── A live session's screen → bg-felt, with bg-felt-deep for its lower band
+ ├── Something floating over content → glass (see Glass)
+ └── Behind a sheet → bg-scrim
 ```
-
-`fill` has no use on web today. `raised` is the selected segment on both clients.
 
 ```
 What color is this text?
  ├── Primary content → text-ink
- ├── Supporting content → text-muted
- ├── Gold text or an icon on a ground → text-accent-text
- ├── Text on a gold fill → text-accent-ink
- ├── A player's result or balance → text-win / text-loss (through Money)
- ├── Something destructive or a failure → text-danger
- ├── A session in play → text-live
- └── A placeholder dash, a list-row chevron, or an empty amount at 24px or larger → text-faint
+ ├── Supporting content: a meta line, a section title, a label → text-muted
+ ├── Text on the primary pill → text-ink-inverse
+ ├── A result or balance → text-win / text-loss (through Money)
+ ├── Something destructive or a failure → text-loss
+ ├── "Live" or a running time on a card or the page → text-live
+ ├── The amount, clock and labels on felt → text-felt-ink, and text-felt-soft for large secondary text
+ └── A placeholder dash, a chevron, a disabled label → text-faint
 ```
 
-- `accent` is a fill. `accent-text` is for text and icons. They differ in light mode, where `accent` as text fails contrast.
-- `faint` is below 4.5:1 on purpose. Never use it for text someone must read. Placeholders use `muted`.
-- `win` means up. Never use it for "success" or "saved". A saved state needs no color.
-- `live` is gold and matches `accent-text` today, because red already means someone is down. `loss` and `danger` share a red but mean different things. Pick by meaning, so they can separate later.
-- Tints use Tailwind's opacity modifier: `bg-accent/15`, `bg-live/15`. Disabled text is `text-muted`, filled buttons use `bg-disabled`, outlined and ghost buttons stay transparent, and inputs use `bg-sunken`. Never an opacity.
-- `--color-chip-*` belong to a player. Read them through `chipOf`, and never use them for anything else.
+- `ink` is the one next step: the primary pill is an ink fill with `ink-inverse` text. There is no brand accent color.
+- `felt` is a fill. Text about a live session on a card uses `live`, which passes 4.5:1 where felt doesn't.
+- `faint` is below 4.5:1 on purpose. Never use it for text someone must read.
+- `win` means up. Never use it for "success" or "saved"; a saved state needs no color. A result chip sits on `win-tint` or `loss-tint`.
+- `loss` is also the destructive color. Show a loss with a minus sign, never by color alone.
+- `chip-red` through `chip-grey` are the game colors (and denominations): craps, poker, roulette, blackjack, baccarat, slots, other. `chip-green` is roulette, never a result. `tint-*` are grounds for soft pills paired with their chip color.
+- `--color-chip-1` to `-8` belong to a player, the same in both themes. Read them through `chipOf`, and never use them for anything else.
+- Disabled text is `text-muted`, filled buttons use `bg-fill`, outlined and ghost buttons stay transparent. Never an opacity.
 
 ## Brand
 
-The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame around four columns in `chip-2`, `chip-1`, `chip-3` and gold, the gold one tallest. It's `BrandMark` on both clients, beside the uppercase Barlow wordmark at the top of the sidebar and on the sign-in screen. The mark's colors come from the tokens, so it follows the theme; the app icon, favicon and touch icon are fixed renders of the dark version.
+The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame around four columns in player chips 2, 1, 3 and 8, the yellow one tallest. It's `BrandMark` on both clients, beside the uppercase Barlow wordmark at the top of the sidebar and on the sign-in screen. The mark's colors come from the tokens, so it follows the theme.
 
 ## Type
 
-Web has two faces: Barlow Condensed for the page title, the wordmark and a hero card's figure, and the system sans for everything else, other money included, with `tabular-nums` on any changing number. Mobile uses tight-tracked **sentence case** system sans for screen titles (`type-title`), card headings (`type-heading`) and section labels (`type-section`), reserving large tabular display/mono figures (`type-hero`, `type-number`) for numeric readouts inside cards.
+`tokens.json` names the type styles. Money styles use its `display` family (SF Pro Display, falling back to the system sans) with tabular figures; text styles use `sans`. Neither is Barlow Condensed, which belongs to the wordmark and the web page title; web hero figures still use it until their screens move to `money-hero`.
 
-| Role            | Use it for                                                        | Web  | Mobile                     |
-| --------------- | ----------------------------------------------------------------- | ---- | -------------------------- |
-| `type-hero`     | Primary figure inside a hero card (`$196.13*`, `+$1,420`, `87%`)  | none | 36px–40px (`tabular-nums`) |
-| `type-title`    | The one title on a page (`PageHeader`, `TopBar` / `PageTitle`)    | 40px | 28px (sentence case, bold) |
-| `type-headline` | The "Can't sign in yet" or onboarding screen heading              | none | 32px (sentence case, bold) |
-| `type-heading`  | Card title (`Cursor Models`, session row title)                   | none | 17px (sentence case, 600)  |
-| `type-body`     | Field text (`>=16px` floor), large button and settings row labels | none | 17px                       |
-| `type-callout`  | On mobile, segmented tabs, pill labels and captions               | 15px | 15px                       |
-| `type-section`  | Grouped list header (`Connections`, `Providers`, `Unsent`)        | none | 13px (sentence case, 500)  |
-| `type-footnote` | Field captions, secondary row metadata (`64.9% of cost`), errors  | none | 13px                       |
-| `type-label`    | Compact status or card kicker (`Raw token cost`, `BETA`)          | none | 12px (sentence case, 500)  |
+| Style         | Use it for                                                                         |
+| ------------- | ---------------------------------------------------------------------------------- |
+| `live-amount` | The live screen's big number on felt: what you've bought in for. 88px, bold        |
+| `money-hero`  | The one figure a screen is about: the month's result, a final result. 44px         |
+| `money-lg`    | A stat card's figure. 28px                                                         |
+| `money-row`   | The amount at the end of a session or player row. 17px, semibold                   |
+| `title-large` | A pushed page's large title, left-aligned. 34px. **Tab roots have no large title** |
+| `title`       | A card's heading, a profile name, a sheet with a big subject. 22px                 |
+| `headline`    | Row titles, sheet titles, navigation titles. 17px, semibold                        |
+| `body`        | Running text and field values. 17px                                                |
+| `callout`     | Feed lines, notes under a field, menu items. 15px                                  |
+| `footnote`    | A row's meta line, times, helper text. 13px                                        |
+| `label`       | Uppercase stat labels over a figure: RESULT, HOURS, SESSIONS, BUY-IN. 11px         |
 
-Everything else is Tailwind's scale. Section headings are `text-lg font-semibold` on web and `type-section text-muted` on mobile, names and row titles `font-medium` (`font-semibold` for primary feed rows on mobile) at the inherited size, secondary text `text-sm`, and tags `text-xs font-medium`.
+The clock on a live session stays small, in the LIVE pill; the big number is the amount.
 
-Amounts are `Money` with a weight or size beside it, such as `font-semibold` in a row. Never give `Money` a `type-*` role.
+In code, a style is a `type-*` utility in both CSS files. Web defines `type-title` (the page title, condensed uppercase) and `type-callout`; mobile defines the rest of its roles (`type-hero`, `type-title`, `type-heading`, `type-body`, `type-section`, `type-footnote`, `type-label`, `type-number`). When a screen moves to a token style that has no utility yet, add it to both files under the token's name with the token's size, weight and tracking.
 
+- Amounts are `Money` with a weight or size beside it. Never give `Money` a text color; its `tone` picks one.
 - Don't add `text-*` sizes, `leading-*` or `tracking-*` beside a `type-*` role, because they fight over the same properties. Color is fine, and mobile needs it: `type-title text-ink`.
 - New roles are `@utility type-*` in both CSS files, not `--text-*` tokens. `cn` runs tailwind-merge, which reads an unknown `text-foo` as a color and drops it when `text-ink` sits beside it. A test fails if web defines a role mobile doesn't.
-- Inputs stay at 16px or larger (`type-body` on mobile), because iOS zooms or clips smaller input text.
-- `text-[10px]` appears only on compact static tags (`BETA`, `HOT`). 11px is the floor for general UI.
-- Keep source strings in **sentence case**. On mobile, titles (`Usage`, `Settings`), section headers (`Unsent`, `Snoozed`, `Settled (16)`), and card kickers (`Raw token cost`, `Processed tokens`) stay in sentence case with tight **tracking** (`-0.025em` on titles) rather than uppercase shouting.
+- `tabular-nums` on any number that changes.
+- Inputs stay at 16px or larger, because iOS zooms or clips smaller input text.
+- Keep strings in sentence case. Only `label` is uppercase, and only over a figure.
 - Reading text stops at `max-w-[65ch]`.
 
 ## Radius
 
-| Class          | Use it for                                                                                                                             |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `rounded-md`   | Static tags (`BETA`), web selected segment, quota progress bars (`24px` h)                                                             |
-| `rounded-lg`   | Web buttons and inputs, menu items, skeletons, mobile row avatar `Chip`                                                                |
-| `rounded-xl`   | Web cards and menus, mobile sunken wells inside a `rounded-2xl` `Surface`                                                              |
-| `rounded-2xl`  | Mobile `Surface` cards (`20px`), grouped settings lists, hero cards, web dialogs                                                       |
-| `rounded-3xl`  | Mobile bottom sheets (`rounded-t-3xl`)                                                                                                 |
-| `rounded-full` | Floating capsule tab bar, active tab thumb, pill segmented controls (`Choice`), circular top-bar `IconButton` (`44×44px`), status dots |
+| Token         | Value | Use it for                                                |
+| ------------- | ----- | --------------------------------------------------------- |
+| `radius-sm`   | 10px  | Inputs, date and time pills, keypad keys                  |
+| `radius-md`   | 14px  | Small cards inside a sheet, avatar squares                |
+| `radius-lg`   | 22px  | Cards and grouped lists on the page                       |
+| `radius-xl`   | 32px  | A sheet's top corners and the floating tab bar            |
+| `radius-pill` | 999px | Mobile buttons, chips, segmented controls and the LiveBar |
 
-Nested radii are concentric (`innerRadius = outerRadius - padding`): `Menu` is `rounded-xl` with `p-1` around `rounded-lg` (12 − 4 = 8); the mobile floating tab bar and `Choice` segmented control are `rounded-full` tracks with `p-1` / `p-1.5` around a `rounded-full` active thumb. Never copy a non-pill parent's radius onto a child without subtracting padding.
+Nested radii are concentric: inner radius is the outer radius minus the padding. `Menu` is `rounded-xl` with `p-1` around `rounded-lg` items (12 − 4 = 8). Never copy a non-pill parent's radius onto a child.
 
 ## Elevation
 
-On mobile, hierarchy comes from a **tinted neutral** `bg-canvas` (`oklch` lightness separation with low **chroma**) under pure `bg-surface` `rounded-2xl` cards and `0.5px` (`StyleSheet.hairlineWidth`) **alpha** dividers (`border-line`), with no decorative radial `Glow` blobs behind hero cards. Floating chrome (the capsule bottom bar, `LiveBar`, and top-bar `IconButton` circles) pairs `bg-surface` with a `1px` `border-line` edge and a whisper-quiet ambient shadow.
+Depth comes from fills more than shadows: solid `surface` cards on a `canvas` ground, with `line` hairlines between rows and no border on the card itself. In dark, the ground is black and cards are clearly lighter; keep that gap if you retune either.
 
-| Token                          | Use it for                                |
-| ------------------------------ | ----------------------------------------- |
-| `shadow-(--elevation-control)` | An outlined control at rest               |
-| `shadow-(--elevation-card)`    | `Surface`                                 |
-| `shadow-(--elevation-popover)` | `Menu` and `LiveBar`: floats over content |
-| `shadow-(--elevation-sheet)`   | `Dialog`                                  |
+| Token                          | Use it for                                          |
+| ------------------------------ | --------------------------------------------------- |
+| `shadow-(--elevation-control)` | An outlined control at rest                         |
+| `shadow-(--elevation-card)`    | `Surface`: barely there in light, none in dark      |
+| `shadow-(--elevation-float)`   | Something solid floating over content, like a toast |
+| `shadow-(--elevation-sheet)`   | A sheet rising from the bottom edge                 |
 
-- Write the parentheses form. The tokens sit outside `@theme` so they can flip, and Tailwind inlines `--shadow-*` values, which would freeze them to one theme.
-- Dark mode has a ring where light mode has depth, because a shadow doesn't show on a dark ground, plus a faint white top edge on cards and menus, the way light catches something raised. Dark overlays keep one black shadow.
-- Depth on dark comes mostly from the gap between `canvas` and `surface`: a near-black page under clearly lighter cards. Keep that gap if you retune either.
-- Use `border-line` or `divide-line` (`0.5px` hairline on mobile retina) to separate rows, and surface contrast to raise a card. Inputs keep a visible edge.
+Write the parentheses form. The tokens sit outside `@theme` so they can flip, and Tailwind inlines `--shadow-*` values, which would freeze them to one theme. Glass surfaces carry their own shadow; don't add one beside them.
+
+## Glass
+
+Liquid Glass is for controls that float over content, so what's behind them still shows through.
+
+```
+Is this glass?
+ ├── The tab bar, the LiveBar → yes
+ ├── A top control floating over the page, like the You button → yes
+ ├── A menu or popover → yes
+ ├── A sheet, and the keypad it joins → yes, edge to edge and rounded on top only
+ ├── A bottom action, a dock, an ActionBar → no, solid
+ ├── A toast or the web Undo bar → no, solid with the float shadow
+ └── A card, a row, anything in the page's flow → no
+```
+
+- On web, glass is the `glass` utility (a floating thing) or `glass-sheet` (a sheet, whose shadow falls upward): the `glass` token as a translucent fill, a backdrop blur, a bright top edge and the shadow. Under `prefers-reduced-transparency` it becomes a plain `surface` card.
+- On mobile, glass is `GlassSurface`. iOS 26 draws the native material, and its `interactive` prop lets glass that is itself a control answer a touch. Earlier iOS and Android draw the `glass` token as a translucent fill with an edge and a shadow. With Reduce Transparency on, iOS draws a solid card.
+- Give `GlassSurface` its rounding both as a class and as `radius`, which is what the native material uses.
+- Don't fade a native glass surface: iOS stops drawing glass at low opacity. Move it with transform instead.
+- Mobile sheets and menus are the system's own, which bring their own material.
 
 ## Layers
 
@@ -107,21 +131,21 @@ Web stacks fixed parts on four steps of Tailwind's scale. Anything else in a pag
 
 ## Motion
 
-Motion says what just happened. If it doesn't, cut it. Web uses CSS transitions and keyframes, and mobile uses React Native's `Animated`. Don't add a library.
+Motion says what just happened. If it doesn't, cut it. The values live in `@stacks/client-runtime/motion`; mobile animates with them directly through React Native's `Animated`, and web mirrors them as CSS variables that a test holds to the same numbers. Don't add an animation library.
 
-| What                                 | Enter | Exit  | Easing                    |
-| ------------------------------------ | ----- | ----- | ------------------------- |
-| Hover, press (`scale(0.97)`), color  | 120ms | 150ms | **ease-out**              |
-| Menu                                 | 150ms | 100ms | `ease-snap`               |
-| Centered dialog                      | 200ms | 150ms | `ease-snap`               |
-| Bottom sheet                         | 250ms | 200ms | `ease-snap`               |
-| A result landing (`rack`)            | 320ms | none  | `ease-snap`, 90ms stagger |
-| Board rows reordering (`useReorder`) | 450ms | none  | in-out                    |
+| What        | Enter | Exit  | Easing                                                    |
+| ----------- | ----- | ----- | --------------------------------------------------------- |
+| Menu        | 200ms | 150ms | in on `ease-enter`, out on `ease-exit`                    |
+| Sheet       | 340ms | 240ms | in on `ease-enter`, out on `ease-exit`; its scrim matches |
+| Toast       | 250ms | 160ms | in on `ease-enter`, out on `ease-exit`                    |
+| Number roll | 220ms | none  | `ease-enter`                                              |
+| Press       | 100ms | 150ms | scale to 0.96 on `ease-press`, back on `ease-enter`       |
 
-- Animate only `transform`, `opacity`, colors, and `box-shadow` on a control's own hover or focus. Name the properties: `transition-[scale,opacity]`, never `transition-all`.
-- On mobile, every interactive surface (`Button`, `IconButton`, floating tab items, pressable `Card` and `Row`) gives immediate tactile press feedback (`scale(0.97)` on `onPressIn` with **ease-out**, springing back on release) paired with selection/impact haptics where appropriate.
-- Signal active selection on tabs and segmented controls with surface (`bg-surface` / `bg-fill`) and color (`text-ink` / `text-felt`) plus **filled vs. outlined** icon swaps—never by changing font weight alone in a way that reflows layout.
-- Paired parts share timing: a dialog and its backdrop use the same duration and easing.
-- Menus scale from their trigger with `origin-[var(--transform-origin)]`.
-- `index.css` cuts all CSS motion under `prefers-reduced-motion`, and transitions stop while the theme switches. JavaScript-driven motion (`TableMap`, the board's `useReorder`) checks the preference itself.
+- `ease-enter` is `cubic-bezier(0.32, 0.72, 0, 1)`: a fast start that reads as an instant answer. `ease-exit` accelerates away. An exit is always faster than its enter.
+- On web, read durations as `duration-(--duration-menu-in)` and easings as `ease-enter` / `ease-exit`. Press feedback is the `pressable` utility, which also eases a control's hover colors. On mobile, animate with `animate()` and press with `PressableScale`; `Button` and `IconButton` already do.
+- Animate only `transform` and `opacity`, plus colors and shadow on a control's own hover. Name the properties: `transition-[scale,opacity]`, never `transition-all`.
+- Menus scale from their trigger with `origin-[var(--transform-origin)]`, from 0.95, never from 0.
+- Paired parts share timing: a sheet and its scrim, a dialog and its backdrop.
+- A centered dialog on a wide screen uses the menu's timings; on a phone the same dialog is a sheet and uses the sheet's.
+- **One reduced-motion switch.** On web, `index.css` ends every CSS transition and animation at once under `prefers-reduced-motion`, and press feedback stops scaling. On mobile, every animation goes through `animate()`, which jumps to the end while Reduce Motion is on, and `useReducedMotion()` covers motion that isn't one animation, like a pager. Script-driven web motion (`TableMap`, the board's reordering) checks the preference itself.
 - A change animates, a page load doesn't: a result already there when the page opens just sits there. One thing runs on its own, because it says the game is in play: the live dot.

@@ -7,11 +7,12 @@ import { useNavigation } from "@react-navigation/native";
 import type * as DateTime from "effect/DateTime";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useEffect } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "../components/ui/Icon";
 import { GlassSurface } from "../components/ui/GlassSurface";
+import { PressableScale } from "../components/ui/PressableScale";
 import { useGo } from "../lib/go";
 import { useStacks } from "../lib/stacks";
 
@@ -114,17 +115,16 @@ function Bar({
           : { bottom: bottom + 8 }
       }
     >
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityHint={hint}
         onPress={onPress}
-        className="active:scale-[0.98]"
       >
         <GlassSurface
           radius={20}
+          interactive
           className="min-h-13 flex-row items-center gap-3 rounded-2xl px-4 py-3"
-          fallbackClassName="border border-fill-strong bg-surface shadow-md"
         >
           <View className="size-2 rounded-full bg-live" />
           <Text className="type-label text-live">Live</Text>
@@ -134,7 +134,7 @@ function Bar({
           <Text className="font-mono text-xs text-muted">since {formatTime(since)}</Text>
           <Icon name="chevron-right" color="muted" size={16} />
         </GlassSurface>
-      </Pressable>
+      </PressableScale>
     </View>
   );
 }

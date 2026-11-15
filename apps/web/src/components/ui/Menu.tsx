@@ -44,7 +44,7 @@ export function Menu({
           sideOffset={4}
           align={align ?? (trigger ? "start" : "end")}
         >
-          <BaseMenu.Popup className="max-h-96 min-w-52 origin-[var(--transform-origin)] overflow-y-auto rounded-xl bg-surface p-1 shadow-(--elevation-popover) outline-none transition-[scale,opacity] duration-150 ease-snap data-[ending-style]:duration-100 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+          <BaseMenu.Popup className="glass max-h-96 min-w-52 origin-[var(--transform-origin)] overflow-y-auto rounded-xl p-1 outline-none transition-[scale,opacity] duration-(--duration-menu-in) ease-enter data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:duration-(--duration-menu-out) data-[ending-style]:ease-exit data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
             {children}
           </BaseMenu.Popup>
         </BaseMenu.Positioner>
