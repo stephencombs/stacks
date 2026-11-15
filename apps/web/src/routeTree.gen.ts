@@ -21,6 +21,7 @@ import { Route as JoinCodeRouteImport } from './routes/join/$code'
 import { Route as PlayVisitIdRouteImport } from './routes/play/$visitId'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions/$sessionId'
 import { Route as TTokenRouteImport } from './routes/t/$token'
+import { Route as TablesTableIdRouteImport } from './routes/tables/$tableId'
 import { Route as GroupsGroupIdIndexRouteImport } from './routes/groups/$groupId/index'
 import { Route as GroupsGroupIdPeopleRouteImport } from './routes/groups/$groupId/people'
 import { Route as GroupsGroupIdSettingsRouteImport } from './routes/groups/$groupId/settings'
@@ -90,6 +91,11 @@ const TTokenRoute = TTokenRouteImport.update({
   path: '/t/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TablesTableIdRoute = TablesTableIdRouteImport.update({
+  id: '/tables/$tableId',
+  path: '/tables/$tableId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GroupsGroupIdIndexRoute = GroupsGroupIdIndexRouteImport.update({
   id: '/groups/$groupId/',
   path: '/groups/$groupId/',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/play/$visitId': typeof PlayVisitIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/t/$token': typeof TTokenRoute
+  '/tables/$tableId': typeof TablesTableIdRoute
   '/groups/': typeof GroupsIndexRoute
   '/groups/$groupId/people': typeof GroupsGroupIdPeopleRoute
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/play/$visitId': typeof PlayVisitIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/t/$token': typeof TTokenRoute
+  '/tables/$tableId': typeof TablesTableIdRoute
   '/groups': typeof GroupsIndexRoute
   '/groups/$groupId/people': typeof GroupsGroupIdPeopleRoute
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/play/$visitId': typeof PlayVisitIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/t/$token': typeof TTokenRoute
+  '/tables/$tableId': typeof TablesTableIdRoute
   '/groups/': typeof GroupsIndexRoute
   '/groups/$groupId/people': typeof GroupsGroupIdPeopleRoute
   '/groups/$groupId/settings': typeof GroupsGroupIdSettingsRoute
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/play/$visitId'
     | '/sessions/$sessionId'
     | '/t/$token'
+    | '/tables/$tableId'
     | '/groups/'
     | '/groups/$groupId/people'
     | '/groups/$groupId/settings'
@@ -234,6 +244,7 @@ export interface FileRouteTypes {
     | '/play/$visitId'
     | '/sessions/$sessionId'
     | '/t/$token'
+    | '/tables/$tableId'
     | '/groups'
     | '/groups/$groupId/people'
     | '/groups/$groupId/settings'
@@ -256,6 +267,7 @@ export interface FileRouteTypes {
     | '/play/$visitId'
     | '/sessions/$sessionId'
     | '/t/$token'
+    | '/tables/$tableId'
     | '/groups/'
     | '/groups/$groupId/people'
     | '/groups/$groupId/settings'
@@ -279,6 +291,7 @@ export interface RootRouteChildren {
   PlayVisitIdRoute: typeof PlayVisitIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   TTokenRoute: typeof TTokenRoute
+  TablesTableIdRoute: typeof TablesTableIdRoute
   GroupsIndexRoute: typeof GroupsIndexRoute
   GroupsGroupIdPeopleRoute: typeof GroupsGroupIdPeopleRoute
   GroupsGroupIdSettingsRoute: typeof GroupsGroupIdSettingsRoute
@@ -376,6 +389,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tables/$tableId': {
+      id: '/tables/$tableId'
+      path: '/tables/$tableId'
+      fullPath: '/tables/$tableId'
+      preLoaderRoute: typeof TablesTableIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/groups/$groupId/': {
       id: '/groups/$groupId/'
       path: '/groups/$groupId'
@@ -447,6 +467,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlayVisitIdRoute: PlayVisitIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   TTokenRoute: TTokenRoute,
+  TablesTableIdRoute: TablesTableIdRoute,
   GroupsIndexRoute: GroupsIndexRoute,
   GroupsGroupIdPeopleRoute: GroupsGroupIdPeopleRoute,
   GroupsGroupIdSettingsRoute: GroupsGroupIdSettingsRoute,

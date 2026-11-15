@@ -309,40 +309,57 @@ const startedVisit = (receipt: RecordingReceipt) =>
 export function StartDialog({
   onClose,
   onStarted,
+  onOpened,
   initialTripId = null,
 }: {
   initialTripId?: TripId | null;
   onClose: () => void;
   onStarted: (visitId: VisitId) => void;
+  /** Offers recording a table without playing at it, which opens with no buy-in of your own. */
+  onOpened?: (tableId: TableId) => void;
 }) {
   const save = useRecordingSubmit();
   const [tripId, setTripId] = useState(initialTripId);
   const buyIn = useAmount("", 1);
   const [game, setGame] = useState<Game | "">("");
   const [highLimit, setHighLimit] = useState(false);
+  const [watching, setWatching] = useState(false);
   return (
     <RecordingDialog
-      title="Start session"
-      description="Your first buy-in starts it, timed from now."
-      submitLabel="Start session"
+      title={watching ? "Record a table" : "Start session"}
+      description={
+        watching
+          ? "Record everyone's buy-ins and cash-outs at a table you aren't playing at."
+          : "Your first buy-in starts it, timed from now."
+      }
+      submitLabel={watching ? "Open table" : "Start session"}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
+        const details = { ...(game ? { game } : {}), highLimit };
+        if (watching) {
+          const receipt = await save.submit({ type: "open_table", ...details });
+          if (tripId && receipt && "tableId" in receipt.command)
+            await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
+          if (receipt && "tableId" in receipt.command) onOpened?.(receipt.command.tableId);
+          return;
+        }
         const amount = buyIn.read();
         if (amount === null) return;
-        const receipt = await save.submit({
-          type: "start",
-          buyIn: amount,
-          ...(game ? { game } : {}),
-          highLimit,
-        });
+        const receipt = await save.submit({ type: "start", buyIn: amount, ...details });
         if (tripId && receipt && "tableId" in receipt.command)
           await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
         const visitId = receipt && startedVisit(receipt);
         if (visitId) onStarted(visitId);
       }}
     >
-      <AmountField label="Buy-in" amount={buyIn} first />
+      {watching ? null : <AmountField label="Buy-in" amount={buyIn} first />}
+      {onOpened ? (
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
+          <Checkbox checked={watching} onCheckedChange={setWatching} />
+          I'm not playing, just recording
+        </label>
+      ) : null}
       <TripChoice value={tripId} onChange={setTripId} />
       <DetailsFields
         game={game}
@@ -437,11 +454,14 @@ type Saved = (entryId: PlayEntry["id"], input: RecordingInput) => void;
 
 export function RebuyDialog({
   visit,
+  who,
   counterparties = noCounterparties,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  /** Whose rebuy, when it isn't yours: "Priya". */
+  who?: string | undefined;
   counterparties?: Counterparties;
   onClose: () => void;
   onSaved: Saved;
@@ -451,7 +471,7 @@ export function RebuyDialog({
   const [paidBy, setPaidBy] = useState("");
   return (
     <RecordingDialog
-      title="Rebuy"
+      title={who ? `${who}'s rebuy` : "Rebuy"}
       submitLabel="Add rebuy"
       save={save}
       onClose={onClose}
@@ -472,7 +492,7 @@ export function RebuyDialog({
       <AmountField label="Amount" amount={amount} first keypad />
       {buyInTotalPreview(visit.totals.buyIn, amount.text, "add") !== null ? (
         <p role="status" className="text-center text-sm text-muted">
-          Your buy-in becomes{" "}
+          {who ? `${who}'s` : "Your"} buy-in becomes{" "}
           <Money
             amount={buyInTotalPreview(visit.totals.buyIn, amount.text, "add")!}
             currency={RECORDING_CURRENCY}
@@ -557,11 +577,17 @@ function ClockField({ label, clock }: { label: string; clock: ReturnType<typeof 
 /** Cashing out finishes the visit: what they left with, and when. */
 export function CashOutDialog({
   visit,
+  who,
+  note,
   counterparties = noCounterparties,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  /** Whose cash-out, when it isn't yours: "Priya". */
+  who?: string | undefined;
+  /** What it does to the table: "Priya's visit ends. You and Dev keep playing." */
+  note?: string | undefined;
   counterparties?: Counterparties;
   onClose: () => void;
   onSaved: Saved;
@@ -574,9 +600,9 @@ export function CashOutDialog({
   const previous = visit.totals.cashOut;
   return (
     <RecordingDialog
-      title="Cash out"
-      description="This finishes the session and works out its result."
-      submitLabel="End session"
+      title={who ? `Cash out ${who}` : "Cash out"}
+      description={note ?? "This finishes the session and works out its result."}
+      submitLabel={who ? `End ${who}'s visit` : "End session"}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -616,7 +642,7 @@ export function CashOutDialog({
       <ClockField label="Finished at" clock={clock} />
       <div className="flex items-center justify-between gap-3 rounded-xl bg-surface p-4">
         <div>
-          <p className="text-sm text-muted">Your result</p>
+          <p className="text-sm text-muted">{who ? `${who}'s result` : "Your result"}</p>
           <p className="text-sm text-muted">
             <Money amount={visit.totals.buyIn} currency={RECORDING_CURRENCY} /> bought in
           </p>
@@ -1019,18 +1045,25 @@ export function AddPlayerDialog({
   tableId: TableId;
   saved: ReadonlyArray<PlayerIdentity>;
   onClose: () => void;
-  onAdded: (visitId: VisitId) => void;
+  onAdded: (visitId: VisitId, name: string) => void;
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 1);
   const [choice, setChoice] = useState<string>(NEW_PLAYER);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+  const chosen =
+    choice === NEW_PLAYER
+      ? name.trim()
+      : (saved.find((player) => player.id === choice)?.displayName ?? "");
+  const typed = parseRecordingAmount(amount.text, 1);
   return (
     <RecordingDialog
       title="Add player"
       description="Record their buy-ins and cash-outs from this device."
-      submitLabel="Add player"
+      submitLabel={
+        chosen && typed.error === null ? `Add ${chosen} · ${money(typed.amount)}` : "Add player"
+      }
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -1044,7 +1077,7 @@ export function AddPlayerDialog({
             ? { type: "join_table", tableId, displayName: trimmed, buyIn: value }
             : { type: "join_table", tableId, playerId: choice as PlayerId, buyIn: value },
         );
-        if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId);
+        if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId, chosen);
       }}
     >
       {saved.length > 0 ? (

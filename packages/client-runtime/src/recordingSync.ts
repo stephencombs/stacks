@@ -12,6 +12,7 @@ import {
 } from "@stacks/contracts";
 import {
   isTableCommand,
+  isVisitCommand,
   RecordingCommand,
   RecordingOperationId,
   type ActorCredential,
@@ -40,6 +41,7 @@ import { applyRecordingCommand, createdEntryIds, RecordingError } from "@stacks/
 import { newId } from "./ids.ts";
 import { prepareRecordingCommand, type RecordingInput, type RecordingStore } from "./recording.ts";
 import {
+  foreignTables,
   missingVenueIds,
   recordingBase,
   rememberVenues,
@@ -111,7 +113,9 @@ export const tableSynced = (state: RecordingState, tableId: TableId) => {
   const synced = new Set(state.sync?.synced);
   return state.receipts.some(
     ({ command }) =>
-      (command.type === "start" || command.type === "record_completed") &&
+      (command.type === "start" ||
+        command.type === "record_completed" ||
+        command.type === "open_table") &&
       command.tableId === tableId &&
       synced.has(command.operationId),
   );
@@ -299,7 +303,7 @@ export const mergeRecordingHistory = (
       playerId: item.player.id,
     })),
     recorders: [],
-    tables: history.tables.filter((table) => table.starterPlayerId !== self.id),
+    tables: foreignTables(history.tables, self.id, history.commands),
     visits: [],
     entries: [],
     receipts: [],
@@ -344,7 +348,7 @@ const settled = (
 ) => {
   const held = remote.get(command.operationId);
   if (held) return commandText(held) === commandText(command);
-  if (isTableCommand(command)) return false;
+  if (!isVisitCommand(command)) return false;
   const visit = ledger.visits.find((item) => item.id === command.visitId);
   if (!visit) return false;
   const entry = (
@@ -489,6 +493,18 @@ const optional = <K extends string, V>(key: K, value: V | null) =>
  * visit and entries of a start recorded again to their new IDs.
  */
 const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): RecordingInput => {
+  if (command.type === "open_table")
+    return {
+      type: "open_table",
+      highLimit: command.highLimit,
+      ...optional("game", command.game),
+      ...optional("venueId", command.venueId),
+    };
+  if (command.type === "delete_table")
+    return {
+      type: command.type,
+      tableId: (ids.get(command.tableId) ?? command.tableId) as typeof command.tableId,
+    };
   if (command.type === "set_table_trip")
     return {
       type: command.type,
@@ -608,7 +624,7 @@ export const recordRejectedAgain = (state: RecordingState, operationId: Recordin
   const refused = rejection.command;
   const visits = new Set("visitId" in refused ? [refused.visitId] : []);
   const chain =
-    refused.type === "start" || refused.type === "record_completed"
+    refused.type === "start" || refused.type === "record_completed" || refused.type === "open_table"
       ? state.sync!.rejected.filter(({ command }) => {
           if (command.type === "join_table" && command.tableId === refused.tableId)
             visits.add(command.visitId);

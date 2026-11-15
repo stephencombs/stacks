@@ -42,6 +42,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.doMock("react-native", () => ({
     Text: Container,
     View: Container,
+    Pressable: Container,
     Platform: { OS: "ios" },
     Animated: { Value, View: Container },
   }));
@@ -127,7 +128,8 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
       ),
     );
     await click("Edit my session");
-    await click("Delete session");
+    // Bea is at the table too, so this removes only your visit.
+    await click("Delete my visit");
     expect(element.querySelector("footer")!.textContent).toContain("Session deletedUndoDismiss");
     await click("Bea");
     expect(dispatch).toHaveBeenCalledWith({ screen: "Play", params: { visitId: guest.id } });

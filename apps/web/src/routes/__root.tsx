@@ -19,8 +19,8 @@ export const Route = createRootRoute({ component: Root });
 /** Opening an invite or claim link happens before you're in the group, so it has no tabs yet. */
 const invitation = /^\/(join|claim)\//;
 
-/** Pages that fill the screen, outside the tabs: a live session and a shared table's links. */
-const fullScreen = /^\/(play|t|invite)\//;
+/** Pages that fill the screen, outside the tabs: a live session or table, and a shared table's links. */
+const fullScreen = /^\/(play|tables|t|invite)\//;
 
 /** Your own play: it lives on this device, so it never waits for sign-in or the network. */
 const personal = (pathname: string) =>

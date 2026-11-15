@@ -162,6 +162,24 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     // Only the server knows who has an account and every way a player came to the table.
     if (actorPlayers !== null && !actorPlayers.includes(table.starterPlayerId))
       throw new RecordingError("forbidden", "Only the player who started this table can do that.");
+    requireValid(table.deletedAt === undefined, "This table was deleted.");
+    if (command.type === "delete_table") {
+      // A visit deleted since still means someone played here.
+      requireValid(
+        !state.visits.some((item) => item.tableId === table.id),
+        "Someone has played at this table, so it can't be deleted.",
+      );
+      return {
+        ...state,
+        tables: state.tables.map((item) =>
+          // Out of its trip too, so the trip keeps nothing of a table nobody played at.
+          item.id === table.id
+            ? Table.make({ ...table, tripId: null, deletedAt: command.preparedAt })
+            : item,
+        ),
+        receipts,
+      };
+    }
     if (command.type === "set_table_trip")
       return {
         ...state,
@@ -185,6 +203,33 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
           : state.recorders.filter(
               (item) => item.tableId !== table.id || item.playerId !== command.playerId,
             ),
+      receipts,
+    };
+  }
+  if (command.type === "open_table") {
+    if (actorPlayers !== null && command.playerId !== state.self.id)
+      throw new RecordingError("forbidden", "Start a table as yourself.");
+    // A table someone else opened came with the history, for a device that records there.
+    const known =
+      actorPlayers === null && state.tables.some((table) => table.id === command.tableId);
+    requireValid(
+      known || !state.tables.some((table) => table.id === command.tableId),
+      "Start IDs are already used.",
+    );
+    if (known) return { ...state, receipts };
+    return {
+      ...state,
+      tables: [
+        ...state.tables,
+        Table.make({
+          id: command.tableId,
+          tripId: null,
+          game: command.game,
+          venueId: command.venueId,
+          highLimit: command.highLimit,
+          starterPlayerId: command.playerId,
+        }),
+      ],
       receipts,
     };
   }
@@ -253,6 +298,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       const table = tables.find((table) => table.id === command.tableId);
       requireValid(table, "Table does not exist.");
       forbid(table, command.playerId);
+      requireValid(table.deletedAt === undefined, "This table was deleted.");
       // A player the server already holds came with the history, as someone at the table.
       const known =
         actorPlayers === null && players.some((player) => player.id === command.playerId);
@@ -369,6 +415,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
           : entry,
       );
     } else if (command.type === "restore_visit") {
+      requireValid(table.deletedAt === undefined, "This table was deleted.");
       requireValid(
         finishedAt !== null || !openAt(visit.tableId, visit.playerId),
         "This player is already playing at this table. Finish that session before restoring this one.",

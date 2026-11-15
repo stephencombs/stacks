@@ -190,6 +190,7 @@ async function load({
     "./screens/Session": ["SessionScreen"],
     "./screens/Sessions": ["SessionsScreen"],
     "./screens/Stats": ["StatsScreen"],
+    "./screens/Table": ["TableScreen"],
   }))
     vi.doMock(module, () => Object.fromEntries(names.map((name) => [name, Container])));
 
@@ -330,6 +331,7 @@ it("keeps every address: your play in the first tab, groups in Crew, invites abo
   expect(root.initialRouteName).toBe("Tabs");
   expect(root.screens.Tabs!.screen).toEqual({ config: tabs });
   expect(root.screens.Play!.linking).toBe("play/:visitId");
+  expect(root.screens.Table!.linking).toBe("tables/:tableId");
   expect(root.screens.Invites!.screen).toEqual({ config: invites });
   expect(Object.keys(tabs.screens)).toEqual(["PlayTab", "StatsTab", "MapTab", "CrewTab"]);
   expect(tabs.initialRouteName).toBe("PlayTab");

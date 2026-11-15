@@ -70,6 +70,16 @@ export type TableDetails = typeof TableDetails.Type;
 // The actor is checked against the push's credential; the rules decide what it may record.
 export const RecordingCommand = Schema.Union([
   Schema.Struct({ type: Schema.Literal("start"), ...start }),
+  // A table its starter records at without playing: everyone's visits there are join_table.
+  Schema.Struct({
+    type: Schema.Literal("open_table"),
+    ...common,
+    tableId: TableId,
+    playerId: PlayerId,
+    game: Schema.NullOr(Game),
+    venueId: Schema.NullOr(VenueId),
+    highLimit: Schema.Boolean,
+  }),
   Schema.Struct({
     type: Schema.Literal("record_completed"),
     ...start,
@@ -135,19 +145,23 @@ export const RecordingCommand = Schema.Union([
   }),
   Schema.Struct({ type: Schema.Literal("appoint_recorder"), ...recorder }),
   Schema.Struct({ type: Schema.Literal("revoke_recorder"), ...recorder }),
+  // Removes a table nobody has played at, such as one opened by mistake.
+  Schema.Struct({ type: Schema.Literal("delete_table"), ...common, tableId: TableId }),
 ]);
 export type RecordingCommand = typeof RecordingCommand.Type;
+/** Commands about a table that already exists, never one of its visits. */
 export type TableCommand = Extract<
   RecordingCommand,
-  { type: "appoint_recorder" | "revoke_recorder" | "set_table_trip" }
+  { type: "appoint_recorder" | "revoke_recorder" | "set_table_trip" | "delete_table" }
 >;
-export type VisitCommand = Exclude<RecordingCommand, TableCommand>;
+export type VisitCommand = Exclude<RecordingCommand, TableCommand | { type: "open_table" }>;
 export const isTableCommand = (command: RecordingCommand): command is TableCommand =>
   command.type === "appoint_recorder" ||
   command.type === "revoke_recorder" ||
-  command.type === "set_table_trip";
+  command.type === "set_table_trip" ||
+  command.type === "delete_table";
 export const isVisitCommand = (command: RecordingCommand): command is VisitCommand =>
-  !isTableCommand(command);
+  !isTableCommand(command) && command.type !== "open_table";
 
 /** The player and actor a device records as. An account's are the same on every device. */
 export const RecordingIdentity = Schema.Struct({ playerId: PlayerId, actorId: ActorId });
