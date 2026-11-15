@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { Button, ButtonLink } from "~/components/ui/Button";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuChoice } from "~/components/ui/Menu";
-import { EmptyState, Note, PageHeader } from "~/components/ui/Page";
+import { EmptyState, Note, TabTitle } from "~/components/ui/Page";
 import { Landing } from "~/features/Landing";
 import { AppShell, Wordmark, You } from "~/features/Shell";
 import { useAccount } from "~/lib/account";
@@ -145,7 +145,7 @@ function NoSignIn() {
 function SignedOut() {
   return (
     <>
-      <PageHeader title="Crew" />
+      <TabTitle>Crew</TabTitle>
       <EmptyState title="See what your friends are playing">
         Groups and trips with friends need an account. Your own sessions keep working without one.
       </EmptyState>

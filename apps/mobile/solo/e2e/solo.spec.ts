@@ -47,7 +47,7 @@ async function clearKeypad(page: Page, length: number) {
 
 async function home(page: Page) {
   await page.goto("/");
-  await expect(visible(page.getByRole("heading", { name: "Play", exact: true }))).toBeVisible();
+  await expect(button(page, "Start session")).toBeVisible();
   await expect(text(page, "Saved on this device")).toBeVisible();
 }
 
@@ -127,7 +127,7 @@ async function expectFinished(page: Page, result: string, amounts: string) {
 /** Back to your play the way a person would: the header's back button. */
 async function back(page: Page) {
   await button(page, "Back to your play").click();
-  await expect(visible(page.getByRole("heading", { name: "Play", exact: true }))).toBeVisible();
+  await expect(button(page, "Start session")).toBeVisible();
 }
 
 test("records the milestone session through reloads without an account", async ({
@@ -151,10 +151,9 @@ test("records the milestone session through reloads without an account", async (
   await page.reload();
   await expectLive(page, "$250");
   await back(page);
-  await expect(text(page, "Playing now")).toBeVisible();
-  await expect(text(page, /In \$250 · Out \$0 · Result pending/)).toBeVisible();
+  await expect(button(page, /^Back to your session, Session, since/)).toBeVisible();
   await expect(text(page, "Finished results")).toHaveCount(0);
-  await button(page, /^Session, live/).click();
+  await button(page, /^Back to your session, Session, since/).click();
 
   await cashOut(page, "350");
   await expect(
@@ -168,7 +167,7 @@ test("records the milestone session through reloads without an account", async (
   await expect(button(page, "Other")).toHaveCount(0);
 
   await back(page);
-  await expect(text(page, "Playing now")).toHaveCount(0);
+  await expect(button(page, /^Back to your session/)).toHaveCount(0);
   await expect(text(page, "Finished results")).toBeVisible();
   await expect(text(page, /^1 finished session\./)).toBeVisible();
   await expect(button(page, /Session, in \$250, out \$350, result \+\$100$/)).toBeVisible();
@@ -315,7 +314,7 @@ test("Crew waits for sign-in, and your play stays a tap away", async ({ page, co
   await visible(page.getByRole("tab", { name: "Crew" })).click();
   await expect(text(page, /^Groups and trips need sign-in/)).toBeVisible();
   await button(page, "Back to your play").click();
-  await expect(visible(page.getByRole("heading", { name: "Play", exact: true }))).toBeVisible();
+  await expect(button(page, "Start session")).toBeVisible();
 
   await page.goto("/join/some-code");
   await expect(text(page, /^Groups and trips need sign-in/)).toBeVisible();
@@ -326,5 +325,35 @@ test("Crew waits for sign-in, and your play stays a tap away", async ({ page, co
   await expect(text(page, "This session isn't on this device")).toBeVisible();
   await button(page, "Back to your play").click();
   await expect(text(page, "No sessions yet")).toBeVisible();
+  expect(api).toEqual([]);
+});
+
+test("one LiveBar for several live sessions, and each session's page points to the others", async ({
+  page,
+  context,
+}) => {
+  const api = await isolate(context);
+  const backToSession = /^Back to your session, Session, since/;
+  await home(page);
+  await start(page, "200");
+  // Alone, a session's page has no bar: it is the session.
+  await expect(button(page, backToSession)).toHaveCount(0);
+  await back(page);
+  await start(page, "100");
+  await expectLive(page, "$100");
+  await button(page, backToSession).click();
+  await expectLive(page, "$200");
+  await button(page, "Back to your play").click();
+  await expectLive(page, "$100");
+  await back(page);
+
+  await expect(button(page, backToSession)).toHaveCount(0);
+  await expect(button(page, /^2 live sessions/)).toContainText("+1 live");
+  await button(page, /^2 live sessions/).click();
+  await expect(button(sheet(page), /^Session · since/)).toHaveCount(2);
+  await button(sheet(page), /^Session · since/)
+    .last()
+    .click();
+  await expectLive(page, "$200");
   expect(api).toEqual([]);
 });

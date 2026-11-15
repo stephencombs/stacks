@@ -9,7 +9,7 @@ import { BalanceLabel } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, Select } from "~/components/ui/Field";
-import { EmptyState, PageHeader } from "~/components/ui/Page";
+import { EmptyState, TabTitle } from "~/components/ui/Page";
 import { List, RowLink, RowText, Tag } from "~/components/ui/Surface";
 import { Loaded, useAction, useStacks } from "~/lib/stacks";
 import { RowsSkeleton } from "~/features/PageSkeletons";
@@ -20,15 +20,11 @@ export function GroupsList() {
   const [creating, setCreating] = useState(false);
   return (
     <>
-      <PageHeader
-        title="Your groups"
-        action={
-          <Button variant="primary" onClick={() => setCreating(true)}>
-            <Plus className="size-4" aria-hidden />
-            New group
-          </Button>
-        }
-      />
+      <TabTitle>Crew</TabTitle>
+      <Button variant="primary" className="self-start" onClick={() => setCreating(true)}>
+        <Plus className="size-4" aria-hidden />
+        New group
+      </Button>
       <Loaded
         query={stacks.groups}
         skeleton={

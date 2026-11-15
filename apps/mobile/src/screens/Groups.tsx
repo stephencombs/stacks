@@ -10,7 +10,7 @@ import { Icon } from "../components/ui/Icon";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, List, PageTitle, Row, Tag } from "../components/ui/Surface";
+import { EmptyState, List, Row, Tag } from "../components/ui/Surface";
 import { useGo } from "../lib/go";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
@@ -27,10 +27,7 @@ export function GroupsScreen() {
 
   return (
     <Screen>
-      <View className="gap-3">
-        <PageTitle>Your groups</PageTitle>
-        <Button label="New group" variant="primary" onPress={() => setCreating(true)} />
-      </View>
+      <Button label="New group" variant="primary" onPress={() => setCreating(true)} />
       <Loaded query={stacks.groups} skeleton={<RowsSkeleton rows={3} trailing={false} />}>
         {(groups) =>
           groups.length === 0 ? (

@@ -101,10 +101,9 @@ test("records the milestone session through reloads without an account", async (
   await page.reload();
   await expectLive(page, "$250");
   await page.getByRole("link", { name: "Back to your play" }).click();
-  await expect(page.getByText("Playing now")).toBeVisible();
-  await expect(page.getByText(/In \$250 · Out \$0 · Result pending/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to your session, Session" })).toBeVisible();
   await expect(page.getByText("Finished results")).toBeHidden();
-  await page.getByRole("link", { name: /Session/ }).click();
+  await page.getByRole("link", { name: "Back to your session, Session" }).click();
 
   await cashOut(page, "350");
   await expectFinished(page, "+$100", "In $250 · Out $350");
@@ -115,7 +114,7 @@ test("records the milestone session through reloads without an account", async (
   await expect(page.getByRole("button", { name: "Other" })).toHaveCount(0);
 
   await page.getByRole("link", { name: "Back to your play" }).click();
-  await expect(page.getByText("Playing now")).toBeHidden();
+  await expect(page.getByRole("link", { name: /^Back to your session/ })).toHaveCount(0);
   await expect(page.getByText("Finished results")).toBeVisible();
   await expect(page.getByText("1 finished session.", { exact: false })).toBeVisible();
   await expect(page.getByRole("link", { name: /Session.*\+\$100/ })).toBeVisible();
@@ -346,8 +345,7 @@ test("reopens Home and a live session with all networking off, then finishes it"
   const home = await context.newPage();
   const navigation = await home.goto("/");
   expect(navigation?.fromServiceWorker()).toBe(true);
-  await expect(home.getByText("Playing now")).toBeVisible();
-  await expect(home.getByText(/In \$300 · Out \$0 · Result pending/)).toBeVisible();
+  await expect(home.getByRole("link", { name: "Back to your session, Session" })).toBeVisible();
   await expect(home.getByText("Saved on this device", { exact: true })).toBeVisible();
   await home.close();
 
@@ -396,4 +394,35 @@ test("custom rebuy offers Undo for the recorded entry", async ({ page, context }
   await dialog(page).getByRole("button", { name: "Add rebuy", exact: true }).click();
   await expect(dialog(page)).toBeHidden();
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
+});
+
+test("one LiveBar for several live sessions, and each session's page points to the others", async ({
+  page,
+  context,
+}) => {
+  const api = await isolate(context);
+  const backToSession = page.getByRole("link", { name: /^Back to your session/ });
+  await page.goto("/");
+  await start(page, "200");
+  const first = new URL(page.url()).pathname;
+  // Alone, a session's page has no bar: it is the session.
+  await expect(backToSession).toHaveCount(0);
+  await page.getByRole("link", { name: "Back to your play" }).click();
+  await start(page, "100");
+  const second = new URL(page.url()).pathname;
+  await backToSession.click();
+  await expect(page).toHaveURL(first);
+  await backToSession.click();
+  await expect(page).toHaveURL(second);
+
+  await page.getByRole("link", { name: "Back to your play" }).click();
+  await expect(backToSession).toHaveCount(0);
+  const bar = page.getByRole("button", { name: "2 live sessions" });
+  await expect(bar).toHaveCount(1);
+  await expect(bar).toContainText("+1 live");
+  await bar.click();
+  await expect(page.getByRole("menuitem")).toHaveCount(2);
+  await page.getByRole("menuitem").last().click();
+  await expect(page).toHaveURL(first);
+  expect(api).toEqual([]);
 });
