@@ -79,7 +79,7 @@ An error beside one field goes in `error`. A failure of the whole form, such as 
 
 ## Surface, List, Row
 
-`Surface` is a solid card on the page: `surface` fill, no border, the card shadow. A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the hairline dividers, and `Row` the padding. On web, a row that goes somewhere is `RowLink`, which adds the pressed state and a chevron, and a row's main text is `RowText`: a `title`, a quieter `meta` line, and `struck` for something voided. On mobile, a pressable `Row` takes `onPress`.
+`Surface` is a solid card on the page: `surface` fill, no border, the card shadow. A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the hairline dividers, and `Row` the padding. On web, a row that goes somewhere is `RowLink`, which adds the pressed state and a chevron, a row that acts in place (Stats' rows apply a filter) is `RowButton`, and a row's main text is `RowText`: a `title`, a quieter `meta` line, and `struck` for something voided. On mobile, a pressable `Row` takes `onPress`.
 
 A row runs chip, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` text, not display type.
 
@@ -182,6 +182,10 @@ The one way to draw glass. Use it only on the parts [Glass](foundations.md#glass
 ## Toast (mobile), Undo bar (web)
 
 A one-tap write's Undo. Solid, not glass, with the float shadow, entering and leaving on the toast's timing. One shows at a time; a new one replaces it.
+
+## FilterChip
+
+A filter that narrows a page, such as Stats' period, game and casino: a pill naming the current choice that opens the choices. An applied filter fills with `ink` and gains a button that clears it. Web builds it on `Menu`; mobile uses the platform's own menu (`FilterChip.native.tsx`) and a `Sheet` in the web build. A row of chips scrolls sideways and ends with "Reset all" once any is applied.
 
 ## CopyButton (web)
 

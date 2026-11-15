@@ -1,5 +1,5 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
-import { Check, ChevronDown, Ellipsis } from "lucide-react";
+import { Check, ChevronDown, Ellipsis, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "./cn";
@@ -38,18 +38,79 @@ export function Menu({
           {icon}
         </BaseMenu.Trigger>
       )}
-      <BaseMenu.Portal>
-        <BaseMenu.Positioner
-          className="z-40"
-          sideOffset={4}
-          align={align ?? (trigger ? "start" : "end")}
-        >
-          <BaseMenu.Popup className="glass max-h-96 min-w-52 origin-[var(--transform-origin)] overflow-y-auto rounded-xl p-1 outline-none transition-[scale,opacity] duration-(--duration-menu-in) ease-enter data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:duration-(--duration-menu-out) data-[ending-style]:ease-exit data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
-            {children}
-          </BaseMenu.Popup>
-        </BaseMenu.Positioner>
-      </BaseMenu.Portal>
+      <Popup align={align ?? (trigger ? "start" : "end")}>{children}</Popup>
     </BaseMenu.Root>
+  );
+}
+
+function Popup({ align, children }: { align: "start" | "end"; children: ReactNode }) {
+  return (
+    <BaseMenu.Portal>
+      <BaseMenu.Positioner className="z-40" sideOffset={4} align={align}>
+        <BaseMenu.Popup className="glass max-h-96 min-w-52 origin-[var(--transform-origin)] overflow-y-auto rounded-xl p-1 outline-none transition-[scale,opacity] duration-(--duration-menu-in) ease-enter data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:duration-(--duration-menu-out) data-[ending-style]:ease-exit data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+          {children}
+        </BaseMenu.Popup>
+      </BaseMenu.Positioner>
+    </BaseMenu.Portal>
+  );
+}
+
+/**
+ * A filter as a pill that opens its choices. Once a choice other than the first is picked, the
+ * pill fills and gains a button that clears it.
+ */
+export function FilterChip<Value extends string>({
+  name,
+  options,
+  value,
+  applied,
+  onChange,
+  onClear,
+}: {
+  /** What it filters, read out before the choice: "Period". */
+  name: string;
+  options: ReadonlyArray<{ value: Value; label: string }>;
+  value: Value;
+  applied: boolean;
+  onChange: (value: Value) => void;
+  onClear: () => void;
+}) {
+  const label = options.find((option) => option.value === value)?.label ?? "";
+  return (
+    <span
+      className={cn(
+        "inline-flex h-11 shrink-0 items-center rounded-full type-callout font-medium",
+        applied ? "bg-ink text-ink-inverse" : "bg-surface text-ink shadow-(--elevation-control)",
+      )}
+    >
+      <BaseMenu.Root>
+        <BaseMenu.Trigger
+          aria-label={`${name}: ${label}`}
+          className={cn(
+            "pressable inline-flex h-11 items-center gap-2 rounded-full whitespace-nowrap focus-visible:outline-offset-[-3px]",
+            applied ? "pr-1 pl-4" : "px-4",
+          )}
+        >
+          {label}
+          {applied ? null : <ChevronDown className="size-3.5 text-muted" aria-hidden />}
+        </BaseMenu.Trigger>
+        <Popup align="start">
+          <MenuChoice options={options} value={value} onChange={onChange} closeOnClick />
+        </Popup>
+      </BaseMenu.Root>
+      {applied ? (
+        <button
+          type="button"
+          aria-label={`Clear ${name.toLowerCase()} filter`}
+          onClick={onClear}
+          className="grid size-11 place-items-center rounded-full focus-visible:outline-offset-[-3px]"
+        >
+          <span className="grid size-5 place-items-center rounded-full bg-ink-inverse/20">
+            <X className="size-3" strokeWidth={3} aria-hidden />
+          </span>
+        </button>
+      ) : null}
+    </span>
   );
 }
 
@@ -80,10 +141,12 @@ export function MenuChoice<Value extends string>({
   options,
   value,
   onChange,
+  closeOnClick = false,
 }: {
   options: ReadonlyArray<{ value: Value; label: string }>;
   value: Value;
   onChange: (value: Value) => void;
+  closeOnClick?: boolean;
 }) {
   return (
     <BaseMenu.RadioGroup value={value} onValueChange={(next: Value) => onChange(next)}>
@@ -91,6 +154,7 @@ export function MenuChoice<Value extends string>({
         <BaseMenu.RadioItem
           key={option.value}
           value={option.value}
+          closeOnClick={closeOnClick}
           className="flex h-9 cursor-default pointer-coarse:h-11 items-center gap-2 rounded-lg px-3 text-sm text-ink outline-none select-none data-[highlighted]:bg-fill"
         >
           <span className="flex size-4 items-center justify-center">

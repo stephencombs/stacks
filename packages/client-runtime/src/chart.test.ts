@@ -1,7 +1,15 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 
-import { around, barTrack, labelWidth, lineScale, placeLabel, spreadLabels } from "./chart.ts";
+import {
+  around,
+  barTrack,
+  labelWidth,
+  lineScale,
+  placeLabel,
+  runningLine,
+  spreadLabels,
+} from "./chart.ts";
 
 describe("barTrack", () => {
   it("puts zero where the losses end and scales bars to the full range", () => {
@@ -190,4 +198,79 @@ describe("placeLabel", () => {
   it("pins a label that runs off the right to the end", () => {
     expect(placeLabel(380, 40, bounds)).toEqual({ x: 390, anchor: "end" });
   });
+});
+
+describe("runningLine", () => {
+  const size = { width: 108, height: 58 };
+  const pad = { x: 4, y: 4 };
+
+  it("places points by time and starts from break-even", () => {
+    const plot = runningLine(
+      [
+        { at: 0, total: -100 },
+        { at: 10, total: 200 },
+        { at: 40, total: 100 },
+      ],
+      size,
+      pad,
+    );
+    expect(plot.points.map((p) => p.x)).toEqual([4, 29, 104]);
+    expect(plot.points[1]!.y).toBe(4);
+    expect(plot.points[0]!.y).toBe(54);
+    expect(plot.zero).toBeCloseTo(4 + (200 / 300) * 50);
+    expect(plot.line.startsWith(`4,${plot.zero} 4,54`)).toBe(true);
+    expect(plot.area.endsWith(`L104 ${plot.zero} Z`)).toBe(true);
+  });
+
+  it("reads the nearest point to a drag", () => {
+    const plot = runningLine(
+      [
+        { at: 0, total: 1 },
+        { at: 10, total: 2 },
+        { at: 40, total: 3 },
+      ],
+      size,
+      pad,
+    );
+    expect(plot.nearest(-50)).toBe(0);
+    expect(plot.nearest(20)).toBe(1);
+    expect(plot.nearest(70)).toBe(2);
+    expect(plot.nearest(500)).toBe(2);
+  });
+
+  it("spreads points that share one time, and draws a lone point at the start", () => {
+    expect(
+      runningLine(
+        [
+          { at: 5, total: 1 },
+          { at: 5, total: 2 },
+        ],
+        size,
+        pad,
+      ).points.map((p) => p.x),
+    ).toEqual([4, 104]);
+    expect(runningLine([{ at: 5, total: -3 }], size, pad).points).toEqual([{ x: 4, y: 54 }]);
+  });
+
+  it.prop(
+    "keeps every point and break-even inside the plot",
+    [
+      Schema.NonEmptyArray(
+        Schema.Struct({
+          at: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 1e12 })),
+          total: Schema.Int.check(Schema.isBetween({ minimum: -1e10, maximum: 1e10 })),
+        }),
+      ),
+    ],
+    ([points]) => {
+      const sorted = points.toSorted((a, b) => a.at - b.at);
+      const plot = runningLine(sorted, size, pad);
+      for (const { x, y } of [...plot.points, { x: 4, y: plot.zero }]) {
+        expect(x).toBeGreaterThanOrEqual(4 - 1e-9);
+        expect(x).toBeLessThanOrEqual(104 + 1e-9);
+        expect(y).toBeGreaterThanOrEqual(4 - 1e-9);
+        expect(y).toBeLessThanOrEqual(54 + 1e-9);
+      }
+    },
+  );
 });

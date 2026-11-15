@@ -10,7 +10,7 @@ depends_on:
   - "002"
 parent: "001"
 created_at: 2026-11-13T04:24:59.890272699Z
-updated_at: 2026-11-14T21:45:36.644331494Z
+updated_at: 2026-11-15T05:33:19.638847724Z
 transitions:
   - status: in-progress
     at: 2026-11-14T21:41:20.546234145Z
@@ -37,12 +37,12 @@ Fill the Stats tab with the player's own play, from the recording store, so it w
 ## Plan
 
 - [x] Shared breakdowns and filters (period, game, casino) with unit and property tests
-- [ ] Stats screen on web
-- [ ] Stats screen on mobile
+- [x] Stats screen on web
+- [x] Stats screen on mobile
 
 ## Test
 
-- [ ] Stats match finished results for every filter combination (property tests)
-- [ ] Win rate counts break-even sessions in the total
-- [ ] Losses shown plainly; both empty states render
+- [x] Stats match finished results for every filter combination (property tests)
+- [x] Win rate counts break-even sessions in the total
+- [x] Losses shown plainly; both empty states render
 - [ ] Works signed out and offline, and after relaunch

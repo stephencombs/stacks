@@ -64,6 +64,28 @@ export function RowLink({
   );
 }
 
+/** A row that does something here, such as applying a filter, rather than going somewhere. */
+export function RowButton({
+  onClick,
+  children,
+  ...props
+}: {
+  onClick: () => void;
+  children: ReactNode;
+  "aria-label"?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(row, pressable, "w-full text-left")}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
 /** A row's main text: what it is, and a quieter line about it. */
 export function RowText({
   title,
