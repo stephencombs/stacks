@@ -1,14 +1,17 @@
-import type { StaticScreenProps } from "@react-navigation/native";
+import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { playerNames } from "@stacks/client-runtime/format";
+import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import { boardMoney, localClock, nightLabel } from "@stacks/client-runtime/trip";
 import { tripNights } from "@stacks/shared/trips";
+import { useState } from "react";
 import { Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { cn } from "../components/ui/cn";
 import { Screen, screenError } from "../components/ui/Screen";
 import { EmptyState, PageTitle, SectionHeading } from "../components/ui/Surface";
+import { StartSheet } from "../features/RecordingForms";
 import { BackingSection } from "../features/Backing";
 import { SessionsSkeleton } from "../features/ScreenSkeletons";
 import { LiveSessionCard, SessionList } from "../features/SessionList";
@@ -58,6 +61,8 @@ const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-mu
 
 function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const go = useGo();
+  const navigation = useNavigation();
+  const [starting, setStarting] = useState(false);
   const names = playerNames(group);
   const mine = trip.sessions.find(
     (s) => s.session.status === "live" && s.playerIds.includes(group.myPlayerId),
@@ -66,11 +71,12 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
   const nights = tripNights(closed, localClock).toReversed();
   const going = trip.trip.endedAt === null;
+  const canStart = going && group.group.currency === RECORDING_CURRENCY;
   return (
     <Screen
       shows={{ trip: trip.trip.id }}
       renderFooter={
-        going
+        going && (mine || canStart)
           ? () => (
               <>
                 {mine ? (
@@ -81,12 +87,14 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
                     onPress={() => go.session(mine.session.id)}
                   />
                 ) : null}
-                <Button
-                  label="Start a session"
-                  variant={mine ? "secondary" : "primary"}
-                  size="lg"
-                  onPress={() => go.newSession(trip.trip.id)}
-                />
+                {canStart ? (
+                  <Button
+                    label="Start a session"
+                    variant={mine ? "secondary" : "primary"}
+                    size="lg"
+                    onPress={() => setStarting(true)}
+                  />
+                ) : null}
               </>
             )
           : undefined
@@ -140,6 +148,16 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
           <SessionList sessions={night.sessions.toReversed()} detail={group} />
         </View>
       ))}
+      {starting ? (
+        <StartSheet
+          initialTripId={trip.trip.id}
+          onClose={() => setStarting(false)}
+          onStarted={(visitId) => {
+            setStarting(false);
+            navigation.navigate("Play", { visitId });
+          }}
+        />
+      ) : null}
       <BackingSection detail={group} trip={trip} />
       {trip.sessions.length === 0 ? (
         <EmptyState centered title="No sessions on this trip yet">
