@@ -36,6 +36,10 @@
       "types": "./src/stats.ts",
       "import": "./src/stats.ts"
     },
+    "./tripTables": {
+      "types": "./src/tripTables.ts",
+      "import": "./src/tripTables.ts"
+    },
     "./table": {
       "types": "./src/table.ts",
       "import": "./src/table.ts"

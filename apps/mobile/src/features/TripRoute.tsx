@@ -1,5 +1,5 @@
 import type { GroupDetail, TripDetail, Venue } from "@stacks/contracts";
-import { boardMoney } from "@stacks/client-runtime/trip";
+import { boardMoney, closedPlays } from "@stacks/client-runtime/trip";
 import { tripRoute } from "@stacks/shared/trips";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { Linking, Platform, Pressable, Text, View } from "react-native";
@@ -53,7 +53,7 @@ export function TripRoute({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const currency = detail.group.currency;
   const { theme } = useUniwind();
   const ink = String(useCSSVariable("--color-ink"));
-  const route = tripRoute(trip.sessions.filter((s) => s.session.status === "closed"));
+  const route = tripRoute(closedPlays(trip));
   if (route.stops.length === 0) return null;
   const onMap = route.stops.filter((s) => placed(s.venue));
   const missingLocations = route.stops.length - onMap.length;

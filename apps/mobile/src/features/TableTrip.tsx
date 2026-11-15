@@ -1,7 +1,10 @@
+import { useAtomValue } from "@effect/atom-react";
 import { tableTripOptions } from "@stacks/client-runtime/recordingView";
 import { useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
+import { tripNames } from "@stacks/client-runtime/trip";
 import { TripId, type Table } from "@stacks/contracts";
-import { useState } from "react";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import { useMemo, useState, type ReactNode } from "react";
 import { Text } from "react-native";
 
 import { Button } from "../components/ui/Button";
@@ -15,6 +18,36 @@ export function TableTripButton({ attached, onOpen }: { attached: boolean; onOpe
   const account = useAccount();
   if (!attached && (!account.available || !account.isSignedIn)) return null;
   return <Button label="Table's trip" variant="ghost" onPress={onOpen} />;
+}
+
+const noNames: ReadonlyMap<TripId, string> = new Map();
+
+/**
+ * The names of your groups' trips, for tables that belong to one. Signed out, or before they load,
+ * there are none, and nothing waits for them.
+ */
+export function TripNames({
+  children,
+}: {
+  children: (names: ReadonlyMap<TripId, string>) => ReactNode;
+}) {
+  const account = useAccount();
+  if (!account.available || !account.isSignedIn) return children(noNames);
+  return (
+    <StacksProvider>
+      <SignedInNames>{children}</SignedInNames>
+    </StacksProvider>
+  );
+}
+
+function SignedInNames({
+  children,
+}: {
+  children: (names: ReadonlyMap<TripId, string>) => ReactNode;
+}) {
+  const groups = AsyncResult.getOrElse(useAtomValue(useStacks().groups), () => []);
+  const names = useMemo(() => tripNames(groups), [groups]);
+  return children(names);
 }
 
 export function TripChoice(props: {

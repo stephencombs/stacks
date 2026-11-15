@@ -1,8 +1,20 @@
 import * as Schema from "effect/Schema";
 
-import { EntryId, GroupId, InviteId, PlayerId, SessionId, TripId, UserId, VenueId } from "./ids.ts";
+import {
+  EntryId,
+  GroupId,
+  InviteId,
+  PlayerId,
+  SessionId,
+  TableId,
+  TripId,
+  UserId,
+  VenueId,
+  VisitId,
+} from "./ids.ts";
 import { Entry, Game, Seat, Seating, Session, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
+import { Table } from "./recording.ts";
 
 export const MemberRole = Schema.Literals(["owner", "admin", "member"]);
 export type MemberRole = typeof MemberRole.Type;
@@ -81,6 +93,37 @@ export const SessionSummary = Schema.Struct({
 });
 export type SessionSummary = typeof SessionSummary.Type;
 
+/**
+ * A table in one of the group's trips, as its members see it. A table player counts as the group
+ * member they're linked to; anyone else at the table is in `others`, on the table but not in
+ * standings.
+ */
+export const TripTable = Schema.Struct({
+  table: Table,
+  /** Null when no casino was set, or the one recorded isn't in the catalog. */
+  venue: Schema.NullOr(Venue),
+  startedAt: Schema.DateTimeUtc,
+  /** When the last player cashed out; null while anyone is still playing. */
+  endedAt: Schema.NullOr(Schema.DateTimeUtc),
+  /** Time anyone was playing, over finished visits; overlapping visits count once. */
+  minutesPlayed: Schema.Int,
+  /** Group members at the table, as group players, in the order they sat down. */
+  playerIds: Schema.Array(PlayerId),
+  /** Members still playing. */
+  playing: Schema.Array(PlayerId),
+  /** Members' finished visits only, so sitting back down never unsettles a cash-out. */
+  results: Schema.Array(PlayerResult),
+  /** What each member still playing has bought in for at their open visit. */
+  inPlay: Schema.Array(Schema.Struct({ playerId: PlayerId, buyIn: MinorUnits })),
+  /** Everyone else, with their finished visits' result. */
+  others: Schema.Array(
+    Schema.Struct({ displayName: Schema.String, playing: Schema.Boolean, net: MinorUnits }),
+  ),
+  /** Your latest visit here, to open; null if you didn't play. */
+  myVisitId: Schema.NullOr(VisitId),
+});
+export type TripTable = typeof TripTable.Type;
+
 export const SessionDetail = Schema.Struct({
   session: Session,
   venue: Venue,
@@ -98,6 +141,7 @@ export const GroupListItem = Schema.Struct({
   role: MemberRole,
   myPlayerId: PlayerId,
   myBalance: MinorUnits,
+  /** Live sessions, and tables in its trips with anyone still playing. */
   liveSessionCount: Schema.Int,
   /** The trip still going, most recently started first; where the app opens. */
   currentTripId: Schema.NullOr(TripId),
@@ -118,10 +162,22 @@ export type GroupListItem = typeof GroupListItem.Type;
 const ActivityGroup = Schema.Struct({ id: GroupId, name: Schema.String, currency: CurrencyCode });
 const ActivityTrip = Schema.Struct({ id: TripId, name: Schema.String });
 const ActivityPlayer = Schema.Struct({ playerId: PlayerId, displayName: Schema.String });
+/** A player at a table; `playerId` is their group player, or null if they aren't in the group. */
+const ActivityTablePlayer = Schema.Struct({
+  playerId: Schema.NullOr(PlayerId),
+  displayName: Schema.String,
+});
+const ActivityTable = {
+  tableId: TableId,
+  venue: Schema.NullOr(Venue),
+  game: Schema.NullOr(Game),
+  /** Your latest visit there, to open; null if you didn't play. */
+  myVisitId: Schema.NullOr(VisitId),
+};
 
 /**
- * One row of the Crew feed. A session appears once, as it stands now: live from when it started,
- * finished from when it closed.
+ * One row of the Crew feed. A session or table appears once, as it stands now: live from when it
+ * started, finished from when it closed. A table closes when its last player cashes out.
  */
 export const CrewActivityItem = Schema.Union([
   Schema.Struct({
@@ -142,6 +198,24 @@ export const CrewActivityItem = Schema.Union([
     venue: Venue,
     /** Everyone seated, in the order they sat down, with what they won or lost. */
     players: Schema.Array(Schema.Struct({ ...ActivityPlayer.fields, net: MinorUnits })),
+    endedAt: Schema.DateTimeUtc,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("table_live"),
+    group: ActivityGroup,
+    trip: ActivityTrip,
+    ...ActivityTable,
+    /** Group members in the order they sat down, then everyone else at the table. */
+    players: Schema.Array(ActivityTablePlayer),
+    startedAt: Schema.DateTimeUtc,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("table_finished"),
+    group: ActivityGroup,
+    trip: ActivityTrip,
+    ...ActivityTable,
+    /** As on a live table, with what each won or lost. */
+    players: Schema.Array(Schema.Struct({ ...ActivityTablePlayer.fields, net: MinorUnits })),
     endedAt: Schema.DateTimeUtc,
   }),
   Schema.Struct({
@@ -178,10 +252,14 @@ export const GroupDetail = Schema.Struct({
 });
 export type GroupDetail = typeof GroupDetail.Type;
 
-/** A trip's sessions, oldest first and live ones included, and its own ledger of who owes whom. */
+/**
+ * A trip's sessions and tables, oldest first and live ones included, and its own ledger of who
+ * owes whom. Balances and stakes read only sessions until tables carry them.
+ */
 export const TripDetail = Schema.Struct({
   trip: Trip,
   sessions: Schema.Array(SessionSummary),
+  tables: Schema.Array(TripTable),
   balances: Schema.Array(Balance),
   stakes: Schema.Array(StakeView),
 });
@@ -219,21 +297,25 @@ export type ClaimPreview = typeof ClaimPreview.Type;
 const StatsBreakdown = <K extends Schema.Top>(key: K) =>
   Schema.Struct({ key, sessionCount: Schema.Int, results: Schema.Array(PlayerResult) });
 
-/** All-time results over closed sessions; live sessions aren't settled yet. */
+/**
+ * All-time results over closed sessions and the closed tables in the group's trips; live ones
+ * aren't settled yet. Only group members' play counts.
+ */
 export const GroupStats = Schema.Struct({
   sessionCount: Schema.Int,
   minutesPlayed: Schema.Int,
   byPlayer: Schema.Array(PlayerResult),
+  /** A table with no game or casino set counts in the totals, not in these. */
   byGame: Schema.Array(StatsBreakdown(Game)),
   byVenue: Schema.Array(StatsBreakdown(Venue)),
   /** Results by seat: each player's session counts for the seat they held longest in it. */
   bySeat: Schema.Array(StatsBreakdown(Seat)),
-  /** Each closed session's results, oldest first. */
+  /** Each closed session's or table's results, oldest first. */
   bySession: Schema.Array(
     Schema.Struct({
-      sessionId: SessionId,
+      id: Schema.Union([SessionId, TableId]),
       tripId: TripId,
-      venueId: VenueId,
+      venueId: Schema.NullOr(VenueId),
       startedAt: Schema.DateTimeUtc,
       results: Schema.Array(PlayerResult),
     }),

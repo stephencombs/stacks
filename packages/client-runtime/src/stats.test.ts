@@ -1,11 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
-import { VenueId, type Game } from "@stacks/contracts";
+import { TripId, VenueId, type Game } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
 import { makeRecordingStore, type RecordingInput, type RecordingStore } from "./recording.ts";
 import type { RecordingStorageDocument } from "./recordingStorage.ts";
 import { recordingHome } from "./recordingView.ts";
-import { formatHours, personalStatsView, type StatsFilters } from "./stats.ts";
+import { formatHours, personalStatsView, sessionShare, type StatsFilters } from "./stats.ts";
 
 const zone = DateTime.zoneMakeNamedUnsafe("America/Los_Angeles");
 const wynn = VenueId.make("0192e7a0-0000-7000-8000-0000000000d1");
@@ -57,7 +57,7 @@ const played = async (sessions: ReadonlyArray<Played>, live = false) => {
 };
 
 const view = (visits: Awaited<ReturnType<typeof played>>, filters: StatsFilters = {}) =>
-  personalStatsView(visits, filters, zone);
+  personalStatsView(visits, filters, { timeZone: zone });
 
 const week: ReadonlyArray<Played> = [
   { day: "2025-03-01", hours: 2, buyIn: 30_000, cashOut: 50_000, game: "blackjack", venueId: wynn },
@@ -66,6 +66,72 @@ const week: ReadonlyArray<Played> = [
   { day: "2026-01-11", hours: 0.5, buyIn: 10_000, cashOut: 12_500, game: "baccarat" },
   { day: "2026-02-01", hours: 1, buyIn: 10_000, cashOut: 0, game: "blackjack", venueId: wynn },
 ];
+
+describe("the trip chip", () => {
+  const vegas = TripId.make("0192e7a0-0000-7000-8000-0000000000e1");
+  const reno = TripId.make("0192e7a0-0000-7000-8000-0000000000e2");
+  const inTrips = async () =>
+    (await played(week)).map((item) => {
+      const day = DateTime.formatIso(item.visit.startedAt).slice(0, 10);
+      const tripId = day.startsWith("2025") ? vegas : day === "2026-01-10" ? reno : null;
+      return { ...item, table: { ...item.table, tripId } };
+    });
+  const tripNames = new Map([[vegas, "Vegas"]]);
+
+  it("appears only once a session belongs to a trip", async () => {
+    expect(view(await played(week)).chips.map((chip) => chip.key)).not.toContain("tripId");
+    const trip = view(await inTrips()).chips.find((chip) => chip.key === "tripId")!;
+    expect(trip.options.map((option) => option.label)).toEqual([
+      "All trips",
+      "Group trip",
+      "Group trip",
+    ]);
+  });
+
+  it("shows the whole trip in place of the period, named when the name is known", async () => {
+    const visits = await inTrips();
+    const all = personalStatsView(visits, { year: 2026 }, { timeZone: zone, tripNames });
+    const vegasOption = all.chips
+      .find((chip) => chip.key === "tripId")!
+      .options.find((option) => option.label === "Vegas")!;
+    expect(vegasOption.filters).toEqual({ year: undefined, tripId: vegas });
+    const stats = personalStatsView(visits, vegasOption.filters, { timeZone: zone, tripNames });
+    expect(stats.chips.map((chip) => chip.key)).toEqual(["tripId", "game", "venueId"]);
+    expect(stats.kind === "stats" && [stats.title, stats.result, stats.sessions]).toEqual([
+      "Result · Vegas",
+      20_000,
+      2,
+    ]);
+    const cleared = personalStatsView(visits, stats.chips[0]!.cleared, { timeZone: zone });
+    expect(cleared.chips.map((chip) => [chip.key, chip.applied])).toEqual([
+      ["year", false],
+      ["game", false],
+      ["venueId", false],
+      ["tripId", false],
+    ]);
+  });
+
+  it("says which trip matched nothing", async () => {
+    const stats = personalStatsView(
+      await inTrips(),
+      { tripId: vegas, game: "baccarat" },
+      { timeZone: zone, tripNames },
+    );
+    expect(stats.kind === "no_match" && stats.sentence).toBe(
+      "No finished Baccarat sessions on Vegas.",
+    );
+  });
+});
+
+describe("sessionShare", () => {
+  it("measures each row against the sessions its breakdown covers", () => {
+    // Two of five sessions had no casino set: the three that did are the whole of By casino.
+    const byCasino = [{ sessionCount: 2 }, { sessionCount: 1 }];
+    const share = sessionShare(byCasino);
+    expect(byCasino.map(share)).toEqual([2 / 3, 1 / 3]);
+    expect(sessionShare([])({ sessionCount: 0 })).toBe(0);
+  });
+});
 
 describe("formatHours", () => {
   it("says hours like a session does, dropping zero minutes", () => {

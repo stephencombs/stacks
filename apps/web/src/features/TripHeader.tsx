@@ -44,7 +44,9 @@ export function TripHeader({
   const ended = trip.trip.endedAt !== null;
   const home = place === "sessions";
   const canDelete =
-    trip.sessions.length === 0 && (isAdmin(group) || trip.trip.createdBy === userId);
+    trip.sessions.length === 0 &&
+    trip.tables.length === 0 &&
+    (isAdmin(group) || trip.trip.createdBy === userId);
   const title = home ? trip.trip.name : titles[place];
 
   const menu = (

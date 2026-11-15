@@ -1,6 +1,18 @@
 import { expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
-import { CurrencyCode, GroupId, SessionId, TripId, UserId, VenueId } from "@stacks/contracts";
+import {
+  CurrencyCode,
+  GroupId,
+  MinorUnits,
+  PlayerId,
+  SessionId,
+  TableId,
+  TripId,
+  UserId,
+  VenueId,
+  type SessionSummary,
+  type TripTable,
+} from "@stacks/contracts";
 
 import {
   awardLine,
@@ -16,6 +28,8 @@ import {
   streakLine,
   tripInScope,
   tripLines,
+  tripNames,
+  tripPlays,
 } from "./trip.ts";
 
 const usd = CurrencyCode.make("USD");
@@ -51,6 +65,95 @@ it("says what earned each award", () => {
     "8 winning sessions in a row",
   );
   expect(awardLine({ ...award, key: "night_owl", value: 2 }, usd)).toMatch(/^Sat down at 2:00/);
+});
+
+it("leaves the place off an award for a table with no casino set", () => {
+  const session = {
+    session: { id: TableId.make("0192e7a0-0000-7000-8000-000000000003"), startedAt: local(24, 2) },
+    venue: null,
+    results: [],
+  };
+  expect(
+    awardLine({ key: "biggest_hit", value: 790000, playerId: undefined as never, session }, usd),
+  ).toBe("+$7,900");
+});
+
+it("lists a trip's sessions and tables together, oldest first, and says which are live", () => {
+  const alex = PlayerId.make("0192e7a0-0000-7000-8000-0000000000a1");
+  const venue = {
+    id: VenueId.make("0192e7a0-0000-7000-8000-000000000002"),
+    name: "Circa",
+    kind: "casino" as const,
+    city: null,
+    region: null,
+    country: null,
+    lat: null,
+    lng: null,
+    verified: true,
+    groupId: null,
+  };
+  const result = { playerId: alex, buyIn: 100, cashOut: 300, adjustment: 0, net: 200 };
+  const money = (r: typeof result) => ({
+    ...r,
+    buyIn: MinorUnits.make(r.buyIn),
+    cashOut: MinorUnits.make(r.cashOut),
+    adjustment: MinorUnits.make(r.adjustment),
+    net: MinorUnits.make(r.net),
+  });
+  const session = {
+    session: {
+      id: SessionId.make("0192e7a0-0000-7000-8000-000000000011"),
+      status: "closed",
+      startedAt: local(24, 20),
+    },
+    venue,
+    playerIds: [alex],
+    playing: [],
+    results: [money(result)],
+  } as unknown as SessionSummary;
+  const table = (n: number, hour: number, live: boolean): TripTable => ({
+    table: {
+      id: TableId.make(`0192e7a0-0000-7000-8000-00000000002${n}`),
+      tripId: null,
+      game: "craps",
+      venueId: null,
+      highLimit: true,
+      starterPlayerId: alex,
+    },
+    venue: null,
+    startedAt: local(24, hour),
+    endedAt: live ? null : local(24, hour + 1),
+    minutesPlayed: live ? 0 : 60,
+    playerIds: [alex],
+    playing: live ? [alex] : [],
+    results: live ? [] : [money(result)],
+    inPlay: live ? [{ playerId: alex, buyIn: MinorUnits.make(100) }] : [],
+    others: [],
+    myVisitId: null,
+  });
+  const plays = tripPlays({
+    sessions: [session],
+    tables: [table(1, 22, true), table(2, 18, false)],
+  });
+  expect(plays.map((play) => [play.kind, play.session.id, play.live])).toEqual([
+    ["table", "0192e7a0-0000-7000-8000-000000000022", false],
+    ["session", "0192e7a0-0000-7000-8000-000000000011", false],
+    ["table", "0192e7a0-0000-7000-8000-000000000021", true],
+  ]);
+  expect(plays[0]!.session).toEqual({
+    id: "0192e7a0-0000-7000-8000-000000000022",
+    startedAt: local(24, 18),
+    highLimit: true,
+  });
+});
+
+it("names every trip in the groups you're in", () => {
+  const trip = (id: string, name: string) => ({ id: TripId.make(id), name });
+  const names = tripNames([
+    { trips: [trip("0192e7a0-0000-7000-8000-0000000000f1", "Vegas")] },
+    { trips: [trip("0192e7a0-0000-7000-8000-0000000000f2", "Reno")] },
+  ]);
+  expect([...names.values()]).toEqual(["Vegas", "Reno"]);
 });
 
 it("puts runs and records into words", () => {

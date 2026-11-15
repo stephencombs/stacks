@@ -8,7 +8,7 @@ import {
   type PersonalStatsView,
   type StatsFilters,
 } from "@stacks/client-runtime/stats";
-import { MinorUnits } from "@stacks/contracts";
+import { MinorUnits, type TripId } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
 import { useMemo, useState, type ReactNode } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -33,6 +33,7 @@ import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/u
 import { cn } from "../components/ui/cn";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet } from "../features/RecordingForms";
+import { TripNames } from "../features/TableTrip";
 
 type Shown = Exclude<PersonalStatsView, { kind: "empty" }>;
 type Summary = Extract<PersonalStatsView, { kind: "stats" }>;
@@ -52,12 +53,17 @@ const signed = (amount: number) =>
 
 /** Your own play, broken down, from this device's sessions: it works signed out and offline. */
 export function StatsScreen() {
+  return <TripNames>{(tripNames) => <StatsView tripNames={tripNames} />}</TripNames>;
+}
+
+function StatsView({ tripNames }: { tripNames: ReadonlyMap<TripId, string> }) {
   const { home, status, error, retryLoad } = useRecordingHome();
   const [filters, setFilters] = useState<StatsFilters>({});
   const [adding, setAdding] = useState(false);
   const view = useMemo(
-    () => (home ? personalStatsView([...home.active, ...home.finished], filters) : null),
-    [home, filters],
+    () =>
+      home ? personalStatsView([...home.active, ...home.finished], filters, { tripNames }) : null,
+    [home, filters, tripNames],
   );
   return (
     <PersonalScreen live>

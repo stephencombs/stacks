@@ -15,6 +15,7 @@ import {
 
 import { TripRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as TripTables from "./TripTables.ts";
 import * as Views from "./Views.ts";
 
 export const load = Effect.fn("Trips.load")(function* (tripId: TripId) {
@@ -47,7 +48,7 @@ export const create = Effect.fn("Trips.create")(function* (
 export const get = Effect.fn("Trips.get")(function* (tripId: TripId) {
   const trip = yield* load(tripId);
   yield* Access.membership(trip.groupId);
-  return yield* Views.tripDetail(trip);
+  return yield* Views.tripDetail(trip, yield* TripTables.load({ tripIds: [trip.id] }));
 });
 
 /** Ending a trip stops new sessions going in. */

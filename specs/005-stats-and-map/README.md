@@ -30,7 +30,7 @@ Fill the Stats tab with the player's own play, from the recording store, so it w
   - Dragging the chart reads one session.
   - A live session isn't counted until it finishes; it shows in the LiveBar above the tabs, not on the page.
   - Empty states: no sessions yet, and no sessions match the filters.
-- **Trip chip:** added by spec 015, once a table can belong to a trip. Picking a trip shows the whole trip and replaces the period filter.
+- **Trip chip:** appears once a session belongs to a group trip (specs 013, 015). Picking a trip shows the whole trip and replaces the period filter. Trip names come from your groups when signed in; otherwise a trip reads "Group trip".
 - Breakdowns are pure functions in `packages/shared` (extend `packages/shared/src/stats.ts`), reading the visits `packages/client-runtime/src/recordingView.ts` already derives. Charts follow the no-library rule in `AGENTS.md` (`@stacks/client-runtime/chart`).
 - Designs: the 005 · Stats page of the canvas, `StM*` frames (inset-grouped layout, 4/8/12/16/20/24/32 spacing).
 

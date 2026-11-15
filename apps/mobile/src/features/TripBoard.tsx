@@ -5,6 +5,7 @@ import {
   awardTitles,
   boardMoney,
   chipOf,
+  closedPlays,
   localClock,
   nightLabel,
   streakLine,
@@ -31,7 +32,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const currency = detail.group.currency;
   const names = playerNames(detail);
   const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const closed = closedPlays(trip);
   const standings = tripStandings(closed, localClock);
   const nights = tripNights(closed, localClock);
   const awards = tripAwards(closed, localClock);
@@ -168,7 +169,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
 function TripNumbers({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const currency = detail.group.currency;
   const names = playerNames(detail);
-  const stats = tripStats(trip.sessions.filter((s) => s.session.status === "closed"));
+  const stats = tripStats(closedPlays(trip));
   const money = (n: number) => boardMoney(Math.round(n), currency);
   const { current, longestWin, longestLoss } = stats.team;
   const tables = (n: number) => `${n} ${n === 1 ? "table" : "tables"}`;

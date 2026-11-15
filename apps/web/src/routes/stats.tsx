@@ -9,7 +9,7 @@ import {
   type PersonalStatsView,
   type StatsFilters,
 } from "@stacks/client-runtime/stats";
-import { MinorUnits } from "@stacks/contracts";
+import { MinorUnits, type TripId } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
 import { ChartColumn, ChevronRight } from "lucide-react";
 import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
@@ -23,6 +23,7 @@ import { List, Row, RowButton, RowText, Skeleton, Surface } from "~/components/u
 import { cn } from "~/components/ui/cn";
 import { SaveStatus } from "~/features/Personal";
 import { PastSessionDialog } from "~/features/RecordingForms";
+import { TripNames } from "~/features/TableTrip";
 import { useWidth } from "~/lib/useWidth";
 
 export const Route = createFileRoute("/stats")({ component: Stats });
@@ -45,12 +46,17 @@ const signed = (amount: number) =>
 
 /** Your own play, broken down, from this device's sessions: it works signed out and offline. */
 function Stats() {
+  return <TripNames>{(tripNames) => <StatsView tripNames={tripNames} />}</TripNames>;
+}
+
+function StatsView({ tripNames }: { tripNames: ReadonlyMap<TripId, string> }) {
   const { home, status, error, retryLoad } = useRecordingHome();
   const [filters, setFilters] = useState<StatsFilters>({});
   const [adding, setAdding] = useState(false);
   const view = useMemo(
-    () => (home ? personalStatsView([...home.active, ...home.finished], filters) : null),
-    [home, filters],
+    () =>
+      home ? personalStatsView([...home.active, ...home.finished], filters, { tripNames }) : null,
+    [home, filters, tripNames],
   );
   return (
     <>

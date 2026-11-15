@@ -23,7 +23,9 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
   const pending = end.pending || reopen.pending || remove.pending;
   const error = end.error ?? reopen.error ?? remove.error;
   const canDelete =
-    trip.sessions.length === 0 && (isAdmin(group) || trip.trip.createdBy === userId);
+    trip.sessions.length === 0 &&
+    trip.tables.length === 0 &&
+    (isAdmin(group) || trip.trip.createdBy === userId);
   const actions = [
     trip.trip.endedAt === null
       ? {

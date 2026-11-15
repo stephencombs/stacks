@@ -160,6 +160,11 @@ export const accept = Effect.fn("Invites.accept")(function* (
       }
       if (existing) {
         yield* sql`
+          insert into membership_absences (group_id, user_id, left_at, returned_at)
+          select group_id, user_id, left_at, now() from memberships
+          where group_id = ${invite.groupId} and user_id = ${userId} and left_at is not null
+        `;
+        yield* sql`
           update memberships set left_at = null, role = 'member', joined_at = now()
           where group_id = ${invite.groupId} and user_id = ${userId}
         `;

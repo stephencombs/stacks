@@ -108,3 +108,7 @@ export const canChangeStake = (detail: GroupDetail, { stake }: StakeView, userId
   stake.createdBy === userId ||
   stake.lenderId === detail.myPlayerId ||
   stake.borrowerId === detail.myPlayerId;
+
+/** Where something was played, or that no casino was set. */
+export const venueLabel = (venue: { readonly name: string } | null) =>
+  venue?.name ?? "No casino set";

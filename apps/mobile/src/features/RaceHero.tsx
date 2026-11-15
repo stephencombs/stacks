@@ -7,7 +7,7 @@ import {
   spreadLabels,
 } from "@stacks/client-runtime/chart";
 import { playerNames } from "@stacks/client-runtime/format";
-import { localClock, raceHeadline } from "@stacks/client-runtime/trip";
+import { closedPlays, localClock, raceHeadline } from "@stacks/client-runtime/trip";
 import { runningTotals } from "@stacks/shared/stats";
 import { tripStandings } from "@stacks/shared/trips";
 import { useState } from "react";
@@ -36,7 +36,7 @@ export function RaceHero({ detail, trip }: { detail: GroupDetail; trip: TripDeta
   const currency = detail.group.currency;
   const names = playerNames(detail);
   const me = detail.myPlayerId;
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const closed = closedPlays(trip);
   const standings = tripStandings(closed, localClock);
   const head = raceHeadline(standings, me, names, currency);
   if (!head || closed.length === 0) return null;

@@ -3,8 +3,8 @@ import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 import { SessionId } from "@stacks/contracts";
 
-import { playerResults, resultsBy, sessionRuns } from "./results.ts";
-import { ALEX, BEA, entry, money } from "./testing/ledgerArbitrary.ts";
+import { mergeResults, playerResults, resultsBy, sessionRuns } from "./results.ts";
+import { ALEX, BEA, RandomLedger, entry, money, toEntries } from "./testing/ledgerArbitrary.ts";
 
 describe("playerResults", () => {
   it("nets cash-outs and adjustments against buy-ins", () => {
@@ -39,6 +39,32 @@ describe("playerResults", () => {
 
     expect(results.get(ALEX)?.net).toBe(-10000);
   });
+});
+
+describe("mergeResults", () => {
+  it("adds each player's results across tables and sessions", () => {
+    const merged = mergeResults([
+      playerResults([entry({ kind: "buy_in", playerId: ALEX, amount: money(100) })]),
+      playerResults([
+        entry({ kind: "cash_out", playerId: ALEX, amount: money(250) }),
+        entry({ kind: "adjustment", playerId: BEA, amount: money(-5) }),
+      ]),
+    ]);
+    expect(merged.get(ALEX)).toEqual({ buyIn: 100, cashOut: 250, adjustment: 0, net: 150 });
+    expect(merged.get(BEA)).toEqual({ buyIn: 0, cashOut: 0, adjustment: -5, net: -5 });
+    expect(mergeResults([]).size).toBe(0);
+  });
+
+  it.prop(
+    "equals the results of every entry together, however they're split",
+    [RandomLedger, Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 50 }))],
+    ([ledger, cut]) => {
+      const entries = toEntries(ledger);
+      expect(
+        mergeResults([playerResults(entries.slice(0, cut)), playerResults(entries.slice(cut))]),
+      ).toEqual(playerResults(entries));
+    },
+  );
 });
 
 describe("resultsBy", () => {
