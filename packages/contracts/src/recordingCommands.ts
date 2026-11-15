@@ -1,6 +1,15 @@
 import * as Schema from "effect/Schema";
 
-import { ActorId, EntryId, PlayerId, PlayerInviteId, TableId, VenueId, VisitId } from "./ids.ts";
+import {
+  ActorId,
+  EntryId,
+  PlayerId,
+  PlayerInviteId,
+  TableId,
+  TripId,
+  VenueId,
+  VisitId,
+} from "./ids.ts";
 import { Game } from "./ledger.ts";
 import { MinorUnits } from "./money.ts";
 import { PlayerIdentity } from "./players.ts";
@@ -118,17 +127,25 @@ export const RecordingCommand = Schema.Union([
   }),
   // The starter lets a player at the table record for everyone, or stops them. These belong to
   // the table, not a visit, and are ordered with its play.
+  Schema.Struct({
+    type: Schema.Literal("set_table_trip"),
+    ...common,
+    tableId: TableId,
+    tripId: Schema.NullOr(TripId),
+  }),
   Schema.Struct({ type: Schema.Literal("appoint_recorder"), ...recorder }),
   Schema.Struct({ type: Schema.Literal("revoke_recorder"), ...recorder }),
 ]);
 export type RecordingCommand = typeof RecordingCommand.Type;
 export type TableCommand = Extract<
   RecordingCommand,
-  { type: "appoint_recorder" | "revoke_recorder" }
+  { type: "appoint_recorder" | "revoke_recorder" | "set_table_trip" }
 >;
 export type VisitCommand = Exclude<RecordingCommand, TableCommand>;
 export const isTableCommand = (command: RecordingCommand): command is TableCommand =>
-  command.type === "appoint_recorder" || command.type === "revoke_recorder";
+  command.type === "appoint_recorder" ||
+  command.type === "revoke_recorder" ||
+  command.type === "set_table_trip";
 export const isVisitCommand = (command: RecordingCommand): command is VisitCommand =>
   !isTableCommand(command);
 
@@ -220,11 +237,13 @@ export type RecordingHistory = typeof RecordingHistory.Type;
 
 /**
  * One table as its starter, a player who joined it, or anyone with its share link sees it: each
- * visit's totals, never its entries, whose audit fields name actors. `viewerPlayerId` is the
+ * visit's totals. Active group members reading through a trip also see the entries. `viewerPlayerId` is the
  * viewer's own player there, if they have one. `recorders` record for everyone. Only the starter
  * sees `appointable`, the players with accounts, and whether the table is `shared`.
  */
 export const TableView = Schema.Struct({
+  /** Whole-table facts for an active group member reading through the table's trip. */
+  entries: Schema.optionalKey(Schema.Array(PlayEntry)),
   table: Table,
   players: Schema.Array(PlayerIdentity),
   visits: Schema.Array(VisitSummary),

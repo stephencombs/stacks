@@ -18,6 +18,7 @@ import {
   Visit,
   type PlayerId,
   type TableId,
+  type TripId,
 } from "@stacks/contracts";
 import {
   isTableCommand,
@@ -151,6 +152,7 @@ const tableRecorders = (sql: SqlClient.SqlClient) => sql`(
     select distinct on (table_id, command ->> 'playerId')
       table_id, (command ->> 'playerId')::uuid as player_id, command ->> 'type' as type
     from personal_operations where visit_id is null and table_id is not null
+      and command ->> 'type' in ('appoint_recorder', 'revoke_recorder')
     order by table_id, command ->> 'playerId', seq desc
   ) latest where type = 'appoint_recorder'
 )`;
@@ -186,7 +188,7 @@ export const principal = Effect.fn("Recording.principal")(function* () {
 const tableOf = (row: typeof TableRow.Type, starterPlayerId: PlayerId) =>
   Table.make({
     id: row.id,
-    tripId: null,
+    tripId: row.tripId,
     game: row.game,
     venueId: row.venueId,
     highLimit: row.highLimit,
@@ -277,6 +279,33 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
         reason: "forbidden",
         message: "Only the player who started this table can do that.",
       });
+    if (command.type === "set_table_trip" && command.tripId !== null) {
+      const recorder = yield* Recorder;
+      if (recorder._tag !== "Account")
+        return yield* new Rejected({ reason: "forbidden", message: "Sign in to choose a trip." });
+      const [trip] = yield* sql<{ endedAt: Date | null }>`
+        select t.ended_at from trips t join memberships m on m.group_id = t.group_id
+        where t.id = ${command.tripId} and m.user_id = ${recorder.user.userId} and m.left_at is null
+        for update of t, m
+      `;
+      if (!trip)
+        return yield* new Rejected({
+          reason: "forbidden",
+          message: "Choose a trip in a group you belong to.",
+        });
+      if (trip.endedAt !== null)
+        return yield* new Rejected({
+          reason: "invalid",
+          message: "That trip has ended. Choose a live trip.",
+        });
+      const stakes =
+        yield* sql`select 1 from stakes where trip_id = ${command.tripId} and ended_at is null and voided_at is null`;
+      if (stakes.length > 0)
+        return yield* new Rejected({
+          reason: "invalid",
+          message: "That trip has an open stake. End the stake before adding a table.",
+        });
+    }
     if (command.type === "appoint_recorder") {
       if (!participants.some((item) => item.playerId === command.playerId))
         return yield* new Rejected({
@@ -373,6 +402,8 @@ const save = Effect.fn("Recording.save")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   if (isTableCommand(command)) {
+    if (command.type === "set_table_trip")
+      yield* sql`update tables set trip_id = ${command.tripId} where id = ${command.tableId}`;
     yield* sql`
       insert into personal_operations (id, player_id, visit_id, table_id, actor_id, command)
       values (${command.operationId}, ${self.playerId}, null, ${command.tableId},
@@ -733,6 +764,7 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
   row: typeof TableRow.Type & { readonly starterPlayerId: PlayerId },
   viewerRole: TableView["viewerRole"],
   viewerPlayerId: PlayerId | null,
+  includeEntries = false,
 ) {
   const sql = yield* SqlClient.SqlClient;
   const visits = yield* sql`
@@ -763,6 +795,7 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalEntryRow)));
   const view: TableView = {
     table: tableOf(row, row.starterPlayerId),
+    ...(includeEntries ? { entries: entries.map(entryOf) } : {}),
     players: players.map((player) => PlayerIdentity.make(player)),
     visits: visits
       .filter((visit) => visit.deletedAt === null)
@@ -776,6 +809,17 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
   return view;
 });
 
+const tripMember = Effect.fn("Recording.tripMember")(function* (tripId: TripId | null) {
+  const recorder = yield* Recorder;
+  if (tripId === null || recorder._tag !== "Account") return false;
+  const sql = yield* SqlClient.SqlClient;
+  const rows = yield* sql`
+    select 1 from trips t join memberships m on m.group_id = t.group_id
+    where t.id = ${tripId} and m.user_id = ${recorder.user.userId} and m.left_at is null
+  `;
+  return rows.length > 0;
+});
+
 /**
  * A table this recorder started, joined or records for, and its role there. Any other is a 404, so
  * its existence stays private.
@@ -783,7 +827,6 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
 const tableAccess = Effect.fn("Recording.tableAccess")(function* (tableId: TableId) {
   const sql = yield* SqlClient.SqlClient;
   const { actorPlayers } = yield* principal();
-  if (actorPlayers.length === 0) return yield* new NotFound({ resource: "table" });
   const [row] = yield* sql`select * from tables where id = ${tableId}`.pipe(
     Effect.flatMap(Access.decodeRows(TableRow)),
   );
@@ -798,7 +841,10 @@ const tableAccess = Effect.fn("Recording.tableAccess")(function* (tableId: Table
     actorPlayers.includes(item.playerId),
   );
   const player = recorder ?? joined;
-  if (!player) return yield* new NotFound({ resource: "table" });
+  if (!player) {
+    if (yield* tripMember(row.tripId)) return { row: at, role: "viewer" as const, playerId: null };
+    return yield* new NotFound({ resource: "table" });
+  }
   return {
     row: at,
     role: recorder ? ("recorder" as const) : ("participant" as const),
@@ -815,7 +861,7 @@ const startedTable = Effect.fn("Recording.startedTable")(function* (tableId: Tab
 
 export const table = Effect.fn("Recording.table")(function* (tableId: TableId) {
   const { row, role, playerId } = yield* tableAccess(tableId);
-  return yield* viewOf(row, role, playerId);
+  return yield* viewOf(row, role, playerId, yield* tripMember(row.tripId));
 });
 
 /** A new read-only link. Only its hash is kept, so an earlier link stops working. */

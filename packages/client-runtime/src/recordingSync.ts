@@ -489,6 +489,8 @@ const optional = <K extends string, V>(key: K, value: V | null) =>
  * visit and entries of a start recorded again to their new IDs.
  */
 const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): RecordingInput => {
+  if (command.type === "set_table_trip")
+    return { type: command.type, tableId: command.tableId, tripId: command.tripId };
   if (isTableCommand(command))
     return { type: command.type, tableId: command.tableId, playerId: command.playerId };
   const visitId = (ids.get(command.visitId) ?? command.visitId) as typeof command.visitId;

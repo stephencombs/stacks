@@ -1,5 +1,5 @@
 ---
-status: planned
+status: complete
 created: 2026-11-14
 priority: high
 tags:
@@ -12,7 +12,13 @@ depends_on:
   - "003"
 parent: "001"
 created_at: 2026-11-14T20:21:34.060804102Z
-updated_at: 2026-11-14T20:21:34.060804102Z
+updated_at: 2026-11-15T20:03:52.447306926Z
+completed_at: 2026-11-15T20:03:52.447306926Z
+transitions:
+  - status: in-progress
+    at: 2026-11-15T19:18:15.341056788Z
+  - status: complete
+    at: 2026-11-15T20:03:52.447306926Z
 ---
 
 # A table's trip: group play recorded from Play
@@ -34,13 +40,13 @@ Today tables recorded from Play never belong to a trip (`tripId: null` in `packa
 
 ## Plan
 
-- [ ] Migration, contracts and shared logic for a table's trip, with tests
-- [ ] API: starter-only, membership, ended-trip and open-stake checks, with tests on the seeded database
-- [ ] Pick a trip when starting a session, web and mobile; refused choices shown
+- [x] Migration, contracts and shared logic for a table's trip, with tests
+- [x] API: starter-only, membership, ended-trip and open-stake checks, with tests on the seeded database
+- [x] Pick a trip when starting a session, web and mobile; refused choices shown
 
 ## Test
 
-- [ ] A member sees a table in their group's trip; a non-member and a removed member don't (API tests)
-- [ ] Changing a table's trip moves all its visits and changes no one's results
-- [ ] A refused trip choice leaves the table personal and visible as refused
-- [ ] A trip with an open stake refuses a table
+- [x] A member sees a table in their group's trip; a non-member and a removed member don't (API tests)
+- [x] Changing a table's trip moves all its visits and changes no one's results
+- [x] A refused trip choice leaves the table personal and visible as refused
+- [x] A trip with an open stake refuses a table

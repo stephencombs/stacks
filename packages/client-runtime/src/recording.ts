@@ -7,6 +7,7 @@ import {
   VisitId,
   type Game,
   type VenueId,
+  type TripId,
 } from "@stacks/contracts";
 import {
   RecordingCommand,
@@ -41,6 +42,7 @@ type StartInput = {
   readonly highLimit?: boolean;
 };
 export type RecordingInput =
+  | { readonly type: "set_table_trip"; readonly tableId: TableId; readonly tripId: TripId | null }
   | ({ readonly type: "start" } & StartInput)
   | ({
       readonly type: "record_completed";
@@ -169,6 +171,7 @@ export const prepareRecordingCommand = (
       ...withCounterparty(input.counterpartyId),
     });
   }
+  if (input.type === "set_table_trip") return RecordingCommand.make({ ...common, ...input });
   if (input.type === "appoint_recorder" || input.type === "revoke_recorder")
     return RecordingCommand.make({
       ...common,

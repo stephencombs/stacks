@@ -53,6 +53,7 @@ import {
   VoidSheet,
 } from "../features/RecordingForms";
 import { TableSection } from "../features/SharedTable";
+import { TableTripSheet, TableTripButton } from "../features/TableTrip";
 
 type Props = StaticScreenProps<{ visitId: string }>;
 
@@ -128,6 +129,7 @@ function Missing() {
 type Open =
   | {
       readonly type:
+        | "trip"
         | "edit"
         | "table"
         | "history"
@@ -441,6 +443,12 @@ function Visit({ visitId }: { visitId: VisitId }) {
               </Row>
             ))}
           </List>
+          {state && ownPlayers(state).includes(visit.table.starterPlayerId) ? (
+            <TableTripButton
+              attached={visit.table.tripId !== null}
+              onOpen={() => setOpen({ type: "trip" })}
+            />
+          ) : null}
           <View className="flex-row gap-2">
             <Button
               label="At this table"
@@ -488,6 +496,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
         <StartTimeSheet visit={visit} onClose={close} onSaved={() => edited("Start time saved.")} />
       ) : open?.type === "game" ? (
         <GameSheet visit={visit} onClose={close} onSaved={() => edited("Game saved.")} />
+      ) : open?.type === "trip" ? (
+        <TableTripSheet table={visit.table} onClose={close} onSaved={() => edited("Trip saved.")} />
       ) : open?.type === "venue" ? (
         <VenueSheet visit={visit} onClose={close} onSaved={() => edited("Casino saved.")} />
       ) : open?.type === "reopen" ? (

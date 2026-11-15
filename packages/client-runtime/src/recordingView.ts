@@ -3,6 +3,8 @@ import {
   CurrencyCode,
   MinorUnits,
   type EntryId,
+  type GroupListItem,
+  type TripId,
   type PlayEntry,
   type PlayerIdentity,
   type Table,
@@ -512,7 +514,9 @@ export const localDateText = (now = new Date()) =>
 const changes = (count: number) => (count === 1 ? "1 change" : `${count} changes`);
 
 /** What a refused change was, and why the account refused it. */
-export const describeRecordingRejection = ({ command, reason }: RecordingRejection) => {
+export const describeRecordingRejection = ({ command, reason, message }: RecordingRejection) => {
+  if (command.type === "set_table_trip")
+    return `The trip choice didn't sync. ${message} Your recorded play is saved. Choose a trip again from Edit.`;
   const what =
     command.type === "start"
       ? `Starting a session with ${money(command.buyIn)}`
@@ -604,7 +608,12 @@ export const recordingSyncView = (
   syncView(
     state,
     sync,
-    (command) => visitId === undefined || ("visitId" in command && command.visitId === visitId),
+    (command) =>
+      visitId === undefined ||
+      ("visitId" in command && command.visitId === visitId) ||
+      (command.type === "set_table_trip" &&
+        state?.visits.some((visit) => visit.id === visitId && visit.tableId === command.tableId) ===
+          true),
   );
 
 const syncView = (
@@ -721,4 +730,19 @@ export const sessionEditFields = (visit: RecordingVisitView, canEditTable: boole
       { field: "venue", label: "Casino", value: visit.venue?.name ?? "Not set" },
     );
   return fields;
+};
+
+export const tableTripOptions = (groups: ReadonlyArray<GroupListItem>, selected: TripId | null) => {
+  const live = groups.flatMap(({ group, trips }) =>
+    trips
+      .filter((trip) => trip.endedAt === null)
+      .map((trip) => ({ key: trip.id, label: `${group.name} · ${trip.name}` })),
+  );
+  return [
+    { key: "", label: "Personal · no trip" },
+    ...(selected && !live.some((item) => item.key === selected)
+      ? [{ key: selected, label: "Current trip" }]
+      : []),
+    ...live,
+  ];
 };

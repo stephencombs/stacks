@@ -7,6 +7,7 @@ import {
   PlayerId,
   NotFound,
   TableId,
+  TripId,
   UserId,
   VenueId,
   type PlayerIdentity,
@@ -35,7 +36,11 @@ import * as Queue from "effect/Queue";
 import * as TestClock from "effect/testing/TestClock";
 
 import { makeRecordingStore, prepareRecordingCommand, type RecordingStore } from "./recording.ts";
-import { decodeRecordingState, type RecordingState } from "./recordingState.ts";
+import {
+  decodeRecordingState,
+  encodeRecordingState,
+  type RecordingState,
+} from "./recordingState.ts";
 import type { RecordingStorage, RecordingStorageDocument } from "./recordingStorage.ts";
 import {
   addJoinedTable,
@@ -1547,4 +1552,43 @@ it("syncs durable offline deletion and restore, preserving rejections for anothe
   expect(state(store).visits[0]!.deletedAt).toBeUndefined();
   expect(pendingRecordingCommands(state(store))).toEqual([]);
   await store.close();
+});
+
+it("rolls back a refused trip choice without losing offline play and shows it on the session", async () => {
+  const store = await open();
+  await save(store, { type: "start", buyIn: 20000 });
+  const started = state(store).receipts[0]!.command;
+  if (started.type !== "start") throw new Error("Expected start");
+  const before = state(store);
+  const tripId = TripId.make(crypto.randomUUID());
+  await save(store, { type: "set_table_trip", tableId: started.tableId, tripId });
+  const selected = state(store).receipts.at(-1)!.command;
+  await save(store, { type: "add", visitId: started.visitId, kind: "buy_in", amount: 10000 });
+  const waiting = state(store);
+  const after = applyPushResults(
+    { ...waiting, sync: { userId: alex, synced: [], rejected: [] } },
+    waiting.receipts.map(({ command }) =>
+      command.operationId === selected.operationId
+        ? {
+            operationId: command.operationId,
+            status: "rejected",
+            reason: "invalid",
+            message: "That trip has ended.",
+          }
+        : { operationId: command.operationId, status: "accepted" },
+    ),
+  );
+  expect(after.tables[0]!.tripId).toBeNull();
+  expect(after.entries).toHaveLength(2);
+  expect(after.visits[0]!.revision).toBe(1);
+  expect(
+    recordingSyncView(after, { phase: "idle", error: null }, started.visitId).rejected[0]!.sentence,
+  ).toContain("That trip has ended");
+  const retried = recordRejectedAgain(after, selected.operationId);
+  expect(retried.tables[0]!.tripId).toBe(tripId);
+  expect(
+    decodeRecordingState(encodeRecordingState(retried), retried.receipts.length + 1).tables[0]!
+      .tripId,
+  ).toBe(tripId);
+  expect(before.entries[0]).toEqual(after.entries[0]);
 });

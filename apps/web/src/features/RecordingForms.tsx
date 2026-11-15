@@ -5,6 +5,7 @@ import {
   type PlayerId,
   type PlayerIdentity,
   type TableId,
+  type TripId,
   type VisitId,
 } from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
@@ -39,6 +40,7 @@ import { Field, FormError, Input, RadioCards, Select } from "~/components/ui/Fie
 import { Note } from "~/components/ui/Page";
 import { Segmented } from "~/components/ui/Segmented";
 import { SessionVenuePicker } from "~/features/VenuePicker";
+import { TripChoice } from "./TableTrip";
 
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
 
@@ -307,11 +309,14 @@ const startedVisit = (receipt: RecordingReceipt) =>
 export function StartDialog({
   onClose,
   onStarted,
+  initialTripId = null,
 }: {
+  initialTripId?: TripId | null;
   onClose: () => void;
   onStarted: (visitId: VisitId) => void;
 }) {
   const save = useRecordingSubmit();
+  const [tripId, setTripId] = useState(initialTripId);
   const buyIn = useAmount("", 1);
   const [game, setGame] = useState<Game | "">("");
   const [highLimit, setHighLimit] = useState(false);
@@ -331,11 +336,14 @@ export function StartDialog({
           ...(game ? { game } : {}),
           highLimit,
         });
+        if (tripId && receipt && "tableId" in receipt.command)
+          await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
         const visitId = receipt && startedVisit(receipt);
         if (visitId) onStarted(visitId);
       }}
     >
       <AmountField label="Buy-in" amount={buyIn} first />
+      <TripChoice value={tripId} onChange={setTripId} />
       <DetailsFields
         game={game}
         highLimit={highLimit}
