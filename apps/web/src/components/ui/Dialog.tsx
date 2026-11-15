@@ -35,7 +35,10 @@ export function Dialog({
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>
         <BaseDialog.Backdrop
-          className={cn("fixed inset-0 z-40 bg-scrim transition-opacity", timing)}
+          className={cn(
+            "fixed inset-0 z-40 bg-scrim transition-opacity data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
+            timing,
+          )}
         />
         <BaseDialog.Popup
           ref={popup}

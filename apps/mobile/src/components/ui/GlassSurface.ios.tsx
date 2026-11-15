@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import { useUniwind, withUniwind } from "uniwind";
 
-import { glassFill, type GlassSurfaceProps } from "./GlassSurface";
+import { glassFill, type GlassSurfaceProps } from "./glassSurfaceShared";
 import { cn } from "./cn";
 
 const NativeGlass = withUniwind(GlassView);

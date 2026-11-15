@@ -32,7 +32,7 @@ import {
 
 import { Button } from "../components/ui/Button";
 import { Choice, FormError } from "../components/ui/Field";
-import { isReducedMotion } from "../components/ui/motion";
+import { animate, isReducedMotion } from "../components/ui/motion";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row } from "../components/ui/Surface";
 import { useAction, useStacks } from "../lib/stacks";
@@ -191,12 +191,11 @@ function ResultTag({
 }) {
   const [flip] = useState(() => new Animated.Value(0));
   useEffect(() => {
-    Animated.timing(flip, {
+    animate(flip, {
       toValue: 1,
       duration: 520,
       easing: Easing.bezier(0.23, 1, 0.32, 1),
-      useNativeDriver: true,
-    }).start();
+    });
   }, [flip]);
   const bust = busted(out);
   const label = bust ? "Bust" : formatMoney(out.net, currency, { signDisplay: "exceptZero" });
