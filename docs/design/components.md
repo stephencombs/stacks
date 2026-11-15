@@ -4,7 +4,7 @@ Parts live in `apps/web/src/components/ui` and `apps/mobile/src/components/ui`; 
 
 ## Button
 
-Use for an action. Going to another page on web is a `ButtonLink`, which takes the same variants.
+Use for an action. Going to another page on web is a `ButtonLink`, which takes the same variants. Floating icon controls use `IconButton`; web navigation uses `IconLink`. They own their round glass surface and require an accessible action label.
 
 Variants: `primary`, `tint`, `secondary`, `ghost`, `danger`. Sizes: `sm`, `md`, `lg`, plus `xl` on mobile. Nothing else exists.
 
@@ -34,7 +34,7 @@ Labels name the outcome: "Void entry", not "Confirm".
 
 Press feedback is built in on both clients: the shared press scale and timing. Don't add your own `active:scale` to a `Button` or wrap one in another pressable.
 
-A one-tap write, like a rebuy, keeps its button where it was, so a second tap does it again. Taking it back is an Undo somewhere else: a toast on mobile, and on web a bar floating where the `LiveBar` sits. A button that turns into its own undo makes a double-tap cancel itself. A repeat-amount button reads "Rebuy $300", never "+$300": a signed amount means a result.
+A one-tap write, like a rebuy, keeps its button where it was, so a second tap does it again. Taking it back is an Undo somewhere else: a toast on mobile, and on web a bar floating where the `LiveBar` sits. A button that turns into its own undo makes a double-tap cancel itself. Outside the felt screen, a repeat-amount button reads "Rebuy $300". The felt screen labels the whole row "Rebuy" and uses three equal controls: "+ $100", "+ $200" and "Other". Its undo toast sits above that row.
 
 ## Segmented (web), Choice (mobile)
 

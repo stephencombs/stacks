@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, IconButton } from "./Button";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { Sheet } from "./Sheet";
 
 export type ActionMenuProps = {
@@ -8,6 +8,7 @@ export type ActionMenuProps = {
   disabled?: boolean;
   actions: ReadonlyArray<{
     label: string;
+    icon?: IconName;
     onPress: () => void;
     destructive?: boolean;
     disabled?: boolean;
@@ -30,6 +31,12 @@ export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps
             <Button
               key={action.label}
               label={action.label}
+              icon={
+                action.icon ? (
+                  <Icon name={action.icon} color={action.destructive ? "loss" : "ink"} />
+                ) : undefined
+              }
+              className={action.icon ? "justify-start" : undefined}
               disabled={action.disabled}
               variant={action.destructive ? "danger" : "secondary"}
               onPress={() => {

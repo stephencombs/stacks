@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-14
 priority: high
 tags:
@@ -12,7 +12,10 @@ depends_on:
   - "009"
 parent: "001"
 created_at: 2026-11-14T20:21:32.890857232Z
-updated_at: 2026-11-14T20:21:32.890857232Z
+updated_at: 2026-11-15T17:54:26.466466362Z
+transitions:
+  - status: in-progress
+    at: 2026-11-15T05:53:32.506416530Z
 ---
 
 # Live screen: felt and Finished
@@ -34,11 +37,13 @@ Build the live session as designed on the canvas, for a player alone at a table:
 
 ## Plan
 
-- [ ] Live screen, rebuy toast and sheets on mobile
-- [ ] Live screen, rebuy toast and sheets on web
-- [ ] Finished screen on web and mobile
+- [x] Live screen, rebuy toast and sheets on mobile
+- [x] Live screen, rebuy toast and sheets on web
+- [x] Finished screen on web and mobile
 
 ## Test
 
-- [ ] Rebuy undo removes only that rebuy
+- [x] Rebuy undo removes only that rebuy
 - [ ] The `PLAN.md` phase 2 milestone still passes on the new screen, offline, web and mobile
+
+The milestone passes in the production web app and the mobile app’s signed-out web build. Native device verification is pending: Android device-hub screenshots and commands failed; iOS simulators require macOS.

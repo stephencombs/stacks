@@ -1,3 +1,4 @@
+import { personalStats } from "@stacks/shared/stats";
 import {
   CurrencyCode,
   MinorUnits,
@@ -15,7 +16,7 @@ import { projectVisit, visitSummary } from "@stacks/shared/visits";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 
-import { gameNames } from "./format.ts";
+import { formatDay, formatTime, gameNames } from "./format.ts";
 import {
   type RecordingCommand,
   type RecordingOperationId,
@@ -609,4 +610,72 @@ const syncView = (
     },
     rejected,
   };
+};
+
+export const LIVE_REBUY_AMOUNTS = [10000, 20000] as const;
+
+export const sessionReadout = (visit: RecordingVisitView, now: DateTime.Utc) => {
+  const elapsed = Math.max(0, ms(visit.visit.finishedAt ?? now) - ms(visit.visit.startedAt));
+  const seconds = Math.floor(elapsed / 1000);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return {
+    clock: `${hours}:${minutes.toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`,
+    buyIns: visit.entries.filter((entry) => entry.kind === "buy_in" && entry.voidedAt === null)
+      .length,
+    corrected: visit.entries.some((entry) => entry.kind === "buy_in" && entry.voidedAt !== null),
+    hourly:
+      visit.finalResult === null || elapsed === 0
+        ? null
+        : personalStats([visit], DateTime.zoneMakeNamedUnsafe("UTC")).summary.hourlyResult,
+  };
+};
+
+export const buyInTotalPreview = (
+  current: number,
+  text: string,
+  mode: "add" | "subtract" | "set",
+) => {
+  const typed = parseRecordingAmount(text, 1);
+  if (typed.error !== null) return null;
+  const total =
+    mode === "add"
+      ? current + typed.amount
+      : mode === "subtract"
+        ? current - typed.amount
+        : typed.amount;
+  return Number.isSafeInteger(total) && total > 0 ? total : null;
+};
+
+export function applyAmountKey(amount: string, key: string, decimal: string): string {
+  if (key === "back") return amount.slice(0, -1);
+  if (key === "sign") return amount.startsWith("-") ? amount.slice(1) : `-${amount}`;
+  if (key === decimal && amount.includes(decimal)) return amount;
+  return amount === "0" && key !== decimal ? key : amount + key;
+}
+
+export const cashOutResultPreview = (visit: RecordingVisitView, text: string) => {
+  const parsed = parseRecordingAmount(text, 0);
+  if (parsed.error !== null) return null;
+  const result = visit.totals.cashOut - visit.totals.buyIn + parsed.amount;
+  return Number.isSafeInteger(result) ? result : null;
+};
+
+export type SessionEditField = "buy_in" | "start_time" | "game" | "venue";
+
+export const sessionEditFields = (visit: RecordingVisitView, canEditTable: boolean) => {
+  const fields: Array<{ field: SessionEditField; label: string; value: string }> = [
+    { field: "buy_in", label: "Buy-in total", value: money(visit.totals.buyIn) },
+    {
+      field: "start_time",
+      label: "Started",
+      value: `${formatDay(visit.visit.startedAt)} · ${formatTime(visit.visit.startedAt)}`,
+    },
+  ];
+  if (canEditTable)
+    fields.push(
+      { field: "game", label: "Game", value: visitTitle(visit.table) },
+      { field: "venue", label: "Casino", value: visit.venue?.name ?? "Not set" },
+    );
+  return fields;
 };

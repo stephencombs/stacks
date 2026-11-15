@@ -3,7 +3,7 @@ import { useCSSVariable } from "uniwind";
 
 import type { IconColor, IconName } from "./Icon";
 
-const symbols: Record<IconName, SFSymbol> = {
+export const symbols: Record<IconName, SFSymbol> = {
   alert: "exclamationmark.circle",
   "chevron-right": "chevron.right",
   "chevron-down": "chevron.down",
@@ -21,6 +21,7 @@ const symbols: Record<IconName, SFSymbol> = {
   stats: "chart.bar",
   map: "map",
   plus: "plus",
+  edit: "pencil",
   search: "magnifyingglass",
   filter: "line.3.horizontal.decrease",
   settings: "gearshape",

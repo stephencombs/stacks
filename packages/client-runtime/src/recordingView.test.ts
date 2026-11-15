@@ -11,6 +11,10 @@ import {
 } from "./recordingStorage.ts";
 import {
   localTimeText,
+  buyInTotalPreview,
+  cashOutResultPreview,
+  sessionReadout,
+  sessionEditFields,
   parsePastSessionTimes,
   parseTimeNear,
   parseRecordingAmount,
@@ -312,5 +316,80 @@ describe("openDeviceRecordingStore", () => {
     expect(store.getSnapshot().status).toBe("saved");
     expect(opened).toEqual([PRIVATE_RECORDING_NAMESPACE, PRIVATE_RECORDING_NAMESPACE]);
     await store.close();
+  });
+});
+
+describe("live session readouts", () => {
+  it("keeps the result pending while live and freezes duration and hourly result at finish", async () => {
+    const { store } = await open();
+    await save(store, { type: "start", buyIn: 25000, startedAt: at(9) });
+    const id = state(store).visits[0]!.id;
+    const live = recordingVisit(state(store), id)!;
+    expect(sessionReadout(live, DateTime.add(at(10), { seconds: 22 }))).toEqual({
+      clock: "1:00:22",
+      buyIns: 1,
+      corrected: false,
+      hourly: null,
+    });
+    expect(cashOutResultPreview(live, "350")).toBe(10000);
+    expect(cashOutResultPreview(live, "0")).toBe(-25000);
+    expect(cashOutResultPreview(live, "")).toBeNull();
+    await save(store, { type: "finish", visitId: id, amount: 35000, finishedAt: at(11) });
+    expect(sessionReadout(recordingVisit(state(store), id)!, at(14))).toEqual({
+      clock: "2:00:00",
+      buyIns: 1,
+      corrected: false,
+      hourly: 5000,
+    });
+    expect(sessionEditFields(live, false).map((field) => field.field)).toEqual([
+      "buy_in",
+      "start_time",
+    ]);
+    expect(sessionEditFields(live, true).map((field) => field.field)).toEqual([
+      "buy_in",
+      "start_time",
+      "game",
+      "venue",
+    ]);
+    await store.close();
+  });
+
+  it("has no hourly rate for an instantaneous finish and counts only standing buy-ins", async () => {
+    const { store } = await open();
+    await save(store, {
+      type: "record_completed",
+      buyIn: 20000,
+      cashOut: 0,
+      startedAt: at(9),
+      finishedAt: at(9),
+    });
+    const id = state(store).visits[0]!.id;
+    const original = recordingVisit(state(store), id)!.entries.find(
+      (entry) => entry.kind === "buy_in",
+    )!;
+    await save(store, {
+      type: "correct",
+      visitId: id,
+      entryId: original.id,
+      reason: "Typo",
+      replacement: { amount: 15000 },
+    });
+    expect(sessionReadout(recordingVisit(state(store), id)!, at(10))).toEqual({
+      clock: "0:00:00",
+      buyIns: 1,
+      corrected: true,
+      hourly: null,
+    });
+    await store.close();
+  });
+
+  it("previews whole-cent add, subtract and set totals without displaying unsafe values", () => {
+    expect(buyInTotalPreview(30000, "0.01", "add")).toBe(30001);
+    expect(buyInTotalPreview(30000, "50", "subtract")).toBe(25000);
+    expect(buyInTotalPreview(30000, "250", "set")).toBe(25000);
+    expect(buyInTotalPreview(30000, "300", "subtract")).toBeNull();
+    expect(buyInTotalPreview(30000, "301", "subtract")).toBeNull();
+    expect(buyInTotalPreview(Number.MAX_SAFE_INTEGER, "0.01", "add")).toBeNull();
+    expect(buyInTotalPreview(30000, "1.001", "set")).toBeNull();
   });
 });

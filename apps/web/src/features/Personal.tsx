@@ -21,12 +21,16 @@ import { Wordmark, You } from "./Shell";
 export function PersonalFrame({
   onClickCapture,
   children,
+  session = false,
+  felt = false,
 }: {
+  session?: boolean;
+  felt?: boolean;
   onClickCapture?: (event: MouseEvent) => void;
   children: ReactNode;
 }) {
   return (
-    <>
+    <div className={felt ? "min-h-dvh bg-felt text-felt-ink" : "min-h-dvh"}>
       <a
         href="#main-content"
         className="sr-only rounded-lg bg-surface px-4 py-3 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-30"
@@ -37,19 +41,25 @@ export function PersonalFrame({
         onClickCapture={onClickCapture}
         className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col pt-[env(safe-area-inset-top)] pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))]"
       >
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3">
-          <Wordmark />
-          <You layout="bar" />
-        </header>
+        {session ? null : (
+          <header className="flex h-16 shrink-0 items-center justify-between gap-3">
+            <Wordmark />
+            <You layout="bar" />
+          </header>
+        )}
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex w-full flex-1 flex-col gap-8 pt-2 pb-10 outline-none"
+          className={
+            session
+              ? "flex w-full flex-1 flex-col gap-6 pt-4 pb-8 outline-none"
+              : "flex w-full flex-1 flex-col gap-8 pt-2 pb-10 outline-none"
+          }
         >
           {children}
         </main>
       </div>
-    </>
+    </div>
   );
 }
 

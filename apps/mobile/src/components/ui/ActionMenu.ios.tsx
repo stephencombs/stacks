@@ -8,6 +8,7 @@ import {
   labelStyle,
 } from "@expo/ui/swift-ui/modifiers";
 import type { ActionMenuProps } from "./ActionMenu";
+import { symbols } from "./Icon.ios";
 
 export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps) {
   return (
@@ -27,6 +28,7 @@ export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps
           <Button
             key={action.label}
             label={action.label}
+            systemImage={action.icon ? symbols[action.icon] : undefined}
             role={action.destructive ? "destructive" : "default"}
             modifiers={[disable(action.disabled ?? false)]}
             onPress={action.onPress}

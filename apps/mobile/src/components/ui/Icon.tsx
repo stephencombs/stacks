@@ -15,6 +15,7 @@ import {
   Ellipsis,
   MapPinned,
   Plus,
+  Pencil,
   Search,
   Settings,
   SlidersHorizontal,
@@ -42,6 +43,7 @@ const icons = {
   stats: ChartColumn,
   map: MapPinned,
   plus: Plus,
+  edit: Pencil,
   search: Search,
   filter: SlidersHorizontal,
   settings: Settings,
@@ -50,7 +52,15 @@ const icons = {
 };
 
 export type IconName = keyof typeof icons;
-export type IconColor = "ink" | "ink-inverse" | "muted" | "faint" | "live" | "win" | "loss";
+export type IconColor =
+  | "ink"
+  | "ink-inverse"
+  | "muted"
+  | "faint"
+  | "live"
+  | "win"
+  | "loss"
+  | "felt-soft";
 
 /** A decorative icon in a palette color; lucide here, SF Symbols on iOS (`Icon.ios.tsx`). */
 export function Icon({
