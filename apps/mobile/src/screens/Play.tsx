@@ -1,14 +1,18 @@
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
+import { formatDay, formatDuration, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
 import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import {
+  useRecordingClock,
   useRecordingSubmit,
   useRecordingTable,
   useRecordingVisit,
   useServerTable,
 } from "@stacks/client-runtime/recordingReact";
 import {
+  LIVE_REBUY_AMOUNTS,
+  sessionReadout,
+  sessionEditFields,
   RECORDING_CURRENCY,
   visitTitle,
   type RecordingEvent,
@@ -19,15 +23,18 @@ import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
-import { Platform, Text, View } from "react-native";
+import { Animated, Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { ActionMenu } from "../components/ui/ActionMenu";
-import { Button } from "../components/ui/Button";
+import { Button, IconButton } from "../components/ui/Button";
+import { GlassSurface } from "../components/ui/GlassSurface";
+import { Icon } from "../components/ui/Icon";
 import { FormError } from "../components/ui/Field";
 import { HeaderTitle } from "../components/ui/HeaderTitle";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, List, Row, SectionHeading, Skeleton, Tag } from "../components/ui/Surface";
+import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
+import { animate, duration, ease } from "../components/ui/motion";
 import { cn } from "../components/ui/cn";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { useRecordingState } from "../lib/recording";
@@ -39,7 +46,6 @@ import {
   RebuySheet,
   SitDownSheet,
   ReopenSheet,
-  StartSheet,
   StartTimeSheet,
   VenueSheet,
   VoidSheet,
@@ -120,10 +126,12 @@ function Missing() {
 type Open =
   | {
       readonly type:
+        | "edit"
+        | "table"
+        | "history"
         | "rebuy"
         | "cash_out"
         | "reopen"
-        | "start"
         | "return"
         | "buy_in"
         | "start_time"
@@ -165,6 +173,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
     setNotice(null);
     setSaved({
       entryId,
+      undo: input.type === "add" && input.kind === "buy_in",
       text:
         input.type === "finish"
           ? `Cash-out of ${money(input.amount)} recorded. You've finished this session.`
@@ -215,149 +224,190 @@ function Visit({ visitId }: { visitId: VisitId }) {
     setSaved(null);
     setNotice(text);
   };
+  const toast = saved ? (
+    <RecordingToast key={saved.entryId}>
+      <Text className="min-w-0 flex-1 text-sm text-ink-inverse">{saved.text}</Text>
+      {saved.undo ? (
+        <Button
+          label="Undo"
+          pending={quick.pending}
+          size="sm"
+          onPress={() => void undo(saved.entryId)}
+        />
+      ) : (
+        <Button
+          label="View entry"
+          size="sm"
+          onPress={() => setOpen({ type: "inspect", entryId: saved.entryId })}
+        />
+      )}
+    </RecordingToast>
+  ) : null;
   return (
     <PersonalScreen
+      session
+      felt={live}
       dock={
-        live ? (
-          <Button
-            key="cash-out"
-            label="Cash out"
-            variant="primary"
-            size="lg"
-            haptic
-            onPress={() => setOpen({ type: "cash_out" })}
-          />
-        ) : !own || table?.role === "participant" ? (
-          <>
-            {canReturn ? (
+        <>
+          {notice ? (
+            <View accessibilityLiveRegion="polite" className="rounded-xl bg-fill px-4 py-2">
+              <Text className="text-sm text-ink">{notice}</Text>
+            </View>
+          ) : null}
+          {toast}
+          {quick.error ? <FormError>{quick.error}</FormError> : null}
+          {live ? (
+            <>
+              <Text className="type-footnote font-medium text-felt-soft">Rebuy</Text>
+              <View
+                className="flex-row gap-2"
+                accessibilityRole="toolbar"
+                accessibilityLabel="Rebuy amounts"
+              >
+                {LIVE_REBUY_AMOUNTS.map((preset) => (
+                  <Button
+                    key={preset}
+                    label={`+ ${money(preset)}`}
+                    size="lg"
+                    haptic
+                    disabled={quick.pending}
+                    className="min-w-0 flex-1"
+                    onPress={() => void rebuy(preset)}
+                  />
+                ))}
+                <Button
+                  label="Other"
+                  size="lg"
+                  disabled={quick.pending}
+                  className="min-w-0 flex-1"
+                  onPress={() => setOpen({ type: "rebuy" })}
+                />
+              </View>
               <Button
-                key="return"
-                label="Back at the table"
+                label="Cash out"
                 variant="primary"
-                size="lg"
-                onPress={() => setOpen({ type: "return" })}
-              />
-            ) : null}
-            <Button
-              key="reopen"
-              label="Fix accidental finish"
-              variant={canReturn ? "ghost" : "secondary"}
-              size="lg"
-              onPress={() => setOpen({ type: "reopen" })}
-            />
-          </>
-        ) : (
-          <>
-            <Button
-              key="start"
-              label="Start another session"
-              variant="primary"
-              size="lg"
-              onPress={() => setOpen({ type: "start" })}
-            />
-            <Button
-              key="reopen"
-              label="Fix accidental finish"
-              variant="ghost"
-              size="lg"
-              onPress={() => setOpen({ type: "reopen" })}
-            />
-          </>
-        )
-      }
-    >
-      <View className="gap-2">
-        <Title
-          tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Finished"}</Tag>}
-          context={[
-            visit.venue?.name,
-            live
-              ? `Started ${formatDay(start)}, ${formatTime(start)}`
-              : `${formatDay(start)} · ${formatTime(start)} to ${formatTime(visit.visit.finishedAt!)}`,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        >
-          {own
-            ? visitTitle(visit.table)
-            : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
-        </Title>
-        <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
-      </View>
-      {live ? (
-        <LiveHero visit={visit} canEditTable={canEditTable} onEdit={(type) => setOpen({ type })} />
-      ) : (
-        <VisitHero visit={visit} />
-      )}
-      {live ? (
-        <View className="gap-2">
-          <SectionHeading>Rebuy</SectionHeading>
-          <View
-            className="flex-row flex-wrap gap-2"
-            accessibilityRole="toolbar"
-            accessibilityLabel="Rebuy amounts"
-          >
-            {visit.presets.map((preset) => (
-              <Button
-                key={preset}
-                label={`+ ${money(preset)}`}
                 size="lg"
                 haptic
                 disabled={quick.pending}
-                className="min-w-24 flex-1"
-                onPress={() => void rebuy(preset)}
+                onPress={() => setOpen({ type: "cash_out" })}
               />
-            ))}
-            <Button
-              label="Other amount"
-              variant="ghost"
-              size="lg"
-              className="min-w-24 flex-1"
-              onPress={() => setOpen({ type: "rebuy" })}
-            />
-          </View>
-          {quick.error ? <FormError>{quick.error}</FormError> : null}
-        </View>
-      ) : null}
-      {notice ? (
-        <View accessibilityLiveRegion="polite" className="rounded-xl bg-fill px-4 py-2.5">
-          <Text className="text-sm text-ink">{notice}</Text>
-        </View>
-      ) : null}
-      {saved ? (
-        <View
-          accessibilityLiveRegion="polite"
-          className="flex-row flex-wrap items-center justify-between gap-2 rounded-xl bg-fill py-1.5 pr-1.5 pl-4"
-        >
-          <Text className="min-w-0 flex-1 text-sm text-ink">{saved.text}</Text>
-          <View className="flex-row gap-1">
-            {saved.undo ? (
-              <Button
-                label="Undo"
-                variant="ghost"
-                size="sm"
-                pending={quick.pending}
-                onPress={() => void undo(saved.entryId)}
-              />
-            ) : null}
-            <Button
-              label="View entry"
-              variant="ghost"
-              size="sm"
-              onPress={() => setOpen({ type: "inspect", entryId: saved.entryId })}
-            />
-          </View>
-        </View>
-      ) : null}
-      <TableSection
-        tableId={visit.visit.tableId}
-        onOpen={(next) => {
-          if (next === visitId) return;
-          setSaved(null);
-          navigation.dispatch(StackActions.push("Play", { visitId: next }));
-        }}
+            </>
+          ) : (
+            <>
+              <Text className="type-footnote text-muted">
+                Undo reopens this session. Returning starts a new one.
+              </Text>
+              <View className="flex-row gap-2">
+                <Button
+                  label="Undo cash-out"
+                  size="lg"
+                  className="flex-1"
+                  onPress={() => setOpen({ type: "reopen" })}
+                />
+                {canReturn ? (
+                  <Button
+                    label="Back at the table"
+                    variant="primary"
+                    size="lg"
+                    className="flex-1"
+                    onPress={() => setOpen({ type: "return" })}
+                  />
+                ) : null}
+              </View>
+            </>
+          )}
+        </>
+      }
+    >
+      <VisitHeader
+        visit={visit}
+        solo={(table?.visits.length ?? 1) === 1}
+        onEdit={() => setOpen({ type: "edit" })}
+        onTable={() => setOpen({ type: "table" })}
+        onHistory={() => setOpen({ type: "history" })}
       />
-      <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
+      {live ? (
+        <>
+          <LiveHero visit={visit} name={own ? undefined : player?.player.displayName} />
+          <View className="items-center">
+            <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} felt />
+          </View>
+        </>
+      ) : (
+        <>
+          <Text accessibilityRole="header" className="type-title text-ink">
+            {own
+              ? visitTitle(visit.table)
+              : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
+          </Text>
+          <Text className="type-footnote text-muted">
+            {[
+              visit.venue?.name,
+              formatDay(start),
+              `${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
+          <VisitHero visit={visit} />
+          <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
+          <TableSection
+            tableId={visit.visit.tableId}
+            onOpen={(next) => {
+              if (next !== visitId) {
+                setSaved(null);
+                navigation.dispatch(StackActions.push("Play", { visitId: next }));
+              }
+            }}
+          />
+          <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
+        </>
+      )}
+      {open?.type === "edit" ? (
+        <Sheet
+          open
+          title="Edit my session"
+          onClose={close}
+          footer={<Button label="Done" onPress={close} />}
+        >
+          <List>
+            {sessionEditFields(visit, canEditTable).map(({ field: type, label, value }) => (
+              <Row key={type} onPress={() => setOpen({ type })}>
+                <Text className="flex-1 type-body text-ink">{label}</Text>
+                <Text className="max-w-[60%] shrink type-callout text-muted">{value}</Text>
+                <Icon name="chevron-right" color="muted" size={18} />
+              </Row>
+            ))}
+          </List>
+          <View className="flex-row gap-2">
+            <Button
+              label="At this table"
+              variant="ghost"
+              onPress={() => setOpen({ type: "table" })}
+            />
+            <Button
+              label="Your history"
+              variant="ghost"
+              onPress={() => setOpen({ type: "history" })}
+            />
+          </View>
+        </Sheet>
+      ) : open?.type === "table" ? (
+        <Sheet open title="At this table" onClose={close}>
+          <TableSection
+            tableId={visit.visit.tableId}
+            onOpen={(next) => {
+              close();
+              if (next !== visitId)
+                navigation.dispatch(StackActions.push("Play", { visitId: next }));
+            }}
+          />
+        </Sheet>
+      ) : open?.type === "history" ? (
+        <Sheet open title="Your history" onClose={close}>
+          <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
+        </Sheet>
+      ) : null}
       {open?.type === "rebuy" ? (
         <RebuySheet visit={visit} onClose={close} onSaved={recorded} />
       ) : open?.type === "cash_out" ? (
@@ -387,16 +437,6 @@ function Visit({ visitId }: { visitId: VisitId }) {
           onSeated={(next) => {
             close();
             setSaved(null);
-            navigation.dispatch(StackActions.replace("Play", { visitId: next }));
-          }}
-        />
-      ) : open?.type === "start" ? (
-        <StartSheet
-          onClose={close}
-          onStarted={(next) => {
-            close();
-            setSaved(null);
-            // The finished session is done with; back from the new one goes to your play.
             navigation.dispatch(StackActions.replace("Play", { visitId: next }));
           }}
         />
@@ -431,92 +471,175 @@ function Visit({ visitId }: { visitId: VisitId }) {
   );
 }
 
-const FIGURE = "type-hero";
-
-/** Now, ticking every 30 seconds, for a live session's clock. */
-function useMinuteClock() {
-  const [now, setNow] = useState(() => DateTime.nowUnsafe());
+function RecordingToast({ children }: { children: ReactNode }) {
+  const [shown] = useState(() => new Animated.Value(0));
   useEffect(() => {
-    const timer = setInterval(() => setNow(DateTime.nowUnsafe()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
+    animate(shown, { toValue: 1, duration: duration.toastIn, easing: ease.enter });
+    return () => shown.stopAnimation();
+  }, [shown]);
+  return (
+    <Animated.View
+      style={{
+        opacity: shown,
+        transform: [{ translateY: shown.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+      }}
+    >
+      <View
+        accessibilityLiveRegion="polite"
+        className="flex-row items-center gap-2 rounded-xl bg-ink py-2 pr-2 pl-4"
+      >
+        {children}
+      </View>
+    </Animated.View>
+  );
 }
 
-type EditField = "buy_in" | "start_time" | "game" | "venue";
-
-/** A live session at a glance: how long, how much in, what game, and a way to fix any of it. */
-function LiveHero({
+function VisitHeader({
   visit,
-  canEditTable,
+  solo,
   onEdit,
+  onTable,
+  onHistory,
 }: {
   visit: RecordingVisitView;
-  canEditTable: boolean;
-  onEdit: (field: EditField) => void;
+  solo: boolean;
+  onEdit: () => void;
+  onTable: () => void;
+  onHistory: () => void;
 }) {
-  const now = useMinuteClock();
-  const game = visit.table.game ? gameNames[visit.table.game] : null;
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+    return () => navigation.setOptions({ headerShown: true });
+  }, [navigation]);
+  const live = visit.visit.finishedAt === null;
   return (
-    <View className="gap-3 overflow-hidden rounded-2xl border border-line bg-surface p-5">
-      <View className="flex-row items-start gap-4">
-        <View className="min-w-0 flex-1 gap-1">
-          <Text className="type-label text-muted">Playing for</Text>
-          <Text numberOfLines={1} adjustsFontSizeToFit className={cn(FIGURE, "text-ink")}>
-            {formatDuration(visit.visit.startedAt, now)}
-          </Text>
-        </View>
-        <View className="min-w-0 flex-1 gap-1">
-          <Text className="type-label text-muted">In</Text>
-          <Money amount={visit.totals.buyIn} currency={RECORDING_CURRENCY} fit className={FIGURE} />
-        </View>
+    <View className="flex-row items-center justify-between gap-3">
+      <IconButton
+        accessibilityLabel="Back to your play"
+        icon={
+          <View className="rotate-180">
+            <Icon name="arrow-right" color="ink" />
+          </View>
+        }
+        onPress={() =>
+          navigation.canGoBack()
+            ? navigation.goBack()
+            : navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } })
+        }
+      />
+      {live ? (
+        <LiveClock visit={visit} />
+      ) : (
+        <Text accessibilityRole="header" className="type-headline text-ink">
+          Finished
+        </Text>
+      )}
+      {live && solo ? (
+        <IconButton
+          accessibilityLabel="Edit my session"
+          icon={<Icon name="edit" color="ink" />}
+          onPress={onEdit}
+        />
+      ) : (
         <ActionMenu
-          label="Edit session"
+          label="Session actions"
           actions={[
-            { label: "Buy-in", onPress: () => onEdit("buy_in") },
-            { label: "Start time", onPress: () => onEdit("start_time") },
-            ...(canEditTable
-              ? [
-                  { label: "Game", onPress: () => onEdit("game") },
-                  { label: "Casino", onPress: () => onEdit("venue") },
-                ]
-              : []),
+            { label: "Edit my session", icon: "edit", onPress: onEdit },
+            { label: "At this table", icon: "group", onPress: onTable },
+            { label: "Your history", icon: "sessions", onPress: onHistory },
           ]}
         />
-      </View>
-      <Text className="type-footnote text-muted">
-        {[
-          game ?? "Game not set",
-          visit.table.highLimit ? "High limit" : null,
-          `since ${formatTime(visit.visit.startedAt)}`,
-          visit.totals.cashOut > 0 ? `${money(visit.totals.cashOut)} out` : null,
-          "result pending",
-        ]
-          .filter(Boolean)
-          .join(" · ")}
+      )}
+    </View>
+  );
+}
+
+function LiveClock({ visit }: { visit: RecordingVisitView }) {
+  const now = useRecordingClock();
+  return (
+    <GlassSurface radius={22} className="min-h-11 flex-row items-center gap-2 rounded-full px-4">
+      <View className="size-2 rounded-full bg-live" />
+      <Text className="type-footnote font-semibold text-ink">LIVE</Text>
+      <Text className="type-callout font-semibold text-ink tabular-nums">
+        {sessionReadout(visit, now).clock}
+      </Text>
+    </GlassSurface>
+  );
+}
+
+function LiveHero({ visit, name }: { visit: RecordingVisitView; name?: string | undefined }) {
+  const summary = sessionReadout(visit, visit.visit.startedAt);
+  return (
+    <View className="items-center gap-3 pt-20">
+      <Text accessibilityRole="header" className="type-body font-medium text-felt-soft">
+        {name ? `${name} · Bought in` : "Bought in"}
+      </Text>
+      <Money
+        amount={visit.totals.buyIn}
+        currency={RECORDING_CURRENCY}
+        fit
+        className="w-full text-center text-7xl leading-[88px] text-felt-ink"
+      />
+      <Text className="mt-3 text-center type-headline text-felt-ink">
+        {[visitTitle(visit.table), visit.venue?.name].filter(Boolean).join(" · ")}
+      </Text>
+      <Text className="text-center type-footnote text-felt-soft">
+        Started {formatTime(visit.visit.startedAt)} ·{" "}
+        {summary.corrected
+          ? "buy-in corrected"
+          : `${summary.buyIns} ${summary.buyIns === 1 ? "buy-in" : "buy-ins"}`}
       </Text>
     </View>
   );
 }
 
 function VisitHero({ visit }: { visit: RecordingVisitView }) {
-  const { totals, finalResult } = visit;
-  if (finalResult === null) return null;
+  const summary = sessionReadout(visit, visit.visit.finishedAt!);
   return (
-    <View className="overflow-hidden rounded-2xl border border-line bg-surface p-5">
+    <View className="gap-5 rounded-2xl bg-surface p-5">
       <View className="gap-1">
-        <Text className="type-label text-muted">Final result</Text>
+        <Text className="type-footnote text-muted">Your result</Text>
         <Money
-          amount={finalResult}
+          amount={visit.finalResult!}
           currency={RECORDING_CURRENCY}
           tone="result"
           fit
           className="type-hero"
         />
-        <Text className="type-footnote text-muted">
-          In <Money amount={totals.buyIn} currency={RECORDING_CURRENCY} className="text-muted" /> ·
-          Out <Money amount={totals.cashOut} currency={RECORDING_CURRENCY} className="text-muted" />
-        </Text>
+      </View>
+      <View className="flex-row gap-4">
+        <View className="flex-1 gap-1">
+          <Text className="type-footnote text-muted">Bought in</Text>
+          <Money amount={visit.totals.buyIn} currency={RECORDING_CURRENCY} />
+        </View>
+        <View className="flex-1 gap-1">
+          <Text className="type-footnote text-muted">Cashed out</Text>
+          <Money amount={visit.totals.cashOut} currency={RECORDING_CURRENCY} />
+        </View>
+      </View>
+      <View className="flex-row gap-4">
+        <View className="flex-1 gap-1">
+          <Text className="type-footnote text-muted">Duration</Text>
+          <Text className="type-body text-ink tabular-nums">
+            {formatDuration(visit.visit.startedAt, visit.visit.finishedAt!)}
+          </Text>
+        </View>
+        <View className="flex-1 gap-1">
+          <Text className="type-footnote text-muted">Hourly result</Text>
+          {summary.hourly === null ? (
+            <Text className="text-muted">—</Text>
+          ) : (
+            <Text>
+              <Money
+                amount={MinorUnits.make(summary.hourly)}
+                currency={RECORDING_CURRENCY}
+                tone="result"
+              />
+              <Text className="text-muted">/hr</Text>
+            </Text>
+          )}
+        </View>
       </View>
     </View>
   );

@@ -1,3 +1,4 @@
+import * as DateTime from "effect/DateTime";
 import {
   UserId,
   type ActorId,
@@ -577,3 +578,12 @@ const describeInviteError = (error: unknown) => {
 };
 
 export type { ActorKeyStorage } from "./recordingSync.ts";
+
+export function useRecordingClock() {
+  const [now, setNow] = useState(() => DateTime.nowUnsafe());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(DateTime.nowUnsafe()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}

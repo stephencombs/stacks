@@ -16,6 +16,9 @@ import type {
 import { useBuyInTotal, useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
 import {
   amountInputText,
+  applyAmountKey,
+  buyInTotalPreview,
+  cashOutResultPreview,
   localDateText,
   localTimeText,
   parsePastSessionTimes,
@@ -24,9 +27,9 @@ import {
   RECORDING_CURRENCY,
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
-import { formatMoney } from "@stacks/shared/money";
+import { decimalSeparator, formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
@@ -64,28 +67,54 @@ function AmountField({
   amount,
   hint,
   first = false,
+  keypad = false,
 }: {
   label: string;
   amount: ReturnType<typeof useAmount>;
   hint?: ReactNode;
   /** The form's first field: a mouse or keyboard starts typing here, a touch screen waits for a tap. */
   first?: boolean;
+  keypad?: boolean;
 }) {
   return (
-    <Field label={label} hint={hint} error={amount.error}>
-      {(props) => (
-        <Input
-          {...props}
-          value={amount.text}
-          onChange={(event) => amount.set(event.target.value)}
-          inputMode="decimal"
-          autoComplete="off"
-          enterKeyHint="done"
-          autoFocus={first && matchMedia("(pointer: fine)").matches}
-          className="text-2xl tabular-nums"
-        />
-      )}
-    </Field>
+    <div className="flex flex-col gap-3">
+      <Field label={label} hint={hint} error={amount.error}>
+        {(props) => (
+          <Input
+            {...props}
+            value={amount.text}
+            onChange={(event) => amount.set(event.target.value)}
+            inputMode={keypad ? "none" : "decimal"}
+            autoComplete="off"
+            enterKeyHint="done"
+            autoFocus={first && matchMedia("(pointer: fine)").matches}
+            className="text-2xl tabular-nums"
+          />
+        )}
+      </Field>
+    </div>
+  );
+}
+
+function AmountKeypad({ amount }: { amount: ReturnType<typeof useAmount> }) {
+  return (
+    <div
+      className="glass grid grid-cols-3 gap-2 rounded-2xl p-2"
+      role="group"
+      aria-label="Amount keypad"
+    >
+      {["1", "2", "3", "4", "5", "6", "7", "8", "9", decimalSeparator(), "0", "back"].map((key) => (
+        <button
+          key={key}
+          type="button"
+          aria-label={key === "back" ? "Delete digit" : key}
+          className="pressable flex h-12 items-center justify-center rounded-lg bg-surface text-2xl font-medium tabular-nums hover:bg-fill"
+          onClick={() => amount.set(applyAmountKey(amount.text, key, decimalSeparator()))}
+        >
+          {key === "back" ? "⌫" : key}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -140,6 +169,7 @@ function RecordingDialog({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const formId = useId();
   const submit = (event: FormEvent) => {
     event.preventDefault();
     onSubmit();
@@ -152,22 +182,33 @@ function RecordingDialog({
       }}
       title={title}
       description={description}
-    >
-      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-        {children}
-        {save.error ? (
-          <FormError>{save.error} What you entered is still here. Try again.</FormError>
-        ) : null}
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          {cancelLabel ? (
-            <Button size="lg" disabled={save.pending} onClick={onClose}>
-              {cancelLabel}
-            </Button>
+      footer={
+        <div className="flex flex-col gap-3">
+          {save.error ? (
+            <FormError>{save.error} What you entered is still here. Try again.</FormError>
           ) : null}
-          <Button type="submit" variant={submitVariant} size="lg" pending={save.pending}>
-            {submitLabel}
-          </Button>
+          <div className="flex gap-2">
+            {cancelLabel ? (
+              <Button size="lg" disabled={save.pending} onClick={onClose}>
+                {cancelLabel}
+              </Button>
+            ) : null}
+            <Button
+              form={formId}
+              type="submit"
+              variant={submitVariant}
+              size="lg"
+              pending={save.pending}
+              className="flex-1"
+            >
+              {submitLabel}
+            </Button>
+          </div>
         </div>
+      }
+    >
+      <form id={formId} onSubmit={submit} noValidate className="flex flex-col gap-4">
+        {children}
       </form>
     </Dialog>
   );
@@ -403,7 +444,7 @@ export function RebuyDialog({
   return (
     <RecordingDialog
       title="Rebuy"
-      submitLabel="Record rebuy"
+      submitLabel="Add rebuy"
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -420,7 +461,16 @@ export function RebuyDialog({
         if (receipt?.command.type === "add") onSaved(receipt.command.entryId, input);
       }}
     >
-      <AmountField label="Amount" amount={amount} first />
+      <AmountField label="Amount" amount={amount} first keypad />
+      {buyInTotalPreview(visit.totals.buyIn, amount.text, "add") !== null ? (
+        <p role="status" className="text-center text-sm text-muted">
+          Your buy-in becomes{" "}
+          <Money
+            amount={buyInTotalPreview(visit.totals.buyIn, amount.text, "add")!}
+            currency={RECORDING_CURRENCY}
+          />
+        </p>
+      ) : null}
       {visit.presets.length > 0 ? (
         <div className="flex gap-2" role="group" aria-label="Recent amounts">
           {visit.presets.map((preset) => (
@@ -440,6 +490,7 @@ export function RebuyDialog({
         value={paidBy}
         onChange={setPaidBy}
       />
+      <AmountKeypad amount={amount} />
     </RecordingDialog>
   );
 }
@@ -517,7 +568,7 @@ export function CashOutDialog({
     <RecordingDialog
       title="Cash out"
       description="This finishes the session and works out its result."
-      submitLabel="Cash out"
+      submitLabel="End session"
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -542,6 +593,7 @@ export function CashOutDialog({
         label="Amount"
         amount={amount}
         first
+        keypad
         hint={
           previous > 0 ? (
             <>
@@ -551,15 +603,35 @@ export function CashOutDialog({
         }
       />
       <Button className="self-start" onClick={() => amount.set(amountInputText(0))}>
-        {previous > 0 ? "Nothing more" : "Nothing to cash out"} · {money(0)}
+        {previous > 0 ? "Nothing more" : "Busted"} · {money(0)}
       </Button>
       <ClockField label="Finished at" clock={clock} />
+      <div className="flex items-center justify-between gap-3 rounded-xl bg-surface p-4">
+        <div>
+          <p className="text-sm text-muted">Your result</p>
+          <p className="text-sm text-muted">
+            <Money amount={visit.totals.buyIn} currency={RECORDING_CURRENCY} /> bought in
+          </p>
+        </div>
+        <span className="text-xl font-semibold">
+          {cashOutResultPreview(visit, amount.text) === null ? (
+            "—"
+          ) : (
+            <Money
+              amount={cashOutResultPreview(visit, amount.text)!}
+              currency={RECORDING_CURRENCY}
+              tone="result"
+            />
+          )}
+        </span>
+      </div>
       <CounterpartyField
         label="Paid to"
         counterparties={counterparties}
         value={paidTo}
         onChange={setPaidTo}
       />
+      <AmountKeypad amount={amount} />
     </RecordingDialog>
   );
 }
@@ -587,24 +659,16 @@ export function BuyInTotalDialog({
   const [mode, setMode] = useState<(typeof totalModes)[number]["value"]>("add");
   const amount = useAmount("", 1);
   const current = visit.totals.buyIn;
-  const typed = parseRecordingAmount(amount.text, 1);
-  const total =
-    typed.error !== null
-      ? null
-      : mode === "add"
-        ? current + typed.amount
-        : mode === "subtract"
-          ? current - typed.amount
-          : typed.amount;
+  const total = buyInTotalPreview(current, amount.text, mode);
   return (
     <RecordingDialog
-      title="Buy-in"
+      title="Edit buy-in"
       description={
         <>
           Now <Money amount={current} currency={RECORDING_CURRENCY} /> in.
         </>
       }
-      submitLabel="Save buy-in"
+      submitLabel="Save total"
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -622,18 +686,23 @@ export function BuyInTotalDialog({
           save.clearError();
         }}
       />
-      <AmountField label={mode === "set" ? "New total" : "Amount"} amount={amount} first />
-      {total !== null ? (
-        <p role="status" className="text-sm text-muted">
-          {total > 0 ? (
-            <>
-              New total <Money amount={total} currency={RECORDING_CURRENCY} />
-            </>
-          ) : (
-            "The buy-in total must be more than zero."
-          )}
-        </p>
-      ) : null}
+      <AmountField label={mode === "set" ? "New total" : "Amount"} amount={amount} first keypad />
+      <p role="status" className="text-sm text-muted">
+        {total !== null ? (
+          <>
+            Your buy-in becomes <Money amount={total} currency={RECORDING_CURRENCY} />
+          </>
+        ) : amount.text ? (
+          "The new total must be greater than zero and within the supported amount."
+        ) : (
+          "Enter an amount to see the new total."
+        )}
+      </p>
+      <Note>
+        Was <Money amount={current} currency={RECORDING_CURRENCY} />. Corrections void earlier
+        buy-ins, which stay in history.
+      </Note>
+      <AmountKeypad amount={amount} />
     </RecordingDialog>
   );
 }

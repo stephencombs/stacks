@@ -84,3 +84,22 @@ export function ButtonLink({
     </Link>
   );
 }
+
+const iconClasses =
+  "glass pressable inline-flex size-11 shrink-0 items-center justify-center rounded-full text-ink disabled:pointer-events-none disabled:text-muted";
+
+export function IconButton({ className, ...props }: ComponentProps<"button">) {
+  return <button type="button" className={cn(iconClasses, className)} {...props} />;
+}
+
+export function IconLink({
+  className,
+  children,
+  ...props
+}: LinkProps & { className?: string; children: ReactNode; "aria-label": string }) {
+  return (
+    <Link className={cn(iconClasses, className)} {...props}>
+      {children}
+    </Link>
+  );
+}
