@@ -216,11 +216,15 @@ const tripLedger = Effect.fn("Views.tripLedger")(function* (tripId: TripId) {
   return { owed: withStakes(balances(entries), stakes, outcomes), stakes, outcomes, sessions };
 });
 
-export const tripDetail = Effect.fn("Views.tripDetail")(function* (trip: typeof TripRow.Type) {
+export const tripDetail = Effect.fn("Views.tripDetail")(function* (
+  trip: typeof TripRow.Type,
+  tables: TripDetail["tables"],
+) {
   const { owed, stakes, outcomes, sessions } = yield* tripLedger(trip.id);
   return {
     trip,
     sessions: yield* summaries(sessions),
+    tables,
     balances: Array.from(owed, ([playerId, amount]) => ({ playerId, amount })),
     stakes: stakes.map((stake) => ({
       stake,

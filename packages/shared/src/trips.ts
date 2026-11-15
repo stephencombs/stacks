@@ -1,17 +1,18 @@
 import * as DateTime from "effect/DateTime";
-import type { PlayerId, PlayerResult, SessionId, VenueId } from "@stacks/contracts";
+import type { PlayerId, PlayerResult, SessionId, TableId, VenueId } from "@stacks/contracts";
 
 import { sessionRuns } from "./results.ts";
 
-/** The parts of a closed session the trip board reads. */
+/** The parts of a closed session or table the trip board reads. */
 export interface TripSession {
   readonly session: {
-    readonly id: SessionId;
+    readonly id: SessionId | TableId;
     readonly startedAt: DateTime.Utc;
     /** Played at a high-limit table. */
     readonly highLimit?: boolean;
   };
-  readonly venue: { readonly id: VenueId };
+  /** Null for a table with no casino set. */
+  readonly venue: { readonly id: VenueId } | null;
   readonly results: ReadonlyArray<Pick<PlayerResult, "playerId" | "buyIn" | "net">>;
 }
 
@@ -276,7 +277,7 @@ export const tripAwards = <S extends TripSession>(
       low = Math.min(low, total);
     }
     if (low < 0 && total > low) claim("comeback", playerId, total - low, null);
-    const venues = new Set(mine.map((m) => m.session.venue.id)).size;
+    const venues = new Set(mine.flatMap((m) => (m.session.venue ? [m.session.venue.id] : []))).size;
     if (venues >= 2) claim("hopper", playerId, venues, null);
     const whale = mine.reduce((top, m) => (m.buyIn > top.buyIn ? m : top));
     if (whale.buyIn > 0) claim("whale", playerId, whale.buyIn, whale.session);
@@ -472,16 +473,14 @@ export interface RouteStop<V> {
 /**
  * Where the trip went: each casino once, numbered in the order it was first visited, and the path
  * between them in the order the sessions were played, a casino repeated only after leaving it.
+ * Tables with no casino set aren't on it.
  */
-export const tripRoute = <S extends TripSession & { readonly venue: { readonly id: VenueId } }>(
-  sessions: ReadonlyArray<S>,
-) => {
-  const stops = new Map<
-    VenueId,
-    { venue: S["venue"]; number: number; visits: number; net: number }
-  >();
-  const path: Array<S["venue"]> = [];
-  for (const s of sessions.toSorted((a, b) => startOf(a) - startOf(b))) {
+export const tripRoute = <S extends TripSession>(sessions: ReadonlyArray<S>) => {
+  type Venue = NonNullable<S["venue"]>;
+  const stops = new Map<VenueId, { venue: Venue; number: number; visits: number; net: number }>();
+  const path: Array<Venue> = [];
+  const placed = sessions.filter((s): s is S & { readonly venue: Venue } => s.venue !== null);
+  for (const s of placed.toSorted((a, b) => startOf(a) - startOf(b))) {
     const stop = stops.get(s.venue.id) ?? {
       venue: s.venue,
       number: stops.size + 1,
@@ -493,5 +492,5 @@ export const tripRoute = <S extends TripSession & { readonly venue: { readonly i
     stops.set(s.venue.id, stop);
     if (path.at(-1)?.id !== s.venue.id) path.push(s.venue);
   }
-  return { stops: [...stops.values()] as ReadonlyArray<RouteStop<S["venue"]>>, path };
+  return { stops: [...stops.values()] as ReadonlyArray<RouteStop<Venue>>, path };
 };

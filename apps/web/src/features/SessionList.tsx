@@ -1,12 +1,13 @@
 import type { GroupDetail, SessionSummary } from "@stacks/contracts";
+import type { TripPlay } from "@stacks/client-runtime/trip";
 
 import * as DateTime from "effect/DateTime";
 import { ArrowRight } from "lucide-react";
 
 import { Money } from "~/components/Money";
 import { ButtonLink } from "~/components/ui/Button";
-import { Glow, List, RowLink, RowText, Surface, Tag } from "~/components/ui/Surface";
-import { formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
+import { Glow, List, Row, RowLink, RowText, Surface, Tag } from "~/components/ui/Surface";
+import { formatDuration, formatTime, gameNames, venueLabel } from "@stacks/client-runtime/format";
 
 function SessionRow({ summary, detail }: { summary: SessionSummary; detail: GroupDetail }) {
   const { session, venue, results } = summary;
@@ -36,19 +37,67 @@ function SessionRow({ summary, detail }: { summary: SessionSummary; detail: Grou
   );
 }
 
-/** Sessions as rows. Closed ones show their start time: they sit under the heading of their day. */
+/** A table in the trip. It opens your own visit there; a table you didn't play has no page yet. */
+function TableRow({
+  play,
+  detail,
+}: {
+  play: Extract<TripPlay, { kind: "table" }>;
+  detail: GroupDetail;
+}) {
+  const mine = play.results.find((result) => result.playerId === detail.myPlayerId);
+  const content = (
+    <>
+      <RowText
+        title={venueLabel(play.venue)}
+        meta={
+          <span className="tabular-nums">
+            {play.table.game ? gameNames[play.table.game] : "No game set"} ·{" "}
+            {play.live ? "since " : ""}
+            {formatTime(play.startedAt)}
+          </span>
+        }
+      />
+      {play.live ? <Tag tone="live">Live</Tag> : null}
+      {mine && !play.live ? (
+        <Money
+          amount={mine.net}
+          currency={detail.group.currency}
+          tone="result"
+          className="font-semibold"
+        />
+      ) : null}
+    </>
+  );
+  return play.myVisitId ? (
+    <RowLink to="/play/$visitId" params={{ visitId: play.myVisitId }}>
+      {content}
+    </RowLink>
+  ) : (
+    <Row>{content}</Row>
+  );
+}
+
+/**
+ * A trip's sessions and tables as rows. Closed ones show their start time: they sit under the
+ * heading of their day.
+ */
 export function SessionList({
   sessions,
   detail,
 }: {
-  sessions: ReadonlyArray<SessionSummary>;
+  sessions: ReadonlyArray<TripPlay>;
   detail: GroupDetail;
 }) {
   return (
     <List>
-      {sessions.map((summary) => (
-        <SessionRow key={summary.session.id} summary={summary} detail={detail} />
-      ))}
+      {sessions.map((play) =>
+        play.kind === "session" ? (
+          <SessionRow key={play.session.id} summary={play} detail={detail} />
+        ) : (
+          <TableRow key={play.session.id} play={play} detail={detail} />
+        ),
+      )}
     </List>
   );
 }

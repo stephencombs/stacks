@@ -1,4 +1,4 @@
-import type { PlayerId, Table, VisitSummary } from "@stacks/contracts";
+import type { PlayerId, Table, TripId, VisitSummary } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
 import { checkedMinorUnits } from "./exactMoney.ts";
@@ -6,7 +6,8 @@ import { sessionRuns, type SessionRuns } from "./results.ts";
 
 /** A closed session as stats see it, oldest first. */
 export interface StatsSession {
-  readonly venue: { readonly id: string; readonly name: string };
+  /** Null for a table with no casino set. */
+  readonly venue: { readonly id: string; readonly name: string } | null;
   readonly results: ReadonlyArray<{
     readonly playerId: PlayerId;
     readonly net: number;
@@ -88,6 +89,7 @@ export const statSheet = <S extends StatsSession>(
 
   const byVenue = new Map<string, { name: string; net: number; sessions: number }>();
   for (const { session, net } of played) {
+    if (session.venue === null) continue;
     const venue = byVenue.get(session.venue.id) ?? {
       name: session.venue.name,
       net: 0,
@@ -99,7 +101,7 @@ export const statSheet = <S extends StatsSession>(
   }
   const byNet = played.toSorted((a, b) => b.net - a.net);
   const buyIns = played.filter((p) => p.buyIn > 0);
-  const bestVenue = [...byVenue.values()].toSorted((a, b) => b.net - a.net)[0]!;
+  const bestVenue = [...byVenue.values()].toSorted((a, b) => b.net - a.net)[0];
 
   return {
     total: played.reduce((sum, p) => sum + p.net, 0),
@@ -111,19 +113,21 @@ export const statSheet = <S extends StatsSession>(
     averageBuyIn: buyIns.length
       ? Math.round(buyIns.reduce((sum, p) => sum + p.buyIn, 0) / buyIns.length)
       : null,
-    bestVenue: bestVenue.net > 0 ? bestVenue : null,
+    bestVenue: bestVenue && bestVenue.net > 0 ? bestVenue : null,
     venues: byVenue.size,
   };
 };
 
 type PersonalStatsSession = Pick<VisitSummary, "visit" | "finalResult"> & {
-  readonly table: Pick<Table, "game" | "venueId">;
+  readonly table: Pick<Table, "game" | "venueId" | "tripId">;
 };
 
 export type PersonalStatsFilters = {
   readonly year?: number | undefined;
   readonly game?: Table["game"] | undefined;
   readonly venueId?: Table["venueId"] | undefined;
+  /** A whole trip, so it replaces the year. */
+  readonly tripId?: TripId | undefined;
 };
 
 const compareKey = (a: string | null, b: string | null) =>
@@ -142,7 +146,8 @@ const hourlyResult = (result: number, milliseconds: bigint) => {
 
 /**
  * Personal visits from the recording view; live visits never count. An omitted year means
- * all time; omitted game/venue filters mean all, while null selects unset games/venues.
+ * all time; omitted game/venue filters mean all, while null selects unset games/venues. A trip
+ * shows the whole trip, so it overrides the year.
  * Options come from all finished visits, so filtering never hides the current selection.
  * Hours round the summed elapsed time to two decimals; hourly result uses unrounded time.
  */
@@ -165,13 +170,16 @@ export const personalStats = (
             result: finalResult,
             game: table.game,
             venueId: table.venueId,
+            tripId: table.tripId,
           },
         ],
   );
   const filtered = finished
     .filter(
       (session) =>
-        (filters.year === undefined || session.year === filters.year) &&
+        (filters.tripId === undefined
+          ? filters.year === undefined || session.year === filters.year
+          : session.tripId === filters.tripId) &&
         (filters.game === undefined || session.game === filters.game) &&
         (filters.venueId === undefined || session.venueId === filters.venueId),
     )
@@ -236,6 +244,16 @@ export const personalStats = (
       years: [...new Set(finished.map((session) => session.year))].toSorted((a, b) => b - a),
       games: [...new Set(finished.map((session) => session.game))].toSorted(compareKey),
       venueIds: [...new Set(finished.map((session) => session.venueId))].toSorted(compareKey),
+      // Most recently played first.
+      tripIds: [
+        ...new Set(
+          finished
+            .toSorted(
+              (a, b) => DateTime.toEpochMillis(b.finishedAt) - DateTime.toEpochMillis(a.finishedAt),
+            )
+            .flatMap((session) => (session.tripId === null ? [] : [session.tripId])),
+        ),
+      ],
     },
   };
 };

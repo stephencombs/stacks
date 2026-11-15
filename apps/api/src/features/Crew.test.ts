@@ -52,7 +52,11 @@ const feed = (client: Client, cursor?: string) =>
   client.crew.activity({ query: cursor === undefined ? {} : { cursor } });
 
 const itemId = (item: CrewActivityItem) =>
-  item.kind === "trip_started" ? item.trip.id : item.sessionId;
+  item.kind === "trip_started"
+    ? item.trip.id
+    : item.kind === "table_live" || item.kind === "table_finished"
+      ? item.tableId
+      : item.sessionId;
 
 const byPlayer = (item: CrewActivityItem | undefined) =>
   item?.kind === "session_finished"
@@ -60,7 +64,11 @@ const byPlayer = (item: CrewActivityItem | undefined) =>
     : [];
 
 const itemTime = (item: CrewActivityItem) =>
-  DateTime.toEpochMillis(item.kind === "session_finished" ? item.endedAt : item.startedAt);
+  DateTime.toEpochMillis(
+    item.kind === "session_finished" || item.kind === "table_finished"
+      ? item.endedAt
+      : item.startedAt,
+  );
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
   it.effect("gathers every group you're in, newest first", () =>

@@ -1,20 +1,33 @@
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
-import type { GroupId, GroupStats, PlayerId, PlayerResult } from "@stacks/contracts";
-import { playerResults, resultsBy } from "@stacks/shared/results";
+import type {
+  GroupId,
+  GroupStats,
+  PlayerId,
+  PlayerResult as ContractResult,
+  TripId,
+} from "@stacks/contracts";
+import { mergeResults, resultsBy, type PlayerResult } from "@stacks/shared/results";
 import { resultsBySeat } from "@stacks/shared/seats";
 
 import { EntryRow, SeatingRow, SessionRow, VenueRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as TripTables from "./TripTables.ts";
 import { venueColumns } from "./Views.ts";
 
-const toList = (results: ReadonlyMap<PlayerId, Omit<PlayerResult, "playerId">>) =>
+const toList = (results: ReadonlyMap<PlayerId, Omit<ContractResult, "playerId">>) =>
   Array.from(results, ([playerId, result]) => ({ playerId, ...result }));
 
+const toMap = (results: ReadonlyArray<ContractResult>): ReadonlyMap<PlayerId, PlayerResult> =>
+  new Map(results.map(({ playerId, ...result }) => [playerId, result]));
+
+const minutes = (startedAt: DateTime.Utc, endedAt: DateTime.Utc) =>
+  Math.round((DateTime.toEpochMillis(endedAt) - DateTime.toEpochMillis(startedAt)) / 60_000);
+
 /**
- * All-time results over the group's closed sessions, split by player, game, venue, seat and
- * session.
+ * All-time results over the group's closed sessions and the closed tables in its trips, split by
+ * player, game, venue, seat and session. Tables have no seats.
  */
 export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
@@ -33,60 +46,82 @@ export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId)
     where st.group_id = ${groupId} and s.status = 'closed'
     order by st.occurred_at, st.created_at
   `.pipe(Effect.flatMap(Access.decodeRows(SeatingRow)));
-  const venues =
-    sessions.length === 0
+  const trips = yield* sql<{ id: TripId }>`select id from trips where group_id = ${groupId}`;
+  const tables = yield* TripTables.load({ tripIds: trips.map((trip) => trip.id) });
+  const venueIds = Array.from(new Set(sessions.map((s) => s.venueId)));
+  const sessionVenues =
+    venueIds.length === 0
       ? []
       : yield* sql`
-          select ${venueColumns(sql)} from venues v
-          where v.id in ${sql.in(Array.from(new Set(sessions.map((s) => s.venueId))))}
+          select ${venueColumns(sql)} from venues v where v.id in ${sql.in(venueIds)}
         `.pipe(Effect.flatMap(Access.decodeRows(VenueRow)));
-
-  const count = <K>(key: (session: (typeof sessions)[number]) => K) => {
-    const counts = new Map<K, number>();
-    for (const session of sessions) counts.set(key(session), (counts.get(key(session)) ?? 0) + 1);
-    return counts;
-  };
-  const gameCounts = count((s) => s.game);
-  const venueCounts = count((s) => s.venueId);
-  const minutesPlayed = sessions.reduce(
-    (total, s) =>
-      total +
-      Math.round(
-        (DateTime.toEpochMillis(s.endedAt!) - DateTime.toEpochMillis(s.startedAt)) / 60_000,
-      ),
-    0,
+  const venues = new Map(
+    [...sessionVenues, ...tables.flatMap((table) => (table.venue ? [table.venue] : []))].map(
+      (venue) => [venue.id, venue],
+    ),
   );
 
-  const bySession = resultsBy(sessions, entries, (s) => s.id);
+  const sessionResults = resultsBy(sessions, entries, (s) => s.id);
+  const played = [
+    ...sessions.map((s) => ({
+      id: s.id,
+      tripId: s.tripId,
+      game: s.game,
+      venueId: s.venueId,
+      startedAt: s.startedAt,
+      minutes: minutes(s.startedAt, s.endedAt!),
+      results: sessionResults.get(s.id) ?? new Map<PlayerId, PlayerResult>(),
+    })),
+    ...tables.flatMap(({ table, endedAt, startedAt, results }) =>
+      endedAt === null || table.tripId === null
+        ? []
+        : [
+            {
+              id: table.id,
+              tripId: table.tripId,
+              game: table.game,
+              venueId: table.venueId,
+              startedAt,
+              minutes: minutes(startedAt, endedAt),
+              results: toMap(results),
+            },
+          ],
+    ),
+  ].toSorted((a, b) => DateTime.toEpochMillis(a.startedAt) - DateTime.toEpochMillis(b.startedAt));
+
+  const breakdown = <K>(key: (play: (typeof played)[number]) => K | null) =>
+    Array.from(
+      Map.groupBy(
+        played.flatMap((play) => {
+          const k = key(play);
+          return k === null ? [] : [{ k, play }];
+        }),
+        (row) => row.k,
+      ),
+      ([k, rows]) => ({
+        key: k,
+        sessionCount: rows.length,
+        results: toList(mergeResults(rows.map((row) => row.play.results))),
+      }),
+    );
 
   return {
-    sessionCount: sessions.length,
-    minutesPlayed,
-    byPlayer: toList(playerResults(entries)),
-    byGame: Array.from(
-      resultsBy(sessions, entries, (s) => s.game),
-      ([game, results]) => ({
-        key: game,
-        sessionCount: gameCounts.get(game) ?? 0,
-        results: toList(results),
-      }),
-    ),
-    byVenue: venues.map((venue) => ({
-      key: venue,
-      sessionCount: venueCounts.get(venue.id) ?? 0,
-      results: toList(resultsBy(sessions, entries, (s) => s.venueId).get(venue.id) ?? new Map()),
-    })),
+    sessionCount: played.length,
+    minutesPlayed: played.reduce((total, play) => total + play.minutes, 0),
+    byPlayer: toList(mergeResults(played.map((play) => play.results))),
+    byGame: breakdown((play) => play.game),
+    byVenue: breakdown((play) => (play.venueId ? (venues.get(play.venueId) ?? null) : null)),
     bySeat: Array.from(resultsBySeat(sessions, seatings, entries), ([seat, row]) => ({
       key: seat,
       sessionCount: row.sessions,
       results: toList(row.results),
     })).toSorted((a, b) => a.key - b.key),
-    bySession: sessions.map((session) => ({
-      sessionId: session.id,
-      tripId: session.tripId,
-      venueId: session.venueId,
-      startedAt: session.startedAt,
-      results: toList(bySession.get(session.id) ?? new Map()),
+    bySession: played.map(({ id, tripId, venueId, startedAt, results }) => ({
+      id,
+      tripId,
+      venueId,
+      startedAt,
+      results: toList(results),
     })),
   } satisfies GroupStats;
 });

@@ -1,4 +1,4 @@
-import type { Game, VenueId } from "@stacks/contracts";
+import type { Game, TripId, VenueId } from "@stacks/contracts";
 import { personalStats, type PersonalStatsFilters } from "@stacks/shared/stats";
 import * as DateTime from "effect/DateTime";
 
@@ -61,7 +61,7 @@ type Choice = {
 };
 
 export type StatsChip = {
-  readonly key: "year" | "game" | "venueId";
+  readonly key: "year" | "game" | "venueId" | "tripId";
   /** What the chip filters, for a screen reader: "Period". */
   readonly name: string;
   readonly label: string;
@@ -107,7 +107,7 @@ const chip = <K extends StatsChip["key"], V>(
   };
 };
 
-const noMatch = (filters: StatsFilters, casino: string) => {
+const noMatch = (filters: StatsFilters, casino: string, trip: string) => {
   const game =
     filters.game === undefined ? "" : filters.game === null ? "" : `${gameNames[filters.game]} `;
   const without = [
@@ -117,7 +117,11 @@ const noMatch = (filters: StatsFilters, casino: string) => {
   return [
     `No finished ${game}sessions`,
     filters.venueId ? ` at ${casino}` : "",
-    filters.year === undefined ? "" : ` in ${filters.year}`,
+    filters.tripId !== undefined
+      ? ` on ${trip}`
+      : filters.year === undefined
+        ? ""
+        : ` in ${filters.year}`,
     without.length ? ` without ${without.join(" or ")} set` : "",
     ".",
   ].join("");
@@ -126,23 +130,43 @@ const noMatch = (filters: StatsFilters, casino: string) => {
 /**
  * Stats as a screen shows them, from the device's visits: the filter chips, then either why
  * there's nothing to show or the summary, running line and breakdowns. Live visits never count.
+ * `tripNames` names the trips the signed-in account can see; the device alone doesn't know them.
  */
 export const personalStatsView = (
   visits: ReadonlyArray<RecordedVisit>,
   filters: StatsFilters,
-  timeZone: DateTime.TimeZone = DateTime.zoneMakeLocal(),
+  {
+    timeZone = DateTime.zoneMakeLocal(),
+    tripNames = new Map(),
+  }: {
+    readonly timeZone?: DateTime.TimeZone;
+    readonly tripNames?: ReadonlyMap<TripId, string>;
+  } = {},
 ) => {
   const venues = new Map(
     visits.flatMap(({ venue }) => (venue ? [[venue.id, venue.name] as const] : [])),
   );
   const venueName = (id: VenueId | null) =>
     id === null ? "No casino set" : (venues.get(id) ?? "Casino");
+  const tripName = (id: TripId) => tripNames.get(id) ?? "Group trip";
   const stats = personalStats(visits, timeZone, filters);
+  const trip =
+    stats.options.tripIds.length === 0 && filters.tripId === undefined
+      ? null
+      : chip(filters, "tripId", "Trip", "All trips", stats.options.tripIds, (id) => ({
+          value: id,
+          label: tripName(id),
+        }));
   const chips = [
-    chip(filters, "year", "Period", "All time", stats.options.years, (year) => ({
-      value: String(year),
-      label: String(year),
-    })),
+    // A trip covers its own dates, so it takes the period's place.
+    ...(filters.tripId === undefined
+      ? [
+          chip(filters, "year", "Period", "All time", stats.options.years, (year) => ({
+            value: String(year),
+            label: String(year),
+          })),
+        ]
+      : []),
     chip(filters, "game", "Game", "All games", stats.options.games, (game) => ({
       value: game ?? "none",
       label: gameName(game),
@@ -151,6 +175,18 @@ export const personalStatsView = (
       value: venueId ?? "none",
       label: venueName(venueId),
     })),
+    ...(trip
+      ? [
+          {
+            ...trip,
+            options: trip.options.map((option) => ({
+              ...option,
+              filters:
+                option.value === "" ? option.filters : { ...option.filters, year: undefined },
+            })),
+          },
+        ]
+      : []),
   ];
   const head = {
     // Applied filters lead, so what the page is showing reads first.
@@ -163,10 +199,19 @@ export const personalStatsView = (
     return {
       ...head,
       kind: "no_match" as const,
-      sentence: noMatch(filters, venueName(filters.venueId ?? null)),
+      sentence: noMatch(
+        filters,
+        venueName(filters.venueId ?? null),
+        filters.tripId === undefined ? "" : tripName(filters.tripId),
+      ),
     };
 
-  const period = filters.year === undefined ? "all time" : String(filters.year);
+  const period =
+    filters.tripId !== undefined
+      ? tripName(filters.tripId)
+      : filters.year === undefined
+        ? "all time"
+        : String(filters.year);
   const fullDay = (at: DateTime.DateTime) =>
     DateTime.format(DateTime.setZone(at, timeZone), {
       month: "short",

@@ -48,9 +48,9 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
   const venues = new Map(stats.byVenue.map((row) => [row.key.id, row.key]));
   const trips = new Map(detail.trips.map((trip) => [trip.id, trip.name]));
   const sessions = stats.bySession.map((row) => ({
-    session: { id: row.sessionId, startedAt: row.startedAt },
+    session: { id: row.id, startedAt: row.startedAt },
     tripId: row.tripId,
-    venue: venues.get(row.venueId)!,
+    venue: row.venueId === null ? null : (venues.get(row.venueId) ?? null),
     results: row.results,
   }));
   const marks = sessions.flatMap((session, index) =>

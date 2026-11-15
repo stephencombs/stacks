@@ -1,7 +1,13 @@
 import { TripId, type GroupDetail, type GroupId, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import { boardMoney, chipOf, localClock, tripDates } from "@stacks/client-runtime/trip";
+import {
+  boardMoney,
+  chipOf,
+  closedPlays,
+  localClock,
+  tripDates,
+} from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
@@ -107,7 +113,7 @@ function NoTrips({ onStart }: { onStart: () => void }) {
 /** The top three on the trip's board so far. */
 function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const names = playerNames(detail);
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const closed = closedPlays(trip);
   const top = tripStandings(closed, localClock).slice(0, 3);
   if (top.length === 0)
     return <Text className="text-sm text-muted">Close a session to put it on the board.</Text>;

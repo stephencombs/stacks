@@ -4,8 +4,10 @@ import {
   awardLine,
   awardTitles,
   chipOf,
+  closedPlays,
   localClock,
   streakLine,
+  tripPlays,
 } from "@stacks/client-runtime/trip";
 import { tonightBoard, tripAwards, tripStandings, tripStats } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
@@ -58,7 +60,7 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
   const currency = detail.group.currency;
   const names = playerNames(detail);
   const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const closed = closedPlays(trip);
   const standings = tripStandings(closed, localClock);
   const awards = tripAwards(closed, localClock);
   const row = useReorder();
@@ -72,7 +74,10 @@ export function TripBoard({ detail, trip }: { detail: GroupDetail; trip: TripDet
     standings.find((s) => s.playerId === picked) ??
     standings.find((s) => s.playerId === detail.myPlayerId) ??
     standings.find((s) => s.rank === 1)!;
-  const venues = Map.groupBy(closed, (s) => s.venue.id);
+  const venues = Map.groupBy(
+    closed.flatMap((s) => (s.venue ? [{ ...s, venue: s.venue }] : [])),
+    (s) => s.venue.id,
+  );
 
   return (
     <>
@@ -186,16 +191,16 @@ export function Tonight({
   const names = playerNames(detail);
   const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
   const now = DateTime.nowUnsafe();
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
-  const live = trip.sessions.filter((s) => s.session.status === "live");
+  const plays = tripPlays(trip);
+  const closed = plays.filter((s) => !s.live);
+  const live = plays.filter((s) => s.live);
   const rows = tonightBoard(closed, live, localClock, now);
   const inPlayTotal = rows.reduce((sum, r) => sum + r.inPlay, 0);
   const row = useReorder();
   const tonight = localClock.night(now);
-  const others = trip.sessions.some(
+  const others = plays.some(
     (s) =>
-      s.session.id !== sessionId &&
-      (s.session.status === "live" || localClock.night(s.session.startedAt) === tonight),
+      s.session.id !== sessionId && (s.live || localClock.night(s.session.startedAt) === tonight),
   );
   if (!others || rows.length === 0) return null;
 
@@ -245,7 +250,7 @@ function TripNumbers({
   total: number;
 }) {
   const currency = detail.group.currency;
-  const stats = tripStats(trip.sessions.filter((s) => s.session.status === "closed"));
+  const stats = tripStats(closedPlays(trip));
   const { current } = stats.team;
   const money = (n: number, tone: "plain" | "result" = "result") => (
     <Money amount={Math.round(n)} currency={currency} tone={tone} className="font-semibold" />

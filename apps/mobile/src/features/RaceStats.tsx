@@ -1,4 +1,4 @@
-import type { GroupDetail, PlayerId, SessionId } from "@stacks/contracts";
+import type { GroupDetail, PlayerId, SessionId, TableId } from "@stacks/contracts";
 import {
   around,
   barTrack,
@@ -7,7 +7,7 @@ import {
   placeLabel,
   spreadLabels,
 } from "@stacks/client-runtime/chart";
-import { formatDay, playerNames } from "@stacks/client-runtime/format";
+import { formatDay, playerNames, venueLabel } from "@stacks/client-runtime/format";
 import { boardMoney, chipOf, returnLabel } from "@stacks/client-runtime/trip";
 import {
   raceLines,
@@ -34,7 +34,7 @@ type Racer = { playerId: PlayerId; name: string; chip: number; running: Readonly
 
 /** A closed session as the race sees it, oldest first. */
 type RaceSession = StatsSession & {
-  readonly session: { readonly id: SessionId; readonly startedAt: DateTime.Utc };
+  readonly session: { readonly id: SessionId | TableId; readonly startedAt: DateTime.Utc };
 };
 /** Where on the axis a stretch of sessions starts, such as a night or a trip. */
 type Mark = { readonly index: number; readonly label: string };
@@ -234,7 +234,7 @@ function Race<S extends RaceSession>({
           )}
         </View>
         <Text className="text-sm text-muted">
-          Session {at + 1}: {session.venue.name}, {formatDay(session.session.startedAt)}
+          Session {at + 1}: {venueLabel(session.venue)}, {formatDay(session.session.startedAt)}
         </Text>
       </View>
       <Choice
@@ -250,7 +250,7 @@ function Race<S extends RaceSession>({
         accessibilityRole="adjustable"
         accessibilityLabel="Replay session by session"
         accessibilityValue={{
-          text: `Session ${at + 1} of ${sessions.length}, ${session.venue.name}`,
+          text: `Session ${at + 1} of ${sessions.length}, ${venueLabel(session.venue)}`,
         }}
         accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
         onAccessibilityAction={(event) =>
@@ -412,13 +412,13 @@ export function PlayerSheet({
     {
       title: "Biggest hit",
       value: sheet.best ? money(sheet.best.net) : "—",
-      line: sheet.best?.session.venue.name ?? "No winning session yet",
+      line: sheet.best ? venueLabel(sheet.best.session.venue) : "No winning session yet",
       tone: sheet.best?.net,
     },
     {
       title: "Worst beat",
       value: sheet.worst ? money(sheet.worst.net) : "—",
-      line: sheet.worst?.session.venue.name ?? "Never finished down",
+      line: sheet.worst ? venueLabel(sheet.worst.session.venue) : "Never finished down",
       tone: sheet.worst?.net,
     },
     {
@@ -498,7 +498,7 @@ export function PlayerSheet({
           Session {selectedSession + 1} of {sheet.played.length} ·{" "}
           {formatDay(focus.session.session.startedAt)}
           {"\n"}
-          {focus.session.venue.name} · {money(focus.net)}
+          {venueLabel(focus.session.venue)} · {money(focus.net)}
         </Text>
         <View className="flex-row gap-2">
           <Button
@@ -522,7 +522,7 @@ export function PlayerSheet({
               key={p.session.session.id}
               accessibilityRole="button"
               accessibilityState={{ selected: selectedSession === i }}
-              accessibilityLabel={`Session ${i + 1} of ${sheet.played.length}, ${formatDay(p.session.session.startedAt)}, ${p.session.venue.name}: ${money(p.net)}`}
+              accessibilityLabel={`Session ${i + 1} of ${sheet.played.length}, ${formatDay(p.session.session.startedAt)}, ${venueLabel(p.session.venue)}: ${money(p.net)}`}
               onPress={() => setShown(i)}
               className="flex-1"
             >

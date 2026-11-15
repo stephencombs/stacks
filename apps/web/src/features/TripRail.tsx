@@ -1,6 +1,6 @@
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { playerNames } from "@stacks/client-runtime/format";
-import { chipOf, localClock } from "@stacks/client-runtime/trip";
+import { chipOf, closedPlays, localClock } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -40,7 +40,7 @@ export function TripRail({ group, trip }: { group: GroupDetail; trip: TripDetail
 }
 
 function RailBoard({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const closed = closedPlays(trip);
   const standings = tripStandings(closed, localClock).toSorted((a, b) => a.rank - b.rank);
   const names = playerNames(group);
   if (standings.length === 0) return null;

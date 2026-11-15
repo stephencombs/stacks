@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Game, MinorUnits, VenueId, VisitId, type PlayerId } from "@stacks/contracts";
+import { Game, MinorUnits, TripId, VenueId, VisitId, type PlayerId } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
@@ -112,6 +112,17 @@ describe("statSheet", () => {
     expect(sheet.runs.wins).toBe(2);
   });
 
+  it("leaves a session with no casino set out of the casinos", () => {
+    const sheet = statSheet([session(null, [[ALEX, 900]]), session(wynn, [[ALEX, 100]])], ALEX)!;
+    expect(sheet.total).toBe(1000);
+    expect(sheet.bestVenue).toEqual({ name: "Wynn", net: 100, sessions: 1 });
+    expect(sheet.venues).toBe(1);
+    expect(statSheet([session(null, [[ALEX, 900]])], ALEX)).toMatchObject({
+      bestVenue: null,
+      venues: 0,
+    });
+  });
+
   it("leaves out what never happened: no winning session, no recorded buy-in", () => {
     const sheet = statSheet([session(wynn, [[ALEX, -50]])], ALEX)!;
     expect(sheet.best).toBeNull();
@@ -124,6 +135,8 @@ const zone = DateTime.zoneMakeNamedUnsafe("America/Los_Angeles");
 const casino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c1");
 const otherCasino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c2");
 const missingCasino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c3");
+const vegasTrip = TripId.make("0192e7a0-0000-7000-8000-0000000000d1");
+const renoTrip = TripId.make("0192e7a0-0000-7000-8000-0000000000d2");
 const personalSession = (
   id: number,
   result: number,
@@ -132,6 +145,7 @@ const personalSession = (
     finishedAt?: string | null;
     game?: typeof Game.Type | null;
     venueId?: VenueId | null;
+    tripId?: TripId | null;
   } = {},
 ) => ({
   visit: {
@@ -147,6 +161,7 @@ const personalSession = (
   table: {
     game: fields.game === undefined ? ("blackjack" as const) : fields.game,
     venueId: fields.venueId === undefined ? casino : fields.venueId,
+    tripId: fields.tripId ?? null,
   },
 });
 
@@ -171,7 +186,26 @@ describe("personalStats", () => {
     expect(stats.runningResult.map((point) => point.sessionId)).toHaveLength(3);
     expect(stats.byGame).toEqual([{ game: "blackjack", sessions: 3, hours: 3, result: 60 }]);
     expect(stats.byCasino).toEqual([{ venueId: casino, sessions: 3, hours: 3, result: 60 }]);
-    expect(stats.options).toEqual({ years: [2026], games: ["blackjack"], venueIds: [casino] });
+    expect(stats.options).toEqual({
+      years: [2026],
+      games: ["blackjack"],
+      venueIds: [casino],
+      tripIds: [],
+    });
+  });
+
+  it("shows a whole trip, whatever the period, and offers each trip played", () => {
+    const sessions = [
+      personalSession(1, 100, { tripId: vegasTrip, finishedAt: "2025-12-31T23:00:00Z" }),
+      personalSession(2, 50, { tripId: vegasTrip, finishedAt: "2026-01-01T03:00:00Z" }),
+      personalSession(3, -70, { tripId: renoTrip }),
+      personalSession(4, 900),
+      personalSession(5, 400, { tripId: renoTrip, finishedAt: null }),
+    ];
+    const stats = personalStats(sessions, zone, { tripId: vegasTrip, year: 2026 });
+    expect(stats.summary).toMatchObject({ result: 150, sessions: 2 });
+    // Most recently played first.
+    expect(personalStats(sessions, zone).options.tripIds).toEqual([renoTrip, vegasTrip]);
   });
 
   it("returns zero summaries and empty rows for no history, live-only history and no matches", () => {
@@ -249,6 +283,7 @@ describe("personalStats", () => {
       years: [2026, 2025],
       games: ["blackjack", "slots", null],
       venueIds: [casino, otherCasino, null],
+      tripIds: [],
     });
     expect(personalStats(sessions, zone, { year: 2024 }).options).toEqual(filtered.options);
   });
@@ -401,6 +436,7 @@ describe("personalStats", () => {
           year: Schema.Literals([2024, 2025, 2026]),
           game: Schema.NullOr(Game),
           venueId: Schema.NullOr(Schema.Literals([casino, otherCasino])),
+          tripId: Schema.NullOr(Schema.Literals([vegasTrip, renoTrip])),
           minutes: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 480 })),
           live: Schema.Boolean,
         }),
@@ -419,16 +455,23 @@ describe("personalStats", () => {
             finishedAt: record.live ? null : DateTime.formatIso(finish),
             game: record.game,
             venueId: record.venueId,
+            tripId: record.tripId,
           },
         );
       });
-      for (const year of [undefined, 2024, 2025, 2026, 2030]) {
+      for (const [year, tripId] of [
+        ...[undefined, 2024, 2025, 2026, 2030].map((year) => [year, undefined] as const),
+        [2025, vegasTrip] as const,
+        [undefined, renoTrip] as const,
+      ]) {
         for (const game of [undefined, ...Game.literals, null]) {
           for (const venueId of [undefined, casino, otherCasino, missingCasino, null]) {
             const expected = sessions.filter(
               (session, index) =>
                 !records[index]!.live &&
-                (year === undefined || records[index]!.year === year) &&
+                (tripId === undefined
+                  ? year === undefined || records[index]!.year === year
+                  : session.table.tripId === tripId) &&
                 (game === undefined || session.table.game === game) &&
                 (venueId === undefined || session.table.venueId === venueId),
             );
@@ -436,7 +479,7 @@ describe("personalStats", () => {
               (total, session) => total + BigInt(session.finalResult!),
               0n,
             );
-            const stats = personalStats(sessions, zone, { year, game, venueId });
+            const stats = personalStats(sessions, zone, { year, game, venueId, tripId });
             expect(stats.summary.result).toBe(Number(sum));
             expect(stats.summary.sessions).toBe(expected.length);
             expect(stats.summary.winRate).toEqual({

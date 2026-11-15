@@ -1,4 +1,4 @@
-import type { GroupDetail, PlayerId, SessionId } from "@stacks/contracts";
+import type { GroupDetail, PlayerId, SessionId, TableId } from "@stacks/contracts";
 import {
   around,
   barTrack,
@@ -7,7 +7,7 @@ import {
   placeLabel,
   spreadLabels,
 } from "@stacks/client-runtime/chart";
-import { formatDay, playerNames } from "@stacks/client-runtime/format";
+import { formatDay, playerNames, venueLabel } from "@stacks/client-runtime/format";
 import { boardMoney, chipOf, returnLabel } from "@stacks/client-runtime/trip";
 import {
   raceLines,
@@ -29,7 +29,7 @@ import { Chip } from "./Chip";
 
 /** A closed session as the race sees it, oldest first. */
 type RaceSession = StatsSession & {
-  readonly session: { readonly id: SessionId; readonly startedAt: DateTime.Utc };
+  readonly session: { readonly id: SessionId | TableId; readonly startedAt: DateTime.Utc };
 };
 /** Where on the axis a stretch of sessions starts, such as a night or a trip. */
 type Mark = { readonly index: number; readonly label: string };
@@ -189,8 +189,8 @@ function Race<S extends RaceSession>({
           )}
         </h2>
         <Note className="tabular-nums">
-          After session {at + 1} of {sessions.length} · {where(session)} · {session.venue.name},{" "}
-          {formatDay(session.session.startedAt)}
+          After session {at + 1} of {sessions.length} · {where(session)} ·{" "}
+          {venueLabel(session.venue)}, {formatDay(session.session.startedAt)}
         </Note>
       </header>
       <Segmented label="Measure" options={measures} value={measure} onChange={setMeasure} />
@@ -298,7 +298,7 @@ function Race<S extends RaceSession>({
         value={at}
         onChange={(event) => setAt(Number(event.target.value))}
         aria-label="Replay session by session"
-        aria-valuetext={`Session ${at + 1} of ${sessions.length}, ${session.venue.name}`}
+        aria-valuetext={`Session ${at + 1} of ${sessions.length}, ${venueLabel(session.venue)}`}
         className="min-h-11 w-full accent-[var(--color-muted)]"
       />
 
@@ -383,12 +383,12 @@ export function PlayerSheet({
     },
     {
       title: "Biggest hit",
-      meta: sheet.best?.session.venue.name ?? "No winning session yet",
+      meta: sheet.best ? venueLabel(sheet.best.session.venue) : "No winning session yet",
       value: sheet.best ? figure(sheet.best.net) : none,
     },
     {
       title: "Worst beat",
-      meta: sheet.worst?.session.venue.name ?? "Never finished down",
+      meta: sheet.worst ? venueLabel(sheet.worst.session.venue) : "Never finished down",
       value: sheet.worst ? figure(sheet.worst.net) : none,
     },
     {
@@ -450,7 +450,7 @@ export function PlayerSheet({
           <h3 className="font-semibold">Every session</h3>
           <span aria-live="polite" className="text-sm text-muted tabular-nums wrap-anywhere">
             {focus
-              ? `${formatDay(focus.session.session.startedAt)} · ${focus.session.venue.name} · ${money(focus.net)}`
+              ? `${formatDay(focus.session.session.startedAt)} · ${venueLabel(focus.session.venue)} · ${money(focus.net)}`
               : "Pick a bar"}
           </span>
         </div>
@@ -465,7 +465,7 @@ export function PlayerSheet({
               <button
                 key={p.session.session.id}
                 type="button"
-                aria-label={`${formatDay(p.session.session.startedAt)}, ${p.session.venue.name}: ${money(p.net)}`}
+                aria-label={`${formatDay(p.session.session.startedAt)}, ${venueLabel(p.session.venue)}: ${money(p.net)}`}
                 onPointerEnter={() => setShown(i)}
                 onFocus={() => setShown(i)}
                 onClick={() => setShown(i)}

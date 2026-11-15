@@ -2,7 +2,7 @@ import { useNavigation, type StaticScreenProps } from "@react-navigation/native"
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { playerNames } from "@stacks/client-runtime/format";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
-import { boardMoney, localClock, nightLabel } from "@stacks/client-runtime/trip";
+import { boardMoney, localClock, nightLabel, tripPlays } from "@stacks/client-runtime/trip";
 import { tripNights } from "@stacks/shared/trips";
 import { useState } from "react";
 import { Text, View } from "react-native";
@@ -67,8 +67,11 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
   const mine = trip.sessions.find(
     (s) => s.session.status === "live" && s.playerIds.includes(group.myPlayerId),
   );
-  const live = trip.sessions.filter((s) => s.session.status === "live" && s !== mine);
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const plays = tripPlays(trip);
+  const live = plays.filter(
+    (s) => s.live && !(s.kind === "session" && s.session.id === mine?.session.id),
+  );
+  const closed = plays.filter((s) => !s.live);
   const nights = tripNights(closed, localClock).toReversed();
   const going = trip.trip.endedAt === null;
   const canStart = going && group.group.currency === RECORDING_CURRENCY;
@@ -159,7 +162,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
         />
       ) : null}
       <BackingSection detail={group} trip={trip} />
-      {trip.sessions.length === 0 ? (
+      {plays.length === 0 ? (
         <EmptyState centered title="No sessions on this trip yet">
           {going
             ? "Start one when you sit down at a table. Everyone's buy-ins and cash-outs go on it."

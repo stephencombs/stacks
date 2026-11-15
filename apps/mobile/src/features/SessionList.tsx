@@ -1,7 +1,8 @@
+import { useNavigation } from "@react-navigation/native";
 import { useGo } from "../lib/go";
 import type { GroupDetail, SessionSummary } from "@stacks/contracts";
-import { formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
-import { chipOf } from "@stacks/client-runtime/trip";
+import { formatDuration, formatTime, gameNames, venueLabel } from "@stacks/client-runtime/format";
+import { chipOf, type TripPlay } from "@stacks/client-runtime/trip";
 import * as DateTime from "effect/DateTime";
 import { Text, View } from "react-native";
 
@@ -9,34 +10,53 @@ import { Money } from "../components/Money";
 import { Badge, Card, List, Row } from "../components/ui/Surface";
 import { Chip } from "./Chip";
 
+/**
+ * A trip's sessions and tables. A table opens your own visit there; one you didn't play has no
+ * screen yet.
+ */
 export function SessionList({
   sessions,
   detail,
 }: {
-  sessions: ReadonlyArray<SessionSummary>;
+  sessions: ReadonlyArray<TripPlay>;
   detail: GroupDetail;
 }) {
   const go = useGo();
+  const navigation = useNavigation();
   return (
     <List>
-      {sessions.map(({ session, venue, results }) => {
+      {sessions.map((play) => {
+        const { session, results, live } = play;
+        const venue = venueLabel(play.venue);
+        const game =
+          play.kind === "session"
+            ? gameNames[play.session.game]
+            : play.table.game
+              ? gameNames[play.table.game]
+              : "No game set";
+        const visitId = play.kind === "table" ? play.myVisitId : null;
+        const open =
+          play.kind === "session"
+            ? () => go.session(play.session.id)
+            : visitId
+              ? () => navigation.navigate("Play", { visitId })
+              : undefined;
         const mine = results.find((result) => result.playerId === detail.myPlayerId);
         return (
           <Row
             key={session.id}
-            accessibilityHint="Opens the session"
-            onPress={() => go.session(session.id)}
+            {...(open ? { accessibilityHint: "Opens the session", onPress: open } : {})}
           >
-            <Chip chip={chipOf(detail, detail.myPlayerId)} name={venue.name} size={28} />
+            <Chip chip={chipOf(detail, detail.myPlayerId)} name={venue} size={28} />
             <View className="flex-1 gap-0.5">
               <View className="flex-row items-center gap-2">
                 <Text numberOfLines={1} className="shrink type-heading text-ink">
-                  {venue.name}
+                  {venue}
                 </Text>
-                {session.status === "live" ? <Badge tone="live">Live</Badge> : null}
+                {live ? <Badge tone="live">Live</Badge> : null}
               </View>
               <Text className="type-footnote text-muted">
-                {gameNames[session.game]} · {session.status === "live" ? "since " : ""}
+                {game} · {live ? "since " : ""}
                 {formatTime(session.startedAt)}
               </Text>
             </View>

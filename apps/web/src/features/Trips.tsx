@@ -2,7 +2,13 @@ import { useNavigate } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
 import { playerNames } from "@stacks/client-runtime/format";
-import { chipOf, localClock, scopeTrips, tripDates } from "@stacks/client-runtime/trip";
+import {
+  chipOf,
+  closedPlays,
+  localClock,
+  scopeTrips,
+  tripDates,
+} from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { Plus } from "lucide-react";
@@ -99,7 +105,7 @@ function StartTripButton({ detail }: { detail: GroupDetail }) {
 /** The top three on the trip's board so far. */
 function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const names = playerNames(detail);
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const closed = closedPlays(trip);
   const top = tripStandings(closed, localClock).slice(0, 3);
   if (top.length === 0)
     return <span className="text-sm text-muted">Close a session to put it on the board.</span>;

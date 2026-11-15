@@ -463,6 +463,33 @@ describe("tripDays", () => {
   });
 });
 
+describe("a table with no casino set", () => {
+  const noCasino = (day: number, hour: number, results: ReadonlyArray<[PlayerId, number]>) => ({
+    ...session(day, hour, results),
+    venue: null,
+  });
+
+  it("counts toward results but not toward casinos visited", () => {
+    const sessions = [
+      session(21, 20, [[ALEX, 100]], 1),
+      noCasino(21, 21, [[ALEX, 200]]),
+      noCasino(21, 22, [[ALEX, 300]]),
+    ];
+    expect(tripAwards(sessions, clock).some((award) => award.key === "hopper")).toBe(false);
+    expect(tripStandings(sessions, clock)[0]).toMatchObject({ playerId: ALEX, net: 600 });
+  });
+
+  it("is left off the route", () => {
+    const route = tripRoute([
+      session(21, 20, [[ALEX, 500]], 1),
+      noCasino(21, 21, [[ALEX, 50]]),
+      session(21, 22, [[ALEX, -100]], 1),
+    ]);
+    expect(route.stops.map((s) => [s.venue.id, s.visits, s.net])).toEqual([[venue(1).id, 2, 400]]);
+    expect(route.path.map((v) => v.id)).toEqual([venue(1).id]);
+  });
+});
+
 describe("tripRoute", () => {
   it("numbers each casino by first visit and keeps the path in playing order", () => {
     const route = tripRoute([

@@ -6,7 +6,11 @@ import {
   type GroupDetail,
   type GroupListItem,
   type PlayerId,
+  type SessionSummary,
+  type TableId,
   type Trip,
+  type TripDetail,
+  type TripTable,
 } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
 import type {
@@ -20,6 +24,51 @@ import type {
 } from "@stacks/shared/trips";
 
 import { formatTime } from "./format.ts";
+
+/**
+ * One thing played on a trip: an older group session, or a table recorded from Play. Both read as
+ * a `TripSession`, so standings, nights and awards count them alike.
+ */
+export type TripPlay =
+  | (SessionSummary & { readonly kind: "session"; readonly live: boolean })
+  | (TripTable & {
+      readonly kind: "table";
+      readonly live: boolean;
+      readonly session: {
+        readonly id: TableId;
+        readonly startedAt: DateTime.Utc;
+        readonly highLimit: boolean;
+      };
+    });
+
+/** A trip's sessions and tables together, oldest first. */
+export const tripPlays = (trip: Pick<TripDetail, "sessions" | "tables">): ReadonlyArray<TripPlay> =>
+  [
+    ...trip.sessions.map((summary): TripPlay => ({
+      ...summary,
+      kind: "session",
+      live: summary.session.status === "live",
+    })),
+    ...trip.tables.map((table): TripPlay => ({
+      ...table,
+      kind: "table",
+      live: table.endedAt === null,
+      session: { id: table.table.id, startedAt: table.startedAt, highLimit: table.table.highLimit },
+    })),
+  ].toSorted(
+    (a, b) =>
+      DateTime.toEpochMillis(a.session.startedAt) - DateTime.toEpochMillis(b.session.startedAt),
+  );
+
+/** Every trip in the groups you're in, by name, for labeling tables that belong to one. */
+export const tripNames = (
+  groups: ReadonlyArray<{ readonly trips: ReadonlyArray<Pick<Trip, "id" | "name">> }>,
+): ReadonlyMap<TripId, string> =>
+  new Map(groups.flatMap(({ trips }) => trips.map((trip) => [trip.id, trip.name] as const)));
+
+/** What a trip has finished: what standings, nights and awards count. */
+export const closedPlays = (trip: Pick<TripDetail, "sessions" | "tables">) =>
+  tripPlays(trip).filter((play) => !play.live);
 
 const HOUR = 3_600_000;
 /** A night runs until 6am, so the 2am session still counts as the night before. */
@@ -72,10 +121,10 @@ export const awardTitles: Record<AwardKey, string> = {
 
 /** What earned an award, as a short line under the winner's name. */
 export const awardLine = (
-  award: TripAward<TripSession & { readonly venue: { readonly name: string } }>,
+  award: TripAward<TripSession & { readonly venue: { readonly name: string } | null }>,
   currency: CurrencyCode,
 ) => {
-  const where = award.session ? ` at ${award.session.venue.name}` : "";
+  const where = award.session?.venue ? ` at ${award.session.venue.name}` : "";
   switch (award.key) {
     case "biggest_hit":
       return `${boardMoney(award.value, currency)}${where}`;

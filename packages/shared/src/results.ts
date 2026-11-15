@@ -42,6 +42,32 @@ export const playerResults = (
   return results;
 };
 
+/** Each player's results added up across several ledgers, such as sessions and tables. */
+export const mergeResults = (
+  parts: Iterable<ReadonlyMap<PlayerId, PlayerResult>>,
+): ReadonlyMap<PlayerId, PlayerResult> => {
+  const totals = new Map<PlayerId, { buyIn: number; cashOut: number; adjustment: number }>();
+  for (const part of parts)
+    for (const [playerId, result] of part) {
+      const player = totals.get(playerId) ?? { buyIn: 0, cashOut: 0, adjustment: 0 };
+      player.buyIn += result.buyIn;
+      player.cashOut += result.cashOut;
+      player.adjustment += result.adjustment;
+      totals.set(playerId, player);
+    }
+  return new Map(
+    Array.from(totals, ([playerId, { buyIn, cashOut, adjustment }]) => [
+      playerId,
+      {
+        buyIn: MinorUnits.make(buyIn),
+        cashOut: MinorUnits.make(cashOut),
+        adjustment: MinorUnits.make(adjustment),
+        net: MinorUnits.make(cashOut + adjustment - buyIn),
+      },
+    ]),
+  );
+};
+
 /**
  * Splits results by a session property such as game or venue. Only entries from the given
  * sessions count, so pass a filtered session list to scope stats to a date range.

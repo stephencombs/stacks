@@ -130,9 +130,49 @@ const liveSummary = {
   myLedgerEntries: [{ id: u(601), kind: "buy_in", amount: 30000, voidedAt: null }],
   results: Object.entries(liveRows).map(([k, r]) => result(+k, r, true)),
 };
+/** Tables recorded from Play and put in the trip: a finished one with a player outside the group. */
+const tripTables = [
+  {
+    table: {
+      id: u(700),
+      tripId: ids.trip,
+      game: "blackjack",
+      venueId: u(320),
+      highLimit: true,
+      starterPlayerId: u(710),
+    },
+    venue: venue(20, "Bellagio"),
+    startedAt: at(32, 20),
+    endedAt: at(32, 23),
+    playerIds: [P[0], P[1]],
+    playing: [],
+    results: [result(0, [400, 950]), result(1, [300, 120])],
+    others: [{ displayName: "Dave", playing: false, net: -15000 }],
+    myVisitId: u(720),
+  },
+  {
+    table: {
+      id: u(701),
+      tripId: ids.trip,
+      game: null,
+      venueId: null,
+      highLimit: false,
+      starterPlayerId: u(711),
+    },
+    venue: null,
+    startedAt: liveStart,
+    endedAt: null,
+    playerIds: [P[3]],
+    playing: [P[3]],
+    results: [result(3, [200, 0], true)],
+    others: [],
+    myVisitId: null,
+  },
+];
 const tripDetail = {
   trip,
   sessions: [...summaries, liveSummary],
+  tables: tripTables,
   balances: [
     [0, 18500],
     [1, 6000],
@@ -261,19 +301,31 @@ const stats = {
     net: [30000, 2000, 1000, -41000, -470000, 0][i],
   })),
   byGame: [{ key: "blackjack", sessionCount: 2, results: summaries[0]!.results }],
-  byVenue: [...Map.groupBy(summaries, (s) => s.venue.id).values()].map((played) => ({
-    key: played[0]!.venue,
-    sessionCount: played.length,
-    results: played.flatMap((s) => s.results),
-  })),
+  byVenue: [
+    ...[...Map.groupBy(summaries, (s) => s.venue.id).values()].map((played) => ({
+      key: played[0]!.venue,
+      sessionCount: played.length,
+      results: played.flatMap((s) => s.results),
+    })),
+    { key: tripTables[0]!.venue, sessionCount: 1, results: tripTables[0]!.results },
+  ],
   bySeat: [],
-  bySession: summaries.map((s) => ({
-    sessionId: s.session.id,
-    tripId: ids.trip,
-    venueId: s.venue.id,
-    startedAt: s.session.startedAt,
-    results: s.results,
-  })),
+  bySession: [
+    ...summaries.map((s) => ({
+      id: s.session.id,
+      tripId: ids.trip,
+      venueId: s.venue.id,
+      startedAt: s.session.startedAt,
+      results: s.results,
+    })),
+    {
+      id: tripTables[0]!.table.id,
+      tripId: ids.trip,
+      venueId: tripTables[0]!.venue!.id,
+      startedAt: tripTables[0]!.startedAt,
+      results: tripTables[0]!.results,
+    },
+  ],
 };
 const invites = [
   {
@@ -384,6 +436,7 @@ export const routes: Record<string, unknown> = {
     ...tripDetail,
     trip: oldTrip,
     sessions: summaries.slice(0, 2),
+    tables: [],
   }),
   [`/api/groups/${work.group.id}`]: check(GroupDetail, workDetail),
   [`/api/groups/${work.group.id}/invites`]: check(Schema.Array(Invite), []),
@@ -392,6 +445,7 @@ export const routes: Record<string, unknown> = {
   [`/api/trips/${work.trip.id}`]: check(TripDetail, {
     trip: work.trip,
     sessions: [],
+    tables: [],
     balances: [],
     stakes: [],
   }),

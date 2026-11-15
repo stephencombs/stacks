@@ -30,6 +30,7 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
       createdBy: UserId.make("alex"),
     },
     sessions: [],
+    tables: [],
     balances: [],
     stakes: [],
   };

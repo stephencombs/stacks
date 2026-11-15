@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
-import { localClock, nightLabel } from "@stacks/client-runtime/trip";
+import { localClock, nightLabel, tripPlays } from "@stacks/client-runtime/trip";
 import { tripNights } from "@stacks/shared/trips";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -32,15 +32,21 @@ function TripPage() {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-/** Sessions: your live table first, then the trip card, then everything played, night by night. */
+/**
+ * Sessions and tables: your live session first, then the trip card, then everything played, night
+ * by night.
+ */
 function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
+  const plays = tripPlays(trip);
   const mine = trip.sessions.find(
     (s) => s.session.status === "live" && s.playerIds.includes(group.myPlayerId),
   );
-  const live = trip.sessions.filter((s) => s.session.status === "live" && s !== mine);
-  const closed = trip.sessions.filter((s) => s.session.status === "closed");
+  const live = plays.filter(
+    (s) => s.live && !(s.kind === "session" && s.session.id === mine?.session.id),
+  );
+  const closed = plays.filter((s) => !s.live);
   const nights = tripNights(closed, localClock).toReversed();
   const startSession =
     trip.trip.endedAt === null && group.group.currency === RECORDING_CURRENCY ? (
