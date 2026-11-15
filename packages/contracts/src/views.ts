@@ -105,11 +105,17 @@ export const TripTable = Schema.Struct({
   startedAt: Schema.DateTimeUtc,
   /** When the last player cashed out; null while anyone is still playing. */
   endedAt: Schema.NullOr(Schema.DateTimeUtc),
+  /** Time anyone was playing, over finished visits; overlapping visits count once. */
+  minutesPlayed: Schema.Int,
   /** Group members at the table, as group players, in the order they sat down. */
   playerIds: Schema.Array(PlayerId),
   /** Members still playing. */
   playing: Schema.Array(PlayerId),
+  /** Members' finished visits only, so sitting back down never unsettles a cash-out. */
   results: Schema.Array(PlayerResult),
+  /** What each member still playing has bought in for at their open visit. */
+  inPlay: Schema.Array(Schema.Struct({ playerId: PlayerId, buyIn: MinorUnits })),
+  /** Everyone else, with their finished visits' result. */
   others: Schema.Array(
     Schema.Struct({ displayName: Schema.String, playing: Schema.Boolean, net: MinorUnits }),
   ),

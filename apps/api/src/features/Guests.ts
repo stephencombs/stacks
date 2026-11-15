@@ -99,6 +99,11 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
         where id = ${guest.playerId}
       `;
       yield* sql`
+        insert into membership_absences (group_id, user_id, left_at, returned_at)
+        select group_id, user_id, left_at, now() from memberships
+        where group_id = ${guest.groupId} and user_id = ${userId} and left_at is not null
+      `;
+      yield* sql`
         insert into memberships (group_id, user_id, role)
         values (${guest.groupId}, ${userId}, 'member')
         on conflict (group_id, user_id) do update set left_at = null

@@ -123,9 +123,11 @@ it("lists a trip's sessions and tables together, oldest first, and says which ar
     venue: null,
     startedAt: local(24, hour),
     endedAt: live ? null : local(24, hour + 1),
+    minutesPlayed: live ? 0 : 60,
     playerIds: [alex],
     playing: live ? [alex] : [],
-    results: [money(result)],
+    results: live ? [] : [money(result)],
+    inPlay: live ? [{ playerId: alex, buyIn: MinorUnits.make(100) }] : [],
     others: [],
     myVisitId: null,
   });

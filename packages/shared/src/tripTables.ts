@@ -4,7 +4,7 @@ import * as DateTime from "effect/DateTime";
 import { playerResults, type PlayerResult } from "./results.ts";
 
 export type TableVisit = Pick<Visit, "id" | "playerId" | "startedAt" | "finishedAt"> & {
-  readonly deletedAt?: DateTime.Utc | undefined;
+  readonly deletedAt?: DateTime.Utc | null | undefined;
 };
 export type TableEntry = Pick<PlayEntry, "visitId" | "kind" | "amount" | "voidedAt">;
 
@@ -12,11 +12,15 @@ export interface GroupTable {
   readonly startedAt: DateTime.Utc;
   /** When the last player cashed out; null while anyone is still playing. */
   readonly endedAt: DateTime.Utc | null;
+  /** Time anyone was playing, over finished visits: overlapping visits count once. */
+  readonly minutesPlayed: number;
   /** Each group member at the table, in the order they first sat down. */
-  readonly members: ReadonlyArray<PlayerResult & { readonly playerId: PlayerId }>;
-  /** Members still playing. */
-  readonly playing: ReadonlyArray<PlayerId>;
-  /** Table players whose play counts for no member: on the table, not in standings. */
+  readonly seated: ReadonlyArray<PlayerId>;
+  /** Members' settled results: their finished visits only, so a return visit can't undo them. */
+  readonly results: ReadonlyArray<PlayerResult & { readonly playerId: PlayerId }>;
+  /** Members playing now, with what their open visit has bought in for. */
+  readonly inPlay: ReadonlyArray<{ readonly playerId: PlayerId; readonly buyIn: MinorUnits }>;
+  /** Table players whose play counts for no member, with their settled results. */
   readonly others: ReadonlyArray<
     PlayerResult & { readonly playerId: PlayerId; readonly playing: boolean }
   >;
@@ -24,6 +28,20 @@ export interface GroupTable {
 
 const none = MinorUnits.make(0);
 const ZERO: PlayerResult = { buyIn: none, cashOut: none, adjustment: none, net: none };
+
+const millis = DateTime.toEpochMillis;
+
+/** The length of the union of the given intervals. */
+const covered = (intervals: ReadonlyArray<readonly [number, number]>) => {
+  let total = 0;
+  let end = -Infinity;
+  for (const [from, to] of intervals.toSorted((a, b) => a[0] - b[0])) {
+    if (to <= end) continue;
+    total += to - Math.max(from, end);
+    end = to;
+  }
+  return total;
+};
 
 /**
  * A table as its trip's group sees it. `memberOf` names the group member a visit counts for, or
@@ -36,53 +54,68 @@ export const groupTable = (
   memberOf: (visit: TableVisit) => PlayerId | null,
 ): GroupTable | null => {
   const shown = Array.from(visits)
-    .filter((visit) => visit.deletedAt === undefined)
+    .filter((visit) => (visit.deletedAt ?? null) === null)
     .toSorted(
       (a, b) =>
-        DateTime.toEpochMillis(a.startedAt) - DateTime.toEpochMillis(b.startedAt) ||
-        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+        millis(a.startedAt) - millis(b.startedAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
     );
   if (shown.length === 0) return null;
 
-  const owners = new Map(
+  const byVisit = new Map(
     shown.map((visit) => {
       const member = memberOf(visit);
-      return [visit.id, member === null ? { other: visit.playerId } : { member }] as const;
+      return [visit.id, { visit, member, owner: member ?? visit.playerId }] as const;
     }),
   );
-  const ledger = (pick: "member" | "other") =>
+  const counted = Array.from(entries).flatMap((entry) => {
+    const at = byVisit.get(entry.visitId);
+    return at && entry.voidedAt === null ? [{ ...entry, ...at }] : [];
+  });
+  const settled = (members: boolean) =>
     playerResults(
-      Array.from(entries).flatMap((entry) => {
-        const owner = owners.get(entry.visitId);
-        const playerId = owner && (pick === "member" ? owner.member : owner.other);
-        return playerId ? [{ ...entry, playerId }] : [];
-      }),
+      counted.flatMap((entry) =>
+        entry.visit.finishedAt !== null && (entry.member !== null) === members
+          ? [{ ...entry, playerId: entry.owner }]
+          : [],
+      ),
     );
-  const memberResults = ledger("member");
-  const otherResults = ledger("other");
-  const open = shown.filter((visit) => visit.finishedAt === null);
+  const memberResults = settled(true);
+  const otherResults = settled(false);
 
-  const members = new Map<PlayerId, boolean>();
+  const seated = new Set<PlayerId>();
+  const inPlay = new Map<PlayerId, number>();
   const others = new Map<PlayerId, boolean>();
-  for (const visit of shown) {
-    const owner = owners.get(visit.id)!;
-    const [into, id] = owner.member ? [members, owner.member] : [others, owner.other!];
-    into.set(id, (into.get(id) ?? false) || visit.finishedAt === null);
+  for (const { visit, member } of byVisit.values()) {
+    const open = visit.finishedAt === null;
+    if (member === null) others.set(visit.playerId, (others.get(visit.playerId) ?? false) || open);
+    else {
+      seated.add(member);
+      if (open) inPlay.set(member, inPlay.get(member) ?? 0);
+    }
   }
+  for (const entry of counted)
+    if (entry.member !== null && entry.visit.finishedAt === null && entry.kind === "buy_in")
+      inPlay.set(entry.member, (inPlay.get(entry.member) ?? 0) + entry.amount);
 
+  const finished = shown.flatMap((visit) =>
+    visit.finishedAt === null ? [] : [[millis(visit.startedAt), millis(visit.finishedAt)] as const],
+  );
   return {
     startedAt: shown[0]!.startedAt,
     endedAt:
-      open.length > 0
+      finished.length < shown.length
         ? null
-        : shown
-            .map((visit) => visit.finishedAt!)
-            .reduce((latest, at) => (DateTime.isGreaterThan(at, latest) ? at : latest)),
-    members: Array.from(members.keys(), (playerId) => ({
+        : DateTime.makeUnsafe(Math.max(...finished.map(([, to]) => to))),
+    minutesPlayed: Math.round(covered(finished) / 60_000),
+    seated: Array.from(seated),
+    results: Array.from(seated).flatMap((playerId) => {
+      const result = memberResults.get(playerId);
+      return result ? [{ playerId, ...result }] : [];
+    }),
+    inPlay: Array.from(inPlay, ([playerId, buyIn]) => ({
       playerId,
-      ...(memberResults.get(playerId) ?? ZERO),
+      buyIn: MinorUnits.make(buyIn),
     })),
-    playing: Array.from(members).flatMap(([playerId, playing]) => (playing ? [playerId] : [])),
     others: Array.from(others, ([playerId, playing]) => ({
       playerId,
       playing,
@@ -90,3 +123,24 @@ export const groupTable = (
     })),
   };
 };
+
+/** When a member was out of the group. `leftAt` is null while they're in it now. */
+export interface MembershipSpan {
+  readonly leftAt: DateTime.Utc | null;
+  /** Earlier times they left and came back. */
+  readonly absences: ReadonlyArray<{
+    readonly leftAt: DateTime.Utc;
+    readonly returnedAt: DateTime.Utc;
+  }>;
+}
+
+/**
+ * Whether play that started at `at` counts for a member: not while they were out of the group.
+ * Play before they first joined counts, since it was in the group's trip.
+ */
+export const inGroupAt = (at: DateTime.Utc, membership: MembershipSpan) =>
+  (membership.leftAt === null || DateTime.isLessThan(at, membership.leftAt)) &&
+  !membership.absences.some(
+    (absence) =>
+      !DateTime.isLessThan(at, absence.leftAt) && DateTime.isLessThan(at, absence.returnedAt),
+  );

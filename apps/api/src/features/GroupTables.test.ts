@@ -4,10 +4,12 @@ import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import {
   ActorId,
+  EntryId,
   PlayerId,
   type CrewActivityItem,
   type TableId,
   type TripId,
+  type VisitId,
 } from "@stacks/contracts";
 import {
   RecordingCommand,
@@ -40,6 +42,20 @@ const toTrip = (who: RecordingIdentity, tableId: TableId, tripId: TripId | null)
     preparedAt: at(1),
     tableId,
     tripId,
+  });
+
+/** Cashes a visit out for `amount` at `minutes` past the hour. */
+const finishAt = (who: RecordingIdentity, visitId: VisitId, minutes: number, amount: number) =>
+  RecordingCommand.make({
+    type: "finish",
+    operationId: RecordingOperationId.make(uuid()),
+    actorId: who.actorId,
+    preparedAt: at(minutes),
+    visitId,
+    expectedRevision: 0,
+    entryId: EntryId.make(uuid()),
+    amount: usd(amount),
+    finishedAt: at(minutes),
   });
 
 const tableItems = (items: ReadonlyArray<CrewActivityItem>, tableId: TableId) =>
@@ -78,7 +94,15 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
 
         const live = yield* alex.trips.get({ params: { tripId: group.tripId } });
         expect(live.tables).toHaveLength(1);
-        expect(live.tables[0]).toMatchObject({ endedAt: null, playing: [alexId, beaId] });
+        expect(live.tables[0]).toMatchObject({
+          endedAt: null,
+          playing: [alexId, beaId],
+          inPlay: [
+            { playerId: alexId, buyIn: 20000 },
+            { playerId: beaId, buyIn: 10000 },
+          ],
+          results: [],
+        });
         expect(live.tables[0]!.others).toMatchObject([{ displayName: "Dave", playing: true }]);
         expect(tableItems((yield* bea.crew.activity({ query: {} })).items, opened.tableId)).toEqual(
           [expect.objectContaining({ kind: "table_live" })],
@@ -208,6 +232,61 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
       expect(yield* Effect.flip(bea.trips.get({ params: { tripId: group.tripId } }))).toMatchObject(
         { _tag: "Forbidden" },
       );
+    }),
+  );
+
+  it.effect("leaves out a member's play from while they were away, after they rejoin", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { alex, bea } = yield* users("alex", "bea");
+      const group = yield* groupWith(alex, bea);
+      const beaPlayer = group.players.find((player) => player.id !== group.myPlayerId)!;
+      const { code } = yield* alex.invites.create({
+        params: { groupId: group.group.id },
+        payload: { id: ids.invite(), maxUses: null },
+      });
+      const alexMe = identity();
+      const opened = start(alexMe);
+      expect(
+        yield* push(alex, alexMe, opened, toTrip(alexMe, opened.tableId, group.tripId)),
+      ).toEqual(["accepted", "accepted"]);
+      const { token } = yield* alex.recording.share({ params: { tableId: opened.tableId } });
+      const beaMe = identity();
+      const { player } = yield* bea.recording.join({
+        params: { token },
+        payload: { identity: beaMe, player: { id: PlayerId.make(uuid()), displayName: "Bea" } },
+      });
+
+      // Bea plays, leaves the group and plays, comes back and plays: 10,000 in each time.
+      const before = sitDown(beaMe, opened.tableId, player.id, 1);
+      expect(yield* push(bea, beaMe, before, finishAt(beaMe, before.visitId, 5, 11000))).toEqual([
+        "accepted",
+        "accepted",
+      ]);
+      yield* bea.groups.leave({ params: { groupId: group.group.id } });
+      const away = sitDown(beaMe, opened.tableId, player.id, 15);
+      expect(yield* push(bea, beaMe, away, finishAt(beaMe, away.visitId, 20, 50000))).toEqual([
+        "accepted",
+        "accepted",
+      ]);
+      yield* bea.invites.accept({ params: { code }, payload: { displayName: "Bea" } });
+      yield* sql`
+        update membership_absences
+        set left_at = ${DateTime.toDateUtc(at(10))}, returned_at = ${DateTime.toDateUtc(at(30))}
+        where group_id = ${group.group.id} and user_id = ${beaPlayer.userId!}
+      `;
+      const back = sitDown(beaMe, opened.tableId, player.id, 35);
+      expect(yield* push(bea, beaMe, back, finishAt(beaMe, back.visitId, 40, 12000))).toEqual([
+        "accepted",
+        "accepted",
+      ]);
+      expect(yield* push(alex, alexMe, finishAt(alexMe, opened.visitId, 45, 20000))).toEqual([
+        "accepted",
+      ]);
+
+      const [table] = (yield* alex.trips.get({ params: { tripId: group.tripId } })).tables;
+      expect(nets(table!.results)).toEqual({ [group.myPlayerId]: 0, [beaPlayer.id]: 3000 });
+      expect(table!.others).toEqual([{ displayName: "Bea", playing: false, net: 40000 }]);
     }),
   );
 

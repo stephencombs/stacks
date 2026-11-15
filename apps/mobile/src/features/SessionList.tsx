@@ -60,7 +60,8 @@ export function SessionList({
                 {formatTime(session.startedAt)}
               </Text>
             </View>
-            {mine ? (
+            {/* A live table's result is only its finished visits; it isn't settled yet. */}
+            {mine && !(live && play.kind === "table") ? (
               <Money
                 amount={mine.net}
                 currency={detail.group.currency}

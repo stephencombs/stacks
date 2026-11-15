@@ -32,6 +32,15 @@ export type GameChip = (typeof gameChips)[Game];
 
 const gameChip = (game: Game | null): GameChip => (game === null ? "grey" : gameChips[game]);
 
+/**
+ * Each row's share of the sessions its breakdown covers. A session with no game, casino or seat
+ * recorded isn't in that breakdown, so it doesn't shrink the others' bars.
+ */
+export const sessionShare = (rows: ReadonlyArray<{ readonly sessionCount: number }>) => {
+  const total = rows.reduce((sum, row) => sum + row.sessionCount, 0);
+  return (row: { readonly sessionCount: number }) => (total === 0 ? 0 : row.sessionCount / total);
+};
+
 /** "45m", "6h" or "38h 30m". */
 export const formatHours = (hours: number) => {
   const minutes = Math.round(hours * 60);

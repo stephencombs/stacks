@@ -179,10 +179,11 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
         myVisitId: table.myVisitId,
       };
       const players = [
-        ...table.results.map((result) => ({
-          playerId: result.playerId,
-          displayName: memberName.get(result.playerId) ?? "Player",
-          net: result.net,
+        ...table.playerIds.map((playerId) => ({
+          playerId,
+          displayName: memberName.get(playerId) ?? "Player",
+          net:
+            table.results.find((result) => result.playerId === playerId)?.net ?? MinorUnits.make(0),
         })),
         ...table.others.map(({ displayName, net }) => ({ playerId: null, displayName, net })),
       ];

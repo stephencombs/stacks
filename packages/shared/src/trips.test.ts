@@ -286,6 +286,18 @@ describe("tonightBoard", () => {
     ]);
   });
 
+  it("keeps a table player's cashed-out visit settled when they sit back down", () => {
+    // Alex cashed out 15,000 on 10,000, then bought back in for 10,000 at the same table.
+    const back = {
+      results: [{ playerId: ALEX, buyIn: money(10000), net: money(5000) }],
+      playing: [ALEX],
+      inPlay: [{ playerId: ALEX, buyIn: money(10000) }],
+    };
+    expect(tonightBoard([], [back], clock, now)).toEqual([
+      { playerId: ALEX, net: 5000, inPlay: 10000, rank: 1 },
+    ]);
+  });
+
   it("lists someone whose only play tonight is still going, with no result yet", () => {
     const board = tonightBoard([], [table([[ALEX, -300, 300]], [ALEX])], clock, now);
     expect(board).toEqual([{ playerId: ALEX, net: null, inPlay: 300, rank: 1 }]);

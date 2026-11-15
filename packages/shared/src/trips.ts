@@ -186,6 +186,11 @@ export interface LiveTable {
   readonly results: ReadonlyArray<Pick<PlayerResult, "playerId" | "buyIn" | "net">>;
   /** Seated and not cashed out. */
   readonly playing: ReadonlyArray<PlayerId>;
+  /**
+   * A table recorded from Play has this: what each open visit has bought in for. Its `results`
+   * are then finished visits only, settled even for a player who sat back down.
+   */
+  readonly inPlay?: ReadonlyArray<{ readonly playerId: PlayerId; readonly buyIn: number }>;
 }
 
 export interface TonightRow {
@@ -204,9 +209,8 @@ export interface TonightRow {
 export const inPlay = (live: ReadonlyArray<LiveTable>): ReadonlyMap<PlayerId, number> => {
   const amounts = new Map<PlayerId, number>();
   for (const table of live)
-    for (const r of table.results)
-      if (table.playing.includes(r.playerId))
-        amounts.set(r.playerId, (amounts.get(r.playerId) ?? 0) + r.buyIn);
+    for (const r of table.inPlay ?? table.results.filter((r) => table.playing.includes(r.playerId)))
+      amounts.set(r.playerId, (amounts.get(r.playerId) ?? 0) + r.buyIn);
   return amounts;
 };
 
@@ -223,7 +227,11 @@ export const tonightBoard = (
       .filter((s) => clock.night(s.session.startedAt) === tonight)
       .toSorted((a, b) => startOf(a) - startOf(b))
       .flatMap((s) => s.results),
-    ...live.flatMap((table) => table.results.filter((r) => !table.playing.includes(r.playerId))),
+    ...live.flatMap((table) =>
+      table.inPlay
+        ? table.results
+        : table.results.filter((r) => !table.playing.includes(r.playerId)),
+    ),
   ];
   const nets = new Map<PlayerId, number>();
   for (const r of finished) nets.set(r.playerId, (nets.get(r.playerId) ?? 0) + r.net);

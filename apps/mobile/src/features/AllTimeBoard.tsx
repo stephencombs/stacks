@@ -6,6 +6,7 @@ import {
   type PlayerResult,
 } from "@stacks/contracts";
 import { gameNames, playedSummary } from "@stacks/client-runtime/format";
+import { sessionShare } from "@stacks/client-runtime/stats";
 import { seatLabel } from "@stacks/client-runtime/table";
 import { Text, View } from "react-native";
 
@@ -63,6 +64,9 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
     rows.toSorted((a, b) => tableNet(b.results) - tableNet(a.results));
 
   const tripCount = new Set(sessions.map((s) => s.tripId)).size;
+  const gameShare = sessionShare(stats.byGame);
+  const casinoShare = sessionShare(stats.byVenue);
+  const seatShare = sessionShare(stats.bySeat);
   return (
     <>
       <Text className="text-base text-muted">
@@ -91,7 +95,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
         <List>
           {byNet(stats.byGame).map((row) => {
             const net = tableNet(row.results);
-            const share = row.sessionCount / Math.max(1, stats.sessionCount);
+            const share = gameShare(row);
             return (
               <ProportionalBarRow
                 key={row.key}
@@ -115,7 +119,7 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
         <List>
           {byNet(stats.byVenue).map((row) => {
             const net = tableNet(row.results);
-            const share = row.sessionCount / Math.max(1, stats.sessionCount);
+            const share = casinoShare(row);
             return (
               <ProportionalBarRow
                 key={row.key.id}
@@ -135,12 +139,12 @@ function StatsView({ detail, stats }: { detail: GroupDetail; stats: GroupStats }
         <View className="gap-2">
           <SectionHeading>By blackjack seat</SectionHeading>
           <Text className="type-footnote text-muted">
-            Bars show share of all sessions; amounts show total result.
+            Bars show share of sessions with a seat; amounts show total result.
           </Text>
           <List>
             {stats.bySeat.map((row) => {
               const net = tableNet(row.results);
-              const share = row.sessionCount / Math.max(1, stats.sessionCount);
+              const share = seatShare(row);
               return (
                 <ProportionalBarRow
                   key={row.key}

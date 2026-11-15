@@ -5,7 +5,7 @@ import * as DateTime from "effect/DateTime";
 import { makeRecordingStore, type RecordingInput, type RecordingStore } from "./recording.ts";
 import type { RecordingStorageDocument } from "./recordingStorage.ts";
 import { recordingHome } from "./recordingView.ts";
-import { formatHours, personalStatsView, type StatsFilters } from "./stats.ts";
+import { formatHours, personalStatsView, sessionShare, type StatsFilters } from "./stats.ts";
 
 const zone = DateTime.zoneMakeNamedUnsafe("America/Los_Angeles");
 const wynn = VenueId.make("0192e7a0-0000-7000-8000-0000000000d1");
@@ -120,6 +120,16 @@ describe("the trip chip", () => {
     expect(stats.kind === "no_match" && stats.sentence).toBe(
       "No finished Baccarat sessions on Vegas.",
     );
+  });
+});
+
+describe("sessionShare", () => {
+  it("measures each row against the sessions its breakdown covers", () => {
+    // Two of five sessions had no casino set: the three that did are the whole of By casino.
+    const byCasino = [{ sessionCount: 2 }, { sessionCount: 1 }];
+    const share = sessionShare(byCasino);
+    expect(byCasino.map(share)).toEqual([2 / 3, 1 / 3]);
+    expect(sessionShare([])({ sessionCount: 0 })).toBe(0);
   });
 });
 

@@ -13,7 +13,7 @@ import {
   type TripTable,
   type VenueId,
 } from "@stacks/contracts";
-import { groupTable } from "@stacks/shared/tripTables";
+import { groupTable, inGroupAt } from "@stacks/shared/tripTables";
 
 import { PersonalEntryRow, PersonalVisitRow, TableRow, VenueRow } from "../db/rows.ts";
 import { decodeRows } from "./Access.ts";
@@ -52,7 +52,7 @@ export const load = Effect.fn("TripTables.load")(function* (
     new Set(tables.flatMap((table) => (table.venueId === null ? [] : [table.venueId]))),
   );
 
-  const [visits, entries, players, members, venues] = yield* Effect.all(
+  const [visits, entries, players, members, absences, venues] = yield* Effect.all(
     [
       sql`
         select * from personal_visits where table_id in ${sql.in(tableIds)} and deleted_at is null
@@ -96,6 +96,21 @@ export const load = Effect.fn("TripTables.load")(function* (
           ),
         ),
       ),
+      sql`
+        select group_id, user_id, left_at, returned_at from membership_absences
+        where group_id in ${sql.in(groupIds)}
+      `.pipe(
+        Effect.flatMap(
+          decodeRows(
+            Schema.Struct({
+              groupId: GroupId,
+              userId: UserId,
+              leftAt: Timestamp,
+              returnedAt: Timestamp,
+            }),
+          ),
+        ),
+      ),
       venueIds.length === 0
         ? Effect.succeed([])
         : sql`select ${venueColumns(sql)} from venues v where v.id in ${sql.in(venueIds)}`.pipe(
@@ -107,23 +122,24 @@ export const load = Effect.fn("TripTables.load")(function* (
 
   const playerById = new Map(players.map((player) => [player.id, player]));
   const memberByAccount = new Map(members.map((m) => [`${m.groupId}:${m.userId}`, m]));
+  const awayByAccount = Map.groupBy(absences, (a) => `${a.groupId}:${a.userId}`);
   const venueById = new Map<VenueId, (typeof venues)[number]>(venues.map((v) => [v.id, v]));
 
   const loaded = tables.flatMap((row): ReadonlyArray<TripTable> => {
     const own = visits.filter((visit) => visit.tableId === row.id);
     const visitIds = new Set(own.map((visit) => visit.id));
-    // A table player counts as the member holding the same account, for visits started before
-    // that member left the group. Later visits stay on the table, out of the standings.
+    // A table player counts as the member holding the same account, for visits started while
+    // that member was in the group. Others stay on the table, out of the standings.
     const table = groupTable(
-      own.map(({ deletedAt: _, ...visit }) => visit),
+      own,
       entries.filter((entry) => visitIds.has(entry.visitId)),
       (visit) => {
         const userId = playerById.get(visit.playerId)?.userId;
-        const member = userId ? memberByAccount.get(`${row.groupId}:${userId}`) : undefined;
+        const account = `${row.groupId}:${userId}`;
+        const member = userId ? memberByAccount.get(account) : undefined;
         if (!member) return null;
-        return member.leftAt === null || DateTime.isLessThan(visit.startedAt, member.leftAt)
-          ? member.id
-          : null;
+        const absences = awayByAccount.get(account) ?? [];
+        return inGroupAt(visit.startedAt, { leftAt: member.leftAt, absences }) ? member.id : null;
       },
     );
     if (!table) return [];
@@ -141,9 +157,11 @@ export const load = Effect.fn("TripTables.load")(function* (
         venue: row.venueId === null ? null : (venueById.get(row.venueId) ?? null),
         startedAt: table.startedAt,
         endedAt: table.endedAt,
-        playerIds: table.members.map((member) => member.playerId),
-        playing: table.playing,
-        results: table.members,
+        minutesPlayed: table.minutesPlayed,
+        playerIds: table.seated,
+        playing: table.inPlay.map((row) => row.playerId),
+        results: table.results,
+        inPlay: table.inPlay,
         others: table.others.map((other) => ({
           displayName: playerById.get(other.playerId)?.displayName ?? "Player",
           playing: other.playing,

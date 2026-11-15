@@ -4,7 +4,7 @@ import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
 import { ALEX, BEA, money } from "./testing/ledgerArbitrary.ts";
-import { groupTable, type TableEntry, type TableVisit } from "./tripTables.ts";
+import { groupTable, inGroupAt, type TableEntry, type TableVisit } from "./tripTables.ts";
 
 const tablePlayer = (n: number) =>
   PlayerId.make(`0192e7a0-0000-7000-8000-0000000001${String(n).padStart(2, "0")}`);
@@ -23,7 +23,8 @@ const visit = (
   playerId: player,
   startedAt: at(hours[0]),
   finishedAt: hours[1] === null ? null : at(hours[1]),
-  ...(deleted ? { deletedAt: VOIDED } : {}),
+  // The API reads a kept visit with a null deletion, the device with none at all.
+  ...(deleted ? { deletedAt: VOIDED } : n % 2 === 0 ? { deletedAt: null } : {}),
 });
 
 const entry = (
@@ -61,7 +62,7 @@ describe("groupTable", () => {
       ],
       (v) => (v.playerId === ALEX_AT_TABLE ? ALEX : null),
     )!;
-    expect(table.members).toEqual([
+    expect(table.results).toEqual([
       { playerId: ALEX, buyIn: 20000, cashOut: 29000, adjustment: 0, net: 9000 },
     ]);
     expect(table.others).toEqual([
@@ -69,7 +70,30 @@ describe("groupTable", () => {
     ]);
     expect(table.startedAt).toEqual(at(20));
     expect(table.endedAt).toEqual(at(23));
-    expect(table.playing).toEqual([]);
+    expect(table.inPlay).toEqual([]);
+    // Someone was playing from 8pm to 11pm: three hours, not the five the visits add up to.
+    expect(table.minutesPlayed).toBe(180);
+  });
+
+  it("keeps a cashed-out visit settled while the player is back at the table", () => {
+    const table = groupTable(
+      [visit(1, ALEX_AT_TABLE, [20, 21]), visit(2, ALEX_AT_TABLE, [22, null])],
+      [
+        entry(1, "buy_in", 10000),
+        entry(1, "cash_out", 15000),
+        entry(2, "buy_in", 10000),
+        entry(2, "buy_in", 2500),
+      ],
+      () => ALEX,
+    )!;
+    expect(table.seated).toEqual([ALEX]);
+    expect(table.results).toEqual([
+      { playerId: ALEX, buyIn: 10000, cashOut: 15000, adjustment: 0, net: 5000 },
+    ]);
+    expect(table.inPlay).toEqual([{ playerId: ALEX, buyIn: 12500 }]);
+    expect(table.endedAt).toBeNull();
+    // An hour from 8pm, and the open visit not yet.
+    expect(table.minutesPlayed).toBe(60);
   });
 
   it("merges two table players linked to the same member", () => {
@@ -78,7 +102,7 @@ describe("groupTable", () => {
       [entry(1, "buy_in", 100), entry(2, "buy_in", 200), entry(2, "adjustment", 50)],
       () => ALEX,
     )!;
-    expect(table.members).toEqual([
+    expect(table.results).toEqual([
       { playerId: ALEX, buyIn: 300, cashOut: 0, adjustment: 50, net: -250 },
     ]);
     expect(table.others).toEqual([]);
@@ -91,7 +115,7 @@ describe("groupTable", () => {
       [entry(1, "buy_in", 100), entry(2, "buy_in", 300), entry(2, "cash_out", 1000)],
       (v) => (v.id === visitId(1) ? ALEX : null),
     )!;
-    expect(table.members).toEqual([
+    expect(table.results).toEqual([
       { playerId: ALEX, buyIn: 100, cashOut: 0, adjustment: 0, net: -100 },
     ]);
     expect(table.others).toEqual([
@@ -126,16 +150,19 @@ describe("groupTable", () => {
     )!;
     expect(table.startedAt).toEqual(at(19));
     expect(table.endedAt).toBeNull();
-    expect(table.playing).toEqual([ALEX]);
-    expect(table.others.map((o) => [o.playerId, o.playing])).toEqual([
-      [DAVE, false],
-      [ERIN, true],
+    expect(table.inPlay).toEqual([{ playerId: ALEX, buyIn: 100 }]);
+    expect(table.results).toEqual([]);
+    expect(table.others.map((o) => [o.playerId, o.playing, o.net])).toEqual([
+      [DAVE, false, -100],
+      [ERIN, true, 0],
     ]);
   });
 
-  it("lists a seated member with no money in play at zero", () => {
+  it("seats a member with no money in play and no result yet", () => {
     const table = groupTable([visit(1, ALEX_AT_TABLE, [20, null])], [], () => BEA)!;
-    expect(table.members).toEqual([{ playerId: BEA, buyIn: 0, cashOut: 0, adjustment: 0, net: 0 }]);
+    expect(table.seated).toEqual([BEA]);
+    expect(table.results).toEqual([]);
+    expect(table.inPlay).toEqual([{ playerId: BEA, buyIn: 0 }]);
   });
 
   const Ledger = Schema.Struct({
@@ -176,11 +203,24 @@ describe("groupTable", () => {
     if (shown.length === 0) return expect(table).toBeNull();
 
     const counted = ledger.entries.filter(
-      (e) => !e.voided && e.visit < visits.length && !ledger.visits[e.visit]!.deleted,
+      (e) =>
+        !e.voided &&
+        e.visit < visits.length &&
+        !ledger.visits[e.visit]!.deleted &&
+        ledger.visits[e.visit]!.finished,
+    );
+    const open = ledger.entries.filter(
+      (e) =>
+        !e.voided &&
+        e.kind === "buy_in" &&
+        e.visit < visits.length &&
+        !ledger.visits[e.visit]!.deleted &&
+        !ledger.visits[e.visit]!.finished &&
+        ledger.visits[e.visit]!.member !== null,
     );
     const sum = (rows: ReadonlyArray<{ net: number; buyIn: number }>) =>
       rows.reduce((total, row) => [total[0]! + row.net, total[1]! + row.buyIn], [0, 0]);
-    const [net, buyIn] = sum([...table!.members, ...table!.others]);
+    const [net, buyIn] = sum([...table!.results, ...table!.others]);
     expect(net).toBe(
       counted.reduce(
         (total, e) =>
@@ -198,11 +238,36 @@ describe("groupTable", () => {
         .filter((e) => e.kind === "buy_in")
         .reduce((total, e) => total + Math.abs(e.amount), 0),
     );
-    for (const row of [...table!.members, ...table!.others])
+    expect(table!.inPlay.reduce((total, row) => total + row.buyIn, 0)).toBe(
+      open.reduce((total, e) => total + Math.abs(e.amount), 0),
+    );
+    for (const row of [...table!.results, ...table!.others])
       expect(Number.isInteger(row.net)).toBe(true);
-    expect(new Set(table!.members.map((m) => m.playerId)).size).toBe(table!.members.length);
+    expect(new Set(table!.results.map((m) => m.playerId)).size).toBe(table!.results.length);
     expect(new Set(table!.others.map((o) => o.playerId)).size).toBe(table!.others.length);
     expect(table!.endedAt === null).toBe(shown.some((n) => !ledger.visits[n]!.finished));
-    for (const id of table!.playing) expect(members).toContain(id);
+    for (const row of [...table!.results, ...table!.inPlay])
+      expect(table!.seated).toContain(row.playerId);
+    // Finished visits each last an hour; the union can't exceed their sum or fall below one.
+    const finished = shown.filter((n) => ledger.visits[n]!.finished);
+    expect(table!.minutesPlayed).toBeLessThanOrEqual(finished.length * 60);
+    expect(table!.minutesPlayed).toBeGreaterThanOrEqual(finished.length > 0 ? 60 : 0);
+  });
+});
+
+describe("inGroupAt", () => {
+  const membership = {
+    leftAt: at(22),
+    absences: [{ leftAt: at(12), returnedAt: at(15) }],
+  };
+
+  it("counts play while a member is in the group, and not while they're out", () => {
+    expect(inGroupAt(at(11), membership)).toBe(true);
+    expect(inGroupAt(at(12), membership)).toBe(false);
+    expect(inGroupAt(at(14), membership)).toBe(false);
+    expect(inGroupAt(at(15), membership)).toBe(true);
+    expect(inGroupAt(at(21), membership)).toBe(true);
+    expect(inGroupAt(at(22), membership)).toBe(false);
+    expect(inGroupAt(at(23), { leftAt: null, absences: membership.absences })).toBe(true);
   });
 });

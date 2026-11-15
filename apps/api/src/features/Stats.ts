@@ -72,7 +72,7 @@ export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId)
       minutes: minutes(s.startedAt, s.endedAt!),
       results: sessionResults.get(s.id) ?? new Map<PlayerId, PlayerResult>(),
     })),
-    ...tables.flatMap(({ table, endedAt, startedAt, results }) =>
+    ...tables.flatMap(({ table, endedAt, startedAt, minutesPlayed, results }) =>
       endedAt === null || table.tripId === null
         ? []
         : [
@@ -82,7 +82,7 @@ export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId)
               game: table.game,
               venueId: table.venueId,
               startedAt,
-              minutes: minutes(startedAt, endedAt),
+              minutes: minutesPlayed,
               results: toMap(results),
             },
           ],
