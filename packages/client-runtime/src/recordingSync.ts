@@ -4,8 +4,11 @@ import {
   type PlayEntry,
   type PlayerIdentity,
   type PlayerInviteId,
+  type SearchPublicVenuesQuery,
   type TableId,
   type UserId,
+  type Venue,
+  type VenueId,
 } from "@stacks/contracts";
 import {
   isTableCommand,
@@ -36,7 +39,13 @@ import { applyRecordingCommand, createdEntryIds, RecordingError } from "@stacks/
 
 import { newId } from "./ids.ts";
 import { prepareRecordingCommand, type RecordingInput, type RecordingStore } from "./recording.ts";
-import { recordingBase, type RecordingRejection, type RecordingState } from "./recordingState.ts";
+import {
+  missingVenueIds,
+  recordingBase,
+  rememberVenues,
+  type RecordingRejection,
+  type RecordingState,
+} from "./recordingState.ts";
 
 /**
  * The API as sync uses it. Given an actor credential, a call proves the device's actor instead of
@@ -89,6 +98,12 @@ export interface RecordingTransport {
     request: RedeemInviteRequest,
     actor: ActorCredential | null,
   ) => Effect.Effect<PlayerIdentity, unknown>;
+  /** Public venues by name or nearness. Needs no account or actor. */
+  readonly searchVenues: (
+    query: typeof SearchPublicVenuesQuery.Type,
+  ) => Effect.Effect<ReadonlyArray<Venue>, unknown>;
+  /** One public venue, for a table that names one this device hasn't cached. */
+  readonly venue: (venueId: VenueId) => Effect.Effect<Venue, unknown>;
 }
 
 /** Whether the server has the table, so it can be shared. */
@@ -641,6 +656,37 @@ export const makeRecordingSync = (
   const credential = (state: RecordingState) =>
     Effect.tryPromise({ try: () => actorCredential(keys, state.actor.id), catch: (e) => e });
   let prepared = false;
+  // Venues the server doesn't have, so later rounds don't ask again.
+  const unknownVenues = new Set<VenueId>();
+
+  /**
+   * Caches the venues of tables that arrived from elsewhere: a joined table, or one another device
+   * started. A venue that can't be fetched now is tried again next round.
+   */
+  const cacheVenues = Effect.gen(function* () {
+    const state = store.getSnapshot().state;
+    const missing = state?.sync
+      ? missingVenueIds(state).filter((id) => !unknownVenues.has(id))
+      : [];
+    if (missing.length === 0) return;
+    const found = yield* Effect.forEach(
+      missing,
+      (id) =>
+        transport.venue(id).pipe(
+          Effect.timeout("10 seconds"),
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              if (isNotFound(error)) unknownVenues.add(id);
+              return null;
+            }),
+          ),
+        ),
+      { concurrency: 4 },
+    );
+    const venues = found.filter((venue) => venue !== null);
+    // Only a synced ledger may save without a receipt; tables from elsewhere come with sync.
+    yield* transform((current) => (current.sync ? rememberVenues(current, venues) : current));
+  });
 
   const round = Effect.gen(function* () {
     const loaded = store.getSnapshot().state;
@@ -698,6 +744,16 @@ export const makeRecordingSync = (
 
   const run = Effect.gen(function* () {
     const wakes = yield* Queue.sliding<"wake" | "change">(1);
+    const hydration = yield* Queue.sliding<void>(1);
+    // Optional venue reads must never hold up money uploads.
+    yield* Effect.forkScoped(
+      Effect.forever(
+        Queue.take(hydration).pipe(
+          Effect.andThen(cacheVenues),
+          Effect.catch(() => Effect.void),
+        ),
+      ),
+    );
     signal = (reason) => Queue.offerUnsafe(wakes, reason);
     const unsubscribe = store.subscribe(() => {
       const state = store.getSnapshot().state;
@@ -712,6 +768,7 @@ export const makeRecordingSync = (
       );
       if (failure === null) {
         attempt = 0;
+        yield* Queue.offer(hydration, undefined);
         if ((yield* Queue.take(wakes)) === "wake") pull = true;
         continue;
       }
@@ -782,6 +839,9 @@ export const makeRecordingSync = (
     share: (tableId: TableId) => sharing(tableId, transport.share),
     /** Stops the table's link working. */
     unshare: (tableId: TableId) => sharing(tableId, transport.unshare),
+    /** Public venues matching `q`, or the nearest to `lat`/`lng`. Needs the network. */
+    searchVenues: (query: typeof SearchPublicVenuesQuery.Type) =>
+      Effect.runPromise(transport.searchVenues(query)),
     /** The whole table as the server has it, for a table this device started or joined. */
     table: (tableId: TableId) => online((actor) => transport.table(tableId, actor)),
     /** A single-use link that lets another device record as `playerId`. */
@@ -858,6 +918,9 @@ export const makeRecordingSync = (
   };
 };
 export type RecordingSync = ReturnType<typeof makeRecordingSync>;
+
+const isNotFound = (error: unknown) =>
+  typeof error === "object" && error !== null && "_tag" in error && error._tag === "NotFound";
 
 const isConflict = (error: unknown, reason: "recording_identity" | "player_claimed") =>
   typeof error === "object" &&

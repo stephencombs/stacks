@@ -147,7 +147,7 @@ function ActiveRow({ item, onPress }: { item: RecordedVisit; onPress: () => void
   return (
     <Row
       onPress={onPress}
-      accessibilityLabel={`${title}, live. Started ${started}, in ${money(item.totals.buyIn)}, out ${money(item.totals.cashOut)}, result pending`}
+      accessibilityLabel={`${title}, live.${item.venue ? ` ${item.venue.name}.` : ""} Started ${started}, in ${money(item.totals.buyIn)}, out ${money(item.totals.cashOut)}, result pending`}
       accessibilityHint="Opens the session"
     >
       <View className="min-w-0 flex-1 gap-0.5">
@@ -155,7 +155,7 @@ function ActiveRow({ item, onPress }: { item: RecordedVisit; onPress: () => void
           {title}
         </Text>
         <Text className="type-footnote text-muted">
-          Started {started} · In{" "}
+          {item.venue ? `${item.venue.name} · ` : null}Started {started} · In{" "}
           <Money amount={item.totals.buyIn} currency={RECORDING_CURRENCY} className="text-muted" />{" "}
           · Out{" "}
           <Money
@@ -177,7 +177,7 @@ function FinishedRow({ item, onPress }: { item: RecordedVisit; onPress: () => vo
   return (
     <Row
       onPress={onPress}
-      accessibilityLabel={`${title}, in ${money(item.totals.buyIn)}, out ${money(item.totals.cashOut)}, result ${signed(item.finalResult!)}`}
+      accessibilityLabel={`${title},${item.venue ? ` ${item.venue.name},` : ""} in ${money(item.totals.buyIn)}, out ${money(item.totals.cashOut)}, result ${signed(item.finalResult!)}`}
       accessibilityHint="Opens the session"
     >
       <View className="min-w-0 flex-1 gap-0.5">
@@ -185,7 +185,7 @@ function FinishedRow({ item, onPress }: { item: RecordedVisit; onPress: () => vo
           {title}
         </Text>
         <Text className="type-footnote text-muted">
-          In{" "}
+          {item.venue ? `${item.venue.name} · ` : null}In{" "}
           <Money amount={item.totals.buyIn} currency={RECORDING_CURRENCY} className="text-muted" />{" "}
           · Out{" "}
           <Money

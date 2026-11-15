@@ -65,6 +65,9 @@ window.fetch = async (input, init) => {
     location.href,
   );
   if (!url.pathname.startsWith("/api/")) return realFetch(input, init);
+  // ?offline=1 fails venue search the way a lost connection does.
+  if (params.get("offline") === "1" && url.pathname.startsWith("/api/public/"))
+    throw new TypeError("Failed to fetch");
   // Recording pushes are accepted, or refused with ?sync=refuse to show what a refusal looks like.
   const request = async <A>() =>
     (await new Response(input instanceof Request ? input.clone().body : init?.body).json()) as A;
@@ -110,9 +113,15 @@ window.fetch = async (input, init) => {
                 ? [{ tableId: (joined.table as { id: string }).id, player: joined.player }]
                 : [],
             }
-          : url.pathname.endsWith("/join") && routes[url.pathname]
-            ? (joined = routes[url.pathname] as typeof joined)
-            : (routes[url.pathname] ?? starterAnswer(url.pathname));
+          : url.pathname === "/api/public/venues" && url.searchParams.get("q")
+            ? (routes[url.pathname] as { name: string; city: string | null }[]).filter((venue) =>
+                `${venue.name} ${venue.city}`
+                  .toLowerCase()
+                  .includes(url.searchParams.get("q")!.toLowerCase()),
+              )
+            : url.pathname.endsWith("/join") && routes[url.pathname]
+              ? (joined = routes[url.pathname] as typeof joined)
+              : (routes[url.pathname] ?? starterAnswer(url.pathname));
   // Stagger dependent queries a little, like a real network.
   await new Promise((r) => setTimeout(r, delay));
   if (body === undefined)

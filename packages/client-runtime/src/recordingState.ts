@@ -6,6 +6,7 @@ import {
   Table,
   TableId,
   UserId,
+  Venue,
   Visit,
   type EntryId,
 } from "@stacks/contracts";
@@ -56,6 +57,30 @@ const RecordingSync = Schema.Struct({
 
 const AtTable = Schema.Struct({ tableId: TableId, playerId: PlayerId });
 
+/** What the device keeps of a venue its sessions use, so its name shows offline and signed out. */
+export const CachedVenue = Schema.Struct({
+  id: Venue.fields.id,
+  name: Venue.fields.name,
+  kind: Venue.fields.kind,
+  city: Venue.fields.city,
+  region: Venue.fields.region,
+  country: Venue.fields.country,
+  lat: Venue.fields.lat,
+  lng: Venue.fields.lng,
+});
+export type CachedVenue = typeof CachedVenue.Type;
+
+const toCachedVenue = ({
+  id,
+  name,
+  kind,
+  city,
+  region,
+  country,
+  lat,
+  lng,
+}: CachedVenue): CachedVenue => ({ id, name, kind, city, region, country, lat, lng });
+
 export const RecordingState = Schema.Struct({
   version: Schema.Literal(2),
   self: PlayerIdentity,
@@ -75,8 +100,39 @@ export const RecordingState = Schema.Struct({
   entries: Schema.Array(PlayEntry),
   receipts: Schema.Array(RecordingReceipt),
   sync: Schema.optionalKey(RecordingSync),
+  /**
+   * Venues the device has seen a table use, kept beside the ledger rather than rebuilt from it:
+   * commands carry only a venue's ID.
+   */
+  venues: Schema.Array(CachedVenue),
 });
 export type RecordingState = typeof RecordingState.Type;
+
+/** The state with these venues cached, replacing older copies; unchanged if it has them all. */
+export const rememberVenues = (
+  state: RecordingState,
+  venues: ReadonlyArray<CachedVenue>,
+): RecordingState => {
+  const known = new Map(state.venues.map((venue) => [venue.id, venue]));
+  const fresh = venues
+    .map(toCachedVenue)
+    .filter((venue) => JSON.stringify(known.get(venue.id)) !== JSON.stringify(venue));
+  if (fresh.length === 0) return state;
+  for (const venue of fresh) known.set(venue.id, venue);
+  return { ...state, venues: [...known.values()] };
+};
+
+/** Venues the device's tables use that it hasn't cached yet. */
+export const missingVenueIds = (state: RecordingState) => {
+  const known = new Set(state.venues.map((venue) => venue.id));
+  return [
+    ...new Set(
+      state.tables.flatMap((table) =>
+        table.venueId !== null && !known.has(table.venueId) ? [table.venueId] : [],
+      ),
+    ),
+  ];
+};
 
 const requireValid: (condition: unknown, message: string) => asserts condition = (
   condition,
@@ -114,7 +170,11 @@ export const recordingBase = (state: RecordingState): RecordingState => {
 const validateRecordingState = (state: RecordingState) => {
   requireValid(state.actor.userId === null, "Private recording has a local actor.");
   requireValid(
-    unique(state.players) && unique(state.tables) && unique(state.visits) && unique(state.entries),
+    unique(state.players) &&
+      unique(state.tables) &&
+      unique(state.visits) &&
+      unique(state.entries) &&
+      unique(state.venues),
     "Duplicate record ID.",
   );
   const players = new Map(state.players.map((player) => [player.id, player]));
@@ -492,10 +552,11 @@ type VersionOne = {
   readonly receipts: ReadonlyArray<{ readonly command: Command }>;
   readonly sync?: { readonly rejected: ReadonlyArray<{ readonly command: Command }> };
 };
-// Documents from before joining had no participants, and from before appointing no recorders.
-const withParticipants = (document: unknown) =>
+// Documents from before joining had no participants, from before appointing no recorders, and
+// from before the venue cache no venues.
+const withDefaults = (document: unknown) =>
   typeof document === "object" && document !== null
-    ? { participants: [], recorders: [], ...document }
+    ? { participants: [], recorders: [], venues: [], ...document }
     : document;
 
 // Version 1 held one player, so its tables and starts were all its own.
@@ -527,7 +588,7 @@ const fromVersionOne = (document: unknown) => {
 export const decodeRecordingState = (payload: string, revision: number) => {
   try {
     const state = validateOrUpgrade(
-      Schema.decodeUnknownSync(codec)(withParticipants(fromVersionOne(JSON.parse(payload))), {
+      Schema.decodeUnknownSync(codec)(withDefaults(fromVersionOne(JSON.parse(payload))), {
         onExcessProperty: "error",
       }),
     );

@@ -5,9 +5,12 @@ import {
   EntryId,
   MinorUnits,
   PlayerId,
+  NotFound,
   TableId,
   UserId,
+  VenueId,
   type PlayerIdentity,
+  type Venue,
 } from "@stacks/contracts";
 import {
   RecordingCommand,
@@ -176,6 +179,8 @@ const transportFor = (remote: ReturnType<typeof server>): RecordingTransport => 
   revokeBinding: unused,
   revokeInvite: unused,
   redeemInvite: unused,
+  searchVenues: unused,
+  venue: unused,
 });
 
 /** An actor key store in memory. */
@@ -200,6 +205,7 @@ const otherDevice = (identity: RecordingIdentity) => {
     visits: [],
     entries: [],
     receipts: [],
+    venues: [],
   };
   const record = (input: Parameters<typeof prepareRecordingCommand>[1]) => {
     const command = prepareRecordingCommand(ledger, input);
@@ -732,6 +738,70 @@ describe("counterparties", () => {
 });
 
 describe("engine", () => {
+  it.effect(
+    "uploads money and handles wakes while a venue lookup stalls, then cancels the lookup",
+    () =>
+      Effect.gen(function* () {
+        const store = yield* Effect.promise(() => open());
+        const venueId = VenueId.make(crypto.randomUUID());
+        yield* Effect.promise(() =>
+          save(store, { type: "start", buyIn: 20000, venueId, startedAt: at(10) }),
+        );
+        const remote = server();
+        const asked = yield* Queue.unbounded<string>();
+        let lookups = 0;
+        let interrupted = 0;
+        let reads = 0;
+        const sync = makeRecordingSync(
+          store,
+          alex,
+          {
+            ...transportFor(remote),
+            history: () =>
+              Effect.sync(() => {
+                reads++;
+                return remote.history();
+              }),
+            venue: () =>
+              Effect.gen(function* () {
+                lookups++;
+                yield* Queue.offer(asked, "venue");
+                return yield* Effect.never;
+              }).pipe(
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    interrupted++;
+                  }),
+                ),
+              ),
+          },
+          memoryKeys(),
+        );
+        const fiber = yield* Effect.forkChild(sync.run);
+        yield* Queue.take(asked);
+        const visitId = state(store).visits[0]!.id;
+        yield* Effect.promise(() =>
+          save(store, {
+            type: "add",
+            visitId,
+            kind: "buy_in",
+            amount: 5000,
+            occurredAt: at(11),
+          }),
+        );
+        sync.wake();
+        yield* TestClock.adjust("1 second");
+        expect(remote.history().entries).toHaveLength(2);
+        expect(pendingRecordingCommands(state(store))).toEqual([]);
+        expect(reads).toBe(2);
+        expect(interrupted).toBe(0);
+        yield* TestClock.adjust("9 seconds");
+        expect(interrupted).toBe(1);
+        yield* Fiber.interrupt(fiber);
+        expect(interrupted).toBe(lookups);
+      }),
+  );
+
   it.effect("backs off on the test clock, and a wake cuts the wait short", () =>
     Effect.gen(function* () {
       const store = yield* Effect.promise(() => open());
@@ -804,6 +874,87 @@ describe("engine", () => {
       const fiber = yield* Effect.forkChild(sync.run);
       while ((yield* Queue.take(statuses)) !== "blocked");
       expect(sync.getStatus().error).toBeInstanceOf(RecordingSyncBlocked);
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+
+  it.effect("caches the venue of a table from another device once, and skips one that's gone", () =>
+    Effect.gen(function* () {
+      const identity = {
+        playerId: PlayerId.make(crypto.randomUUID()),
+        actorId: ActorId.make(crypto.randomUUID()),
+      };
+      const venue: Venue = {
+        id: VenueId.make(crypto.randomUUID()),
+        name: "Bellagio",
+        kind: "casino",
+        city: "Las Vegas",
+        region: "NV",
+        country: "US",
+        lat: 36.11,
+        lng: -115.17,
+        verified: true,
+        groupId: null,
+      };
+      const gone = VenueId.make(crypto.randomUUID());
+      const first = otherDevice(identity);
+      for (const venueId of [venue.id, gone])
+        first.record({
+          type: "record_completed",
+          buyIn: 30000,
+          cashOut: 35000,
+          startedAt: at(1),
+          finishedAt: at(3),
+          venueId,
+        });
+      const remote = server();
+      remote.push({ identity, commands: first.commands() });
+
+      const store = yield* Effect.promise(() => open());
+      const asked = yield* Queue.unbounded<VenueId>();
+      const transport: RecordingTransport = {
+        ...transportFor(remote),
+        venue: (id) =>
+          Effect.suspend(() => {
+            Queue.offerUnsafe(asked, id);
+            return id === venue.id
+              ? Effect.succeed(venue)
+              : Effect.fail(new NotFound({ resource: "venue" }));
+          }),
+      };
+      const sync = makeRecordingSync(store, alex, transport, memoryKeys());
+      const statuses = yield* Queue.unbounded<string>();
+      sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
+      const cached = yield* Queue.unbounded<void>();
+      store.subscribe(() => {
+        if (state(store).venues.length > 0) Queue.offerUnsafe(cached, undefined);
+      });
+      const fiber = yield* Effect.forkChild(sync.run);
+      yield* Queue.take(cached);
+      while ((yield* Queue.take(statuses)) !== "idle");
+      expect(state(store).venues).toEqual([
+        {
+          id: venue.id,
+          name: "Bellagio",
+          kind: "casino",
+          city: "Las Vegas",
+          region: "NV",
+          country: "US",
+          lat: 36.11,
+          lng: -115.17,
+        },
+      ]);
+      const home = recordingHome(state(store));
+      expect(home.finished.map((item) => item.venue?.name ?? null).toSorted()).toEqual([
+        "Bellagio",
+        null,
+      ]);
+      expect((yield* Queue.takeAll(asked)).toSorted()).toEqual([venue.id, gone].toSorted());
+
+      // Another round asks for neither: one is cached, the other doesn't exist.
+      sync.wake();
+      while ((yield* Queue.take(statuses)) !== "idle");
+      expect(yield* Queue.size(asked)).toBe(0);
       yield* Fiber.interrupt(fiber);
     }),
   );
