@@ -50,7 +50,7 @@ const icons = {
 };
 
 export type IconName = keyof typeof icons;
-export type IconColor = "ink" | "muted" | "faint" | "live" | "win" | "loss";
+export type IconColor = "ink" | "ink-inverse" | "muted" | "faint" | "live" | "win" | "loss";
 
 /** A decorative icon in a palette color; lucide here, SF Symbols on iOS (`Icon.ios.tsx`). */
 export function Icon({
