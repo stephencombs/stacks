@@ -4,7 +4,7 @@ import { RecordingCommand, RecordingOperationId } from "@stacks/contracts/record
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
-import { applyRecordingCommand, type RecordingLedger } from "./recording.ts";
+import { applyRecordingCommand, ownPlayers, type RecordingLedger } from "./recording.ts";
 import { ACTOR, BEA, visit } from "./testing/recording.ts";
 import { visitSummary } from "./visits.ts";
 
@@ -127,6 +127,45 @@ it("touches only your visit and refuses starter and recorder authority over some
       "delete_visit",
     ),
   ).toThrow("only your own");
+});
+
+it("does not mistake a recorder's fetched participants for players it owns offline", () => {
+  const before = opened();
+  const seat = {
+    ...common(),
+    type: "join_table",
+    tableId: visit.tableId,
+    visitId: VisitId.make(uuid()),
+    playerId: BEA,
+    newPlayer: { id: BEA, displayName: "Bea" },
+    buyInId: EntryId.make(uuid()),
+    buyIn: MinorUnits.make(10000),
+    startedAt: at(5),
+  } satisfies RecordingCommand;
+  const shared = applyRecordingCommand(before, seat);
+  const self = PlayerIdentity.make({ id: PlayerId.make(uuid()), displayName: "Recorder" });
+  const recorder = {
+    ...shared,
+    self,
+    participants: [
+      { tableId: visit.tableId, playerId: self.id },
+      { tableId: visit.tableId, playerId: BEA },
+    ],
+    recorders: [{ tableId: visit.tableId, playerId: self.id }],
+  };
+  expect(ownPlayers(recorder)).toEqual([self.id]);
+  expect(() => change(recorder, "delete_visit", seat.visitId)).toThrow("only your own");
+  const deleted = applyRecordingCommand(
+    recorder,
+    {
+      ...common(),
+      type: "delete_visit",
+      visitId: seat.visitId,
+      expectedRevision: 0,
+    },
+    null,
+  );
+  expect(() => change(deleted, "restore_visit", seat.visitId)).toThrow("only your own");
 });
 
 it("refuses recording into a deleted visit and refuses imported history", () => {

@@ -33,6 +33,8 @@ export interface Participant {
 export interface RecordingLedger {
   readonly self: PlayerIdentity;
   readonly actor: Actor;
+  /** Authoritative account/device bindings, separate from everyone visible at a table. */
+  readonly ownedPlayerIds?: ReadonlyArray<PlayerId>;
   readonly players: ReadonlyArray<PlayerIdentity>;
   readonly participants: ReadonlyArray<Participant>;
   /** The players the starters appointed to record for everyone at their tables. */
@@ -71,13 +73,7 @@ export const authorize = (
 
 /** The players a device records as: its own, and the ones it joined other tables as. */
 export const ownPlayers = (state: RecordingLedger): ReadonlyArray<PlayerId> => [
-  state.self.id,
-  ...state.participants
-    .filter(
-      (item) =>
-        state.tables.find((table) => table.id === item.tableId)?.starterPlayerId !== state.self.id,
-    )
-    .map((item) => item.playerId),
+  ...new Set([state.self.id, ...(state.ownedPlayerIds ?? [])]),
 ];
 
 export class RecordingError extends Error {

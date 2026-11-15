@@ -23,6 +23,7 @@ import {
 } from "@stacks/contracts/recordingCommands";
 import {
   applyRecordingCommand,
+  ownPlayers,
   RecordingError,
   type RecordingLedger,
 } from "@stacks/shared/recording";
@@ -305,6 +306,7 @@ describe("merging", () => {
     const history: RecordingHistory = {
       ...remote.history(),
       identity: account,
+      ownedPlayerIds: [device.self.id, account.playerId],
       participants: [{ tableId: device.tables[0]!.id, player: device.self }],
     };
     await store.transform((s) => mergeRecordingHistory(s, alex, history));
@@ -1193,6 +1195,7 @@ describe("shared tables", () => {
     });
     const history: RecordingHistory = {
       identity: { playerId: state(joiner).self.id, actorId: state(joiner).actor.id },
+      ownedPlayerIds: [player.id],
       commands: [sat, correction],
       tables: [table],
       participants: [{ tableId: table.id, player }],
@@ -1236,6 +1239,7 @@ describe("shared tables", () => {
     const ledger = state(starter);
     return {
       identity: { playerId: state(device).self.id, actorId: state(device).actor.id },
+      ownedPlayerIds: [participant.id],
       commands: [...ledger.receipts.map((receipt) => receipt.command), ...extra],
       tables: ledger.tables,
       participants: [{ tableId: ledger.tables[0]!.id, player: participant }],
@@ -1248,6 +1252,58 @@ describe("shared tables", () => {
       entries: [],
     };
   };
+
+  it("persists bound-player ownership without granting a recorder the other fetched players", async () => {
+    const starter = await withGuest();
+    const ledger = state(starter.store);
+    const table = ledger.tables[0]!;
+    const dee = { id: PlayerId.make(crypto.randomUUID()), displayName: "Dee" };
+    const db = memory();
+    const device = await open(db);
+    const appoint = RecordingCommand.make({
+      type: "appoint_recorder",
+      operationId: RecordingOperationId.make(crypto.randomUUID()),
+      actorId: ledger.actor.id,
+      preparedAt: at(11),
+      tableId: table.id,
+      playerId: dee.id,
+    });
+    const history = {
+      ...historyFor(starter.store, device, dee, [appoint]),
+      participants: [
+        { tableId: table.id, player: ledger.players[1]! },
+        { tableId: table.id, player: dee },
+      ],
+    };
+    await device.transform((s) => mergeRecordingHistory(s, null, history));
+    // Rejoining a fetched participant still establishes its binding.
+    await device.transform((s) => addJoinedTable(s, { table, player: dee }));
+    await save(device, { type: "join_table", tableId: table.id, playerId: dee.id, buyIn: 5000 });
+    const visitId = state(device).visits.find((v) => v.playerId === dee.id)!.id;
+    await save(device, { type: "delete_visit", visitId });
+    await device.close();
+    const reloaded = await open(db);
+    expect(ownPlayers(state(reloaded))).toEqual([state(reloaded).self.id, dee.id]);
+    expect(recordingHome(state(reloaded)).deleted.map((v) => v.visit.id)).toEqual([visitId]);
+    expect(recordingHome(state(reloaded)).active).toEqual([]);
+    for (const type of ["delete_visit", "restore_visit"] as const) {
+      await expect(save(reloaded, { type, visitId: ledger.visits[1]!.id })).rejects.toThrow(
+        "only your own",
+      );
+    }
+    await save(reloaded, { type: "restore_visit", visitId });
+    expect(recordingHome(state(reloaded)).active.map((v) => v.visit.id)).toEqual([visitId]);
+    expect(pendingRecordingCommands(state(reloaded)).map((c) => c.type)).toEqual([
+      "join_table",
+      "delete_visit",
+      "restore_visit",
+    ]);
+    const { ownedPlayerIds: _bindings, ...oldHistory } = history;
+    const legacy = mergeRecordingHistory(state(reloaded), null, oldHistory);
+    expect(ownPlayers(legacy)).toEqual([legacy.self.id]);
+    await reloaded.close();
+    await starter.store.close();
+  });
 
   it("records for everyone as an appointed recorder, and sets aside what it queued once revoked", async () => {
     const starter = await withGuest();

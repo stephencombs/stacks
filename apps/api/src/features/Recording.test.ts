@@ -194,6 +194,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       const empty = yield* bea.recording.history();
       expect(empty).toEqual({
         identity: null,
+        ownedPlayerIds: [],
         commands: [],
         tables: [],
         participants: [],

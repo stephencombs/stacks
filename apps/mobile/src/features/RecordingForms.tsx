@@ -21,6 +21,8 @@ import {
 } from "@stacks/client-runtime/recordingReact";
 import {
   amountInputText,
+  buyInTotalPreview,
+  cashOutResultPreview,
   localDateText,
   localTimeText,
   parsePastSessionTimes,
@@ -42,6 +44,7 @@ import { DateTimeField } from "../components/ui/DateTimeField";
 import { Sheet } from "../components/ui/Sheet";
 import { cn } from "../components/ui/cn";
 import { useRecordingState } from "../lib/recording";
+import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
 import { SessionVenuePicker } from "./VenuePicker";
 import { applyAmountKey } from "./amountKey";
@@ -78,7 +81,9 @@ function KeypadAmount({
   label,
   amount,
   hint,
+  keypad = true,
 }: {
+  keypad?: boolean;
   label: string;
   amount: Amount;
   hint?: ReactNode;
@@ -121,8 +126,16 @@ function KeypadAmount({
       ) : hint ? (
         <Text className="px-1 text-center type-footnote text-muted">{hint}</Text>
       ) : null}
-      <AmountKeypad onKey={amount.press} bottomLeft={decimal} />
+      {keypad ? <RecordingKeypad amount={amount} /> : null}
     </View>
+  );
+}
+
+function RecordingKeypad({ amount }: { amount: Amount }) {
+  return (
+    <GlassSurface radius={22} className="rounded-2xl p-2">
+      <AmountKeypad onKey={amount.press} bottomLeft={decimal} />
+    </GlassSurface>
   );
 }
 
@@ -489,7 +502,7 @@ export function RebuySheet({
   return (
     <RecordingSheet
       title="Rebuy"
-      submitLabel="Record rebuy"
+      submitLabel="Add rebuy"
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -506,7 +519,23 @@ export function RebuySheet({
         if (receipt?.command.type === "add") onSaved(receipt.command.entryId, input);
       }}
     >
-      <KeypadAmount label="Amount" amount={amount} />
+      <KeypadAmount
+        keypad={false}
+        label="Amount"
+        amount={amount}
+        hint={
+          buyInTotalPreview(visit.totals.buyIn, amount.text, "add") === null ? undefined : (
+            <>
+              Your buy-in becomes{" "}
+              <Money
+                amount={MinorUnits.make(buyInTotalPreview(visit.totals.buyIn, amount.text, "add")!)}
+                currency={RECORDING_CURRENCY}
+                className="type-footnote"
+              />
+            </>
+          )
+        }
+      />
       {visit.presets.length > 0 ? (
         <View
           className="flex-row justify-center gap-2"
@@ -525,6 +554,7 @@ export function RebuySheet({
         </View>
       ) : null}
       <PaidField label="Paid by" paid={paid} />
+      <RecordingKeypad amount={amount} />
     </RecordingSheet>
   );
 }
@@ -596,7 +626,7 @@ export function CashOutSheet({
     <RecordingSheet
       title="Cash out"
       description="This finishes the session and works out its result."
-      submitLabel="Cash out"
+      submitLabel="End session"
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -618,6 +648,7 @@ export function CashOutSheet({
       }}
     >
       <KeypadAmount
+        keypad={false}
         label="Amount"
         amount={amount}
         hint={
@@ -636,14 +667,31 @@ export function CashOutSheet({
       />
       <View className="items-center">
         <Button
-          label={`${previous > 0 ? "Nothing more" : "Nothing to cash out"} · ${money(0)}`}
+          label={`${previous > 0 ? "Nothing more" : "Busted"} · ${money(0)}`}
           size="sm"
           // Fills the amount like a preset does: one stray tap shouldn't record anything.
           onPress={() => amount.set(amountInputText(0))}
         />
       </View>
       <ClockField label="Finished at" clock={clock} />
+      <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface p-4">
+        <View>
+          <Text className="type-footnote text-muted">Your result</Text>
+          <Text className="type-footnote text-muted">{money(visit.totals.buyIn)} bought in</Text>
+        </View>
+        {cashOutResultPreview(visit, amount.text) === null ? (
+          <Text className="text-muted">—</Text>
+        ) : (
+          <Money
+            amount={MinorUnits.make(cashOutResultPreview(visit, amount.text)!)}
+            currency={RECORDING_CURRENCY}
+            tone="result"
+            className="type-title"
+          />
+        )}
+      </View>
       <PaidField label="Paid to" paid={paid} />
+      <RecordingKeypad amount={amount} />
     </RecordingSheet>
   );
 }
@@ -671,20 +719,12 @@ export function BuyInTotalSheet({
   const [mode, setMode] = useState<(typeof totalModes)[number]["value"]>("add");
   const amount = useAmount("", 1);
   const current = visit.totals.buyIn;
-  const typed = parseRecordingAmount(amount.text, 1);
-  const total =
-    typed.error !== null
-      ? null
-      : mode === "add"
-        ? current + typed.amount
-        : mode === "subtract"
-          ? current - typed.amount
-          : typed.amount;
+  const total = buyInTotalPreview(current, amount.text, mode);
   return (
     <RecordingSheet
-      title="Buy-in"
+      title="Edit buy-in"
       description={`Now ${money(current)} in.`}
-      submitLabel="Save buy-in"
+      submitLabel="Save total"
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -703,23 +743,32 @@ export function BuyInTotalSheet({
         }}
       />
       <KeypadAmount
+        keypad={false}
         label={mode === "set" ? "New total" : "Amount"}
         amount={amount}
         hint={
-          total === null ? undefined : total > 0 ? (
+          total === null ? (
+            amount.text ? (
+              "The new total must be greater than zero and within the supported amount."
+            ) : (
+              "Enter an amount to see the new total."
+            )
+          ) : (
             <>
-              New total{" "}
+              Your buy-in becomes{" "}
               <Money
                 amount={MinorUnits.make(total)}
                 currency={RECORDING_CURRENCY}
                 className="type-footnote text-muted"
               />
             </>
-          ) : (
-            "The buy-in total must be more than zero."
           )
         }
       />
+      <Text className="type-footnote text-muted">
+        Was {money(current)}. Corrections void earlier buy-ins, which stay in history.
+      </Text>
+      <RecordingKeypad amount={amount} />
     </RecordingSheet>
   );
 }

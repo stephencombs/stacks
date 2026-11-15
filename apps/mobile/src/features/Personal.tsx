@@ -30,10 +30,14 @@ export function PersonalScreen({
   children,
   dock,
   live = false,
+  felt = false,
+  session = false,
 }: {
   children: ReactNode;
   dock?: ReactNode;
   live?: boolean;
+  felt?: boolean;
+  session?: boolean;
 }) {
   const header = useNativeHeaderActions(true);
   const bar = use(TabBarHeight);
@@ -45,14 +49,18 @@ export function PersonalScreen({
     paddingRight: Math.max(16, insets.right),
   };
   return (
-    <View className="flex-1 bg-canvas">
+    <View className={felt ? "flex-1 bg-felt" : "flex-1 bg-canvas"}>
       {header}
       <ScrollView
         className="flex-1"
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         contentContainerClassName="gap-6 pt-4 pb-8"
-        contentContainerStyle={sides}
+        contentContainerStyle={{
+          ...sides,
+          flexGrow: 1,
+          ...(session ? { paddingTop: insets.top + 12 } : {}),
+        }}
       >
         {children}
         <View style={{ height: (dock ? dockHeight : bar) + liveBarHeight }} />
@@ -61,7 +69,7 @@ export function PersonalScreen({
         <View
           pointerEvents="box-none"
           onLayout={(event) => setDockHeight(event.nativeEvent.layout.height)}
-          className="absolute inset-x-0 bottom-0 gap-2 pt-3"
+          className={cn("absolute inset-x-0 bottom-0 gap-2 pt-3", felt && "bg-felt")}
           style={{ ...sides, paddingBottom: bar || Math.max(insets.bottom, 12) }}
         >
           {dock}
@@ -89,21 +97,25 @@ export function SaveStatus({
   error,
   onRetry,
   visitId,
+  felt = false,
 }: {
   status: Status;
   error: string | null;
   onRetry: () => void;
   visitId?: VisitId;
+  felt?: boolean;
 }) {
   const sync = useRecordingSync(visitId);
   if (
     status !== "saved" ||
     (sync.rejected.length === 0 && sync.error === null && sync.claim.length === 0 && !sync.canLink)
   )
-    return <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />;
+    return (
+      <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} felt={felt} />
+    );
   return (
     <View className="gap-2">
-      <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} />
+      <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} felt={felt} />
       {sync.canLink ? (
         <View className="gap-3 rounded-lg bg-fill px-3 py-2.5">
           <Text className="text-sm text-muted">
@@ -180,11 +192,13 @@ function SaveLine({
   error,
   onRetry,
   sync,
+  felt = false,
 }: {
   status: Status;
   error: string | null;
   onRetry: () => void;
   sync: RecordingSyncLine;
+  felt?: boolean;
 }) {
   if (status === "load_failed")
     return (
@@ -214,15 +228,22 @@ function SaveLine({
   return (
     <View accessibilityLiveRegion="polite" className="min-h-5 flex-row items-center gap-1.5">
       {busy ? (
-        <ActivityIndicator size="small" colorClassName="accent-muted" />
+        <ActivityIndicator
+          size="small"
+          colorClassName={felt ? "accent-felt-soft" : "accent-muted"}
+        />
       ) : (
         <Icon
           name={failed ? "alert" : syncIcons[sync.kind]}
-          color={failed ? "loss" : "muted"}
+          color={failed ? "loss" : felt ? "felt-soft" : "muted"}
           size={14}
         />
       )}
-      <Text className={cn("text-sm", failed ? "text-loss" : "text-muted")}>{text}</Text>
+      <Text
+        className={cn("text-sm", failed ? "text-loss" : felt ? "text-felt-soft" : "text-muted")}
+      >
+        {text}
+      </Text>
     </View>
   );
 }

@@ -211,20 +211,21 @@ const replay = (
 };
 
 /** Adds a table this device joined, as the player it joined as. Joining again changes nothing. */
-export const addJoinedTable = (state: RecordingState, joined: JoinedTable): RecordingState =>
-  state.participants.some((item) => item.playerId === joined.player.id)
-    ? state
-    : {
-        ...state,
-        players: [...state.players, joined.player],
-        participants: [
-          ...state.participants,
-          { tableId: joined.table.id, playerId: joined.player.id },
-        ],
-        tables: state.tables.some((table) => table.id === joined.table.id)
-          ? state.tables
-          : [...state.tables, joined.table],
-      };
+export const addJoinedTable = (state: RecordingState, joined: JoinedTable): RecordingState => ({
+  ...state,
+  ownedPlayerIds: [...new Set([...(state.ownedPlayerIds ?? []), joined.player.id])],
+  players: state.players.some((player) => player.id === joined.player.id)
+    ? state.players
+    : [...state.players, joined.player],
+  participants: state.participants.some(
+    (item) => item.tableId === joined.table.id && item.playerId === joined.player.id,
+  )
+    ? state.participants
+    : [...state.participants, { tableId: joined.table.id, playerId: joined.player.id }],
+  tables: state.tables.some((table) => table.id === joined.table.id)
+    ? state.tables
+    : [...state.tables, joined.table],
+});
 
 /** Saved commands the server hasn't confirmed, oldest first. */
 export const pendingRecordingCommands = (state: RecordingState) => {
@@ -284,6 +285,7 @@ export const mergeRecordingHistory = (
   const base: RecordingState = {
     ...state,
     self,
+    ownedPlayerIds: history.ownedPlayerIds ?? [],
     actor: { id: actorId, userId: null },
     players: [
       ...new Map(

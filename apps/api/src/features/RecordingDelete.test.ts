@@ -110,6 +110,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("delete a session", (it) => {
           recorderCommand("appoint_recorder", starter.identity, opened.tableId, player.id),
         ),
       ).toEqual(["accepted"]);
+      const history = yield* recorder.client.recording.history();
+      expect(history.ownedPlayerIds).toContain(player.id);
+      expect(history.ownedPlayerIds).not.toContain(opened.playerId);
+      expect(history.visits.some((visit) => visit.id === opened.visitId)).toBe(true);
       expect(
         yield* recorder.push(
           lifecycle("delete_visit", recorder.identity.actorId, opened.visitId, 0),

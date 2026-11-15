@@ -657,6 +657,7 @@ export const history = Effect.fn("Recording.history")(function* () {
   if (!self || actorPlayers.length === 0)
     return {
       identity: null,
+      ownedPlayerIds: [],
       commands: [],
       tables: [],
       participants: [],
@@ -715,6 +716,7 @@ export const history = Effect.fn("Recording.history")(function* () {
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalOperationRow)));
   return {
     identity: { playerId: self.playerId, actorId: self.actorId },
+    ownedPlayerIds: actorPlayers,
     commands: operations.map((row) => row.command),
     tables: tables.map((row) => tableOf(row, row.starterPlayerId!)),
     participants: participants.map(({ tableId, ...player }) => ({

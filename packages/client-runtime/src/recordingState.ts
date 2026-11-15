@@ -86,6 +86,7 @@ export const RecordingState = Schema.Struct({
   version: Schema.Literal(2),
   self: PlayerIdentity,
   actor: Actor,
+  ownedPlayerIds: Schema.optionalKey(Schema.Array(PlayerId)),
   /**
    * Everyone whose play this device holds: `self`, the players it added at its tables, the
    * `participants` (who joined its tables, and who it is at others'), and anyone else at the
@@ -169,6 +170,10 @@ export const recordingBase = (state: RecordingState): RecordingState => {
 };
 
 const validateRecordingState = (state: RecordingState) => {
+  requireValid(
+    new Set(state.ownedPlayerIds ?? []).size === (state.ownedPlayerIds ?? []).length,
+    "Owned player IDs must be unique.",
+  );
   requireValid(state.actor.userId === null, "Private recording has a local actor.");
   requireValid(
     unique(state.players) &&

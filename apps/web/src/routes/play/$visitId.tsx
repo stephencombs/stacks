@@ -1,14 +1,18 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
+import { formatDay, formatDuration, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
 import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import {
+  useRecordingClock,
   useRecordingSubmit,
   useRecordingTable,
   useRecordingVisit,
   useServerTable,
 } from "@stacks/client-runtime/recordingReact";
 import {
+  LIVE_REBUY_AMOUNTS,
+  sessionReadout,
+  sessionEditFields,
   RECORDING_CURRENCY,
   visitTitle,
   type RecordingEvent,
@@ -21,17 +25,18 @@ import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { ArrowLeft, Pencil, Users, List as ListIcon, ChevronRight } from "lucide-react";
+
 import { Money } from "~/components/Money";
-import { Button, ButtonLink } from "~/components/ui/Button";
+import { Button, ButtonLink, IconButton, IconLink } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
 import { BackLink } from "~/components/ui/Nav";
 import { EmptyState, PageHeader, Section } from "~/components/ui/Page";
-import { Glow, List, Row, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
+import { List, Row, RowText, Skeleton, Surface } from "~/components/ui/Surface";
 import { Dock, focusMain, PersonalFrame, SaveStatus, useDialogFocus } from "~/features/Personal";
 import { recordingStore } from "~/lib/recording";
-import { DeleteSessionDialog, DeletedSession } from "~/features/DeleteSession";
 import {
   BuyInTotalDialog,
   CashOutDialog,
@@ -41,19 +46,26 @@ import {
   RebuyDialog,
   ReopenDialog,
   SitDownDialog,
-  StartDialog,
   StartTimeDialog,
   VenueDialog,
   VoidDialog,
 } from "~/features/RecordingForms";
 import { TableSection } from "~/features/SharedTable";
+import { DeleteSessionDialog, DeletedSession } from "~/features/DeleteSession";
 
 export const Route = createFileRoute("/play/$visitId")({ component: VisitPage });
 
 function VisitPage() {
   const { visitId } = Route.useParams();
   const id = Option.getOrNull(VisitId.makeOption(visitId));
-  return <PersonalFrame>{id ? <Visit visitId={id} /> : <Missing />}</PersonalFrame>;
+  return id ? (
+    // Keyed so moving to another player's visit starts with no sheet open.
+    <Visit key={id} visitId={id} />
+  ) : (
+    <PersonalFrame>
+      <Missing />
+    </PersonalFrame>
+  );
 }
 
 const back = <BackLink to="/">Your play</BackLink>;
@@ -76,10 +88,12 @@ type Open =
   | {
       readonly type:
         | "delete"
+        | "edit"
+        | "table"
+        | "history"
         | "rebuy"
         | "cash_out"
         | "reopen"
-        | "start"
         | "return"
         | "buy_in"
         | "start_time"
@@ -100,22 +114,31 @@ function Visit({ visitId }: { visitId: VisitId }) {
     undo?: boolean;
   } | null>(null);
   const quick = useRecordingSubmit();
-  const savedButton = useRef<HTMLButtonElement>(null);
   const [deletedHere, setDeletedHere] = useState(false);
+  const savedButton = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const focus = useDialogFocus(() => savedButton.current);
   const table = useRecordingTable(visit?.visit.tableId ?? null);
   const serverTable = useServerTable(visit?.visit.tableId ?? null);
   const state = useSyncExternalStore(recordingStore.subscribe, recordingStore.getSnapshot).state;
-  if (visit === null) return <Missing />;
+  useEffect(() => {
+    if (visit)
+      document.title = `${visit.visit.finishedAt === null ? "Live" : "Finished"} · Color Up`;
+  }, [visit]);
+  if (visit === null)
+    return (
+      <PersonalFrame>
+        <Missing />
+      </PersonalFrame>
+    );
   if (visit === undefined)
     return (
-      <>
+      <PersonalFrame>
         <PageHeader back={back} title="Session">
           <SaveStatus status={status} error={error} onRetry={retryLoad} />
         </PageHeader>
         {status === "load_failed" ? null : <Skeleton className="h-40 w-full rounded-xl" />}
-      </>
+      </PersonalFrame>
     );
   const live = visit.visit.finishedAt === null;
   const close = () => {
@@ -128,6 +151,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
     setNotice(null);
     setSaved({
       entryId,
+      undo: input.type === "add" && input.kind === "buy_in",
       text:
         input.type === "finish"
           ? `Cash-out of ${money(input.amount)} recorded. You've finished this session.`
@@ -165,12 +189,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
       kind: "buy_in",
       amount,
     });
-    if (receipt?.command.type === "add")
+    if (receipt?.command.type === "add") {
+      setNotice(null);
       setSaved({
         entryId: receipt.command.entryId,
         text: `Rebuy of ${money(amount)} recorded.`,
         undo: true,
       });
+    }
   };
   const undo = async (entryId: EntryId) => {
     const receipt = await quick.submit({
@@ -198,7 +224,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   };
   if (visit.visit.deletedAt !== undefined)
     return (
-      <>
+      <PersonalFrame>
         <PageHeader back={back} title="Session deleted" />
         <DeletedSession
           canRestore={canDelete}
@@ -209,173 +235,163 @@ function Visit({ visitId }: { visitId: VisitId }) {
         />
         {quick.error ? <FormError>{quick.error}</FormError> : null}
         <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
-      </>
+        <TableSection tableId={visit.visit.tableId} visitId={visitId} onAdded={seated} />
+      </PersonalFrame>
     );
   return (
-    <div className="contents" onClickCapture={focus.capture}>
-      <PageHeader
-        back={back}
-        options={
-          canDelete && !live ? (
-            <Menu label="Session options">
-              <MenuItem tone="danger" onClick={() => setOpen({ type: "delete" })}>
-                Delete session
+    <PersonalFrame session felt={live} onClickCapture={focus.capture}>
+      <header className="grid grid-cols-[44px_1fr_44px] items-center gap-3">
+        <IconLink to="/" aria-label="Back to your play">
+          <ArrowLeft className="size-5" aria-hidden />
+        </IconLink>
+        {live ? (
+          <LiveClock visit={visit} />
+        ) : (
+          <h1 className="text-center text-lg font-semibold">Finished</h1>
+        )}
+        {live && (table?.visits.length ?? 1) === 1 ? (
+          <IconButton aria-label="Edit my session" onClick={() => setOpen({ type: "edit" })}>
+            <Pencil className="size-5" aria-hidden />
+          </IconButton>
+        ) : (
+          <div className="glass flex size-11 items-center justify-center rounded-full">
+            <Menu label="Session actions">
+              <MenuItem onClick={() => setOpen({ type: "edit" })}>
+                <span className="flex items-center gap-3">
+                  <Pencil className="size-4" aria-hidden />
+                  Edit my session
+                </span>
+              </MenuItem>
+              <MenuItem onClick={() => setOpen({ type: "table" })}>
+                <span className="flex items-center gap-3">
+                  <Users className="size-4" aria-hidden />
+                  At this table
+                </span>
+              </MenuItem>
+              <MenuItem onClick={() => setOpen({ type: "history" })}>
+                <span className="flex items-center gap-3">
+                  <ListIcon className="size-4" aria-hidden />
+                  Your history
+                </span>
               </MenuItem>
             </Menu>
-          ) : undefined
-        }
-        title={
-          own
-            ? visitTitle(visit.table)
-            : `${player!.player.displayName} · ${visitTitle(visit.table)}`
-        }
-        tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Finished"}</Tag>}
-        context={[
-          visit.venue?.name,
-          live
-            ? `Started ${formatDay(start)}, ${formatTime(start)}`
-            : `${formatDay(start)} · ${formatTime(start)} to ${formatTime(visit.visit.finishedAt!)}`,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      >
-        <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
-      </PageHeader>
+          </div>
+        )}
+      </header>
       {live ? (
-        <LiveHero
-          visit={visit}
-          canEditTable={canEditTable}
-          onEdit={(type) => setOpen({ type })}
-          onDelete={canDelete ? () => setOpen({ type: "delete" }) : undefined}
-        />
+        <LiveHero visit={visit} name={own ? undefined : player?.player.displayName} />
       ) : (
-        <VisitHero visit={visit} />
+        <>
+          <PageHeader
+            title={
+              own
+                ? visitTitle(visit.table)
+                : `${player!.player.displayName} · ${visitTitle(visit.table)}`
+            }
+            context={[
+              visit.venue?.name,
+              formatDay(start),
+              `${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          />
+          <VisitHero visit={visit} />
+          <TableSection tableId={visit.visit.tableId} visitId={visitId} onAdded={seated} />
+          <History
+            visit={visit}
+            names={names}
+            onInspect={(entryId) => setOpen({ type: "inspect", entryId })}
+          />
+        </>
       )}
-      {live ? (
-        <Section title="Rebuy">
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Rebuy amounts">
-            {visit.presets.map((preset) => (
-              <Button
-                key={preset}
-                size="lg"
-                disabled={quick.pending}
-                className="min-w-24 flex-1 tabular-nums sm:flex-none"
-                onClick={() => void rebuy(preset)}
-              >
-                + {money(preset)}
-              </Button>
-            ))}
-            <Button
-              size="lg"
-              variant="ghost"
-              className="flex-1 sm:flex-none"
-              onClick={() => setOpen({ type: "rebuy" })}
-            >
-              Other amount
-            </Button>
-          </div>
-          {quick.error ? <FormError>{quick.error}</FormError> : null}
-        </Section>
-      ) : null}
-      {notice ? (
-        <p role="status" className="rounded-xl bg-fill px-4 py-2.5 text-sm">
-          {notice}
-        </p>
-      ) : null}
-      {saved ? (
-        <div
-          role="status"
-          className="flex items-center justify-between gap-3 rounded-xl bg-fill py-2 pr-2 pl-4"
-        >
-          <p className="min-w-0 text-sm text-pretty">{saved.text}</p>
-          <div className="flex shrink-0 gap-1">
-            {saved.undo ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                pending={quick.pending}
-                onClick={() => void undo(saved.entryId)}
-              >
-                Undo
-              </Button>
-            ) : null}
-            <Button
+      {live ? <div className="mt-auto h-52 shrink-0" aria-hidden /> : null}
+      <div
+        className={
+          live
+            ? "fixed inset-x-0 bottom-0 z-10 bg-felt px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+            : "contents"
+        }
+      >
+        <div className={live ? "mx-auto flex max-w-2xl flex-col gap-3 pt-3" : "contents"}>
+          {notice ? (
+            <p role="status" className="rounded-xl bg-fill px-4 py-2.5 text-sm text-ink">
+              {notice}
+            </p>
+          ) : null}
+          {saved ? (
+            <div
+              role="status"
               key={saved.entryId}
-              ref={savedButton}
-              size="sm"
-              variant="ghost"
-              onClick={() => setOpen({ type: "inspect", entryId: saved.entryId })}
+              className="flex items-center justify-between gap-3 rounded-xl bg-ink py-2 pr-2 pl-4 text-ink-inverse shadow-(--elevation-float) transition-[translate,opacity] duration-(--duration-toast-in) ease-enter starting:translate-y-2 starting:opacity-0"
             >
-              View entry
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      <TableSection
-        tableId={visit.visit.tableId}
-        visitId={visitId}
-        onAdded={(next) => {
-          setSaved(null);
-          void navigate({ to: "/play/$visitId", params: { visitId: next } }).then(focusMain);
-        }}
-      />
-      <History
-        visit={visit}
-        names={names}
-        onInspect={(entryId) => setOpen({ type: "inspect", entryId })}
-      />
-      <Dock>
-        {live ? (
-          <Button
-            key="cash-out"
-            variant="primary"
-            size="lg"
-            onClick={() => setOpen({ type: "cash_out" })}
-          >
-            Cash out
-          </Button>
-        ) : !own || table?.role === "participant" ? (
-          <>
-            {canReturn ? (
+              <p className="min-w-0 text-sm text-pretty">{saved.text}</p>
+              <div className="flex shrink-0 gap-1">
+                {saved.undo ? (
+                  <button
+                    className="pressable min-h-11 rounded-lg px-3 text-sm font-semibold"
+                    disabled={quick.pending}
+                    onClick={() => void undo(saved.entryId)}
+                  >
+                    Undo
+                  </button>
+                ) : null}
+                <button
+                  ref={savedButton}
+                  className="pressable min-h-11 rounded-lg px-3 text-sm font-semibold"
+                  onClick={() => setOpen({ type: "inspect", entryId: saved.entryId })}
+                >
+                  View entry
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {quick.error ? <FormError>{quick.error}</FormError> : null}
+          {live ? (
+            <>
+              <p className="text-sm font-medium text-felt-soft">Rebuy</p>
+              <div className="grid grid-cols-3 gap-2" role="group" aria-label="Rebuy amounts">
+                {LIVE_REBUY_AMOUNTS.map((preset) => (
+                  <Button
+                    key={preset}
+                    size="lg"
+                    disabled={quick.pending}
+                    onClick={() => void rebuy(preset)}
+                  >
+                    + {money(preset)}
+                  </Button>
+                ))}
+                <Button
+                  size="lg"
+                  disabled={quick.pending}
+                  onClick={() => setOpen({ type: "rebuy" })}
+                >
+                  Other
+                </Button>
+              </div>
               <Button
-                key="return"
                 variant="primary"
                 size="lg"
-                onClick={() => setOpen({ type: "return" })}
+                disabled={quick.pending}
+                onClick={() => setOpen({ type: "cash_out" })}
               >
-                Back at the table
+                Cash out
               </Button>
-            ) : null}
-            <Button
-              key="reopen"
-              variant={canReturn ? "ghost" : "secondary"}
-              size="lg"
-              onClick={() => setOpen({ type: "reopen" })}
-            >
-              Fix accidental finish
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              key="start"
-              variant="primary"
-              size="lg"
-              onClick={() => setOpen({ type: "start" })}
-            >
-              Start another session
-            </Button>
-            <Button
-              key="reopen"
-              variant="ghost"
-              size="lg"
-              onClick={() => setOpen({ type: "reopen" })}
-            >
-              Fix accidental finish
-            </Button>
-          </>
-        )}
-      </Dock>
+            </>
+          ) : (
+            <Dock>
+              <Button variant="secondary" size="lg" onClick={() => setOpen({ type: "reopen" })}>
+                Undo cash-out
+              </Button>
+              {canReturn ? (
+                <Button variant="primary" size="lg" onClick={() => setOpen({ type: "return" })}>
+                  Back at the table
+                </Button>
+              ) : null}
+            </Dock>
+          )}
+        </div>
+      </div>
       {open?.type === "delete" ? (
         <DeleteSessionDialog
           visit={visit}
@@ -390,6 +406,69 @@ function Visit({ visitId }: { visitId: VisitId }) {
             }
           }}
         />
+      ) : null}
+      {open?.type === "edit" ? (
+        <Dialog
+          open
+          title="Edit my session"
+          onOpenChange={(value) => {
+            if (!value) close();
+          }}
+          footer={<Button onClick={close}>Done</Button>}
+        >
+          <div className="flex flex-col gap-1">
+            {sessionEditFields(visit, canEditTable).map(({ field: type, label, value }) => (
+              <button
+                key={type}
+                className="pressable flex min-h-14 items-center justify-between gap-3 rounded-lg px-3 text-left hover:bg-fill"
+                onClick={() => setOpen({ type })}
+              >
+                <span>{label}</span>
+                <span className="flex min-w-0 items-center gap-2 text-sm text-muted">
+                  <span className="truncate">{value}</span>
+                  <ChevronRight className="size-4 shrink-0" aria-hidden />
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="ghost" onClick={() => setOpen({ type: "table" })}>
+              At this table
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen({ type: "history" })}>
+              Your history
+            </Button>
+          </div>
+          {canDelete ? (
+            <Button variant="danger" className="mt-4" onClick={() => setOpen({ type: "delete" })}>
+              Delete session
+            </Button>
+          ) : null}
+        </Dialog>
+      ) : open?.type === "table" ? (
+        <Dialog
+          open
+          title="At this table"
+          onOpenChange={(value) => {
+            if (!value) close();
+          }}
+        >
+          <TableSection tableId={visit.visit.tableId} visitId={visitId} onAdded={seated} />
+        </Dialog>
+      ) : open?.type === "history" ? (
+        <Dialog
+          open
+          title="Your history"
+          onOpenChange={(value) => {
+            if (!value) close();
+          }}
+        >
+          <History
+            visit={visit}
+            names={names}
+            onInspect={(entryId) => setOpen({ type: "inspect", entryId })}
+          />
+        </Dialog>
       ) : null}
       {open?.type === "rebuy" ? (
         <RebuyDialog
@@ -434,15 +513,6 @@ function Visit({ visitId }: { visitId: VisitId }) {
           onClose={close}
           onSeated={seated}
         />
-      ) : open?.type === "start" ? (
-        <StartDialog
-          onClose={close}
-          onStarted={(next) => {
-            close();
-            setSaved(null);
-            void navigate({ to: "/play/$visitId", params: { visitId: next } }).then(focusMain);
-          }}
-        />
       ) : open?.type === "inspect" ? (
         <EntryInspector
           visit={visit}
@@ -472,141 +542,111 @@ function Visit({ visitId }: { visitId: VisitId }) {
           }}
         />
       ) : null}
+    </PersonalFrame>
+  );
+}
+
+function LiveClock({ visit }: { visit: RecordingVisitView }) {
+  const now = useRecordingClock();
+  return (
+    <div className="glass mx-auto flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold text-ink tabular-nums">
+      <span className="size-2 rounded-full bg-live" aria-hidden />
+      <span className="tracking-wide">LIVE</span>
+      <span>{sessionReadout(visit, now).clock}</span>
     </div>
   );
 }
 
-/** Now, ticking once a minute, for a live session's clock. */
-function useMinuteClock() {
-  const [now, setNow] = useState(() => DateTime.nowUnsafe());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(DateTime.nowUnsafe()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
+function LiveHero({ visit, name }: { visit: RecordingVisitView; name?: string | undefined }) {
+  const summary = sessionReadout(visit, visit.visit.startedAt);
+  return (
+    <section className="flex flex-col items-center gap-3 pt-[clamp(3rem,12dvh,8rem)] text-center">
+      <h1 className="text-base font-medium text-felt-soft">
+        {name ? `${name} · Bought in` : "Bought in"}
+      </h1>
+      <Money
+        amount={visit.totals.buyIn}
+        currency={RECORDING_CURRENCY}
+        className="max-w-full font-display text-[clamp(3rem,16vw,6rem)] leading-none tracking-tight break-all"
+      />
+      <p className="mt-3 text-lg font-medium">
+        {[visitTitle(visit.table), visit.venue?.name].filter(Boolean).join(" · ")}
+      </p>
+      <p className="text-sm text-felt-soft">
+        Started {formatTime(visit.visit.startedAt)} ·{" "}
+        {summary.corrected
+          ? "buy-in corrected"
+          : `${summary.buyIns} ${summary.buyIns === 1 ? "buy-in" : "buy-ins"}`}
+      </p>
+      <div className="mt-3 text-left">
+        <SaveStatusForVisit visit={visit} felt />
+      </div>
+    </section>
+  );
 }
 
-/** A live session at a glance: how long, how much in, what game, and a way to fix any of it. */
-function LiveHero({
+function SaveStatusForVisit({
   visit,
-  canEditTable,
-  onEdit,
-  onDelete,
+  felt = false,
 }: {
   visit: RecordingVisitView;
-  canEditTable: boolean;
-  onEdit: (field: "buy_in" | "start_time" | "game" | "venue") => void;
-  onDelete?: (() => void) | undefined;
+  felt?: boolean;
 }) {
-  const now = useMinuteClock();
-  const game = visit.table.game ? gameNames[visit.table.game] : null;
+  const { status, error, retryLoad } = useRecordingVisit(visit.visit.id);
   return (
-    <Surface className="relative overflow-hidden p-4">
-      <Glow tone="felt" />
-      <div className="relative flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <dl className="grid flex-1 grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <dt className="text-sm font-medium text-muted">Playing for</dt>
-              <dd className="font-display text-5xl tabular-nums">
-                {formatDuration(visit.visit.startedAt, now)}
-              </dd>
-            </div>
-            <div className="flex flex-col gap-1">
-              <dt className="text-sm font-medium text-muted">In</dt>
-              <dd>
-                <Money
-                  amount={visit.totals.buyIn}
-                  currency={RECORDING_CURRENCY}
-                  className="font-display text-5xl"
-                />
-              </dd>
-            </div>
-          </dl>
-          <Menu label="Edit session">
-            <MenuItem onClick={() => onEdit("buy_in")}>Buy-in</MenuItem>
-            <MenuItem onClick={() => onEdit("start_time")}>Start time</MenuItem>
-            {canEditTable ? (
-              <>
-                <MenuItem onClick={() => onEdit("game")}>Game</MenuItem>
-                <MenuItem onClick={() => onEdit("venue")}>Casino</MenuItem>
-              </>
-            ) : null}
-            {onDelete ? (
-              <MenuItem tone="danger" onClick={onDelete}>
-                Delete session
-              </MenuItem>
-            ) : null}
-          </Menu>
-        </div>
-        <p className="text-sm text-muted">
-          {[
-            game ?? "Game not set",
-            visit.table.highLimit ? "High limit" : null,
-            `since ${formatTime(visit.visit.startedAt)}`,
-            visit.totals.cashOut > 0 ? `${money(visit.totals.cashOut)} out` : null,
-            "result pending",
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-      </div>
-    </Surface>
+    <div className={felt && status !== "save_failed" ? "[&>p]:text-felt-soft" : undefined}>
+      <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visit.visit.id} />
+    </div>
   );
 }
 
 function VisitHero({ visit }: { visit: RecordingVisitView }) {
-  const { totals, finalResult } = visit;
-  const amounts = (
-    <>
-      In <Money amount={totals.buyIn} currency={RECORDING_CURRENCY} /> · Out{" "}
-      <Money amount={totals.cashOut} currency={RECORDING_CURRENCY} />
-    </>
-  );
-  if (finalResult === null)
-    return (
-      <Surface className="relative overflow-hidden p-4">
-        <Glow tone="felt" />
-        <dl className="relative grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1">
-            <dt className="text-sm font-medium text-muted">Total in</dt>
-            <dd>
-              <Money
-                amount={totals.buyIn}
-                currency={RECORDING_CURRENCY}
-                className="font-display text-5xl"
-              />
-            </dd>
-          </div>
-          <div className="flex flex-col gap-1">
-            <dt className="text-sm font-medium text-muted">Total out</dt>
-            <dd>
-              <Money
-                amount={totals.cashOut}
-                currency={RECORDING_CURRENCY}
-                className="font-display text-5xl"
-              />
-            </dd>
-          </div>
-        </dl>
-        <p className="relative mt-3 text-sm text-muted">
-          Final result pending until you finish playing.
-        </p>
-      </Surface>
-    );
+  const summary = sessionReadout(visit, visit.visit.finishedAt!);
   return (
-    <Surface className="relative overflow-hidden p-4">
-      <Glow tone={finalResult > 0 ? "win" : finalResult < 0 ? "loss" : "ink"} />
-      <div className="relative flex flex-col gap-1">
-        <p className="text-sm font-medium text-muted">Final result</p>
+    <Surface className="flex flex-col gap-5 p-5">
+      <div className="flex flex-col gap-1">
+        <p className="text-sm text-muted">Your result</p>
         <Money
-          amount={finalResult}
+          amount={visit.finalResult!}
           currency={RECORDING_CURRENCY}
           tone="result"
-          className="font-display text-5xl sm:text-6xl"
+          className="font-display text-6xl"
         />
-        <p className="text-sm text-muted">{amounts}</p>
       </div>
+      <dl className="grid grid-cols-2 gap-5">
+        <div>
+          <dt className="text-sm text-muted">Bought in</dt>
+          <dd>
+            <Money amount={visit.totals.buyIn} currency={RECORDING_CURRENCY} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted">Cashed out</dt>
+          <dd>
+            <Money amount={visit.totals.cashOut} currency={RECORDING_CURRENCY} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted">Duration</dt>
+          <dd className="tabular-nums">
+            {formatDuration(visit.visit.startedAt, visit.visit.finishedAt!)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted">Hourly result</dt>
+          <dd>
+            {summary.hourly === null ? (
+              "—"
+            ) : (
+              <>
+                <Money amount={summary.hourly} currency={RECORDING_CURRENCY} tone="result" />
+                /hr
+              </>
+            )}
+          </dd>
+        </div>
+      </dl>
+      <SaveStatusForVisit visit={visit} />
     </Surface>
   );
 }

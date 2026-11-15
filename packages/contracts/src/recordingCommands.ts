@@ -207,6 +207,7 @@ export type TableParticipant = typeof TableParticipant.Type;
  * applied them, whoever made them.
  */
 export const RecordingHistory = Schema.Struct({
+  ownedPlayerIds: Schema.optionalKey(Schema.Array(PlayerId)),
   identity: Schema.NullOr(RecordingIdentity),
   commands: Schema.Array(RecordingCommand),
   tables: Schema.Array(Table),
