@@ -174,7 +174,12 @@ function Breakdown({
           fit
           className="type-hero"
         />
-        {view.chart ? <RunningChart chart={view.chart} /> : null}
+        {view.chart ? (
+          <RunningChart
+            key={view.chart.points.map((point) => point.sessionId).join(",")}
+            chart={view.chart}
+          />
+        ) : null}
         <View className="mt-4 flex-row flex-wrap gap-y-4">
           <Figure label="Sessions">
             <Text className="type-heading text-ink">{view.sessions}</Text>

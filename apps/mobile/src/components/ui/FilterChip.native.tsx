@@ -1,7 +1,7 @@
 import { MenuView } from "@expo/ui/community/menu";
 import { View } from "react-native";
 
-import { ChipFace, ChipShell, type FilterChipProps } from "./FilterChip";
+import { ChipFace, ChipShell, type FilterChipProps } from "./FilterChip.tsx";
 
 /** A filter as a pill that opens the platform's own menu, with the picked choice checked. */
 export function FilterChip<Value extends string>(props: FilterChipProps<Value>) {

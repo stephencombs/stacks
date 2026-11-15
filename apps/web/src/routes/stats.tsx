@@ -155,7 +155,12 @@ function Breakdown({
           tone="result"
           className="mt-2 font-display text-5xl leading-none sm:text-6xl"
         />
-        {view.chart ? <RunningChart chart={view.chart} /> : null}
+        {view.chart ? (
+          <RunningChart
+            key={view.chart.points.map((point) => point.sessionId).join(",")}
+            chart={view.chart}
+          />
+        ) : null}
         <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
           <Figure label="Sessions">{view.sessions}</Figure>
           <Figure label="Hours">{view.hours}</Figure>
