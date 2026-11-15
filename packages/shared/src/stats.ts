@@ -120,7 +120,7 @@ type PersonalStatsSession = Pick<VisitSummary, "visit" | "finalResult"> & {
   readonly table: Pick<Table, "game" | "venueId">;
 };
 
-type PersonalStatsFilters = {
+export type PersonalStatsFilters = {
   readonly year?: number | undefined;
   readonly game?: Table["game"] | undefined;
   readonly venueId?: Table["venueId"] | undefined;

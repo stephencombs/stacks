@@ -131,3 +131,42 @@ export const placeLabel = (
   if (at + width / 2 > bounds.max) return { x: bounds.max, anchor: "end" };
   return { x: at, anchor: "middle" };
 };
+
+/**
+ * One running total drawn against time: each point sits at when it happened, and the line starts
+ * at break-even at the first point's time. Points that all share one time spread evenly instead.
+ * `nearest` reads which point an x position is closest to, for dragging along the line.
+ */
+export const runningLine = (
+  points: ReadonlyArray<{ readonly at: number; readonly total: number }>,
+  size: { readonly width: number; readonly height: number },
+  pad: { readonly x: number; readonly y: number } = { x: 0, y: 0 },
+) => {
+  const scale = lineScale([[0, ...points.map((point) => point.total)]], size, pad);
+  const first = points[0]?.at ?? 0;
+  const span = (points.at(-1)?.at ?? first) - first;
+  const across = size.width - 2 * pad.x;
+  const xs = points.map(
+    (point, i) =>
+      pad.x +
+      (span > 0 ? (point.at - first) / span : points.length <= 1 ? 0 : i / (points.length - 1)) *
+        across,
+  );
+  const placed = points.map((point, i) => ({ x: xs[i]!, y: scale.y(point.total) }));
+  const line = [{ x: pad.x, y: scale.zero }, ...placed];
+  const end = line.at(-1)!;
+  return {
+    zero: scale.zero,
+    points: placed,
+    /** The line, from break-even through every point, for a polyline. */
+    line: line.map((p) => `${p.x},${p.y}`).join(" "),
+    /** The region between the line and break-even, for a path. */
+    area: `M${pad.x} ${scale.zero} ${line.map((p) => `L${p.x} ${p.y}`).join(" ")} L${end.x} ${scale.zero} Z`,
+    nearest: (x: number) => {
+      let best = 0;
+      for (let i = 1; i < xs.length; i++)
+        if (Math.abs(xs[i]! - x) < Math.abs(xs[best]! - x)) best = i;
+      return best;
+    },
+  };
+};
