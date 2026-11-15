@@ -64,6 +64,7 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
       join trips tr on tr.id = t.trip_id
       join personal_visits v on v.table_id = t.id and v.deleted_at is null
       where tr.group_id in (select group_id from mine) and t.legacy_session_id is null
+        and t.deleted_at is null
       group by t.id
     ),
     keyed as (

@@ -30,7 +30,8 @@ export const list = Effect.fn("Groups.list")(function* () {
     select g.id, g.name, g.currency, g.created_at, m.group_id, m.role, p.id as player_id,
       (select count(*)::int from sessions s where s.group_id = g.id and s.status = 'live')
         + (select count(*)::int from tables t join trips tr on tr.id = t.trip_id
-          where tr.group_id = g.id and t.legacy_session_id is null and exists (
+          where tr.group_id = g.id and t.legacy_session_id is null and t.deleted_at is null
+            and exists (
             select 1 from personal_visits v
             where v.table_id = t.id and v.finished_at is null and v.deleted_at is null
           ))

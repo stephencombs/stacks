@@ -22,8 +22,8 @@ import { venueColumns } from "./Views.ts";
 const Timestamp = Schema.DateTimeUtcFromDate;
 
 /**
- * The tables in the given trips, as their groups see them. A table imported from an older group
- * session is left out: that session already counts.
+ * The tables in the given trips, as their groups see them. A deleted table is left out, and so is
+ * one imported from an older group session, which already counts.
  */
 export const load = Effect.fn("TripTables.load")(function* (
   where:
@@ -37,7 +37,7 @@ export const load = Effect.fn("TripTables.load")(function* (
   const tables = yield* sql`
     select t.*, tr.group_id from tables t join trips tr on tr.id = t.trip_id
     where ${"tripIds" in where ? sql`t.trip_id` : sql`t.id`} in ${sql.in(ids)}
-      and t.legacy_session_id is null and t.starter_player_id is not null
+      and t.legacy_session_id is null and t.starter_player_id is not null and t.deleted_at is null
   `.pipe(
     Effect.flatMap(
       decodeRows(
