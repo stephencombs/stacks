@@ -238,8 +238,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
 
   it.effect("serializes attaching against both stake creation and reopening", () =>
     Effect.gen(function* () {
-      const { alex, bea } = yield* users("alex", "bea");
       for (const operation of ["create", "reopen"] as const) {
+        const { alex, bea } = yield* users("alex", "bea");
         const group = yield* groupWith(alex, bea);
         const request = {
           id: ids.stake(),
