@@ -162,12 +162,14 @@ function useNearby() {
 /**
  * The casino a personal session was at: nearby casinos first when location is allowed, then by
  * name as you type, and "Not listed" for none. Searching needs the network; casinos this device
- * has saved stay pickable without it. `selected` null is "Not listed".
+ * has saved stay pickable without it. `selectedId` keeps an uncached casino distinct from none.
  */
 export function SessionVenuePicker({
+  selectedId,
   selected,
   onSelect,
 }: {
+  selectedId: VenueId | null;
   selected: CachedVenue | null;
   onSelect: (venue: CachedVenue | null) => void;
 }) {
@@ -238,11 +240,17 @@ export function SessionVenuePicker({
       ) : null}
       <div className="flex flex-col">
         {heading ? <p className="pb-1 text-sm text-muted">{heading}</p> : null}
+        {selectedId !== null && !shown.some((venue) => venue.id === selectedId) ? (
+          <p role="status" className="px-3 py-2 text-sm text-muted">
+            Current casino unavailable. This session keeps it until you choose another casino or Not
+            listed.
+          </p>
+        ) : null}
         {shown.map((venue) => (
           <VenueOption
             key={venue.id}
             venue={venue}
-            selected={selected?.id === venue.id}
+            selected={selectedId === venue.id}
             onSelect={() => onSelect(venue)}
           />
         ))}
@@ -250,7 +258,7 @@ export function SessionVenuePicker({
           icon={Ban}
           title="Not listed"
           detail="Keep this session without a casino"
-          selected={selected === null}
+          selected={selectedId === null}
           onSelect={() => onSelect(null)}
         />
       </div>

@@ -665,12 +665,15 @@ export const makeRecordingSync = (
    */
   const cacheVenues = Effect.gen(function* () {
     const state = store.getSnapshot().state;
-    const missing = state ? missingVenueIds(state).filter((id) => !unknownVenues.has(id)) : [];
+    const missing = state?.sync
+      ? missingVenueIds(state).filter((id) => !unknownVenues.has(id))
+      : [];
     if (missing.length === 0) return;
     const found = yield* Effect.forEach(
       missing,
       (id) =>
         transport.venue(id).pipe(
+          Effect.timeout("10 seconds"),
           Effect.catch((error) =>
             Effect.sync(() => {
               if (isNotFound(error)) unknownVenues.add(id);
@@ -736,12 +739,21 @@ export const makeRecordingSync = (
       // A refusal can mean another device changed the visit: converge on the server's ledger.
       if (response.results.some((result) => result.status === "rejected")) pull = true;
     }
-    yield* cacheVenues;
     setStatus({ phase: "idle", error: null });
   });
 
   const run = Effect.gen(function* () {
     const wakes = yield* Queue.sliding<"wake" | "change">(1);
+    const hydration = yield* Queue.sliding<void>(1);
+    // Optional venue reads must never hold up money uploads.
+    yield* Effect.forkScoped(
+      Effect.forever(
+        Queue.take(hydration).pipe(
+          Effect.andThen(cacheVenues),
+          Effect.catch(() => Effect.void),
+        ),
+      ),
+    );
     signal = (reason) => Queue.offerUnsafe(wakes, reason);
     const unsubscribe = store.subscribe(() => {
       const state = store.getSnapshot().state;
@@ -756,6 +768,7 @@ export const makeRecordingSync = (
       );
       if (failure === null) {
         attempt = 0;
+        yield* Queue.offer(hydration, undefined);
         if ((yield* Queue.take(wakes)) === "wake") pull = true;
         continue;
       }

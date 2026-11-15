@@ -801,6 +801,36 @@ describe("editing a session after the fact", () => {
 });
 
 describe("the venue cache", () => {
+  it("retries a failed venue edit with its metadata on a never-synced device, surviving relaunch", async () => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(start(store));
+    const id = visitId(store);
+    const command = store.prepare({
+      type: "edit_visit",
+      visitId: id,
+      table: { game: null, venueId: bellagio.id, highLimit: false },
+    });
+    const venue = { ...bellagio };
+    const venues = [venue];
+    db.fail();
+    await expect(store.execute(command, venues)).rejects.toThrow("disk full");
+    // Failed work owns its payload even if the caller reuses the search results.
+    venue.name = "Changed by caller";
+    venues.length = 0;
+    expect(store.getSnapshot().state!.venues).toEqual([]);
+    db.fail(false);
+    expect((await store.retry()).command).toEqual(command);
+    store = await reload(store, db);
+    expect(store.getSnapshot().state!.sync).toBeUndefined();
+    expect(store.getSnapshot().state!.receipts).toHaveLength(2);
+    expect(recordingVisit(store.getSnapshot().state!, id)).toMatchObject({
+      table: { venueId: bellagio.id },
+      venue: bellagio,
+    });
+    await store.close();
+  });
+
   it("loads a document saved before the cache with no venues, and saves one with them", async () => {
     const db = memory();
     let store = await open(db);

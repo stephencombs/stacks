@@ -129,12 +129,14 @@ const here = () =>
 /**
  * The casino a personal session was at: nearby casinos first when location is allowed, then by
  * name as you type, and "Not listed" for none. Searching needs the network; casinos this device
- * has saved stay pickable without it. `selected` null is "Not listed".
+ * has saved stay pickable without it. `selectedId` keeps an uncached casino distinct from none.
  */
 export function SessionVenuePicker({
+  selectedId,
   selected,
   onSelect,
 }: {
+  selectedId: VenueId | null;
   selected: CachedVenue | null;
   onSelect: (venue: CachedVenue | null) => void;
 }) {
@@ -223,18 +225,24 @@ export function SessionVenuePicker({
       ) : null}
       <View accessibilityRole="radiogroup">
         {heading ? <Text className="pb-1 text-sm text-muted">{heading}</Text> : null}
+        {selectedId !== null && !shown.some((venue) => venue.id === selectedId) ? (
+          <Text accessibilityLiveRegion="polite" className="px-3 py-2 text-sm text-muted">
+            Current casino unavailable. This session keeps it until you choose another casino or Not
+            listed.
+          </Text>
+        ) : null}
         {shown.map((venue) => (
           <VenueOption
             key={venue.id}
             venue={venue}
-            selected={selected?.id === venue.id}
+            selected={selectedId === venue.id}
             onSelect={() => onSelect(venue)}
           />
         ))}
         <OptionRow
           title="Not listed"
           detail="Keep this session without a casino"
-          selected={selected === null}
+          selected={selectedId === null}
           onSelect={() => onSelect(null)}
         />
       </View>

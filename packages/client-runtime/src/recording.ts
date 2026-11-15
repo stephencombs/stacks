@@ -24,7 +24,7 @@ import {
   encodeRecordingState,
   RecordingError,
   rememberVenues,
-  type CachedVenue,
+  CachedVenue,
   type RecordingReceipt,
   type RecordingState,
 } from "./recordingState.ts";
@@ -273,6 +273,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
   });
   let closed = false;
   let loadFailed = false;
+  let failedVenues: ReadonlyArray<CachedVenue> = [];
   let closePromise: Promise<void> | undefined;
   let queue: Promise<unknown> = Promise.resolve();
   const listeners = new Set<() => void>();
@@ -380,6 +381,9 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
       onExcessProperty: "error",
     });
     Object.freeze(command);
+    const cached = Object.freeze(
+      venues.map((venue) => Object.freeze(Schema.decodeUnknownSync(CachedVenue)({ ...venue }))),
+    );
     if (command.type === "correct" && command.replacement) Object.freeze(command.replacement);
     if (command.type === "edit_visit" && command.table) Object.freeze(command.table);
     return serialize(async (): Promise<RecordingReceipt> => {
@@ -396,14 +400,16 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
               "operation_reused",
               "This operation ID was already saved with different content.",
             );
+          failedVenues = [];
           update({ status: "saved", error: null, failedCommand: null });
           return receipt;
         }
-        const committed = rememberVenues(applyRecordingCommand(state, command), venues);
+        const committed = rememberVenues(applyRecordingCommand(state, command), cached);
         const saved = committed.receipts[committed.receipts.length - 1]!;
         const payload = encodeRecordingState(committed);
         update({ status: "saving", error: null, failedCommand: null });
         const revision = await storage.commit(snapshot.revision, payload);
+        failedVenues = [];
         update({
           state: freezeState(committed),
           revision,
@@ -413,6 +419,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         });
         return saved;
       } catch (error) {
+        failedVenues = cached;
         update({
           status: loadFailed ? "load_failed" : "save_failed",
           error,
@@ -441,7 +448,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         return Promise.reject(
           new RecordingError("invalid", "There is no failed command to retry."),
         );
-      return execute(snapshot.failedCommand);
+      return execute(snapshot.failedCommand, failedVenues);
     },
     refresh,
     /**

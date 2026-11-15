@@ -738,6 +738,70 @@ describe("counterparties", () => {
 });
 
 describe("engine", () => {
+  it.effect(
+    "uploads money and handles wakes while a venue lookup stalls, then cancels the lookup",
+    () =>
+      Effect.gen(function* () {
+        const store = yield* Effect.promise(() => open());
+        const venueId = VenueId.make(crypto.randomUUID());
+        yield* Effect.promise(() =>
+          save(store, { type: "start", buyIn: 20000, venueId, startedAt: at(10) }),
+        );
+        const remote = server();
+        const asked = yield* Queue.unbounded<string>();
+        let lookups = 0;
+        let interrupted = 0;
+        let reads = 0;
+        const sync = makeRecordingSync(
+          store,
+          alex,
+          {
+            ...transportFor(remote),
+            history: () =>
+              Effect.sync(() => {
+                reads++;
+                return remote.history();
+              }),
+            venue: () =>
+              Effect.gen(function* () {
+                lookups++;
+                yield* Queue.offer(asked, "venue");
+                return yield* Effect.never;
+              }).pipe(
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    interrupted++;
+                  }),
+                ),
+              ),
+          },
+          memoryKeys(),
+        );
+        const fiber = yield* Effect.forkChild(sync.run);
+        yield* Queue.take(asked);
+        const visitId = state(store).visits[0]!.id;
+        yield* Effect.promise(() =>
+          save(store, {
+            type: "add",
+            visitId,
+            kind: "buy_in",
+            amount: 5000,
+            occurredAt: at(11),
+          }),
+        );
+        sync.wake();
+        yield* TestClock.adjust("1 second");
+        expect(remote.history().entries).toHaveLength(2);
+        expect(pendingRecordingCommands(state(store))).toEqual([]);
+        expect(reads).toBe(2);
+        expect(interrupted).toBe(0);
+        yield* TestClock.adjust("9 seconds");
+        expect(interrupted).toBe(1);
+        yield* Fiber.interrupt(fiber);
+        expect(interrupted).toBe(lookups);
+      }),
+  );
+
   it.effect("backs off on the test clock, and a wake cuts the wait short", () =>
     Effect.gen(function* () {
       const store = yield* Effect.promise(() => open());
@@ -861,7 +925,12 @@ describe("engine", () => {
       const sync = makeRecordingSync(store, alex, transport, memoryKeys());
       const statuses = yield* Queue.unbounded<string>();
       sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
+      const cached = yield* Queue.unbounded<void>();
+      store.subscribe(() => {
+        if (state(store).venues.length > 0) Queue.offerUnsafe(cached, undefined);
+      });
       const fiber = yield* Effect.forkChild(sync.run);
+      yield* Queue.take(cached);
       while ((yield* Queue.take(statuses)) !== "idle");
       expect(state(store).venues).toEqual([
         {

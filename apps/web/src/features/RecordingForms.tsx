@@ -754,7 +754,11 @@ export function VenueDialog({
         if (receipt) onSaved();
       }}
     >
-      <SessionVenuePicker selected={selected} onSelect={(venue) => setPicked({ venue })} />
+      <SessionVenuePicker
+        selectedId={picked ? (picked.venue?.id ?? null) : visit.table.venueId}
+        selected={selected}
+        onSelect={(venue) => setPicked({ venue })}
+      />
     </RecordingDialog>
   );
 }
