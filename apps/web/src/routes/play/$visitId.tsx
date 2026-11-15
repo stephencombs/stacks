@@ -41,6 +41,7 @@ import {
   SitDownDialog,
   StartDialog,
   StartTimeDialog,
+  VenueDialog,
   VoidDialog,
 } from "~/features/RecordingForms";
 import { TableSection } from "~/features/SharedTable";
@@ -79,7 +80,8 @@ type Open =
         | "return"
         | "buy_in"
         | "start_time"
-        | "game";
+        | "game"
+        | "venue";
     }
   | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId };
 
@@ -149,7 +151,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
     !table.visits.some(
       (item) => item.player.id === player.player.id && item.visit.finishedAt === null,
     );
-  // Whoever records for everyone at the table changes its game; a player who joined it can't.
+  // Whoever records for everyone at the table changes its game and casino; a player who joined it
+  // can't.
   const canEditTable = table?.role !== "participant";
   const rebuy = async (amount: number) => {
     const receipt = await quick.submit({
@@ -195,11 +198,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
             : `${player!.player.displayName} · ${visitTitle(visit.table)}`
         }
         tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Finished"}</Tag>}
-        context={
+        context={[
+          visit.venue?.name,
           live
             ? `Started ${formatDay(start)}, ${formatTime(start)}`
-            : `${formatDay(start)} · ${formatTime(start)} to ${formatTime(visit.visit.finishedAt!)}`
-        }
+            : `${formatDay(start)} · ${formatTime(start)} to ${formatTime(visit.visit.finishedAt!)}`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       >
         <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
       </PageHeader>
@@ -357,6 +363,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
         />
       ) : open?.type === "game" ? (
         <GameDialog visit={visit} onClose={close} onSaved={() => edited("Game saved.")} />
+      ) : open?.type === "venue" ? (
+        <VenueDialog visit={visit} onClose={close} onSaved={() => edited("Casino saved.")} />
       ) : open?.type === "reopen" ? (
         <ReopenDialog
           visit={visit}
@@ -434,7 +442,7 @@ function LiveHero({
 }: {
   visit: RecordingVisitView;
   canEditTable: boolean;
-  onEdit: (field: "buy_in" | "start_time" | "game") => void;
+  onEdit: (field: "buy_in" | "start_time" | "game" | "venue") => void;
 }) {
   const now = useMinuteClock();
   const game = visit.table.game ? gameNames[visit.table.game] : null;
@@ -464,7 +472,12 @@ function LiveHero({
           <Menu label="Edit session">
             <MenuItem onClick={() => onEdit("buy_in")}>Buy-in</MenuItem>
             <MenuItem onClick={() => onEdit("start_time")}>Start time</MenuItem>
-            {canEditTable ? <MenuItem onClick={() => onEdit("game")}>Game</MenuItem> : null}
+            {canEditTable ? (
+              <>
+                <MenuItem onClick={() => onEdit("game")}>Game</MenuItem>
+                <MenuItem onClick={() => onEdit("venue")}>Casino</MenuItem>
+              </>
+            ) : null}
           </Menu>
         </div>
         <p className="text-sm text-muted">
