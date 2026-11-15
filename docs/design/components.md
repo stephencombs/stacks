@@ -10,10 +10,10 @@ Variants: `primary`, `tint`, `secondary`, `ghost`, `danger`. Sizes: `sm`, `md`, 
 
 ```
 Is it the single next step on this screen?
- ├── Yes → variant="primary", one per view
+ ├── Yes → variant="primary", the ink pill, one per view
  └── No
       ├── Destructive or hard to undo? → variant="danger"
-      ├── A gold-led action sitting beside a primary elsewhere on screen? → variant="tint"
+      ├── A filled action that mustn't compete with the primary? → variant="tint"
       ├── In a toolbar or section header, repeated down a page? → variant="ghost"
       └── Default → secondary, which is what you get with no variant prop
 ```
@@ -31,6 +31,8 @@ While a request is in flight, pass `pending`. It shows a spinner and blocks pres
 ```
 
 Labels name the outcome: "Void entry", not "Confirm".
+
+Press feedback is built in on both clients: the shared press scale and timing. Don't add your own `active:scale` to a `Button` or wrap one in another pressable.
 
 A one-tap write, like a rebuy, keeps its button where it was, so a second tap does it again. Taking it back is an Undo somewhere else: a toast on mobile, and on web a bar floating where the `LiveBar` sits. A button that turns into its own undo makes a double-tap cancel itself. A repeat-amount button reads "Rebuy $300", never "+$300": a signed amount means a result.
 
@@ -75,32 +77,27 @@ A yes-or-no option on web is `Checkbox`, wrapped in a `<label>` with its text: t
 
 An error beside one field goes in `error`. A failure of the whole form, such as the API refusing it, is `FormError`.
 
-## Surface, List, Row, ProportionalBarRow and QuotaCard
+## Surface, List, Row
 
-`Surface` is an elevated card container (`rounded-xl` on web, `rounded-2xl` / `20px` on mobile). A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the `0.5px` hairline dividers (`border-line`), and `Row` the padding. On web, a row that goes somewhere is `RowLink`, which adds the pressed state and a chevron, and a row's main text is `RowText`: a `title`, a quieter `meta` line, and `struck` for something voided. On mobile, a pressable `Row` takes `onPress`.
+`Surface` is a solid card on the page: `surface` fill, no border, the card shadow. A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the hairline dividers, and `Row` the padding. On web, a row that goes somewhere is `RowLink`, which adds the pressed state and a chevron, and a row's main text is `RowText`: a `title`, a quieter `meta` line, and `struck` for something voided. On mobile, a pressable `Row` takes `onPress`.
 
-A row runs chip, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` (`font-semibold` for primary feed titles on mobile) text, not display type.
+A row runs chip, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` text, not display type.
 
-On mobile, four specialized row/card patterns handle feeds, breakdowns, backing and settings:
+Mobile has a few more card parts beside `Surface`: `ProportionalBarRow` for a breakdown (a dot or chip, the name, the amount, a thin bar scaled to its share and a muted footnote), `QuotaCard` for a backing stake's pace, and `SettingsGroup` with `SettingsRow` for grouped settings under a `type-section` header. Reach for these before drawing a card by hand.
 
-1. **Feed & Status Rows (`screens/Home.tsx`, `screens/Sessions.tsx`, `features/SessionList.tsx`)**: Two-line rows with a `rounded-lg` player/venue monogram `Chip` on the left, sentence-case title + right-aligned relative timestamp or live badge (`Live · 2h 14m` with spinner/dot) on the top line, and venue/trip metadata + tabular `Money` result on the bottom line.
-2. **Proportional Breakdown Rows (`ProportionalBarRow` in `components/ui/Surface.tsx`, used by `features/TripBoard.tsx` and `features/AllTimeBoard.tsx`)**: Grouped inside a `rounded-2xl bg-surface` card under a muted `type-section` header. Each row displays a color dot or `Chip` + title on the left and tabular `Money` on the right, a thin (`4px` high, `rounded-full`) horizontal **progress** bar in the middle scaled to share of total, and a muted `type-footnote` line below (`64.9% of buy-ins · 8 sessions · +$52/hr`).
-3. **Quota & Pace Cards (`QuotaCard` in `components/ui/Surface.tsx`, used by `features/Backing.tsx`)**: A `rounded-2xl bg-surface p-5` card with a sentence-case title on the left, pace status on the right, a `type-hero` tabular readout (`87% left` or `$410 left`), a `24px`-high `rounded-md` progress bar combining a solid fill, diagonal SVG hatch stripes for the consumed/remaining portion, and a vertical `2px` pace tick mark (`|`), plus a metadata footer (`↻ Resets in 6d 14h`).
-4. **Grouped Settings Rows (`SettingsGroup` & `SettingsRow` in `components/ui/Surface.tsx`, used by `features/You.tsx`, `screens/Group.tsx`, `screens/GroupSettings.tsx`)**: Grouped `rounded-2xl bg-surface` cards beneath sentence-case `type-section` headers (`Account & sync`, `Preferences`, `Group & table`). Each `SettingsRow` (`min-h-[52px]`) pairs a `20px` outlined left icon, a `type-body` label, a right-aligned `text-muted` value, and a `text-faint` `chevron-right` disclosure indicator with inset `0.5px` dividers.
-
-Don't put a `Surface` inside a `Surface`. Use `bg-sunken` for a well.
+Don't put a `Surface` inside a `Surface`. A card on a card is `bg-raised`.
 
 ## Hero cards: TripHero, BalanceHero, RaceHero
 
-A place can open on one hero card: the figure that place exists to show, big enough to read across a table. Sessions has `TripHero` (your trip total, your running line, win rate, best session, board place), and the Board's This trip `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in gold). The Board's All time opens on the same `TripHero` across every trip ("All time with …"). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. When you're seated at a live session, Sessions opens on `LiveSessionCard`, above the hero, with "Back to the table" as the screen's primary action.
+A place can open on one hero card: the figure that place exists to show, big enough to read across a table. Sessions has `TripHero` (your trip total, your running line, win rate, best session, board place), and the Board's This trip `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in ink). The Board's All time opens on the same `TripHero` across every trip ("All time with …"). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. When you're seated at a live session, Sessions opens on `LiveSessionCard`, above the hero, with "Back to the table" as the screen's primary action.
 
 One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure.
 
-On web, a hero is a `Surface` with `Glow` inside it in the tone of the figure (`win`, `loss`, `accent`). On mobile, hero cards are **glow-free** `rounded-2xl bg-surface p-5` cards (`emil-unslop-design`: no decorative radial `Glow` blobs behind the figure). A sentence-case `type-label text-muted` kicker (`Net bankroll`, `Trip total`) sits over the `type-hero` `Money` figure (`36px–40px` `tabular-nums`), followed by a `type-footnote text-muted` subtitle (`Across 14 sessions`), the clean chart (`rx={4}` rounded-cap vertical session bars or running `RaceChart` lines), bottom-corner date range labels (`Oct 11` … `Nov 9`), and an inline color-dot legend along the bottom edge. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`, never gold. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`) so both clients say the same thing.
+On web, a hero is a `Surface` with `Glow` inside it in the tone of the figure (`win`, `loss`, `ink`, or `felt` while live). On mobile, hero cards are **glow-free** `rounded-2xl bg-surface p-5` cards (`emil-unslop-design`: no decorative radial `Glow` blobs behind the figure). A sentence-case `type-label text-muted` kicker (`Net bankroll`, `Trip total`) sits over the `type-hero` `Money` figure (`36px–40px` `tabular-nums`), followed by a `type-footnote text-muted` subtitle (`Across 14 sessions`), the clean chart (`rx={4}` rounded-cap vertical session bars or running `RaceChart` lines), bottom-corner date range labels (`Oct 11` … `Nov 9`), and an inline color-dot legend along the bottom edge. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`) so both clients say the same thing.
 
 ## Charts
 
-Every chart that compares players draws the same way: lines start at break-even, a dashed `line-strong` rule; the line you're following is `accent`, 3px with a halo on its current point; everyone else is `muted` at 45%; each line ends on a dot and the player's initial, spread apart with `spreadLabels` so none overlap. No chip colors on lines: the chip next to a name is identity, the gold line is focus. Scales come from `@stacks/client-runtime/chart` and draw per platform, SVG on web and `react-native-svg` on mobile.
+Every chart that compares players draws the same way: lines start at break-even, a dashed `line-strong` rule; the line you're following is `ink`, 3px with a halo on its current point; everyone else is `muted` at 45%; each line ends on a dot and the player's initial, spread apart with `spreadLabels` so none overlap. No chip colors on lines: the chip next to a name is identity, the ink line is focus. Scales come from `@stacks/client-runtime/chart` and draw per platform, SVG on web and `react-native-svg` on mobile.
 
 Players at very different stakes would flatten each other, so:
 
@@ -112,9 +109,9 @@ Players at very different stakes would flatten each other, so:
 
 Where content lives is decided in [docs/internals/navigation.md](../internals/navigation.md). Every page sits in the four tabs, Play, Stats, Map and Crew, except the ones that fill the screen: a live session, a shared table's links and an invitation. Those use `PersonalFrame` (`features/Personal.tsx`): the wordmark and You, with nothing read from an account. A full-screen page's main actions go in its `Dock`, pinned above the home indicator on a phone and in the page's flow from `sm` up. Save state is `SaveStatus`, which only ever says "Saved on this device" after the device has it.
 
-On web, `AppShell` (`features/Shell.tsx`) draws the tabs with **`TabLink`** (`ui/Nav.tsx`): `layout="bar"` stacks icon over label in the bottom bar below `lg`; `layout="side"` is a sidebar row above it. The current tab is gold. The shell reads nothing from an account or the network, so it opens offline and signed out; Crew asks for sign-in inside the tab. A tab page's main actions go in an `ActionBar`, which sits above the bottom bar. You opens from the avatar. `LiveBar` floats above the tabs while you're playing: your own session first, and on Crew's pages your seat at a group's table.
+On web, `AppShell` (`features/Shell.tsx`) draws the tabs with **`TabLink`** (`ui/Nav.tsx`): `layout="bar"` stacks icon over label in the bottom bar below `lg`; `layout="side"` is a sidebar row above it. The current tab is `ink`, the rest `muted`. Below `lg` the bottom bar is glass, so the page shows through it as it scrolls. The shell reads nothing from an account or the network, so it opens offline and signed out; Crew asks for sign-in inside the tab. A tab page's main actions go in an `ActionBar`, which sits above the bottom bar. You opens from the avatar. `LiveBar` floats above the tabs while you're playing, in glass: your own session first, and on Crew's pages your seat at a group's table. The bottom actions above the tabs (`ActionBar`, `Dock`) stay solid.
 
-On mobile, keep React Navigation native-stack, one stack per tab. iOS uses native bottom tabs and grouped native header actions; Android uses the standard destination bar. Screens learn the tab bar's height from `TabBarHeight` and keep their content and docks clear of it, and reserve the measured LiveBar height above it.
+On mobile, keep React Navigation native-stack, one stack per tab. iOS uses native bottom tabs, which bring their own Liquid Glass, and grouped native header actions; Android floats the tab bar on a `GlassSurface`. The `LiveBar`, the You button and an `IconButton` are glass too. Screens learn the tab bar's height from `TabBarHeight` and keep their content and docks clear of it, and reserve the measured LiveBar height above it.
 
 See [mobile controls](mobile-redesign.md) for platform selection, native sheet sizing and chart interaction.
 
@@ -139,7 +136,7 @@ A section's action is a `ghost` or `sm` button or a `Segmented`. Supporting text
 
 Keep **Tag** and **Badge** distinct (`emil-design-vocabulary`):
 
-- **Tag**: A static categorical label (`BETA`, `NLH $1/$3`, `Closed`). Tones: `neutral` (default), `live`. Rendered as a compact `rounded-md` pill.
+- **Tag**: A static categorical label (`BETA`, `NLH $1/$3`, `Closed`). Tones: `neutral` (default) on `fill`, and `live` on `felt` with a dot. Rendered as a compact pill.
 - **Badge**: A dynamic status or live count indicator (`Live · 2h 14m` with activity dot/spinner, `Draft`, `+13` diff, or a numeric count in a settings row). A caption that names rather than states ("Biggest winner") is neither: it's plain `text-muted` text.
 
 ## Money, BalanceLabel
@@ -166,15 +163,25 @@ A long form's submit action stays visible: use `ActionBar` on web and `Screen`'s
 
 ## Dialog (web), Sheet (mobile)
 
+On a phone, a web `Dialog` is a glass sheet: edge to edge, rounded on top only, over the `scrim`, sliding up on the sheet's timing. From `sm` up it's a centered glass dialog on the menu's timing. On mobile, `Sheet` is the system's sheet, with its own material and motion.
+
 Keep a form's submit action and submission errors in `footer`, outside the scrolling fields. Secondary outcomes stay in the body so the keyboard leaves room for inputs. A web submit button in the footer links to its form with the `form` attribute.
 
 Use native action menus for short choices and confirmations for destructive outcomes. iOS Sheet uses native detents and title/close controls; pass `busy` while saving to prevent dismissal. A reason field stays in a form sheet. The title says what's being decided, and a confirmation names the outcome on its button. Keep the safe choice beside it: "Keep it" and "Void entry".
 
-## Menu, MenuItem, MenuChoice (web)
+## Menu, MenuItem, MenuChoice (web); ActionMenu (mobile)
 
-Secondary actions behind "…", with destructive items as `tone="danger"`. If a section's main action sits in a menu, promote it to a `Button`.
+Secondary actions behind "…", with destructive items as `tone="danger"`. On web the menu is glass and scales from its trigger on the menu's timing; on mobile `ActionMenu` is the system menu. If a section's main action sits in a menu, promote it to a `Button`.
 
 A page-level destructive action, like deleting a trip, goes in the menu and opens a `Dialog`, where the confirming button is `danger`. A `danger` button sitting in the open beside the primary competes with it.
+
+## GlassSurface (mobile), glass (web)
+
+The one way to draw glass. Use it only on the parts [Glass](foundations.md#glass) lists. On web it's the `glass` or `glass-sheet` class on the part's own element. On mobile wrap the content in `GlassSurface`, inside a `PressableScale` when the whole surface is a control, and pass `interactive` so iOS glass answers the touch.
+
+## Toast (mobile), Undo bar (web)
+
+A one-tap write's Undo. Solid, not glass, with the float shadow, entering and leaving on the toast's timing. One shows at a time; a new one replaces it.
 
 ## CopyButton (web)
 
