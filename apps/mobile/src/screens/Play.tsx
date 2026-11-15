@@ -41,6 +41,7 @@ import {
   ReopenSheet,
   StartSheet,
   StartTimeSheet,
+  VenueSheet,
   VoidSheet,
 } from "../features/RecordingForms";
 import { TableSection } from "../features/SharedTable";
@@ -126,7 +127,8 @@ type Open =
         | "return"
         | "buy_in"
         | "start_time"
-        | "game";
+        | "game"
+        | "venue";
     }
   | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId };
 
@@ -184,7 +186,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
     !table.visits.some(
       (item) => item.player.id === player.player.id && item.visit.finishedAt === null,
     );
-  // Whoever records for everyone at the table changes its game; a player who joined it can't.
+  // Whoever records for everyone at the table changes its game and casino; a player who joined it
+  // can't.
   const canEditTable = table?.role !== "participant";
   const rebuy = async (amount: number) => {
     const receipt = await quick.submit({ type: "add", visitId, kind: "buy_in", amount });
@@ -266,11 +269,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
       <View className="gap-2">
         <Title
           tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Finished"}</Tag>}
-          context={
+          context={[
+            visit.venue?.name,
             live
               ? `Started ${formatDay(start)}, ${formatTime(start)}`
-              : `${formatDay(start)} · ${formatTime(start)} to ${formatTime(visit.visit.finishedAt!)}`
-          }
+              : `${formatDay(start)} · ${formatTime(start)} to ${formatTime(visit.visit.finishedAt!)}`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         >
           {own
             ? visitTitle(visit.table)
@@ -362,6 +368,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
         <StartTimeSheet visit={visit} onClose={close} onSaved={() => edited("Start time saved.")} />
       ) : open?.type === "game" ? (
         <GameSheet visit={visit} onClose={close} onSaved={() => edited("Game saved.")} />
+      ) : open?.type === "venue" ? (
+        <VenueSheet visit={visit} onClose={close} onSaved={() => edited("Casino saved.")} />
       ) : open?.type === "reopen" ? (
         <ReopenSheet
           visit={visit}
@@ -435,7 +443,7 @@ function useMinuteClock() {
   return now;
 }
 
-type EditField = "buy_in" | "start_time" | "game";
+type EditField = "buy_in" | "start_time" | "game" | "venue";
 
 /** A live session at a glance: how long, how much in, what game, and a way to fix any of it. */
 function LiveHero({
@@ -467,7 +475,12 @@ function LiveHero({
           actions={[
             { label: "Buy-in", onPress: () => onEdit("buy_in") },
             { label: "Start time", onPress: () => onEdit("start_time") },
-            ...(canEditTable ? [{ label: "Game", onPress: () => onEdit("game") }] : []),
+            ...(canEditTable
+              ? [
+                  { label: "Game", onPress: () => onEdit("game") },
+                  { label: "Casino", onPress: () => onEdit("venue") },
+                ]
+              : []),
           ]}
         />
       </View>

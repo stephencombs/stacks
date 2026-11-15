@@ -8,7 +8,11 @@ import {
   type VisitId,
 } from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
-import type { RecordingInput, RecordingReceipt } from "@stacks/client-runtime/recording";
+import type {
+  CachedVenue,
+  RecordingInput,
+  RecordingReceipt,
+} from "@stacks/client-runtime/recording";
 import { useBuyInTotal, useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
 import {
   amountInputText,
@@ -31,6 +35,7 @@ import { Dialog } from "~/components/ui/Dialog";
 import { Field, FormError, Input, RadioCards, Select } from "~/components/ui/Field";
 import { Note } from "~/components/ui/Page";
 import { Segmented } from "~/components/ui/Segmented";
+import { SessionVenuePicker } from "~/features/VenuePicker";
 
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
 
@@ -708,6 +713,52 @@ export function GameDialog({
       }}
     >
       <GameFields game={game} highLimit={highLimit} onGame={setGame} onHighLimit={setHighLimit} />
+    </RecordingDialog>
+  );
+}
+
+/** The table's casino, picked from a search or from those saved on this device, or none. */
+export function VenueDialog({
+  visit,
+  onClose,
+  onSaved,
+}: {
+  visit: RecordingVisitView;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const save = useRecordingSubmit();
+  // A venue another device set that this one hasn't fetched yet stays until something is picked.
+  const [picked, setPicked] = useState<{ venue: CachedVenue | null } | null>(null);
+  const selected = picked ? picked.venue : visit.venue;
+  return (
+    <RecordingDialog
+      title="Casino"
+      submitLabel="Save casino"
+      save={save}
+      onClose={onClose}
+      onSubmit={async () => {
+        if (!picked) return onSaved();
+        const receipt = await save.submit(
+          {
+            type: "edit_visit",
+            visitId: visit.visit.id,
+            table: {
+              game: visit.table.game,
+              venueId: picked.venue?.id ?? null,
+              highLimit: visit.table.highLimit,
+            },
+          },
+          picked.venue ? [picked.venue] : [],
+        );
+        if (receipt) onSaved();
+      }}
+    >
+      <SessionVenuePicker
+        selectedId={picked ? (picked.venue?.id ?? null) : visit.table.venueId}
+        selected={selected}
+        onSelect={(venue) => setPicked({ venue })}
+      />
     </RecordingDialog>
   );
 }

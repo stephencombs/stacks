@@ -3,6 +3,9 @@ import { describeError } from "@stacks/client-runtime/errors";
 import * as Cause from "effect/Cause";
 import { VenueId, type GroupId, type Venue } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
+import type { CachedVenue } from "@stacks/client-runtime/recording";
+import { useVenueSearch } from "@stacks/client-runtime/recordingReact";
+import { venuePlace } from "@stacks/client-runtime/recordingView";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
@@ -20,30 +23,46 @@ function VenueOption({
   selected,
   onSelect,
 }: {
-  venue: Venue;
+  venue: CachedVenue & { readonly verified?: boolean };
   selected: boolean;
   onSelect: () => void;
 }) {
-  const place = [venue.city, venue.region].filter(Boolean).join(", ");
-  const detail = [
-    place || (venue.kind === "online" ? "Online" : venue.kind === "home" ? "Home game" : ""),
-    venue.verified ? "" : "Unverified",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  return (
+    <OptionRow
+      title={venue.name}
+      detail={[venuePlace(venue), venue.verified === false ? "Unverified" : ""]
+        .filter(Boolean)
+        .join(" · ")}
+      selected={selected}
+      onSelect={onSelect}
+    />
+  );
+}
+
+function OptionRow({
+  title,
+  detail,
+  selected,
+  onSelect,
+}: {
+  title: string;
+  detail: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityLabel={venue.name}
+      accessibilityLabel={title}
       accessibilityState={{ checked: selected }}
       onPress={onSelect}
-      className={cn("rounded-xl px-3 py-2.5", selected ? "bg-ink" : "active:bg-fill")}
+      className={cn("min-h-11 rounded-xl px-3 py-2.5", selected ? "bg-ink" : "active:bg-fill")}
     >
       <Text
         numberOfLines={1}
         className={cn("text-base font-medium", selected ? "text-ink-inverse" : "text-ink")}
       >
-        {venue.name}
+        {title}
       </Text>
       {detail ? (
         <Text
@@ -96,6 +115,138 @@ function SearchResults({
         />
       ))}
     </>
+  );
+}
+
+type Near = { lat: number; lng: number };
+
+const here = () =>
+  Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).then(
+    (position): Near => ({ lat: position.coords.latitude, lng: position.coords.longitude }),
+    () => null,
+  );
+
+/**
+ * The casino a personal session was at: nearby casinos first when location is allowed, then by
+ * name as you type, and "Not listed" for none. Searching needs the network; casinos this device
+ * has saved stay pickable without it. `selectedId` keeps an uncached casino distinct from none.
+ */
+export function SessionVenuePicker({
+  selectedId,
+  selected,
+  onSelect,
+}: {
+  selectedId: VenueId | null;
+  selected: CachedVenue | null;
+  onSelect: (venue: CachedVenue | null) => void;
+}) {
+  const [text, setText] = useState("");
+  const q = useDebounced(text.trim());
+  const [near, setNear] = useState<Near | null>(null);
+  const [locating, setLocating] = useState<"idle" | "busy" | "failed">("idle");
+  const search = useVenueSearch(q, near);
+
+  const locate = async () => {
+    setLocating("busy");
+    const permission = await Location.requestForegroundPermissionsAsync();
+    const position = permission.granted ? await here() : null;
+    if (!position) return setLocating("failed");
+    setNear(position);
+    setLocating("idle");
+  };
+
+  // Someone who has already let Color Up see where they are gets nearby casinos first, unasked.
+  useEffect(() => {
+    let current = true;
+    void Location.getForegroundPermissionsAsync().then(async (permission) => {
+      const position = permission.granted ? await here() : null;
+      if (current && position) setNear(position);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  const shown =
+    selected && !search.venues.some((venue) => venue.id === selected.id)
+      ? [selected, ...search.venues]
+      : search.venues;
+  const status =
+    search.status === "offline"
+      ? "Searching needs a connection. These are the casinos saved on this device."
+      : search.status === "searching" && search.venues.length === 0
+        ? "Searching…"
+        : search.status === "found" && search.venues.length === 0
+          ? q
+            ? `No casinos match “${q}”.`
+            : "No casinos found near you. Search by name instead."
+          : search.status === "saved" && search.venues.length === 0
+            ? "Search for where you're playing."
+            : null;
+  const heading =
+    search.status === "found" && search.venues.length > 0 && !q
+      ? "Near you"
+      : search.status === "saved" && search.venues.length > 0
+        ? "On this device"
+        : null;
+  return (
+    <View className="gap-3">
+      <TextField
+        label="Search casinos"
+        value={text}
+        onChangeText={setText}
+        placeholder="Search casinos"
+        autoCorrect={false}
+        returnKeyType="search"
+      />
+      {near ? null : (
+        <Button
+          label="Near me"
+          size="sm"
+          className="self-start"
+          pending={locating === "busy"}
+          onPress={() => void locate()}
+        />
+      )}
+      {locating === "failed" ? (
+        <Text className="text-sm text-muted">
+          Couldn't get your location. Search by name instead.
+        </Text>
+      ) : null}
+      {status ? (
+        <View className="flex-row items-center justify-between gap-3">
+          <Text accessibilityLiveRegion="polite" className="flex-1 text-sm text-muted">
+            {status}
+          </Text>
+          {search.status === "offline" ? (
+            <Button label="Try again" size="sm" variant="ghost" onPress={search.retry} />
+          ) : null}
+        </View>
+      ) : null}
+      <View accessibilityRole="radiogroup">
+        {heading ? <Text className="pb-1 text-sm text-muted">{heading}</Text> : null}
+        {selectedId !== null && !shown.some((venue) => venue.id === selectedId) ? (
+          <Text accessibilityLiveRegion="polite" className="px-3 py-2 text-sm text-muted">
+            Current casino unavailable. This session keeps it until you choose another casino or Not
+            listed.
+          </Text>
+        ) : null}
+        {shown.map((venue) => (
+          <VenueOption
+            key={venue.id}
+            venue={venue}
+            selected={selectedId === venue.id}
+            onSelect={() => onSelect(venue)}
+          />
+        ))}
+        <OptionRow
+          title="Not listed"
+          detail="Keep this session without a casino"
+          selected={selectedId === null}
+          onSelect={() => onSelect(null)}
+        />
+      </View>
+    </View>
   );
 }
 

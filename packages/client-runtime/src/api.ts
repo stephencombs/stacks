@@ -84,6 +84,8 @@ export const makeRecordingTransport = ({
       Effect.flatMap(client(actor), (api) =>
         api.recording.redeemInvite({ params: { token }, payload }),
       ),
+    searchVenues: (query) => searchPublicVenues({ baseUrl }, query),
+    venue: (venueId) => fetchPublicVenue({ baseUrl }, venueId),
   };
 };
 

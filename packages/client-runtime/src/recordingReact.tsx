@@ -1,4 +1,11 @@
-import { UserId, type ActorId, type PlayerId, type TableId, type VisitId } from "@stacks/contracts";
+import {
+  UserId,
+  type ActorId,
+  type PlayerId,
+  type TableId,
+  type Venue,
+  type VisitId,
+} from "@stacks/contracts";
 import type {
   JoinedTable,
   PlayerAccess,
@@ -24,6 +31,7 @@ import { describeError } from "./errors.ts";
 import {
   makeRecordingStore,
   RecordingError,
+  type CachedVenue,
   type RecordingInput,
   type RecordingReceipt,
   type RecordingStore,
@@ -48,6 +56,7 @@ import {
   recordingTable,
   nextBuyInChange,
   recordingVisit,
+  venueChoices,
 } from "./recordingView.ts";
 
 /**
@@ -106,12 +115,16 @@ export const openDeviceRecordingStore = (
  */
 export const makeRecordingSubmission = (store: RecordingStore) => {
   let retained: { readonly key: string; readonly command: RecordingCommand } | null = null;
-  return async (input: RecordingInput): Promise<RecordingReceipt> => {
+  /** `venues` are cached in the same save, for a venue the input names. */
+  return async (
+    input: RecordingInput,
+    venues: ReadonlyArray<CachedVenue> = [],
+  ): Promise<RecordingReceipt> => {
     const key = JSON.stringify(input);
     const command = retained?.key === key ? retained.command : store.prepare(input);
     retained = { key, command };
     try {
-      const receipt = await store.execute(command);
+      const receipt = await store.execute(command, venues);
       retained = null;
       return receipt;
     } catch (error) {
@@ -273,12 +286,12 @@ export const useRecordingSubmit = () => {
     pending: false,
     error: null,
   });
-  const submit = async (input: RecordingInput) => {
+  const submit = async (input: RecordingInput, venues?: ReadonlyArray<CachedVenue>) => {
     if (busy.current) return null;
     busy.current = true;
     setState({ pending: true, error: null });
     try {
-      const receipt = await submission(input);
+      const receipt = await submission(input, venues);
       setState({ pending: false, error: null });
       return receipt;
     } catch (error) {
@@ -326,6 +339,47 @@ export const useBuyInTotal = (visitId: VisitId) => {
     }
   };
   return { ...state, set, clearError: () => setState((s) => ({ ...s, error: null })) };
+};
+
+/**
+ * Venues to pick for a table: before a search, the ones this device has cached; then the server's
+ * public venues matching `q`, or nearest to `near` when `q` is empty. Searching needs the network,
+ * and without it the cached venues matching `q` stay pickable. Pass `q` already debounced.
+ */
+export const useVenueSearch = (
+  q: string,
+  near: { readonly lat: number; readonly lng: number } | null,
+) => {
+  const { state } = useSnapshot();
+  const sync = use(RecordingSyncContext);
+  const [attempt, setAttempt] = useState(0);
+  const text = q.trim();
+  const lat = near?.lat ?? null;
+  const lng = near?.lng ?? null;
+  const searching = text !== "" || lat !== null;
+  const key = JSON.stringify([text, lat, lng, attempt]);
+  const [answer, setAnswer] = useState<{
+    key: string;
+    venues: ReadonlyArray<Venue> | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!searching || !sync) return;
+    let current = true;
+    sync.searchVenues(text || lat === null || lng === null ? { q: text } : { lat, lng }).then(
+      (venues) => current && setAnswer({ key, venues }),
+      () => current && setAnswer({ key, venues: null }),
+    );
+    return () => {
+      current = false;
+    };
+  }, [sync, key, searching, text, lat, lng]);
+  // Without sync (no network layer at all) a search can't be asked.
+  const found = !sync ? null : answer?.key === key ? answer.venues : undefined;
+  const choices = useMemo(
+    () => venueChoices(state?.venues ?? [], text, searching, found),
+    [state?.venues, text, searching, found],
+  );
+  return { ...choices, retry: () => setAttempt((n) => n + 1) };
 };
 
 /** A table and everyone recorded at it. `table` is undefined while loading, null if missing. */

@@ -93,7 +93,7 @@ test("runtime saves private play and receipts across real IndexedDB reloads", as
   await page.evaluate(() => window.recording.close());
 });
 
-for (const operation of ["start", "finish", "correct"] as const) {
+for (const operation of ["start", "finish", "correct", "venue"] as const) {
   test(`runtime ${operation} rolls back an aborted IndexedDB transaction and retries identical work`, async ({
     page,
   }) => {
@@ -102,6 +102,7 @@ for (const operation of ["start", "finish", "correct"] as const) {
     const before = await snapshot(page);
     expect(
       await page.evaluate(async (operation) => {
+        const { VenueId } = await import("../fixture");
         const store = window.recording;
         const state = store.getSnapshot().state!;
         window.prepared =
@@ -109,13 +110,23 @@ for (const operation of ["start", "finish", "correct"] as const) {
             ? store.prepare({ type: "start", buyIn: 20000 })
             : operation === "finish"
               ? store.prepare({ type: "finish", visitId: state.visits[0]!.id, amount: 25000 })
-              : store.prepare({
-                  type: "correct",
-                  visitId: state.visits[0]!.id,
-                  entryId: state.entries[0]!.id,
-                  reason: "wrong amount",
-                  replacement: { amount: 18000 },
-                });
+              : operation === "venue"
+                ? store.prepare({
+                    type: "edit_visit",
+                    visitId: state.visits[0]!.id,
+                    table: {
+                      game: null,
+                      venueId: VenueId.make("0192e7a0-0000-7000-8000-0000000000b1"),
+                      highLimit: false,
+                    },
+                  })
+                : store.prepare({
+                    type: "correct",
+                    visitId: state.visits[0]!.id,
+                    entryId: state.entries[0]!.id,
+                    reason: "wrong amount",
+                    replacement: { amount: 18000 },
+                  });
         const original = IDBObjectStore.prototype.put;
         IDBObjectStore.prototype.put = function (...args) {
           const request = original.apply(this, args);
@@ -123,7 +134,23 @@ for (const operation of ["start", "finish", "correct"] as const) {
           return request;
         };
         try {
-          await store.execute(window.prepared);
+          await store.execute(
+            window.prepared,
+            operation === "venue"
+              ? [
+                  {
+                    id: VenueId.make("0192e7a0-0000-7000-8000-0000000000b1"),
+                    name: "Bellagio",
+                    kind: "casino",
+                    city: "Las Vegas",
+                    region: "NV",
+                    country: "US",
+                    lat: 36.11,
+                    lng: -115.17,
+                  },
+                ]
+              : [],
+          );
           return "unexpected success";
         } catch (error) {
           return (error as { reason: string }).reason;
@@ -143,6 +170,12 @@ for (const operation of ["start", "finish", "correct"] as const) {
     );
     await reopen(page);
     expect((await snapshot(page)).state!.receipts.at(-1)).toEqual(receipt);
+    if (operation === "venue") {
+      expect((await snapshot(page)).state!.venues).toMatchObject([{ name: "Bellagio" }]);
+      expect((await snapshot(page)).state!.tables[0]!.venueId).toBe(
+        "0192e7a0-0000-7000-8000-0000000000b1",
+      );
+    }
     await page.evaluate(() => window.recording.close());
   });
 }

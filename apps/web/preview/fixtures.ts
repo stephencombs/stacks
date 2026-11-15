@@ -7,6 +7,7 @@ import {
   Invite,
   SessionDetail,
   TripDetail,
+  Venue,
 } from "@stacks/contracts";
 import * as Schema from "effect/Schema";
 
@@ -336,6 +337,15 @@ const sharedTable = {
 /** Joining the shared table through its link, as Cal. */
 const joinedAs = { id: shared(12), displayName: "Cal" };
 
+/** The public catalog that venue search answers from, nearest to the Strip first. */
+const catalog = [
+  { ...venue(20, "Bellagio"), lat: 36.1126, lng: -115.1767 },
+  { ...venue(21, "Aria"), lat: 36.1072, lng: -115.1765 },
+  { ...venue(22, "Wynn Las Vegas"), lat: 36.1265, lng: -115.1657 },
+  { ...venue(23, "Caesars Palace"), lat: 36.1162, lng: -115.1745 },
+  { ...venue(24, "Borgata"), city: "Atlantic City", region: "NJ", lat: 39.378, lng: -74.4365 },
+];
+
 // Decoding first checks every fixture against the contract, so a wrong field fails loudly here.
 const check = <S extends Schema.Top>(schema: S, value: unknown) => {
   const json = Schema.toCodecJson(schema as never);
@@ -361,6 +371,10 @@ export const routes: Record<string, unknown> = {
     viewerRole: "participant",
     viewerPlayerId: joinedAs.id,
   }),
+  "/api/public/venues": check(Schema.Array(Venue), catalog),
+  ...Object.fromEntries(
+    catalog.map((item) => [`/api/public/venues/${item.id}`, check(Venue, item)]),
+  ),
   "/api/groups": check(Schema.Array(GroupListItem), groupList),
   [`/api/groups/${ids.group}`]: check(GroupDetail, groupDetail),
   [`/api/groups/${ids.group}/stats`]: check(GroupStats, stats),

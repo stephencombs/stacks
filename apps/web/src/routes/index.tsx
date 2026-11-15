@@ -116,8 +116,8 @@ function ActiveRow({ item }: { item: RecordedVisit }) {
         title={visitTitle(item.table)}
         meta={
           <>
-            Started {formatTime(item.visit.startedAt)} · In{" "}
-            <Money amount={item.totals.buyIn} currency={RECORDING_CURRENCY} /> · Out{" "}
+            {item.venue ? `${item.venue.name} · ` : null}Started {formatTime(item.visit.startedAt)}{" "}
+            · In <Money amount={item.totals.buyIn} currency={RECORDING_CURRENCY} /> · Out{" "}
             <Money amount={item.totals.cashOut} currency={RECORDING_CURRENCY} /> · Result pending
           </>
         }
@@ -134,7 +134,8 @@ function FinishedRow({ item }: { item: RecordedVisit }) {
         title={`${formatDay(item.visit.finishedAt!)} · ${visitTitle(item.table)}`}
         meta={
           <>
-            In <Money amount={item.totals.buyIn} currency={RECORDING_CURRENCY} /> · Out{" "}
+            {item.venue ? `${item.venue.name} · ` : null}In{" "}
+            <Money amount={item.totals.buyIn} currency={RECORDING_CURRENCY} /> · Out{" "}
             <Money amount={item.totals.cashOut} currency={RECORDING_CURRENCY} />
           </>
         }
