@@ -87,6 +87,10 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     SaveStatus: () => null,
   }));
   vi.doMock("../features/RecordingForms", () => ({}));
+  vi.doMock("../features/TableTrip", () => ({
+    TableTripSheet: () => null,
+    TableTripButton: () => null,
+  }));
   vi.doMock("../features/LiveBar", () => ({ LiveSessionsBar: () => null }));
   vi.doMock("../lib/recording", () => ({
     useRecordingState: () => useSyncExternalStore(store.subscribe, store.getSnapshot).state,

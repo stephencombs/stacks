@@ -5,6 +5,7 @@ import {
   type PlayerId,
   type PlayerIdentity,
   type TableId,
+  type TripId,
   type VisitId,
 } from "@stacks/contracts";
 import { gameNames } from "@stacks/client-runtime/format";
@@ -48,6 +49,7 @@ import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
 import { SessionVenuePicker } from "./VenuePicker";
 import { applyAmountKey } from "./amountKey";
+import { TripChoice } from "./TableTrip";
 
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
 const decimal = decimalSeparator();
@@ -338,11 +340,14 @@ const startedVisit = (receipt: RecordingReceipt) =>
 export function StartSheet({
   onClose,
   onStarted,
+  initialTripId = null,
 }: {
+  initialTripId?: TripId | null;
   onClose: () => void;
   onStarted: (visitId: VisitId) => void;
 }) {
   const save = useRecordingSubmit();
+  const [tripId, setTripId] = useState(initialTripId);
   const buyIn = useAmount("", 1);
   const [game, setGame] = useState<GameChoice>("none");
   const [highLimit, setHighLimit] = useState(false);
@@ -361,11 +366,14 @@ export function StartSheet({
           buyIn: amount,
           ...details(game, highLimit),
         });
+        if (tripId && receipt && "tableId" in receipt.command)
+          await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
         const visitId = receipt && startedVisit(receipt);
         if (visitId) onStarted(visitId);
       }}
     >
       <KeypadAmount label="Buy-in" amount={buyIn} />
+      <TripChoice value={tripId} onChange={setTripId} />
       <DetailsFields
         game={game}
         highLimit={highLimit}

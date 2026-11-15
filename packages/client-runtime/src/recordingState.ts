@@ -202,7 +202,6 @@ const validateRecordingState = (state: RecordingState) => {
   // A table someone else started is here because this device joined it.
   const joined = new Set<Table["id"]>();
   for (const table of state.tables) {
-    requireValid(table.tripId === null, "Foreign table ownership.");
     if (table.starterPlayerId === state.self.id)
       requireValid(
         state.visits.some((visit) => visit.tableId === table.id),
@@ -266,6 +265,7 @@ const validateRecordingState = (state: RecordingState) => {
   // Where each visit started and what each table is, as its receipts left them: edits change both.
   const starts = new Map<Visit["id"], DateTime.Utc>();
   const details = new Map<Table["id"], TableDetails>();
+  const trips = new Map<Table["id"], Table["tripId"]>();
   const verifyEntry = (
     command: VisitCommand,
     id: EntryId,
@@ -303,6 +303,11 @@ const validateRecordingState = (state: RecordingState) => {
     );
     operations.add(command.operationId);
     if (isTableCommand(command)) {
+      if (command.type === "set_table_trip") {
+        requireValid(tables.has(command.tableId), "Trip choice references a missing table.");
+        trips.set(command.tableId, command.tripId);
+        continue;
+      }
       const key = `${command.tableId}:${command.playerId}`;
       requireValid(
         tables.has(command.tableId) &&
@@ -357,6 +362,7 @@ const validateRecordingState = (state: RecordingState) => {
         "Start records differ from the receipt.",
       );
       createdTables.add(table.id);
+      trips.set(table.id, null);
       starts.set(visit.id, command.startedAt);
       details.set(table.id, {
         game: command.game,
@@ -532,6 +538,8 @@ const validateRecordingState = (state: RecordingState) => {
       "Visit start differs from its receipts.",
     );
   }
+  for (const [tableId, tripId] of trips)
+    requireValid(tables.get(tableId)?.tripId === tripId, "Table trip differs from its receipts.");
   for (const [tableId, expected] of details) {
     const table = tables.get(tableId);
     requireValid(

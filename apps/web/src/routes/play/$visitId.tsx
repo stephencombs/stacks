@@ -53,6 +53,7 @@ import {
 import { LiveSessionsBar, useLiveSessions } from "~/features/LiveBar";
 import { TableSection } from "~/features/SharedTable";
 import { DeleteSessionDialog, DeletedSession } from "~/features/DeleteSession";
+import { TableTripDialog, TableTripButton } from "~/features/TableTrip";
 
 export const Route = createFileRoute("/play/$visitId")({ component: VisitPage });
 
@@ -89,6 +90,7 @@ type Open =
   | {
       readonly type:
         | "delete"
+        | "trip"
         | "edit"
         | "table"
         | "history"
@@ -438,6 +440,12 @@ function Visit({ visitId }: { visitId: VisitId }) {
               </button>
             ))}
           </div>
+          {state && ownPlayers(state).includes(visit.table.starterPlayerId) ? (
+            <TableTripButton
+              attached={visit.table.tripId !== null}
+              onOpen={() => setOpen({ type: "trip" })}
+            />
+          ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="ghost" onClick={() => setOpen({ type: "table" })}>
               At this table
@@ -501,6 +509,12 @@ function Visit({ visitId }: { visitId: VisitId }) {
         />
       ) : open?.type === "game" ? (
         <GameDialog visit={visit} onClose={close} onSaved={() => edited("Game saved.")} />
+      ) : open?.type === "trip" ? (
+        <TableTripDialog
+          table={visit.table}
+          onClose={close}
+          onSaved={() => edited("Trip saved.")}
+        />
       ) : open?.type === "venue" ? (
         <VenueDialog visit={visit} onClose={close} onSaved={() => edited("Casino saved.")} />
       ) : open?.type === "reopen" ? (

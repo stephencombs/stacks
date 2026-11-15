@@ -61,6 +61,7 @@ export const ConflictReason = Schema.Literals([
   "stake_ended",
   "stake_open",
   "trip_not_empty",
+  "trip_has_tables",
   "trip_ended",
   "trip_open",
   "last_owner",

@@ -1,13 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
+import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import { localClock, nightLabel } from "@stacks/client-runtime/trip";
 import { tripNights } from "@stacks/shared/trips";
 import { Plus } from "lucide-react";
+import { useState } from "react";
 
 import { ActionBar } from "~/components/ui/ActionBar";
 import { Money } from "~/components/Money";
-import { ButtonLink } from "~/components/ui/Button";
+import { Button, ButtonLink } from "~/components/ui/Button";
 import { EmptyState, Section } from "~/components/ui/Page";
+import { StartDialog } from "~/features/RecordingForms";
 import { BackingSection } from "~/features/Backing";
 import { LiveSessionCard, SessionList } from "~/features/SessionList";
 import { TripHero } from "~/features/TripHero";
@@ -31,6 +34,8 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** Sessions: your live table first, then the trip card, then everything played, night by night. */
 function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
+  const navigate = useNavigate();
+  const [starting, setStarting] = useState(false);
   const mine = trip.sessions.find(
     (s) => s.session.status === "live" && s.playerIds.includes(group.myPlayerId),
   );
@@ -38,21 +43,30 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const closed = trip.sessions.filter((s) => s.session.status === "closed");
   const nights = tripNights(closed, localClock).toReversed();
   const startSession =
-    trip.trip.endedAt === null ? (
-      <ButtonLink
-        to="/trips/$tripId/sessions/new"
-        params={{ tripId: trip.trip.id }}
+    trip.trip.endedAt === null && group.group.currency === RECORDING_CURRENCY ? (
+      <Button
+        onClick={() => setStarting(true)}
         variant={mine ? "secondary" : "primary"}
         className="w-full lg:w-auto"
         size="lg"
       >
         <Plus className="size-4" aria-hidden />
         Start a session
-      </ButtonLink>
+      </Button>
     ) : null;
 
   return (
     <>
+      {starting ? (
+        <StartDialog
+          initialTripId={trip.trip.id}
+          onClose={() => setStarting(false)}
+          onStarted={(visitId) => {
+            setStarting(false);
+            void navigate({ to: "/play/$visitId", params: { visitId } });
+          }}
+        />
+      ) : null}
       <TripHeader
         group={group}
         trip={trip}

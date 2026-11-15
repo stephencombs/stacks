@@ -88,6 +88,7 @@ export const remove = Effect.fn("Trips.remove")(function* (tripId: TripId) {
   const used = yield* sql`
     select 1 from sessions where trip_id = ${tripId}
     union all select 1 from stakes where trip_id = ${tripId}
+    union all select 1 from tables where trip_id = ${tripId}
     limit 1
   `;
   if (used.length > 0) return yield* new Conflict({ reason: "trip_not_empty" });

@@ -348,3 +348,55 @@ it.prop(
     }
   },
 );
+
+it("moves a whole table between trips and back to personal without changing play", () => {
+  const before = applyRecordingCommand(
+    opened(20000, true),
+    RecordingCommand.make({
+      ...common(),
+      type: "join_table",
+      tableId: visit.tableId,
+      visitId: VisitId.make(uuid()),
+      playerId: visit.playerId,
+      buyInId: EntryId.make(uuid()),
+      buyIn: MinorUnits.make(10000),
+      startedAt: at(30),
+    }),
+  );
+  expect(before.visits).toHaveLength(2);
+  const setTrip = (state: RecordingLedger, tripId: string | null) =>
+    applyRecordingCommand(
+      state,
+      Schema.decodeUnknownSync(RecordingCommand)({
+        ...common(),
+        type: "set_table_trip",
+        tableId: visit.tableId,
+        tripId,
+      }),
+    );
+  const first = uuid();
+  const second = uuid();
+  const attached = setTrip(before, first);
+  expect(attached.tables[0]!.tripId).toBe(first);
+  const moved = setTrip(attached, second);
+  expect(moved.tables[0]!.tripId).toBe(second);
+  const cleared = setTrip(moved, null);
+  expect(cleared.tables[0]!.tripId).toBeNull();
+  for (const state of [attached, moved, cleared]) {
+    expect(state.visits).toEqual(before.visits);
+    expect(state.entries).toEqual(before.entries);
+    expect(visitSummary(state.visits[0]!, state.entries).finalResult).toBe(15000);
+  }
+  expect(() =>
+    applyRecordingCommand(
+      before,
+      Schema.decodeUnknownSync(RecordingCommand)({
+        ...common(),
+        type: "set_table_trip",
+        tableId: visit.tableId,
+        tripId: first,
+      }),
+      [BEA],
+    ),
+  ).toThrow("Only the player who started this table");
+});

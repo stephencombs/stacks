@@ -489,8 +489,18 @@ const optional = <K extends string, V>(key: K, value: V | null) =>
  * visit and entries of a start recorded again to their new IDs.
  */
 const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): RecordingInput => {
+  if (command.type === "set_table_trip")
+    return {
+      type: command.type,
+      tableId: (ids.get(command.tableId) ?? command.tableId) as typeof command.tableId,
+      tripId: command.tripId,
+    };
   if (isTableCommand(command))
-    return { type: command.type, tableId: command.tableId, playerId: command.playerId };
+    return {
+      type: command.type,
+      tableId: (ids.get(command.tableId) ?? command.tableId) as typeof command.tableId,
+      playerId: command.playerId,
+    };
   const visitId = (ids.get(command.visitId) ?? command.visitId) as typeof command.visitId;
   switch (command.type) {
     case "start":
@@ -596,13 +606,17 @@ export const discardRejected = (state: RecordingState, operationId: RecordingOpe
 export const recordRejectedAgain = (state: RecordingState, operationId: RecordingOperationId) => {
   const { rejection } = withoutRejection(state, operationId);
   const refused = rejection.command;
+  const visits = new Set("visitId" in refused ? [refused.visitId] : []);
   const chain =
     refused.type === "start" || refused.type === "record_completed"
-      ? state.sync!.rejected.filter(
-          (item) =>
-            item === rejection ||
-            ("visitId" in item.command && item.command.visitId === refused.visitId),
-        )
+      ? state.sync!.rejected.filter(({ command }) => {
+          if (command.type === "join_table" && command.tableId === refused.tableId)
+            visits.add(command.visitId);
+          return (
+            ("tableId" in command && command.tableId === refused.tableId) ||
+            ("visitId" in command && visits.has(command.visitId))
+          );
+        })
       : [rejection];
   const ids = new Map<string, string>();
   let next = state;

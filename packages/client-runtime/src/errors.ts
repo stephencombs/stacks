@@ -34,6 +34,7 @@ const conflictMessages: Record<ConflictReason, string> = {
   stake_voided: "That stake was voided.",
   stake_ended: "That stake has already ended. Reopen it first.",
   stake_open: "That stake is still open.",
+  trip_has_tables: "This trip has tables. Detach them before creating or reopening a stake.",
   trip_not_empty: "Only a trip with nothing played in it can be deleted. End it instead.",
   trip_ended: "That trip has ended. Reopen it to start a session in it.",
   trip_open: "That trip is still going.",

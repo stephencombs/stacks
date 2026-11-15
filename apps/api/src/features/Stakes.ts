@@ -44,30 +44,44 @@ const loadToChange = Effect.fn("Stakes.loadToChange")(function* (stakeId: StakeI
   return stake;
 });
 
+/** Call inside a transaction, after locking the trip as Recording.loadLedger does. */
+const requireNoTables = Effect.fn("Stakes.requireNoTables")(function* (tripId: TripId) {
+  const sql = yield* SqlClient.SqlClient;
+  const tables = yield* sql`select 1 from tables where trip_id = ${tripId} limit 1`;
+  if (tables.length > 0) return yield* new Conflict({ reason: "trip_has_tables" });
+});
+
 export const create = Effect.fn("Stakes.create")(function* (
   tripId: TripId,
   request: typeof CreateStakeRequest.Type,
 ) {
   const sql = yield* SqlClient.SqlClient;
-  const { userId } = yield* CurrentUser;
-  const { groupId } = yield* Trips.load(tripId);
-  yield* Access.membership(groupId);
-  if (request.lenderId === request.borrowerId) {
-    return yield* new InvalidRequest({ message: "Pick two different players." });
-  }
-  yield* Access.requirePlayersInGroup(groupId, [request.lenderId, request.borrowerId]);
-  const startedAt = request.startedAt ?? (yield* DateTime.now);
-  yield* sql`
-    insert into stakes (id, group_id, trip_id, lender_id, borrower_id, amount, lender_share,
-      started_at, note, created_by)
-    values (${request.id}, ${groupId}, ${tripId}, ${request.lenderId}, ${request.borrowerId},
-      ${BigInt(request.amount)}, ${request.lenderShare}, ${DateTime.toDateUtc(startedAt)},
-      ${request.note}, ${userId})
-    on conflict (id) do nothing
-  `;
-  const stored = yield* load(request.id);
-  if (stored.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
-  return stored;
+  return yield* sql.withTransaction(
+    Effect.gen(function* () {
+      const { userId } = yield* CurrentUser;
+      yield* sql`select id from trips where id = ${tripId} for update`;
+      const { groupId } = yield* Trips.load(tripId);
+      yield* Access.membership(groupId);
+      if (request.lenderId === request.borrowerId) {
+        return yield* new InvalidRequest({ message: "Pick two different players." });
+      }
+      yield* Access.requirePlayersInGroup(groupId, [request.lenderId, request.borrowerId]);
+      const existing = yield* sql`select id from stakes where id = ${request.id}`;
+      if (existing.length === 0) yield* requireNoTables(tripId);
+      const startedAt = request.startedAt ?? (yield* DateTime.now);
+      yield* sql`
+        insert into stakes (id, group_id, trip_id, lender_id, borrower_id, amount, lender_share,
+          started_at, note, created_by)
+        values (${request.id}, ${groupId}, ${tripId}, ${request.lenderId}, ${request.borrowerId},
+          ${BigInt(request.amount)}, ${request.lenderShare}, ${DateTime.toDateUtc(startedAt)},
+          ${request.note}, ${userId})
+        on conflict (id) do nothing
+      `;
+      const stored = yield* load(request.id);
+      if (stored.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
+      return stored;
+    }),
+  );
 });
 
 export const end = Effect.fn("Stakes.end")(function* (
@@ -87,10 +101,17 @@ export const end = Effect.fn("Stakes.end")(function* (
 
 export const reopen = Effect.fn("Stakes.reopen")(function* (stakeId: StakeId) {
   const sql = yield* SqlClient.SqlClient;
-  const stake = yield* loadToChange(stakeId);
-  if (stake.endedAt === null) return yield* new Conflict({ reason: "stake_open" });
-  yield* sql`update stakes set ended_at = null where id = ${stakeId}`;
-  return yield* load(stakeId);
+  return yield* sql.withTransaction(
+    Effect.gen(function* () {
+      const { tripId } = yield* load(stakeId);
+      yield* sql`select id from trips where id = ${tripId} for update`;
+      const stake = yield* loadToChange(stakeId);
+      if (stake.endedAt === null) return yield* new Conflict({ reason: "stake_open" });
+      yield* requireNoTables(tripId);
+      yield* sql`update stakes set ended_at = null where id = ${stakeId}`;
+      return yield* load(stakeId);
+    }),
+  );
 });
 
 export const voidStake = Effect.fn("Stakes.void")(function* (

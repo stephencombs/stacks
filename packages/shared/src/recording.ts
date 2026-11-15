@@ -162,6 +162,14 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     // Only the server knows who has an account and every way a player came to the table.
     if (actorPlayers !== null && !actorPlayers.includes(table.starterPlayerId))
       throw new RecordingError("forbidden", "Only the player who started this table can do that.");
+    if (command.type === "set_table_trip")
+      return {
+        ...state,
+        tables: state.tables.map((item) =>
+          item.id === table.id ? Table.make({ ...table, tripId: command.tripId }) : item,
+        ),
+        receipts,
+      };
     const appointed = at(state.recorders, table.id, command.playerId);
     requireValid(
       command.type === "appoint_recorder" ? !appointed : appointed,
