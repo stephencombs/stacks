@@ -34,6 +34,8 @@ export type LiveTable = {
 };
 
 const ms = DateTime.toEpochMillis;
+// Players added while the table was being set up sat down with it, not later.
+const LATER = 5 * 60_000;
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
 
 /**
@@ -76,7 +78,7 @@ export const liveTable = (
         playing,
         status: !playing
           ? `Cashed out ${formatTime(visit.finishedAt!)} · ${money(totals.buyIn)} in`
-          : first && ms(visit.startedAt) > ms(first)
+          : first && ms(visit.startedAt) - ms(first) >= LATER
             ? `Playing · sat down ${formatTime(visit.startedAt)}`
             : "Playing",
         amount: playing ? totals.buyIn : finalResult!,

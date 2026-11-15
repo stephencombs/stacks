@@ -42,6 +42,7 @@ import { GroupsScreen } from "./screens/Groups";
 import { NewSessionScreen } from "./screens/NewSession";
 import { PeopleScreen } from "./screens/People";
 import { PlayScreen } from "./screens/Play";
+import { TableScreen } from "./screens/Table";
 import { SessionScreen } from "./screens/Session";
 import { SessionsScreen } from "./screens/Sessions";
 import { StatsScreen } from "./screens/Stats";
@@ -157,6 +158,7 @@ const RootStack = createNativeStackNavigator({
   screens: {
     Tabs: { screen: Tabs, options: { headerShown: false } },
     Play: { screen: PlayScreen, linking: "play/:visitId" },
+    Table: { screen: TableScreen, linking: "tables/:tableId", options: { headerShown: false } },
     History: { screen: HistoryScreen, linking: "history", options: { title: "All sessions" } },
     Invites: { screen: InvitesStack, options: { headerShown: false } },
   },

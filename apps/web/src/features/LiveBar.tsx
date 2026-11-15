@@ -3,8 +3,7 @@ import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { Link, useLocation, useNavigate, type LinkProps } from "@tanstack/react-router";
 import { formatTime } from "@stacks/client-runtime/format";
 import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
-import { visitTitle, type RecordedVisit } from "@stacks/client-runtime/recordingView";
-import type { VisitId } from "@stacks/contracts";
+import { tableTitle, visitTitle } from "@stacks/client-runtime/recordingView";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as DateTime from "effect/DateTime";
 import { ChevronRight, ChevronUp } from "lucide-react";
@@ -16,11 +15,42 @@ import { useAccount } from "~/lib/account";
 import { StacksProvider, useStacks } from "~/lib/stacks";
 import { tabOf } from "./tabs";
 
-/** Your own live sessions, newest first, leaving out the one on screen. */
-export function useLiveSessions(except?: VisitId) {
+/** Somewhere live to go back to: a session you're playing, or a table you record at. */
+export type LivePlace = {
+  readonly key: string;
+  readonly title: string;
+  readonly since: DateTime.Utc | null;
+  readonly playing: number;
+  readonly link: LinkProps;
+};
+
+/**
+ * Your own live sessions, newest first, then the tables you record for everyone at without
+ * playing, leaving out the one on screen (a visit's or a table's ID).
+ */
+export function useLiveSessions(except?: string) {
   const { home } = useRecordingHome();
-  return (home?.active ?? []).filter((item) => item.visit.id !== except);
+  const places: ReadonlyArray<LivePlace> = [
+    ...(home?.active ?? []).map((item) => ({
+      key: item.visit.id,
+      title: visitTitle(item.table),
+      since: item.visit.startedAt,
+      playing: 1,
+      link: { to: "/play/$visitId", params: { visitId: item.visit.id } } as const,
+    })),
+    ...(home?.tables ?? []).map((item) => ({
+      key: item.table.id,
+      title: tableTitle(item.table),
+      since: item.startedAt,
+      playing: item.playing,
+      link: { to: "/tables/$tableId", params: { tableId: item.table.id } } as const,
+    })),
+  ];
+  return places.filter((item) => item.key !== except);
 }
+
+const trailing = (place: LivePlace) =>
+  place.since ? `since ${formatTime(place.since)}` : "Nobody playing yet";
 
 /**
  * What you're playing, floating just above the tabs so a live session never goes missing: your own
@@ -52,18 +82,22 @@ export function LiveBar({ inline = false }: { inline?: boolean }) {
  * One bar for your live sessions. It goes straight to a single session; with several it names the
  * newest and opens a menu to pick one.
  */
-export function LiveSessionsBar({ live }: { live: ReadonlyArray<RecordedVisit> }) {
+export function LiveSessionsBar({ live }: { live: ReadonlyArray<LivePlace> }) {
   const navigate = useNavigate();
   const [newest, ...rest] = live;
   if (!newest) return null;
-  const title = visitTitle(newest.table);
+  const title = newest.title;
   if (rest.length === 0)
     return (
       <Bar
-        link={{ to: "/play/$visitId", params: { visitId: newest.visit.id } }}
-        label={`Back to your session, ${title}`}
+        link={newest.link}
+        label={
+          newest.link.to === "/play/$visitId"
+            ? `Back to your session, ${title}`
+            : `Back to the table, ${title}`
+        }
         title={title}
-        since={newest.visit.startedAt}
+        trailing={trailing(newest)}
       />
     );
   return (
@@ -73,16 +107,9 @@ export function LiveSessionsBar({ live }: { live: ReadonlyArray<RecordedVisit> }
       </BaseMenu.Trigger>
       <MenuPopup align="center" side="top">
         {live.map((item) => (
-          <MenuItem
-            key={item.visit.id}
-            onClick={() =>
-              void navigate({ to: "/play/$visitId", params: { visitId: item.visit.id } })
-            }
-          >
-            <span className="truncate font-medium">{visitTitle(item.table)}</span>
-            <span className="shrink-0 text-muted tabular-nums">
-              since {formatTime(item.visit.startedAt)}
-            </span>
+          <MenuItem key={item.key} onClick={() => void navigate(item.link)}>
+            <span className="truncate font-medium">{item.title}</span>
+            <span className="shrink-0 text-muted tabular-nums">{trailing(item)}</span>
           </MenuItem>
         ))}
       </MenuPopup>
@@ -108,7 +135,7 @@ function Seat({ inline, pathname }: { inline: boolean; pathname: string }) {
         link={{ to: "/sessions/$sessionId", params: { sessionId: seat.id } }}
         label={`Back to your table at ${seat.venueName}`}
         title={seat.venueName}
-        since={seat.startedAt}
+        trailing={`since ${formatTime(seat.startedAt)}`}
       />
     </Floating>
   );
@@ -149,16 +176,16 @@ function Bar({
   link,
   label,
   title,
-  since,
+  trailing,
 }: {
   link: LinkProps;
   label: string;
   title: string;
-  since: DateTime.Utc;
+  trailing: string;
 }) {
   return (
     <Link {...link} aria-label={label} className={barClass}>
-      <BarContent title={title} trailing={`since ${formatTime(since)}`} />
+      <BarContent title={title} trailing={trailing} />
     </Link>
   );
 }

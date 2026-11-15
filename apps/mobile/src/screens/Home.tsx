@@ -120,7 +120,16 @@ export function HomeScreen() {
         className="self-start"
         onPress={() => navigation.navigate("History")}
       />
-      {sheet === "start" ? <StartSheet onClose={() => setSheet(null)} onStarted={opened} /> : null}
+      {sheet === "start" ? (
+        <StartSheet
+          onClose={() => setSheet(null)}
+          onStarted={opened}
+          onOpened={(tableId) => {
+            setSheet(null);
+            navigation.navigate("Table", { tableId });
+          }}
+        />
+      ) : null}
       {sheet === "past" ? (
         <PastSessionSheet onClose={() => setSheet(null)} onAdded={opened} />
       ) : null}

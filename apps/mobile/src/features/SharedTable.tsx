@@ -119,7 +119,7 @@ export function TableSection({
 }
 
 /** Creates, shares and revokes the table's read-only link. Only the starter sees this. */
-function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: () => void }) {
+export function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: () => void }) {
   const sharing = useTableSharing(tableId);
   const url = sharing.token ? `${webUrl}/t/${sharing.token}` : null;
   return (
@@ -273,7 +273,13 @@ function JoinedTableSection({
  * The starter's settings for a table: an invite for each player, who records for everyone, and
  * the share link. Recorders need an account, so only players with one are listed.
  */
-function TableSettingsSheet({ tableId, onClose }: { tableId: TableId; onClose: () => void }) {
+export function TableSettingsSheet({
+  tableId,
+  onClose,
+}: {
+  tableId: TableId;
+  onClose: () => void;
+}) {
   const table = useRecordingTable(tableId)!;
   const server = useServerTable(tableId);
   const sharing = useTableSharing(tableId);

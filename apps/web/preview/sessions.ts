@@ -43,3 +43,35 @@ export const seedSessions = async () => {
   }
   await save({ type: "start", buyIn: 30_000, game: "blackjack", venueId: venues[2]!.id });
 };
+
+/**
+ * ?sessions=table: a live table you started, with Priya and Jonah there from the start, Dev who
+ * sat down later and Sam who cashed out. The page to open is the newest live session.
+ */
+export const seedTable = async () => {
+  await recordingStore.ready;
+  if ((recordingStore.getSnapshot().state?.visits.length ?? 0) > 0) return;
+  const save = async (input: Parameters<typeof recordingStore.prepare>[0]) => {
+    const command = recordingStore.prepare(input);
+    await recordingStore.execute(command, venues);
+    return command;
+  };
+  const ago = (minutes: number) => DateTime.makeUnsafe(Date.now() - minutes * 60_000);
+  const start = await save({
+    type: "start",
+    buyIn: 30_000,
+    startedAt: ago(108),
+    game: "blackjack",
+    venueId: venues[2]!.id,
+  });
+  if (!("tableId" in start)) return;
+  const { tableId } = start;
+  const seat = (displayName: string, buyIn: number, minutes: number) =>
+    save({ type: "join_table", tableId, displayName, buyIn, startedAt: ago(minutes) });
+  await seat("Priya", 30_000, 108);
+  await seat("Jonah", 20_000, 108);
+  await seat("Dev", 10_000, 64);
+  const sam = await seat("Sam", 20_000, 100);
+  if ("visitId" in sam)
+    await save({ type: "finish", visitId: sam.visitId, amount: 40_000, finishedAt: ago(20) });
+};

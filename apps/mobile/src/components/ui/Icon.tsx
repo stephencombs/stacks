@@ -18,8 +18,11 @@ import {
   Pencil,
   Search,
   Settings,
+  Share2,
   SlidersHorizontal,
   Sparkles,
+  Trash2,
+  UserPlus,
   Users,
   X,
 } from "lucide-react-native";
@@ -49,6 +52,9 @@ const icons = {
   settings: Settings,
   download: Download,
   sparkles: Sparkles,
+  "add-person": UserPlus,
+  share: Share2,
+  trash: Trash2,
 };
 
 export type IconName = keyof typeof icons;

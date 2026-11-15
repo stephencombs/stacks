@@ -1,7 +1,7 @@
-import type { SessionId, TripId, VisitId } from "@stacks/contracts";
+import type { SessionId, TableId, TripId, VisitId } from "@stacks/contracts";
 import { formatTime } from "@stacks/client-runtime/format";
 import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
-import { visitTitle } from "@stacks/client-runtime/recordingView";
+import { tableTitle, visitTitle } from "@stacks/client-runtime/recordingView";
 import { useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation } from "@react-navigation/native";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
@@ -26,10 +26,35 @@ type Placement = {
   onHeightChange?: (height: number) => void;
 };
 
-/** Your own live sessions, newest first, leaving out the one on screen. */
-function useLiveSessions(except?: VisitId) {
+/** Somewhere live to go back to: a session you're playing, or a table you record at. */
+type LivePlace = {
+  readonly key: string;
+  readonly title: string;
+  readonly trailing: string;
+  readonly to: { readonly visitId: VisitId } | { readonly tableId: TableId };
+};
+
+/**
+ * Your own live sessions, newest first, then the tables you record for everyone at without
+ * playing, leaving out the one on screen (a visit's or a table's ID).
+ */
+function useLiveSessions(except?: string) {
   const { home } = useRecordingHome();
-  return (home?.active ?? []).filter((item) => item.visit.id !== except);
+  const places: ReadonlyArray<LivePlace> = [
+    ...(home?.active ?? []).map((item) => ({
+      key: item.visit.id,
+      title: visitTitle(item.table),
+      trailing: `since ${formatTime(item.visit.startedAt)}`,
+      to: { visitId: item.visit.id },
+    })),
+    ...(home?.tables ?? []).map((item) => ({
+      key: item.table.id,
+      title: tableTitle(item.table),
+      trailing: item.startedAt ? `since ${formatTime(item.startedAt)}` : "Nobody playing yet",
+      to: { tableId: item.table.id },
+    })),
+  ];
+  return places.filter((item) => item.key !== except);
 }
 
 /**
@@ -65,23 +90,27 @@ export function PersonalLiveBar(placement: Placement) {
  * One bar for your live sessions other than `except`. It goes straight to a single session; with
  * several it names the newest and opens a sheet to pick one. Nothing when there are none.
  */
-export function LiveSessionsBar({ except }: { except?: VisitId }) {
+export function LiveSessionsBar({ except }: { except?: string }) {
   const navigation = useNavigation();
   const live = useLiveSessions(except);
   const [picking, setPicking] = useState(false);
   const [newest, ...rest] = live;
   if (!newest) return null;
-  const open = (visitId: VisitId) => navigation.dispatch(StackActions.push("Play", { visitId }));
-  const title = visitTitle(newest.table);
-  const since = formatTime(newest.visit.startedAt);
+  const open = (place: LivePlace) =>
+    navigation.dispatch(
+      "visitId" in place.to
+        ? StackActions.push("Play", { visitId: place.to.visitId })
+        : StackActions.push("Table", { tableId: place.to.tableId }),
+    );
+  const title = newest.title;
   if (rest.length === 0)
     return (
       <Bar
-        label={`Back to your session, ${title}, since ${since}`}
-        hint="Goes back to your session"
+        label={`${"visitId" in newest.to ? "Back to your session" : "Back to the table"}, ${title}, ${newest.trailing}`}
+        hint={"visitId" in newest.to ? "Goes back to your session" : "Goes back to the table"}
         title={title}
-        trailing={`since ${since}`}
-        onPress={() => open(newest.visit.id)}
+        trailing={newest.trailing}
+        onPress={() => open(newest)}
       />
     );
   return (
@@ -97,12 +126,12 @@ export function LiveSessionsBar({ except }: { except?: VisitId }) {
         <Sheet open title="Live sessions" onClose={() => setPicking(false)}>
           {live.map((item) => (
             <Button
-              key={item.visit.id}
-              label={`${visitTitle(item.table)} · since ${formatTime(item.visit.startedAt)}`}
+              key={item.key}
+              label={`${item.title} · ${item.trailing}`}
               variant="secondary"
               onPress={() => {
                 setPicking(false);
-                open(item.visit.id);
+                open(item);
               }}
             />
           ))}

@@ -27,6 +27,9 @@ export const symbols: Record<IconName, SFSymbol> = {
   settings: "gearshape",
   download: "square.and.arrow.up",
   sparkles: "sparkles",
+  "add-person": "person.badge.plus",
+  share: "square.and.arrow.up",
+  trash: "trash",
 };
 
 const filledSymbols: Partial<Record<IconName, SFSymbol>> = {

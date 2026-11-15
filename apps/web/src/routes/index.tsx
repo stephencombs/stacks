@@ -6,7 +6,7 @@ import {
   visitTitle,
   type RecordedVisit,
 } from "@stacks/client-runtime/recordingView";
-import type { VisitId } from "@stacks/contracts";
+import type { TableId, VisitId } from "@stacks/contracts";
 import { useState } from "react";
 
 import { Money } from "~/components/Money";
@@ -37,6 +37,10 @@ function Home() {
   const open = (visitId: VisitId) => {
     setDialog(null);
     void navigate({ to: "/play/$visitId", params: { visitId } }).then(focusMain);
+  };
+  const opened = (tableId: TableId) => {
+    setDialog(null);
+    void navigate({ to: "/tables/$tableId", params: { tableId } }).then(focusMain);
   };
   const playing = (home?.active.length ?? 0) > 0;
   return (
@@ -100,7 +104,9 @@ function Home() {
           </Button>
         </div>
       </ActionBar>
-      {dialog === "start" ? <StartDialog onClose={close} onStarted={open} /> : null}
+      {dialog === "start" ? (
+        <StartDialog onClose={close} onStarted={open} onOpened={opened} />
+      ) : null}
       {dialog === "past" ? <PastSessionDialog onClose={close} onAdded={open} /> : null}
     </div>
   );

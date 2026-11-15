@@ -54,6 +54,13 @@ describe("liveTable", () => {
       buyIn: 30000,
       startedAt: at(21),
     });
+    const jonah = await save(store, {
+      type: "join_table",
+      tableId,
+      displayName: "Jonah",
+      buyIn: 20000,
+      startedAt: at(21, 3),
+    });
     const dev = await save(store, {
       type: "join_table",
       tableId,
@@ -70,6 +77,7 @@ describe("liveTable", () => {
     const table = liveTable(recordingTable(state(store), tableId)!, undefined);
     expect(table.seats.map((seat) => [seat.name, seat.status, seat.playing])).toEqual([
       ["You", "Playing", true],
+      ["Jonah", "Playing", true],
       ["Dev", `Playing · sat down ${formatTime(at(22, 5))}`, true],
       [
         "Priya",
@@ -77,16 +85,20 @@ describe("liveTable", () => {
         false,
       ],
     ]);
-    expect(table.seats.map((seat) => seat.amount)).toEqual([20000, 10000, 20000]);
-    expect(table.seats.map((seat) => seat.recordable)).toEqual([false, true, true]);
-    expect(table).toMatchObject({ startedAt: at(21), inPlay: 30000, playing: 2, closed: false });
+    expect(table.seats.map((seat) => seat.amount)).toEqual([20000, 20000, 10000, 20000]);
+    expect(table.seats.map((seat) => seat.recordable)).toEqual([false, true, true, true]);
+    expect(table).toMatchObject({ startedAt: at(21), inPlay: 50000, playing: 3, closed: false });
     expect(table.seats[0]!.visitId).toBe(visitOf(mine));
 
     // Cashing out another player leaves the table open until the last player.
-    expect(cashOutNote(table.seats, visitOf(dev))).toBe("Dev's visit ends. You keep playing.");
+    expect(cashOutNote(table.seats, visitOf(dev))).toBe(
+      "Dev's visit ends. You and Jonah keep playing.",
+    );
     await save(store, { type: "finish", visitId: visitOf(dev), amount: 0, finishedAt: at(23) });
     expect(liveTable(recordingTable(state(store), tableId)!, undefined).closed).toBe(false);
     await save(store, { type: "finish", visitId: visitOf(mine), amount: 0, finishedAt: at(23) });
+    expect(liveTable(recordingTable(state(store), tableId)!, undefined).playing).toBe(1);
+    await save(store, { type: "finish", visitId: visitOf(jonah), amount: 0, finishedAt: at(23) });
     expect(liveTable(recordingTable(state(store), tableId)!, undefined)).toMatchObject({
       closed: true,
       playing: 0,

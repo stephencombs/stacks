@@ -83,6 +83,10 @@ export type RecordingHome = {
 export const visitTitle = (table: Table) =>
   `${table.game ? gameNames[table.game] : "Session"}${table.highLimit ? " · High limit" : ""}`;
 
+/** A table you record at without playing, by name: "Blackjack table". */
+export const tableTitle = (table: Table) =>
+  `${table.game ? `${gameNames[table.game]} table` : "Table"}${table.highLimit ? " · High limit" : ""}`;
+
 const tableOf = (state: RecordingState, tableId: Table["id"]) =>
   state.tables.find((table) => table.id === tableId)!;
 
@@ -705,13 +709,19 @@ const syncView = (
 
 export const LIVE_REBUY_AMOUNTS = [10000, 20000] as const;
 
-export const sessionReadout = (visit: RecordingVisitView, now: DateTime.Utc) => {
-  const elapsed = Math.max(0, ms(visit.visit.finishedAt ?? now) - ms(visit.visit.startedAt));
-  const seconds = Math.floor(elapsed / 1000);
+/** Time since `start` as the LIVE pill reads it: "1:48:22". */
+export const elapsedClock = (start: DateTime.Utc, now: DateTime.Utc) => {
+  const seconds = Math.floor(Math.max(0, ms(now) - ms(start)) / 1000);
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}:${minutes.toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+};
+
+export const sessionReadout = (visit: RecordingVisitView, now: DateTime.Utc) => {
+  const end = visit.visit.finishedAt ?? now;
+  const elapsed = Math.max(0, ms(end) - ms(visit.visit.startedAt));
   return {
-    clock: `${hours}:${minutes.toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`,
+    clock: elapsedClock(visit.visit.startedAt, end),
     buyIns: visit.entries.filter((entry) => entry.kind === "buy_in" && entry.voidedAt === null)
       .length,
     corrected: visit.entries.some((entry) => entry.kind === "buy_in" && entry.voidedAt !== null),
