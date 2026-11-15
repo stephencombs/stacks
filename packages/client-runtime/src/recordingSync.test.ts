@@ -1592,3 +1592,54 @@ it("rolls back a refused trip choice without losing offline play and shows it on
   ).toBe(tripId);
   expect(before.entries[0]).toEqual(after.entries[0]);
 });
+
+it("retries a refused start with its table choices and joined players on the replacement table", async () => {
+  const store = await open();
+  const remote = server();
+  await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+  const opened = await save(store, { type: "start", buyIn: 20000 });
+  if (opened.command.type !== "start") throw new Error("Expected start");
+  const { tableId, visitId } = opened.command;
+  const tripId = TripId.make(crypto.randomUUID());
+  await save(store, { type: "set_table_trip", tableId, tripId });
+  const joined = await save(store, {
+    type: "join_table",
+    tableId,
+    displayName: "Bea",
+    buyIn: 10000,
+  });
+  if (joined.command.type !== "join_table") throw new Error("Expected join");
+  await save(store, { type: "add", visitId: joined.command.visitId, kind: "buy_in", amount: 5000 });
+  await save(store, { type: "set_table_trip", tableId, tripId: null });
+  await save(store, { type: "set_table_trip", tableId, tripId });
+  await save(store, { type: "finish", visitId, amount: 30000 });
+  remote.refuse(opened.command.operationId);
+  await pushAll(store, remote);
+  expect(state(store).sync?.rejected).toHaveLength(7);
+  expect(state(store).tables).toEqual([]);
+
+  await store.transform((s) => recordRejectedAgain(s, opened.command.operationId));
+  const retried = state(store);
+  expect(retried.sync?.rejected).toEqual([]);
+  expect(retried.tables).toHaveLength(1);
+  const replacement = retried.tables[0]!;
+  expect(replacement.id).not.toBe(tableId);
+  expect(replacement.tripId).toBe(tripId);
+  expect(retried.visits).toHaveLength(2);
+  expect(retried.visits.every((visit) => visit.tableId === replacement.id)).toBe(true);
+  expect(retried.entries).toHaveLength(4);
+  expect(pendingRecordingCommands(retried).map((c) => c.type)).toEqual([
+    "start",
+    "set_table_trip",
+    "join_table",
+    "add",
+    "set_table_trip",
+    "set_table_trip",
+    "finish",
+  ]);
+  expect(decodeRecordingState(encodeRecordingState(retried), 1).tables).toEqual(retried.tables);
+  await pushAll(store, remote);
+  expect(state(store).sync?.rejected).toEqual([]);
+  expect(remote.history().tables[0]!.tripId).toBe(tripId);
+  await store.close();
+});
