@@ -78,6 +78,35 @@ describe("formatHours", () => {
 });
 
 describe("personalStatsView", () => {
+  it("uses offline casino names in filters, breakdowns and no-match text", async () => {
+    const visits = (await played(week)).map((item) => ({
+      ...item,
+      venue:
+        item.table.venueId === wynn
+          ? {
+              id: wynn,
+              name: "Wynn",
+              kind: "casino" as const,
+              city: "Las Vegas",
+              region: "NV",
+              country: "US",
+              lat: 36.127,
+              lng: -115.164,
+            }
+          : null,
+    }));
+    const all = view(visits);
+    if (all.kind !== "stats") throw new Error(all.kind);
+    expect(
+      all.chips.find((chip) => chip.key === "venueId")!.options.map((option) => option.label),
+    ).toContain("Wynn");
+    expect(all.byCasino!.find((row) => row.key === wynn)!.label).toBe("Wynn");
+    expect(all.byCasino!.find((row) => row.key === aria)!.label).toBe("Casino");
+    const empty = view(visits, { venueId: wynn, game: "roulette" });
+    if (empty.kind !== "no_match") throw new Error(empty.kind);
+    expect(empty.sentence).toContain("at Wynn");
+  });
+
   it("is empty with no finished sessions, even while one is live", async () => {
     const stats = view(await played([], true));
     expect(stats.kind).toBe("empty");

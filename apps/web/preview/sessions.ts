@@ -4,7 +4,16 @@ import * as DateTime from "effect/DateTime";
 
 import { recordingStore } from "~/lib/recording";
 
-const venues = [1, 2, 3, 4].map((n) => VenueId.make(`0192e7a0-0000-7000-8000-0000000007${n}0`));
+const venues = ["Wynn", "Aria", "Bellagio", "The Venetian"].map((name, i) => ({
+  id: VenueId.make(`0192e7a0-0000-7000-8000-0000000007${i + 1}0`),
+  name,
+  kind: "casino" as const,
+  city: "Las Vegas",
+  region: "NV",
+  country: "US",
+  lat: 36.12,
+  lng: -115.17,
+}));
 const games: ReadonlyArray<Game> = ["blackjack", "craps", "baccarat", "blackjack", "roulette"];
 const DAY = 86_400_000;
 
@@ -15,7 +24,7 @@ export const seedSessions = async () => {
   let seed = 7;
   const random = () => (seed = (seed * 16_807) % 2_147_483_647) / 2_147_483_647;
   const save = (input: Parameters<typeof recordingStore.prepare>[0]) =>
-    recordingStore.execute(recordingStore.prepare(input));
+    recordingStore.execute(recordingStore.prepare(input), venues);
   let at = Date.UTC(2024, 0, 20, 2);
   for (let i = 0; i < 40; i++) {
     at += Math.round((8 + random() * 22) * DAY);
@@ -29,8 +38,8 @@ export const seedSessions = async () => {
       startedAt,
       finishedAt: DateTime.makeUnsafe(at + Math.round(4 + random() * 14) * 15 * 60_000),
       game: games[i % games.length]!,
-      venueId: venues[Math.floor(random() * venues.length)]!,
+      venueId: venues[Math.floor(random() * venues.length)]!.id,
     });
   }
-  await save({ type: "start", buyIn: 30_000, game: "blackjack", venueId: venues[2]! });
+  await save({ type: "start", buyIn: 30_000, game: "blackjack", venueId: venues[2]!.id });
 };

@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-14
 priority: medium
 tags:
@@ -11,10 +11,13 @@ depends_on:
   - "003"
 parent: "001"
 created_at: 2026-11-14T20:15:30.759235709Z
-updated_at: 2026-11-15T02:53:45.670023640Z
+updated_at: 2026-11-15T05:52:55.785682357Z
+completed_at: 2026-11-15T05:52:55.785682357Z
 transitions:
   - status: in-progress
     at: 2026-11-14T21:28:45.380575121Z
+  - status: complete
+    at: 2026-11-15T05:52:55.785682357Z
 ---
 
 # Venues for personal play

@@ -14,13 +14,6 @@ const FEW = 3;
 /** How many casinos show before "See all". */
 export const TOP_CASINOS = 2;
 
-/**
- * A casino's name. The device only keeps venue ids for now, so every casino reads the same until
- * a venue cache can name it; this is the one place to look the name up.
- */
-export const venueName = (venueId: VenueId | null) =>
-  venueId === null ? "No casino set" : "Casino";
-
 const gameName = (game: Game | null) => (game === null ? "No game set" : gameNames[game]);
 
 /** Each game's chip color, as the design tokens assign them. */
@@ -107,7 +100,7 @@ const chip = <K extends StatsChip["key"], V>(
   };
 };
 
-const noMatch = (filters: StatsFilters) => {
+const noMatch = (filters: StatsFilters, casino: string) => {
   const game =
     filters.game === undefined ? "" : filters.game === null ? "" : `${gameNames[filters.game]} `;
   const without = [
@@ -116,7 +109,7 @@ const noMatch = (filters: StatsFilters) => {
   ].filter((part) => part !== null);
   return [
     `No finished ${game}sessions`,
-    filters.venueId ? ` at ${venueName(filters.venueId)}` : "",
+    filters.venueId ? ` at ${casino}` : "",
     filters.year === undefined ? "" : ` in ${filters.year}`,
     without.length ? ` without ${without.join(" or ")} set` : "",
     ".",
@@ -132,6 +125,11 @@ export const personalStatsView = (
   filters: StatsFilters,
   timeZone: DateTime.TimeZone = DateTime.zoneMakeLocal(),
 ) => {
+  const venues = new Map(
+    visits.flatMap(({ venue }) => (venue ? [[venue.id, venue.name] as const] : [])),
+  );
+  const venueName = (id: VenueId | null) =>
+    id === null ? "No casino set" : (venues.get(id) ?? "Casino");
   const stats = personalStats(visits, timeZone, filters);
   const chips = [
     chip(filters, "year", "Period", "All time", stats.options.years, (year) => ({
@@ -155,7 +153,11 @@ export const personalStatsView = (
   if (stats.options.years.length === 0) return { ...head, kind: "empty" as const };
   const { summary } = stats;
   if (summary.sessions === 0)
-    return { ...head, kind: "no_match" as const, sentence: noMatch(filters) };
+    return {
+      ...head,
+      kind: "no_match" as const,
+      sentence: noMatch(filters, venueName(filters.venueId ?? null)),
+    };
 
   const period = filters.year === undefined ? "all time" : String(filters.year);
   const day = filters.year === undefined ? fullDay : shortDay;
