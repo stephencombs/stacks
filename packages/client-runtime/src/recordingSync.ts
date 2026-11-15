@@ -41,6 +41,7 @@ import { applyRecordingCommand, createdEntryIds, RecordingError } from "@stacks/
 import { newId } from "./ids.ts";
 import { prepareRecordingCommand, type RecordingInput, type RecordingStore } from "./recording.ts";
 import {
+  foreignTables,
   missingVenueIds,
   recordingBase,
   rememberVenues,
@@ -302,7 +303,7 @@ export const mergeRecordingHistory = (
       playerId: item.player.id,
     })),
     recorders: [],
-    tables: history.tables.filter((table) => table.starterPlayerId !== self.id),
+    tables: foreignTables(history.tables, self.id, history.commands),
     visits: [],
     entries: [],
     receipts: [],

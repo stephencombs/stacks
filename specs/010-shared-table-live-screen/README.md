@@ -39,7 +39,7 @@ Bring the shared table onto the felt screen from spec 008, following "my session
 - **Not playing:** a starter who cashed out while others play sees the table view: "In play at the table $1,000.00", "3 playing", the list, and **Sit down and play**.
 - **Recording without playing (last):** start a table with no buy-in of your own, or appoint a recorder who never sits down. Needs a table start that isn't a visit, a table address to return to, and changes to the `start` command (it requires a buy-in) and the "Table has no visit." invariant in `packages/client-runtime/src/recordingState.ts`. `docs/internals/navigation.md` says there is no table page; update its Shared tables and Addresses sections with the table address.
 - Designs: `Mp*` frames on the 003 · Live session page.
-- **Way out of an empty table:** a table nobody has played at can be deleted (`delete_table`), so one opened by mistake doesn't sit in the LiveBar. Once anyone plays there, it stays; their visits are theirs to delete.
+- **Way out of an empty table:** a table nobody has played at can be deleted (`delete_table`), so one opened by mistake doesn't sit in the LiveBar. Deleting it also takes it out of its trip. Once anyone plays there, it stays, even if they delete their visit.
 
 ## Plan
 

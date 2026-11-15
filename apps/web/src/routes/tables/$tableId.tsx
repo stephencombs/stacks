@@ -158,9 +158,11 @@ function Table({ tableId }: { tableId: TableId }) {
       </section>
       {view.seats.length === 0 ? (
         <p className="rounded-xl bg-felt-deep px-4 py-3 text-sm text-felt-soft">
-          {table.role === "participant"
+          {!actions.includes("add_player")
             ? "Nobody has bought in here yet."
-            : "Add the players here from the menu, or share the table so they record their own."}
+            : actions.includes("share")
+              ? "Add the players here from the menu, or share the table so they record their own."
+              : "Add the players here from the menu."}
         </p>
       ) : (
         <TableSeats

@@ -164,14 +164,18 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       throw new RecordingError("forbidden", "Only the player who started this table can do that.");
     requireValid(table.deletedAt === undefined, "This table was deleted.");
     if (command.type === "delete_table") {
+      // A visit deleted since still means someone played here.
       requireValid(
-        !state.visits.some((item) => item.tableId === table.id && item.deletedAt === undefined),
+        !state.visits.some((item) => item.tableId === table.id),
         "Someone has played at this table, so it can't be deleted.",
       );
       return {
         ...state,
         tables: state.tables.map((item) =>
-          item.id === table.id ? Table.make({ ...table, deletedAt: command.preparedAt }) : item,
+          // Out of its trip too, so the trip keeps nothing of a table nobody played at.
+          item.id === table.id
+            ? Table.make({ ...table, tripId: null, deletedAt: command.preparedAt })
+            : item,
         ),
         receipts,
       };
@@ -411,6 +415,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
           : entry,
       );
     } else if (command.type === "restore_visit") {
+      requireValid(table.deletedAt === undefined, "This table was deleted.");
       requireValid(
         finishedAt !== null || !openAt(visit.tableId, visit.playerId),
         "This player is already playing at this table. Finish that session before restoring this one.",

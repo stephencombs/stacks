@@ -265,7 +265,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
   const shared = (seats?.seats.length ?? 1) > 1;
   const actions = live
-    ? tableActions(table?.role ?? "starter", {
+    ? tableActions(table?.role ?? "participant", {
         playing: true,
         closed: false,
         empty: false,
@@ -444,6 +444,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       {open?.type === "delete" ? (
         <DeleteSessionDialog
           visit={visit}
+          shared={shared}
           pending={quick.pending}
           error={quick.error}
           onClose={close}

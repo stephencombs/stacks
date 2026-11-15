@@ -270,7 +270,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
   const shared = (seats?.seats.length ?? 1) > 1;
   const actions = live
-    ? tableActions(table?.role ?? "starter", { playing: true, closed: false, empty: false })
+    ? tableActions(table?.role ?? "participant", { playing: true, closed: false, empty: false })
     : (["edit"] as const);
   const act = (action: TableAction) =>
     setOpen(
@@ -285,9 +285,9 @@ function Visit({ visitId }: { visitId: VisitId }) {
   };
   const deleteVisit = () =>
     confirmAction(
-      "Delete this session?",
+      shared ? "Delete my visit?" : "Delete this session?",
       `${visitTitle(visit.table)} · ${visit.venue?.name ?? "No casino set"}\n${formatDay(start)}, ${formatTime(start)} · Buy-in ${money(visit.totals.buyIn)}\n\nYour entries will be voided and this session will stop counting. Other players keep their sessions. You can restore yours later.`,
-      "Delete session",
+      shared ? "Delete my visit" : "Delete session",
       () => {
         void (async () => {
           if (await quick.submit({ type: "delete_visit", visitId })) {

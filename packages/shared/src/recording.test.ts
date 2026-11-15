@@ -466,6 +466,55 @@ it("opens a table without playing, records for the players added there, and dele
   expect(() => remove(empty, [BEA])).toThrow("Only the player who started this table");
   const deleted = remove(empty);
   expect(deleted.tables[0]!.deletedAt).toEqual(at(30));
+  // Deleting takes the table out of its trip, so the trip holds nothing of it.
+  const inTrip = applyRecordingCommand(
+    empty,
+    Schema.decodeUnknownSync(RecordingCommand)({
+      ...common(),
+      type: "set_table_trip",
+      tableId: visit.tableId,
+      tripId: uuid(),
+    }),
+  );
+  expect(remove(inTrip).tables[0]!.tripId).toBeNull();
   expect(() => remove(deleted)).toThrow("This table was deleted");
   expect(() => applyRecordingCommand(deleted, seat)).toThrow("This table was deleted");
+});
+
+it("keeps a table someone played at, even after they deleted their visit, and restores nothing into a deleted table", () => {
+  const open = {
+    ...common(),
+    type: "open_table",
+    tableId: visit.tableId,
+    playerId: visit.playerId,
+    game: null,
+    venueId: null,
+    highLimit: false,
+  } satisfies RecordingCommand;
+  const sat = {
+    ...common(),
+    type: "join_table",
+    tableId: visit.tableId,
+    visitId: visit.id,
+    playerId: visit.playerId,
+    buyInId: EntryId.make(uuid()),
+    buyIn: MinorUnits.make(10000),
+    startedAt: at(5),
+  } satisfies RecordingCommand;
+  const played = change(
+    applyRecordingCommand(applyRecordingCommand(initial(), open), sat),
+    "delete_visit",
+  );
+  expect(() =>
+    applyRecordingCommand(
+      played,
+      RecordingCommand.make({ ...common(), type: "delete_table", tableId: visit.tableId }),
+    ),
+  ).toThrow("Someone has played at this table");
+  // However it came to be deleted, a deleted table takes no visit back.
+  const gone = {
+    ...played,
+    tables: played.tables.map((table) => ({ ...table, deletedAt: at(40) })),
+  };
+  expect(() => change(gone, "restore_visit")).toThrow("This table was deleted");
 });

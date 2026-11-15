@@ -244,8 +244,11 @@ export const recordingTable = (
   const starter = table.starterPlayerId === state.self.id;
   const here = state.participants.filter((item) => item.tableId === tableId);
   const recorders = state.recorders.filter((item) => item.tableId === tableId);
-  const recording = here.find((item) => recorders.some((r) => r.playerId === item.playerId));
-  const you = starter ? state.self : players.get((recording ?? here[0]!).playerId)!;
+  // A device that records for everyone sees everyone who joined; it is only its own players.
+  const owned = new Set(ownPlayers(state));
+  const mine = here.filter((item) => owned.has(item.playerId));
+  const recording = mine.find((item) => recorders.some((r) => r.playerId === item.playerId));
+  const you = starter ? state.self : players.get((recording ?? mine[0] ?? here[0]!).playerId)!;
   const role = starter ? "starter" : recording ? "recorder" : "participant";
   const visits = state.visits
     .filter((visit) => visit.tableId === tableId && visit.deletedAt === undefined)

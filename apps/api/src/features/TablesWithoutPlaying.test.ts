@@ -1,6 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import { PlayerId } from "@stacks/contracts";
+import { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
 
 import {
   account,
@@ -104,6 +105,27 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without play
         "appoint_recorder",
         "join_table",
         "add",
+      ]);
+    }),
+  );
+
+  it.effect("keeps a table someone played at, even once they deleted their visit", () =>
+    Effect.gen(function* () {
+      const starter = yield* device();
+      const opened = openTable(starter.identity);
+      const sat = sitDown(starter.identity, opened.tableId, starter.identity.playerId);
+      expect(yield* starter.push(opened, sat)).toEqual(["accepted", "accepted"]);
+      const removed = RecordingCommand.make({
+        type: "delete_visit",
+        operationId: RecordingOperationId.make(uuid()),
+        actorId: starter.identity.actorId,
+        preparedAt: sat.preparedAt,
+        visitId: sat.visitId,
+        expectedRevision: 0,
+      });
+      expect(yield* starter.push(removed)).toEqual(["accepted"]);
+      expect(yield* starter.push(deleteTable(starter.identity, opened.tableId))).toEqual([
+        "invalid",
       ]);
     }),
   );

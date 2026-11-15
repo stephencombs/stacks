@@ -340,11 +340,11 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
           message: "Only a player with an account can record for everyone.",
         });
     }
-    // Deleting needs to know whether anyone played here.
+    // Deleting needs to know whether anyone played here, even in a visit deleted since.
     const visits =
       command.type === "delete_table"
         ? yield* sql`
-            select * from personal_visits where table_id = ${table.id} and deleted_at is null
+            select * from personal_visits where table_id = ${table.id}
           `.pipe(Effect.flatMap(Access.decodeRows(PersonalVisitRow)))
         : [];
     return { ...ledger, participants, recorders, tables: [table], visits: visits.map(visitOf) };
@@ -436,7 +436,8 @@ const save = Effect.fn("Recording.save")(function* (
       yield* sql`update tables set trip_id = ${command.tripId} where id = ${command.tableId}`;
     if (command.type === "delete_table")
       yield* sql`
-        update tables set deleted_at = ${date(command.preparedAt)} where id = ${command.tableId}
+        update tables set deleted_at = ${date(command.preparedAt)}, trip_id = null
+        where id = ${command.tableId}
       `;
     yield* sql`
       insert into personal_operations (id, player_id, visit_id, table_id, actor_id, command)

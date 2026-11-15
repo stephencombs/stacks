@@ -150,6 +150,25 @@ const added = (command: RecordingCommand) =>
   command.type === "join_table" ? command.newPlayer?.id : undefined;
 
 /**
+ * The tables someone else started, as they were before `commands`: a deletion among them is
+ * replayed, so the table starts undeleted and the commands before it still apply.
+ */
+export const foreignTables = (
+  tables: ReadonlyArray<Table>,
+  self: PlayerId,
+  commands: ReadonlyArray<RecordingCommand>,
+) => {
+  const deleted = new Set(
+    commands.flatMap((command) => (command.type === "delete_table" ? [command.tableId] : [])),
+  );
+  return tables
+    .filter((table) => table.starterPlayerId !== self)
+    .map(({ deletedAt, ...table }) =>
+      deletedAt !== undefined && !deleted.has(table.id) ? { ...table, deletedAt } : table,
+    );
+};
+
+/**
  * The ledger before any command: the device's own player, who is at which tables, and the tables
  * others started. Commands rebuild everything else, including the players they added.
  */
@@ -162,7 +181,11 @@ export const recordingBase = (state: RecordingState): RecordingState => {
       (player) => player.id === state.self.id || joined.has(player.id) || !created.has(player.id),
     ),
     recorders: [],
-    tables: state.tables.filter((table) => table.starterPlayerId !== state.self.id),
+    tables: foreignTables(
+      state.tables,
+      state.self.id,
+      state.receipts.map((receipt) => receipt.command),
+    ),
     visits: [],
     entries: [],
     receipts: [],
@@ -320,6 +343,7 @@ const validateRecordingState = (state: RecordingState) => {
       );
       if (command.type === "delete_table") {
         deletedTables.set(command.tableId, command.preparedAt);
+        trips.set(command.tableId, null);
         continue;
       }
       if (command.type === "set_table_trip") {
