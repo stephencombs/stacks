@@ -48,6 +48,16 @@ export function PageHeader({
   );
 }
 
+/** A tab's first screen: the selected tab already says where you are, so its heading is unseen. */
+export function TabTitle({ children }: { children: string }) {
+  return (
+    <>
+      <title>{`${children} · Color Up`}</title>
+      <h1 className="sr-only">{children}</h1>
+    </>
+  );
+}
+
 export function Section({
   title,
   action,

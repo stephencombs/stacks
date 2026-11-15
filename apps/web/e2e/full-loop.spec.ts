@@ -53,7 +53,7 @@ test.describe.serial("a group's first night out", () => {
       .getByRole("navigation", { name: "Tabs" })
       .getByRole("link", { name: "Crew" })
       .click();
-    await expect(alex.getByRole("heading", { name: "Your groups" })).toBeVisible();
+    await expect(alex).toHaveTitle("Crew · Color Up");
     await alex.getByRole("button", { name: "New group" }).click();
     await alex.getByLabel("Group name").fill("Vegas crew");
     await expect(alex.getByLabel("Your name in this group")).toHaveValue("Alex");

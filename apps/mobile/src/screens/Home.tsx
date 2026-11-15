@@ -1,5 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
-import { formatDay, formatTime } from "@stacks/client-runtime/format";
+import { formatDay } from "@stacks/client-runtime/format";
 import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
 import {
   RECORDING_CURRENCY,
@@ -13,16 +13,7 @@ import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
-import { Icon } from "../components/ui/Icon";
-import {
-  Badge,
-  EmptyState,
-  List,
-  PageTitle,
-  Row,
-  SectionHeading,
-  Skeleton,
-} from "../components/ui/Surface";
+import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet, StartSheet } from "../features/RecordingForms";
 
@@ -33,7 +24,7 @@ const money = (amount: MinorUnits) => formatMoney(amount, RECORDING_CURRENCY);
 const signed = (amount: MinorUnits) =>
   formatMoney(amount, RECORDING_CURRENCY, { signDisplay: "exceptZero" });
 
-/** Your play: sessions in play, then finished ones and their result. No account needed. */
+/** Your finished sessions and their result; the LiveBar shows what's live. No account needed. */
 export function HomeScreen() {
   const { home, status, error, retryLoad } = useRecordingHome();
   const navigation = useNavigation();
@@ -48,6 +39,7 @@ export function HomeScreen() {
   const playing = (home?.active.length ?? 0) > 0;
   return (
     <PersonalScreen
+      live
       dock={
         <>
           <Button
@@ -69,7 +61,6 @@ export function HomeScreen() {
       }
     >
       <View className="gap-2">
-        <PageTitle>Play</PageTitle>
         <SaveStatus status={status} error={error} onRetry={retryLoad} />
       </View>
       {home === null ? (
@@ -78,16 +69,6 @@ export function HomeScreen() {
         )
       ) : (
         <>
-          {playing ? (
-            <View className="gap-2">
-              <SectionHeading>Playing now</SectionHeading>
-              <List>
-                {home.active.map((item) => (
-                  <ActiveRow key={item.visit.id} item={item} onPress={() => open(item.visit.id)} />
-                ))}
-              </List>
-            </View>
-          ) : null}
           {home.finished.length > 0 ? (
             <>
               <FinishedHero result={home.finishedResult} count={home.finished.length} />
@@ -144,37 +125,6 @@ export function HomeScreen() {
         <PastSessionSheet onClose={() => setSheet(null)} onAdded={opened} />
       ) : null}
     </PersonalScreen>
-  );
-}
-
-function ActiveRow({ item, onPress }: { item: RecordedVisit; onPress: () => void }) {
-  const title = visitTitle(item.table);
-  const started = formatTime(item.visit.startedAt);
-  return (
-    <Row
-      onPress={onPress}
-      accessibilityLabel={`${title}, live.${item.venue ? ` ${item.venue.name}.` : ""} Started ${started}, in ${money(item.totals.buyIn)}, out ${money(item.totals.cashOut)}, result pending`}
-      accessibilityHint="Opens the session"
-    >
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text numberOfLines={1} className="type-heading text-ink">
-          {title}
-        </Text>
-        <Text className="type-footnote text-muted">
-          {item.venue ? `${item.venue.name} · ` : null}Started {started} · In{" "}
-          <Money amount={item.totals.buyIn} currency={RECORDING_CURRENCY} className="text-muted" />{" "}
-          · Out{" "}
-          <Money
-            amount={item.totals.cashOut}
-            currency={RECORDING_CURRENCY}
-            className="text-muted"
-          />{" "}
-          · Result pending
-        </Text>
-      </View>
-      <Badge tone="live">Live</Badge>
-      <Icon name="chevron-right" color="faint" size={16} />
-    </Row>
   );
 }
 

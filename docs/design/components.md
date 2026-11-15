@@ -128,7 +128,7 @@ One page title per page. On web that's `PageHeader`, which also takes the `back`
 Each group of content is a `Section` on web (`title`, plus an `action` or a quiet `aside`) and a `SectionHeading` on mobile (`components/ui/Surface.tsx`). Mobile `SectionHeading` has two variants:
 
 1. **Grouped Card Header (`SectionHeading`)**: Sentence-case `type-section text-muted` label sitting above a `rounded-2xl` `Surface` card (`Standings`, `By game`, `People`).
-2. **Inline-Rule Header (`AccordionSectionHeading`)**: Sentence-case `type-section text-muted` label (with optional count, e.g. `Playing now`, `Finished (16)`) followed by a `flex-1 h-[0.5px] bg-line` horizontal separator rule and optional collapse chevron for collapsible feed sections.
+2. **Inline-Rule Header (`AccordionSectionHeading`)**: Sentence-case `type-section text-muted` label (with optional count, e.g. `Finished (16)`) followed by a `flex-1 h-[0.5px] bg-line` horizontal separator rule and optional collapse chevron for collapsible feed sections.
 
 A section's action is a `ghost` or `sm` button or a `Segmented`. Supporting text on web is `Note`.
 

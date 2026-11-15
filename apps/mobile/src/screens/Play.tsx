@@ -52,6 +52,7 @@ import {
   VenueSheet,
   VoidSheet,
 } from "../features/RecordingForms";
+import { LiveSessionsBar } from "../features/LiveBar";
 import { TableSection } from "../features/SharedTable";
 import { TableTripSheet, TableTripButton } from "../features/TableTrip";
 
@@ -313,6 +314,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       felt={live}
       dock={
         <>
+          <LiveSessionsBar except={visitId} />
           {notice ? (
             <View accessibilityLiveRegion="polite" className="rounded-xl bg-fill px-4 py-2">
               <Text className="text-sm text-ink">{notice}</Text>
