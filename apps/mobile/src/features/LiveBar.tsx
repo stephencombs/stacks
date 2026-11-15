@@ -6,7 +6,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
 import type * as DateTime from "effect/DateTime";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -27,39 +27,48 @@ type Placement = {
 
 /**
  * What you're playing, pinned to the bottom of every screen in Crew that isn't showing it, so a
- * live session never goes missing: your own session first, else your seat at a group's table.
+ * live session never goes missing: each of your own live sessions, else your seat at a group's
+ * table.
  */
 export function LiveBar({ shows, ...placement }: Placement & { shows?: ShowsTable }) {
   const { home } = useRecordingHome();
-  const visit = home?.active[0];
-  return visit ? <YourSession {...placement} /> : <Seat shows={shows} {...placement} />;
+  return home?.active.length ? (
+    <YourSessions {...placement} />
+  ) : (
+    <Seat shows={shows} {...placement} />
+  );
 }
 
-/** Your own live session, for screens that read nothing from an account. */
+/** Your own live sessions, for screens that read nothing from an account. */
 export function PersonalLiveBar(placement: Placement) {
   const { home } = useRecordingHome();
-  const visit = home?.active[0];
+  const live = (home?.active.length ?? 0) > 0;
   const { onHeightChange } = placement;
   useEffect(() => {
-    if (!visit) onHeightChange?.(0);
-  }, [visit, onHeightChange]);
-  return visit ? <YourSession {...placement} /> : null;
+    if (!live) onHeightChange?.(0);
+  }, [live, onHeightChange]);
+  return live ? <YourSessions {...placement} /> : null;
 }
 
-function YourSession(placement: Placement) {
+function YourSessions(placement: Placement) {
   const navigation = useNavigation();
   const { home } = useRecordingHome();
-  const visit = home!.active[0]!;
-  const title = visitTitle(visit.table);
   return (
-    <Bar
-      {...placement}
-      label={`Back to your session, ${title}, since ${formatTime(visit.visit.startedAt)}`}
-      hint="Goes back to your session"
-      title={title}
-      since={visit.visit.startedAt}
-      onPress={() => navigation.navigate("Play", { visitId: visit.visit.id })}
-    />
+    <Bars {...placement}>
+      {home!.active.map((item) => {
+        const title = visitTitle(item.table);
+        return (
+          <Bar
+            key={item.visit.id}
+            label={`Back to your session, ${title}, since ${formatTime(item.visit.startedAt)}`}
+            hint="Goes back to your session"
+            title={title}
+            since={item.visit.startedAt}
+            onPress={() => navigation.navigate("Play", { visitId: item.visit.id })}
+          />
+        );
+      })}
+    </Bars>
   );
 }
 
@@ -77,37 +86,24 @@ function Seat({ shows, ...placement }: Placement & { shows?: ShowsTable | undefi
   }, [visible, onHeightChange]);
   if (!visible) return null;
   return (
-    <Bar
-      {...placement}
-      label={`Back to your table at ${seat.venueName}, since ${formatTime(seat.startedAt)}`}
-      hint="Goes back to your table"
-      title={seat.venueName}
-      since={seat.startedAt}
-      onPress={() => go.session(seat.id)}
-    />
+    <Bars {...placement}>
+      <Bar
+        label={`Back to your table at ${seat.venueName}, since ${formatTime(seat.startedAt)}`}
+        hint="Goes back to your table"
+        title={seat.venueName}
+        since={seat.startedAt}
+        onPress={() => go.session(seat.id)}
+      />
+    </Bars>
   );
 }
 
-function Bar({
-  bottom,
-  onHeightChange,
-  label,
-  hint,
-  title,
-  since,
-  onPress,
-}: Placement & {
-  label: string;
-  hint: string;
-  title: string;
-  since: DateTime.Utc;
-  onPress: () => void;
-}) {
+function Bars({ bottom, onHeightChange, children }: Placement & { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
     <View
       pointerEvents="box-none"
-      className="absolute inset-x-0 px-5"
+      className="absolute inset-x-0 gap-2 px-5"
       onLayout={(event) => onHeightChange?.(event.nativeEvent.layout.height)}
       style={
         bottom === undefined
@@ -115,26 +111,44 @@ function Bar({
           : { bottom: bottom + 8 }
       }
     >
-      <PressableScale
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityHint={hint}
-        onPress={onPress}
-      >
-        <GlassSurface
-          radius={20}
-          interactive
-          className="min-h-13 flex-row items-center gap-3 rounded-2xl px-4 py-3"
-        >
-          <View className="size-2 rounded-full bg-live" />
-          <Text className="type-label text-live">Live</Text>
-          <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
-            {title}
-          </Text>
-          <Text className="font-mono text-xs text-muted">since {formatTime(since)}</Text>
-          <Icon name="chevron-right" color="muted" size={16} />
-        </GlassSurface>
-      </PressableScale>
+      {children}
     </View>
+  );
+}
+
+function Bar({
+  label,
+  hint,
+  title,
+  since,
+  onPress,
+}: {
+  label: string;
+  hint: string;
+  title: string;
+  since: DateTime.Utc;
+  onPress: () => void;
+}) {
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      onPress={onPress}
+    >
+      <GlassSurface
+        radius={20}
+        interactive
+        className="min-h-13 flex-row items-center gap-3 rounded-2xl px-4 py-3"
+      >
+        <View className="size-2 rounded-full bg-live" />
+        <Text className="type-label text-live">Live</Text>
+        <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
+          {title}
+        </Text>
+        <Text className="font-mono text-xs text-muted">since {formatTime(since)}</Text>
+        <Icon name="chevron-right" color="muted" size={16} />
+      </GlassSurface>
+    </PressableScale>
   );
 }

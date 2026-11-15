@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-14
 priority: medium
 tags:
@@ -11,10 +11,13 @@ depends_on:
   - "003"
 parent: "001"
 created_at: 2026-11-14T20:21:35.164878914Z
-updated_at: 2026-11-15T18:08:38.127422807Z
+updated_at: 2026-11-15T19:47:59.092651854Z
+completed_at: 2026-11-15T19:47:59.092651854Z
 transitions:
   - status: in-progress
     at: 2026-11-15T05:52:44.754669990Z
+  - status: complete
+    at: 2026-11-15T19:47:59.092651854Z
 ---
 
 # Delete a session

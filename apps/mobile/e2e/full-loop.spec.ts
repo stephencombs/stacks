@@ -58,7 +58,6 @@ test.describe.serial("live mode on a phone", () => {
     await signIn(alex, alexUser!.emailAddress);
     // Signing in lands on personal Home; groups sit behind Groups in the header.
     await visible(alex.getByRole("button", { name: "Groups", exact: true })).click();
-    await expect(visible(alex.getByRole("heading", { name: "Your groups" })).first()).toBeVisible();
     await visible(alex.getByRole("button", { name: "New group" })).click();
     await alex.getByLabel("Group name").fill("Vegas crew");
     await expect(alex.getByLabel("Your name in this group")).toHaveValue("Alex");

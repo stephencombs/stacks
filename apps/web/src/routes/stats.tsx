@@ -18,7 +18,7 @@ import { Money } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FilterChip } from "~/components/ui/Menu";
-import { Section } from "~/components/ui/Page";
+import { Section, TabTitle } from "~/components/ui/Page";
 import { List, Row, RowButton, RowText, Skeleton, Surface } from "~/components/ui/Surface";
 import { cn } from "~/components/ui/cn";
 import { SaveStatus } from "~/features/Personal";
@@ -54,8 +54,7 @@ function Stats() {
   );
   return (
     <>
-      <title>Stats · Color Up</title>
-      <h1 className="sr-only">Stats</h1>
+      <TabTitle>Stats</TabTitle>
       {status === "load_failed" ? (
         <SaveStatus status={status} error={error} onRetry={retryLoad} />
       ) : null}

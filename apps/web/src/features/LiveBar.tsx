@@ -6,6 +6,7 @@ import { visitTitle } from "@stacks/client-runtime/recordingView";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as DateTime from "effect/DateTime";
 import { ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Tag } from "~/components/ui/Surface";
 import { useAccount } from "~/lib/account";
@@ -13,26 +14,32 @@ import { StacksProvider, useStacks } from "~/lib/stacks";
 import { tabOf } from "./tabs";
 
 /**
- * What you're playing, floating just above the tabs so a live session never goes missing: your own
- * session first, else, on Crew's pages, your seat at a group's table. Your play, stats and map
- * ask nothing of the network, so they show only your own. Hidden on the page that already shows it.
+ * What you're playing, floating just above the tabs so a live session never goes missing: each of
+ * your own live sessions, else, on Crew's pages, your seat at a group's table. Your play, stats and
+ * map ask nothing of the network, so they show only your own. Play shows it inline, in its own
+ * action bar, and a session's page leaves itself out.
  */
 export function LiveBar({ inline = false }: { inline?: boolean }) {
   const { home } = useRecordingHome();
   const { pathname } = useLocation();
   const account = useAccount();
-  const visit = home?.active[0];
-  if (visit) {
-    // Your play lists what's live first, and the session itself is where the bar would take you.
-    if (pathname === "/" || pathname === `/play/${visit.visit.id}`) return null;
+  const live = home?.active ?? [];
+  if (live.length > 0) {
+    if (!inline && pathname === "/") return null;
+    const shown = live.filter((item) => pathname !== `/play/${item.visit.id}`);
+    if (shown.length === 0) return null;
     return (
-      <Bar
-        inline={inline}
-        link={{ to: "/play/$visitId", params: { visitId: visit.visit.id } }}
-        label={`Back to your session, ${visitTitle(visit.table)}`}
-        title={visitTitle(visit.table)}
-        since={visit.visit.startedAt}
-      />
+      <Bars inline={inline}>
+        {shown.map((item) => (
+          <Bar
+            key={item.visit.id}
+            link={{ to: "/play/$visitId", params: { visitId: item.visit.id } }}
+            label={`Back to your session, ${visitTitle(item.table)}`}
+            title={visitTitle(item.table)}
+            since={item.visit.startedAt}
+          />
+        ))}
+      </Bars>
     );
   }
   if (tabOf(pathname) !== "crew" || !account.available || !account.isSignedIn || !account.userId)
@@ -57,29 +64,18 @@ function Seat({ inline, pathname }: { inline: boolean; pathname: string }) {
   )
     return null;
   return (
-    <Bar
-      inline={inline}
-      link={{ to: "/sessions/$sessionId", params: { sessionId: seat.id } }}
-      label={`Back to your table at ${seat.venueName}`}
-      title={seat.venueName}
-      since={seat.startedAt}
-    />
+    <Bars inline={inline}>
+      <Bar
+        link={{ to: "/sessions/$sessionId", params: { sessionId: seat.id } }}
+        label={`Back to your table at ${seat.venueName}`}
+        title={seat.venueName}
+        since={seat.startedAt}
+      />
+    </Bars>
   );
 }
 
-function Bar({
-  inline,
-  link,
-  label,
-  title,
-  since,
-}: {
-  inline: boolean;
-  link: LinkProps;
-  label: string;
-  title: string;
-  since: DateTime.Utc;
-}) {
+function Bars({ inline, children }: { inline: boolean; children: ReactNode }) {
   return (
     <div
       className={
@@ -88,16 +84,34 @@ function Bar({
           : "pointer-events-none fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:bottom-0 lg:pr-10 lg:pb-6 lg:pl-70"
       }
     >
-      <Link
-        {...link}
-        aria-label={label}
-        className="glass pressable pointer-events-auto mx-auto flex min-h-14 w-full max-w-[40rem] items-center gap-3 rounded-xl px-4 py-3"
-      >
-        <Tag tone="live">Live</Tag>
-        <span className="min-w-0 flex-1 truncate font-medium">{title}</span>
-        <span className="text-sm text-muted tabular-nums">since {formatTime(since)}</span>
-        <ChevronRight className="size-4 text-muted" aria-hidden />
-      </Link>
+      <div className={inline ? "flex flex-col gap-2" : "mx-auto flex max-w-[40rem] flex-col gap-2"}>
+        {children}
+      </div>
     </div>
+  );
+}
+
+function Bar({
+  link,
+  label,
+  title,
+  since,
+}: {
+  link: LinkProps;
+  label: string;
+  title: string;
+  since: DateTime.Utc;
+}) {
+  return (
+    <Link
+      {...link}
+      aria-label={label}
+      className="glass pressable pointer-events-auto flex min-h-14 items-center gap-3 rounded-xl px-4 py-3"
+    >
+      <Tag tone="live">Live</Tag>
+      <span className="min-w-0 flex-1 truncate font-medium">{title}</span>
+      <span className="text-sm text-muted tabular-nums">since {formatTime(since)}</span>
+      <ChevronRight className="size-4 text-muted" aria-hidden />
+    </Link>
   );
 }

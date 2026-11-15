@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { formatDay, formatTime } from "@stacks/client-runtime/format";
+import { formatDay } from "@stacks/client-runtime/format";
 import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
 import {
   RECORDING_CURRENCY,
@@ -12,8 +12,9 @@ import { useState } from "react";
 import { Money } from "~/components/Money";
 import { ActionBar } from "~/components/ui/ActionBar";
 import { Button, ButtonLink } from "~/components/ui/Button";
-import { EmptyState, PageHeader, Section } from "~/components/ui/Page";
-import { Glow, List, RowLink, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
+import { EmptyState, Section, TabTitle } from "~/components/ui/Page";
+import { Glow, List, RowLink, RowText, Skeleton, Surface } from "~/components/ui/Surface";
+import { LiveBar } from "~/features/LiveBar";
 import { focusMain, SaveStatus, useDialogFocus } from "~/features/Personal";
 import { PastSessionDialog, StartDialog } from "~/features/RecordingForms";
 
@@ -40,24 +41,16 @@ function Home() {
   const playing = (home?.active.length ?? 0) > 0;
   return (
     <div onClickCapture={focus.capture} className="contents">
-      <PageHeader title="Play">
+      <TabTitle>Play</TabTitle>
+      <div className="flex flex-col gap-3">
         <SaveStatus status={status} error={error} onRetry={retryLoad} />
-      </PageHeader>
+      </div>
       {home === null ? (
         status === "load_failed" ? null : (
           <Skeleton className="h-32 w-full rounded-xl" />
         )
       ) : (
         <>
-          {playing ? (
-            <Section title="Playing now">
-              <List>
-                {home.active.map((item) => (
-                  <ActiveRow key={item.visit.id} item={item} />
-                ))}
-              </List>
-            </Section>
-          ) : null}
           {home.finished.length > 0 ? (
             <>
               <FinishedHero result={home.finishedResult} count={home.finished.length} />
@@ -87,6 +80,7 @@ function Home() {
         All sessions
       </ButtonLink>
       <ActionBar>
+        <LiveBar inline />
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             variant={playing ? "secondary" : "primary"}
@@ -109,24 +103,6 @@ function Home() {
       {dialog === "start" ? <StartDialog onClose={close} onStarted={open} /> : null}
       {dialog === "past" ? <PastSessionDialog onClose={close} onAdded={open} /> : null}
     </div>
-  );
-}
-
-function ActiveRow({ item }: { item: RecordedVisit }) {
-  return (
-    <RowLink to="/play/$visitId" params={{ visitId: item.visit.id }}>
-      <RowText
-        title={visitTitle(item.table)}
-        meta={
-          <>
-            {item.venue ? `${item.venue.name} · ` : null}Started {formatTime(item.visit.startedAt)}{" "}
-            · In <Money amount={item.totals.buyIn} currency={RECORDING_CURRENCY} /> · Out{" "}
-            <Money amount={item.totals.cashOut} currency={RECORDING_CURRENCY} /> · Result pending
-          </>
-        }
-      />
-      <Tag tone="live">Live</Tag>
-    </RowLink>
   );
 }
 
