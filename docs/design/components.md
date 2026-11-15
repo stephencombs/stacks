@@ -187,7 +187,6 @@ A one-tap write's Undo. Solid, not glass, with the float shadow, entering and le
 
 A filter that narrows a page, such as Stats' period, game and casino: a pill naming the current choice that opens the choices. An applied filter fills with `ink` and gains a button that clears it. Web builds it on `Menu`; mobile uses the platform's own menu (`FilterChip.native.tsx`) and a `Sheet` in the web build. A row of chips scrolls sideways and ends with "Reset all" once any is applied.
 
-
 ## CopyButton (web)
 
 Copies a link or code and confirms it. Use it instead of writing to the clipboard from a screen.

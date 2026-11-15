@@ -87,7 +87,7 @@ export function FilterChip<Value extends string>({
         <BaseMenu.Trigger
           aria-label={`${name}: ${label}`}
           className={cn(
-            "inline-flex h-11 items-center gap-2 rounded-full whitespace-nowrap transition-[scale] duration-150 active:scale-[0.97] focus-visible:outline-offset-[-3px]",
+            "pressable inline-flex h-11 items-center gap-2 rounded-full whitespace-nowrap focus-visible:outline-offset-[-3px]",
             applied ? "pr-1 pl-4" : "px-4",
           )}
         >
