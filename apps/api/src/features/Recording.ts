@@ -283,8 +283,11 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
       const recorder = yield* Recorder;
       if (recorder._tag !== "Account")
         return yield* new Rejected({ reason: "forbidden", message: "Sign in to choose a trip." });
-      const [trip] = yield* sql<{ endedAt: Date | null }>`
-        select t.ended_at from trips t join memberships m on m.group_id = t.group_id
+      // Stakes.create and Stakes.reopen take this same trip lock before opening a stake.
+      const [trip] = yield* sql<{ endedAt: Date | null; currency: string }>`
+        select t.ended_at, g.currency from trips t
+        join groups g on g.id = t.group_id
+        join memberships m on m.group_id = t.group_id
         where t.id = ${command.tripId} and m.user_id = ${recorder.user.userId} and m.left_at is null
         for update of t, m
       `;
@@ -292,6 +295,11 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
         return yield* new Rejected({
           reason: "forbidden",
           message: "Choose a trip in a group you belong to.",
+        });
+      if (trip.currency !== "USD")
+        return yield* new Rejected({
+          reason: "invalid",
+          message: "Tables are recorded in USD. Choose a trip in a USD group.",
         });
       if (trip.endedAt !== null)
         return yield* new Rejected({

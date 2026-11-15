@@ -733,14 +733,19 @@ export const sessionEditFields = (visit: RecordingVisitView, canEditTable: boole
 };
 
 export const tableTripOptions = (groups: ReadonlyArray<GroupListItem>, selected: TripId | null) => {
-  const live = groups.flatMap(({ group, trips }) =>
+  const compatible = groups.filter(({ group }) => group.currency === RECORDING_CURRENCY);
+  const mismatched = groups.some(
+    ({ group, trips }) =>
+      group.currency !== RECORDING_CURRENCY && trips.some((trip) => trip.id === selected),
+  );
+  const live = compatible.flatMap(({ group, trips }) =>
     trips
       .filter((trip) => trip.endedAt === null)
       .map((trip) => ({ key: trip.id, label: `${group.name} · ${trip.name}` })),
   );
   return [
     { key: "", label: "Personal · no trip" },
-    ...(selected && !live.some((item) => item.key === selected)
+    ...(selected && !mismatched && !live.some((item) => item.key === selected)
       ? [{ key: selected, label: "Current trip" }]
       : []),
     ...live,

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
-import { VenueId } from "@stacks/contracts";
+import {
+  CurrencyCode,
+  GroupId,
+  MinorUnits,
+  PlayerId,
+  TripId,
+  UserId,
+  VenueId,
+  type GroupListItem,
+} from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
 import { makeRecordingStore, type RecordingInput, type RecordingStore } from "./recording.ts";
@@ -25,6 +34,7 @@ import {
   recordingVisit,
   venueChoices,
   venuePlace,
+  tableTripOptions,
 } from "./recordingView.ts";
 
 const at = (hour: number) =>
@@ -446,4 +456,44 @@ describe("live session readouts", () => {
     expect(buyInTotalPreview(Number.MAX_SAFE_INTEGER, "0.01", "add")).toBeNull();
     expect(buyInTotalPreview(30000, "1.001", "set")).toBeNull();
   });
+});
+
+it("offers only live trips in the recording currency, including when a mismatched trip was selected", () => {
+  const groupId = GroupId.make(crypto.randomUUID());
+  const trip = (name: string, endedAt: DateTime.Utc | null = null) => ({
+    id: TripId.make(crypto.randomUUID()),
+    groupId,
+    name,
+    startedAt: at(9),
+    endedAt,
+    createdBy: UserId.make("owner"),
+    createdAt: at(9),
+  });
+  const live = trip("Vegas");
+  const ended = trip("Reno", at(10));
+  const euro = trip("Paris");
+  const yen = trip("Tokyo");
+  const group = (currency: string, trips: GroupListItem["trips"]): GroupListItem => ({
+    group: { id: groupId, name: "Crew", currency: CurrencyCode.make(currency), createdAt: at(9) },
+    role: "owner",
+    myPlayerId: PlayerId.make(crypto.randomUUID()),
+    myBalance: MinorUnits.make(0),
+    liveSessionCount: 0,
+    currentTripId: null,
+    mySession: null,
+    trips,
+  });
+  const groups = [group("USD", [live, ended]), group("EUR", [euro]), group("JPY", [yen])];
+  const expected = [
+    { key: "", label: "Personal · no trip" },
+    { key: live.id, label: "Crew · Vegas" },
+  ];
+  expect(tableTripOptions(groups, null)).toEqual(expected);
+  expect(tableTripOptions(groups, euro.id)).toEqual(expected);
+  expect(tableTripOptions(groups, yen.id)).toEqual(expected);
+  expect(tableTripOptions(groups, ended.id)).toEqual([
+    expected[0],
+    { key: ended.id, label: "Current trip" },
+    expected[1],
+  ]);
 });

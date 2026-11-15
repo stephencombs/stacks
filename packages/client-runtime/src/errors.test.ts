@@ -29,3 +29,9 @@ it("retries what the network could explain, not what the API refused", () => {
   expect(isRetryable(new Conflict({ reason: "session_closed" }))).toBe(false);
   expect(isRetryable(new Forbidden({ reason: "not_your_entry" }))).toBe(false);
 });
+
+it("explains why a stake cannot open on a trip with tables", () => {
+  expect(describeError(new Conflict({ reason: "trip_has_tables" }))).toBe(
+    "This trip has tables. Detach them before creating or reopening a stake.",
+  );
+});

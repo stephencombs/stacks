@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { ActorId, EntryId, PlayerId, TableId, VisitId } from "@stacks/contracts";
+import { ActorId, CurrencyCode, EntryId, PlayerId, TableId, VisitId } from "@stacks/contracts";
 import {
   RecordingCommand,
   RecordingOperationId,
@@ -142,6 +142,145 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
           })).results[0]!.status,
         ).toBe("accepted");
       }),
+  );
+
+  it.effect("refuses EUR and JPY trips without attaching USD play", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const who = identity();
+      const opened = start(who);
+      yield* alex.recording.push({ payload: { identity: who, commands: [opened] } });
+      for (const currency of ["EUR", "JPY"]) {
+        const groupId = ids.group();
+        yield* alex.groups.create({
+          payload: {
+            id: groupId,
+            name: "Crew",
+            currency: CurrencyCode.make(currency),
+            displayName: "Alex",
+          },
+        });
+        const trip = yield* alex.trips.create({
+          params: { groupId },
+          payload: { id: ids.trip(), name: "Away" },
+        });
+        const response = yield* alex.recording.push({
+          payload: {
+            identity: who,
+            commands: [choose(who, opened.tableId, trip.id)],
+          },
+        });
+        expect(response.results[0]).toMatchObject({
+          status: "rejected",
+          reason: "invalid",
+          message: expect.stringContaining("USD"),
+        });
+      }
+      const history = yield* alex.recording.history();
+      expect(history.tables[0]!.tripId).toBeNull();
+      expect(history.entries).toHaveLength(1);
+    }),
+  );
+
+  it.effect(
+    "refuses creating or reopening stakes while any table belongs to the trip, and allows them after detach",
+    () =>
+      Effect.gen(function* () {
+        const { alex, bea } = yield* users("alex", "bea");
+        const group = yield* groupWith(alex, bea);
+        const request = {
+          id: ids.stake(),
+          lenderId: group.myPlayerId,
+          borrowerId: group.players.find((p) => p.id !== group.myPlayerId)!.id,
+          amount: usd(10000),
+          lenderShare: 50,
+          note: null,
+        };
+        const stake = yield* alex.stakes.create({
+          params: { tripId: group.tripId },
+          payload: request,
+        });
+        yield* alex.stakes.end({ params: { stakeId: stake.id }, payload: {} });
+        const who = identity();
+        const opened = start(who);
+        yield* alex.recording.push({
+          payload: { identity: who, commands: [opened, choose(who, opened.tableId, group.tripId)] },
+        });
+        expect(
+          yield* Effect.flip(
+            alex.stakes.create({
+              params: { tripId: group.tripId },
+              payload: { ...request, id: ids.stake() },
+            }),
+          ),
+        ).toMatchObject({ _tag: "Conflict", reason: "trip_has_tables" });
+        expect(
+          yield* Effect.flip(alex.stakes.reopen({ params: { stakeId: stake.id } })),
+        ).toMatchObject({ _tag: "Conflict", reason: "trip_has_tables" });
+        // Retrying an existing creation does not open the ended stake.
+        expect(
+          (yield* alex.stakes.create({ params: { tripId: group.tripId }, payload: request }))
+            .endedAt,
+        ).not.toBeNull();
+        yield* alex.recording.push({
+          payload: { identity: who, commands: [choose(who, opened.tableId, null)] },
+        });
+        expect((yield* alex.stakes.reopen({ params: { stakeId: stake.id } })).endedAt).toBeNull();
+        yield* alex.stakes.end({ params: { stakeId: stake.id }, payload: {} });
+        expect(
+          (yield* alex.stakes.create({
+            params: { tripId: group.tripId },
+            payload: { ...request, id: ids.stake() },
+          })).endedAt,
+        ).toBeNull();
+      }),
+  );
+
+  it.effect("serializes attaching against both stake creation and reopening", () =>
+    Effect.gen(function* () {
+      const { alex, bea } = yield* users("alex", "bea");
+      for (const operation of ["create", "reopen"] as const) {
+        const group = yield* groupWith(alex, bea);
+        const request = {
+          id: ids.stake(),
+          lenderId: group.myPlayerId,
+          borrowerId: group.players.find((p) => p.id !== group.myPlayerId)!.id,
+          amount: usd(10000),
+          lenderShare: 50,
+          note: null,
+        };
+        if (operation === "reopen") {
+          yield* alex.stakes.create({ params: { tripId: group.tripId }, payload: request });
+          yield* alex.stakes.end({ params: { stakeId: request.id }, payload: {} });
+        }
+        const who = identity();
+        const opened = start(who);
+        yield* alex.recording.push({ payload: { identity: who, commands: [opened] } });
+        const [attached, staked] = yield* Effect.all(
+          [
+            alex.recording
+              .push({
+                payload: { identity: who, commands: [choose(who, opened.tableId, group.tripId)] },
+              })
+              .pipe(Effect.map((r) => r.results[0]!.status === "accepted")),
+            (operation === "create"
+              ? alex.stakes.create({ params: { tripId: group.tripId }, payload: request })
+              : alex.stakes.reopen({ params: { stakeId: request.id } })
+            ).pipe(
+              Effect.match({
+                onSuccess: () => true,
+                onFailure: (error) => {
+                  expect(error).toMatchObject({ _tag: "Conflict", reason: "trip_has_tables" });
+                  return false;
+                },
+              }),
+            ),
+          ],
+          { concurrency: "unbounded" },
+        );
+        expect(Number(attached) + Number(staked)).toBe(1);
+      }
+    }),
   );
 
   it.effect("does not let a participant or recorder set the trip", () =>
