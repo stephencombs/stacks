@@ -122,4 +122,5 @@ window.fetch = async (input, init) => {
     headers: { "content-type": "application/json" },
   });
 };
+if (params.get("sessions") === "sample") await (await import("./sessions")).seedSessions();
 await import("~/main");
