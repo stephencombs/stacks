@@ -95,7 +95,7 @@ export function FilterChip<Value extends string>({
           {applied ? null : <ChevronDown className="size-3.5 text-muted" aria-hidden />}
         </BaseMenu.Trigger>
         <Popup align="start">
-          <MenuChoice options={options} value={value} onChange={onChange} />
+          <MenuChoice options={options} value={value} onChange={onChange} closeOnClick />
         </Popup>
       </BaseMenu.Root>
       {applied ? (
@@ -141,10 +141,12 @@ export function MenuChoice<Value extends string>({
   options,
   value,
   onChange,
+  closeOnClick = false,
 }: {
   options: ReadonlyArray<{ value: Value; label: string }>;
   value: Value;
   onChange: (value: Value) => void;
+  closeOnClick?: boolean;
 }) {
   return (
     <BaseMenu.RadioGroup value={value} onValueChange={(next: Value) => onChange(next)}>
@@ -152,6 +154,7 @@ export function MenuChoice<Value extends string>({
         <BaseMenu.RadioItem
           key={option.value}
           value={option.value}
+          closeOnClick={closeOnClick}
           className="flex h-9 cursor-default pointer-coarse:h-11 items-center gap-2 rounded-lg px-3 text-sm text-ink outline-none select-none data-[highlighted]:bg-fill"
         >
           <span className="flex size-4 items-center justify-center">

@@ -44,12 +44,14 @@ export const formatHours = (hours: number) => {
 const played = (sessions: number, hours: number) =>
   `${sessions} ${sessions === 1 ? "session" : "sessions"} · ${formatHours(hours)}`;
 
-const fullDay = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-const shortDay = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const hoursOf = (visits: ReadonlyArray<RecordedVisit>) =>
+  visits.reduce(
+    (milliseconds, { visit }) =>
+      milliseconds +
+      DateTime.toEpochMillis(visit.finishedAt!) -
+      DateTime.toEpochMillis(visit.startedAt),
+    0,
+  ) / 3_600_000;
 
 type Choice = {
   readonly value: string;
@@ -85,6 +87,11 @@ const chip = <K extends StatsChip["key"], V>(
     ...values.map((value) => ({ ...describe(value), filters: { ...filters, [key]: value } })),
   ];
   const current = filters[key];
+  if (current !== undefined) {
+    const selected = describe(current as V);
+    if (!options.some((option) => option.value === selected.value))
+      options.push({ ...selected, filters });
+  }
   const picked =
     current === undefined
       ? options[0]!
@@ -160,13 +167,24 @@ export const personalStatsView = (
     };
 
   const period = filters.year === undefined ? "all time" : String(filters.year);
-  const day = filters.year === undefined ? fullDay : shortDay;
+  const fullDay = (at: DateTime.DateTime) =>
+    DateTime.format(DateTime.setZone(at, timeZone), {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  const day =
+    filters.year === undefined
+      ? fullDay
+      : (at: DateTime.DateTime) =>
+          DateTime.format(DateTime.setZone(at, timeZone), { month: "short", day: "numeric" });
   const running = stats.runningResult.map((point) => ({
     ...point,
     at: DateTime.toEpochMillis(point.finishedAt),
-    day: fullDay.format(DateTime.toDateUtc(point.finishedAt)),
+    day: fullDay(point.finishedAt),
   }));
   const visit = new Map(visits.map((item) => [item.visit.id, item]));
+  const matching = running.map((point) => visit.get(point.sessionId)!);
   const biggest = Math.max(...stats.byGame.map((row) => Math.abs(row.result)));
 
   return {
@@ -175,7 +193,7 @@ export const personalStatsView = (
     title: `Result · ${period}`,
     result: summary.result,
     sessions: summary.sessions,
-    hours: formatHours(summary.hours),
+    hours: formatHours(hoursOf(matching)),
     hourlyResult: summary.hourlyResult,
     winRate: `${Math.round((summary.winRate.wins * 100) / summary.winRate.sessions)}%`,
     winRateLine: `${summary.winRate.wins} of ${summary.winRate.sessions}`,
@@ -184,8 +202,8 @@ export const personalStatsView = (
         ? null
         : {
             points: running,
-            from: day.format(DateTime.toDateUtc(running[0]!.finishedAt)),
-            to: day.format(DateTime.toDateUtc(running.at(-1)!.finishedAt)),
+            from: day(running[0]!.finishedAt),
+            to: day(running.at(-1)!.finishedAt),
           },
     list:
       summary.sessions > FEW
@@ -211,7 +229,10 @@ export const personalStatsView = (
         : stats.byGame.map((row) => ({
             key: row.game ?? "none",
             label: gameName(row.game),
-            meta: played(row.sessions, row.hours),
+            meta: played(
+              row.sessions,
+              hoursOf(matching.filter((item) => item.table.game === row.game)),
+            ),
             chip: gameChip(row.game),
             result: row.result,
             share: biggest === 0 ? 0 : Math.abs(row.result) / biggest,
@@ -225,7 +246,10 @@ export const personalStatsView = (
             .map((row) => ({
               key: row.venueId ?? "none",
               label: venueName(row.venueId),
-              meta: played(row.sessions, row.hours),
+              meta: played(
+                row.sessions,
+                hoursOf(matching.filter((item) => item.table.venueId === row.venueId)),
+              ),
               result: row.result,
               filters: { ...filters, venueId: row.venueId },
             })),

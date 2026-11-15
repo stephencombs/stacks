@@ -78,6 +78,52 @@ describe("formatHours", () => {
 });
 
 describe("personalStatsView", () => {
+  it("keeps selected filters visible after their last matching session disappears", async () => {
+    const visits = await played(week);
+    const filters = { year: 2025, game: "craps" as const, venueId: null };
+    const updated = visits.filter((item) => item.table.game !== "craps");
+    const stats = view(updated, filters);
+    const selected = stats.chips.find((chip) => chip.key === "game")!;
+    expect(selected.label).toBe("Craps");
+    expect(selected.value).toBe("craps");
+    expect(selected.options.find((option) => option.value === "craps")?.filters).toEqual(filters);
+    const empty = view([], filters);
+    expect(empty.chips.map((chip) => chip.label)).toEqual(["2025", "Craps", "No casino set"]);
+  });
+
+  it("formats session dates in the same timezone as the period filter", async () => {
+    const visits = await played([{ day: "2025-12-31", hours: 5, buyIn: 10000, cashOut: 12000 }]);
+    const stats = view(visits, { year: 2025 });
+    if (stats.kind !== "stats") throw new Error(stats.kind);
+    expect(stats.list![0]!.meta).toContain("Dec 31, 2025");
+    const chart = view(
+      await played(
+        [28, 29, 30, 31].map((day) => ({
+          day: `2025-12-${day}`,
+          hours: 5,
+          buyIn: 10000,
+          cashOut: 12000,
+        })),
+      ),
+    );
+    if (chart.kind !== "stats") throw new Error(chart.kind);
+    expect(chart.chart!.points.at(-1)!.day).toBe("Dec 31, 2025");
+    expect(chart.chart!.from).toBe("Dec 28, 2025");
+    expect(chart.chart!.to).toBe("Dec 31, 2025");
+  });
+
+  it("uses unrounded elapsed time for duration labels", async () => {
+    const visits = await played([
+      { day: "2026-01-01", hours: 29 / 3600, buyIn: 10000, cashOut: 12000 },
+    ]);
+    const stats = view(visits);
+    if (stats.kind !== "stats") throw new Error(stats.kind);
+    expect(stats.hours).toBe("0m");
+    expect(stats.list![0]!.meta).toMatch(/ · 0m$/);
+    expect(stats.byGame![0]!.meta).toBe("1 session · 0m");
+    expect(stats.byCasino![0]!.meta).toBe("1 session · 0m");
+  });
+
   it("uses offline casino names in filters, breakdowns and no-match text", async () => {
     const visits = (await played(week)).map((item) => ({
       ...item,
