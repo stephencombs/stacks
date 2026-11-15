@@ -21,7 +21,6 @@ import { formatMoney } from "@stacks/shared/money";
 import { tableSizes } from "@stacks/shared/seats";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   PixelRatio,
@@ -33,6 +32,7 @@ import {
 
 import { Button } from "../components/ui/Button";
 import { Choice, FormError } from "../components/ui/Field";
+import { isReducedMotion } from "../components/ui/motion";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row } from "../components/ui/Surface";
 import { useAction, useStacks } from "../lib/stacks";
@@ -400,11 +400,6 @@ function TableScene({
 
   useEffect(() => {
     if (width === 0) return;
-    let reduced = false;
-    void AccessibilityInfo.isReduceMotionEnabled().then((r) => (reduced = r));
-    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (r) => {
-      reduced = r;
-    });
     const now = (): Camera => {
       const m = camera.move;
       const t = m.ms === 0 ? 1 : Math.min(1, (Date.now() - m.start) / m.ms);
@@ -494,12 +489,11 @@ function TableScene({
       },
       wait,
       paused: () => latest().paused,
-      reduced: () => reduced,
+      reduced: isReducedMotion,
     };
     director.current = makeDirector(art, currency, stage, latest().shown);
     void director.current.update(latest().view);
     return () => {
-      subscription.remove();
       director.current?.stop();
       director.current = null;
     };

@@ -8,8 +8,7 @@ type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const base =
-  "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap select-none " +
-  "transition-[background-color,color,scale,box-shadow] duration-150 active:scale-[0.96] disabled:pointer-events-none " +
+  "pressable relative inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap select-none disabled:pointer-events-none " +
   // A pending button keeps its look, so a save in flight doesn't read as one that's unavailable.
   "disabled:not-aria-busy:bg-fill disabled:not-aria-busy:text-muted disabled:not-aria-busy:shadow-none";
 

@@ -11,7 +11,8 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { duration } from "@stacks/client-runtime/motion";
+import { useRef, useState } from "react";
 
 import { BalanceLabel, Money } from "~/components/Money";
 import { CopyButton } from "~/components/CopyButton";
@@ -124,6 +125,14 @@ export function Gallery() {
             </div>
           ))}
         </Surface>
+      </Section>
+
+      <Section title="Glass">
+        <Glass onOpenSheet={() => setDialog(true)} />
+      </Section>
+
+      <Section title="Motion">
+        <Motion />
       </Section>
 
       <Section title="Buttons">
@@ -307,5 +316,136 @@ export function Gallery() {
         </div>
       </Dialog>
     </div>
+  );
+}
+
+/** Glass over something busy, so the blur shows: a floating bar, a menu and a sheet's top edge. */
+function Glass({ onOpenSheet }: { onOpenSheet: () => void }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="relative isolate h-72 overflow-hidden rounded-xl bg-felt">
+        <div aria-hidden className="absolute inset-0 flex flex-col justify-center gap-3 px-6">
+          {["bg-chip-red", "bg-chip-blue", "bg-chip-orange", "bg-chip-purple"].map((chip, i) => (
+            <div
+              key={chip}
+              className={cn("h-6 rounded-full", chip)}
+              style={{ width: `${90 - i * 15}%` }}
+            />
+          ))}
+        </div>
+        <div className="glass absolute top-4 left-4 flex min-h-14 items-center gap-3 rounded-full px-5">
+          <Tag tone="live">Live</Tag>
+          <span className="font-medium">Floating bar</span>
+        </div>
+        <div className="absolute top-4 right-4">
+          <Menu label="Glass menu">
+            <MenuItem onClick={() => undefined}>Edit session</MenuItem>
+            <MenuItem tone="danger" onClick={() => undefined}>
+              Delete session
+            </MenuItem>
+          </Menu>
+        </div>
+        <div className="glass-sheet absolute inset-x-0 bottom-0 flex h-24 flex-col items-center gap-3 rounded-t-[2rem] px-5 pt-2">
+          <span aria-hidden className="h-1.5 w-9 rounded-full bg-fill-strong" />
+          <span className="font-semibold">A sheet: edge to edge, rounded on top</span>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={onOpenSheet}>Open sheet</Button>
+      </div>
+      <Note>
+        Glass for what floats: the tab bar, LiveBar, top controls, menus, sheets and the keypad.
+        Bottom actions and toasts stay solid. With reduced transparency, glass is a plain card.
+      </Note>
+    </div>
+  );
+}
+
+const motions = [
+  {
+    name: "Menu",
+    tokens: `${duration.menuIn}ms in · ${duration.menuOut}ms out`,
+    hidden: "data-[hidden]:scale-95 data-[hidden]:opacity-0",
+    timing: "duration-(--duration-menu-in) data-[hidden]:duration-(--duration-menu-out)",
+  },
+  {
+    name: "Sheet",
+    tokens: `${duration.sheetIn}ms in · ${duration.sheetOut}ms out`,
+    hidden: "data-[hidden]:translate-y-full",
+    timing: "duration-(--duration-sheet-in) data-[hidden]:duration-(--duration-sheet-out)",
+  },
+  {
+    name: "Toast",
+    tokens: `${duration.toastIn}ms in · ${duration.toastOut}ms out`,
+    hidden: "data-[hidden]:translate-y-2 data-[hidden]:opacity-0",
+    timing: "duration-(--duration-toast-in) data-[hidden]:duration-(--duration-toast-out)",
+  },
+];
+
+/** Each named timing, played out and back in on Replay. Reduced motion makes every one a cut. */
+function Motion() {
+  const [hidden, setHidden] = useState(false);
+  const [amount, setAmount] = useState(300);
+  const back = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const replay = () => {
+    clearTimeout(back.current);
+    setHidden(true);
+    setAmount((value) => value + 100);
+    back.current = setTimeout(() => setHidden(false), duration.sheetOut + 200);
+  };
+  return (
+    <Surface className="flex flex-col gap-4 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm text-muted">
+          Enter on ease-enter, leave on ease-exit, faster. Transform and opacity only.
+        </span>
+        <Button variant="primary" size="sm" onClick={replay}>
+          Replay
+        </Button>
+      </div>
+      {motions.map((motion) => (
+        <div key={motion.name} className="flex items-center gap-4">
+          <div className="relative h-14 flex-1 overflow-hidden rounded-lg bg-fill">
+            <div
+              data-hidden={hidden || undefined}
+              className={cn(
+                "absolute inset-x-3 top-2 bottom-2 origin-top-right rounded-md bg-surface shadow-(--elevation-card) transition-[translate,scale,opacity] ease-enter data-[hidden]:ease-exit",
+                motion.hidden,
+                motion.timing,
+              )}
+            />
+          </div>
+          <span className="w-44 text-sm">
+            <span className="font-medium">{motion.name}</span>
+            <span className="block text-muted">{motion.tokens}</span>
+          </span>
+        </div>
+      ))}
+      <div className="flex items-center gap-4">
+        <div className="flex h-14 flex-1 items-center overflow-hidden rounded-lg bg-fill px-3">
+          <span
+            key={amount}
+            className="text-2xl font-bold tabular-nums transition-[translate,opacity] duration-(--duration-roll) ease-enter starting:translate-y-[30%] starting:opacity-0"
+          >
+            ${amount}
+          </span>
+        </div>
+        <span className="w-44 text-sm">
+          <span className="font-medium">Number roll</span>
+          <span className="block text-muted">{duration.roll}ms</span>
+        </span>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex h-14 flex-1 items-center rounded-lg bg-fill px-3">
+          <Button size="sm">Hold me</Button>
+        </div>
+        <span className="w-44 text-sm">
+          <span className="font-medium">Press</span>
+          <span className="block text-muted">
+            0.96, {duration.pressDown}ms down · {duration.pressUp}ms up
+          </span>
+        </span>
+      </div>
+    </Surface>
   );
 }

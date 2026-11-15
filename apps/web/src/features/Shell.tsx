@@ -76,7 +76,7 @@ export function AppShell({
       </div>
       <nav
         aria-label="Tabs"
-        className="fixed inset-x-0 bottom-0 z-20 flex bg-surface pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] shadow-[0_-1px_0_var(--color-line)] lg:hidden"
+        className="glass fixed inset-x-0 bottom-0 z-20 flex pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] lg:hidden"
       >
         <Tabs current={current} layout="bar" />
       </nav>
@@ -131,7 +131,7 @@ export function You({ layout }: { layout: "bar" | "side" }) {
           aria-label="You"
           aria-haspopup="dialog"
           onClick={() => setOpen(true)}
-          className="-mr-1.5 inline-grid size-11 shrink-0 place-items-center rounded-full transition-[scale] duration-150 active:scale-[0.96]"
+          className="pressable -mr-1.5 inline-grid size-11 shrink-0 place-items-center rounded-full"
         >
           {signedIn ? <SignedInAvatar /> : <Avatar />}
         </button>
@@ -141,7 +141,7 @@ export function You({ layout }: { layout: "bar" | "side" }) {
           aria-label="You"
           aria-haspopup="dialog"
           onClick={() => setOpen(true)}
-          className="flex h-12 shrink-0 items-center gap-3 rounded-lg px-2 text-left text-sm transition-[background-color,scale] duration-150 hover:bg-fill active:scale-[0.96]"
+          className="pressable flex h-12 shrink-0 items-center gap-3 rounded-lg px-2 text-left text-sm hover:bg-fill"
         >
           {signedIn ? <SignedInAvatar /> : <Avatar />}
           <span className="flex min-w-0 flex-col">

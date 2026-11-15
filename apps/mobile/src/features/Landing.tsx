@@ -5,7 +5,6 @@ import {
   AccessibilityInfo,
   Animated,
   BackHandler,
-  Easing,
   Platform,
   Pressable,
   ScrollView,
@@ -21,10 +20,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/ui/Button";
 import { cn } from "../components/ui/cn";
+import { animate, ease, useReducedMotion } from "../components/ui/motion";
 import { SignInButton } from "./SignInButton";
 import { TripHero } from "./TripHero";
 
-const SNAP = Easing.bezier(0.32, 0.72, 0, 1);
 const SHIFT_MS = 250;
 /** Phone-width column. Wider windows center it; the frame itself never grows into a page. */
 const FRAME = 440;
@@ -125,24 +124,11 @@ export function Landing({
   const accountRef = useRef(invited);
   const [index, setIndex] = useState(0);
   const [account, setAccount] = useState(invited);
-  const [reduceMotion, setReduceMotion] = useState(false);
+  const reduceMotion = useReducedMotion();
   const [bodyHeight, setBodyHeight] = useState(0);
   const [pageHeight, setPageHeight] = useState(0);
   const compact = bodyHeight > 0 && bodyHeight < 520;
   const last = index === steps.length - 1;
-
-  useEffect(() => {
-    let live = true;
-    const apply = (enabled: boolean) => {
-      if (live) setReduceMotion(enabled);
-    };
-    void AccessibilityInfo.isReduceMotionEnabled().then(apply);
-    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", apply);
-    return () => {
-      live = false;
-      subscription.remove();
-    };
-  }, []);
 
   useEffect(() => {
     translateX.stopAnimation();
@@ -154,19 +140,8 @@ export function Landing({
     pager.current?.scrollTo({ x: indexRef.current * frame, animated: false });
   }, [frame, pageHeight]);
 
-  const shift = (to: number) => {
-    translateX.stopAnimation();
-    if (reduceMotion) {
-      translateX.setValue(to);
-      return;
-    }
-    Animated.timing(translateX, {
-      toValue: to,
-      duration: SHIFT_MS,
-      easing: SNAP,
-      useNativeDriver: true,
-    }).start();
-  };
+  const shift = (to: number) =>
+    animate(translateX, { toValue: to, duration: SHIFT_MS, easing: ease.enter });
 
   const closeAccount = () => {
     if (!accountRef.current) return;

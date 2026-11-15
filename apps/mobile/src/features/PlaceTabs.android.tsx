@@ -4,6 +4,7 @@ import {
 } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon, type IconName } from "../components/ui/Icon";
 
 export const createPlaceTabs = createBottomTabNavigator;
@@ -18,7 +19,9 @@ export const placeTabsConfig = {
       borderTopWidth: 0,
       borderRadius: 32,
       elevation: 0,
+      backgroundColor: "transparent",
     },
+    tabBarBackground: () => <GlassSurface className="flex-1 rounded-[32px]" />,
   },
 };
 

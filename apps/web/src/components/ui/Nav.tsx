@@ -32,7 +32,7 @@ export function TabLink({
     <Link
       aria-current={current ? "page" : undefined}
       className={cn(
-        "transition-[color,background-color,box-shadow,scale] duration-150 active:scale-[0.96] focus-visible:outline-offset-[-2px]",
+        "pressable focus-visible:outline-offset-[-2px]",
         layout === "bar"
           ? "flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium"
           : "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium pointer-coarse:h-11",

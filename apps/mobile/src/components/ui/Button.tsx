@@ -1,8 +1,10 @@
 import * as Haptics from "expo-haptics";
 import type { ReactNode } from "react";
-import { ActivityIndicator, Platform, Pressable, Text } from "react-native";
+import { ActivityIndicator, Platform, Text } from "react-native";
 
 import { cn } from "./cn";
+import { GlassSurface } from "./GlassSurface";
+import { PressableScale } from "./PressableScale";
 
 type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg" | "xl";
@@ -69,7 +71,7 @@ export function Button({
 }) {
   const inactive = disabled || pending;
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: inactive, busy: pending }}
@@ -80,7 +82,7 @@ export function Button({
         onPress();
       }}
       className={cn(
-        "flex-row items-center justify-center gap-2 active:scale-[0.97]",
+        "flex-row items-center justify-center gap-2",
         surfaces[variant],
         sizes[size],
         disabled && !pending && (variant === "ghost" ? "bg-transparent" : "bg-fill"),
@@ -98,7 +100,7 @@ export function Button({
       >
         {label}
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -120,7 +122,7 @@ export function IconButton({
   className?: string;
 }) {
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
@@ -132,13 +134,15 @@ export function IconButton({
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
-      className={cn(
-        "size-11 items-center justify-center rounded-full border border-line bg-surface active:scale-[0.95] active:bg-fill",
-        disabled && "opacity-50",
-        className,
-      )}
+      className={cn("size-11", disabled && "opacity-50", className)}
     >
-      {icon}
-    </Pressable>
+      <GlassSurface
+        radius={22}
+        interactive
+        className="size-11 items-center justify-center rounded-full"
+      >
+        {icon}
+      </GlassSurface>
+    </PressableScale>
   );
 }
