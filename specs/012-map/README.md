@@ -23,7 +23,7 @@ The Map tab shows where you've played: venues as pins colored by result, a venue
 
 - **Pins:** each venue you've played, colored by your result there (win, loss, even). Tapping a pin opens the venue: name, place, session count, hours, result, then its sessions newest first, linking to each.
 - **A day as a path:** a day chip in the top row (for example "Saturday") draws that day's venues numbered in the order you played, with a summary card: venues, time span, result.
-- **A trip as a path:** added by spec 015. Until then, days only.
+- **A trip as a path:** a trip chip draws the trip's venues in the order played, reading the trip from each table (`Table.tripId`, spec 013).
 - Mobile uses `expo-maps` (already used by `apps/mobile/src/features/TripRoute.tsx`). Web shows the same data as a venue list; no web map yet.
 - Pins and paths are pure functions in `packages/shared`, from visits with a venue and its cached coordinates.
 - Sessions without a venue, or a venue without coordinates, are counted in a "no location" line rather than dropped.
@@ -31,7 +31,7 @@ The Map tab shows where you've played: venues as pins colored by result, a venue
 
 ## Plan
 
-- [ ] Shared pins and day paths, with tests
+- [ ] Shared pins, day paths and trip paths, with tests
 - [ ] Map tab on mobile with `expo-maps`
 - [ ] Venue list on web
 
