@@ -57,6 +57,7 @@ export type RecordingHome = {
   readonly active: ReadonlyArray<RecordedVisit>;
   /** Finished visits, most recently finished first. */
   readonly finished: ReadonlyArray<RecordedVisit>;
+  readonly deleted: ReadonlyArray<RecordedVisit>;
   /** The sum of finished visits' final results; live play never counts. */
   readonly finishedResult: MinorUnits;
 };
@@ -115,15 +116,47 @@ export const recordingHome = (state: RecordingState): RecordingHome => {
     return { ...visitSummary(visit, state.entries), table, venue: venueOf(state, table) };
   });
   const active = visits
-    .filter((item) => item.finalResult === null)
+    .filter((item) => item.visit.deletedAt === undefined && item.finalResult === null)
     .toSorted((a, b) => ms(b.visit.startedAt) - ms(a.visit.startedAt));
   const finished = visits
-    .filter((item) => item.finalResult !== null)
+    .filter((item) => item.visit.deletedAt === undefined && item.finalResult !== null)
     .toSorted((a, b) => ms(b.visit.finishedAt!) - ms(a.visit.finishedAt!));
   let total = 0n;
   for (const item of finished) total += BigInt(item.finalResult!);
   // MinorUnits refuses an unsafe integer, so an overflowing total fails loudly.
-  return { active, finished, finishedResult: MinorUnits.make(Number(total)) };
+  return {
+    active,
+    finished,
+    deleted: visits.filter((item) => item.visit.deletedAt !== undefined),
+    finishedResult: MinorUnits.make(Number(total)),
+  };
+};
+
+/** Own sessions by local start month, with deleted visits after that month's visible play. */
+export const recordingMonths = (home: RecordingHome) => {
+  const groups = new Map<string, RecordedVisit[]>();
+  for (const item of [...home.active, ...home.finished, ...home.deleted]) {
+    const key = localDateText(DateTime.toDateUtc(item.visit.startedAt)).slice(0, 7);
+    const group = groups.get(key) ?? [];
+    group.push(item);
+    groups.set(key, group);
+  }
+  return [...groups]
+    .toSorted(([a], [b]) => b.localeCompare(a))
+    .map(([month, items]) => {
+      const visible = items.filter((item) => item.visit.deletedAt === undefined);
+      const result = visible.reduce((sum, item) => sum + BigInt(item.finalResult ?? 0), 0n);
+      return {
+        month,
+        result: MinorUnits.make(Number(result)),
+        count: visible.length,
+        visits: items.toSorted(
+          (a, b) =>
+            Number(a.visit.deletedAt !== undefined) - Number(b.visit.deletedAt !== undefined) ||
+            ms(b.visit.startedAt) - ms(a.visit.startedAt),
+        ),
+      };
+    });
 };
 
 export type RecordingTableView = {
@@ -154,7 +187,12 @@ export const recordingTable = (
   tableId: Table["id"],
 ): RecordingTableView | null => {
   const table = state.tables.find((item) => item.id === tableId);
-  if (!table) return null;
+  if (
+    !table ||
+    (state.visits.some((visit) => visit.tableId === tableId) &&
+      !state.visits.some((visit) => visit.tableId === tableId && visit.deletedAt === undefined))
+  )
+    return null;
   const players = new Map(state.players.map((player) => [player.id, player]));
   const starter = table.starterPlayerId === state.self.id;
   const here = state.participants.filter((item) => item.tableId === tableId);
@@ -163,7 +201,7 @@ export const recordingTable = (
   const you = starter ? state.self : players.get((recording ?? here[0]!).playerId)!;
   const role = starter ? "starter" : recording ? "recorder" : "participant";
   const visits = state.visits
-    .filter((visit) => visit.tableId === tableId)
+    .filter((visit) => visit.tableId === tableId && visit.deletedAt === undefined)
     .map((visit) => ({
       ...visitSummary(visit, state.entries),
       player: players.get(visit.playerId)!,
@@ -489,13 +527,17 @@ export const describeRecordingRejection = ({ command, reason }: RecordingRejecti
               ? `Finishing with ${money(command.amount)}`
               : command.type === "correct"
                 ? "A correction"
-                : command.type === "reopen"
-                  ? "Reopening a session"
-                  : command.type === "edit_visit"
-                    ? "Changing a session's details"
-                    : command.type === "appoint_recorder"
-                      ? "Letting a player record for everyone"
-                      : "Stopping a recorder";
+                : command.type === "delete_visit"
+                  ? "Deleting a session"
+                  : command.type === "restore_visit"
+                    ? "Restoring a session"
+                    : command.type === "reopen"
+                      ? "Reopening a session"
+                      : command.type === "edit_visit"
+                        ? "Changing a session's details"
+                        : command.type === "appoint_recorder"
+                          ? "Letting a player record for everyone"
+                          : "Stopping a recorder";
   const why =
     reason === "conflict"
       ? "The session changed on another device."

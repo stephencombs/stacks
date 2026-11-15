@@ -15,6 +15,7 @@ import {
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
 import { MinorUnits, VisitId, type EntryId, type PlayEntry } from "@stacks/contracts";
+import { ownPlayers } from "@stacks/shared/recording";
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -22,6 +23,8 @@ import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } fro
 import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
+import { confirmAction } from "../components/ui/confirmAction";
+import { useToast } from "../components/ui/Toast";
 import { ActionMenu } from "../components/ui/ActionMenu";
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
@@ -138,6 +141,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const { visit, status, error, retryLoad } = useRecordingVisit(visitId);
   const navigation = useNavigation();
   const [open, setOpen] = useState<Open | null>(null);
+  const toast = useToast();
+  const state = useRecordingState();
   const [saved, setSaved] = useState<{
     entryId: EntryId;
     text: string;
@@ -215,6 +220,52 @@ function Visit({ visitId }: { visitId: VisitId }) {
     setSaved(null);
     setNotice(text);
   };
+  const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
+  const restore = async () => {
+    await quick.submit({ type: "restore_visit", visitId });
+  };
+  const deleteVisit = () =>
+    confirmAction(
+      "Delete this session?",
+      `${visitTitle(visit.table)} · ${visit.venue?.name ?? "No casino set"}\n${formatDay(start)}, ${formatTime(start)} · Buy-in ${money(visit.totals.buyIn)}\n\nYour entries will be voided and this session will stop counting. Other players keep their sessions. You can restore yours later.`,
+      "Delete session",
+      () => {
+        void (async () => {
+          if (await quick.submit({ type: "delete_visit", visitId })) {
+            setSaved(null);
+            toast({
+              message: "Session deleted",
+              action: {
+                label: "Undo",
+                onPress: () => {
+                  void restore();
+                },
+              },
+            });
+          }
+        })();
+      },
+    );
+  if (visit.visit.deletedAt !== undefined)
+    return (
+      <PersonalScreen>
+        <Title>Session deleted</Title>
+        <Text className="text-muted">
+          This session no longer counts. You can restore it from All sessions.
+        </Text>
+        <Button label="All sessions" onPress={() => navigation.navigate("History")} />
+        {canDelete ? (
+          <Button
+            label="Restore"
+            variant="secondary"
+            pending={quick.pending}
+            onPress={() => void restore()}
+          />
+        ) : null}
+        {quick.error ? <FormError>{quick.error}</FormError> : null}
+        <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
+      </PersonalScreen>
+    );
   return (
     <PersonalScreen
       dock={
@@ -267,6 +318,15 @@ function Visit({ visitId }: { visitId: VisitId }) {
       }
     >
       <View className="gap-2">
+        {canDelete && !live ? (
+          <View className="self-end">
+            <ActionMenu
+              label="Session options"
+              disabled={quick.pending}
+              actions={[{ label: "Delete session", destructive: true, onPress: deleteVisit }]}
+            />
+          </View>
+        ) : null}
         <Title
           tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Finished"}</Tag>}
           context={[
@@ -285,7 +345,12 @@ function Visit({ visitId }: { visitId: VisitId }) {
         <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
       </View>
       {live ? (
-        <LiveHero visit={visit} canEditTable={canEditTable} onEdit={(type) => setOpen({ type })} />
+        <LiveHero
+          visit={visit}
+          canEditTable={canEditTable}
+          onEdit={(type) => setOpen({ type })}
+          onDelete={canDelete ? deleteVisit : undefined}
+        />
       ) : (
         <VisitHero visit={visit} />
       )}
@@ -450,10 +515,12 @@ function LiveHero({
   visit,
   canEditTable,
   onEdit,
+  onDelete,
 }: {
   visit: RecordingVisitView;
   canEditTable: boolean;
   onEdit: (field: EditField) => void;
+  onDelete?: (() => void) | undefined;
 }) {
   const now = useMinuteClock();
   const game = visit.table.game ? gameNames[visit.table.game] : null;
@@ -480,6 +547,9 @@ function LiveHero({
                   { label: "Game", onPress: () => onEdit("game") },
                   { label: "Casino", onPress: () => onEdit("venue") },
                 ]
+              : []),
+            ...(onDelete
+              ? [{ label: "Delete session", destructive: true, onPress: onDelete }]
               : []),
           ]}
         />

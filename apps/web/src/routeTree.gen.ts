@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CrewRouteImport } from './routes/crew'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as ClaimCodeRouteImport } from './routes/claim/$code'
@@ -37,6 +38,11 @@ const IndexRoute = IndexRouteImport.update({
 const CrewRoute = CrewRouteImport.update({
   id: '/crew',
   path: '/crew',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MapRoute = MapRouteImport.update({
@@ -128,6 +134,7 @@ const TripsTripIdSessionsNewRoute = TripsTripIdSessionsNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/crew': typeof CrewRoute
+  '/history': typeof HistoryRoute
   '/map': typeof MapRoute
   '/stats': typeof StatsRoute
   '/claim/$code': typeof ClaimCodeRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/crew': typeof CrewRoute
+  '/history': typeof HistoryRoute
   '/map': typeof MapRoute
   '/stats': typeof StatsRoute
   '/claim/$code': typeof ClaimCodeRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/crew': typeof CrewRoute
+  '/history': typeof HistoryRoute
   '/map': typeof MapRoute
   '/stats': typeof StatsRoute
   '/claim/$code': typeof ClaimCodeRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/crew'
+    | '/history'
     | '/map'
     | '/stats'
     | '/claim/$code'
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/crew'
+    | '/history'
     | '/map'
     | '/stats'
     | '/claim/$code'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/crew'
+    | '/history'
     | '/map'
     | '/stats'
     | '/claim/$code'
@@ -258,6 +270,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CrewRoute: typeof CrewRoute
+  HistoryRoute: typeof HistoryRoute
   MapRoute: typeof MapRoute
   StatsRoute: typeof StatsRoute
   ClaimCodeRoute: typeof ClaimCodeRoute
@@ -291,6 +304,13 @@ declare module '@tanstack/react-router' {
       path: '/crew'
       fullPath: '/crew'
       preLoaderRoute: typeof CrewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/map': {
@@ -418,6 +438,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CrewRoute: CrewRoute,
+  HistoryRoute: HistoryRoute,
   MapRoute: MapRoute,
   StatsRoute: StatsRoute,
   ClaimCodeRoute: ClaimCodeRoute,

@@ -133,6 +133,12 @@ export function HomeScreen() {
           ) : null}
         </>
       )}
+      <Button
+        label="All sessions"
+        variant="ghost"
+        className="self-start"
+        onPress={() => navigation.navigate("History")}
+      />
       {sheet === "start" ? <StartSheet onClose={() => setSheet(null)} onStarted={opened} /> : null}
       {sheet === "past" ? (
         <PastSessionSheet onClose={() => setSheet(null)} onAdded={opened} />

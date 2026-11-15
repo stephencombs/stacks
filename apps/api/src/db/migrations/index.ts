@@ -19,6 +19,7 @@ import invitesRecorders from "./0016_invites_recorders.ts";
 import playerMoney from "./0017_player_money.ts";
 import claimedTablePlayers from "./0018_claimed_table_players.ts";
 import removeSettlementsPaymentsLimits from "./0019_remove_settlements_payments_limits.ts";
+import deleteVisit from "./0020_delete_visit.ts";
 
 export const records = {
   "0001_init": init,
@@ -40,6 +41,7 @@ export const records = {
   "0017_player_money": playerMoney,
   "0018_claimed_table_players": claimedTablePlayers,
   "0019_remove_settlements_payments_limits": removeSettlementsPaymentsLimits,
+  "0020_delete_visit": deleteVisit,
 };
 
 export const migrations = Migrator.fromRecord(records);

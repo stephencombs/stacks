@@ -105,6 +105,8 @@ export const RecordingCommand = Schema.Union([
     reason: Schema.NonEmptyString,
     replacement: Schema.NullOr(RecordingReplacement),
   }),
+  Schema.Struct({ type: Schema.Literal("delete_visit"), ...existing }),
+  Schema.Struct({ type: Schema.Literal("restore_visit"), ...existing }),
   Schema.Struct({ type: Schema.Literal("reopen"), ...existing, reason: Schema.NonEmptyString }),
   // Changes when a visit started, or its table's game, venue and high-limit, after the fact.
   // Only whoever records for everyone at the table changes the table.

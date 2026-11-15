@@ -152,7 +152,7 @@ export const personalStats = (
   filters: PersonalStatsFilters = {},
 ) => {
   const finished = sessions.flatMap(({ visit, table, finalResult }) =>
-    visit.finishedAt === null || finalResult === null
+    visit.deletedAt !== undefined || visit.finishedAt === null || finalResult === null
       ? []
       : [
           {

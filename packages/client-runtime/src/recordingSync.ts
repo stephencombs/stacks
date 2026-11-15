@@ -420,6 +420,8 @@ const settled = (
           ))
       );
     }
+    case "delete_visit":
+    case "restore_visit":
     case "reopen":
     case "edit_visit":
       return false;
@@ -549,6 +551,9 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
           ...optional("counterpartyId", command.replacement.counterpartyId ?? null),
         },
       };
+    case "delete_visit":
+    case "restore_visit":
+      return { type: command.type, visitId };
     case "reopen":
       return { type: "reopen", visitId, reason: command.reason };
     case "edit_visit":

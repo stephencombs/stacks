@@ -10,12 +10,14 @@ import {
   type RecordingStorageDocument,
 } from "./recordingStorage.ts";
 import {
+  describeRecordingRejection,
   localTimeText,
   parsePastSessionTimes,
   parseTimeNear,
   parseRecordingAmount,
   PRIVATE_RECORDING_NAMESPACE,
   recordingHome,
+  recordingMonths,
   recordingVisit,
   venueChoices,
   venuePlace,
@@ -82,7 +84,12 @@ describe("recordingHome", () => {
 
   it("is even, not pending, when the finished results cancel out", async () => {
     const { store } = await open();
-    expect(recordingHome(state(store))).toEqual({ active: [], finished: [], finishedResult: 0 });
+    expect(recordingHome(state(store))).toEqual({
+      active: [],
+      finished: [],
+      deleted: [],
+      finishedResult: 0,
+    });
     await save(store, {
       type: "record_completed",
       buyIn: 10000,
@@ -313,4 +320,48 @@ describe("openDeviceRecordingStore", () => {
     expect(opened).toEqual([PRIVATE_RECORDING_NAMESPACE, PRIVATE_RECORDING_NAMESPACE]);
     await store.close();
   });
+});
+
+it("keeps deleted visits at their month end, outside Play, table and history totals", async () => {
+  const { store } = await open();
+  await save(store, {
+    type: "record_completed",
+    buyIn: 20000,
+    cashOut: 30000,
+    startedAt: at(9),
+    finishedAt: at(10),
+  });
+  const deleted = state(store).visits[0]!.id;
+  await save(store, {
+    type: "record_completed",
+    buyIn: 5000,
+    cashOut: 0,
+    startedAt: at(1),
+    finishedAt: at(2),
+  });
+  const visible = state(store).visits[1]!.id;
+  await save(store, { type: "delete_visit", visitId: deleted });
+  const home = recordingHome(state(store));
+  expect(home.finishedResult).toBe(-5000);
+  expect(home.finished.map((item) => item.visit.id)).toEqual([visible]);
+  expect(home.deleted.map((item) => item.visit.id)).toEqual([deleted]);
+  const [month] = recordingMonths(home);
+  expect(month!.count).toBe(1);
+  expect(month!.result).toBe(-5000);
+  expect(month!.visits.map((item) => item.visit.id)).toEqual([visible, deleted]);
+  await store.close();
+});
+
+it.each(["delete_visit", "restore_visit"] as const)("names a refused %s change", async (type) => {
+  const { store } = await open();
+  await save(store, { type: "start", buyIn: 20000 });
+  const visitId = state(store).visits[0]!.id;
+  if (type === "restore_visit") await save(store, { type: "delete_visit", visitId });
+  const command = store.prepare({ type, visitId });
+  expect(
+    describeRecordingRejection({ command, reason: "forbidden", message: "Only your own sessions" }),
+  ).toBe(
+    `${type === "delete_visit" ? "Deleting" : "Restoring"} a session didn't sync. At this table you can record only your own play.`,
+  );
+  await store.close();
 });

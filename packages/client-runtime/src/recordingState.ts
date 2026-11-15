@@ -23,6 +23,7 @@ import {
   finalCashOut,
   RecordingError,
   RecordingReceipt,
+  visitLiveEntryIds,
 } from "@stacks/shared/recording";
 import { visitSummary } from "@stacks/shared/visits";
 import * as DateTime from "effect/DateTime";
@@ -241,6 +242,17 @@ const validateRecordingState = (state: RecordingState) => {
   const operations = new Set<string>();
   const createdEntries = new Set<EntryId>();
   const voids = new Set<EntryId>();
+  const audits = new Map<
+    EntryId,
+    {
+      at: DateTime.Utc;
+      by: RecordingCommand["actorId"];
+      reason: string;
+      source: "reopen" | "correct" | "delete_visit";
+    }
+  >();
+  const deleted = new Map<Visit["id"], DateTime.Utc>();
+  const deletedEntries = new Map<Visit["id"], ReadonlySet<EntryId>>();
   const lifecycle = new Map<Visit["id"], { revision: number; finishedAt: DateTime.Utc | null }>();
   const finals = new Map<Visit["id"], EntryId | null>();
   const createdTables = new Set<Table["id"]>();
@@ -365,7 +377,31 @@ const validateRecordingState = (state: RecordingState) => {
         "Invalid visit revision history.",
       );
       previous.revision += 1;
-      if (command.type === "add" || command.type === "finish") {
+      requireValid(
+        command.type === "restore_visit" ? deleted.has(visit.id) : !deleted.has(visit.id),
+        "Invalid deletion history.",
+      );
+      if (command.type === "delete_visit") {
+        deleted.set(visit.id, command.preparedAt);
+        const live = visitLiveEntryIds(state.receipts.slice(0, index), visit.id);
+        deletedEntries.set(visit.id, live);
+        for (const id of live) {
+          voids.add(id);
+          audits.set(id, {
+            at: command.preparedAt,
+            by: command.actorId,
+            reason: "Session deleted",
+            source: "delete_visit",
+          });
+        }
+      } else if (command.type === "restore_visit") {
+        deleted.delete(visit.id);
+        for (const id of deletedEntries.get(visit.id) ?? []) {
+          voids.delete(id);
+          audits.delete(id);
+        }
+        deletedEntries.delete(visit.id);
+      } else if (command.type === "add" || command.type === "finish") {
         requireValid(previous.finishedAt === null, "Receipt adds play after finish.");
         if (command.type === "add")
           verifyEntry(
@@ -403,16 +439,13 @@ const validateRecordingState = (state: RecordingState) => {
         previous.finishedAt = null;
         const final = finals.get(visit.id);
         if (final) {
-          const voided = entries.get(final);
-          requireValid(
-            voided &&
-              !voids.has(final) &&
-              voided.voidedAt !== null &&
-              ms(voided.voidedAt) === ms(command.preparedAt) &&
-              voided.voidedBy === command.actorId &&
-              voided.voidReason === command.reason,
-            reopenNotVoided,
-          );
+          requireValid(entries.has(final) && !voids.has(final), reopenNotVoided);
+          audits.set(final, {
+            at: command.preparedAt,
+            by: command.actorId,
+            reason: command.reason,
+            source: "reopen",
+          });
           voids.add(final);
         }
       } else {
@@ -424,13 +457,12 @@ const validateRecordingState = (state: RecordingState) => {
             !voids.has(original.id),
           "Invalid correction history.",
         );
-        requireValid(
-          original.voidedAt !== null &&
-            ms(original.voidedAt) === ms(command.preparedAt) &&
-            original.voidedBy === command.actorId &&
-            original.voidReason === command.reason,
-          "Void differs from its command receipt.",
-        );
+        audits.set(original.id, {
+          at: command.preparedAt,
+          by: command.actorId,
+          reason: command.reason,
+          source: "correct",
+        });
         voids.add(original.id);
         if (command.replacement)
           verifyEntry(
@@ -453,11 +485,30 @@ const validateRecordingState = (state: RecordingState) => {
       lifecycle.size === visits.size,
     "Records have missing command receipts.",
   );
-  for (const entry of state.entries)
+  for (const entry of state.entries) {
+    const audit = audits.get(entry.id);
+    requireValid(
+      audit === undefined ||
+        (entry.voidedAt !== null &&
+          ms(entry.voidedAt) === ms(audit.at) &&
+          entry.voidedBy === audit.by &&
+          entry.voidReason === audit.reason),
+      audit?.source === "reopen" ? reopenNotVoided : "Void differs from its command receipt.",
+    );
     requireValid(
       (entry.voidedAt !== null) === voids.has(entry.id),
       "Void has no correction receipt.",
     );
+  }
+  for (const visit of state.visits) {
+    const at = deleted.get(visit.id);
+    requireValid(
+      at === undefined
+        ? visit.deletedAt === undefined
+        : visit.deletedAt !== undefined && ms(at) === ms(visit.deletedAt),
+      "Visit deletion differs from its receipts.",
+    );
+  }
   for (const visit of state.visits) {
     const history = lifecycle.get(visit.id);
     requireValid(

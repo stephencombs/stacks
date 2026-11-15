@@ -22,6 +22,7 @@ export const Visit = Schema.Struct({
   playerId: PlayerId,
   startedAt: Schema.DateTimeUtc,
   finishedAt: Schema.NullOr(Schema.DateTimeUtc),
+  deletedAt: Schema.optionalKey(Schema.DateTimeUtc),
   revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).check(
   Schema.makeFilter((visit) =>

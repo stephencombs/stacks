@@ -1454,3 +1454,41 @@ describe("shared tables", () => {
       yield* Fiber.interrupt(second);
     }));
 });
+
+it("syncs durable offline deletion and restore, preserving rejections for another attempt", async () => {
+  const db = memory();
+  let store = await open(db);
+  await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+  const visitId = state(store).visits[0]!.id;
+  const before = state(store).entries;
+  const remote = server();
+  await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+  await pushAll(store, remote);
+  const deletion = await save(store, { type: "delete_visit", visitId });
+  await store.close();
+  store = await open(db);
+  expect(pendingRecordingCommands(state(store)).map((command) => command.type)).toEqual([
+    "delete_visit",
+  ]);
+  remote.refuse(deletion.command.operationId);
+  await pushAll(store, remote);
+  expect(state(store).visits[0]!.deletedAt).toBeUndefined();
+  expect(state(store).sync!.rejected.map((item) => item.command.type)).toEqual(["delete_visit"]);
+  await store.transform((s) => recordRejectedAgain(s, deletion.command.operationId));
+  await pushAll(store, remote);
+  await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+  expect(recordingHome(state(store)).active).toHaveLength(0);
+  await save(store, { type: "restore_visit", visitId });
+  await store.close();
+  store = await open(db);
+  expect(pendingRecordingCommands(state(store)).map((command) => command.type)).toEqual([
+    "restore_visit",
+  ]);
+  await pushAll(store, remote);
+  await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+  expect(state(store).entries).toEqual(before);
+  expect(remote.history().entries).toEqual(before);
+  expect(state(store).visits[0]!.deletedAt).toBeUndefined();
+  expect(pendingRecordingCommands(state(store))).toEqual([]);
+  await store.close();
+});

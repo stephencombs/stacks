@@ -15,6 +15,7 @@ import {
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
 import { VisitId, type EntryId, type PlayEntry } from "@stacks/contracts";
+import { ownPlayers } from "@stacks/shared/recording";
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -30,6 +31,7 @@ import { EmptyState, PageHeader, Section } from "~/components/ui/Page";
 import { Glow, List, Row, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
 import { Dock, focusMain, PersonalFrame, SaveStatus, useDialogFocus } from "~/features/Personal";
 import { recordingStore } from "~/lib/recording";
+import { DeleteSessionDialog, DeletedSession } from "~/features/DeleteSession";
 import {
   BuyInTotalDialog,
   CashOutDialog,
@@ -73,6 +75,7 @@ function Missing() {
 type Open =
   | {
       readonly type:
+        | "delete"
         | "rebuy"
         | "cash_out"
         | "reopen"
@@ -98,6 +101,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   } | null>(null);
   const quick = useRecordingSubmit();
   const savedButton = useRef<HTMLButtonElement>(null);
+  const [deletedHere, setDeletedHere] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const focus = useDialogFocus(() => savedButton.current);
   const table = useRecordingTable(visit?.visit.tableId ?? null);
@@ -188,10 +192,38 @@ function Visit({ visitId }: { visitId: VisitId }) {
     setSaved(null);
     void navigate({ to: "/play/$visitId", params: { visitId: next } }).then(focusMain);
   };
+  const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
+  const restore = async () => {
+    if (await quick.submit({ type: "restore_visit", visitId })) setDeletedHere(false);
+  };
+  if (visit.visit.deletedAt !== undefined)
+    return (
+      <>
+        <PageHeader back={back} title="Session deleted" />
+        <DeletedSession
+          canRestore={canDelete}
+          undo={deletedHere}
+          pending={quick.pending}
+          onRestore={() => void restore()}
+          onDismiss={() => setDeletedHere(false)}
+        />
+        {quick.error ? <FormError>{quick.error}</FormError> : null}
+        <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
+      </>
+    );
   return (
     <div className="contents" onClickCapture={focus.capture}>
       <PageHeader
         back={back}
+        options={
+          canDelete && !live ? (
+            <Menu label="Session options">
+              <MenuItem tone="danger" onClick={() => setOpen({ type: "delete" })}>
+                Delete session
+              </MenuItem>
+            </Menu>
+          ) : undefined
+        }
         title={
           own
             ? visitTitle(visit.table)
@@ -210,7 +242,12 @@ function Visit({ visitId }: { visitId: VisitId }) {
         <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
       </PageHeader>
       {live ? (
-        <LiveHero visit={visit} canEditTable={canEditTable} onEdit={(type) => setOpen({ type })} />
+        <LiveHero
+          visit={visit}
+          canEditTable={canEditTable}
+          onEdit={(type) => setOpen({ type })}
+          onDelete={canDelete ? () => setOpen({ type: "delete" }) : undefined}
+        />
       ) : (
         <VisitHero visit={visit} />
       )}
@@ -339,6 +376,21 @@ function Visit({ visitId }: { visitId: VisitId }) {
           </>
         )}
       </Dock>
+      {open?.type === "delete" ? (
+        <DeleteSessionDialog
+          visit={visit}
+          pending={quick.pending}
+          error={quick.error}
+          onClose={close}
+          onDelete={async () => {
+            if (await quick.submit({ type: "delete_visit", visitId })) {
+              close();
+              setSaved(null);
+              setDeletedHere(true);
+            }
+          }}
+        />
+      ) : null}
       {open?.type === "rebuy" ? (
         <RebuyDialog
           visit={visit}
@@ -439,10 +491,12 @@ function LiveHero({
   visit,
   canEditTable,
   onEdit,
+  onDelete,
 }: {
   visit: RecordingVisitView;
   canEditTable: boolean;
   onEdit: (field: "buy_in" | "start_time" | "game" | "venue") => void;
+  onDelete?: (() => void) | undefined;
 }) {
   const now = useMinuteClock();
   const game = visit.table.game ? gameNames[visit.table.game] : null;
@@ -477,6 +531,11 @@ function LiveHero({
                 <MenuItem onClick={() => onEdit("game")}>Game</MenuItem>
                 <MenuItem onClick={() => onEdit("venue")}>Casino</MenuItem>
               </>
+            ) : null}
+            {onDelete ? (
+              <MenuItem tone="danger" onClick={onDelete}>
+                Delete session
+              </MenuItem>
             ) : null}
           </Menu>
         </div>
