@@ -23,7 +23,10 @@ const starterAnswer = (pathname: string) => {
   const added = commands.flatMap((command) => (command.newPlayer ? [command.newPlayer] : []));
   const table = pathname.match(/^\/api\/tables\/([^/]+)$/)?.[1];
   if (table) {
-    const start = commands.find((command) => command.tableId === table && command.type === "start");
+    const start = commands.find(
+      (command) =>
+        command.tableId === table && (command.type === "start" || command.type === "open_table"),
+    );
     if (!start) return undefined;
     const recorders = new Set<string>();
     for (const command of commands)
@@ -132,4 +135,5 @@ window.fetch = async (input, init) => {
   });
 };
 if (params.get("sessions") === "sample") await (await import("./sessions")).seedSessions();
+if (params.get("sessions") === "table") await (await import("./sessions")).seedTable();
 await import("~/main");

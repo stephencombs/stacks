@@ -1391,6 +1391,81 @@ describe("shared tables", () => {
     ).toThrow(expect.objectContaining({ reason: "forbidden" }));
   });
 
+  it("is its own player among several recorders, however the server lists them", async () => {
+    const starter = await withGuest();
+    const table = state(starter.store).tables[0]!;
+    const dee = { id: PlayerId.make(crypto.randomUUID()), displayName: "Dee" };
+    const eli = { id: PlayerId.make(crypto.randomUUID()), displayName: "Eli" };
+    const appoint = (playerId: PlayerId) =>
+      RecordingCommand.make({
+        type: "appoint_recorder",
+        operationId: RecordingOperationId.make(crypto.randomUUID()),
+        actorId: state(starter.store).actor.id,
+        preparedAt: DateTime.makeUnsafe(Date.now()),
+        tableId: table.id,
+        playerId,
+      });
+    const device = await open();
+    await device.transform((s) =>
+      mergeRecordingHistory({ ...s, sync: { userId: null, synced: [], rejected: [] } }, null, {
+        ...historyFor(starter.store, device, dee, [appoint(eli.id), appoint(dee.id)]),
+        participants: [
+          { tableId: table.id, player: eli },
+          { tableId: table.id, player: dee },
+        ],
+      }),
+    );
+    const view = recordingTable(state(device), table.id)!;
+    expect(view.role).toBe("recorder");
+    expect(view.you.player).toEqual(dee);
+  });
+
+  it("converges on a deleted table for a recorder who never sat down, and drops it", async () => {
+    const db = memory();
+    const starter = await open();
+    await save(starter, { type: "open_table" });
+    const opened = state(starter).tables[0]!;
+    const dee = { id: PlayerId.make(crypto.randomUUID()), displayName: "Dee" };
+    const by = { actorId: state(starter).actor.id, preparedAt: DateTime.makeUnsafe(Date.now()) };
+    const appoint = RecordingCommand.make({
+      ...by,
+      type: "appoint_recorder",
+      operationId: RecordingOperationId.make(crypto.randomUUID()),
+      tableId: opened.id,
+      playerId: dee.id,
+    });
+    const remove = RecordingCommand.make({
+      ...by,
+      type: "delete_table",
+      operationId: RecordingOperationId.make(crypto.randomUUID()),
+      tableId: opened.id,
+    });
+    let device = await open(db);
+    const pull = (commands: ReadonlyArray<RecordingCommand>, deleted: boolean) =>
+      device.transform((s) =>
+        mergeRecordingHistory(
+          { ...s, sync: s.sync ?? { userId: null, synced: [], rejected: [] } },
+          null,
+          {
+            ...historyFor(starter, device, dee),
+            commands: [...state(starter).receipts.map((receipt) => receipt.command), ...commands],
+            tables: [deleted ? { ...opened, deletedAt: remove.preparedAt } : opened],
+          },
+        ),
+      );
+    await pull([appoint], false);
+    expect(recordingHome(state(device)).tables.map((item) => item.table.id)).toEqual([opened.id]);
+    // The starter deletes it; the server now sends the table already deleted.
+    await pull([appoint, remove], true);
+    expect(recordingTable(state(device), opened.id)).toBeNull();
+    expect(recordingHome(state(device)).tables).toEqual([]);
+    await pull([appoint, remove], true);
+    await device.close();
+    device = await open(db);
+    expect(device.getSnapshot().status).toBe("saved");
+    expect(recordingHome(state(device)).tables).toEqual([]);
+  });
+
   it("records as the player a personal invite named, and nobody else", async () => {
     const starter = await withGuest();
     const table = state(starter.store).tables[0]!;

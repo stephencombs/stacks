@@ -41,6 +41,41 @@ const choose = (
 ) => RecordingCommand.make({ ...common(who), type: "set_table_trip", tableId, tripId });
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
+  it.effect("leaves the trip free once a table in it is deleted unplayed", () =>
+    Effect.gen(function* () {
+      const { alex, bea } = yield* users("alex", "bea");
+      const { tripId } = yield* groupWith(alex, bea);
+      const who = identity();
+      const opened = RecordingCommand.make({
+        ...common(who),
+        type: "open_table",
+        tableId: TableId.make(crypto.randomUUID()),
+        playerId: who.playerId,
+        game: null,
+        venueId: null,
+        highLimit: false,
+      });
+      const tableId = (opened as Extract<RecordingCommand, { type: "open_table" }>).tableId;
+      yield* alex.recording.push({
+        payload: { identity: who, commands: [opened, choose(who, tableId, tripId)] },
+      });
+      expect(yield* Effect.flip(alex.trips.delete({ params: { tripId } }))).toMatchObject({
+        _tag: "Conflict",
+        reason: "trip_not_empty",
+      });
+      const { results } = yield* alex.recording.push({
+        payload: {
+          identity: who,
+          commands: [RecordingCommand.make({ ...common(who), type: "delete_table", tableId })],
+        },
+      });
+      expect(results.map((result) => result.status)).toEqual(["accepted"]);
+      const history = yield* alex.recording.history();
+      expect(history.tables.find((table) => table.id === tableId)?.tripId).toBeNull();
+      yield* alex.trips.delete({ params: { tripId } });
+    }),
+  );
+
   it.effect("grants only active members whole-table access and revokes it on move or clear", () =>
     Effect.gen(function* () {
       const { alex, bea, cal, eve } = yield* users("alex", "bea", "cal", "eve");

@@ -12,12 +12,15 @@ import { FormError } from "~/components/ui/Field";
 
 export function DeleteSessionDialog({
   visit,
+  shared = false,
   pending,
   error,
   onClose,
   onDelete,
 }: {
   visit: RecordingVisitView;
+  /** Others played at this table, so only your visit goes. */
+  shared?: boolean;
   pending: boolean;
   error: string | null;
   onClose: () => void;
@@ -26,7 +29,7 @@ export function DeleteSessionDialog({
   return (
     <Dialog
       open
-      title="Delete this session?"
+      title={shared ? "Delete my visit?" : "Delete this session?"}
       description="Your entries will be voided and this session will stop counting. Other players at the table keep their sessions. You can restore yours later."
       onOpenChange={(open) => {
         if (!open && !pending) onClose();
@@ -37,7 +40,7 @@ export function DeleteSessionDialog({
             Keep session
           </Button>
           <Button variant="danger" pending={pending} onClick={() => void onDelete()}>
-            Delete session
+            {shared ? "Delete my visit" : "Delete session"}
           </Button>
         </div>
       }

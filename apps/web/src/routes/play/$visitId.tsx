@@ -3,12 +3,18 @@ import { formatDay, formatDuration, formatTime } from "@stacks/client-runtime/fo
 import type { RecordingInput } from "@stacks/client-runtime/recording";
 import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import {
-  useRecordingClock,
   useRecordingSubmit,
   useRecordingTable,
   useRecordingVisit,
   useServerTable,
 } from "@stacks/client-runtime/recordingReact";
+import {
+  cashOutNote,
+  liveTable,
+  tableActions,
+  type TableAction,
+  type TableSeat,
+} from "@stacks/client-runtime/liveTable";
 import {
   LIVE_REBUY_AMOUNTS,
   sessionReadout,
@@ -25,13 +31,12 @@ import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-import { ArrowLeft, Pencil, Users, List as ListIcon, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 
 import { Money } from "~/components/Money";
-import { Button, ButtonLink, IconButton, IconLink } from "~/components/ui/Button";
+import { Button, ButtonLink, IconLink } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
-import { Menu, MenuItem } from "~/components/ui/Menu";
 import { BackLink } from "~/components/ui/Nav";
 import { EmptyState, PageHeader, Section } from "~/components/ui/Page";
 import { List, Row, RowText, Skeleton, Surface } from "~/components/ui/Surface";
@@ -52,6 +57,14 @@ import {
 } from "~/features/RecordingForms";
 import { LiveSessionsBar, useLiveSessions } from "~/features/LiveBar";
 import { TableSection } from "~/features/SharedTable";
+import {
+  ActionSlot,
+  LiveClock,
+  SeatSheet,
+  TableActionDialog,
+  TableSeats,
+  type TableRecorded,
+} from "~/features/LiveTable";
 import { DeleteSessionDialog, DeletedSession } from "~/features/DeleteSession";
 import { TableTripDialog, TableTripButton } from "~/features/TableTrip";
 
@@ -92,7 +105,6 @@ type Open =
         | "delete"
         | "trip"
         | "edit"
-        | "table"
         | "history"
         | "rebuy"
         | "cash_out"
@@ -103,7 +115,9 @@ type Open =
         | "game"
         | "venue";
     }
-  | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId };
+  | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId }
+  | { readonly type: "action"; readonly action: Exclude<TableAction, "edit"> }
+  | { readonly type: "seat"; readonly seat: TableSeat };
 
 const money = (amount: number) => formatMoney(amount as PlayEntry["amount"], RECORDING_CURRENCY);
 
@@ -111,10 +125,12 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const { visit, status, error, retryLoad } = useRecordingVisit(visitId);
   const navigate = useNavigate();
   const [open, setOpen] = useState<Open | null>(null);
+  // The toast for the last write here: yours, or one for another player at the table.
   const [saved, setSaved] = useState<{
     entryId: EntryId;
     text: string;
     undo?: boolean;
+    visitId?: VisitId;
   } | null>(null);
   const quick = useRecordingSubmit();
   const [deletedHere, setDeletedHere] = useState(false);
@@ -123,6 +139,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const focus = useDialogFocus(() => savedButton.current);
   const table = useRecordingTable(visit?.visit.tableId ?? null);
   const serverTable = useServerTable(visit?.visit.tableId ?? null);
+  const seats = table ? liveTable(table, serverTable) : null;
   const state = useSyncExternalStore(recordingStore.subscribe, recordingStore.getSnapshot).state;
   // This page has no tabs, so your other live sessions sit above its dock.
   const elsewhere = useLiveSessions(visitId);
@@ -155,6 +172,19 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const recorded = (entryId: EntryId, input: RecordingInput) => {
     close();
     setNotice(null);
+    // Cashing out while others play leaves you recording for them, on the table.
+    if (
+      input.type === "finish" &&
+      own &&
+      table &&
+      table.role !== "participant" &&
+      seats?.seats.some((seat) => seat.playing && seat.visitId !== visitId)
+    ) {
+      void navigate({ to: "/tables/$tableId", params: { tableId: table.table.id } }).then(
+        focusMain,
+      );
+      return;
+    }
     setSaved({
       entryId,
       undo: input.type === "add" && input.kind === "buy_in",
@@ -204,15 +234,23 @@ function Visit({ visitId }: { visitId: VisitId }) {
       });
     }
   };
-  const undo = async (entryId: EntryId) => {
+  const undo = async (entryId: EntryId, of: VisitId = visitId) => {
     const receipt = await quick.submit({
       type: "correct",
-      visitId,
+      visitId: of,
       entryId,
       reason: "Undone",
       replacement: null,
     });
     if (receipt) setSaved({ entryId, text: "Rebuy undone. It stays in the history, voided." });
+  };
+  const fromTable = ({ entryId, ...rest }: TableRecorded) => {
+    close();
+    if (entryId) setSaved({ entryId, ...rest });
+    else {
+      setSaved(null);
+      setNotice(rest.text);
+    }
   };
   const edited = (text: string) => {
     close();
@@ -225,6 +263,16 @@ function Visit({ visitId }: { visitId: VisitId }) {
     void navigate({ to: "/play/$visitId", params: { visitId: next } }).then(focusMain);
   };
   const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
+  const shared = (seats?.seats.length ?? 1) > 1;
+  const actions = live
+    ? tableActions(table?.role ?? "participant", {
+        playing: true,
+        closed: false,
+        empty: false,
+      })
+    : (["edit"] as const);
+  const act = (action: TableAction) =>
+    setOpen(action === "edit" ? { type: "edit" } : { type: "action", action });
   const restore = async () => {
     if (await quick.submit({ type: "restore_visit", visitId })) setDeletedHere(false);
   };
@@ -251,41 +299,23 @@ function Visit({ visitId }: { visitId: VisitId }) {
           <ArrowLeft className="size-5" aria-hidden />
         </IconLink>
         {live ? (
-          <LiveClock visit={visit} />
+          <LiveClock since={seats?.startedAt ?? visit.visit.startedAt} />
         ) : (
           <h1 className="text-center text-lg font-semibold">Finished</h1>
         )}
-        {live && (table?.visits.length ?? 1) === 1 ? (
-          <IconButton aria-label="Edit my session" onClick={() => setOpen({ type: "edit" })}>
-            <Pencil className="size-5" aria-hidden />
-          </IconButton>
-        ) : (
-          <div className="glass flex size-11 items-center justify-center rounded-full">
-            <Menu label="Session actions">
-              <MenuItem onClick={() => setOpen({ type: "edit" })}>
-                <span className="flex items-center gap-3">
-                  <Pencil className="size-4" aria-hidden />
-                  Edit my session
-                </span>
-              </MenuItem>
-              <MenuItem onClick={() => setOpen({ type: "table" })}>
-                <span className="flex items-center gap-3">
-                  <Users className="size-4" aria-hidden />
-                  At this table
-                </span>
-              </MenuItem>
-              <MenuItem onClick={() => setOpen({ type: "history" })}>
-                <span className="flex items-center gap-3">
-                  <ListIcon className="size-4" aria-hidden />
-                  Your history
-                </span>
-              </MenuItem>
-            </Menu>
-          </div>
-        )}
+        <ActionSlot actions={actions} onAction={act} />
       </header>
       {live ? (
-        <LiveHero visit={visit} name={own ? undefined : player?.player.displayName} />
+        <>
+          <LiveHero visit={visit} name={own ? undefined : player?.player.displayName} />
+          {seats && shared ? (
+            <TableSeats
+              table={seats}
+              current={visitId}
+              onSeat={(seat) => setOpen({ type: "seat", seat })}
+            />
+          ) : null}
+        </>
       ) : (
         <>
           <PageHeader
@@ -339,18 +369,28 @@ function Visit({ visitId }: { visitId: VisitId }) {
                   <button
                     className="pressable min-h-11 rounded-lg px-3 text-sm font-semibold"
                     disabled={quick.pending}
-                    onClick={() => void undo(saved.entryId)}
+                    onClick={() => void undo(saved.entryId, saved.visitId)}
                   >
                     Undo
                   </button>
                 ) : null}
-                <button
-                  ref={savedButton}
-                  className="pressable min-h-11 rounded-lg px-3 text-sm font-semibold"
-                  onClick={() => setOpen({ type: "inspect", entryId: saved.entryId })}
-                >
-                  View entry
-                </button>
+                {saved.visitId && saved.visitId !== visitId ? (
+                  <button
+                    ref={savedButton}
+                    className="pressable min-h-11 rounded-lg px-3 text-sm font-semibold"
+                    onClick={() => setSaved(null)}
+                  >
+                    Dismiss
+                  </button>
+                ) : (
+                  <button
+                    ref={savedButton}
+                    className="pressable min-h-11 rounded-lg px-3 text-sm font-semibold"
+                    onClick={() => setOpen({ type: "inspect", entryId: saved.entryId })}
+                  >
+                    View entry
+                  </button>
+                )}
               </div>
             </div>
           ) : null}
@@ -404,6 +444,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       {open?.type === "delete" ? (
         <DeleteSessionDialog
           visit={visit}
+          shared={shared}
           pending={quick.pending}
           error={quick.error}
           onClose={close}
@@ -419,7 +460,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       {open?.type === "edit" ? (
         <Dialog
           open
-          title="Edit my session"
+          title={own ? "Edit my session" : `Edit ${player?.player.displayName ?? "their"} session`}
           onOpenChange={(value) => {
             if (!value) close();
           }}
@@ -447,29 +488,31 @@ function Visit({ visitId }: { visitId: VisitId }) {
             />
           ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button variant="ghost" onClick={() => setOpen({ type: "table" })}>
-              At this table
-            </Button>
             <Button variant="ghost" onClick={() => setOpen({ type: "history" })}>
-              Your history
+              {own ? "Your history" : "History"}
             </Button>
           </div>
           {canDelete ? (
             <Button variant="danger" className="mt-4" onClick={() => setOpen({ type: "delete" })}>
-              Delete session
+              {shared ? "Delete my visit" : "Delete session"}
             </Button>
           ) : null}
         </Dialog>
-      ) : open?.type === "table" ? (
-        <Dialog
-          open
-          title="At this table"
-          onOpenChange={(value) => {
-            if (!value) close();
-          }}
-        >
-          <TableSection tableId={visit.visit.tableId} visitId={visitId} onAdded={seated} />
-        </Dialog>
+      ) : open?.type === "action" && table ? (
+        <TableActionDialog
+          action={open.action}
+          table={table}
+          onClose={close}
+          onAdded={(name) => edited(`${name} is at the table.`)}
+        />
+      ) : open?.type === "seat" && seats ? (
+        <SeatSheet
+          seat={open.seat}
+          table={seats}
+          onClose={close}
+          onRecorded={fromTable}
+          onSeated={(_, name) => edited(`${name} is back at the table.`)}
+        />
       ) : open?.type === "history" ? (
         <Dialog
           open
@@ -488,6 +531,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       {open?.type === "rebuy" ? (
         <RebuyDialog
           visit={visit}
+          who={own ? undefined : player?.player.displayName}
           counterparties={counterparties}
           onClose={close}
           onSaved={recorded}
@@ -495,6 +539,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
       ) : open?.type === "cash_out" ? (
         <CashOutDialog
           visit={visit}
+          who={own ? undefined : player?.player.displayName}
+          note={shared && seats ? cashOutNote(seats.seats, visitId) : undefined}
           counterparties={counterparties}
           onClose={close}
           onSaved={recorded}
@@ -564,17 +610,6 @@ function Visit({ visitId }: { visitId: VisitId }) {
         />
       ) : null}
     </PersonalFrame>
-  );
-}
-
-function LiveClock({ visit }: { visit: RecordingVisitView }) {
-  const now = useRecordingClock();
-  return (
-    <div className="glass mx-auto flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold text-ink tabular-nums">
-      <span className="size-2 rounded-full bg-live" aria-hidden />
-      <span className="tracking-wide">LIVE</span>
-      <span>{sessionReadout(visit, now).clock}</span>
-    </div>
   );
 }
 

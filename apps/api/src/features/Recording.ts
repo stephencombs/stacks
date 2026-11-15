@@ -193,6 +193,7 @@ const tableOf = (row: typeof TableRow.Type, starterPlayerId: PlayerId) =>
     venueId: row.venueId,
     highLimit: row.highLimit,
     starterPlayerId,
+    ...(row.deletedAt === null ? {} : { deletedAt: row.deletedAt }),
   });
 
 const visitOf = (visit: typeof PersonalVisitRow.Type) =>
@@ -208,6 +209,15 @@ const visitOf = (visit: typeof PersonalVisitRow.Type) =>
 
 const entryOf = (entry: typeof PersonalEntryRow.Type) =>
   PlayEntry.make({ ...entry, currency: "USD" });
+
+/**
+ * A table that's still there: not deleted, and not one whose every visit was deleted. A table
+ * nobody has sat down at yet is there; its starter may record at it without playing.
+ */
+const open = (sql: SqlClient.SqlClient) => sql`(
+  tables.deleted_at is null and (
+    not exists (select 1 from personal_visits where table_id = tables.id)
+    or exists (select 1 from personal_visits where table_id = tables.id and deleted_at is null)))`;
 
 const participantsAt = Effect.fn("Recording.participantsAt")(function* (tableId: TableId) {
   const sql = yield* SqlClient.SqlClient;
@@ -330,7 +340,19 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
           message: "Only a player with an account can record for everyone.",
         });
     }
-    return { ...ledger, participants, recorders, tables: [table] };
+    // Deleting needs to know whether anyone played here, even in a visit deleted since.
+    const visits =
+      command.type === "delete_table"
+        ? yield* sql`
+            select * from personal_visits where table_id = ${table.id}
+          `.pipe(Effect.flatMap(Access.decodeRows(PersonalVisitRow)))
+        : [];
+    return { ...ledger, participants, recorders, tables: [table], visits: visits.map(visitOf) };
+  }
+  if (command.type === "open_table") {
+    const taken = yield* sql`select 1 from tables where id = ${command.tableId}`;
+    if (taken.length > 0) return yield* new Rejected(sessionRecorded);
+    return ledger;
   }
   if (command.type === "start" || command.type === "record_completed") {
     const taken = yield* sql`
@@ -412,6 +434,11 @@ const save = Effect.fn("Recording.save")(function* (
   if (isTableCommand(command)) {
     if (command.type === "set_table_trip")
       yield* sql`update tables set trip_id = ${command.tripId} where id = ${command.tableId}`;
+    if (command.type === "delete_table")
+      yield* sql`
+        update tables set deleted_at = ${date(command.preparedAt)}, trip_id = null
+        where id = ${command.tableId}
+      `;
     yield* sql`
       insert into personal_operations (id, player_id, visit_id, table_id, actor_id, command)
       values (${command.operationId}, ${self.playerId}, null, ${command.tableId},
@@ -428,6 +455,14 @@ const save = Effect.fn("Recording.save")(function* (
       values (${table.id}, ${table.starterPlayerId}, ${table.game}, ${table.venueId},
         ${table.highLimit})
     `;
+  }
+  if (command.type === "open_table") {
+    yield* sql`
+      insert into personal_operations (id, player_id, visit_id, table_id, actor_id, command)
+      values (${command.operationId}, ${self.playerId}, null, ${command.tableId},
+        ${self.actorId}, ${commandText(command)}::jsonb)
+    `;
+    return;
   }
   // An edit replaces its table's record; every other table comes back as it was.
   for (const table of after.tables) {
@@ -570,7 +605,9 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
       ),
     );
     const venueId =
-      command.type === "start" || command.type === "record_completed"
+      command.type === "start" ||
+      command.type === "record_completed" ||
+      command.type === "open_table"
         ? command.venueId
         : command.type === "edit_visit"
           ? command.table?.venueId
@@ -778,7 +815,10 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
   const visits = yield* sql`
     select * from personal_visits where table_id = ${row.id} order by started_at, id
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalVisitRow)));
-  if (visits.length > 0 && visits.every((visit) => visit.deletedAt !== null))
+  if (
+    row.deletedAt !== null ||
+    (visits.length > 0 && visits.every((visit) => visit.deletedAt !== null))
+  )
     return yield* new NotFound({ resource: "table" });
   const players = yield* sql`
     select id, display_name from players
@@ -838,7 +878,8 @@ const tableAccess = Effect.fn("Recording.tableAccess")(function* (tableId: Table
   const [row] = yield* sql`select * from tables where id = ${tableId}`.pipe(
     Effect.flatMap(Access.decodeRows(TableRow)),
   );
-  if (!row?.starterPlayerId) return yield* new NotFound({ resource: "table" });
+  if (!row?.starterPlayerId || row.deletedAt !== null)
+    return yield* new NotFound({ resource: "table" });
   const at = { ...row, starterPlayerId: row.starterPlayerId };
   if (actorPlayers.includes(row.starterPlayerId))
     return { row: at, role: "starter" as const, playerId: row.starterPlayerId };
@@ -909,20 +950,14 @@ export const join = Effect.fn("Recording.join")(function* (
   const sql = yield* SqlClient.SqlClient;
   const hash = yield* digest(token);
   // A bad link creates nothing, not even the recorder's own player.
-  const linked = yield* sql`
-    select 1 from tables where share_token_hash = ${hash}
-      and exists (select 1 from personal_visits where table_id = tables.id and deleted_at is null)
-  `;
+  const linked = yield* sql`select 1 from tables where share_token_hash = ${hash} and ${open(sql)}`;
   if (linked.length === 0) return yield* new NotFound({ resource: "table" });
   const { self, actorPlayers } = yield* establish(request.identity);
   const attempt = Effect.gen(function* () {
     const [row] = yield* sql`
-      select * from tables where share_token_hash = ${hash} for update
+      select * from tables where share_token_hash = ${hash} and ${open(sql)} for update
     `.pipe(Effect.flatMap(Access.decodeRows(TableRow)));
     if (!row?.starterPlayerId) return yield* new NotFound({ resource: "table" });
-    const remaining =
-      yield* sql`select 1 from personal_visits where table_id = ${row.id} and deleted_at is null limit 1`;
-    if (remaining.length === 0) return yield* new NotFound({ resource: "table" });
     const table = tableOf(row, row.starterPlayerId);
     if (actorPlayers.includes(table.starterPlayerId))
       return yield* new Conflict({ reason: "table_starter" });

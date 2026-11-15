@@ -55,9 +55,23 @@ export type RecordedVisit = VisitSummary & {
   readonly venue: CachedVenue | null;
 };
 
+/** A table this device records for everyone at, while you aren't playing there. */
+export type RecordedTable = {
+  readonly table: Table;
+  readonly venue: CachedVenue | null;
+  /** When its first visit started; null until someone sits down. */
+  readonly startedAt: DateTime.Utc | null;
+  readonly playing: number;
+};
+
 export type RecordingHome = {
   /** Every visit still in play, newest first. There can be more than one. */
   readonly active: ReadonlyArray<RecordedVisit>;
+  /**
+   * Tables you record for everyone at, without a visit of yours in play there, until they close:
+   * one you opened without playing, or one you cashed out of while others play. Newest first.
+   */
+  readonly tables: ReadonlyArray<RecordedTable>;
   /** Finished visits, most recently finished first. */
   readonly finished: ReadonlyArray<RecordedVisit>;
   readonly deleted: ReadonlyArray<RecordedVisit>;
@@ -68,6 +82,10 @@ export type RecordingHome = {
 /** A session's name in lists and titles: its game, or just "Session" until one is set. */
 export const visitTitle = (table: Table) =>
   `${table.game ? gameNames[table.game] : "Session"}${table.highLimit ? " · High limit" : ""}`;
+
+/** A table you record at without playing, by name: "Blackjack table". */
+export const tableTitle = (table: Table) =>
+  `${table.game ? `${gameNames[table.game]} table` : "Table"}${table.highLimit ? " · High limit" : ""}`;
 
 const tableOf = (state: RecordingState, tableId: Table["id"]) =>
   state.tables.find((table) => table.id === tableId)!;
@@ -126,9 +144,34 @@ export const recordingHome = (state: RecordingState): RecordingHome => {
     .toSorted((a, b) => ms(b.visit.finishedAt!) - ms(a.visit.finishedAt!));
   let total = 0n;
   for (const item of finished) total += BigInt(item.finalResult!);
+  const playingHere = new Set(active.map((item) => item.table.id));
+  const recording = new Set(
+    state.recorders.filter((item) => mine.has(item.playerId)).map((item) => item.tableId),
+  );
+  const tables = state.tables
+    .filter(
+      (table) =>
+        table.deletedAt === undefined &&
+        !playingHere.has(table.id) &&
+        (mine.has(table.starterPlayerId) || recording.has(table.id)),
+    )
+    .flatMap((table): ReadonlyArray<RecordedTable> => {
+      const here = state.visits.filter(
+        (visit) => visit.tableId === table.id && visit.deletedAt === undefined,
+      );
+      const playing = here.filter((visit) => visit.finishedAt === null).length;
+      // Closed once everyone cashed out; gone once every visit was deleted.
+      if (playing === 0 && state.visits.some((visit) => visit.tableId === table.id)) return [];
+      const first = here.toSorted((a, b) => ms(a.startedAt) - ms(b.startedAt))[0];
+      return [
+        { table, venue: venueOf(state, table), startedAt: first?.startedAt ?? null, playing },
+      ];
+    })
+    .toReversed();
   // MinorUnits refuses an unsafe integer, so an overflowing total fails loudly.
   return {
     active,
+    tables,
     finished,
     deleted: visits.filter((item) => item.visit.deletedAt !== undefined),
     finishedResult: MinorUnits.make(Number(total)),
@@ -192,6 +235,7 @@ export const recordingTable = (
   const table = state.tables.find((item) => item.id === tableId);
   if (
     !table ||
+    table.deletedAt !== undefined ||
     (state.visits.some((visit) => visit.tableId === tableId) &&
       !state.visits.some((visit) => visit.tableId === tableId && visit.deletedAt === undefined))
   )
@@ -200,8 +244,11 @@ export const recordingTable = (
   const starter = table.starterPlayerId === state.self.id;
   const here = state.participants.filter((item) => item.tableId === tableId);
   const recorders = state.recorders.filter((item) => item.tableId === tableId);
-  const recording = here.find((item) => recorders.some((r) => r.playerId === item.playerId));
-  const you = starter ? state.self : players.get((recording ?? here[0]!).playerId)!;
+  // A device that records for everyone sees everyone who joined; it is only its own players.
+  const owned = new Set(ownPlayers(state));
+  const mine = here.filter((item) => owned.has(item.playerId));
+  const recording = mine.find((item) => recorders.some((r) => r.playerId === item.playerId));
+  const you = starter ? state.self : players.get((recording ?? mine[0] ?? here[0]!).playerId)!;
   const role = starter ? "starter" : recording ? "recorder" : "participant";
   const visits = state.visits
     .filter((visit) => visit.tableId === tableId && visit.deletedAt === undefined)
@@ -665,13 +712,19 @@ const syncView = (
 
 export const LIVE_REBUY_AMOUNTS = [10000, 20000] as const;
 
-export const sessionReadout = (visit: RecordingVisitView, now: DateTime.Utc) => {
-  const elapsed = Math.max(0, ms(visit.visit.finishedAt ?? now) - ms(visit.visit.startedAt));
-  const seconds = Math.floor(elapsed / 1000);
+/** Time since `start` as the LIVE pill reads it: "1:48:22". */
+export const elapsedClock = (start: DateTime.Utc, now: DateTime.Utc) => {
+  const seconds = Math.floor(Math.max(0, ms(now) - ms(start)) / 1000);
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}:${minutes.toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+};
+
+export const sessionReadout = (visit: RecordingVisitView, now: DateTime.Utc) => {
+  const end = visit.visit.finishedAt ?? now;
+  const elapsed = Math.max(0, ms(end) - ms(visit.visit.startedAt));
   return {
-    clock: `${hours}:${minutes.toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`,
+    clock: elapsedClock(visit.visit.startedAt, end),
     buyIns: visit.entries.filter((entry) => entry.kind === "buy_in" && entry.voidedAt === null)
       .length,
     corrected: visit.entries.some((entry) => entry.kind === "buy_in" && entry.voidedAt !== null),

@@ -162,6 +162,7 @@ export const TableRow = Schema.Struct({
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
   shareTokenHash: Schema.NullOr(Schema.String),
+  deletedAt: Schema.NullOr(Timestamp),
 });
 
 export const PlayerIdentityRow = Schema.Struct({

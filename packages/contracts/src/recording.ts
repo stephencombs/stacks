@@ -13,6 +13,8 @@ export const Table = Schema.Struct({
   highLimit: Schema.Boolean,
   /** Whoever holds this player records and corrects for everyone at the table. */
   starterPlayerId: PlayerId,
+  /** Set when its starter deleted it before anyone played there. */
+  deletedAt: Schema.optionalKey(Schema.DateTimeUtc),
 });
 export type Table = typeof Table.Type;
 

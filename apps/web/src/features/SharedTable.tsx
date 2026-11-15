@@ -202,7 +202,7 @@ function JoinedTableSection({ tableId, visitId }: { tableId: TableId; visitId: V
 }
 
 /** Creates, copies and revokes the table's read-only link. Only the starter sees this. */
-function ShareDialog({ tableId, onClose }: { tableId: TableId; onClose: () => void }) {
+export function ShareDialog({ tableId, onClose }: { tableId: TableId; onClose: () => void }) {
   const sharing = useTableSharing(tableId);
   const url = sharing.token ? `${location.origin}/t/${sharing.token}` : null;
   return (
@@ -264,7 +264,13 @@ function ShareDialog({ tableId, onClose }: { tableId: TableId; onClose: () => vo
  * The starter's settings for a table: an invite for each player, who records for everyone, and
  * the share link. Recorders need an account, so only players with one are listed.
  */
-function TableSettingsDialog({ tableId, onClose }: { tableId: TableId; onClose: () => void }) {
+export function TableSettingsDialog({
+  tableId,
+  onClose,
+}: {
+  tableId: TableId;
+  onClose: () => void;
+}) {
   const table = useRecordingTable(tableId)!;
   const server = useServerTable(tableId);
   const sharing = useTableSharing(tableId);

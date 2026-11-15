@@ -3,7 +3,13 @@ import { formatDay, formatDuration, formatTime } from "@stacks/client-runtime/fo
 import type { RecordingInput } from "@stacks/client-runtime/recording";
 import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import {
-  useRecordingClock,
+  cashOutNote,
+  liveTable,
+  tableActions,
+  type TableAction,
+  type TableSeat,
+} from "@stacks/client-runtime/liveTable";
+import {
   useRecordingSubmit,
   useRecordingTable,
   useRecordingVisit,
@@ -27,9 +33,7 @@ import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } fro
 import { Animated, Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { ActionMenu } from "../components/ui/ActionMenu";
 import { Button, IconButton } from "../components/ui/Button";
-import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon } from "../components/ui/Icon";
 import { FormError } from "../components/ui/Field";
 import { HeaderTitle } from "../components/ui/HeaderTitle";
@@ -55,6 +59,14 @@ import {
 import { LiveSessionsBar } from "../features/LiveBar";
 import { TableSection } from "../features/SharedTable";
 import { TableTripSheet, TableTripButton } from "../features/TableTrip";
+import {
+  ActionSlot,
+  LiveClock,
+  SeatSheet,
+  TableActionSheet,
+  TableSeats,
+  type TableRecorded,
+} from "../features/LiveTable";
 
 type Props = StaticScreenProps<{ visitId: string }>;
 
@@ -132,7 +144,6 @@ type Open =
       readonly type:
         | "trip"
         | "edit"
-        | "table"
         | "history"
         | "rebuy"
         | "cash_out"
@@ -143,7 +154,9 @@ type Open =
         | "game"
         | "venue";
     }
-  | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId };
+  | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId }
+  | { readonly type: "action"; readonly action: Exclude<TableAction, "edit" | "delete_table"> }
+  | { readonly type: "seat"; readonly seat: TableSeat };
 
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
 
@@ -151,16 +164,20 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const { visit, status, error, retryLoad } = useRecordingVisit(visitId);
   const navigation = useNavigation();
   const [open, setOpen] = useState<Open | null>(null);
+  // The toast for the last write here: yours, or one for another player at the table.
   const [saved, setSaved] = useState<{
     entryId: EntryId;
     text: string;
     undo?: boolean;
+    visitId?: VisitId;
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const quick = useRecordingSubmit();
   const state = useRecordingState();
   const [deletedHere, setDeletedHere] = useState(false);
   const table = useRecordingTable(visit?.visit.tableId ?? null);
+  const server = useServerTable(visit?.visit.tableId ?? null);
+  const seats = table ? liveTable(table, server) : null;
   if (visit === null) return <Missing />;
   if (visit === undefined)
     return (
@@ -178,6 +195,17 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const recorded = (entryId: EntryId, input: RecordingInput) => {
     close();
     setNotice(null);
+    // Cashing out while others play leaves you recording for them, on the table.
+    if (
+      input.type === "finish" &&
+      own &&
+      table &&
+      table.role !== "participant" &&
+      seats?.seats.some((seat) => seat.playing && seat.visitId !== visitId)
+    ) {
+      navigation.dispatch(StackActions.replace("Table", { tableId: table.table.id }));
+      return;
+    }
     setSaved({
       entryId,
       undo: input.type === "add" && input.kind === "buy_in",
@@ -216,15 +244,23 @@ function Visit({ visitId }: { visitId: VisitId }) {
       });
     }
   };
-  const undo = async (entryId: EntryId) => {
+  const undo = async (entryId: EntryId, of: VisitId = visitId) => {
     const receipt = await quick.submit({
       type: "correct",
-      visitId,
+      visitId: of,
       entryId,
       reason: "Undone",
       replacement: null,
     });
     if (receipt) setSaved({ entryId, text: "Rebuy undone. It stays in the history, voided." });
+  };
+  const fromTable = ({ entryId, ...rest }: TableRecorded) => {
+    close();
+    if (entryId) setSaved({ entryId, ...rest });
+    else {
+      setSaved(null);
+      setNotice(rest.text);
+    }
   };
   const edited = (text: string) => {
     close();
@@ -232,14 +268,26 @@ function Visit({ visitId }: { visitId: VisitId }) {
     setNotice(text);
   };
   const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
+  const shared = (seats?.seats.length ?? 1) > 1;
+  const actions = live
+    ? tableActions(table?.role ?? "participant", { playing: true, closed: false, empty: false })
+    : (["edit"] as const);
+  const act = (action: TableAction) =>
+    setOpen(
+      action === "edit"
+        ? { type: "edit" }
+        : action === "delete_table"
+          ? null
+          : { type: "action", action },
+    );
   const restore = async () => {
     if (await quick.submit({ type: "restore_visit", visitId })) setDeletedHere(false);
   };
   const deleteVisit = () =>
     confirmAction(
-      "Delete this session?",
+      shared ? "Delete my visit?" : "Delete this session?",
       `${visitTitle(visit.table)} · ${visit.venue?.name ?? "No casino set"}\n${formatDay(start)}, ${formatTime(start)} · Buy-in ${money(visit.totals.buyIn)}\n\nYour entries will be voided and this session will stop counting. Other players keep their sessions. You can restore yours later.`,
-      "Delete session",
+      shared ? "Delete my visit" : "Delete session",
       () => {
         void (async () => {
           if (await quick.submit({ type: "delete_visit", visitId })) {
@@ -297,8 +345,10 @@ function Visit({ visitId }: { visitId: VisitId }) {
           label="Undo"
           pending={quick.pending}
           size="sm"
-          onPress={() => void undo(saved.entryId)}
+          onPress={() => void undo(saved.entryId, saved.visitId)}
         />
+      ) : saved.visitId && saved.visitId !== visitId ? (
+        <Button label="Dismiss" size="sm" onPress={() => setSaved(null)} />
       ) : (
         <Button
           label="View entry"
@@ -387,10 +437,9 @@ function Visit({ visitId }: { visitId: VisitId }) {
     >
       <VisitHeader
         visit={visit}
-        solo={(table?.visits.length ?? 1) === 1}
-        onEdit={() => setOpen({ type: "edit" })}
-        onTable={() => setOpen({ type: "table" })}
-        onHistory={() => setOpen({ type: "history" })}
+        since={seats?.startedAt ?? visit.visit.startedAt}
+        actions={actions}
+        onAction={act}
       />
       {live ? (
         <>
@@ -398,6 +447,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
           <View className="items-center">
             <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} felt />
           </View>
+          {seats && shared ? (
+            <TableSeats
+              table={seats}
+              current={visitId}
+              onSeat={(seat) => setOpen({ type: "seat", seat })}
+              onSelf={(next) => navigation.dispatch(StackActions.push("Play", { visitId: next }))}
+            />
+          ) : null}
         </>
       ) : (
         <>
@@ -432,7 +489,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       {open?.type === "edit" ? (
         <Sheet
           open
-          title="Edit my session"
+          title={own ? "Edit my session" : `Edit ${player?.player.displayName ?? "their"} session`}
           onClose={close}
           footer={<Button label="Done" onPress={close} />}
         >
@@ -451,47 +508,60 @@ function Visit({ visitId }: { visitId: VisitId }) {
               onOpen={() => setOpen({ type: "trip" })}
             />
           ) : null}
-          <View className="flex-row gap-2">
-            <Button
-              label="At this table"
-              variant="ghost"
-              onPress={() => setOpen({ type: "table" })}
-            />
-            <Button
-              label="Your history"
-              variant="ghost"
-              onPress={() => setOpen({ type: "history" })}
-            />
-          </View>
+          <Button
+            label={own ? "Your history" : "History"}
+            variant="ghost"
+            className="self-start"
+            onPress={() => setOpen({ type: "history" })}
+          />
           {canDelete ? (
             <Button
-              label="Delete session"
+              label={shared ? "Delete my visit" : "Delete session"}
               variant="danger"
               pending={quick.pending}
               onPress={deleteVisit}
             />
           ) : null}
         </Sheet>
-      ) : open?.type === "table" ? (
-        <Sheet open title="At this table" onClose={close}>
-          <TableSection
-            tableId={visit.visit.tableId}
-            onOpen={(next) => {
-              close();
-              if (next !== visitId)
-                navigation.dispatch(StackActions.push("Play", { visitId: next }));
-            }}
-          />
-        </Sheet>
+      ) : open?.type === "action" && table ? (
+        <TableActionSheet
+          action={open.action}
+          table={table}
+          onClose={close}
+          onAdded={(name) => edited(`${name} is at the table.`)}
+        />
+      ) : open?.type === "seat" && seats ? (
+        <SeatSheet
+          seat={open.seat}
+          table={seats}
+          onClose={close}
+          onRecorded={fromTable}
+          onSeated={(_, name) => edited(`${name} is back at the table.`)}
+          onHistory={(next) => {
+            close();
+            navigation.dispatch(StackActions.push("Play", { visitId: next }));
+          }}
+        />
       ) : open?.type === "history" ? (
         <Sheet open title="Your history" onClose={close}>
           <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
         </Sheet>
       ) : null}
       {open?.type === "rebuy" ? (
-        <RebuySheet visit={visit} onClose={close} onSaved={recorded} />
+        <RebuySheet
+          visit={visit}
+          who={own ? undefined : player?.player.displayName}
+          onClose={close}
+          onSaved={recorded}
+        />
       ) : open?.type === "cash_out" ? (
-        <CashOutSheet visit={visit} onClose={close} onSaved={recorded} />
+        <CashOutSheet
+          visit={visit}
+          who={own ? undefined : player?.player.displayName}
+          note={shared && seats ? cashOutNote(seats.seats, visitId) : undefined}
+          onClose={close}
+          onSaved={recorded}
+        />
       ) : open?.type === "buy_in" ? (
         <BuyInTotalSheet visit={visit} onClose={close} onSaved={() => edited("Buy-in saved.")} />
       ) : open?.type === "start_time" ? (
@@ -553,7 +623,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   );
 }
 
-function RecordingToast({ children }: { children: ReactNode }) {
+export function RecordingToast({ children }: { children: ReactNode }) {
   const [shown] = useState(() => new Animated.Value(0));
   useEffect(() => {
     animate(shown, { toValue: 1, duration: duration.toastIn, easing: ease.enter });
@@ -578,16 +648,14 @@ function RecordingToast({ children }: { children: ReactNode }) {
 
 function VisitHeader({
   visit,
-  solo,
-  onEdit,
-  onTable,
-  onHistory,
+  since,
+  actions,
+  onAction,
 }: {
   visit: RecordingVisitView;
-  solo: boolean;
-  onEdit: () => void;
-  onTable: () => void;
-  onHistory: () => void;
+  since: DateTime.Utc;
+  actions: ReadonlyArray<TableAction>;
+  onAction: (action: TableAction) => void;
 }) {
   const navigation = useNavigation();
   useLayoutEffect(() => {
@@ -597,56 +665,36 @@ function VisitHeader({
   const live = visit.visit.finishedAt === null;
   return (
     <View className="flex-row items-center justify-between gap-3">
-      <IconButton
-        accessibilityLabel="Back to your play"
-        icon={
-          <View className="rotate-180">
-            <Icon name="arrow-right" color="ink" />
-          </View>
-        }
-        onPress={() =>
-          navigation.canGoBack()
-            ? navigation.goBack()
-            : navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } })
-        }
-      />
+      <BackButton />
       {live ? (
-        <LiveClock visit={visit} />
+        <LiveClock since={since} />
       ) : (
         <Text accessibilityRole="header" className="type-headline text-ink">
           Finished
         </Text>
       )}
-      {live && solo ? (
-        <IconButton
-          accessibilityLabel="Edit my session"
-          icon={<Icon name="edit" color="ink" />}
-          onPress={onEdit}
-        />
-      ) : (
-        <ActionMenu
-          label="Session actions"
-          actions={[
-            { label: "Edit my session", icon: "edit", onPress: onEdit },
-            { label: "At this table", icon: "group", onPress: onTable },
-            { label: "Your history", icon: "sessions", onPress: onHistory },
-          ]}
-        />
-      )}
+      <ActionSlot actions={actions} onAction={onAction} />
     </View>
   );
 }
 
-function LiveClock({ visit }: { visit: RecordingVisitView }) {
-  const now = useRecordingClock();
+/** Back to wherever this screen came from, or to your play when it opened from a link. */
+export function BackButton() {
+  const navigation = useNavigation();
   return (
-    <GlassSurface radius={22} className="min-h-11 flex-row items-center gap-2 rounded-full px-4">
-      <View className="size-2 rounded-full bg-live" />
-      <Text className="type-footnote font-semibold text-ink">LIVE</Text>
-      <Text className="type-callout font-semibold text-ink tabular-nums">
-        {sessionReadout(visit, now).clock}
-      </Text>
-    </GlassSurface>
+    <IconButton
+      accessibilityLabel="Back to your play"
+      icon={
+        <View className="rotate-180">
+          <Icon name="arrow-right" color="ink" />
+        </View>
+      }
+      onPress={() =>
+        navigation.canGoBack()
+          ? navigation.goBack()
+          : navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } })
+      }
+    />
   );
 }
 

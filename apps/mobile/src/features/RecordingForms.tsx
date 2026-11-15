@@ -340,25 +340,40 @@ const startedVisit = (receipt: RecordingReceipt) =>
 export function StartSheet({
   onClose,
   onStarted,
+  onOpened,
   initialTripId = null,
 }: {
   initialTripId?: TripId | null;
   onClose: () => void;
   onStarted: (visitId: VisitId) => void;
+  /** Offers recording a table without playing at it, which opens with no buy-in of your own. */
+  onOpened?: (tableId: TableId) => void;
 }) {
   const save = useRecordingSubmit();
   const [tripId, setTripId] = useState(initialTripId);
   const buyIn = useAmount("", 1);
   const [game, setGame] = useState<GameChoice>("none");
   const [highLimit, setHighLimit] = useState(false);
+  const [watching, setWatching] = useState(false);
   return (
     <RecordingSheet
-      title="Start session"
-      description="Your first buy-in starts it, timed from now."
-      submitLabel="Start session"
+      title={watching ? "Record a table" : "Start session"}
+      description={
+        watching
+          ? "Record everyone's buy-ins and cash-outs at a table you aren't playing at."
+          : "Your first buy-in starts it, timed from now."
+      }
+      submitLabel={watching ? "Open table" : "Start session"}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
+        if (watching) {
+          const receipt = await save.submit({ type: "open_table", ...details(game, highLimit) });
+          if (tripId && receipt && "tableId" in receipt.command)
+            await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
+          if (receipt && "tableId" in receipt.command) onOpened?.(receipt.command.tableId);
+          return;
+        }
         const amount = buyIn.read();
         if (amount === null) return;
         const receipt = await save.submit({
@@ -372,7 +387,17 @@ export function StartSheet({
         if (visitId) onStarted(visitId);
       }}
     >
-      <KeypadAmount label="Buy-in" amount={buyIn} />
+      {watching ? null : <KeypadAmount label="Buy-in" amount={buyIn} />}
+      {onOpened ? (
+        <View className="min-h-12 flex-row items-center justify-between gap-3 rounded-xl bg-surface px-4 py-2">
+          <Text className="flex-1 type-body text-ink">I'm not playing, just recording</Text>
+          <Switch
+            accessibilityLabel="I'm not playing, just recording"
+            value={watching}
+            onValueChange={setWatching}
+          />
+        </View>
+      ) : null}
       <TripChoice value={tripId} onChange={setTripId} />
       <DetailsFields
         game={game}
@@ -497,10 +522,13 @@ function PaidField({ label, paid }: { label: string; paid: ReturnType<typeof use
 
 export function RebuySheet({
   visit,
+  who,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  /** Whose rebuy, when it isn't yours: "Priya". */
+  who?: string | undefined;
   onClose: () => void;
   onSaved: Saved;
 }) {
@@ -509,7 +537,7 @@ export function RebuySheet({
   const paid = usePaidBy(visit);
   return (
     <RecordingSheet
-      title="Rebuy"
+      title={who ? `${who}'s rebuy` : "Rebuy"}
       submitLabel="Add rebuy"
       save={save}
       onClose={onClose}
@@ -534,7 +562,7 @@ export function RebuySheet({
         hint={
           buyInTotalPreview(visit.totals.buyIn, amount.text, "add") === null ? undefined : (
             <>
-              Your buy-in becomes{" "}
+              {who ? `${who}'s` : "Your"} buy-in becomes{" "}
               <Money
                 amount={MinorUnits.make(buyInTotalPreview(visit.totals.buyIn, amount.text, "add")!)}
                 currency={RECORDING_CURRENCY}
@@ -617,10 +645,16 @@ function ClockField({ label, clock }: { label: string; clock: ReturnType<typeof 
 /** Cashing out finishes the visit: what they left with, and when. */
 export function CashOutSheet({
   visit,
+  who,
+  note,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  /** Whose cash-out, when it isn't yours: "Priya". */
+  who?: string | undefined;
+  /** What it does to the table: "Priya's visit ends. You and Dev keep playing." */
+  note?: string | undefined;
   onClose: () => void;
   onSaved: Saved;
 }) {
@@ -632,9 +666,9 @@ export function CashOutSheet({
   const previous = visit.totals.cashOut;
   return (
     <RecordingSheet
-      title="Cash out"
-      description="This finishes the session and works out its result."
-      submitLabel="End session"
+      title={who ? `Cash out ${who}` : "Cash out"}
+      description={note ?? "This finishes the session and works out its result."}
+      submitLabel={who ? `End ${who}'s visit` : "End session"}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -684,7 +718,9 @@ export function CashOutSheet({
       <ClockField label="Finished at" clock={clock} />
       <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface p-4">
         <View>
-          <Text className="type-footnote text-muted">Your result</Text>
+          <Text className="type-footnote text-muted">
+            {who ? `${who}'s result` : "Your result"}
+          </Text>
           <Text className="type-footnote text-muted">{money(visit.totals.buyIn)} bought in</Text>
         </View>
         {cashOutResultPreview(visit, amount.text) === null ? (
@@ -1080,18 +1116,25 @@ export function AddPlayerSheet({
   tableId: TableId;
   saved: ReadonlyArray<PlayerIdentity>;
   onClose: () => void;
-  onAdded: (visitId: VisitId) => void;
+  onAdded: (visitId: VisitId, name: string) => void;
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 1);
   const [choice, setChoice] = useState<string>(NEW_PLAYER);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+  const chosen =
+    choice === NEW_PLAYER
+      ? name.trim()
+      : (saved.find((player) => player.id === choice)?.displayName ?? "");
+  const typed = parseRecordingAmount(amount.text, 1);
   return (
     <RecordingSheet
       title="Add player"
       description="Record their buy-ins and cash-outs from this device."
-      submitLabel="Add player"
+      submitLabel={
+        chosen && typed.error === null ? `Add ${chosen} · ${money(typed.amount)}` : "Add player"
+      }
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -1105,7 +1148,7 @@ export function AddPlayerSheet({
             ? { type: "join_table", tableId, displayName: trimmed, buyIn: value }
             : { type: "join_table", tableId, playerId: choice as PlayerId, buyIn: value },
         );
-        if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId);
+        if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId, chosen);
       }}
     >
       {saved.length > 0 ? (

@@ -114,9 +114,9 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
           </List>
         )}
       </Section>
-      {local?.role === "starter" ? (
+      {local && local.role !== "participant" ? (
         <>
-          <Note>You started this table. Record for everyone from your session.</Note>
+          <Note>You record for everyone at this table.</Note>
           {local.you.playing ? (
             <ButtonLink
               to="/play/$visitId"
@@ -125,7 +125,15 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
             >
               Open your session
             </ButtonLink>
-          ) : null}
+          ) : (
+            <ButtonLink
+              to="/tables/$tableId"
+              params={{ tableId: view.table.id }}
+              className="self-start"
+            >
+              Open the table
+            </ButtonLink>
+          )}
         </>
       ) : local ? (
         <div className="flex flex-wrap gap-2">

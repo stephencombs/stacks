@@ -1035,3 +1035,62 @@ it.each(["marker", "audit", "revived entry"])(
     await store.close();
   },
 );
+
+describe("recording a table without playing", () => {
+  const opened = async (db: ReturnType<typeof memory>) => {
+    const store = await open(db);
+    await save(store, { type: "open_table", game: "blackjack" });
+    return { store, tableId: store.getSnapshot().state!.tables[0]!.id };
+  };
+
+  it("records a player there, lists the table as live until they cash out, and survives a reload", async () => {
+    const db = memory();
+    let { store, tableId } = await opened(db);
+    expect(store.getSnapshot().state!.visits).toEqual([]);
+    expect(recordingHome(store.getSnapshot().state!).tables).toMatchObject([
+      { table: { id: tableId, game: "blackjack" }, startedAt: null, playing: 0 },
+    ]);
+    await save(store, {
+      type: "join_table",
+      tableId,
+      displayName: "Priya",
+      buyIn: 30000,
+      startedAt: at(10),
+    });
+    store = await reload(store, db);
+    expect(store.getSnapshot().status).toBe("saved");
+    const home = recordingHome(store.getSnapshot().state!);
+    expect(home.active).toEqual([]);
+    expect(home.tables).toMatchObject([{ startedAt: at(10), playing: 1 }]);
+    await save(store, {
+      type: "finish",
+      visitId: visitId(store),
+      amount: 50000,
+      finishedAt: at(12),
+    });
+    store = await reload(store, db);
+    expect(recordingHome(store.getSnapshot().state!).tables).toEqual([]);
+    expect(recordingHome(store.getSnapshot().state!).finished).toEqual([]);
+    expect(() => store.prepare({ type: "delete_table", tableId })).not.toThrow();
+    await expect(save(store, { type: "delete_table", tableId })).rejects.toThrow(
+      "Someone has played at this table",
+    );
+    await store.close();
+  });
+
+  it("deletes an empty table for good, and refuses a damaged deletion on load", async () => {
+    const db = memory();
+    let { store, tableId } = await opened(db);
+    await save(store, { type: "delete_table", tableId });
+    store = await reload(store, db);
+    expect(store.getSnapshot().status).toBe("saved");
+    expect(recordingHome(store.getSnapshot().state!).tables).toEqual([]);
+    await store.close();
+    const saved = JSON.parse(db.document.payload!);
+    delete saved.tables[0].deletedAt;
+    db.document = { revision: db.document.revision, payload: JSON.stringify(saved) };
+    store = makeRecordingStore(db.adapter());
+    await expect(store.ready).rejects.toMatchObject({ reason: "load" });
+    await store.close();
+  });
+});
