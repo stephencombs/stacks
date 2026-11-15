@@ -395,3 +395,34 @@ test("custom rebuy offers Undo for the recorded entry", async ({ page, context }
   await expect(dialog(page)).toBeHidden();
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
 });
+
+test("one LiveBar for several live sessions, and each session's page points to the others", async ({
+  page,
+  context,
+}) => {
+  const api = await isolate(context);
+  const backToSession = page.getByRole("link", { name: /^Back to your session/ });
+  await page.goto("/");
+  await start(page, "200");
+  const first = new URL(page.url()).pathname;
+  // Alone, a session's page has no bar: it is the session.
+  await expect(backToSession).toHaveCount(0);
+  await page.getByRole("link", { name: "Back to your play" }).click();
+  await start(page, "100");
+  const second = new URL(page.url()).pathname;
+  await backToSession.click();
+  await expect(page).toHaveURL(first);
+  await backToSession.click();
+  await expect(page).toHaveURL(second);
+
+  await page.getByRole("link", { name: "Back to your play" }).click();
+  await expect(backToSession).toHaveCount(0);
+  const bar = page.getByRole("button", { name: "2 live sessions" });
+  await expect(bar).toHaveCount(1);
+  await expect(bar).toContainText("+1 live");
+  await bar.click();
+  await expect(page.getByRole("menuitem")).toHaveCount(2);
+  await page.getByRole("menuitem").last().click();
+  await expect(page).toHaveURL(first);
+  expect(api).toEqual([]);
+});

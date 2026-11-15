@@ -38,15 +38,24 @@ export function Menu({
           {icon}
         </BaseMenu.Trigger>
       )}
-      <Popup align={align ?? (trigger ? "start" : "end")}>{children}</Popup>
+      <MenuPopup align={align ?? (trigger ? "start" : "end")}>{children}</MenuPopup>
     </BaseMenu.Root>
   );
 }
 
-function Popup({ align, children }: { align: "start" | "end"; children: ReactNode }) {
+/** A menu's floating list, for a trigger drawn by the part that owns it. */
+export function MenuPopup({
+  align,
+  side = "bottom",
+  children,
+}: {
+  align: "start" | "center" | "end";
+  side?: "top" | "bottom";
+  children: ReactNode;
+}) {
   return (
     <BaseMenu.Portal>
-      <BaseMenu.Positioner className="z-40" sideOffset={4} align={align}>
+      <BaseMenu.Positioner className="z-40" sideOffset={4} side={side} align={align}>
         <BaseMenu.Popup className="glass max-h-96 min-w-52 origin-[var(--transform-origin)] overflow-y-auto rounded-xl p-1 outline-none transition-[scale,opacity] duration-(--duration-menu-in) ease-enter data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:duration-(--duration-menu-out) data-[ending-style]:ease-exit data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
           {children}
         </BaseMenu.Popup>
@@ -94,9 +103,9 @@ export function FilterChip<Value extends string>({
           {label}
           {applied ? null : <ChevronDown className="size-3.5 text-muted" aria-hidden />}
         </BaseMenu.Trigger>
-        <Popup align="start">
+        <MenuPopup align="start">
           <MenuChoice options={options} value={value} onChange={onChange} closeOnClick />
-        </Popup>
+        </MenuPopup>
       </BaseMenu.Root>
       {applied ? (
         <button

@@ -103,13 +103,14 @@ export const focusMain = () => document.getElementById("main-content")?.focus();
  * A page's main actions, pinned within thumb reach on a phone above the home indicator, and in the
  * page's flow on a wide screen. A spacer of the bar's height keeps the last row clear of it.
  */
-export function Dock({ children }: { children: ReactNode }) {
+export function Dock({ above, children }: { above?: ReactNode; children: ReactNode }) {
   return (
     <>
-      <div aria-hidden className="h-24 shrink-0 sm:hidden" />
+      <div aria-hidden className={above ? "h-40 shrink-0 sm:hidden" : "h-24 shrink-0 sm:hidden"} />
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-canvas pr-[max(1rem,env(safe-area-inset-right))] pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] sm:static sm:border-0 sm:bg-transparent sm:p-0">
-        <div className="mx-auto flex w-full max-w-2xl gap-2 pt-3 sm:pt-0 [&>*]:flex-1 sm:[&>*]:flex-none">
-          {children}
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 pt-3 sm:pt-0">
+          {above}
+          <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">{children}</div>
         </div>
       </div>
     </>

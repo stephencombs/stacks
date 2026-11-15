@@ -50,6 +50,7 @@ import {
   VenueDialog,
   VoidDialog,
 } from "~/features/RecordingForms";
+import { LiveSessionsBar, useLiveSessions } from "~/features/LiveBar";
 import { TableSection } from "~/features/SharedTable";
 import { DeleteSessionDialog, DeletedSession } from "~/features/DeleteSession";
 
@@ -121,6 +122,9 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const table = useRecordingTable(visit?.visit.tableId ?? null);
   const serverTable = useServerTable(visit?.visit.tableId ?? null);
   const state = useSyncExternalStore(recordingStore.subscribe, recordingStore.getSnapshot).state;
+  // This page has no tabs, so your other live sessions sit above its dock.
+  const elsewhere = useLiveSessions(visitId);
+  const others = elsewhere.length > 0 ? <LiveSessionsBar live={elsewhere} /> : null;
   useEffect(() => {
     if (visit)
       document.title = `${visit.visit.finishedAt === null ? "Live" : "Finished"} · Color Up`;
@@ -305,7 +309,9 @@ function Visit({ visitId }: { visitId: VisitId }) {
           />
         </>
       )}
-      {live ? <div className="mt-auto h-52 shrink-0" aria-hidden /> : null}
+      {live ? (
+        <div className={others ? "mt-auto h-69 shrink-0" : "mt-auto h-52 shrink-0"} aria-hidden />
+      ) : null}
       <div
         className={
           live
@@ -349,6 +355,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
           {quick.error ? <FormError>{quick.error}</FormError> : null}
           {live ? (
             <>
+              {others}
               <p className="text-sm font-medium text-felt-soft">Rebuy</p>
               <div className="grid grid-cols-3 gap-2" role="group" aria-label="Rebuy amounts">
                 {LIVE_REBUY_AMOUNTS.map((preset) => (
@@ -379,7 +386,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
               </Button>
             </>
           ) : (
-            <Dock>
+            <Dock above={others}>
               <Button variant="secondary" size="lg" onClick={() => setOpen({ type: "reopen" })}>
                 Undo cash-out
               </Button>

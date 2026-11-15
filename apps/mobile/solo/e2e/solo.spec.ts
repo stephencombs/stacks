@@ -327,3 +327,33 @@ test("Crew waits for sign-in, and your play stays a tap away", async ({ page, co
   await expect(text(page, "No sessions yet")).toBeVisible();
   expect(api).toEqual([]);
 });
+
+test("one LiveBar for several live sessions, and each session's page points to the others", async ({
+  page,
+  context,
+}) => {
+  const api = await isolate(context);
+  const backToSession = /^Back to your session, Session, since/;
+  await home(page);
+  await start(page, "200");
+  // Alone, a session's page has no bar: it is the session.
+  await expect(button(page, backToSession)).toHaveCount(0);
+  await back(page);
+  await start(page, "100");
+  await expectLive(page, "$100");
+  await button(page, backToSession).click();
+  await expectLive(page, "$200");
+  await button(page, "Back to your play").click();
+  await expectLive(page, "$100");
+  await back(page);
+
+  await expect(button(page, backToSession)).toHaveCount(0);
+  await expect(button(page, /^2 live sessions/)).toContainText("+1 live");
+  await button(page, /^2 live sessions/).click();
+  await expect(button(sheet(page), /^Session · since/)).toHaveCount(2);
+  await button(sheet(page), /^Session · since/)
+    .last()
+    .click();
+  await expectLive(page, "$200");
+  expect(api).toEqual([]);
+});
