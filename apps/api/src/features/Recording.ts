@@ -201,6 +201,7 @@ const visitOf = (visit: typeof PersonalVisitRow.Type) =>
     startedAt: visit.startedAt,
     finishedAt: visit.finishedAt,
     revision: visit.revision,
+    ...(visit.deletedAt === null ? {} : { deletedAt: visit.deletedAt }),
   });
 
 const entryOf = (entry: typeof PersonalEntryRow.Type) =>
@@ -419,6 +420,7 @@ const save = Effect.fn("Recording.save")(function* (
       update personal_visits
       set started_at = ${date(visit.startedAt)},
         finished_at = ${visit.finishedAt ? date(visit.finishedAt) : null},
+        deleted_at = ${visit.deletedAt ? date(visit.deletedAt) : null},
         revision = ${visit.revision}
       where id = ${visit.id}
     `;
@@ -438,10 +440,10 @@ const save = Effect.fn("Recording.save")(function* (
           ${entry.replacesEntryId}, ${entry.counterpartyId}
         )
       `;
-    } else if (previous.voidedAt === null && entry.voidedAt !== null) {
+    } else if (previous !== entry) {
       yield* sql`
         update personal_entries
-        set voided_at = ${date(entry.voidedAt)}, voided_by = ${entry.voidedBy},
+        set voided_at = ${entry.voidedAt ? date(entry.voidedAt) : null}, voided_by = ${entry.voidedBy},
           void_reason = ${entry.voidReason}
         where id = ${entry.id}
       `;
@@ -655,6 +657,7 @@ export const history = Effect.fn("Recording.history")(function* () {
   if (!self || actorPlayers.length === 0)
     return {
       identity: null,
+      ownedPlayerIds: [],
       commands: [],
       tables: [],
       participants: [],
@@ -713,6 +716,7 @@ export const history = Effect.fn("Recording.history")(function* () {
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalOperationRow)));
   return {
     identity: { playerId: self.playerId, actorId: self.actorId },
+    ownedPlayerIds: actorPlayers,
     commands: operations.map((row) => row.command),
     tables: tables.map((row) => tableOf(row, row.starterPlayerId!)),
     participants: participants.map(({ tableId, ...player }) => ({
@@ -734,6 +738,8 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
   const visits = yield* sql`
     select * from personal_visits where table_id = ${row.id} order by started_at, id
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalVisitRow)));
+  if (visits.length > 0 && visits.every((visit) => visit.deletedAt !== null))
+    return yield* new NotFound({ resource: "table" });
   const players = yield* sql`
     select id, display_name from players
     where id in (select player_id from personal_visits where table_id = ${row.id})
@@ -758,7 +764,9 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
   const view: TableView = {
     table: tableOf(row, row.starterPlayerId),
     players: players.map((player) => PlayerIdentity.make(player)),
-    visits: visits.map((visit) => visitSummary(visitOf(visit), entries.map(entryOf))),
+    visits: visits
+      .filter((visit) => visit.deletedAt === null)
+      .map((visit) => visitSummary(visitOf(visit), entries.map(entryOf))),
     viewerRole,
     viewerPlayerId,
     recorders: recorders.map((item) => item.playerId),
@@ -847,14 +855,20 @@ export const join = Effect.fn("Recording.join")(function* (
   const sql = yield* SqlClient.SqlClient;
   const hash = yield* digest(token);
   // A bad link creates nothing, not even the recorder's own player.
-  const linked = yield* sql`select 1 from tables where share_token_hash = ${hash}`;
+  const linked = yield* sql`
+    select 1 from tables where share_token_hash = ${hash}
+      and exists (select 1 from personal_visits where table_id = tables.id and deleted_at is null)
+  `;
   if (linked.length === 0) return yield* new NotFound({ resource: "table" });
   const { self, actorPlayers } = yield* establish(request.identity);
   const attempt = Effect.gen(function* () {
-    const [row] = yield* sql`select * from tables where share_token_hash = ${hash} for update`.pipe(
-      Effect.flatMap(Access.decodeRows(TableRow)),
-    );
+    const [row] = yield* sql`
+      select * from tables where share_token_hash = ${hash} for update
+    `.pipe(Effect.flatMap(Access.decodeRows(TableRow)));
     if (!row?.starterPlayerId) return yield* new NotFound({ resource: "table" });
+    const remaining =
+      yield* sql`select 1 from personal_visits where table_id = ${row.id} and deleted_at is null limit 1`;
+    if (remaining.length === 0) return yield* new NotFound({ resource: "table" });
     const table = tableOf(row, row.starterPlayerId);
     if (actorPlayers.includes(table.starterPlayerId))
       return yield* new Conflict({ reason: "table_starter" });

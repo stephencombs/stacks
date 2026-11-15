@@ -11,7 +11,7 @@ import { useState } from "react";
 
 import { Money } from "~/components/Money";
 import { ActionBar } from "~/components/ui/ActionBar";
-import { Button } from "~/components/ui/Button";
+import { Button, ButtonLink } from "~/components/ui/Button";
 import { EmptyState, PageHeader, Section } from "~/components/ui/Page";
 import { Glow, List, RowLink, RowText, Skeleton, Surface, Tag } from "~/components/ui/Surface";
 import { focusMain, SaveStatus, useDialogFocus } from "~/features/Personal";
@@ -83,6 +83,9 @@ function Home() {
           ) : null}
         </>
       )}
+      <ButtonLink to="/history" variant="ghost" className="self-start">
+        All sessions
+      </ButtonLink>
       <ActionBar>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button

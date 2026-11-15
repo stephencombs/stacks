@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-14
 priority: medium
 tags:
@@ -11,7 +11,10 @@ depends_on:
   - "003"
 parent: "001"
 created_at: 2026-11-14T20:21:35.164878914Z
-updated_at: 2026-11-14T20:21:35.164878914Z
+updated_at: 2026-11-15T18:08:38.127422807Z
+transitions:
+  - status: in-progress
+    at: 2026-11-15T05:52:44.754669990Z
 ---
 
 # Delete a session
@@ -32,13 +35,13 @@ The live screen's edit sheet ends with **Delete session**. The ledger never eras
 
 ## Plan
 
-- [ ] Commands, shared logic and API, with unit and API tests
-- [ ] Delete and undo on the live screen and Finished, web and mobile
-- [ ] Deleted visits in All sessions with Restore
+- [x] Commands, shared logic and API, with unit and API tests
+- [x] Delete and undo on the live screen and Finished, web and mobile
+- [x] Deleted visits in All sessions with Restore
 
 ## Test
 
-- [ ] Delete then restore returns every entry and total exactly (unit and API tests)
-- [ ] Deleting your visit on a shared table leaves the others' visits untouched; the API refuses deleting someone else's
-- [ ] A deleted visit is absent from Play and Stats, present in All sessions as deleted
-- [ ] Works offline and syncs
+- [x] Delete then restore returns every entry and total exactly (unit and API tests)
+- [x] Deleting your visit on a shared table leaves the others' visits untouched; the API refuses deleting someone else's
+- [x] A deleted visit is absent from Play and Stats, present in All sessions as deleted
+- [x] Works offline and syncs

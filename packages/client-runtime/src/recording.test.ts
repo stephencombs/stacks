@@ -965,3 +965,73 @@ describe("setting the buy-in total", () => {
     await store.close();
   });
 });
+
+it.each([false, true])(
+  "durably deletes and restores a visit (finished: %s) without reviving corrections",
+  async (finished) => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(start(store));
+    const id = visitId(store);
+    const original = store.review(id).entries[0]!;
+    await save(store, {
+      type: "correct",
+      visitId: id,
+      entryId: original.id,
+      reason: "Wrong amount",
+      replacement: { amount: 25000 },
+    });
+    await save(store, { type: "finish", visitId: id, amount: 35000, finishedAt: at(12) });
+    await save(store, {
+      type: "correct",
+      visitId: id,
+      entryId: store.review(id).entries.at(-1)!.id,
+      reason: "Recounted",
+      replacement: { amount: 36000 },
+    });
+    await save(store, { type: "reopen", visitId: id, reason: "Still playing" });
+    if (finished)
+      await save(store, { type: "finish", visitId: id, amount: 40000, finishedAt: at(13) });
+    const before = store.review(id);
+    await save(store, { type: "delete_visit", visitId: id });
+    store = await reload(store, db);
+    expect(store.getSnapshot().status).toBe("saved");
+    expect(store.review(id).summary.visit.deletedAt).toBeDefined();
+    expect(store.review(id).entries.every((entry) => entry.voidedAt !== null)).toBe(true);
+    expect(recordingHome(store.getSnapshot().state!).active).toHaveLength(0);
+    expect(recordingHome(store.getSnapshot().state!).finished).toHaveLength(0);
+    await save(store, { type: "restore_visit", visitId: id });
+    store = await reload(store, db);
+    const restored = store.review(id);
+    expect(restored.entries).toEqual(before.entries);
+    expect(restored.summary).toEqual({
+      ...before.summary,
+      visit: { ...before.summary.visit, revision: before.summary.visit.revision + 2 },
+    });
+    await store.close();
+  },
+);
+
+it.each(["marker", "audit", "revived entry"])(
+  "refuses damaged durable deletion: %s",
+  async (damage) => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(start(store));
+    await save(store, { type: "delete_visit", visitId: visitId(store) });
+    await store.close();
+    const saved = JSON.parse(db.document.payload!);
+    if (damage === "marker") delete saved.visits[0].deletedAt;
+    else if (damage === "audit") saved.entries[0].voidReason = "Different reason";
+    else {
+      saved.entries[0].voidedAt = null;
+      saved.entries[0].voidedBy = null;
+      saved.entries[0].voidReason = null;
+    }
+    db.document = { revision: db.document.revision, payload: JSON.stringify(saved) };
+    store = makeRecordingStore(db.adapter());
+    await expect(store.ready).rejects.toMatchObject({ reason: "load" });
+    expect(store.getSnapshot()).toMatchObject({ state: null, status: "load_failed" });
+    await store.close();
+  },
+);

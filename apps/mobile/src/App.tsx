@@ -32,6 +32,7 @@ import { ScopeProvider } from "./lib/scope";
 import { SignedInProvider, StacksProvider } from "./lib/stacks";
 import "./lib/theme";
 import { BoardScreen } from "./screens/Board";
+import { HistoryScreen } from "./screens/History";
 import { HomeScreen } from "./screens/Home";
 import { MapScreen } from "./screens/Map";
 import { ClaimScreen, JoinScreen } from "./screens/Invites";
@@ -156,6 +157,7 @@ const RootStack = createNativeStackNavigator({
   screens: {
     Tabs: { screen: Tabs, options: { headerShown: false } },
     Play: { screen: PlayScreen, linking: "play/:visitId" },
+    History: { screen: HistoryScreen, linking: "history", options: { title: "All sessions" } },
     Invites: { screen: InvitesStack, options: { headerShown: false } },
   },
 });

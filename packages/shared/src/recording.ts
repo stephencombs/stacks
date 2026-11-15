@@ -7,6 +7,7 @@ import {
   type EntryId,
   type PlayerId,
   type TableId,
+  type VisitId,
 } from "@stacks/contracts";
 import { isTableCommand, RecordingCommand } from "@stacks/contracts/recordingCommands";
 import * as DateTime from "effect/DateTime";
@@ -32,6 +33,8 @@ export interface Participant {
 export interface RecordingLedger {
   readonly self: PlayerIdentity;
   readonly actor: Actor;
+  /** Authoritative account/device bindings, separate from everyone visible at a table. */
+  readonly ownedPlayerIds?: ReadonlyArray<PlayerId>;
   readonly players: ReadonlyArray<PlayerIdentity>;
   readonly participants: ReadonlyArray<Participant>;
   /** The players the starters appointed to record for everyone at their tables. */
@@ -70,13 +73,7 @@ export const authorize = (
 
 /** The players a device records as: its own, and the ones it joined other tables as. */
 export const ownPlayers = (state: RecordingLedger): ReadonlyArray<PlayerId> => [
-  state.self.id,
-  ...state.participants
-    .filter(
-      (item) =>
-        state.tables.find((table) => table.id === item.tableId)?.starterPlayerId !== state.self.id,
-    )
-    .map((item) => item.playerId),
+  ...new Set([state.self.id, ...(state.ownedPlayerIds ?? [])]),
 ];
 
 export class RecordingError extends Error {
@@ -121,6 +118,20 @@ export const createdEntryIds = (command: RecordingCommand): ReadonlyArray<EntryI
         : command.type === "correct" && command.replacement
           ? [command.replacement.id]
           : [];
+
+/** The entries live before a deletion, excluding earlier corrections and undone cash-outs. */
+export const visitLiveEntryIds = (receipts: ReadonlyArray<RecordingReceipt>, visitId: VisitId) => {
+  const live = new Set<EntryId>();
+  let final: EntryId | null = null;
+  for (const { command } of receipts) {
+    if (!("visitId" in command) || command.visitId !== visitId) continue;
+    for (const id of createdEntryIds(command)) live.add(id);
+    if (command.type === "correct") live.delete(command.entryId);
+    if (command.type === "reopen" && final !== null) live.delete(final);
+    final = finalCashOut(final, command);
+  }
+  return live;
+};
 
 /**
  * Applies one command. `actorPlayers` are the players bound to the command's actor: on a device,
@@ -220,7 +231,10 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
   const openAt = (tableId: Table["id"], playerId: PlayerId) =>
     visits.some(
       (visit) =>
-        visit.tableId === tableId && visit.playerId === playerId && visit.finishedAt === null,
+        visit.tableId === tableId &&
+        visit.playerId === playerId &&
+        visit.finishedAt === null &&
+        visit.deletedAt === undefined,
     );
   if (
     command.type === "start" ||
@@ -303,16 +317,62 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     requireValid(visit, "Visit does not exist.");
     const table = tables.find((table) => table.id === visit.tableId);
     requireValid(table, "Table does not exist.");
-    forbid(table, visit.playerId);
+    if (command.type === "delete_visit" || command.type === "restore_visit") {
+      if (actorPlayers !== null && !actorPlayers.includes(visit.playerId))
+        throw new RecordingError("forbidden", "You can delete or restore only your own sessions.");
+      requireValid(
+        state.receipts.some(
+          ({ command: original }) =>
+            (original.type === "start" ||
+              original.type === "record_completed" ||
+              original.type === "join_table") &&
+            original.visitId === visit.id,
+        ),
+        "Imported history is read-only.",
+      );
+    } else forbid(table, visit.playerId);
     if (visit.revision !== command.expectedRevision)
       throw new RecordingError(
         "conflict",
         "Visit changed. Review it before preparing another command.",
       );
     requireValid(visit.revision < Number.MAX_SAFE_INTEGER, "Visit revision overflow.");
+    requireValid(
+      command.type === "restore_visit"
+        ? visit.deletedAt !== undefined
+        : visit.deletedAt === undefined,
+      command.type === "restore_visit"
+        ? "This session isn't deleted."
+        : "Restore this session before changing it.",
+    );
+    let deletedAt = visit.deletedAt;
     let finishedAt = visit.finishedAt;
     let startedAt = visit.startedAt;
-    if (command.type === "edit_visit") {
+    if (command.type === "delete_visit") {
+      deletedAt = command.preparedAt;
+      entries = entries.map((entry) =>
+        entry.visitId === visit.id && entry.voidedAt === null
+          ? PlayEntry.make({
+              ...entry,
+              voidedAt: command.preparedAt,
+              voidedBy: command.actorId,
+              voidReason: "Session deleted",
+            })
+          : entry,
+      );
+    } else if (command.type === "restore_visit") {
+      requireValid(
+        finishedAt !== null || !openAt(visit.tableId, visit.playerId),
+        "This player is already playing at this table. Finish that session before restoring this one.",
+      );
+      deletedAt = undefined;
+      const live = visitLiveEntryIds(state.receipts, visit.id);
+      entries = entries.map((entry) =>
+        entry.visitId === visit.id && live.has(entry.id)
+          ? PlayEntry.make({ ...entry, voidedAt: null, voidedBy: null, voidReason: null })
+          : entry,
+      );
+    } else if (command.type === "edit_visit") {
       requireValid(
         command.startedAt !== undefined || command.table !== undefined,
         "Change the start time, game or venue.",
@@ -434,11 +494,15 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         );
       }
     }
-    visits = visits.map((item) =>
-      item.id === visit.id
-        ? Visit.make({ ...visit, startedAt, finishedAt, revision: visit.revision + 1 })
-        : item,
-    );
+    const { deletedAt: _deletedAt, ...restored } = visit;
+    const updated = Visit.make({
+      ...restored,
+      startedAt,
+      finishedAt,
+      revision: visit.revision + 1,
+      ...(deletedAt === undefined ? {} : { deletedAt }),
+    });
+    visits = visits.map((item) => (item.id === visit.id ? updated : item));
   }
   return {
     ...state,

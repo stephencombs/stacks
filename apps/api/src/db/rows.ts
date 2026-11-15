@@ -171,6 +171,7 @@ export const PlayerIdentityRow = Schema.Struct({
 export const ParticipantRow = Schema.Struct({ ...PlayerIdentityRow.fields, tableId: TableId });
 
 export const PersonalVisitRow = Schema.Struct({
+  deletedAt: Schema.NullOr(Timestamp),
   id: VisitId,
   tableId: TableId,
   playerId: PlayerId,

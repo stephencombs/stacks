@@ -19,6 +19,7 @@ import {
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
 import { VisitId, type EntryId, type PlayEntry } from "@stacks/contracts";
+import { ownPlayers } from "@stacks/shared/recording";
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -50,6 +51,7 @@ import {
   VoidDialog,
 } from "~/features/RecordingForms";
 import { TableSection } from "~/features/SharedTable";
+import { DeleteSessionDialog, DeletedSession } from "~/features/DeleteSession";
 
 export const Route = createFileRoute("/play/$visitId")({ component: VisitPage });
 
@@ -85,6 +87,7 @@ function Missing() {
 type Open =
   | {
       readonly type:
+        | "delete"
         | "edit"
         | "table"
         | "history"
@@ -111,6 +114,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
     undo?: boolean;
   } | null>(null);
   const quick = useRecordingSubmit();
+  const [deletedHere, setDeletedHere] = useState(false);
   const savedButton = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const focus = useDialogFocus(() => savedButton.current);
@@ -214,6 +218,26 @@ function Visit({ visitId }: { visitId: VisitId }) {
     setSaved(null);
     void navigate({ to: "/play/$visitId", params: { visitId: next } }).then(focusMain);
   };
+  const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
+  const restore = async () => {
+    if (await quick.submit({ type: "restore_visit", visitId })) setDeletedHere(false);
+  };
+  if (visit.visit.deletedAt !== undefined)
+    return (
+      <PersonalFrame>
+        <PageHeader back={back} title="Session deleted" />
+        <DeletedSession
+          canRestore={canDelete}
+          undo={deletedHere}
+          pending={quick.pending}
+          onRestore={() => void restore()}
+          onDismiss={() => setDeletedHere(false)}
+        />
+        {quick.error ? <FormError>{quick.error}</FormError> : null}
+        <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
+        <TableSection tableId={visit.visit.tableId} visitId={visitId} onAdded={seated} />
+      </PersonalFrame>
+    );
   return (
     <PersonalFrame session felt={live} onClickCapture={focus.capture}>
       <header className="grid grid-cols-[44px_1fr_44px] items-center gap-3">
@@ -368,6 +392,21 @@ function Visit({ visitId }: { visitId: VisitId }) {
           )}
         </div>
       </div>
+      {open?.type === "delete" ? (
+        <DeleteSessionDialog
+          visit={visit}
+          pending={quick.pending}
+          error={quick.error}
+          onClose={close}
+          onDelete={async () => {
+            if (await quick.submit({ type: "delete_visit", visitId })) {
+              close();
+              setSaved(null);
+              setDeletedHere(true);
+            }
+          }}
+        />
+      ) : null}
       {open?.type === "edit" ? (
         <Dialog
           open
@@ -400,6 +439,11 @@ function Visit({ visitId }: { visitId: VisitId }) {
               Your history
             </Button>
           </div>
+          {canDelete ? (
+            <Button variant="danger" className="mt-4" onClick={() => setOpen({ type: "delete" })}>
+              Delete session
+            </Button>
+          ) : null}
         </Dialog>
       ) : open?.type === "table" ? (
         <Dialog

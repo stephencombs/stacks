@@ -86,6 +86,7 @@ export type RecordingInput =
         readonly counterpartyId?: PlayerId;
       } | null;
     }
+  | { readonly type: "delete_visit" | "restore_visit"; readonly visitId: VisitId }
   | { readonly type: "reopen"; readonly visitId: VisitId; readonly reason: string }
   | {
       readonly type: "edit_visit";
@@ -221,6 +222,9 @@ export const prepareRecordingCommand = (
               },
       });
     }
+    case "delete_visit":
+    case "restore_visit":
+      return RecordingCommand.make({ ...existing, type: input.type });
     case "reopen":
       return RecordingCommand.make({ ...existing, type: "reopen", reason: input.reason });
     case "edit_visit":

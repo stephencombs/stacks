@@ -454,3 +454,20 @@ describe("personalStats", () => {
     },
   );
 });
+
+it("excludes deleted visits even when passed unfiltered results", () => {
+  const deleted = personalSession(1, 10000);
+  const kept = personalSession(2, -5000);
+  expect(
+    personalStats(
+      [
+        {
+          ...deleted,
+          visit: { ...deleted.visit, deletedAt: DateTime.makeUnsafe("2026-11-07T20:00:00Z") },
+        },
+        kept,
+      ],
+      DateTime.zoneMakeNamedUnsafe("UTC"),
+    ),
+  ).toEqual(personalStats([kept], DateTime.zoneMakeNamedUnsafe("UTC")));
+});

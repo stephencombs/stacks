@@ -19,6 +19,7 @@ import {
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
 import { MinorUnits, VisitId, type EntryId, type PlayEntry } from "@stacks/contracts";
+import { ownPlayers } from "@stacks/shared/recording";
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -36,6 +37,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { animate, duration, ease } from "../components/ui/motion";
 import { cn } from "../components/ui/cn";
+import { confirmAction } from "../components/ui/confirmAction";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { useRecordingState } from "../lib/recording";
 import {
@@ -153,6 +155,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const quick = useRecordingSubmit();
+  const state = useRecordingState();
+  const [deletedHere, setDeletedHere] = useState(false);
   const table = useRecordingTable(visit?.visit.tableId ?? null);
   if (visit === null) return <Missing />;
   if (visit === undefined)
@@ -224,6 +228,64 @@ function Visit({ visitId }: { visitId: VisitId }) {
     setSaved(null);
     setNotice(text);
   };
+  const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
+  const restore = async () => {
+    if (await quick.submit({ type: "restore_visit", visitId })) setDeletedHere(false);
+  };
+  const deleteVisit = () =>
+    confirmAction(
+      "Delete this session?",
+      `${visitTitle(visit.table)} · ${visit.venue?.name ?? "No casino set"}\n${formatDay(start)}, ${formatTime(start)} · Buy-in ${money(visit.totals.buyIn)}\n\nYour entries will be voided and this session will stop counting. Other players keep their sessions. You can restore yours later.`,
+      "Delete session",
+      () => {
+        void (async () => {
+          if (await quick.submit({ type: "delete_visit", visitId })) {
+            close();
+            setSaved(null);
+            setDeletedHere(true);
+          }
+        })();
+      },
+    );
+  if (visit.visit.deletedAt !== undefined)
+    return (
+      <PersonalScreen
+        dock={
+          canDelete && deletedHere ? (
+            <RecordingToast>
+              <Text className="min-w-0 flex-1 text-sm text-ink-inverse">Session deleted</Text>
+              <Button
+                label="Undo"
+                size="sm"
+                pending={quick.pending}
+                onPress={() => void restore()}
+              />
+              <Button label="Dismiss" size="sm" onPress={() => setDeletedHere(false)} />
+            </RecordingToast>
+          ) : undefined
+        }
+      >
+        <Title>Session deleted</Title>
+        <Text className="text-muted">
+          This session no longer counts. You can restore it from All sessions.
+        </Text>
+        <Button label="All sessions" onPress={() => navigation.navigate("History")} />
+        {canDelete ? (
+          <Button
+            label="Restore"
+            variant="secondary"
+            pending={quick.pending}
+            onPress={() => void restore()}
+          />
+        ) : null}
+        {quick.error ? <FormError>{quick.error}</FormError> : null}
+        <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
+        <TableSection
+          tableId={visit.visit.tableId}
+          onOpen={(next) => navigation.dispatch(StackActions.push("Play", { visitId: next }))}
+        />
+      </PersonalScreen>
+    );
   const toast = saved ? (
     <RecordingToast key={saved.entryId}>
       <Text className="min-w-0 flex-1 text-sm text-ink-inverse">{saved.text}</Text>
@@ -391,6 +453,14 @@ function Visit({ visitId }: { visitId: VisitId }) {
               onPress={() => setOpen({ type: "history" })}
             />
           </View>
+          {canDelete ? (
+            <Button
+              label="Delete session"
+              variant="danger"
+              pending={quick.pending}
+              onPress={deleteVisit}
+            />
+          ) : null}
         </Sheet>
       ) : open?.type === "table" ? (
         <Sheet open title="At this table" onClose={close}>
