@@ -400,3 +400,72 @@ it("moves a whole table between trips and back to personal without changing play
     ),
   ).toThrow("Only the player who started this table");
 });
+
+it("opens a table without playing, records for the players added there, and deletes it only while nobody has played", () => {
+  const open = {
+    ...common(),
+    type: "open_table",
+    tableId: visit.tableId,
+    playerId: visit.playerId,
+    game: null,
+    venueId: null,
+    highLimit: false,
+  } satisfies RecordingCommand;
+  expect(() => applyRecordingCommand(initial(), { ...open, playerId: BEA })).toThrow(
+    "Start a table as yourself",
+  );
+  const empty = applyRecordingCommand(initial(), open);
+  expect(empty.tables).toEqual([
+    {
+      id: visit.tableId,
+      tripId: null,
+      game: null,
+      venueId: null,
+      highLimit: false,
+      starterPlayerId: visit.playerId,
+    },
+  ]);
+  expect(empty.visits).toEqual([]);
+  expect(() => applyRecordingCommand(empty, open)).toThrow("Start IDs are already used");
+  // A recorder's device gets the table with its history, then replays the opening.
+  expect(applyRecordingCommand(empty, open, null).tables).toEqual(empty.tables);
+
+  const seat = {
+    ...common(),
+    type: "join_table",
+    tableId: visit.tableId,
+    visitId: VisitId.make(uuid()),
+    playerId: BEA,
+    newPlayer: { id: BEA, displayName: "Bea" },
+    buyInId: EntryId.make(uuid()),
+    buyIn: MinorUnits.make(10000),
+    startedAt: at(5),
+  } satisfies RecordingCommand;
+  const seated = applyRecordingCommand(empty, seat);
+  const finished = applyRecordingCommand(
+    seated,
+    RecordingCommand.make({
+      ...common(),
+      type: "finish",
+      visitId: seat.visitId,
+      expectedRevision: 0,
+      entryId: EntryId.make(uuid()),
+      amount: MinorUnits.make(25000),
+      finishedAt: at(20),
+    }),
+  );
+  expect(visitSummary(finished.visits[0]!, finished.entries).finalResult).toBe(15000);
+
+  const remove = (state: RecordingLedger, actorPlayers?: ReadonlyArray<PlayerId>) =>
+    applyRecordingCommand(
+      state,
+      RecordingCommand.make({ ...common(), type: "delete_table", tableId: visit.tableId }),
+      actorPlayers,
+    );
+  expect(() => remove(finished)).toThrow("Someone has played at this table");
+  expect(() => remove(empty, [BEA])).toThrow("Only the player who started this table");
+  const deleted = remove(empty);
+  expect(deleted.tables[0]!.deletedAt).toEqual(at(30));
+  expect(() => remove(deleted)).toThrow("This table was deleted");
+  expect(() => applyRecordingCommand(deleted, seat)).toThrow("This table was deleted");
+});

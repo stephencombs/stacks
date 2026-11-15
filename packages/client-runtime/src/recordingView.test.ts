@@ -100,6 +100,7 @@ describe("recordingHome", () => {
     const { store } = await open();
     expect(recordingHome(state(store))).toEqual({
       active: [],
+      tables: [],
       finished: [],
       deleted: [],
       finishedResult: 0,

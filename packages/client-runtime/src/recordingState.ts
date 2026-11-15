@@ -199,21 +199,16 @@ const validateRecordingState = (state: RecordingState) => {
       state.participants.every((item) => tables.has(item.tableId) && players.has(item.playerId)),
     "Invalid table participant.",
   );
-  // A table someone else started is here because this device joined it.
+  // A table someone else started is here because this device joined it. Its own tables come from
+  // their receipts, with or without a visit: its starter can record there without playing.
   const joined = new Set<Table["id"]>();
   for (const table of state.tables) {
-    if (table.starterPlayerId === state.self.id)
-      requireValid(
-        state.visits.some((visit) => visit.tableId === table.id),
-        "Table has no visit.",
-      );
-    else {
-      requireValid(
-        state.participants.some((item) => item.tableId === table.id),
-        "Foreign table ownership.",
-      );
-      joined.add(table.id);
-    }
+    if (table.starterPlayerId === state.self.id) continue;
+    requireValid(
+      state.participants.some((item) => item.tableId === table.id),
+      "Foreign table ownership.",
+    );
+    joined.add(table.id);
   }
   const synced = new Set(state.sync?.synced);
   for (const visit of state.visits) {
@@ -266,6 +261,7 @@ const validateRecordingState = (state: RecordingState) => {
   const starts = new Map<Visit["id"], DateTime.Utc>();
   const details = new Map<Table["id"], TableDetails>();
   const trips = new Map<Table["id"], Table["tripId"]>();
+  const deletedTables = new Map<Table["id"], DateTime.Utc>();
   const verifyEntry = (
     command: VisitCommand,
     id: EntryId,
@@ -302,7 +298,30 @@ const validateRecordingState = (state: RecordingState) => {
       "Invalid command receipt.",
     );
     operations.add(command.operationId);
+    if (command.type === "open_table") {
+      const table = tables.get(command.tableId);
+      requireValid(
+        table && !createdTables.has(table.id) && table.starterPlayerId === command.playerId,
+        "Duplicate or missing start records.",
+      );
+      createdTables.add(table.id);
+      trips.set(table.id, null);
+      details.set(table.id, {
+        game: command.game,
+        venueId: command.venueId,
+        highLimit: command.highLimit,
+      });
+      continue;
+    }
     if (isTableCommand(command)) {
+      requireValid(
+        tables.has(command.tableId) && !deletedTables.has(command.tableId),
+        "Table command references a missing table.",
+      );
+      if (command.type === "delete_table") {
+        deletedTables.set(command.tableId, command.preparedAt);
+        continue;
+      }
       if (command.type === "set_table_trip") {
         requireValid(tables.has(command.tableId), "Trip choice references a missing table.");
         trips.set(command.tableId, command.tripId);
@@ -536,6 +555,16 @@ const validateRecordingState = (state: RecordingState) => {
     requireValid(
       start !== undefined && ms(start) === ms(visit.startedAt),
       "Visit start differs from its receipts.",
+    );
+  }
+  // A joined table's deletion comes from the server, without its starter's receipt.
+  for (const table of state.tables.filter((item) => createdTables.has(item.id))) {
+    const at = deletedTables.get(table.id);
+    requireValid(
+      at === undefined
+        ? table.deletedAt === undefined
+        : table.deletedAt !== undefined && ms(at) === ms(table.deletedAt),
+      "Table deletion differs from its receipts.",
     );
   }
   for (const [tableId, tripId] of trips)

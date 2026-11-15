@@ -43,6 +43,14 @@ type StartInput = {
 };
 export type RecordingInput =
   | { readonly type: "set_table_trip"; readonly tableId: TableId; readonly tripId: TripId | null }
+  | {
+      /** A table to record at without playing. */
+      readonly type: "open_table";
+      readonly game?: Game;
+      readonly venueId?: VenueId;
+      readonly highLimit?: boolean;
+    }
+  | { readonly type: "delete_table"; readonly tableId: TableId }
   | ({ readonly type: "start" } & StartInput)
   | ({
       readonly type: "record_completed";
@@ -171,7 +179,18 @@ export const prepareRecordingCommand = (
       ...withCounterparty(input.counterpartyId),
     });
   }
-  if (input.type === "set_table_trip") return RecordingCommand.make({ ...common, ...input });
+  if (input.type === "open_table")
+    return RecordingCommand.make({
+      ...common,
+      type: "open_table",
+      tableId: TableId.make(newId()),
+      playerId: state.self.id,
+      game: input.game ?? null,
+      venueId: input.venueId ?? null,
+      highLimit: input.highLimit ?? false,
+    });
+  if (input.type === "set_table_trip" || input.type === "delete_table")
+    return RecordingCommand.make({ ...common, ...input });
   if (input.type === "appoint_recorder" || input.type === "revoke_recorder")
     return RecordingCommand.make({
       ...common,

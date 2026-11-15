@@ -55,9 +55,23 @@ export type RecordedVisit = VisitSummary & {
   readonly venue: CachedVenue | null;
 };
 
+/** A table this device records for everyone at, while you aren't playing there. */
+export type RecordedTable = {
+  readonly table: Table;
+  readonly venue: CachedVenue | null;
+  /** When its first visit started; null until someone sits down. */
+  readonly startedAt: DateTime.Utc | null;
+  readonly playing: number;
+};
+
 export type RecordingHome = {
   /** Every visit still in play, newest first. There can be more than one. */
   readonly active: ReadonlyArray<RecordedVisit>;
+  /**
+   * Tables you record for everyone at, without a visit of yours in play there, until they close:
+   * one you opened without playing, or one you cashed out of while others play. Newest first.
+   */
+  readonly tables: ReadonlyArray<RecordedTable>;
   /** Finished visits, most recently finished first. */
   readonly finished: ReadonlyArray<RecordedVisit>;
   readonly deleted: ReadonlyArray<RecordedVisit>;
@@ -126,9 +140,34 @@ export const recordingHome = (state: RecordingState): RecordingHome => {
     .toSorted((a, b) => ms(b.visit.finishedAt!) - ms(a.visit.finishedAt!));
   let total = 0n;
   for (const item of finished) total += BigInt(item.finalResult!);
+  const playingHere = new Set(active.map((item) => item.table.id));
+  const recording = new Set(
+    state.recorders.filter((item) => mine.has(item.playerId)).map((item) => item.tableId),
+  );
+  const tables = state.tables
+    .filter(
+      (table) =>
+        table.deletedAt === undefined &&
+        !playingHere.has(table.id) &&
+        (mine.has(table.starterPlayerId) || recording.has(table.id)),
+    )
+    .flatMap((table): ReadonlyArray<RecordedTable> => {
+      const here = state.visits.filter(
+        (visit) => visit.tableId === table.id && visit.deletedAt === undefined,
+      );
+      const playing = here.filter((visit) => visit.finishedAt === null).length;
+      // Closed once everyone cashed out; gone once every visit was deleted.
+      if (playing === 0 && state.visits.some((visit) => visit.tableId === table.id)) return [];
+      const first = here.toSorted((a, b) => ms(a.startedAt) - ms(b.startedAt))[0];
+      return [
+        { table, venue: venueOf(state, table), startedAt: first?.startedAt ?? null, playing },
+      ];
+    })
+    .toReversed();
   // MinorUnits refuses an unsafe integer, so an overflowing total fails loudly.
   return {
     active,
+    tables,
     finished,
     deleted: visits.filter((item) => item.visit.deletedAt !== undefined),
     finishedResult: MinorUnits.make(Number(total)),
@@ -192,6 +231,7 @@ export const recordingTable = (
   const table = state.tables.find((item) => item.id === tableId);
   if (
     !table ||
+    table.deletedAt !== undefined ||
     (state.visits.some((visit) => visit.tableId === tableId) &&
       !state.visits.some((visit) => visit.tableId === tableId && visit.deletedAt === undefined))
   )

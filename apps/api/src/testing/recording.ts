@@ -91,6 +91,21 @@ export const start = (identity: RecordingIdentity) =>
     highLimit: false,
   }) as Extract<RecordingCommand, { type: "start" }>;
 
+/** A table its starter records at without playing. */
+export const openTable = (identity: RecordingIdentity) =>
+  RecordingCommand.make({
+    type: "open_table",
+    ...common(identity),
+    tableId: TableId.make(uuid()),
+    playerId: identity.playerId,
+    game: "blackjack",
+    venueId: null,
+    highLimit: false,
+  }) as Extract<RecordingCommand, { type: "open_table" }>;
+
+export const deleteTable = (identity: RecordingIdentity, tableId: TableId) =>
+  RecordingCommand.make({ type: "delete_table", ...common(identity, 2), tableId });
+
 export const sitDown = (
   identity: RecordingIdentity,
   tableId: TableId,
