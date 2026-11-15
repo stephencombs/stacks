@@ -57,7 +57,8 @@ function VisitPage() {
   const { visitId } = Route.useParams();
   const id = Option.getOrNull(VisitId.makeOption(visitId));
   return id ? (
-    <Visit visitId={id} />
+    // Keyed so moving to another player's visit starts with no sheet open.
+    <Visit key={id} visitId={id} />
   ) : (
     <PersonalFrame>
       <Missing />

@@ -664,14 +664,15 @@ export const cashOutResultPreview = (visit: RecordingVisitView, text: string) =>
 export type SessionEditField = "buy_in" | "start_time" | "game" | "venue";
 
 export const sessionEditFields = (visit: RecordingVisitView, canEditTable: boolean) => {
-  const fields: Array<{ field: SessionEditField; label: string; value: string }> = [
-    { field: "buy_in", label: "Buy-in total", value: money(visit.totals.buyIn) },
-    {
-      field: "start_time",
-      label: "Started",
-      value: `${formatDay(visit.visit.startedAt)} · ${formatTime(visit.visit.startedAt)}`,
-    },
-  ];
+  const fields: Array<{ field: SessionEditField; label: string; value: string }> = [];
+  // A finished visit takes no new buy-ins; its entries change through corrections.
+  if (visit.visit.finishedAt === null)
+    fields.push({ field: "buy_in", label: "Buy-in total", value: money(visit.totals.buyIn) });
+  fields.push({
+    field: "start_time",
+    label: "Started",
+    value: `${formatDay(visit.visit.startedAt)} · ${formatTime(visit.visit.startedAt)}`,
+  });
   if (canEditTable)
     fields.push(
       { field: "game", label: "Game", value: visitTitle(visit.table) },

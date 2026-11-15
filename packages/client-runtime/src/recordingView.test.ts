@@ -351,6 +351,9 @@ describe("live session readouts", () => {
       "game",
       "venue",
     ]);
+    expect(
+      sessionEditFields(recordingVisit(state(store), id)!, false).map((field) => field.field),
+    ).toEqual(["start_time"]);
     await store.close();
   });
 
