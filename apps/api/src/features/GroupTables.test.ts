@@ -18,7 +18,7 @@ import {
 } from "@stacks/contracts/recordingCommands";
 
 import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
-import { at, finish, seatNew, sitDown, start, uuid } from "../testing/recording.ts";
+import { at, finish, openTable, seatNew, sitDown, start, uuid } from "../testing/recording.ts";
 import { TestApi } from "../testing/TestApi.ts";
 import * as LegacyMigration from "./LegacyMigration.ts";
 
@@ -287,6 +287,48 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
       const [table] = (yield* alex.trips.get({ params: { tripId: group.tripId } })).tables;
       expect(nets(table!.results)).toEqual({ [group.myPlayerId]: 0, [beaPlayer.id]: 3000 });
       expect(table!.others).toEqual([{ displayName: "Bea", playing: false, net: 40000 }]);
+    }),
+  );
+
+  it.effect("leaves deleted tables out of the trip, group stats and Crew", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { alex } = yield* users("alex");
+      const group = yield* groupWith(alex);
+      const me = identity();
+      // A table nobody played at, deleted the usual way: it leaves its trip.
+      const empty = openTable(me);
+      const deleteEmpty = RecordingCommand.make({
+        type: "delete_table",
+        operationId: RecordingOperationId.make(uuid()),
+        actorId: me.actorId,
+        preparedAt: at(2),
+        tableId: empty.tableId,
+      });
+      // A played table marked deleted with its trip still set: reads must not trust trip_id alone.
+      const played = start(me);
+      expect(
+        yield* push(
+          alex,
+          me,
+          empty,
+          toTrip(me, empty.tableId, group.tripId),
+          deleteEmpty,
+          played,
+          toTrip(me, played.tableId, group.tripId),
+          finish(me, played.visitId),
+        ),
+      ).toEqual(["accepted", "accepted", "accepted", "accepted", "accepted", "accepted"]);
+      yield* sql`update tables set deleted_at = now() where id = ${played.tableId}`;
+
+      const trip = yield* alex.trips.get({ params: { tripId: group.tripId } });
+      expect(trip.tables).toEqual([]);
+      expect((yield* alex.groups.stats({ params: { groupId: group.group.id } })).sessionCount).toBe(
+        0,
+      );
+      const feed = (yield* alex.crew.activity({ query: {} })).items;
+      expect(tableItems(feed, played.tableId)).toEqual([]);
+      expect(tableItems(feed, empty.tableId)).toEqual([]);
     }),
   );
 
