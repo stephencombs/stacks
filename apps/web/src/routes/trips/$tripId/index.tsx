@@ -22,7 +22,7 @@ export const Route = createFileRoute("/trips/$tripId/")({ component: TripPage })
 function TripPage() {
   const { tripId } = Route.useParams();
   return (
-    <TripLoaded tripId={TripId.make(tripId)} skeleton={<TripPageSkeleton on="sessions" />}>
+    <TripLoaded tripId={TripId.make(tripId)} skeleton={<TripPageSkeleton />}>
       {(trip, group) => <TripView trip={trip} group={group} />}
     </TripLoaded>
   );
@@ -70,7 +70,6 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
       <TripHeader
         group={group}
         trip={trip}
-        place="sessions"
         action={<div className="hidden lg:block">{startSession}</div>}
       />
       <TripHero currency={group.group.currency} me={group.myPlayerId} sessions={closed} />

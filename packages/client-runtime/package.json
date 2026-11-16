@@ -36,6 +36,10 @@
       "types": "./src/freshness.ts",
       "import": "./src/freshness.ts"
     },
+    "./groupStats": {
+      "types": "./src/groupStats.ts",
+      "import": "./src/groupStats.ts"
+    },
     "./ids": {
       "types": "./src/ids.ts",
       "import": "./src/ids.ts"
@@ -87,6 +91,10 @@
     "./stats": {
       "types": "./src/stats.ts",
       "import": "./src/stats.ts"
+    },
+    "./statsCopy": {
+      "types": "./src/statsCopy.ts",
+      "import": "./src/statsCopy.ts"
     },
     "./table": {
       "types": "./src/table.ts",

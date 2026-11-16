@@ -31,7 +31,7 @@ import { PlayerName } from "~/features/Player";
 import { EntryDialog, VoidEntryDialog, type EntryDraft } from "~/features/EntryDialogs";
 import { SeatHero, TableStats } from "~/features/SeatHero";
 import { TableMap } from "~/features/TableMap";
-import { Tonight } from "~/features/TripBoard";
+import { Tonight } from "~/features/Tonight";
 import { isAdmin, playerNames } from "@stacks/client-runtime/format";
 import { formatDay, formatDuration, formatTime, gameNames } from "@stacks/client-runtime/format";
 import { tableView } from "@stacks/client-runtime/table";
@@ -371,11 +371,11 @@ export function SessionView({
               </ButtonLink>
             ) : null}
             <ButtonLink
-              to="/trips/$tripId/board"
-              params={{ tripId: session.tripId }}
+              to="/stats"
+              state={{ statsPick: { groupId: session.groupId, tripId: session.tripId } }}
               variant={tripEnded ? "primary" : "secondary"}
             >
-              See the board
+              See the trip's stats
             </ButtonLink>
           </div>
         )}

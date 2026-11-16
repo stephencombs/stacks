@@ -46,35 +46,6 @@ export interface TripNight<S> {
   readonly winner: { readonly playerId: PlayerId; readonly net: number } | null;
 }
 
-export type AwardKey =
-  | "biggest_hit"
-  | "heater"
-  | "comeback"
-  | "hopper"
-  | "whale"
-  | "night_owl"
-  | "rough_night";
-
-export interface TripAward<S> {
-  readonly key: AwardKey;
-  readonly playerId: PlayerId;
-  /** What earned it: money for hits, buy-ins and comebacks; a count for runs and casinos; an hour. */
-  readonly value: number;
-  /** The session it happened in, for awards about one session. */
-  readonly session: S | null;
-}
-
-/** Awards in the order they're handed out; earlier awards get first pick of the players. */
-const ORDER: ReadonlyArray<AwardKey> = [
-  "biggest_hit",
-  "heater",
-  "comeback",
-  "hopper",
-  "whale",
-  "night_owl",
-  "rough_night",
-];
-
 const startOf = (s: TripSession) => DateTime.toEpochMillis(s.session.startedAt);
 
 const netsOf = (sessions: ReadonlyArray<TripSession>) => {
@@ -84,14 +55,18 @@ const netsOf = (sessions: ReadonlyArray<TripSession>) => {
   return nets;
 };
 
-/** Highest net first; ties keep the order players first appeared in. */
-const ranked = (nets: ReadonlyMap<PlayerId, number>) =>
-  new Map(
-    Array.from(nets)
-      .map(([playerId, net], index) => ({ playerId, net, index }))
-      .sort((a, b) => b.net - a.net || a.index - b.index)
-      .map(({ playerId }, index) => [playerId, index + 1]),
+/**
+ * Highest net first. Equal nets share a rank (1, 2, 2, 4) and keep the order players first
+ * appeared in, as group stats rank them.
+ */
+const ranked = (nets: ReadonlyMap<PlayerId, number>) => {
+  const order = Array.from(nets)
+    .map(([playerId, net], index) => ({ playerId, net, index }))
+    .sort((a, b) => b.net - a.net || a.index - b.index);
+  return new Map(
+    order.map(({ playerId, net }) => [playerId, 1 + order.filter((o) => o.net > net).length]),
   );
+};
 
 /** The trip's sessions oldest first, grouped into nights. */
 export const tripNights = <S extends TripSession>(
@@ -246,71 +221,6 @@ export const tonightBoard = (
     .map((row, index) => ({ ...row, rank: index + 1 }));
 };
 
-/** Hours into the night: 6pm is 0, 2am is 8. Daytime is -1 and never wins Night Owl. */
-const lateness = (hour: number) => (hour >= 18 ? hour - 18 : hour < 6 ? hour + 6 : -1);
-
-/**
- * The trip's awards. Each award goes to the best player for it who doesn't already hold one,
- * so one hot player doesn't sweep the lot; when everyone eligible already has an award, the
- * best of them takes it anyway.
- */
-export const tripAwards = <S extends TripSession>(
-  sessions: ReadonlyArray<S>,
-  clock: TripClock,
-): ReadonlyArray<TripAward<S>> => {
-  const ordered = sessions.toSorted((a, b) => startOf(a) - startOf(b));
-  const players = Array.from(netsOf(ordered).keys());
-  const played = (playerId: PlayerId) =>
-    ordered.flatMap((session) => {
-      const result = session.results.find((r) => r.playerId === playerId);
-      return result ? [{ session, ...result }] : [];
-    });
-
-  // Every eligible claim on each award, best first.
-  const claims = new Map<AwardKey, Array<TripAward<S>>>(ORDER.map((key) => [key, []]));
-  const claim = (key: AwardKey, playerId: PlayerId, value: number, session: S | null) =>
-    claims.get(key)!.push({ key, playerId, value, session });
-  for (const playerId of players) {
-    const mine = played(playerId);
-    const best = mine.reduce((top, m) => (m.net > top.net ? m : top));
-    if (best.net > 0) claim("biggest_hit", playerId, best.net, best.session);
-    const worst = mine.reduce((low, m) => (m.net < low.net ? m : low));
-    if (worst.net < 0) claim("rough_night", playerId, -worst.net, worst.session);
-    const run = sessionRuns(mine.map((m) => m.net)).longestWinningRun;
-    if (run >= 2) claim("heater", playerId, run, null);
-    let total = 0;
-    let low = 0;
-    for (const m of mine) {
-      total += m.net;
-      low = Math.min(low, total);
-    }
-    if (low < 0 && total > low) claim("comeback", playerId, total - low, null);
-    const venues = new Set(mine.flatMap((m) => (m.session.venue ? [m.session.venue.id] : []))).size;
-    if (venues >= 2) claim("hopper", playerId, venues, null);
-    const whale = mine.reduce((top, m) => (m.buyIn > top.buyIn ? m : top));
-    if (whale.buyIn > 0) claim("whale", playerId, whale.buyIn, whale.session);
-    const owl = mine.reduce((top, m) =>
-      lateness(clock.hour(m.session.session.startedAt)) >
-      lateness(clock.hour(top.session.session.startedAt))
-        ? m
-        : top,
-    );
-    const owlHour = clock.hour(owl.session.session.startedAt);
-    if (lateness(owlHour) >= 6) claim("night_owl", playerId, owlHour, owl.session);
-  }
-
-  const lateFirst = (a: TripAward<S>, b: TripAward<S>) =>
-    a.key === "night_owl" ? lateness(b.value) - lateness(a.value) : b.value - a.value;
-  const holders = new Set<PlayerId>();
-  return ORDER.flatMap((key) => {
-    const ranking = claims.get(key)!.sort(lateFirst);
-    const award = ranking.find((c) => !holders.has(c.playerId)) ?? ranking[0];
-    if (!award) return [];
-    holders.add(award.playerId);
-    return [award];
-  });
-};
-
 /** The latest results, newest session first and its biggest swings first: the ticker. */
 export const tripFeed = <S extends TripSession>(sessions: ReadonlyArray<S>, limit = 8) =>
   sessions
@@ -322,106 +232,6 @@ export const tripFeed = <S extends TripSession>(sessions: ReadonlyArray<S>, limi
         .map((r) => ({ session, playerId: r.playerId, net: r.net })),
     )
     .slice(0, limit);
-
-/**
- * How a table went for the group: a win when everyone who played it won, a loss when everyone
- * lost, mixed otherwise (an even result included). Players who sat out don't count.
- */
-export type TeamResult = "win" | "loss" | "mixed";
-
-export const teamResult = (s: TripSession): TeamResult =>
-  s.results.length > 0 && s.results.every((r) => r.net > 0)
-    ? "win"
-    : s.results.length > 0 && s.results.every((r) => r.net < 0)
-      ? "loss"
-      : "mixed";
-
-export interface TripStats {
-  readonly sessions: number;
-  readonly net: number;
-  /** Every winning player result added up, and every losing one. */
-  readonly grossWins: number;
-  readonly grossLosses: number;
-  readonly record: { readonly wins: number; readonly losses: number; readonly mixed: number };
-  /** The share of tables everyone won, mixed tables included in the count. */
-  readonly winRate: number;
-  /** The group's net per table. */
-  readonly average: number;
-  /** The best and worst single player result at one table. */
-  readonly best: { readonly playerId: PlayerId; readonly net: number } | null;
-  readonly worst: { readonly playerId: PlayerId; readonly net: number } | null;
-  /** The biggest fall in the group's running total from a high it had reached; 0 or less. */
-  readonly drawdown: number;
-  readonly team: {
-    /** The run the group is on now; mixed tables end a run. */
-    readonly current: { readonly result: "win" | "loss"; readonly length: number } | null;
-    readonly longestWin: number;
-    readonly longestLoss: number;
-  };
-  readonly highLimit: { readonly net: number; readonly sessions: number };
-  readonly otherTables: { readonly net: number; readonly sessions: number };
-}
-
-/** The numbers behind a trip: totals, extremes, how the group ran, and high-limit play. */
-export const tripStats = (sessions: ReadonlyArray<TripSession>): TripStats => {
-  const ordered = sessions.toSorted((a, b) => startOf(a) - startOf(b));
-  let grossWins = 0;
-  let grossLosses = 0;
-  let best: TripStats["best"] = null;
-  let worst: TripStats["worst"] = null;
-  let running = 0;
-  let peak = 0;
-  let drawdown = 0;
-  const record = { wins: 0, losses: 0, mixed: 0 };
-  let current = null as TripStats["team"]["current"];
-  let longestWin = 0;
-  let longestLoss = 0;
-  const high = { net: 0, sessions: 0 };
-  const other = { net: 0, sessions: 0 };
-  for (const s of ordered) {
-    let net = 0;
-    for (const r of s.results) {
-      net += r.net;
-      if (r.net > 0) grossWins += r.net;
-      else grossLosses += r.net;
-      if (!best || r.net > best.net) best = { playerId: r.playerId, net: r.net };
-      if (!worst || r.net < worst.net) worst = { playerId: r.playerId, net: r.net };
-    }
-    running += net;
-    peak = Math.max(peak, running);
-    drawdown = Math.min(drawdown, running - peak);
-    const side = s.session.highLimit ? high : other;
-    side.net += net;
-    side.sessions += 1;
-    const result = teamResult(s);
-    if (result === "mixed") {
-      record.mixed += 1;
-      current = null;
-      continue;
-    }
-    if (result === "win") record.wins += 1;
-    else record.losses += 1;
-    current =
-      current?.result === result ? { result, length: current.length + 1 } : { result, length: 1 };
-    if (result === "win") longestWin = Math.max(longestWin, current.length);
-    else longestLoss = Math.max(longestLoss, current.length);
-  }
-  return {
-    sessions: ordered.length,
-    net: running,
-    grossWins,
-    grossLosses,
-    record,
-    winRate: ordered.length === 0 ? 0 : record.wins / ordered.length,
-    average: ordered.length === 0 ? 0 : running / ordered.length,
-    best,
-    worst,
-    drawdown,
-    team: { current, longestWin, longestLoss },
-    highLimit: high,
-    otherTables: other,
-  };
-};
 
 export interface TripDay {
   readonly key: string;

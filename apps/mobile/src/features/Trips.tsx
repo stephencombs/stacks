@@ -137,8 +137,8 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
 }
 
 /**
- * Starts a trip and puts it in scope. A group's first trip brings Sessions and Board
- * into the tab bar, so that one stays put; any later one opens its sessions.
+ * Starts a trip and puts it in scope. A group's first trip puts it in scope right away; any
+ * later one opens its sessions.
  */
 function StartTripSheet({
   groupId,

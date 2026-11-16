@@ -3,6 +3,7 @@ import {
   DefaultTheme,
   CommonActions,
   createStaticNavigation,
+  getStateFromPath,
   useNavigation,
   type StaticParamList,
 } from "@react-navigation/native";
@@ -27,11 +28,11 @@ import { AccountProvider, useAccount } from "./lib/account";
 import { markStartup, reportStartupError } from "./lib/diagnostics";
 import { useAppFonts } from "./lib/fonts";
 import { getInitialURL } from "./lib/initialUrl";
+import { oldAddress } from "./lib/oldAddresses";
 import { recordingStore } from "./lib/recording";
 import { ScopeProvider } from "./lib/scope";
 import { SignedInProvider, StacksProvider } from "./lib/stacks";
 import "./lib/theme";
-import { BoardScreen } from "./screens/Board";
 import { HistoryScreen } from "./screens/History";
 import { HomeScreen } from "./screens/Home";
 import { MapScreen } from "./screens/Map";
@@ -94,14 +95,11 @@ const CrewStack = createNativeStackNavigator({
       linking: "groups/:groupId/settings",
     },
     Sessions: { screen: SessionsScreen, options: { title: "" }, linking: "trips/:tripId" },
-    Board: { screen: BoardScreen, options: { title: "" }, linking: "trips/:tripId/board" },
-    // Old addresses. A linking alias here would leave every screen in this stack without typed
-    // params, so each is a screen of its own: your groups, a group's People, a trip's Results and
-    // a group's Stats.
+    // An old address. A linking alias here would leave every screen in this stack without typed
+    // params, so each is a screen of its own: your groups and a group's People. Old Board,
+    // Results and Stats links go to Stats.
     Groups: { screen: CrewScreen, options: { title: "" }, linking: "groups" },
     People: { screen: GroupScreen, options: { title: "" }, linking: "groups/:groupId/people" },
-    Results: { screen: BoardScreen, options: { title: "" }, linking: "trips/:tripId/results" },
-    GroupStats: { screen: BoardScreen, options: { title: "" }, linking: "groups/:groupId/stats" },
     Session: { screen: SessionScreen, options: { title: "" }, linking: "sessions/:sessionId" },
     NewSession: {
       screen: NewSessionScreen,
@@ -173,6 +171,8 @@ const linking = {
   prefixes: [Linking.createURL("/")],
   // Back from any link lands on the tabs.
   config: { initialRouteName: "Tabs" as const },
+  getStateFromPath: (path: string, options?: Parameters<typeof getStateFromPath>[1]) =>
+    getStateFromPath(oldAddress(path), options),
   getInitialURL: () =>
     getInitialURL(
       () => Linking.getInitialURL(),

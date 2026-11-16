@@ -472,9 +472,9 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                 />
               ) : null}
               <Button
-                label="See the board"
+                label="See the trip's stats"
                 className="flex-1"
-                onPress={() => go.trip(session.tripId, "Board")}
+                onPress={() => go.stats({ groupId: session.groupId, tripId: session.tripId })}
               />
             </View>
           ) : null}

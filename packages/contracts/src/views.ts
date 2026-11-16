@@ -12,7 +12,7 @@ import {
   VenueId,
   VisitId,
 } from "./ids.ts";
-import { Entry, Game, Seat, Seating, Session, Stake, Trip } from "./ledger.ts";
+import { Entry, Game, Seating, Session, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import { Table } from "./recording.ts";
 
@@ -296,31 +296,33 @@ export const ClaimPreview = Schema.Struct({
 });
 export type ClaimPreview = typeof ClaimPreview.Type;
 
-const StatsBreakdown = <K extends Schema.Top>(key: K) =>
-  Schema.Struct({ key, sessionCount: Schema.Int, results: Schema.Array(PlayerResult) });
-
 /**
- * All-time results over closed sessions and the closed tables in the group's trips; live ones
- * aren't settled yet. Only group members' play counts.
+ * Every finished session and table in the group's trips, oldest first; live ones aren't settled
+ * yet, and play recorded only on a device never counts. Only group members' play is in `results`.
+ * Standings, breakdowns and awards come from `groupStats` and `groupAwards` in
+ * `@stacks/shared/stats`, so trip, game, casino and period filter on the device.
  */
 export const GroupStats = Schema.Struct({
-  sessionCount: Schema.Int,
-  minutesPlayed: Schema.Int,
-  byPlayer: Schema.Array(PlayerResult),
-  /** A table with no game or casino set counts in the totals, not in these. */
-  byGame: Schema.Array(StatsBreakdown(Game)),
-  byVenue: Schema.Array(StatsBreakdown(Venue)),
-  /** Results by seat: each player's session counts for the seat they held longest in it. */
-  bySeat: Schema.Array(StatsBreakdown(Seat)),
-  /** Each closed session's or table's results, oldest first. */
-  bySession: Schema.Array(
+  plays: Schema.Array(
     Schema.Struct({
       id: Schema.Union([SessionId, TableId]),
       tripId: TripId,
+      game: Schema.NullOr(Game),
       venueId: Schema.NullOr(VenueId),
       startedAt: Schema.DateTimeUtc,
-      results: Schema.Array(PlayerResult),
+      endedAt: Schema.DateTimeUtc,
+      results: Schema.Array(
+        Schema.Struct({
+          playerId: PlayerId,
+          buyIn: MinorUnits,
+          net: MinorUnits,
+          /** How long this member played at it, in milliseconds. */
+          milliseconds: Schema.Int,
+        }),
+      ),
     }),
   ),
+  /** The casinos the plays name. */
+  venues: Schema.Array(Venue),
 });
 export type GroupStats = typeof GroupStats.Type;

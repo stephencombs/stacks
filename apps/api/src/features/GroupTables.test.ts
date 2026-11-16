@@ -7,6 +7,7 @@ import {
   EntryId,
   PlayerId,
   type CrewActivityItem,
+  type GroupStats,
   type TableId,
   type TripId,
   type VisitId,
@@ -67,6 +68,14 @@ const tableItems = (items: ReadonlyArray<CrewActivityItem>, tableId: TableId) =>
 const nets = (results: ReadonlyArray<{ readonly playerId: PlayerId; readonly net: number }>) =>
   Object.fromEntries(results.map((result) => [result.playerId, result.net]));
 
+/** Each member's result over every play in a group's stats. */
+const statNets = (stats: GroupStats) => {
+  const totals: Record<string, number> = {};
+  for (const play of stats.plays)
+    for (const { playerId, net } of play.results) totals[playerId] = (totals[playerId] ?? 0) + net;
+  return totals;
+};
+
 it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (it) => {
   it.effect(
     "shows a trip's table once in the trip, group stats and Crew, counting only linked players",
@@ -107,9 +116,9 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         expect(tableItems((yield* bea.crew.activity({ query: {} })).items, opened.tableId)).toEqual(
           [expect.objectContaining({ kind: "table_live" })],
         );
-        expect(
-          (yield* alex.groups.stats({ params: { groupId: group.group.id } })).sessionCount,
-        ).toBe(0);
+        expect((yield* alex.groups.stats({ params: { groupId: group.group.id } })).plays).toEqual(
+          [],
+        );
         expect(
           (yield* alex.groups.list()).find((item) => item.group.id === group.group.id)!,
         ).toMatchObject({ liveSessionCount: 1, liveTripIds: [group.tripId] });
@@ -140,16 +149,16 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         ).toBe(beaSeat.visitId);
 
         const stats = yield* bea.groups.stats({ params: { groupId: group.group.id } });
-        expect(stats.sessionCount).toBe(1);
-        expect(stats.minutesPlayed).toBe(20);
-        expect(nets(stats.byPlayer)).toEqual({ [alexId]: -8000, [beaId]: 2000 });
-        expect(stats.byGame).toEqual([
-          { key: "blackjack", sessionCount: 1, results: expect.any(Array) },
+        expect(stats.plays.map((play) => [play.id, play.tripId, play.game])).toEqual([
+          [opened.tableId, group.tripId, "blackjack"],
         ]);
-        expect(stats.byVenue).toEqual([]);
-        expect(stats.bySession.map((row) => [row.id, row.tripId])).toEqual([
-          [opened.tableId, group.tripId],
+        expect(statNets(stats)).toEqual({ [alexId]: -8000, [beaId]: 2000 });
+        // Alex played from the start; Bea sat down five minutes in.
+        expect(stats.plays[0]!.results.map((result) => result.milliseconds)).toEqual([
+          20 * 60_000,
+          15 * 60_000,
         ]);
+        expect(stats.venues).toEqual([]);
 
         const feed = tableItems((yield* alex.crew.activity({ query: {} })).items, opened.tableId);
         expect(feed).toHaveLength(1);
@@ -229,11 +238,15 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
       expect(afterwards.others).toEqual([{ displayName: "Bea", playing: false, net: 2000 }]);
 
       const stats = yield* alex.groups.stats({ params: { groupId: group.group.id } });
-      expect(stats.sessionCount).toBe(2);
-      expect(nets(stats.byPlayer)).toEqual({ [beaPlayer.id]: -8000, [group.myPlayerId]: -8000 });
+      expect(stats.plays).toHaveLength(2);
+      expect(statNets(stats)).toEqual({ [beaPlayer.id]: -8000, [group.myPlayerId]: -8000 });
       expect(yield* Effect.flip(bea.trips.get({ params: { tripId: group.tripId } }))).toMatchObject(
         { _tag: "Forbidden" },
       );
+      // Removed, Bea loses the group's stats too.
+      expect(
+        yield* Effect.flip(bea.groups.stats({ params: { groupId: group.group.id } })),
+      ).toMatchObject({ _tag: "Forbidden" });
     }),
   );
 
@@ -292,6 +305,17 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
     }),
   );
 
+  it.effect("never counts a member's play recorded outside the group's trips", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const group = yield* groupWith(alex);
+      const me = identity();
+      const own = start(me);
+      expect(yield* push(alex, me, own, finish(me, own.visitId))).toEqual(["accepted", "accepted"]);
+      expect((yield* alex.groups.stats({ params: { groupId: group.group.id } })).plays).toEqual([]);
+    }),
+  );
+
   it.effect("leaves deleted tables out of the trip, group stats and Crew", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
@@ -325,9 +349,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
 
       const trip = yield* alex.trips.get({ params: { tripId: group.tripId } });
       expect(trip.tables).toEqual([]);
-      expect((yield* alex.groups.stats({ params: { groupId: group.group.id } })).sessionCount).toBe(
-        0,
-      );
+      expect((yield* alex.groups.stats({ params: { groupId: group.group.id } })).plays).toEqual([]);
       const feed = (yield* alex.crew.activity({ query: {} })).items;
       expect(tableItems(feed, played.tableId)).toEqual([]);
       expect(tableItems(feed, empty.tableId)).toEqual([]);
@@ -374,8 +396,9 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
       const trip = yield* alex.trips.get({ params: { tripId: group.tripId } });
       expect([trip.sessions.length, trip.tables.length]).toEqual([1, 0]);
       const stats = yield* alex.groups.stats({ params: { groupId: group.group.id } });
-      expect(stats.sessionCount).toBe(1);
-      expect(nets(stats.byPlayer)).toEqual({ [group.myPlayerId]: 5000 });
+      expect(stats.plays).toHaveLength(1);
+      expect(statNets(stats)).toEqual({ [group.myPlayerId]: 5000 });
+      expect(stats.venues.map((v) => v.id)).toEqual([venue.id]);
       const feed = (yield* alex.crew.activity({ query: {} })).items.filter(
         (item) => item.kind !== "trip_started" && item.trip.id === group.tripId,
       );

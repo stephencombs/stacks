@@ -1,4 +1,4 @@
-import type { GroupDetail, TripDetail, TripId } from "@stacks/contracts";
+import type { GroupDetail, GroupId, TripDetail, TripId } from "@stacks/contracts";
 import { getClerkInstance } from "@clerk/expo";
 import { useAtomValue } from "@effect/atom-react";
 import * as Cause from "effect/Cause";
@@ -19,6 +19,8 @@ import {
   useUnsaved,
   useStacks,
   useLastTrip,
+  useStatsCopies,
+  useGroupStats as useGroupStatsWith,
   useRevalidate,
   useSignedInOutbox,
 } from "@stacks/client-runtime/react";
@@ -34,7 +36,7 @@ import { apiUrl, clerkPublishableKey } from "./config";
 import { markStartup } from "./diagnostics";
 import { outboxStorage, wakeOutbox } from "./outbox";
 import { captureTestEvent } from "./telemetry";
-import { lastTripStorage } from "./tripStorage";
+import { lastTripStorage, statsCopyStorage } from "./tripStorage";
 
 /**
  * Around the navigation: whoever is signed in keeps one API client, query cache and outbox while
@@ -71,6 +73,7 @@ const signIn = (userId: string) =>
     stacks: makeStacksClient(api),
     outbox: outboxStorage(userId),
     lastTrip: lastTripStorage(userId),
+    statsCopies: statsCopyStorage(userId),
     capture: captureTestEvent,
   });
 
@@ -83,7 +86,7 @@ export function StacksProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export { useAction, useLastTrip, useOutbox, usePending, useStacks, useUnsaved };
+export { useAction, useLastTrip, useOutbox, usePending, useStacks, useStatsCopies, useUnsaved };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 /** The app coming back to the foreground: shown data may be stale. */
@@ -93,6 +96,9 @@ const onWake = (revalidate: () => void) => {
   );
   return () => subscription.remove();
 };
+
+/** A group's stats, fresh while shown, and the phone's last copy of them offline. */
+export const useGroupStats = (groupId: GroupId) => useGroupStatsWith(groupId, onWake);
 
 export function Loaded<A, E>({
   query,

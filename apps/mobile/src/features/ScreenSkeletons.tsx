@@ -98,17 +98,8 @@ function SectionSkeleton({ action = false, children }: { action?: boolean; child
   );
 }
 
-/**
- * A hero card: label, figure, comparison, then the trip card's 96px chart and three tiles, the
- * race's 128px chart, or neither.
- */
-function HeroSkeleton({
-  chart = "trip",
-  tiles = true,
-}: {
-  chart?: "trip" | "race" | false;
-  tiles?: boolean;
-}) {
+/** A hero card: label, figure, comparison, then the trip card's 96px chart and three tiles. */
+function HeroSkeleton() {
   return (
     <View className="overflow-hidden rounded-xl bg-surface">
       <View className="px-4 pt-4">
@@ -116,34 +107,21 @@ function HeroSkeleton({
         <SkeletonText size="figure" className="mt-2 w-40" />
         <SkeletonText size="sm" className="mt-1.5 w-48" />
       </View>
-      {chart === "trip" ? (
-        <View className="mt-3 h-24" />
-      ) : chart === "race" ? (
-        <View className="mt-3 mb-4 h-32" />
-      ) : (
-        <View className="h-4" />
-      )}
-      {tiles ? (
-        <View className="flex-row border-t border-line">
-          {["w-12", "w-16", "w-14"].map((width, i) => (
-            <View
-              key={width}
-              className={cn("grow gap-0.5 px-4 py-3", i > 0 && "border-l border-line")}
-            >
-              <SkeletonText size="sm" className="w-14" />
-              <SkeletonText size="lg" className={width} />
-            </View>
-          ))}
-        </View>
-      ) : null}
+      <View className="mt-3 h-24" />
+      <View className="flex-row border-t border-line">
+        {["w-12", "w-16", "w-14"].map((width, i) => (
+          <View
+            key={width}
+            className={cn("grow gap-0.5 px-4 py-3", i > 0 && "border-l border-line")}
+          >
+            <SkeletonText size="sm" className="w-14" />
+            <SkeletonText size="lg" className={width} />
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
-
-/*
- * The places. The Board draws its title and its This trip / All time
- * switch before anything loads, so its skeleton starts below it.
- */
 
 /**
  * Sessions loading: the title beside the trip's "…", your live table when you're at one, the trip
@@ -161,50 +139,6 @@ export function SessionsSkeleton() {
       <SectionSkeleton>
         <RowsSkeleton rows={3} />
       </SectionSkeleton>
-    </SkeletonScreen>
-  );
-}
-
-/** The Board for a trip loading: the race, the night it's on, then the standings. */
-export function BoardSkeleton() {
-  return (
-    <SkeletonScreen label="Loading the board">
-      <HeroSkeleton chart="race" tiles={false} />
-      <View className="flex-row items-end justify-between">
-        <View className="gap-1">
-          <SkeletonText size="sm" className="w-24" />
-          <SkeletonText size="lg" className="w-36" />
-        </View>
-        <View className="items-end gap-1">
-          <SkeletonText size="sm" className="w-10" />
-          <SkeletonText size="lg" className="w-16" />
-        </View>
-      </View>
-      {/* Standings has a plain heading, shorter than a section's. */}
-      <View className="gap-2">
-        <SkeletonText size="lg" className="w-36" />
-        <RowsSkeleton rows={4} chip />
-      </View>
-    </SkeletonScreen>
-  );
-}
-
-/** The Board across every trip loading: the summary line, your all-time card, then the race. */
-export function AllTimeSkeleton() {
-  return (
-    <SkeletonScreen label="Loading all-time stats">
-      {/* "The group has played 6 sessions over 12 hours." takes two lines on a phone. */}
-      <View>
-        <SkeletonText className="w-full" />
-        <SkeletonText className="w-16" />
-      </View>
-      <HeroSkeleton />
-      <View className="gap-1">
-        <SkeletonText size="sm" className="w-40" />
-        <SkeletonText size="lg" className="w-52" />
-        <SkeletonText size="sm" className="w-44" />
-      </View>
-      <Skeleton className="h-[190px] rounded-xl" />
     </SkeletonScreen>
   );
 }

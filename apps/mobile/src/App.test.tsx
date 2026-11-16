@@ -87,6 +87,7 @@ async function load({
   }));
   vi.doMock("./lib/tripStorage", () => ({
     lastTripStorage: () => ({ load: () => null, save: () => {} }),
+    statsCopyStorage: () => ({ load: () => null, save: () => {} }),
   }));
   vi.doMock("./lib/theme", () => ({}));
   vi.doMock("./lib/actorKeys", () => ({ actorKeys: {} }));
@@ -178,7 +179,6 @@ async function load({
     "./features/Personal": ["PersonalYouButton"],
     "./features/You": ["YouButton"],
     "./lib/scope": ["ScopeProvider"],
-    "./screens/Board": ["BoardScreen"],
     "./screens/Invites": ["ClaimScreen", "JoinScreen"],
     "./screens/Crew": ["CrewScreen"],
     "./screens/Group": ["GroupScreen"],
@@ -340,10 +340,9 @@ it("keeps every address: your play in the first tab, groups in Crew, invites abo
   expect(stack("Map").screens.Map!.linking).toBe("map");
   expect(tabs.screens.CrewTab!.screen).toEqual({ config: crew });
   expect(crew.screens.Crew!.linking).toBe("crew");
-  // Old addresses still open: your groups, a trip's Results and a group's Stats.
+  // Your groups' old address still opens; old Board and Stats links go to Stats.
   expect(crew.screens.Groups!.linking).toBe("groups");
-  expect(crew.screens.Results!.linking).toBe("trips/:tripId/results");
-  expect(crew.screens.GroupStats!.linking).toBe("groups/:groupId/stats");
+  expect(Object.keys(crew.screens)).not.toContain("Board");
   expect(invites.screens.Join!.linking).toBe("join/:code");
   expect(invites.screens.Claim!.linking).toBe("claim/:code");
 });

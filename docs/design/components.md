@@ -58,7 +58,7 @@ On native mobile, `Choice` uses SwiftUI or Compose controls and accounts for lab
 
 A form value from a few short options, where the choice deserves weight, is `RadioCards` on web: `kind` of an entry or venue, the game of a session. Set columns with `className`.
 
-Moving between tabs and pages is the app's navigation (see Navigation below; `PlaceTabs` on mobile), never `Segmented` or `Choice`. The same data at another scope or measure is `Segmented`: the Board's This trip / All time, the race's Money / % of buy-in.
+Moving between tabs and pages is the app's navigation (see Navigation below; `PlaceTabs` on mobile), never `Segmented` or `Choice`. The same data at another measure is `Segmented`: the race's Money / % of buy-in. Narrowing a page, such as Stats to a group or a trip, is a `FilterChip`.
 
 ## Field, Input, Select (web), TextField (mobile)
 
@@ -87,9 +87,9 @@ Mobile has a few more card parts beside `Surface`: `ProportionalBarRow` for a br
 
 Don't put a `Surface` inside a `Surface`. A card on a card is `bg-raised`.
 
-## Hero cards: TripHero, BalanceHero, RaceHero
+## Hero cards: TripHero, BalanceHero
 
-A place can open on one hero card: the figure that place exists to show, big enough to read across a table. A trip has `TripHero` (your trip total, your running line, win rate, best session, your place), and the Board's This trip `RaceHero` (your gap to the player just ahead, or just behind when you lead, with everyone's running totals and yours in ink). The Board's All time opens on the same `TripHero` across every trip ("All time with …"). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. Your own live session is never a card on a page: the LiveBar holds it.
+A place can open on one hero card: the figure that place exists to show, big enough to read across a table. A trip has `TripHero` (your trip total, your running line, win rate, best session, your place). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. Your own live session is never a card on a page: the LiveBar holds it.
 
 One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure.
 
@@ -102,7 +102,7 @@ Every chart that compares players draws the same way: lines start at break-even,
 Players at very different stakes would flatten each other, so:
 
 - **A race fits the people near you.** Pass `lineScale` a `focus` from `around(index, count)`. A line far outside that range pins to the edge, and its initial gets an arrow (`J ↓`) from `clipped`.
-- **A race can compare stakes fairly.** The All time race has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
+- **A race can compare stakes fairly.** The running result in Stats has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
 - **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
 
 ## Navigation: AppShell, TabLink, LiveBar (web); PlaceTabs, LiveBar (mobile)
@@ -123,7 +123,7 @@ Pages keep the 672px reading column beside the sidebar, the trip included.
 
 ## PageHeader, Section, Note (web); PageTitle, SectionHeading, AccordionSectionHeading (mobile)
 
-One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `children` for what sits under the title (a session's notes, the Board's `Segmented`), and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip is titled with the trip, through `TripHeader`, which carries the trip's ⋯ menu and a **Stats** link (`StatsLink`, which opens Stats with the group and trip picked); the Board goes back to the trip.
+One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `children` for what sits under the title (a session's notes), and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip is titled with the trip, through `TripHeader`, which carries the trip's ⋯ menu and a **Stats** link (`StatsLink`, which opens Stats with the group and trip picked).
 
 Each group of content is a `Section` on web (`title`, plus an `action` or a quiet `aside`) and a `SectionHeading` on mobile (`components/ui/Surface.tsx`). Mobile `SectionHeading` has two variants:
 

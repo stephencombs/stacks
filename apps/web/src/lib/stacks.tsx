@@ -18,12 +18,15 @@ import {
   useOutbox,
   usePending,
   useRememberTrip,
+  useGroupStats as useGroupStatsWith,
   useRevalidate,
+  useStatsCopies,
   useUnsaved,
   useStacks,
 } from "@stacks/client-runtime/react";
+import type { StatsCopyStorage } from "@stacks/client-runtime/statsCopy";
 import type { LastTripStorage } from "@stacks/client-runtime/trip";
-import type { GroupDetail, TripDetail, TripId } from "@stacks/contracts";
+import type { GroupDetail, GroupId, TripDetail, TripId } from "@stacks/contracts";
 import type { ReactNode } from "react";
 
 import { FormError } from "~/components/ui/Field";
@@ -62,6 +65,7 @@ const signIn = (userId: string) =>
     stacks: makeStacksClient(api),
     outbox: outboxStorage(userId),
     lastTrip: lastTripStorage(userId),
+    statsCopies: statsCopyStorage(userId),
     capture: captureTestEvent,
   });
 
@@ -84,6 +88,16 @@ const lastTripStorage = (userId: string): LastTripStorage => ({
   load: () => localStorage.getItem(`stacks-last-trip-${userId}`),
   save: (value) => {
     const key = `stacks-last-trip-${userId}`;
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  },
+});
+
+/** The last copy of each group's stats, so the group view still shows offline. */
+const statsCopyStorage = (userId: string): StatsCopyStorage => ({
+  load: (groupId) => localStorage.getItem(`stacks-stats-${userId}-${groupId}`),
+  save: (groupId, value) => {
+    const key = `stacks-stats-${userId}-${groupId}`;
     if (value === null) localStorage.removeItem(key);
     else localStorage.setItem(key, value);
   },
@@ -113,7 +127,19 @@ const wakeOutbox = (flush: () => void) => {
   };
 };
 
-export { useAction, useLastTrip, useOutbox, usePending, useRememberTrip, useStacks, useUnsaved };
+/** A group's stats, fresh while shown, and the device's last copy of them offline. */
+export const useGroupStats = (groupId: GroupId) => useGroupStatsWith(groupId, onWake);
+
+export {
+  useAction,
+  useLastTrip,
+  useOutbox,
+  usePending,
+  useRememberTrip,
+  useStacks,
+  useStatsCopies,
+  useUnsaved,
+};
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 export function Loaded<A, E>({

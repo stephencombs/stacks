@@ -14,7 +14,7 @@ const FEW = 3;
 /** How many casinos show before "See all". */
 export const TOP_CASINOS = 2;
 
-const gameName = (game: Game | null) => (game === null ? "No game set" : gameNames[game]);
+export const gameName = (game: Game | null) => (game === null ? "No game set" : gameNames[game]);
 
 /** Each game's chip color, as the design tokens assign them. */
 const gameChips = {
@@ -30,7 +30,7 @@ const gameChips = {
 
 export type GameChip = (typeof gameChips)[Game];
 
-const gameChip = (game: Game | null): GameChip => (game === null ? "grey" : gameChips[game]);
+export const gameChip = (game: Game | null): GameChip => (game === null ? "grey" : gameChips[game]);
 
 /**
  * Each row's share of the sessions its breakdown covers. A session with no game, casino or seat
@@ -50,7 +50,7 @@ export const formatHours = (hours: number) => {
   return rest === 0 ? `${whole}h` : `${whole}h ${String(rest).padStart(2, "0")}m`;
 };
 
-const played = (sessions: number, hours: number) =>
+export const played = (sessions: number, hours: number) =>
   `${sessions} ${sessions === 1 ? "session" : "sessions"} · ${formatHours(hours)}`;
 
 const hoursOf = (visits: ReadonlyArray<RecordedVisit>) =>
@@ -116,7 +116,8 @@ const chip = <K extends StatsChip["key"], V>(
   };
 };
 
-const noMatch = (filters: StatsFilters, casino: string, trip: string) => {
+/** Why nothing shows: "No finished Craps sessions at Wynn in 2025." */
+export const noMatch = (filters: StatsFilters, casino: string, trip: string) => {
   const game =
     filters.game === undefined ? "" : filters.game === null ? "" : `${gameNames[filters.game]} `;
   const without = [
@@ -134,6 +135,67 @@ const noMatch = (filters: StatsFilters, casino: string, trip: string) => {
     without.length ? ` without ${without.join(" or ")} set` : "",
     ".",
   ].join("");
+};
+
+/**
+ * The filter chips for what's played: period, game, casino, and a trip once there is one. A trip
+ * covers its own dates, so picking one takes the period's place. Applied chips lead, so what the
+ * page is showing reads first.
+ */
+export const filterChips = (
+  filters: StatsFilters,
+  options: {
+    readonly years: ReadonlyArray<number>;
+    readonly games: ReadonlyArray<Game | null>;
+    readonly venueIds: ReadonlyArray<VenueId | null>;
+    readonly tripIds: ReadonlyArray<TripId>;
+  },
+  names: {
+    readonly venueName: (id: VenueId | null) => string;
+    readonly tripName: (id: TripId) => string;
+  },
+) => {
+  const trip =
+    options.tripIds.length === 0 && filters.tripId === undefined
+      ? null
+      : chip(filters, "tripId", "Trip", "All trips", options.tripIds, (id) => ({
+          value: id,
+          label: names.tripName(id),
+        }));
+  const chips = [
+    ...(filters.tripId === undefined
+      ? [
+          chip(filters, "year", "Period", "All time", options.years, (year) => ({
+            value: String(year),
+            label: String(year),
+          })),
+        ]
+      : []),
+    chip(filters, "game", "Game", "All games", options.games, (game) => ({
+      value: game ?? "none",
+      label: gameName(game),
+    })),
+    chip(filters, "venueId", "Casino", "All casinos", options.venueIds, (venueId) => ({
+      value: venueId ?? "none",
+      label: names.venueName(venueId),
+    })),
+    ...(trip
+      ? [
+          {
+            ...trip,
+            options: trip.options.map((option) => ({
+              ...option,
+              filters:
+                option.value === "" ? option.filters : { ...option.filters, year: undefined },
+            })),
+          },
+        ]
+      : []),
+  ];
+  return {
+    chips: [...chips.filter((c) => c.applied), ...chips.filter((c) => !c.applied)],
+    filtered: chips.some((c) => c.applied),
+  };
 };
 
 /**
@@ -159,49 +221,7 @@ export const personalStatsView = (
     id === null ? "No casino set" : (venues.get(id) ?? "Casino");
   const tripName = (id: TripId) => tripNames.get(id) ?? "Group trip";
   const stats = personalStats(visits, timeZone, filters);
-  const trip =
-    stats.options.tripIds.length === 0 && filters.tripId === undefined
-      ? null
-      : chip(filters, "tripId", "Trip", "All trips", stats.options.tripIds, (id) => ({
-          value: id,
-          label: tripName(id),
-        }));
-  const chips = [
-    // A trip covers its own dates, so it takes the period's place.
-    ...(filters.tripId === undefined
-      ? [
-          chip(filters, "year", "Period", "All time", stats.options.years, (year) => ({
-            value: String(year),
-            label: String(year),
-          })),
-        ]
-      : []),
-    chip(filters, "game", "Game", "All games", stats.options.games, (game) => ({
-      value: game ?? "none",
-      label: gameName(game),
-    })),
-    chip(filters, "venueId", "Casino", "All casinos", stats.options.venueIds, (venueId) => ({
-      value: venueId ?? "none",
-      label: venueName(venueId),
-    })),
-    ...(trip
-      ? [
-          {
-            ...trip,
-            options: trip.options.map((option) => ({
-              ...option,
-              filters:
-                option.value === "" ? option.filters : { ...option.filters, year: undefined },
-            })),
-          },
-        ]
-      : []),
-  ];
-  const head = {
-    // Applied filters lead, so what the page is showing reads first.
-    chips: [...chips.filter((c) => c.applied), ...chips.filter((c) => !c.applied)],
-    filtered: chips.some((c) => c.applied),
-  };
+  const head = filterChips(filters, stats.options, { venueName, tripName });
   if (stats.options.years.length === 0) return { ...head, kind: "empty" as const };
   const { summary } = stats;
   if (summary.sessions === 0)

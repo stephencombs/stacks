@@ -13,17 +13,7 @@ import {
   type TripTable,
 } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
-import type {
-  AwardKey,
-  PlayerTrip,
-  TripAward,
-  TripStanding,
-  TripClock,
-  TripNight,
-  TripSession,
-} from "@stacks/shared/trips";
-
-import { formatTime } from "./format.ts";
+import type { PlayerTrip, TripClock, TripNight, TripSession } from "@stacks/shared/trips";
 
 /**
  * One thing played on a trip: an older group session, or a table recorded from Play. Both read as
@@ -109,40 +99,6 @@ export const boardMoney = (amount: number, currency: CurrencyCode, signed = true
     trailingZeroDisplay: "stripIfInteger",
   });
 
-export const awardTitles: Record<AwardKey, string> = {
-  biggest_hit: "Biggest hit",
-  heater: "Heater",
-  comeback: "Comeback kid",
-  hopper: "Casino hopper",
-  whale: "Whale",
-  night_owl: "Night owl",
-  rough_night: "Rough night",
-};
-
-/** What earned an award, as a short line under the winner's name. */
-export const awardLine = (
-  award: TripAward<TripSession & { readonly venue: { readonly name: string } | null }>,
-  currency: CurrencyCode,
-) => {
-  const where = award.session?.venue ? ` at ${award.session.venue.name}` : "";
-  switch (award.key) {
-    case "biggest_hit":
-      return `${boardMoney(award.value, currency)}${where}`;
-    case "rough_night":
-      return `${boardMoney(-award.value, currency)}${where}`;
-    case "heater":
-      return `${award.value} winning sessions in a row`;
-    case "comeback":
-      return `Climbed ${boardMoney(award.value, currency, false)} from their low`;
-    case "hopper":
-      return `Played ${award.value} different casinos`;
-    case "whale":
-      return `Bought in ${boardMoney(award.value, currency, false)} in one session`;
-    case "night_owl":
-      return `Sat down at ${award.session ? formatTime(award.session.session.startedAt) : `${award.value}:00`}`;
-  }
-};
-
 /** Chip colors go to players in the order they joined, 1 to 8, then around again. */
 export const chipOf = (detail: GroupDetail, playerId: PlayerId) => {
   const index = detail.players.findIndex((player) => player.id === playerId);
@@ -170,55 +126,6 @@ export const tripLines = (trip: PlayerTrip<unknown>, currency: CurrencyCode) => 
       : null,
   winRate: trip.played === 0 ? "–" : `${Math.round((trip.won / trip.played) * 100)}%`,
 });
-
-/**
- * Where you stand on the board, led by the gap that matters: to the player just ahead, or when
- * you lead, to the one just behind. With no gap to show (tied, or alone on the board) the figure
- * falls back to your trip result.
- */
-export const raceHeadline = (
-  standings: ReadonlyArray<Pick<TripStanding, "playerId" | "net" | "rank">>,
-  me: PlayerId,
-  names: ReadonlyMap<PlayerId, string>,
-  currency: CurrencyCode,
-) => {
-  const order = standings.toSorted((a, b) => a.rank - b.rank);
-  const mine = order.find((s) => s.playerId === me);
-  if (!mine) return null;
-  const name = (playerId: PlayerId) => names.get(playerId) ?? "Someone";
-  const place = `${ordinal(mine.rank)} of ${order.length} · ${boardMoney(mine.net, currency)} for the trip`;
-  const tied = order.find((s) => s.playerId !== me && s.net === mine.net);
-  const above = order.findLast((s) => s.net > mine.net);
-  const below = order.find((s) => s.net < mine.net);
-  if (tied)
-    return {
-      label:
-        mine.rank === 1
-          ? `Tied for the lead with ${name(tied.playerId)}`
-          : `Tied with ${name(tied.playerId)}`,
-      gap: null,
-      net: mine.net,
-      tone: "ink" as const,
-      line: place,
-    };
-  if (above)
-    return {
-      label: `Behind ${name(above.playerId)}`,
-      gap: above.net - mine.net,
-      net: mine.net,
-      tone: "loss" as const,
-      line: place,
-    };
-  if (below)
-    return {
-      label: `Ahead of ${name(below.playerId)}`,
-      gap: mine.net - below.net,
-      net: mine.net,
-      tone: "win" as const,
-      line: place,
-    };
-  return { label: "You lead", gap: null, net: mine.net, tone: "ink" as const, line: null };
-};
 
 const percent = new Intl.NumberFormat("en-US", {
   style: "percent",

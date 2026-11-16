@@ -73,6 +73,9 @@ describe("groupTable", () => {
     expect(table.inPlay).toEqual([]);
     // Someone was playing from 8pm to 11pm: three hours, not the five the visits add up to.
     expect(table.minutesPlayed).toBe(180);
+    // Alex's two visits ran back to back, 8pm to 11pm.
+    expect(table.memberMinutes).toEqual([{ playerId: ALEX, minutes: 180 }]);
+    expect(table.memberMilliseconds).toEqual([{ playerId: ALEX, milliseconds: 180 * 60_000 }]);
   });
 
   it("keeps a cashed-out visit settled while the player is back at the table", () => {
@@ -94,6 +97,7 @@ describe("groupTable", () => {
     expect(table.endedAt).toBeNull();
     // An hour from 8pm, and the open visit not yet.
     expect(table.minutesPlayed).toBe(60);
+    expect(table.memberMinutes).toEqual([{ playerId: ALEX, minutes: 60 }]);
   });
 
   it("merges two table players linked to the same member", () => {

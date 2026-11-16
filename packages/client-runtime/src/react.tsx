@@ -1,5 +1,12 @@
-import { RegistryContext, scheduleTask, useAtomRefresh, useAtomSet } from "@effect/atom-react";
-import type { SessionId, TripId } from "@stacks/contracts";
+import {
+  RegistryContext,
+  scheduleTask,
+  useAtomRefresh,
+  useAtomSet,
+  useAtomValue,
+} from "@effect/atom-react";
+import type { GroupId, SessionId, TripId } from "@stacks/contracts";
+import * as DateTime from "effect/DateTime";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -21,6 +28,7 @@ import { LEDGER_KEYS, type Stacks } from "./api.ts";
 import { describeError } from "./errors.ts";
 import { CACHE_MS, shouldRevalidate } from "./freshness.ts";
 import { makeOutbox, type Outbox, type OutboxStorage, type Pending } from "./outbox.ts";
+import { makeStatsCopies, statsState, type StatsCopyStorage } from "./statsCopy.ts";
 import { makeLastTripStore, type LastTripStorage } from "./trip.ts";
 import type { TestEvent } from "./telemetry.ts";
 
@@ -75,18 +83,21 @@ export function useAction<Arg, A, E>(mutation: Atom.AtomResultFn<Arg, A, E>, eve
 const RETRY_MS = 15_000;
 
 /**
- * What the app keeps for whoever is signed in: their API client, query cache, last trip and
- * outbox. Making it starts nothing; `SignedInRoot` holds one per user and keeps it sending.
+ * What the app keeps for whoever is signed in: their API client, query cache, last trip, outbox
+ * and the last copy of each group's stats. Making it starts nothing; `SignedInRoot` holds one per
+ * user and keeps it sending.
  */
 export const makeSignedIn = ({
   stacks,
   outbox,
   lastTrip,
+  statsCopies,
   capture,
 }: {
   stacks: Stacks;
   outbox: OutboxStorage;
   lastTrip: LastTripStorage;
+  statsCopies: StatsCopyStorage;
   capture: (event: TestEvent) => void;
 }) => {
   const registry = AtomRegistry.make({ scheduleTask, defaultIdleTTL: CACHE_MS });
@@ -95,6 +106,7 @@ export const makeSignedIn = ({
     stacks,
     registry,
     lastTrip: makeLastTripStore(lastTrip),
+    statsCopies: makeStatsCopies(statsCopies),
     outbox: makeOutbox(outbox, async ({ sessionId, entry }) => {
       const release = registry.mount(addEntry);
       try {
@@ -195,7 +207,9 @@ export function SignedInScope({ children }: { children: ReactNode }) {
     <StacksContext value={signedIn.stacks}>
       <RegistryContext value={signedIn.registry}>
         <LastTripContext value={signedIn.lastTrip}>
-          <OutboxContext value={signedIn.outbox}>{children}</OutboxContext>
+          <StatsCopiesContext value={signedIn.statsCopies}>
+            <OutboxContext value={signedIn.outbox}>{children}</OutboxContext>
+          </StatsCopiesContext>
         </LastTripContext>
       </RegistryContext>
     </StacksContext>
@@ -264,6 +278,41 @@ export const useRememberTrip = (tripId: TripId) => {
     store?.set(tripId);
   }, [store, tripId]);
 };
+
+const StatsCopiesContext = createContext<ReturnType<typeof makeStatsCopies> | null>(null);
+
+/** The signed-in user's cached group stats copies, or null while nobody is signed in. */
+export const useStatsCopies = () => use(StatsCopiesContext);
+
+/**
+ * A group's stats and the group they belong to, kept fresh like `<Loaded>`. Each fetch is kept on
+ * the device, so offline the last copy shows; the API refusing, as when you've left the group,
+ * forgets it.
+ */
+export function useGroupStats(groupId: GroupId, onWake: (revalidate: () => void) => () => void) {
+  const stacks = useStacks();
+  const copies = use(StatsCopiesContext);
+  if (!copies) throw new Error("useGroupStats needs a SignedInScope above it");
+  const detailQuery = stacks.group(groupId);
+  const statsQuery = stacks.stats(groupId);
+  const detail = useAtomValue(detailQuery);
+  const stats = useAtomValue(statsQuery);
+  useRevalidate(detailQuery, detail, onWake);
+  useRevalidate(statsQuery, stats, onWake);
+  const state = statsState(detail, stats, () => copies.load(groupId));
+  const keep = useEffectEvent((id: GroupId, kind: typeof state.kind, fetchedAt: number | null) => {
+    if (kind === "live" && fetchedAt !== null && state.kind === "live")
+      copies.save(id, {
+        fetchedAt: DateTime.makeUnsafe(fetchedAt),
+        detail: state.detail,
+        stats: state.stats,
+      });
+    if (kind === "refused") copies.forget(id);
+  });
+  const fetchedAt = state.kind === "live" ? state.fetchedAt : null;
+  useEffect(() => keep(groupId, state.kind, fetchedAt), [groupId, state.kind, fetchedAt]);
+  return state;
+}
 
 /** When each query last refetched in the background, so screens sharing one ask only once. */
 const lastRevalidated = new WeakMap<object, number>();

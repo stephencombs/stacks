@@ -298,41 +298,61 @@ const sessionDetail = {
     occurredAt: liveStart,
   })),
 };
-const stats = {
-  sessionCount: summaries.length,
-  minutesPlayed: 720,
-  byPlayer: P.map((p, i) => ({
-    playerId: p,
-    buyIn: 0,
-    cashOut: 0,
-    adjustment: 0,
-    net: [30000, 2000, 1000, -41000, -470000, 0][i],
+const play = (
+  id: string,
+  tripId: string,
+  game: string | null,
+  venueId: string | null,
+  startedAt: string,
+  minutes: number,
+  results: ReadonlyArray<{ playerId: string | undefined; buyIn: number; net: number }>,
+) => ({
+  id,
+  tripId,
+  game,
+  venueId,
+  startedAt,
+  endedAt: new Date(Date.parse(startedAt) + minutes * 60_000).toISOString(),
+  results: results.map(({ playerId, buyIn, net }) => ({
+    playerId,
+    buyIn,
+    net,
+    milliseconds: minutes * 60_000,
   })),
-  byGame: [{ key: "blackjack", sessionCount: 2, results: summaries[0]!.results }],
-  byVenue: [
-    ...[...Map.groupBy(summaries, (s) => s.venue.id).values()].map((played) => ({
-      key: played[0]!.venue,
-      sessionCount: played.length,
-      results: played.flatMap((s) => s.results),
-    })),
-    { key: tripTables[0]!.venue, sessionCount: 1, results: tripTables[0]!.results },
+});
+/** Atlantic City in the spring, then the Vegas weekend's finished sessions and table. */
+const stats = {
+  plays: [
+    play(u(230), ids.oldTrip, "blackjack", u(330), at(1, 20), 150, [
+      result(0, [300, 120]),
+      result(1, [200, 380]),
+      result(2, [400, 400]),
+      result(3, [200, 520]),
+    ]),
+    play(u(231), ids.oldTrip, "slots", u(330), at(2, 2), 90, [
+      result(0, [200, 610]),
+      result(3, [300, 0]),
+    ]),
+    ...summaries.map((s) =>
+      play(s.session.id, ids.trip, s.session.game, s.venue.id, s.session.startedAt, 120, s.results),
+    ),
+    play(
+      tripTables[0]!.table.id,
+      ids.trip,
+      tripTables[0]!.table.game,
+      tripTables[0]!.venue!.id,
+      tripTables[0]!.startedAt,
+      180,
+      tripTables[0]!.results,
+    ),
   ],
-  bySeat: [],
-  bySession: [
-    ...summaries.map((s) => ({
-      id: s.session.id,
-      tripId: ids.trip,
-      venueId: s.venue.id,
-      startedAt: s.session.startedAt,
-      results: s.results,
-    })),
-    {
-      id: tripTables[0]!.table.id,
-      tripId: ids.trip,
-      venueId: tripTables[0]!.venue!.id,
-      startedAt: tripTables[0]!.startedAt,
-      results: tripTables[0]!.results,
-    },
+  venues: [
+    ...new Map(
+      [...summaries.map((s) => s.venue), tripTables[0]!.venue!, venue(30, "Borgata")].map((v) => [
+        v.id,
+        v,
+      ]),
+    ).values(),
   ],
 };
 const invites = [

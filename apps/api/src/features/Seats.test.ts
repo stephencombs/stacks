@@ -151,16 +151,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("seats at a table", (it) => {
       expect(seats(closed)).toEqual([[alexId, 5]]);
       const late = yield* Effect.flip(sit(alex, beaId, 1));
       expect(late).toMatchObject({ _tag: "Conflict", reason: "session_closed" });
-
-      // Stats credit the result to the seat it was played from.
-      const stats = yield* alex.groups.stats({ params: { groupId: closed.session.groupId } });
-      expect(stats.bySeat).toEqual([
-        {
-          key: 5,
-          sessionCount: 1,
-          results: [{ playerId: alexId, buyIn: 30000, cashOut: 110000, adjustment: 0, net: 80000 }],
-        },
-      ]);
     }),
   );
 
