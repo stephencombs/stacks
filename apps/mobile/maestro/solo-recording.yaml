@@ -17,7 +17,7 @@ tags:
     visible: "No sessions yet"
     timeout: 60000
 
-- tapOn: "Start session"
+- runFlow: subflows/start-session.yaml
 - tapOn: "2"
 - tapOn: "0"
 - tapOn: "0"

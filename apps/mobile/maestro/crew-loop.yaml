@@ -24,7 +24,7 @@ onFlowComplete:
       AppleLocale: en_US
       AppleLanguages: (en)
 - extendedWaitUntil:
-    visible: "Start session"
+    visible: "Start session|Start or add a session"
     timeout: 60000
 
 # Groups need an account: Crew opens on the welcome until you sign in.

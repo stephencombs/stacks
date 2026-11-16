@@ -13,9 +13,9 @@ tags:
       AppleLocale: en_US
       AppleLanguages: (en)
 - extendedWaitUntil:
-    visible: "Start session"
+    visible: "Start session|Start or add a session"
     timeout: 60000
-- tapOn: "Start session"
+- runFlow: subflows/start-session.yaml
 - tapOn: "2"
 - tapOn: "0"
 - tapOn: "0"
@@ -54,7 +54,7 @@ tags:
       AppleLocale: en_US
       AppleLanguages: (en)
 - extendedWaitUntil:
-    visible: "Start session"
+    visible: "Start session|Start or add a session"
     timeout: 60000
 - openLink: ${output.link}
 # iOS may ask before a link opens an app.

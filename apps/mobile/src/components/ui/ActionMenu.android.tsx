@@ -15,6 +15,7 @@ export function ActionMenu({ label, actions, disabled = false, trigger }: Action
       shouldOpenOnLongPress={false}
     >
       <View
+        accessible
         accessibilityLabel={label}
         accessibilityRole="button"
         accessibilityState={{ disabled }}

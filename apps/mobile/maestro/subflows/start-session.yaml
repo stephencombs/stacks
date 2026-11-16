@@ -1,0 +1,10 @@
+# Starts a session from Play. iOS has a Start session button; Android has a FAB that opens a menu
+# with Start session in it.
+appId: com.stephencombs.colorup.preview
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: "Start or add a session"
+- tapOn: "Start session"
