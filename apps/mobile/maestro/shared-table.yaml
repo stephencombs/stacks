@@ -5,9 +5,13 @@ name: Join a shared table from its link
 tags:
   - shared
 ---
+# Amounts follow the device's locale; on iOS this pins it to en-US for the app.
 - launchApp:
     clearState: true
     clearKeychain: true
+    arguments:
+      AppleLocale: en_US
+      AppleLanguages: (en)
 - extendedWaitUntil:
     visible: "Start session"
     timeout: 60000
@@ -18,7 +22,9 @@ tags:
 - tapOn:
     id: "sheet-submit"
 - extendedWaitUntil:
-    visible: "Bought in"
+    visible:
+      id: "live-buy-in"
+      text: "\\$200"
     timeout: 10000
 
 - tapOn: "Table actions"
@@ -39,15 +45,17 @@ tags:
 - copyTextFrom: "stacks-preview://t/.+"
 - evalScript: ${output.link = maestro.copiedText}
 
-# A stranger: nothing of the starter's is left on this phone.
-- stopApp
-- clearState
-# The device keys live in the iOS keychain, which outlasts the app's data.
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - clearKeychain
+# A stranger: nothing of the starter's is left on this phone. The link opens in the running app,
+# which has the pinned locale.
+- launchApp:
+    clearState: true
+    clearKeychain: true
+    arguments:
+      AppleLocale: en_US
+      AppleLanguages: (en)
+- extendedWaitUntil:
+    visible: "Start session"
+    timeout: 60000
 - openLink: ${output.link}
 # iOS may ask before a link opens an app.
 - runFlow:
@@ -61,7 +69,8 @@ tags:
 - assertVisible: "Read-only"
 
 - tapOn: "Join this table"
-- tapOn: "Your name"
+- tapOn:
+    id: "join-name"
 - inputText: "Sam"
 - tapOn: "Join as a new player"
 # Someone new to the table buys in, rather than sitting back down.
@@ -75,6 +84,7 @@ tags:
 - tapOn:
     id: "sheet-submit"
 - extendedWaitUntil:
-    visible: "Bought in"
+    visible:
+      id: "live-buy-in"
+      text: "\\$100"
     timeout: 15000
-- assertVisible: "\\$100"

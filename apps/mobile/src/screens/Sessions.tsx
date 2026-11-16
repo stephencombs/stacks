@@ -120,7 +120,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
           <View key={night.key} className="gap-2">
             <SectionHeading
               action={
-                <Text numberOfLines={1} className="shrink text-sm text-muted">
+                <Text testID="night-result" numberOfLines={1} className="shrink text-sm text-muted">
                   {played.length === 0 ? (
                     plural(night.sessions.length, "session")
                   ) : (

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vite-plus/test";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -136,4 +136,19 @@ describe.each(Object.entries(themes))("the %s palette", (name, theme) => {
       .map(([name]) => name);
     expect(outside).toEqual([]);
   });
+});
+
+// Tailwind drops a class it doesn't know without a word, so a type role a screen names has to be
+// one global.css defines.
+it("defines every type role the screens use", () => {
+  const defined = new Set([...css.matchAll(/@utility (type-[a-z0-9-]+)/g)].map((m) => m[1]));
+  const src = new URL("..", import.meta.url);
+  const used = new Set(
+    readdirSync(src, { recursive: true, encoding: "utf8" })
+      .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+      .flatMap((file) => [...read(`../${file}`).matchAll(/(?<![\w-])type-[a-z][a-z0-9-]*/g)])
+      .map((m) => m[0]),
+  );
+  expect(used.size).toBeGreaterThan(0);
+  expect([...used].filter((role) => !defined.has(role))).toEqual([]);
 });

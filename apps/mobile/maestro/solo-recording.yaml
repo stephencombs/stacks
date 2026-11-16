@@ -5,9 +5,14 @@ name: Signed-out solo recording
 tags:
   - solo
 ---
+# Amounts follow the device's locale. On iOS these pin it to en-US for the app; EAS's Android
+# emulators already start in en-US.
 - launchApp:
     clearState: true
     clearKeychain: true
+    arguments:
+      AppleLocale: en_US
+      AppleLanguages: (en)
 - extendedWaitUntil:
     visible: "No sessions yet"
     timeout: 60000
@@ -19,10 +24,12 @@ tags:
 # The sheet's title and submit both say "Start session".
 - tapOn:
     id: "sheet-submit"
+# The hero, not the "+ $200" rebuy preset under it.
 - extendedWaitUntil:
-    visible: "Bought in"
+    visible:
+      id: "live-buy-in"
+      text: "\\$200"
     timeout: 10000
-- assertVisible: "\\$200"
 
 - tapOn: "Other"
 - tapOn: "1"
@@ -31,17 +38,24 @@ tags:
 - tapOn:
     id: "sheet-submit"
 - assertVisible: "Rebuy of \\$100 recorded\\."
-- assertVisible: "\\$300"
+- assertVisible:
+    id: "live-buy-in"
+    text: "\\$300"
 
 # Saved on the device: a cold start comes back to the same live session.
 - stopApp
-- launchApp
+- launchApp:
+    arguments:
+      AppleLocale: en_US
+      AppleLanguages: (en)
 - runFlow:
     when:
       visible: "Back to your session, Session, .*"
     commands:
       - tapOn: "Back to your session, Session, .*"
-- assertVisible: "\\$300"
+- assertVisible:
+    id: "live-buy-in"
+    text: "\\$300"
 
 - tapOn: "Cash out"
 - tapOn: "4"
@@ -50,8 +64,9 @@ tags:
 - tapOn:
     id: "sheet-submit"
 - assertVisible: "Cash-out of \\$450 recorded\\. You've finished this session\\."
-- assertVisible: "Your result"
-- assertVisible: "\\+\\$150"
+- assertVisible:
+    id: "visit-result"
+    text: "\\+\\$150"
 - assertVisible: "Saved on this device"
 
 - tapOn: "Back to your play"

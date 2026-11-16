@@ -1,30 +1,67 @@
 name: E2E
 
-# Manual only. Each run spends EAS build and test minutes, and the flows write to the API the
-# preview build points at. Start it with:
-#   npx -y eas-cli@latest workflow:run .eas/workflows/e2e.yml
-# The account flows need MAESTRO_CLERK_SECRET_KEY, the Clerk development instance's secret key,
-# as a secret in the preview environment.
+# Manual only. Each run spends EAS build and test minutes, and the flows create users, groups,
+# trips and shared tables on the API the app is built against. That must never be the API real
+# users' builds use, so a run needs an explicit test API, such as a PR preview Worker:
+#   npx -y eas-cli@latest workflow:run .eas/workflows/e2e.yml -F api_url=https://<test-api>
+# The account flow also needs MAESTRO_CLERK_SECRET_KEY, the Clerk development instance's secret
+# key, as a secret in the preview environment.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      api_url:
+        type: string
+        required: true
+        description: A non-production API for the app to talk to, with /api/health answering.
 
 concurrency:
   group: e2e
   cancel_in_progress: true
 
 jobs:
+  check_api:
+    name: Check the test API
+    env:
+      API_URL: ${{ inputs.api_url }}
+    steps:
+      - name: Refuse a missing or production API
+        run: |
+          case "$API_URL" in
+            https://?*) ;;
+            *) echo "api_url must be an https URL of a test API." >&2; exit 1 ;;
+          esac
+          if [ "${API_URL%/}" = "https://colorup.stephen-jcombs.workers.dev" ]; then
+            echo "That's the API every real build uses. Pass a test API." >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --retry 3 "${API_URL%/}/api/health"
   build_ios:
     name: Build iOS Simulator app
     type: build
+    needs: [check_api]
+    env:
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
     params:
       platform: ios
-      profile: preview-simulator
+      profile: e2e-simulator
+    hooks:
+      after_install_node_modules:
+        - name: Confirm the build talks to the test API
+          run: test "$EXPO_PUBLIC_API_URL" = "${{ inputs.api_url }}"
   build_android:
     name: Build Android Emulator app
     type: build
+    needs: [check_api]
+    env:
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
     params:
       platform: android
-      profile: preview-simulator
+      profile: e2e-simulator
+    hooks:
+      after_install_node_modules:
+        - name: Confirm the build talks to the test API
+          run: test "$EXPO_PUBLIC_API_URL" = "${{ inputs.api_url }}"
+  # Screens aren't recorded: the shared-table flow shows a live share link.
   maestro_ios:
     name: Maestro on iOS Simulator
     type: maestro
@@ -33,7 +70,6 @@ jobs:
     params:
       build_id: ${{ needs.build_ios.outputs.build_id }}
       flow_path: ./maestro
-      record_screen: true
   maestro_android:
     name: Maestro on Android Emulator
     type: maestro
@@ -43,4 +79,3 @@ jobs:
     params:
       build_id: ${{ needs.build_android.outputs.build_id }}
       flow_path: ./maestro
-      record_screen: true

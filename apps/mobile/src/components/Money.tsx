@@ -13,6 +13,7 @@ export function Money({
   currency,
   tone = "plain",
   fit = false,
+  testID,
   className,
 }: {
   amount: MinorUnits;
@@ -20,10 +21,13 @@ export function Money({
   tone?: "plain" | "result";
   /** Shrink to one line instead of wrapping, for a hero figure on a narrow phone. */
   fit?: boolean;
+  /** For the simulator E2E flows in apps/mobile/maestro. */
+  testID?: string;
   className?: string;
 }) {
   return (
     <Text
+      testID={testID}
       numberOfLines={fit ? 1 : undefined}
       adjustsFontSizeToFit={fit}
       className={cn(

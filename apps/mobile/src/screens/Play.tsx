@@ -709,6 +709,7 @@ function LiveHero({ visit, name }: { visit: RecordingVisitView; name?: string | 
         amount={visit.totals.buyIn}
         currency={RECORDING_CURRENCY}
         fit
+        testID="live-buy-in"
         className="w-full text-center text-7xl leading-[88px] text-felt-ink"
       />
       <Text className="mt-3 text-center type-headline text-felt-ink">
@@ -735,6 +736,7 @@ function VisitHero({ visit }: { visit: RecordingVisitView }) {
           currency={RECORDING_CURRENCY}
           tone="result"
           fit
+          testID="visit-result"
           className="type-hero"
         />
       </View>

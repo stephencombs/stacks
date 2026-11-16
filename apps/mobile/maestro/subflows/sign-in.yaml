@@ -3,19 +3,24 @@ appId: com.stephencombs.colorup.preview
 ---
 - tapOn: "Skip"
 - tapOn: "Sign in"
-# iOS asks before it opens the sign-in pages in a browser sheet.
+# iOS may ask before it opens the sign-in pages in a browser sheet; Android doesn't. Either the
+# prompt or the page comes up first.
+- extendedWaitUntil:
+    visible: "Continue|Email address"
+    timeout: 30000
 - runFlow:
     when:
-      platform: iOS
+      notVisible: "Email address"
     commands:
-      - extendedWaitUntil:
-          visible: "Continue"
-          timeout: 15000
       - tapOn: "Continue"
 - extendedWaitUntil:
     visible: "Email address"
     timeout: 30000
-- tapOn: "Email address"
+# The page's caption and its field both read "Email address". Either one focuses the field, so
+# take the first rather than leave the match ambiguous.
+- tapOn:
+    text: "Email address"
+    index: 0
 - inputText: ${output.user.email}
 - tapOn: "Continue"
 - extendedWaitUntil:

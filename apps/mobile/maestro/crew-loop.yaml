@@ -16,9 +16,13 @@ onFlowComplete:
       env:
         CLERK_SECRET_KEY: ${MAESTRO_CLERK_SECRET_KEY}
 ---
+# Amounts follow the device's locale; on iOS this pins it to en-US for the app.
 - launchApp:
     clearState: true
     clearKeychain: true
+    arguments:
+      AppleLocale: en_US
+      AppleLanguages: (en)
 - extendedWaitUntil:
     visible: "Start session"
     timeout: 60000
@@ -31,7 +35,9 @@ onFlowComplete:
     timeout: 60000
 
 - tapOn: "New group"
-- tapOn: "Group name"
+# A field's caption and the field share its label, so fields are tapped by id.
+- tapOn:
+    id: "group-name"
 - inputText: "Vegas crew"
 - tapOn: "Create group"
 - extendedWaitUntil:
@@ -39,7 +45,8 @@ onFlowComplete:
     timeout: 30000
 
 - tapOn: "Start a trip"
-- tapOn: "Trip name"
+- tapOn:
+    id: "trip-name"
 - inputText: "Vegas weekend"
 - tapOn: "Start trip"
 - tapOn: "Vegas weekend, going"
@@ -51,7 +58,9 @@ onFlowComplete:
 - tapOn:
     id: "sheet-submit"
 - extendedWaitUntil:
-    visible: "Bought in"
+    visible:
+      id: "live-buy-in"
+      text: "\\$100"
     timeout: 15000
 
 - tapOn: "Cash out"
@@ -60,12 +69,15 @@ onFlowComplete:
 - tapOn: "0"
 - tapOn:
     id: "sheet-submit"
-- assertVisible: "Your result"
-- assertVisible: "\\+\\$70"
+- assertVisible:
+    id: "visit-result"
+    text: "\\+\\$70"
 
 # The trip counts it once the table syncs: back on the trip, the night shows the win.
 - tapOn: "Back to your play"
 - assertVisible: "Vegas weekend"
 - extendedWaitUntil:
-    visible: "You \\+\\$70"
+    visible:
+      id: "night-result"
+      text: "You \\+\\$70"
     timeout: 60000

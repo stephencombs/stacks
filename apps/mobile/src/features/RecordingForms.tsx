@@ -1269,6 +1269,7 @@ export function JoinSheet({
     >
       <TextField
         label="Your name"
+        testID="join-name"
         hint="Others at the table see it."
         value={name}
         error={nameError}
