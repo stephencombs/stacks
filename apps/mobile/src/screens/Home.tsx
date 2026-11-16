@@ -128,7 +128,7 @@ export function HomeScreen() {
 function MonthHero({ home }: { home: RecordingHome }) {
   const key = localDateText().slice(0, 7);
   const month = recordingMonths(home).find((item) => item.month === key);
-  const count = month?.count ?? 0;
+  const count = month?.finished ?? 0;
   const minutes = month?.minutes ?? 0;
   const played = minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`;
   return (

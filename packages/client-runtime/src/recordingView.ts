@@ -203,6 +203,8 @@ export const recordingMonths = (home: RecordingHome) => {
         month,
         result: MinorUnits.make(Number(result)),
         count: visible.length,
+        /** Finished sessions only, to sit beside the result and minutes, which leave out live play. */
+        finished: visible.filter((item) => item.visit.finishedAt).length,
         /** Minutes played in finished sessions; live play counts once it finishes. */
         minutes,
         visits: items.toSorted(

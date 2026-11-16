@@ -368,6 +368,22 @@ it("keeps deleted visits at their month end, outside Play, table and history tot
   await store.close();
 });
 
+it("counts a month's finished sessions apart from live play", async () => {
+  const { store } = await open();
+  await save(store, {
+    type: "record_completed",
+    buyIn: 20000,
+    cashOut: 30000,
+    startedAt: at(1),
+    finishedAt: at(2),
+  });
+  await save(store, { type: "start", buyIn: 5000, startedAt: at(9) });
+  const [month] = recordingMonths(recordingHome(state(store)));
+  expect(month!.count).toBe(2);
+  expect(month!.finished).toBe(1);
+  await store.close();
+});
+
 it.each(["delete_visit", "restore_visit"] as const)("names a refused %s change", async (type) => {
   const { store } = await open();
   await save(store, { type: "start", buyIn: 20000 });
