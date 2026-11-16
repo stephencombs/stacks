@@ -9,8 +9,8 @@ import * as Access from "./Access.ts";
 import * as TripTables from "./TripTables.ts";
 import { venueColumns } from "./Views.ts";
 
-const minutes = (startedAt: DateTime.Utc, endedAt: DateTime.Utc) =>
-  Math.round((DateTime.toEpochMillis(endedAt) - DateTime.toEpochMillis(startedAt)) / 60_000);
+const elapsed = (startedAt: DateTime.Utc, endedAt: DateTime.Utc) =>
+  Math.max(0, DateTime.toEpochMillis(endedAt) - DateTime.toEpochMillis(startedAt));
 
 /**
  * Every finished session and table in the group's trips, with each member's result and time at
@@ -41,24 +41,25 @@ export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId)
   const plays = [
     ...sessions.map((s) => {
       // An older group session has no visits: everyone at it played the whole session.
-      const played = minutes(s.startedAt, s.endedAt!);
+      const played = elapsed(s.startedAt, s.endedAt!);
       return {
         id: s.id,
         tripId: s.tripId,
         game: s.game,
         venueId: s.venueId,
         startedAt: s.startedAt,
+        endedAt: s.endedAt!,
         results: Array.from(sessionResults.get(s.id) ?? [], ([playerId, result]) => ({
           playerId,
           buyIn: result.buyIn,
           net: result.net,
-          minutes: played,
+          milliseconds: played,
         })),
       };
     }),
-    ...tables.flatMap(({ table, endedAt, startedAt, results, memberMinutes }) => {
+    ...tables.flatMap(({ table, endedAt, startedAt, results, memberMilliseconds }) => {
       if (endedAt === null || table.tripId === null) return [];
-      const time = new Map(memberMinutes.map((row) => [row.playerId, row.minutes]));
+      const time = new Map(memberMilliseconds.map((row) => [row.playerId, row.milliseconds]));
       return [
         {
           id: table.id,
@@ -66,11 +67,12 @@ export const forGroup = Effect.fn("Stats.forGroup")(function* (groupId: GroupId)
           game: table.game,
           venueId: table.venueId,
           startedAt,
+          endedAt,
           results: results.map(({ playerId, buyIn, net }) => ({
             playerId,
             buyIn,
             net,
-            minutes: time.get(playerId) ?? 0,
+            milliseconds: time.get(playerId) ?? 0,
           })),
         },
       ];

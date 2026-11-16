@@ -110,13 +110,13 @@ function NoTrips({ onStart }: { onStart: () => void }) {
   );
 }
 
-/** The top three on the trip's board so far. */
+/** The top three in the trip's standings so far. */
 function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const names = playerNames(detail);
   const closed = closedPlays(trip);
   const top = tripStandings(closed, localClock).slice(0, 3);
   if (top.length === 0)
-    return <Text className="text-sm text-muted">Close a session to put it on the board.</Text>;
+    return <Text className="text-sm text-muted">Finish a session to start the standings.</Text>;
   return (
     <View className="flex-row flex-wrap gap-x-4 gap-y-2">
       {top.map((s) => (
@@ -135,8 +135,8 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
 }
 
 /**
- * Starts a trip and puts it in scope. A group's first trip brings Sessions and Board
- * into the tab bar, so that one stays put; any later one opens its sessions.
+ * Starts a trip and puts it in scope. A group's first trip puts it in scope right away; any
+ * later one opens its sessions.
  */
 function StartTripSheet({
   groupId,
@@ -185,7 +185,7 @@ function StartTripSheet({
       open
       onClose={onClose}
       title="Start a trip"
-      description="Sessions you start in it go on its board."
+      description="Sessions you start in it count toward its stats."
       footer={
         <Button
           label="Start trip"

@@ -127,7 +127,7 @@ export const load = Effect.fn("TripTables.load")(function* (
 
   // Members' own time at each table goes to group stats; a table's response leaves it out.
   const loaded = tables.flatMap(
-    (row): ReadonlyArray<TripTable & Pick<GroupTable, "memberMinutes">> => {
+    (row): ReadonlyArray<TripTable & Pick<GroupTable, "memberMilliseconds">> => {
       const own = visits.filter((visit) => visit.tableId === row.id);
       const visitIds = new Set(own.map((visit) => visit.id));
       // A table player counts as the member holding the same account, for visits started while
@@ -170,7 +170,7 @@ export const load = Effect.fn("TripTables.load")(function* (
             net: other.net,
           })),
           myVisitId: mine?.id ?? null,
-          memberMinutes: table.memberMinutes,
+          memberMilliseconds: table.memberMilliseconds,
         },
       ];
     },

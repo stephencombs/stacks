@@ -151,7 +151,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         ]);
         expect(statNets(stats)).toEqual({ [alexId]: -8000, [beaId]: 2000 });
         // Alex played from the start; Bea sat down five minutes in.
-        expect(stats.plays[0]!.results.map((result) => result.minutes)).toEqual([20, 15]);
+        expect(stats.plays[0]!.results.map((result) => result.milliseconds)).toEqual([
+          20 * 60_000,
+          15 * 60_000,
+        ]);
         expect(stats.venues).toEqual([]);
 
         const feed = tableItems((yield* alex.crew.activity({ query: {} })).items, opened.tableId);

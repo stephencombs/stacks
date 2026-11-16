@@ -12,7 +12,7 @@ import {
 import { tripNames } from "@stacks/client-runtime/trip";
 import { GroupId, type GroupListItem } from "@stacks/contracts";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useMemo, useState, useEffect, type KeyboardEvent, type ReactNode } from "react";
 
 import { Money } from "~/components/Money";
 import { Button } from "~/components/ui/Button";
@@ -33,7 +33,7 @@ import {
   signed,
 } from "~/features/StatsParts";
 import { useAccount } from "~/lib/account";
-import { StacksProvider, useStacks } from "~/lib/stacks";
+import { StacksProvider, useStacks, useStatsCopies } from "~/lib/stacks";
 import type { StatsPick } from "~/lib/statsPick";
 import { useWidth } from "~/lib/useWidth";
 
@@ -57,6 +57,7 @@ function Stats() {
 }
 
 const noGroups: ReadonlyArray<GroupListItem> = [];
+const remembered = new WeakSet<object>();
 
 /** Your groups when you're signed in; signed out, or before they load, there are none. */
 function YourGroups({
@@ -65,7 +66,7 @@ function YourGroups({
   children: (groups: ReadonlyArray<GroupListItem>) => ReactNode;
 }) {
   const account = useAccount();
-  if (!account.available || !account.isSignedIn) return children(noGroups);
+  if (!account.available || !account.isSignedIn || !account.userId) return children(noGroups);
   return (
     <StacksProvider>
       <SignedInGroups>{children}</SignedInGroups>
@@ -78,7 +79,14 @@ function SignedInGroups({
 }: {
   children: (groups: ReadonlyArray<GroupListItem>) => ReactNode;
 }) {
-  const groups = AsyncResult.getOrElse(useAtomValue(useStacks().groups), () => noGroups);
+  const result = useAtomValue(useStacks().groups);
+  const copies = useStatsCopies();
+  useEffect(() => {
+    if (!copies || !AsyncResult.isSuccess(result) || remembered.has(result.value)) return;
+    remembered.add(result.value);
+    copies.rememberGroups(result.value);
+  }, [copies, result]);
+  const groups = AsyncResult.getOrElse(result, () => noGroups);
   return children(groups);
 }
 
@@ -89,18 +97,24 @@ function StatsView({
   pick: StatsPick | null;
   groups: ReadonlyArray<GroupListItem>;
 }) {
+  const copies = useStatsCopies();
   const [picked, setPicked] = useState<StatsPick | null>(pick);
   const [filters, setFilters] = useState<StatsFilters>(pick?.tripId ? { tripId: pick.tripId } : {});
-  // A trip alone names its group once your groups have loaded.
+  const rememberedTrip = picked?.tripId && copies ? copies.groupOfTrip(picked.tripId) : null;
+  // A trip alone names its group once your groups have loaded, or from the device's index offline.
   const groupId =
     picked?.groupId ??
     groups.find((item) => item.trips.some((trip) => trip.id === picked?.tripId))?.group.id ??
+    rememberedTrip?.groupId ??
     null;
+  const fallbackName =
+    groupId === null ? null : (copies?.groupName(groupId) ?? rememberedTrip?.groupName ?? null);
   const chip =
     groups.length === 0 && groupId === null ? null : (
       <GroupChip
         groups={groups}
         groupId={groupId}
+        fallbackName={fallbackName}
         onChange={(next) => {
           setPicked(next === null ? null : { groupId: next });
           // A trip stays picked only in the group it belongs to.
@@ -139,16 +153,20 @@ function StatsView({
 function GroupChip({
   groups,
   groupId,
+  fallbackName,
   onChange,
 }: {
   groups: ReadonlyArray<GroupListItem>;
   groupId: GroupId | null;
+  fallbackName: string | null;
   onChange: (groupId: GroupId | null) => void;
 }) {
-  const chip = groupChip(
-    groups.map((item) => ({ id: item.group.id, name: item.group.name })),
-    groupId,
-  );
+  const list = groups.map((item) => ({ id: item.group.id, name: item.group.name }));
+  const items =
+    groupId !== null && !list.some((item) => item.id === groupId)
+      ? [...list, { id: groupId, name: fallbackName ?? "Group" }]
+      : list;
+  const chip = groupChip(items, groupId);
   return (
     <FilterChip
       name={chip.name}

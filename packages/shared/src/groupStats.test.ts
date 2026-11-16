@@ -22,23 +22,31 @@ const play = (
   results: ReadonlyArray<[PlayerId, number, number?]>,
   fields: {
     at?: string;
+    endedAt?: string;
     tripId?: TripId;
     game?: Game | null;
     venueId?: VenueId | null;
   } = {},
-): GroupPlay => ({
-  id: `play-${++count}`,
-  tripId: fields.tripId ?? vegas,
-  game: fields.game === undefined ? "blackjack" : fields.game,
-  venueId: fields.venueId === undefined ? wynn : fields.venueId,
-  startedAt: DateTime.makeUnsafe(fields.at ?? "2026-10-21T20:00:00Z"),
-  results: results.map(([playerId, net, minutes]) => ({
-    playerId,
-    net,
-    buyIn: Math.max(0, -net),
-    minutes: minutes ?? 60,
-  })),
-});
+): GroupPlay => {
+  const startedAt = DateTime.makeUnsafe(fields.at ?? "2026-10-21T20:00:00Z");
+  const endedAt = DateTime.makeUnsafe(
+    fields.endedAt ?? DateTime.toEpochMillis(startedAt) + 3_600_000,
+  );
+  return {
+    id: `play-${++count}`,
+    tripId: fields.tripId ?? vegas,
+    game: fields.game === undefined ? "blackjack" : fields.game,
+    venueId: fields.venueId === undefined ? wynn : fields.venueId,
+    startedAt,
+    endedAt,
+    results: results.map(([playerId, net, minutes]) => ({
+      playerId,
+      net,
+      buyIn: Math.max(0, -net),
+      milliseconds: (minutes ?? 60) * 60_000,
+    })),
+  };
+};
 
 describe("groupStats", () => {
   it("ranks members by result, and equal results share a rank", () => {
@@ -101,10 +109,30 @@ describe("groupStats", () => {
       rank: 1,
       result: 600,
       sessions: 3,
-      minutes: 180,
+      hours: 3,
       hourlyResult: 200,
       wins: 1,
     });
+  });
+
+  it("sums raw milliseconds for hours and hourly result, and assigns period year from endedAt", () => {
+    const crossYear = play([[ALEX, 10_000]], {
+      at: "2025-12-31T22:00:00Z",
+      endedAt: "2026-01-01T02:00:00Z",
+    });
+    const subMinuteA: GroupPlay = {
+      ...play([]),
+      results: [{ playerId: ALEX, net: 1000, buyIn: 0, milliseconds: 29 * 60_000 + 40_000 }],
+    };
+    const subMinuteB: GroupPlay = {
+      ...play([]),
+      results: [{ playerId: ALEX, net: 1000, buyIn: 0, milliseconds: 29 * 60_000 + 40_000 }],
+    };
+    expect(groupStats([crossYear], [ALEX], zone).options.years).toEqual([2026]);
+    const summed = groupStats([subMinuteA, subMinuteB], [ALEX], zone).standings[0]!;
+    // 59m20s = 0.99h (not 58m = 0.97h if each play were rounded to minutes first).
+    expect(summed.hours).toBe(0.99);
+    expect(summed.hourlyResult).toBe(2022);
   });
 
   it("filters by trip, game, casino and period; a trip replaces the period", () => {
@@ -196,20 +224,24 @@ describe("groupStats", () => {
       const games = ["blackjack", "craps", null] as const;
       const venues = [wynn, bellagio, null] as const;
       const trips = [vegas, reno];
-      const plays = raw.map((p, index) => ({
-        id: `p${index}`,
-        tripId: trips[p.trip]!,
-        game: games[p.game]!,
-        venueId: venues[p.venue]!,
-        startedAt: DateTime.makeUnsafe(Date.UTC(2025, 0, 1 + p.day, 20)),
-        // One result per player at a table.
-        results: [...new Map(p.results.map((r) => [r.player, r.net]))].map(([player, net]) => ({
-          playerId: people[player]!,
-          net,
-          buyIn: 0,
-          minutes: 45,
-        })),
-      }));
+      const plays = raw.map((p, index) => {
+        const startedAt = DateTime.makeUnsafe(Date.UTC(2025, 0, 1 + p.day, 20));
+        return {
+          id: `p${index}`,
+          tripId: trips[p.trip]!,
+          game: games[p.game]!,
+          venueId: venues[p.venue]!,
+          startedAt,
+          endedAt: DateTime.makeUnsafe(DateTime.toEpochMillis(startedAt) + 45 * 60_000),
+          // One result per player at a table.
+          results: [...new Map(p.results.map((r) => [r.player, r.net]))].map(([player, net]) => ({
+            playerId: people[player]!,
+            net,
+            buyIn: 0,
+            milliseconds: 45 * 60_000,
+          })),
+        };
+      });
       const filters = {
         ...(f.trip === -1 ? {} : { tripId: trips[f.trip]! }),
         ...(f.game === -1 ? {} : { game: games[f.game]! }),
@@ -223,7 +255,7 @@ describe("groupStats", () => {
         (p) =>
           (filters.tripId === undefined
             ? filters.year === undefined ||
-              p.startedAt.pipe(DateTime.getPart("year")) === filters.year
+              p.endedAt.pipe(DateTime.getPart("year")) === filters.year
             : p.tripId === filters.tripId) &&
           (filters.game === undefined || p.game === filters.game) &&
           (filters.venueId === undefined || p.venueId === filters.venueId),
@@ -270,19 +302,23 @@ it.prop(
   ],
   ([tables]) => {
     const people = [ALEX, BEA, CAL, DEE];
-    const plays = tables.map((rows, index) => ({
-      id: `t${index}`,
-      tripId: vegas,
-      game: null,
-      venueId: null,
-      startedAt: DateTime.makeUnsafe(Date.UTC(2026, 9, 21, 18 + (index % 6), index)),
-      results: [...new Map(rows.map((r) => [r.player, r.net]))].map(([player, net]) => ({
-        playerId: people[player]!,
-        net,
-        buyIn: 0,
-        minutes: 30,
-      })),
-    }));
+    const plays = tables.map((rows, index) => {
+      const startedAt = DateTime.makeUnsafe(Date.UTC(2026, 9, 21, 18 + (index % 6), index));
+      return {
+        id: `t${index}`,
+        tripId: vegas,
+        game: null,
+        venueId: null,
+        startedAt,
+        endedAt: DateTime.makeUnsafe(DateTime.toEpochMillis(startedAt) + 30 * 60_000),
+        results: [...new Map(rows.map((r) => [r.player, r.net]))].map(([player, net]) => ({
+          playerId: people[player]!,
+          net,
+          buyIn: 0,
+          milliseconds: 30 * 60_000,
+        })),
+      };
+    });
     const ours = groupStats(plays, [], zone, { tripId: vegas }).standings;
     const trip = tripStandings(
       plays.map((play) => ({

@@ -16,6 +16,11 @@ export interface GroupTable {
   readonly minutesPlayed: number;
   /** Each seated member's own time playing, over their finished visits, counted once. */
   readonly memberMinutes: ReadonlyArray<{ readonly playerId: PlayerId; readonly minutes: number }>;
+  /** Each seated member's own time playing in milliseconds, over their finished visits, counted once. */
+  readonly memberMilliseconds: ReadonlyArray<{
+    readonly playerId: PlayerId;
+    readonly milliseconds: number;
+  }>;
   /** Each group member at the table, in the order they first sat down. */
   readonly seated: ReadonlyArray<PlayerId>;
   /** Members' settled results: their finished visits only, so a return visit can't undo them. */
@@ -104,6 +109,14 @@ export const groupTable = (
   const finished = shown.flatMap(span);
   const minutes = (intervals: ReadonlyArray<readonly [number, number]>) =>
     Math.round(covered(intervals) / 60_000);
+  const memberMilliseconds = Array.from(seated, (playerId) => ({
+    playerId,
+    milliseconds: covered(
+      Array.from(byVisit.values()).flatMap(({ visit, member }) =>
+        member === playerId ? span(visit) : [],
+      ),
+    ),
+  }));
   return {
     startedAt: shown[0]!.startedAt,
     endedAt:
@@ -111,14 +124,11 @@ export const groupTable = (
         ? null
         : DateTime.makeUnsafe(Math.max(...finished.map(([, to]) => to))),
     minutesPlayed: minutes(finished),
-    memberMinutes: Array.from(seated, (playerId) => ({
+    memberMinutes: memberMilliseconds.map(({ playerId, milliseconds }) => ({
       playerId,
-      minutes: minutes(
-        Array.from(byVisit.values()).flatMap(({ visit, member }) =>
-          member === playerId ? span(visit) : [],
-        ),
-      ),
+      minutes: Math.round(milliseconds / 60_000),
     })),
+    memberMilliseconds,
     seated: Array.from(seated),
     results: Array.from(seated).flatMap((playerId) => {
       const result = memberResults.get(playerId);

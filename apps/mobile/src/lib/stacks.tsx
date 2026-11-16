@@ -19,6 +19,7 @@ import {
   useUnsaved,
   useStacks,
   useLastTrip,
+  useStatsCopies,
   useGroupStats as useGroupStatsWith,
   useRevalidate,
   useSignedInOutbox,
@@ -85,7 +86,7 @@ export function StacksProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export { useAction, useLastTrip, useOutbox, usePending, useStacks, useUnsaved };
+export { useAction, useLastTrip, useOutbox, usePending, useStacks, useStatsCopies, useUnsaved };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 /** The app coming back to the foreground: shown data may be stale. */

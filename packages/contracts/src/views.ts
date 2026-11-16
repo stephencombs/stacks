@@ -308,13 +308,14 @@ export const GroupStats = Schema.Struct({
       game: Schema.NullOr(Game),
       venueId: Schema.NullOr(VenueId),
       startedAt: Schema.DateTimeUtc,
+      endedAt: Schema.DateTimeUtc,
       results: Schema.Array(
         Schema.Struct({
           playerId: PlayerId,
           buyIn: MinorUnits,
           net: MinorUnits,
-          /** How long this member played at it. */
-          minutes: Schema.Int,
+          /** How long this member played at it, in milliseconds. */
+          milliseconds: Schema.Int,
         }),
       ),
     }),

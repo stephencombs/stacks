@@ -20,6 +20,7 @@ import {
   useRememberTrip,
   useGroupStats as useGroupStatsWith,
   useRevalidate,
+  useStatsCopies,
   useUnsaved,
   useStacks,
 } from "@stacks/client-runtime/react";
@@ -129,7 +130,16 @@ const wakeOutbox = (flush: () => void) => {
 /** A group's stats, fresh while shown, and the device's last copy of them offline. */
 export const useGroupStats = (groupId: GroupId) => useGroupStatsWith(groupId, onWake);
 
-export { useAction, useLastTrip, useOutbox, usePending, useRememberTrip, useStacks, useUnsaved };
+export {
+  useAction,
+  useLastTrip,
+  useOutbox,
+  usePending,
+  useRememberTrip,
+  useStacks,
+  useStatsCopies,
+  useUnsaved,
+};
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 export function Loaded<A, E>({

@@ -281,6 +281,9 @@ export const useRememberTrip = (tripId: TripId) => {
 
 const StatsCopiesContext = createContext<ReturnType<typeof makeStatsCopies> | null>(null);
 
+/** The signed-in user's cached group stats copies, or null while nobody is signed in. */
+export const useStatsCopies = () => use(StatsCopiesContext);
+
 /**
  * A group's stats and the group they belong to, kept fresh like `<Loaded>`. Each fetch is kept on
  * the device, so offline the last copy shows; the API refusing, as when you've left the group,
@@ -297,17 +300,17 @@ export function useGroupStats(groupId: GroupId, onWake: (revalidate: () => void)
   useRevalidate(detailQuery, detail, onWake);
   useRevalidate(statsQuery, stats, onWake);
   const state = statsState(detail, stats, () => copies.load(groupId));
-  const keep = useEffectEvent((kind: typeof state.kind, fetchedAt: number | null) => {
+  const keep = useEffectEvent((id: GroupId, kind: typeof state.kind, fetchedAt: number | null) => {
     if (kind === "live" && fetchedAt !== null && state.kind === "live")
-      copies.save(groupId, {
+      copies.save(id, {
         fetchedAt: DateTime.makeUnsafe(fetchedAt),
         detail: state.detail,
         stats: state.stats,
       });
-    if (kind === "refused") copies.forget(groupId);
+    if (kind === "refused") copies.forget(id);
   });
   const fetchedAt = state.kind === "live" ? state.fetchedAt : null;
-  useEffect(() => keep(state.kind, fetchedAt), [state.kind, fetchedAt]);
+  useEffect(() => keep(groupId, state.kind, fetchedAt), [groupId, state.kind, fetchedAt]);
   return state;
 }
 

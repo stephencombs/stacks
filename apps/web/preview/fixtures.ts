@@ -308,7 +308,13 @@ const play = (
   game,
   venueId,
   startedAt,
-  results: results.map(({ playerId, buyIn, net }) => ({ playerId, buyIn, net, minutes })),
+  endedAt: new Date(Date.parse(startedAt) + minutes * 60_000).toISOString(),
+  results: results.map(({ playerId, buyIn, net }) => ({
+    playerId,
+    buyIn,
+    net,
+    milliseconds: minutes * 60_000,
+  })),
 });
 /** Atlantic City in the spring, then the Vegas weekend's finished sessions and table. */
 const stats = {

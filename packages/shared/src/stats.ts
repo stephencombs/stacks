@@ -214,12 +214,13 @@ export interface GroupPlay {
   readonly game: Game | null;
   readonly venueId: VenueId | null;
   readonly startedAt: DateTime.Utc;
-  /** Group members' results; `minutes` is how long that member played. */
+  readonly endedAt: DateTime.Utc;
+  /** Group members' results; `milliseconds` is how long that member played. */
   readonly results: ReadonlyArray<{
     readonly playerId: PlayerId;
     readonly buyIn: number;
     readonly net: number;
-    readonly minutes: number;
+    readonly milliseconds: number;
   }>;
 }
 
@@ -230,7 +231,7 @@ export interface GroupStanding {
   readonly rank: number | null;
   readonly result: MinorUnits;
   readonly sessions: number;
-  readonly minutes: number;
+  readonly hours: number;
   readonly hourlyResult: MinorUnits;
   /** Sessions that came out ahead; an even one counts only in `sessions`. */
   readonly wins: number;
@@ -242,6 +243,7 @@ export interface GroupStanding {
  * members and guests, in roster order: each appears, last and unranked when they have nothing in
  * scope. A former member appears only with play in scope. Options come from all the play, so
  * filtering never hides the current choice.
+ * Hours round the summed elapsed time to two decimals; hourly result uses unrounded time.
  */
 export const groupStats = <P extends GroupPlay>(
   plays: ReadonlyArray<P>,
@@ -249,7 +251,7 @@ export const groupStats = <P extends GroupPlay>(
   timeZone: DateTime.TimeZone,
   filters: PersonalStatsFilters = {},
 ) => {
-  const yearOf = (play: P) => DateTime.toParts(DateTime.setZone(play.startedAt, timeZone)).year;
+  const yearOf = (play: P) => DateTime.toParts(DateTime.setZone(play.endedAt, timeZone)).year;
   const ordered = plays.toSorted(
     (a, b) =>
       DateTime.toEpochMillis(a.startedAt) - DateTime.toEpochMillis(b.startedAt) ||
@@ -266,16 +268,21 @@ export const groupStats = <P extends GroupPlay>(
 
   const sheets = new Map<
     PlayerId,
-    { result: bigint; sessions: number; minutes: number; wins: number }
+    { result: bigint; sessions: number; milliseconds: bigint; wins: number }
   >();
   for (const playerId of members)
-    sheets.set(playerId, { result: 0n, sessions: 0, minutes: 0, wins: 0 });
+    sheets.set(playerId, { result: 0n, sessions: 0, milliseconds: 0n, wins: 0 });
   for (const play of shown)
-    for (const { playerId, net, minutes } of play.results) {
-      const sheet = sheets.get(playerId) ?? { result: 0n, sessions: 0, minutes: 0, wins: 0 };
+    for (const { playerId, net, milliseconds } of play.results) {
+      const sheet = sheets.get(playerId) ?? {
+        result: 0n,
+        sessions: 0,
+        milliseconds: 0n,
+        wins: 0,
+      };
       sheet.result += BigInt(net);
       sheet.sessions += 1;
-      sheet.minutes += minutes;
+      sheet.milliseconds += BigInt(Math.max(0, milliseconds));
       if (net > 0) sheet.wins += 1;
       sheets.set(playerId, sheet);
     }
@@ -283,8 +290,8 @@ export const groupStats = <P extends GroupPlay>(
     playerId,
     result: checkedMinorUnits(sheet.result),
     sessions: sheet.sessions,
-    minutes: sheet.minutes,
-    hourlyResult: hourlyResult(checkedMinorUnits(sheet.result), BigInt(sheet.minutes) * 60_000n),
+    hours: hours(sheet.milliseconds),
+    hourlyResult: hourlyResult(checkedMinorUnits(sheet.result), sheet.milliseconds),
     wins: sheet.wins,
   }));
   // Played rows keep roster order among equals: a stable sort, and nothing breaks the tie.

@@ -160,13 +160,14 @@ test.describe.serial("a group's first night out", () => {
       .click();
     await expect(alex.getByText("Voided by Alex: Undone")).toBeVisible();
     await expect(gus).toContainText("In $100");
-    // The trip's board is a step back from the table, and the table stays in reach from there.
-    const toBoard = async () => {
-      await alex.getByRole("link", { name: "Vegas weekend" }).first().click();
-      await alex.getByRole("link", { name: "Board", exact: true }).click();
-    };
-    await toBoard();
-    await expect(alex.getByText("Nothing on the board yet")).toBeVisible();
+    // The trip's stats wait on a finished session, and Crew keeps the live bar one click away.
+    await alex.getByRole("link", { name: "Vegas weekend" }).first().click();
+    await alex.getByRole("link", { name: "Stats", exact: true }).click();
+    await expect(alex.getByText("No finished sessions yet")).toBeVisible();
+    await alex
+      .getByRole("navigation", { name: "Tabs" })
+      .getByRole("link", { name: "Crew" })
+      .click();
     await alex.getByRole("link", { name: /^Back to (your|the) table/ }).click();
 
     await alex.getByRole("button", { name: "Close session" }).click();
@@ -186,7 +187,10 @@ test.describe.serial("a group's first night out", () => {
     await shoot(alex, "session-live");
 
     // Away from the table it's one tap away on the live bar.
-    await toBoard();
+    await alex
+      .getByRole("navigation", { name: "Tabs" })
+      .getByRole("link", { name: "Crew" })
+      .click();
     await alex.getByRole("link", { name: /^Back to (your|the) table/ }).click();
     await expect(alex.getByRole("button", { name: "Close session" })).toBeVisible();
 
@@ -200,20 +204,20 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByText("+$170").first()).toBeVisible();
     await expect(alex.getByRole("link", { name: "Start another session" })).toBeVisible();
 
-    // The trip's board ranks the night, with the numbers of whoever's picked under it.
-    await alex.getByRole("link", { name: "See the board" }).click();
-    const board = alex.getByRole("list", { name: "Standings" });
-    await expect(board.getByRole("listitem").first()).toContainText("+$170");
+    // The trip's stats rank the night, with each member's stat sheet a click away.
+    await alex.getByRole("link", { name: "See the trip's stats" }).click();
+    const standings = alex.getByRole("list", { name: "Standings" });
+    await expect(standings.getByRole("listitem").first()).toContainText("+$170");
     await expect(alex.getByRole("heading", { name: "Awards" })).toBeVisible();
-    const numbers = (name: string) => alex.getByRole("region", { name: `${name}'s numbers` });
-    await expect(numbers("Alex")).toContainText("#1 of 3 · 1 session");
-    await board.getByRole("button", { name: /Bea/ }).click();
-    await expect(numbers("Bea")).toContainText("#3 of 3 · 1 session");
-    // The trip's numbers: one table where some won and some lost, so no team run yet.
-    await expect(alex.getByText("0W · 0L · 1 mixed")).toBeVisible();
-    await expect(alex.getByText("Largest drawdown")).toBeVisible();
-    await shoot(alex, "trip-board");
+    await standings.getByRole("button", { name: /Alex/ }).click();
+    await expect(alex.getByRole("dialog")).toContainText("Vegas weekend · Rank 1");
+    await alex.keyboard.press("Escape");
+    await standings.getByRole("button", { name: /Bea/ }).click();
+    await expect(alex.getByRole("dialog")).toContainText("Vegas weekend · Rank 3");
+    await alex.keyboard.press("Escape");
+    await shoot(alex, "trip-stats");
     // Sessions heads each night with how it went for you.
+    await alex.goBack();
     await alex.getByRole("link", { name: "Vegas weekend" }).first().click();
     await expect(alex.getByRole("heading", { name: /^Day 1 · / })).toBeVisible();
     await shoot(alex, "trip-sessions");
@@ -248,21 +252,23 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByRole("heading", { name: "Vegas crew" })).toBeVisible();
     await shoot(alex, "group-home");
 
-    // The board's All time races every trip; the stat sheet opens on you, and anyone else is a tap away.
+    // Clearing the trip filter shows All time for the group; a stat sheet opens on tap.
     await alex
       .getByRole("link", { name: /^Vegas weekend/ })
       .first()
       .click();
-    await alex.getByRole("link", { name: "Board", exact: true }).click();
-    await alex.getByRole("button", { name: "All time" }).click();
-    await expect(alex).toHaveURL(/scope=all/);
-    await expect(alex.getByRole("cell", { name: "Craps" })).toBeVisible();
-    await expect(alex.getByRole("heading", { name: /leads by \$150/ })).toBeVisible();
-    await expect(numbers("Alex")).toContainText("#1 of 3 · 1 session");
+    await alex.getByRole("link", { name: "Stats", exact: true }).click();
+    await alex.getByRole("button", { name: "Clear period filter" }).click();
+    await expect(alex.getByRole("button", { name: "Period: All time" })).toBeVisible();
+    await expect(alex.getByRole("button", { name: /^Craps, / })).toBeVisible();
+    await alex.getByRole("button", { name: /Alex/ }).click();
+    await expect(alex.getByRole("dialog")).toContainText("All time · Rank 1");
+    await alex.keyboard.press("Escape");
     await alex.getByRole("button", { name: /Bea/ }).click();
-    await expect(numbers("Bea")).toContainText("#3 of 3 · 1 session");
+    await expect(alex.getByRole("dialog")).toContainText("All time · Rank 3");
+    await alex.keyboard.press("Escape");
 
-    // On a phone, the standings pick a player with a tap.
+    // On a phone, the standings open a stat sheet with a tap.
     const phone = await browser.newContext({
       storageState: await alex.context().storageState(),
       viewport: { width: 390, height: 844 },
@@ -271,10 +277,10 @@ test.describe.serial("a group's first night out", () => {
     });
     const phonePage = await phone.newPage();
     await phonePage.goto(alex.url());
+    await phonePage.getByRole("button", { name: "Group: Just me" }).tap();
+    await phonePage.getByRole("menuitemradio", { name: "Vegas crew" }).click();
     await phonePage.getByRole("button", { name: /Bea/ }).tap();
-    await expect(phonePage.getByRole("region", { name: "Bea's numbers" })).toContainText(
-      "#3 of 3 · 1 session",
-    );
+    await expect(phonePage.getByRole("dialog")).toContainText("All time · Rank 3");
     await phone.close();
     await shoot(alex, "stats");
   });

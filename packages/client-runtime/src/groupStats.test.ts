@@ -68,19 +68,23 @@ const play = (
   tripId: TripId,
   startedAt: string,
   results: ReadonlyArray<[PlayerId, number]>,
-): GroupStats["plays"][number] => ({
-  id: TableId.make(id(100 + ++count)),
-  tripId,
-  game: "blackjack",
-  venueId: wynn,
-  startedAt: at(startedAt),
-  results: results.map(([playerId, net]) => ({
-    playerId,
-    net: MinorUnits.make(net),
-    buyIn: MinorUnits.make(Math.max(0, -net)),
-    minutes: 90,
-  })),
-});
+): GroupStats["plays"][number] => {
+  const start = at(startedAt);
+  return {
+    id: TableId.make(id(100 + ++count)),
+    tripId,
+    game: "blackjack",
+    venueId: wynn,
+    startedAt: start,
+    endedAt: DateTime.makeUnsafe(DateTime.toEpochMillis(start) + 90 * 60_000),
+    results: results.map(([playerId, net]) => ({
+      playerId,
+      net: MinorUnits.make(net),
+      buyIn: MinorUnits.make(Math.max(0, -net)),
+      milliseconds: 90 * 60_000,
+    })),
+  };
+};
 const stats: GroupStats = {
   plays: [
     play(vegas, "2026-10-02T20:00:00Z", [

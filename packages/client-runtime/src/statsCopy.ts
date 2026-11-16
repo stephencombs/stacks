@@ -1,4 +1,4 @@
-import { GroupDetail, GroupStats, type GroupId } from "@stacks/contracts";
+import { GroupDetail, GroupId, GroupStats, TripId, type GroupListItem } from "@stacks/contracts";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -25,70 +25,145 @@ const Json = Schema.toCodecJson(StatsCopy);
 const decode = Schema.decodeUnknownOption(Json);
 const encode = Schema.encodeSync(Json);
 
-export const makeStatsCopies = (storage: StatsCopyStorage) => ({
-  load: (groupId: GroupId): StatsCopy | null => {
+const TRIP_INDEX = "_trips" as GroupId;
+const TripIndex = Schema.Array(
+  Schema.Struct({
+    tripId: TripId,
+    groupId: GroupId,
+    groupName: Schema.String,
+  }),
+);
+const IndexJson = Schema.toCodecJson(TripIndex);
+const decodeIndex = Schema.decodeUnknownOption(IndexJson);
+const encodeIndex = Schema.encodeSync(IndexJson);
+
+export const makeStatsCopies = (storage: StatsCopyStorage) => {
+  const readIndex = () => {
+    try {
+      const kept = storage.load(TRIP_INDEX);
+      return kept === null ? [] : (Option.getOrNull(decodeIndex(JSON.parse(kept))) ?? []);
+    } catch {
+      return [];
+    }
+  };
+  const writeIndex = (entries: typeof TripIndex.Type) => {
+    try {
+      storage.save(TRIP_INDEX, entries.length === 0 ? null : JSON.stringify(encodeIndex(entries)));
+    } catch {
+      // A full or missing store only costs the offline trip lookup.
+    }
+  };
+  const load = (groupId: GroupId): StatsCopy | null => {
     try {
       const kept = storage.load(groupId);
       return kept === null ? null : Option.getOrNull(decode(JSON.parse(kept)));
     } catch {
       return null;
     }
-  },
-  save: (groupId: GroupId, copy: StatsCopy) => {
-    try {
-      storage.save(groupId, JSON.stringify(encode(copy)));
-    } catch {
-      // A full or missing store only costs the offline copy.
-    }
-  },
-  forget: (groupId: GroupId) => {
-    try {
-      storage.save(groupId, null);
-    } catch {
-      // Nothing was kept.
-    }
-  },
-});
+  };
+  return {
+    load,
+    save: (groupId: GroupId, copy: StatsCopy) => {
+      try {
+        storage.save(groupId, JSON.stringify(encode(copy)));
+      } catch {
+        // A full or missing store only costs the offline copy.
+      }
+      const rest = readIndex().filter((entry) => entry.groupId !== groupId);
+      const own = copy.detail.trips.map((trip) => ({
+        tripId: trip.id,
+        groupId,
+        groupName: copy.detail.group.name,
+      }));
+      writeIndex([...rest, ...own]);
+    },
+    forget: (groupId: GroupId) => {
+      try {
+        storage.save(groupId, null);
+      } catch {
+        // Nothing was kept.
+      }
+      const next = readIndex().filter((entry) => entry.groupId !== groupId);
+      writeIndex(next);
+    },
+    rememberGroups: (groups: ReadonlyArray<Pick<GroupListItem, "group" | "trips">>) => {
+      writeIndex(
+        groups.flatMap((item) =>
+          item.trips.map((trip) => ({
+            tripId: trip.id,
+            groupId: item.group.id,
+            groupName: item.group.name,
+          })),
+        ),
+      );
+    },
+    groupOfTrip: (
+      tripId: TripId,
+    ): { readonly groupId: GroupId; readonly groupName: string } | null => {
+      const match = readIndex().find((entry) => entry.tripId === tripId);
+      return match ? { groupId: match.groupId, groupName: match.groupName } : null;
+    },
+    groupName: (groupId: GroupId): string | null =>
+      readIndex().find((entry) => entry.groupId === groupId)?.groupName ??
+      load(groupId)?.detail.group.name ??
+      null,
+  };
+};
 export type StatsCopies = ReturnType<typeof makeStatsCopies>;
 
 /**
  * What a group's stats screen shows, from its two queries and the copy kept on the device: the
- * live numbers, the last copy when the network can't be reached (with when it was fetched), an
- * unavailable state when there's no copy, or the API's refusal, which no copy outlives.
+ * API's refusal (which no live or saved copy outlives), the live numbers, the last copy when the
+ * network can't be reached (with when it was fetched), or an unavailable state when there's no
+ * copy.
  */
 export const statsState = <E1, E2>(
   detail: AsyncResult.AsyncResult<GroupDetail, E1>,
   stats: AsyncResult.AsyncResult<GroupStats, E2>,
   copy: () => StatsCopy | null,
 ) => {
-  const value = <A, E>(result: AsyncResult.AsyncResult<A, E>) =>
-    AsyncResult.isSuccess(result)
-      ? Option.some(result.value)
-      : AsyncResult.isFailure(result)
-        ? Option.map(result.previousSuccess, (previous) => previous.value)
-        : Option.none();
-  const shownDetail = value(detail);
-  const shownStats = value(stats);
-  if (Option.isSome(shownDetail) && Option.isSome(shownStats))
+  const errors = [
+    ...(AsyncResult.isFailure(detail) ? [Cause.squash(detail.cause)] : []),
+    ...(AsyncResult.isFailure(stats) ? [Cause.squash(stats.cause)] : []),
+  ];
+  for (const error of errors) {
+    if (!isRetryable(error)) return { kind: "refused" as const, message: describeError(error) };
+  }
+  if (AsyncResult.isSuccess(detail) && AsyncResult.isSuccess(stats))
     return {
       kind: "live" as const,
-      detail: shownDetail.value,
-      stats: shownStats.value,
+      detail: detail.value,
+      stats: stats.value,
       // When both came back, for the copy kept on the device.
-      fetchedAt:
-        AsyncResult.isSuccess(detail) && AsyncResult.isSuccess(stats)
-          ? Math.min(detail.timestamp, stats.timestamp)
-          : null,
+      fetchedAt: Math.min(detail.timestamp, stats.timestamp),
     };
-  const error = AsyncResult.isFailure(detail)
-    ? Cause.squash(detail.cause)
-    : AsyncResult.isFailure(stats)
-      ? Cause.squash(stats.cause)
-      : undefined;
-  if (error === undefined) return { kind: "loading" as const };
-  if (!isRetryable(error)) return { kind: "refused" as const, message: describeError(error) };
-  const saved = copy();
-  return saved ? { kind: "saved" as const, copy: saved } : { kind: "unavailable" as const };
+  if (errors.length > 0) {
+    const kept = <A, E>(result: AsyncResult.AsyncResult<A, E>) =>
+      AsyncResult.isSuccess(result)
+        ? Option.some({ value: result.value, timestamp: result.timestamp })
+        : AsyncResult.isFailure(result)
+          ? Option.map(result.previousSuccess, (previous) => ({
+              value: previous.value,
+              timestamp: previous.timestamp,
+            }))
+          : Option.none();
+    const keptDetail = kept(detail);
+    const keptStats = kept(stats);
+    if (Option.isSome(keptDetail) && Option.isSome(keptStats))
+      return {
+        kind: "saved" as const,
+        copy: {
+          fetchedAt: DateTime.makeUnsafe(
+            Math.min(keptDetail.value.timestamp, keptStats.value.timestamp),
+          ),
+          detail: keptDetail.value.value,
+          stats: keptStats.value.value,
+        },
+      };
+    const saved = copy();
+    return saved ? { kind: "saved" as const, copy: saved } : { kind: "unavailable" as const };
+  }
+  return { kind: "loading" as const };
 };
 
 export type StatsState = ReturnType<typeof statsState>;

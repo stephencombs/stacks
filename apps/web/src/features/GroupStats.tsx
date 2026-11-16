@@ -113,17 +113,17 @@ function Shown({
 }) {
   const [open, setOpen] = useState<Standing | null>(null);
   const racers = view.standings.filter((row) => row.rank !== null);
-  const picked = racers.some((row) => row.playerId === me) ? me : racers[0]!.playerId;
+  const leader = racers.some((row) => row.playerId === me) ? me : racers[0]?.playerId;
   return (
     <>
       <Standings view={view} onOpen={setOpen} />
-      {view.sessions > 1 ? (
+      {view.sessions > 1 && leader !== undefined ? (
         <Section title="Running result">
           <Race
             sessions={view.race.sessions}
             players={racers}
             currency={view.currency}
-            picked={picked}
+            picked={leader}
             marks={view.race.marks}
             where={(session) => session.where}
           />
