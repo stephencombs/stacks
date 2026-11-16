@@ -12,7 +12,7 @@ import { Chip } from "./Chip";
 
 /**
  * Sessions on a screen with room beside it: the trip's sessions on the left, and on the right who's
- * winning and where you stand, a glance before going to Board. Below `xl` the rail
+ * winning and where you stand, a glance before going to Stats. Below `xl` the rail
  * drops away and the page is one column.
  */
 export function TripLayout({ children, rail }: { children: ReactNode; rail: ReactNode }) {
@@ -29,17 +29,17 @@ export function TripLayout({ children, rail }: { children: ReactNode; rail: Reac
   );
 }
 
-/** What the rail holds: the board and your balance. */
+/** What the rail holds: the standings and your balance. */
 export function TripRail({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
   return (
     <>
-      <RailBoard group={group} trip={trip} />
+      <RailStandings group={group} trip={trip} />
       <RailBalance group={group} trip={trip} />
     </>
   );
 }
 
-function RailBoard({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
+function RailStandings({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
   const closed = closedPlays(trip);
   const standings = tripStandings(closed, localClock).toSorted((a, b) => a.rank - b.rank);
   const names = playerNames(group);
@@ -47,13 +47,13 @@ function RailBoard({ group, trip }: { group: GroupDetail; trip: TripDetail }) {
   return (
     <Surface className="overflow-hidden">
       <div className="flex min-h-12 items-center justify-between pr-2 pl-4">
-        <h2 className="font-semibold">Board</h2>
+        <h2 className="font-semibold">Standings</h2>
         <Link
-          to="/trips/$tripId/board"
-          params={{ tripId: trip.trip.id }}
+          to="/stats"
+          state={{ statsPick: { groupId: group.group.id, tripId: trip.trip.id } }}
           className="inline-flex min-h-10 items-center rounded-lg px-2 text-sm text-muted transition-colors duration-150 hover:text-ink"
         >
-          Full board
+          Stats
         </Link>
       </div>
       <ol className="pb-1">

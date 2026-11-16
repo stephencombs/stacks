@@ -102,13 +102,13 @@ function StartTripButton({ detail }: { detail: GroupDetail }) {
   );
 }
 
-/** The top three on the trip's board so far. */
+/** The top three in the trip's standings so far. */
 function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const names = playerNames(detail);
   const closed = closedPlays(trip);
   const top = tripStandings(closed, localClock).slice(0, 3);
   if (top.length === 0)
-    return <span className="text-sm text-muted">Close a session to put it on the board.</span>;
+    return <span className="text-sm text-muted">Finish a session to start the standings.</span>;
   return (
     // One line, as tall as its skeleton: each leader's chip, which carries their initial, and result.
     <span className="flex gap-x-4 text-sm">
@@ -131,7 +131,7 @@ function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: ()
       open
       onOpenChange={(open) => (open ? undefined : onClose())}
       title="New trip"
-      description={`Sessions you start in it go on its board, in ${detail.group.name}.`}
+      description={`Sessions you start in it count toward its stats, in ${detail.group.name}.`}
     >
       <TripForm
         detail={detail}

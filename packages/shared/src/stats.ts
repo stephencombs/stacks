@@ -1,8 +1,17 @@
-import type { PlayerId, Table, TripId, VisitSummary } from "@stacks/contracts";
+import type {
+  Game,
+  MinorUnits,
+  PlayerId,
+  Table,
+  TripId,
+  VenueId,
+  VisitSummary,
+} from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
 import { checkedMinorUnits } from "./exactMoney.ts";
-import { sessionRuns, type SessionRuns } from "./results.ts";
+import { sessionRuns } from "./results.ts";
+import type { TripClock } from "./trips.ts";
 
 /** A closed session as stats see it, oldest first. */
 export interface StatsSession {
@@ -57,66 +66,6 @@ export const raceLines = (
       measure === "money" ? runningTotals(sessions, playerId) : runningReturns(sessions, playerId);
     return { playerId, values, line: [0, ...values.map((value) => value ?? 0)] };
   });
-
-export interface StatSheet<S> {
-  readonly total: number;
-  readonly runs: SessionRuns;
-  /** Each session they played, oldest first. */
-  readonly played: ReadonlyArray<{ readonly session: S; readonly net: number }>;
-  /** Their best session if they ever finished up, and worst if they ever finished down. */
-  readonly best: { readonly session: S; readonly net: number } | null;
-  readonly worst: { readonly session: S; readonly net: number } | null;
-  /** Across sessions with a recorded buy-in; imported sessions only have a net. */
-  readonly averageBuyIn: number | null;
-  readonly bestVenue: {
-    readonly name: string;
-    readonly net: number;
-    readonly sessions: number;
-  } | null;
-  readonly venues: number;
-}
-
-/** One player's numbers over the given sessions, or null if they played none of them. */
-export const statSheet = <S extends StatsSession>(
-  sessions: ReadonlyArray<S>,
-  playerId: PlayerId,
-): StatSheet<S> | null => {
-  const played = sessions.flatMap((session) => {
-    const result = session.results.find((r) => r.playerId === playerId);
-    return result ? [{ session, net: result.net, buyIn: result.buyIn }] : [];
-  });
-  if (played.length === 0) return null;
-
-  const byVenue = new Map<string, { name: string; net: number; sessions: number }>();
-  for (const { session, net } of played) {
-    if (session.venue === null) continue;
-    const venue = byVenue.get(session.venue.id) ?? {
-      name: session.venue.name,
-      net: 0,
-      sessions: 0,
-    };
-    venue.net += net;
-    venue.sessions += 1;
-    byVenue.set(session.venue.id, venue);
-  }
-  const byNet = played.toSorted((a, b) => b.net - a.net);
-  const buyIns = played.filter((p) => p.buyIn > 0);
-  const bestVenue = [...byVenue.values()].toSorted((a, b) => b.net - a.net)[0];
-
-  return {
-    total: played.reduce((sum, p) => sum + p.net, 0),
-    runs: sessionRuns(played.map((p) => p.net)),
-    played: played.map(({ session, net }) => ({ session, net })),
-    best: byNet[0]!.net > 0 ? { session: byNet[0]!.session, net: byNet[0]!.net } : null,
-    worst:
-      byNet.at(-1)!.net < 0 ? { session: byNet.at(-1)!.session, net: byNet.at(-1)!.net } : null,
-    averageBuyIn: buyIns.length
-      ? Math.round(buyIns.reduce((sum, p) => sum + p.buyIn, 0) / buyIns.length)
-      : null,
-    bestVenue: bestVenue && bestVenue.net > 0 ? bestVenue : null,
-    venues: byVenue.size,
-  };
-};
 
 type PersonalStatsSession = Pick<VisitSummary, "visit" | "finalResult"> & {
   readonly table: Pick<Table, "game" | "venueId" | "tripId">;
@@ -256,4 +205,202 @@ export const personalStats = (
       ],
     },
   };
+};
+
+/** A finished session or table in one of a group's trips, as group stats read it. */
+export interface GroupPlay {
+  readonly id: string;
+  readonly tripId: TripId;
+  readonly game: Game | null;
+  readonly venueId: VenueId | null;
+  readonly startedAt: DateTime.Utc;
+  /** Group members' results; `minutes` is how long that member played. */
+  readonly results: ReadonlyArray<{
+    readonly playerId: PlayerId;
+    readonly buyIn: number;
+    readonly net: number;
+    readonly minutes: number;
+  }>;
+}
+
+/** A member's place in the group's standings, with their stat sheet. */
+export interface GroupStanding {
+  readonly playerId: PlayerId;
+  /** Equal results share a rank (1, 2, 2, 4). Null for a member with nothing in scope. */
+  readonly rank: number | null;
+  readonly result: MinorUnits;
+  readonly sessions: number;
+  readonly minutes: number;
+  readonly hourlyResult: MinorUnits;
+  /** Sessions that came out ahead; an even one counts only in `sessions`. */
+  readonly wins: number;
+}
+
+/**
+ * A group's stats over its finished play, filtered as Just me is: an omitted filter means all,
+ * null picks play with it unset, and a trip replaces the period. `members` are the group's current
+ * members and guests, in roster order: each appears, last and unranked when they have nothing in
+ * scope. A former member appears only with play in scope. Options come from all the play, so
+ * filtering never hides the current choice.
+ */
+export const groupStats = <P extends GroupPlay>(
+  plays: ReadonlyArray<P>,
+  members: ReadonlyArray<PlayerId>,
+  timeZone: DateTime.TimeZone,
+  filters: PersonalStatsFilters = {},
+) => {
+  const yearOf = (play: P) => DateTime.toParts(DateTime.setZone(play.startedAt, timeZone)).year;
+  const ordered = plays.toSorted(
+    (a, b) =>
+      DateTime.toEpochMillis(a.startedAt) - DateTime.toEpochMillis(b.startedAt) ||
+      compareKey(a.id, b.id),
+  );
+  const shown = ordered.filter(
+    (play) =>
+      (filters.tripId === undefined
+        ? filters.year === undefined || yearOf(play) === filters.year
+        : play.tripId === filters.tripId) &&
+      (filters.game === undefined || play.game === filters.game) &&
+      (filters.venueId === undefined || play.venueId === filters.venueId),
+  );
+
+  const sheets = new Map<
+    PlayerId,
+    { result: bigint; sessions: number; minutes: number; wins: number }
+  >();
+  for (const playerId of members)
+    sheets.set(playerId, { result: 0n, sessions: 0, minutes: 0, wins: 0 });
+  for (const play of shown)
+    for (const { playerId, net, minutes } of play.results) {
+      const sheet = sheets.get(playerId) ?? { result: 0n, sessions: 0, minutes: 0, wins: 0 };
+      sheet.result += BigInt(net);
+      sheet.sessions += 1;
+      sheet.minutes += minutes;
+      if (net > 0) sheet.wins += 1;
+      sheets.set(playerId, sheet);
+    }
+  const rows = Array.from(sheets, ([playerId, sheet]) => ({
+    playerId,
+    result: checkedMinorUnits(sheet.result),
+    sessions: sheet.sessions,
+    minutes: sheet.minutes,
+    hourlyResult: hourlyResult(checkedMinorUnits(sheet.result), BigInt(sheet.minutes) * 60_000n),
+    wins: sheet.wins,
+  }));
+  // Played rows keep roster order among equals: a stable sort, and nothing breaks the tie.
+  const played = rows.filter((row) => row.sessions > 0).toSorted((a, b) => b.result - a.result);
+  const standings: ReadonlyArray<GroupStanding> = [
+    ...played.map((row) => ({
+      ...row,
+      rank: 1 + played.filter((other) => other.result > row.result).length,
+    })),
+    ...rows.filter((row) => row.sessions === 0).map((row) => ({ ...row, rank: null })),
+  ];
+
+  const breakdown = <K extends string | null>(key: (play: P) => K) =>
+    Array.from(Map.groupBy(shown, key), ([k, group]) => ({
+      key: k,
+      sessions: group.length,
+      result: checkedMinorUnits(
+        group.reduce((sum, play) => sum + play.results.reduce((n, r) => n + BigInt(r.net), 0n), 0n),
+      ),
+    })).toSorted((a, b) =>
+      a.result === b.result ? compareKey(a.key, b.key) : a.result > b.result ? -1 : 1,
+    );
+
+  return {
+    standings,
+    result: checkedMinorUnits(played.reduce((sum, row) => sum + BigInt(row.result), 0n)),
+    /** In scope, oldest first. */
+    plays: shown,
+    byGame: breakdown((play) => play.game).map(({ key, ...row }) => ({ game: key, ...row })),
+    byCasino: breakdown((play) => play.venueId).map(({ key, ...row }) => ({
+      venueId: key,
+      ...row,
+    })),
+    options: {
+      years: [...new Set(ordered.map(yearOf))].toSorted((a, b) => b - a),
+      games: [...new Set(ordered.map((play) => play.game))].toSorted(compareKey),
+      venueIds: [...new Set(ordered.map((play) => play.venueId))].toSorted(compareKey),
+      // Most recently played first.
+      tripIds: [...new Set(ordered.toReversed().map((play) => play.tripId))],
+    },
+  };
+};
+
+export type AwardKey = "biggest_hit" | "heater" | "comeback" | "hopper" | "night_owl";
+
+export interface GroupAward {
+  readonly key: AwardKey;
+  readonly playerId: PlayerId;
+  /** What earned it: money for a hit or a comeback, a count for a run or casinos, an hour. */
+  readonly value: number;
+  /** The session it happened in, for awards about one session. */
+  readonly play: GroupPlay | null;
+}
+
+/** Awards in the order they're handed out; earlier awards get first pick of the players. */
+const AWARDS: ReadonlyArray<AwardKey> = [
+  "biggest_hit",
+  "heater",
+  "comeback",
+  "hopper",
+  "night_owl",
+];
+
+/** Hours into the night: 6pm is 0, 2am is 8. Daytime is -1 and never wins Night owl. */
+const lateness = (hour: number) => (hour >= 18 ? hour - 18 : hour < 6 ? hour + 6 : -1);
+
+/**
+ * A trip's awards. Each goes to the best player for it who doesn't already hold one, so one hot
+ * player doesn't sweep the lot; when everyone eligible already has one, the best takes it anyway.
+ */
+export const groupAwards = (
+  plays: ReadonlyArray<GroupPlay>,
+  clock: TripClock,
+): ReadonlyArray<GroupAward> => {
+  const ordered = plays.toSorted(
+    (a, b) => DateTime.toEpochMillis(a.startedAt) - DateTime.toEpochMillis(b.startedAt),
+  );
+  const players = [...new Set(ordered.flatMap((play) => play.results.map((r) => r.playerId)))];
+  const claims = new Map<AwardKey, Array<GroupAward>>(AWARDS.map((key) => [key, []]));
+  const claim = (key: AwardKey, playerId: PlayerId, value: number, play: GroupPlay | null) =>
+    claims.get(key)!.push({ key, playerId, value, play });
+  for (const playerId of players) {
+    const mine = ordered.flatMap((play) => {
+      const result = play.results.find((r) => r.playerId === playerId);
+      return result ? [{ play, net: result.net }] : [];
+    });
+    const best = mine.reduce((top, m) => (m.net > top.net ? m : top));
+    if (best.net > 0) claim("biggest_hit", playerId, best.net, best.play);
+    const run = sessionRuns(mine.map((m) => m.net)).longestWinningRun;
+    if (run >= 2) claim("heater", playerId, run, null);
+    let total = 0;
+    let low = 0;
+    for (const m of mine) {
+      total += m.net;
+      low = Math.min(low, total);
+    }
+    if (low < 0 && total > low) claim("comeback", playerId, total - low, null);
+    const venues = new Set(mine.flatMap((m) => (m.play.venueId ? [m.play.venueId] : []))).size;
+    if (venues >= 2) claim("hopper", playerId, venues, null);
+    const owl = mine.reduce((top, m) =>
+      lateness(clock.hour(m.play.startedAt)) > lateness(clock.hour(top.play.startedAt)) ? m : top,
+    );
+    const owlHour = clock.hour(owl.play.startedAt);
+    if (lateness(owlHour) >= 6) claim("night_owl", playerId, owlHour, owl.play);
+  }
+
+  const holders = new Set<PlayerId>();
+  return AWARDS.flatMap((key) => {
+    const ranking = claims
+      .get(key)!
+      .sort((a, b) =>
+        key === "night_owl" ? lateness(b.value) - lateness(a.value) : b.value - a.value,
+      );
+    const award = ranking.find((c) => !holders.has(c.playerId)) ?? ranking[0];
+    if (!award) return [];
+    holders.add(award.playerId);
+    return [award];
+  });
 };

@@ -1,17 +1,19 @@
+import { useAtomValue } from "@effect/atom-react";
+import type { StaticScreenProps } from "@react-navigation/native";
 import { runningLine } from "@stacks/client-runtime/chart";
+import { groupChip } from "@stacks/client-runtime/groupStats";
 import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import {
   personalStatsView,
-  TOP_CASINOS,
-  type GameChip,
   type PersonalStatsView,
   type StatsFilters,
 } from "@stacks/client-runtime/stats";
-import { MinorUnits, type TripId } from "@stacks/contracts";
-import { formatMoney } from "@stacks/shared/money";
+import { tripNames } from "@stacks/client-runtime/trip";
+import { GroupId, TripId, type GroupListItem } from "@stacks/contracts";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useMemo, useState, type ReactNode } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import Svg, {
   Circle,
   ClipPath,
@@ -27,46 +29,159 @@ import { useCSSVariable } from "uniwind";
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { FilterChip } from "../components/ui/FilterChip";
-import { Icon } from "../components/ui/Icon";
-import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
+import { GroupStatsView } from "../features/GroupStats";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet } from "../features/RecordingForms";
-import { TripNames } from "../features/TableTrip";
+import { ByCasino, ByGame, Figure, Filters, chipColor, signed } from "../features/StatsParts";
+import { useAccount } from "../lib/account";
+import { StacksProvider, useStacks } from "../lib/stacks";
 
-type Shown = Exclude<PersonalStatsView, { kind: "empty" }>;
 type Summary = Extract<PersonalStatsView, { kind: "stats" }>;
 
-const chipColor: Record<GameChip, string> = {
-  red: "bg-chip-red",
-  blue: "bg-chip-blue",
-  green: "bg-chip-green",
-  black: "bg-chip-black",
-  purple: "bg-chip-purple",
-  orange: "bg-chip-orange",
-  grey: "bg-chip-grey",
-};
+/** The group, and maybe trip, Stats opens on: from a trip or group's Stats, or an old Board link. */
+type Props = StaticScreenProps<{ groupId?: string; tripId?: string } | undefined>;
 
-const signed = (amount: number) =>
-  formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY, { signDisplay: "exceptZero" });
-
-/** Your own play, broken down, from this device's sessions: it works signed out and offline. */
-export function StatsScreen() {
-  return <TripNames>{(tripNames) => <StatsView tripNames={tripNames} />}</TripNames>;
+/**
+ * Your own play, broken down, from this device's sessions: it works signed out and offline.
+ * Signed in, the Group chip switches the screen to one of your groups.
+ */
+export function StatsScreen({ route }: Props) {
+  const pick = {
+    ...(route.params?.groupId ? { groupId: GroupId.make(route.params.groupId) } : {}),
+    ...(route.params?.tripId ? { tripId: TripId.make(route.params.tripId) } : {}),
+  };
+  return (
+    <PersonalScreen live>
+      <YourGroups>
+        {(groups) => (
+          // Each arrival with a group picked starts fresh, even when Stats is already open.
+          <StatsView key={`${pick.groupId}:${pick.tripId}`} pick={pick} groups={groups} />
+        )}
+      </YourGroups>
+    </PersonalScreen>
+  );
 }
 
-function StatsView({ tripNames }: { tripNames: ReadonlyMap<TripId, string> }) {
+type Pick = { readonly groupId?: GroupId; readonly tripId?: TripId };
+
+const noGroups: ReadonlyArray<GroupListItem> = [];
+
+/** Your groups when you're signed in; signed out, or before they load, there are none. */
+function YourGroups({
+  children,
+}: {
+  children: (groups: ReadonlyArray<GroupListItem>) => ReactNode;
+}) {
+  const account = useAccount();
+  if (!account.available || !account.isSignedIn) return children(noGroups);
+  return (
+    <StacksProvider>
+      <SignedInGroups>{children}</SignedInGroups>
+    </StacksProvider>
+  );
+}
+
+function SignedInGroups({
+  children,
+}: {
+  children: (groups: ReadonlyArray<GroupListItem>) => ReactNode;
+}) {
+  const groups = AsyncResult.getOrElse(useAtomValue(useStacks().groups), () => noGroups);
+  return children(groups);
+}
+
+function StatsView({ pick, groups }: { pick: Pick; groups: ReadonlyArray<GroupListItem> }) {
+  const [picked, setPicked] = useState<Pick>(pick);
+  const [filters, setFilters] = useState<StatsFilters>(pick.tripId ? { tripId: pick.tripId } : {});
+  // A trip alone names its group once your groups have loaded.
+  const groupId =
+    picked.groupId ??
+    groups.find((item) => item.trips.some((trip) => trip.id === picked.tripId))?.group.id ??
+    null;
+  const chip =
+    groups.length === 0 && groupId === null ? null : (
+      <GroupChip
+        groups={groups}
+        groupId={groupId}
+        onChange={(next) => {
+          setPicked(next === null ? {} : { groupId: next });
+          // A trip stays picked only in the group it belongs to.
+          const keep =
+            next === null ||
+            groups.some(
+              (item) =>
+                item.group.id === next && item.trips.some((trip) => trip.id === filters.tripId),
+            );
+          if (!keep) setFilters({ ...filters, tripId: undefined });
+        }}
+      />
+    );
+  return groupId === null ? (
+    <JustMe names={tripNames(groups)} chip={chip} filters={filters} onFilters={setFilters} />
+  ) : (
+    <GroupStatsView
+      key={groupId}
+      groupId={groupId}
+      chip={chip}
+      filters={filters}
+      onFilters={setFilters}
+      onJustMe={() => {
+        setPicked({});
+        setFilters({});
+      }}
+    />
+  );
+}
+
+function GroupChip({
+  groups,
+  groupId,
+  onChange,
+}: {
+  groups: ReadonlyArray<GroupListItem>;
+  groupId: GroupId | null;
+  onChange: (groupId: GroupId | null) => void;
+}) {
+  const chip = groupChip(
+    groups.map((item) => ({ id: item.group.id, name: item.group.name })),
+    groupId,
+  );
+  return (
+    <FilterChip
+      name={chip.name}
+      options={chip.options}
+      value={chip.value}
+      applied={chip.applied}
+      onChange={(value) => onChange(value === "" ? null : GroupId.make(value))}
+      onClear={() => onChange(null)}
+    />
+  );
+}
+
+function JustMe({
+  names,
+  chip,
+  filters,
+  onFilters,
+}: {
+  names: ReturnType<typeof tripNames>;
+  chip: ReactNode;
+  filters: StatsFilters;
+  onFilters: (filters: StatsFilters) => void;
+}) {
   const { home, status, error, retryLoad } = useRecordingHome();
-  const [filters, setFilters] = useState<StatsFilters>({});
   const [adding, setAdding] = useState(false);
   const view = useMemo(
     () =>
-      home ? personalStatsView([...home.active, ...home.finished], filters, { tripNames }) : null,
-    [home, filters, tripNames],
+      home
+        ? personalStatsView([...home.active, ...home.finished], filters, { tripNames: names })
+        : null,
+    [home, filters, names],
   );
   return (
-    <PersonalScreen live>
+    <>
       {status === "load_failed" ? (
         <SaveStatus status={status} error={error} onRetry={retryLoad} />
       ) : null}
@@ -81,29 +196,32 @@ function StatsView({ tripNames }: { tripNames: ReadonlyMap<TripId, string> }) {
           </View>
         )
       ) : view.kind === "empty" ? (
-        <View className="gap-3">
-          <EmptyState
-            centered
-            title="Your stats start here"
-            action={
-              <Button
-                label="Add a past session"
-                variant="primary"
-                size="lg"
-                className="mt-2 self-stretch"
-                onPress={() => setAdding(true)}
-              />
-            }
-          >
-            Add a finished session to see your result, hours and games here.
-          </EmptyState>
-          <Text className="text-center type-footnote text-muted">
-            No account or internet connection needed. Your sessions are saved on this phone.
-          </Text>
-        </View>
+        <>
+          {chip ? <Filters lead={chip} chips={[]} filtered={false} onChange={onFilters} /> : null}
+          <View className="gap-3">
+            <EmptyState
+              centered
+              title="Your stats start here"
+              action={
+                <Button
+                  label="Add a past session"
+                  variant="primary"
+                  size="lg"
+                  className="mt-2 self-stretch"
+                  onPress={() => setAdding(true)}
+                />
+              }
+            >
+              Add a finished session to see your result, hours and games here.
+            </EmptyState>
+            <Text className="text-center type-footnote text-muted">
+              No account or internet connection needed. Your sessions are saved on this phone.
+            </Text>
+          </View>
+        </>
       ) : (
         <>
-          <Filters view={view} onChange={setFilters} />
+          <Filters lead={chip} chips={view.chips} filtered={view.filtered} onChange={onFilters} />
           {view.kind === "no_match" ? (
             <EmptyState
               centered
@@ -114,50 +232,21 @@ function StatsView({ tripNames }: { tripNames: ReadonlyMap<TripId, string> }) {
                   variant="primary"
                   size="lg"
                   className="mt-2 self-stretch"
-                  onPress={() => setFilters({})}
+                  onPress={() => onFilters({})}
                 />
               }
             >
               {view.sentence}
             </EmptyState>
           ) : (
-            <Breakdown view={view} onFilter={setFilters} />
+            <Breakdown view={view} onFilter={onFilters} />
           )}
         </>
       )}
       {adding ? (
         <PastSessionSheet onClose={() => setAdding(false)} onAdded={() => setAdding(false)} />
       ) : null}
-    </PersonalScreen>
-  );
-}
-
-function Filters({ view, onChange }: { view: Shown; onChange: (filters: StatsFilters) => void }) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      accessibilityLabel="Stats filters"
-      className="-mx-4"
-      contentContainerClassName="items-center gap-2 px-4"
-    >
-      {view.chips.map((chip) => (
-        <FilterChip
-          key={chip.key}
-          name={chip.name}
-          options={chip.options}
-          value={chip.value}
-          applied={chip.applied}
-          onChange={(value) =>
-            onChange(chip.options.find((option) => option.value === value)!.filters)
-          }
-          onClear={() => onChange(chip.cleared)}
-        />
-      ))}
-      {view.filtered ? (
-        <Button label="Reset all" variant="ghost" size="sm" onPress={() => onChange({})} />
-      ) : null}
-    </ScrollView>
+    </>
   );
 }
 
@@ -168,7 +257,6 @@ function Breakdown({
   view: Summary;
   onFilter: (filters: StatsFilters) => void;
 }) {
-  const [casinos, setCasinos] = useState(false);
   return (
     <>
       <View className="gap-2 rounded-2xl border border-line bg-surface p-4">
@@ -233,129 +321,17 @@ function Breakdown({
         </View>
       ) : null}
       {view.byGame ? (
-        <View className="gap-2">
-          <SectionHeading>By game</SectionHeading>
-          <List>
-            {view.byGame.map((row) => (
-              <Row
-                key={row.key}
-                onPress={() => onFilter(row.filters)}
-                accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result)}`}
-                accessibilityHint={`Shows only ${row.label}`}
-              >
-                <View className={cn("size-2 rounded-full", chipColor[row.chip])} />
-                <View className="min-w-0 flex-1 gap-0.5">
-                  <Text numberOfLines={1} className="type-heading text-ink">
-                    {row.label}
-                  </Text>
-                  <Text numberOfLines={1} className="type-footnote text-muted">
-                    {row.meta}
-                  </Text>
-                </View>
-                <View className="h-1.5 w-10 overflow-hidden rounded-full bg-fill">
-                  <View
-                    className={cn("h-full rounded-full", row.result < 0 ? "bg-loss" : "bg-win")}
-                    style={{ width: `${row.share * 100}%` }}
-                  />
-                </View>
-                <Money
-                  amount={row.result}
-                  currency={RECORDING_CURRENCY}
-                  tone="result"
-                  className="min-w-18 text-right font-semibold"
-                />
-              </Row>
-            ))}
-          </List>
-        </View>
+        <ByGame rows={view.byGame} currency={RECORDING_CURRENCY} onFilter={onFilter} />
       ) : null}
       {view.byCasino ? (
-        <View className="gap-2">
-          <SectionHeading
-            action={
-              view.byCasino.length > TOP_CASINOS ? (
-                <Button
-                  label="See all"
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => setCasinos(true)}
-                />
-              ) : undefined
-            }
-          >
-            By casino
-          </SectionHeading>
-          <CasinoRows rows={view.byCasino.slice(0, TOP_CASINOS)} onFilter={onFilter} />
-          {casinos ? (
-            <Sheet
-              open
-              title="Casinos"
-              description={view.casinosLine}
-              onClose={() => setCasinos(false)}
-            >
-              <View className="gap-2">
-                <View className="flex-row justify-between px-4">
-                  <Text className="type-footnote text-muted">Most played first</Text>
-                  <Text className="type-footnote text-muted">Result</Text>
-                </View>
-                <CasinoRows
-                  rows={view.byCasino}
-                  onFilter={(filters) => {
-                    setCasinos(false);
-                    onFilter(filters);
-                  }}
-                />
-              </View>
-            </Sheet>
-          ) : null}
-        </View>
+        <ByCasino
+          rows={view.byCasino}
+          currency={RECORDING_CURRENCY}
+          line={view.casinosLine}
+          onFilter={onFilter}
+        />
       ) : null}
     </>
-  );
-}
-
-function CasinoRows({
-  rows,
-  onFilter,
-}: {
-  rows: NonNullable<Summary["byCasino"]>;
-  onFilter: (filters: StatsFilters) => void;
-}) {
-  return (
-    <List>
-      {rows.map((row) => (
-        <Row
-          key={row.key}
-          onPress={() => onFilter(row.filters)}
-          accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result)}`}
-          accessibilityHint="Shows only this casino"
-        >
-          <View className="min-w-0 flex-1 gap-0.5">
-            <Text numberOfLines={1} className="type-heading text-ink">
-              {row.label}
-            </Text>
-            <Text className="type-footnote text-muted">{row.meta}</Text>
-          </View>
-          <Money
-            amount={row.result}
-            currency={RECORDING_CURRENCY}
-            tone="result"
-            className="font-semibold"
-          />
-          <Icon name="chevron-right" color="faint" size={16} />
-        </Row>
-      ))}
-    </List>
-  );
-}
-
-function Figure({ label, sub, children }: { label: string; sub?: string; children: ReactNode }) {
-  return (
-    <View className="w-1/2 min-w-0 gap-1 pr-2">
-      <Text className="type-label text-muted">{label}</Text>
-      {children}
-      {sub ? <Text className="type-label text-muted">{sub}</Text> : null}
-    </View>
   );
 }
 
@@ -411,8 +387,8 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
         accessibilityLabel="Running result by finished session"
         accessibilityValue={{
           text: shown
-            ? `${shown.day}, session ${signed(shown.result)}, running ${signed(shown.total)}`
-            : signed(total),
+            ? `${shown.day}, session ${signed(shown.result, RECORDING_CURRENCY)}, running ${signed(shown.total, RECORDING_CURRENCY)}`
+            : signed(total, RECORDING_CURRENCY),
         }}
         accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
         onAccessibilityAction={(event) =>

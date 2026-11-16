@@ -2,7 +2,7 @@ import { useAuth } from "@clerk/react";
 import { useNavigate } from "@tanstack/react-router";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
-import { TrendingUp } from "lucide-react";
+import { ChartColumn } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { Button, ButtonLink } from "~/components/ui/Button";
@@ -14,23 +14,18 @@ import { PageHeader } from "~/components/ui/Page";
 import { Tag } from "~/components/ui/Surface";
 import { useAction, useLastTrip, useRememberTrip, useStacks } from "~/lib/stacks";
 
-const titles = { sessions: "Sessions", board: "Board" } as const;
-
 /**
- * A trip page's title. The trip's home, its sessions, is named for the trip and goes back to its
- * group, with a link to the Board; the Board goes back to the trip. The home also says when the
- * trip has ended and holds the trip's own menu.
+ * A trip page's title: named for the trip, going back to its group, with a link to the trip's
+ * Stats. It also says when the trip has ended and holds the trip's own menu.
  */
 export function TripHeader({
   group,
   trip,
-  place,
   action,
   children,
 }: {
   group: GroupDetail;
   trip: TripDetail;
-  place: keyof typeof titles;
   action?: ReactNode;
   children?: ReactNode;
 }) {
@@ -42,12 +37,10 @@ export function TripHeader({
   const [deleting, setDeleting] = useState(false);
   const params = { tripId: trip.trip.id };
   const ended = trip.trip.endedAt !== null;
-  const home = place === "sessions";
   const canDelete =
     trip.sessions.length === 0 &&
     trip.tables.length === 0 &&
     (isAdmin(group) || trip.trip.createdBy === userId);
-  const title = home ? trip.trip.name : titles[place];
 
   const menu = (
     <Menu label={`Actions for ${trip.trip.name}`}>
@@ -68,32 +61,26 @@ export function TripHeader({
     <>
       <PageHeader
         back={
-          home ? (
-            <BackLink to="/groups/$groupId" params={{ groupId: group.group.id }}>
-              {group.group.name}
-            </BackLink>
-          ) : (
-            <BackLink to="/trips/$tripId" params={params}>
-              {trip.trip.name}
-            </BackLink>
-          )
+          <BackLink to="/groups/$groupId" params={{ groupId: group.group.id }}>
+            {group.group.name}
+          </BackLink>
         }
-        title={title}
-        documentTitle={`${titles[place]} · ${trip.trip.name}`}
-        tag={home && ended ? <Tag>Ended</Tag> : null}
+        title={trip.trip.name}
+        documentTitle={`Sessions · ${trip.trip.name}`}
+        tag={ended ? <Tag>Ended</Tag> : null}
         action={
-          home ? (
-            <div className="flex items-center gap-2">
-              <ButtonLink to="/trips/$tripId/board" params={params} variant="ghost">
-                <TrendingUp className="size-4" aria-hidden />
-                Board
-              </ButtonLink>
-              {action}
-              {menu}
-            </div>
-          ) : (
-            action
-          )
+          <div className="flex items-center gap-2">
+            <ButtonLink
+              to="/stats"
+              state={{ statsPick: { groupId: group.group.id, tripId: trip.trip.id } }}
+              variant="ghost"
+            >
+              <ChartColumn className="size-4" aria-hidden />
+              Stats
+            </ButtonLink>
+            {action}
+            {menu}
+          </div>
         }
       >
         {(end.error ?? reopen.error) ? <FormError>{end.error ?? reopen.error}</FormError> : null}

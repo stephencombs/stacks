@@ -111,10 +111,10 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
           {trip.trip.name}
         </PageTitle>
         <Button
-          label="Board"
+          label="Stats"
           variant="secondary"
           className="self-start"
-          onPress={() => go.trip(trip.trip.id, "Board")}
+          onPress={() => go.stats(group.group.id, trip.trip.id)}
         />
       </View>
       {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}

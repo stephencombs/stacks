@@ -15,12 +15,10 @@ import {
 } from "@stacks/contracts";
 
 import {
-  awardLine,
   boardMoney,
   localClock,
   makeLastTripStore,
   ordinal,
-  raceHeadline,
   recordLine,
   resolveEntry,
   returnLabel,
@@ -47,35 +45,6 @@ it("shows board money signed, without cents when there are none", () => {
   expect(boardMoney(4115000, usd)).toBe("+$41,150");
   expect(boardMoney(-48050, usd)).toBe("-$480.50");
   expect(boardMoney(100000, usd, false)).toBe("$1,000");
-});
-
-it("says what earned each award", () => {
-  const session = {
-    session: {
-      id: SessionId.make("0192e7a0-0000-7000-8000-000000000001"),
-      startedAt: local(24, 2),
-    },
-    venue: { id: VenueId.make("0192e7a0-0000-7000-8000-000000000002"), name: "Circa" },
-    results: [],
-  };
-  const award = { playerId: undefined as never, session };
-  expect(awardLine({ ...award, key: "biggest_hit", value: 790000 }, usd)).toBe("+$7,900 at Circa");
-  expect(awardLine({ ...award, key: "rough_night", value: 50000 }, usd)).toBe("-$500 at Circa");
-  expect(awardLine({ ...award, key: "heater", value: 8, session: null }, usd)).toBe(
-    "8 winning sessions in a row",
-  );
-  expect(awardLine({ ...award, key: "night_owl", value: 2 }, usd)).toMatch(/^Sat down at 2:00/);
-});
-
-it("leaves the place off an award for a table with no casino set", () => {
-  const session = {
-    session: { id: TableId.make("0192e7a0-0000-7000-8000-000000000003"), startedAt: local(24, 2) },
-    venue: null,
-    results: [],
-  };
-  expect(
-    awardLine({ key: "biggest_hit", value: 790000, playerId: undefined as never, session }, usd),
-  ).toBe("+$7,900");
 });
 
 it("lists a trip's sessions and tables together, oldest first, and says which are live", () => {
@@ -309,53 +278,6 @@ it("says how far a trip climbed from its low, and how often it won", () => {
   expect(tripLines({ ...trip, low: 0 }, usd).climb).toBeNull();
   expect(tripLines({ ...trip, net: -12500 }, usd).climb).toBeNull();
   expect(tripLines({ ...trip, played: 0, won: 0 }, usd).winRate).toBe("–");
-});
-
-it("leads the race with the gap to the next player, falling back to your result", () => {
-  const [me, priya, dev] = ["p1", "p2", "p3"] as unknown as ReadonlyArray<
-    Parameters<typeof raceHeadline>[1]
-  >;
-  const names = new Map([
-    [me!, "Maya"],
-    [priya!, "Priya"],
-    [dev!, "Dev"],
-  ]);
-  const board = [
-    { playerId: dev!, net: -21000, rank: 3 },
-    { playerId: me!, net: 27500, rank: 1 },
-    { playerId: priya!, net: 18000, rank: 2 },
-  ];
-  expect(raceHeadline(board, me!, names, usd)).toEqual({
-    label: "Ahead of Priya",
-    gap: 9500,
-    net: 27500,
-    tone: "win",
-    line: "1st of 3 · +$275 for the trip",
-  });
-  expect(raceHeadline(board, dev!, names, usd)).toEqual({
-    label: "Behind Priya",
-    gap: 39000,
-    net: -21000,
-    tone: "loss",
-    line: "3rd of 3 · -$210 for the trip",
-  });
-  const tied = [
-    { playerId: me!, net: 500, rank: 1 },
-    { playerId: priya!, net: 500, rank: 1 },
-  ];
-  expect(raceHeadline(tied, me!, names, usd)).toMatchObject({
-    label: "Tied for the lead with Priya",
-    gap: null,
-    tone: "ink",
-  });
-  expect(raceHeadline([{ playerId: me!, net: 500, rank: 1 }], me!, names, usd)).toEqual({
-    label: "You lead",
-    gap: null,
-    net: 500,
-    tone: "ink",
-    line: null,
-  });
-  expect(raceHeadline(board, "nobody" as never, names, usd)).toBeNull();
 });
 
 it("words a return on buy-ins with its sign", () => {

@@ -11,7 +11,6 @@ import {
   raceLines,
   runningReturns,
   runningTotals,
-  statSheet,
   type StatsSession,
 } from "./stats.ts";
 
@@ -86,48 +85,6 @@ describe("raceLines", () => {
       values: [null, -0.3],
       line: [0, 0, -0.3],
     });
-  });
-});
-
-describe("statSheet", () => {
-  it("is null for a player who sat everything out", () => {
-    expect(statSheet([session(palazzo, [[ALEX, 100]])], BEA)).toBeNull();
-  });
-
-  it("finds the best and worst sessions, best casino and average buy-in", () => {
-    const sheet = statSheet(
-      [
-        session(palazzo, [[ALEX, 300, 200]]),
-        session(wynn, [[ALEX, -500, 400]]),
-        session(palazzo, [[ALEX, 100]]),
-      ],
-      ALEX,
-    )!;
-    expect(sheet.total).toBe(-100);
-    expect(sheet.best?.net).toBe(300);
-    expect(sheet.worst?.net).toBe(-500);
-    expect(sheet.bestVenue).toEqual({ name: "The Palazzo", net: 400, sessions: 2 });
-    expect(sheet.venues).toBe(2);
-    expect(sheet.averageBuyIn).toBe(300);
-    expect(sheet.runs.wins).toBe(2);
-  });
-
-  it("leaves a session with no casino set out of the casinos", () => {
-    const sheet = statSheet([session(null, [[ALEX, 900]]), session(wynn, [[ALEX, 100]])], ALEX)!;
-    expect(sheet.total).toBe(1000);
-    expect(sheet.bestVenue).toEqual({ name: "Wynn", net: 100, sessions: 1 });
-    expect(sheet.venues).toBe(1);
-    expect(statSheet([session(null, [[ALEX, 900]])], ALEX)).toMatchObject({
-      bestVenue: null,
-      venues: 0,
-    });
-  });
-
-  it("leaves out what never happened: no winning session, no recorded buy-in", () => {
-    const sheet = statSheet([session(wynn, [[ALEX, -50]])], ALEX)!;
-    expect(sheet.best).toBeNull();
-    expect(sheet.bestVenue).toBeNull();
-    expect(sheet.averageBuyIn).toBeNull();
   });
 });
 

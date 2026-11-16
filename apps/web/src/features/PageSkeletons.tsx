@@ -151,41 +151,27 @@ function SectionSkeleton({ children, aside = false }: { children: ReactNode; asi
   );
 }
 
-/** A hero card: label, figure, comparison, then the trip card's line and tiles, or the race's chart. */
-function HeroSkeleton({
-  chart = "line",
-  tiles = true,
-}: {
-  chart?: "line" | "race" | null;
-  tiles?: boolean;
-}) {
+/** A hero card: label, figure, comparison, then the trip card's line and tiles. */
+function HeroSkeleton() {
   return (
     <Surface className="overflow-hidden">
       <div className="flex flex-col px-4 pt-4">
         <div className="flex items-center justify-between">
           <SkeletonText size="sm" className="w-20" />
-          {chart === "line" ? <SkeletonText size="sm" className="w-32" /> : null}
+          <SkeletonText size="sm" className="w-32" />
         </div>
         <SkeletonText size="figure" className="mt-2 w-40" />
         <SkeletonText size="sm" className="mt-1.5 w-48" />
       </div>
-      {chart === "line" ? (
-        <div className="mt-3 h-24" />
-      ) : chart === "race" ? (
-        <div className="mt-3 mb-4 h-32" />
-      ) : (
-        <div className="h-4" />
-      )}
-      {tiles ? (
-        <div className="flex divide-x divide-line border-t border-line">
-          {["w-12", "w-16", "w-14"].map((width) => (
-            <div key={width} className="flex flex-auto flex-col gap-0.5 px-4 py-3">
-              <SkeletonText size="sm" className="w-14" />
-              <SkeletonText size="lg" className={width} />
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <div className="mt-3 h-24" />
+      <div className="flex divide-x divide-line border-t border-line">
+        {["w-12", "w-16", "w-14"].map((width) => (
+          <div key={width} className="flex flex-auto flex-col gap-0.5 px-4 py-3">
+            <SkeletonText size="sm" className="w-14" />
+            <SkeletonText size="lg" className={width} />
+          </div>
+        ))}
+      </div>
     </Surface>
   );
 }
@@ -244,39 +230,21 @@ function useSeatedIn(tripId: string | undefined) {
   return groups.some((item) => item.mySession !== null && item.mySession.tripId === tripId);
 }
 
-/** A trip place loading: its title, then the place's own shape; Sessions keeps its rail. */
-export function TripPageSkeleton({
-  on,
-  scope = "trip",
-}: {
-  on: "sessions" | "board";
-  scope?: "trip" | "all";
-}) {
+/** A trip loading: its title, then its sessions beside the rail. */
+export function TripPageSkeleton() {
   const params: { tripId?: string } = useParams({ strict: false });
   const { lastTripId } = useLastTrip();
   const seated = useSeatedIn(params.tripId ?? lastTripId ?? undefined);
-  if (on === "sessions")
-    return (
-      <SkeletonPage label="Loading the trip">
-        <HeaderSkeleton back action menu />
-        <TripLayout rail={<RailSkeleton />}>
-          {seated ? <LiveCardSkeleton /> : null}
-          <HeroSkeleton />
-          <SectionSkeleton aside>
-            <RowsSkeleton rows={3} />
-          </SectionSkeleton>
-        </TripLayout>
-      </SkeletonPage>
-    );
   return (
-    <SkeletonPage label="Loading the board">
-      <HeaderSkeleton back title="w-28">
-        <Skeleton className="h-12 w-48 rounded-lg pointer-coarse:h-[52px]" />
-      </HeaderSkeleton>
-      <HeroSkeleton chart={scope === "trip" ? "race" : "line"} tiles={scope === "all"} />
-      <SectionSkeleton aside={scope === "trip"}>
-        <RowsSkeleton rows={5} chip />
-      </SectionSkeleton>
+    <SkeletonPage label="Loading the trip">
+      <HeaderSkeleton back action menu />
+      <TripLayout rail={<RailSkeleton />}>
+        {seated ? <LiveCardSkeleton /> : null}
+        <HeroSkeleton />
+        <SectionSkeleton aside>
+          <RowsSkeleton rows={3} />
+        </SectionSkeleton>
+      </TripLayout>
     </SkeletonPage>
   );
 }

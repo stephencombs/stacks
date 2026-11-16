@@ -14,6 +14,8 @@ export interface GroupTable {
   readonly endedAt: DateTime.Utc | null;
   /** Time anyone was playing, over finished visits: overlapping visits count once. */
   readonly minutesPlayed: number;
+  /** Each seated member's own time playing, over their finished visits, counted once. */
+  readonly memberMinutes: ReadonlyArray<{ readonly playerId: PlayerId; readonly minutes: number }>;
   /** Each group member at the table, in the order they first sat down. */
   readonly seated: ReadonlyArray<PlayerId>;
   /** Members' settled results: their finished visits only, so a return visit can't undo them. */
@@ -97,16 +99,26 @@ export const groupTable = (
     if (entry.member !== null && entry.visit.finishedAt === null && entry.kind === "buy_in")
       inPlay.set(entry.member, (inPlay.get(entry.member) ?? 0) + entry.amount);
 
-  const finished = shown.flatMap((visit) =>
-    visit.finishedAt === null ? [] : [[millis(visit.startedAt), millis(visit.finishedAt)] as const],
-  );
+  const span = (visit: TableVisit) =>
+    visit.finishedAt === null ? [] : [[millis(visit.startedAt), millis(visit.finishedAt)] as const];
+  const finished = shown.flatMap(span);
+  const minutes = (intervals: ReadonlyArray<readonly [number, number]>) =>
+    Math.round(covered(intervals) / 60_000);
   return {
     startedAt: shown[0]!.startedAt,
     endedAt:
       finished.length < shown.length
         ? null
         : DateTime.makeUnsafe(Math.max(...finished.map(([, to]) => to))),
-    minutesPlayed: Math.round(covered(finished) / 60_000),
+    minutesPlayed: minutes(finished),
+    memberMinutes: Array.from(seated, (playerId) => ({
+      playerId,
+      minutes: minutes(
+        Array.from(byVisit.values()).flatMap(({ visit, member }) =>
+          member === playerId ? span(visit) : [],
+        ),
+      ),
+    })),
     seated: Array.from(seated),
     results: Array.from(seated).flatMap((playerId) => {
       const result = memberResults.get(playerId);

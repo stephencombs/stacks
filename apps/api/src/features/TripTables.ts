@@ -13,7 +13,7 @@ import {
   type TripTable,
   type VenueId,
 } from "@stacks/contracts";
-import { groupTable, inGroupAt } from "@stacks/shared/tripTables";
+import { groupTable, inGroupAt, type GroupTable } from "@stacks/shared/tripTables";
 
 import { PersonalEntryRow, PersonalVisitRow, TableRow, VenueRow } from "../db/rows.ts";
 import { decodeRows } from "./Access.ts";
@@ -125,52 +125,56 @@ export const load = Effect.fn("TripTables.load")(function* (
   const awayByAccount = Map.groupBy(absences, (a) => `${a.groupId}:${a.userId}`);
   const venueById = new Map<VenueId, (typeof venues)[number]>(venues.map((v) => [v.id, v]));
 
-  const loaded = tables.flatMap((row): ReadonlyArray<TripTable> => {
-    const own = visits.filter((visit) => visit.tableId === row.id);
-    const visitIds = new Set(own.map((visit) => visit.id));
-    // A table player counts as the member holding the same account, for visits started while
-    // that member was in the group. Others stay on the table, out of the standings.
-    const table = groupTable(
-      own,
-      entries.filter((entry) => visitIds.has(entry.visitId)),
-      (visit) => {
-        const userId = playerById.get(visit.playerId)?.userId;
-        const account = `${row.groupId}:${userId}`;
-        const member = userId ? memberByAccount.get(account) : undefined;
-        if (!member) return null;
-        const absences = awayByAccount.get(account) ?? [];
-        return inGroupAt(visit.startedAt, { leftAt: member.leftAt, absences }) ? member.id : null;
-      },
-    );
-    if (!table) return [];
-    const mine = own.findLast((visit) => playerById.get(visit.playerId)?.userId === userId);
-    return [
-      {
-        table: Table.make({
-          id: row.id,
-          tripId: row.tripId,
-          game: row.game,
-          venueId: row.venueId,
-          highLimit: row.highLimit,
-          starterPlayerId: row.starterPlayerId,
-        }),
-        venue: row.venueId === null ? null : (venueById.get(row.venueId) ?? null),
-        startedAt: table.startedAt,
-        endedAt: table.endedAt,
-        minutesPlayed: table.minutesPlayed,
-        playerIds: table.seated,
-        playing: table.inPlay.map((row) => row.playerId),
-        results: table.results,
-        inPlay: table.inPlay,
-        others: table.others.map((other) => ({
-          displayName: playerById.get(other.playerId)?.displayName ?? "Player",
-          playing: other.playing,
-          net: other.net,
-        })),
-        myVisitId: mine?.id ?? null,
-      },
-    ];
-  });
+  // Members' own time at each table goes to group stats; a table's response leaves it out.
+  const loaded = tables.flatMap(
+    (row): ReadonlyArray<TripTable & Pick<GroupTable, "memberMinutes">> => {
+      const own = visits.filter((visit) => visit.tableId === row.id);
+      const visitIds = new Set(own.map((visit) => visit.id));
+      // A table player counts as the member holding the same account, for visits started while
+      // that member was in the group. Others stay on the table, out of the standings.
+      const table = groupTable(
+        own,
+        entries.filter((entry) => visitIds.has(entry.visitId)),
+        (visit) => {
+          const userId = playerById.get(visit.playerId)?.userId;
+          const account = `${row.groupId}:${userId}`;
+          const member = userId ? memberByAccount.get(account) : undefined;
+          if (!member) return null;
+          const absences = awayByAccount.get(account) ?? [];
+          return inGroupAt(visit.startedAt, { leftAt: member.leftAt, absences }) ? member.id : null;
+        },
+      );
+      if (!table) return [];
+      const mine = own.findLast((visit) => playerById.get(visit.playerId)?.userId === userId);
+      return [
+        {
+          table: Table.make({
+            id: row.id,
+            tripId: row.tripId,
+            game: row.game,
+            venueId: row.venueId,
+            highLimit: row.highLimit,
+            starterPlayerId: row.starterPlayerId,
+          }),
+          venue: row.venueId === null ? null : (venueById.get(row.venueId) ?? null),
+          startedAt: table.startedAt,
+          endedAt: table.endedAt,
+          minutesPlayed: table.minutesPlayed,
+          playerIds: table.seated,
+          playing: table.inPlay.map((row) => row.playerId),
+          results: table.results,
+          inPlay: table.inPlay,
+          others: table.others.map((other) => ({
+            displayName: playerById.get(other.playerId)?.displayName ?? "Player",
+            playing: other.playing,
+            net: other.net,
+          })),
+          myVisitId: mine?.id ?? null,
+          memberMinutes: table.memberMinutes,
+        },
+      ];
+    },
+  );
   return loaded.toSorted(
     (a, b) => DateTime.toEpochMillis(a.startedAt) - DateTime.toEpochMillis(b.startedAt),
   );

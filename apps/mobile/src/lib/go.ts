@@ -24,11 +24,17 @@ export function useGo() {
         params: { tripId, ...(from ? { from } : {}) },
         initial: false,
       }),
-    /** Puts a trip in scope and opens its sessions or its board. */
-    trip: (tripId: TripId, page: "Sessions" | "Board" = "Sessions") => {
+    /** Puts a trip in scope and opens its sessions. */
+    trip: (tripId: TripId) => {
       setTrip(tripId);
-      crew({ screen: page, params: { tripId }, initial: false });
+      crew({ screen: "Sessions", params: { tripId }, initial: false });
     },
+    /** Stats, with a group (and maybe one of its trips) picked. */
+    stats: (groupId: GroupId, tripId?: TripId) =>
+      navigation.navigate("Tabs", {
+        screen: "StatsTab",
+        params: { screen: "Stats", params: { groupId, ...(tripId ? { tripId } : {}) } },
+      }),
     /** Puts a group in scope and opens it. */
     group: (groupId: GroupId) => {
       setGroup(groupId);

@@ -59,7 +59,7 @@ export function TripHero({
         <Tile label="Best">
           {mine.best ? <Money amount={mine.best.net} currency={currency} tone="result" /> : "–"}
         </Tile>
-        <Tile label="Board">
+        <Tile label="Standing">
           {rank === undefined ? (
             "–"
           ) : (
