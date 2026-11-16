@@ -308,7 +308,7 @@ function NoSignIn() {
 function Opening() {
   return (
     <View className="flex-1 items-center justify-center bg-canvas">
-      <Text accessibilityRole="status" className="text-lg text-ink">
+      <Text accessibilityLiveRegion="polite" className="text-lg text-ink">
         Opening Color Up…
       </Text>
     </View>
