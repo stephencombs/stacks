@@ -128,7 +128,7 @@ export function TableSeats({
                 amount={seat.amount}
                 currency={RECORDING_CURRENCY}
                 tone={seat.playing ? "plain" : "result"}
-                className={cn("font-semibold", felt && "text-felt-ink")}
+                className={cn("type-number", felt && "text-felt-ink")}
               />
               {press ? (
                 <Icon name="chevron-right" color={felt ? "felt-soft" : "muted"} size={16} />

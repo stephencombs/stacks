@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { Icon } from "./Icon";
 import type { ActionMenuProps } from "./ActionMenu";
 
-export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps) {
+export function ActionMenu({ label, actions, disabled = false, fab = false }: ActionMenuProps) {
   return (
     <MenuView
       actions={actions.map((action, index) => ({
@@ -15,12 +15,21 @@ export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps
       shouldOpenOnLongPress={false}
     >
       <View
+        accessible
         accessibilityLabel={label}
         accessibilityRole="button"
         accessibilityState={{ disabled }}
-        className="size-11 items-center justify-center rounded-full bg-surface"
+        className={
+          fab
+            ? "size-14 items-center justify-center rounded-2xl bg-ink shadow-lg"
+            : "size-11 items-center justify-center rounded-full bg-fill"
+        }
       >
-        <Icon name="more" color="ink" size={20} />
+        {fab ? (
+          <Icon name="plus" color="ink-inverse" size={28} />
+        ) : (
+          <Icon name="more" color="ink" size={20} />
+        )}
       </View>
     </MenuView>
   );

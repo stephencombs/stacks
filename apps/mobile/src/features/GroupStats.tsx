@@ -192,7 +192,7 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
             accessibilityHint="Shows their stats"
             className={cn(row.you && "border-l-[3px] border-l-ink")}
           >
-            <Text className="min-w-6 text-center font-mono text-base text-muted">
+            <Text className="min-w-6 text-center tabular-nums text-base text-muted">
               {row.rank ?? "–"}
             </Text>
             <Chip chip={row.chip} name={row.name} size={28} />
@@ -209,7 +209,7 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
               amount={row.result}
               currency={view.currency}
               tone="result"
-              className="font-semibold"
+              className="type-number"
             />
           </Row>
         ))}
@@ -224,7 +224,7 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
             amount={view.total}
             currency={view.currency}
             tone="result"
-            className="font-semibold"
+            className="type-number"
           />
         </Row>
       </List>

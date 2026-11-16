@@ -192,10 +192,21 @@ export const recordingMonths = (home: RecordingHome) => {
     .map(([month, items]) => {
       const visible = items.filter((item) => item.visit.deletedAt === undefined);
       const result = visible.reduce((sum, item) => sum + BigInt(item.finalResult ?? 0), 0n);
+      const minutes = visible.reduce(
+        (sum, item) =>
+          item.visit.finishedAt
+            ? sum + Math.round((ms(item.visit.finishedAt) - ms(item.visit.startedAt)) / 60_000)
+            : sum,
+        0,
+      );
       return {
         month,
         result: MinorUnits.make(Number(result)),
         count: visible.length,
+        /** Finished sessions only, to sit beside the result and minutes, which leave out live play. */
+        finished: visible.filter((item) => item.visit.finishedAt).length,
+        /** Minutes played in finished sessions; live play counts once it finishes. */
+        minutes,
         visits: items.toSorted(
           (a, b) =>
             Number(a.visit.deletedAt !== undefined) - Number(b.visit.deletedAt !== undefined) ||

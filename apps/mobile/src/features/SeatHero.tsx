@@ -52,7 +52,7 @@ export function SeatHero({
   else figure = <Text className={cn(FIGURE, "text-muted")}>Not in yet</Text>;
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-line bg-surface p-5">
+    <View className="overflow-hidden rounded-[22px] bg-surface p-5">
       <View className="flex-row items-center gap-3">
         <Chip chip={chip} name={name} size={40} />
         <View className="min-w-0 flex-1">

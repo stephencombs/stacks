@@ -1,0 +1,5 @@
+# Starts a session from Play: its + button opens a menu with Start session in it.
+appId: com.stephencombs.colorup.preview
+---
+- tapOn: "Start or add a session"
+- tapOn: "Start session"

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { ActivityIndicator, Platform, Text } from "react-native";
 
 import { cn } from "./cn";
-import { GlassSurface } from "./GlassSurface";
+import { ControlSurface } from "./ControlSurface";
 import { PressableScale } from "./PressableScale";
 
 type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
@@ -140,13 +140,7 @@ export function IconButton({
       }}
       className={cn("size-11", disabled && "opacity-50", className)}
     >
-      <GlassSurface
-        radius={22}
-        interactive
-        className="size-11 items-center justify-center rounded-full"
-      >
-        {icon}
-      </GlassSurface>
+      <ControlSurface>{icon}</ControlSurface>
     </PressableScale>
   );
 }

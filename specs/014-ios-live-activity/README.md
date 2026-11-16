@@ -16,7 +16,7 @@ updated_at: 2026-11-14T20:21:32.073282694Z
 
 ## Overview
 
-While a session is live on iOS, show it on the lock screen and in the Dynamic Island, so a player can glance at their money and the clock without opening the app. Version one is display-only; its buttons open the app. Android gets nothing for now.
+While a session is live on iOS, show it on the lock screen and in the Dynamic Island, so a player can glance at their money and the clock without opening the app. Version one is display-only; its buttons open the app. Android's counterpart is spec 023 (Live Updates).
 
 ## Design
 

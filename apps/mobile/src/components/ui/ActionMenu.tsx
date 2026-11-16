@@ -1,11 +1,15 @@
 import { useState } from "react";
+import { Pressable } from "react-native";
 import { Button, IconButton } from "./Button";
+import { GlassSurface } from "./GlassSurface";
 import { Icon, type IconName } from "./Icon";
 import { Sheet } from "./Sheet";
 
 export type ActionMenuProps = {
   label: string;
   disabled?: boolean;
+  /** Opens from a floating "+" button, a screen's main way to add, instead of the "…" button. */
+  fab?: boolean;
   actions: ReadonlyArray<{
     label: string;
     icon?: IconName;
@@ -15,16 +19,30 @@ export type ActionMenuProps = {
   }>;
 };
 
-export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps) {
+export function ActionMenu({ label, actions, disabled = false, fab = false }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <IconButton
-        accessibilityLabel={label}
-        disabled={disabled}
-        icon={<Icon name="more" color="ink" size={20} />}
-        onPress={() => setOpen(true)}
-      />
+      {fab ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityState={{ disabled }}
+          disabled={disabled}
+          onPress={() => setOpen(true)}
+        >
+          <GlassSurface className="size-14 items-center justify-center rounded-full">
+            <Icon name="plus" color="ink" size={26} />
+          </GlassSurface>
+        </Pressable>
+      ) : (
+        <IconButton
+          accessibilityLabel={label}
+          disabled={disabled}
+          icon={<Icon name="more" color="ink" size={20} />}
+          onPress={() => setOpen(true)}
+        />
+      )}
       {open ? (
         <Sheet open title={label} onClose={() => setOpen(false)}>
           {actions.map((action) => (

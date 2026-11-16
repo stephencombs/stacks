@@ -233,7 +233,9 @@ function ResultTag({
           numberOfLines={1}
           style={{ flexShrink: 0 }}
           className={
-            bust || out.net !== 0 ? "font-mono text-xs text-canvas" : "font-mono text-xs text-ink"
+            bust || out.net !== 0
+              ? "tabular-nums text-xs text-canvas"
+              : "tabular-nums text-xs text-ink"
           }
         >
           {label}

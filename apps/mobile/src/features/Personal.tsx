@@ -7,7 +7,10 @@ import { use, useState, type ReactNode } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/ui/Button";
+import { ControlSurface } from "../components/ui/ControlSurface";
+import { PressableScale } from "../components/ui/PressableScale";
 import { Choice } from "../components/ui/Field";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
@@ -16,9 +19,13 @@ import { SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useAccount } from "../lib/account";
 import { setTheme, useTheme } from "../lib/theme";
+import { Chip } from "./Chip";
 import { SignInButton } from "./SignInButton";
 import { PersonalLiveBar } from "./LiveBar";
 import { useNativeHeaderActions } from "./NativeHeaderActions";
+
+/** The 56px floating action button and the 16px around it, which the list scrolls clear of. */
+const FAB_ROOM = 88;
 
 /**
  * A screen of your own play: it scrolls under the header, and its main actions sit in a dock
@@ -29,12 +36,15 @@ import { useNativeHeaderActions } from "./NativeHeaderActions";
 export function PersonalScreen({
   children,
   dock,
+  fab,
   live = false,
   felt = false,
   session = false,
 }: {
   children: ReactNode;
   dock?: ReactNode;
+  /** A floating action button, bottom right above the live bar: the screen's main way to add. */
+  fab?: ReactNode;
   live?: boolean;
   felt?: boolean;
   session?: boolean;
@@ -63,8 +73,22 @@ export function PersonalScreen({
         }}
       >
         {children}
-        <View style={{ height: (dock ? dockHeight : bar) + liveBarHeight }} />
+        <View
+          style={{ height: (dock ? dockHeight : bar) + liveBarHeight + (fab ? FAB_ROOM : 0) }}
+        />
       </ScrollView>
+      {fab ? (
+        <View
+          pointerEvents="box-none"
+          className="absolute"
+          style={{
+            right: sides.paddingRight,
+            bottom: bar + (liveBarHeight > 0 ? liveBarHeight + 8 : 0) + 16,
+          }}
+        >
+          {fab}
+        </View>
+      ) : null}
       {dock ? (
         <View
           pointerEvents="box-none"
@@ -217,6 +241,8 @@ function SaveLine({
     );
   const busy = status === "loading" || status === "saving" || sync.kind === "syncing";
   const failed = status === "save_failed";
+  // Saved and in step needs no line; the You sheet says where your sessions are kept.
+  if (!busy && !failed && (sync.kind === "device" || sync.kind === "synced")) return null;
   const text =
     status === "loading"
       ? "Opening…"
@@ -251,11 +277,48 @@ function SaveLine({
 /** You, top right of your own play's screens, for anyone signed in or not. */
 export function PersonalYouButton() {
   const [open, setOpen] = useState(false);
+  const account = useAccount();
   return (
     <>
-      <Button label="You" variant="ghost" size="sm" onPress={() => setOpen(true)} />
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel="You"
+        accessibilityHint="Your sessions, appearance and account"
+        onPress={() => setOpen(true)}
+        hitSlop={6}
+        className="size-11"
+      >
+        <ControlSurface>
+          {account.available && account.isSignedIn ? (
+            <SignedInChip />
+          ) : (
+            <Icon name="person" color="ink" size={20} />
+          )}
+        </ControlSurface>
+      </PressableScale>
       {open ? <PersonalYou onClose={() => setOpen(false)} /> : null}
     </>
+  );
+}
+
+/** Your chip, once signed in. Only rendered under Clerk, which useUser needs. */
+function SignedInChip() {
+  const { user } = useUser();
+  return <Chip chip={1} name={user?.firstName ?? user?.fullName ?? "You"} size={32} />;
+}
+
+/** Color Up's mark and name, top left of Play. */
+export function PlayBrand() {
+  return (
+    <View
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel="Color Up"
+      className="flex-row items-center gap-2.5"
+    >
+      <BrandMark size={30} />
+      <Text className="type-title text-ink">Color Up</Text>
+    </View>
   );
 }
 

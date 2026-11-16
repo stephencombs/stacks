@@ -31,7 +31,7 @@ export function Money({
       numberOfLines={fit ? 1 : undefined}
       adjustsFontSizeToFit={fit}
       className={cn(
-        "font-mono",
+        "font-sans tabular-nums",
         tone === "plain" && "text-ink",
         tone === "result" && amount > 0 && "text-win",
         tone === "result" && amount < 0 && "text-loss",

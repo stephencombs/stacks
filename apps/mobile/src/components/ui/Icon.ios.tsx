@@ -28,6 +28,7 @@ export const symbols: Record<IconName, SFSymbol> = {
   download: "square.and.arrow.up",
   sparkles: "sparkles",
   "add-person": "person.badge.plus",
+  person: "person.crop.circle",
   share: "square.and.arrow.up",
   trash: "trash",
 };

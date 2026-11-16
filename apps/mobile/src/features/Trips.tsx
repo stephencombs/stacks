@@ -123,10 +123,10 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
     <View className="flex-row flex-wrap gap-x-4 gap-y-2">
       {top.map((s) => (
         <View key={s.playerId} className="flex-row items-center gap-2">
-          <Text className="font-mono text-sm text-ink">{s.rank}</Text>
+          <Text className="tabular-nums text-sm text-ink">{s.rank}</Text>
           <Chip chip={chipOf(detail, s.playerId)} name={names.get(s.playerId) ?? ""} size={22} />
           <Text
-            className={`font-mono text-sm ${s.net > 0 ? "text-win" : s.net < 0 ? "text-loss" : "text-muted"}`}
+            className={`tabular-nums text-sm ${s.net > 0 ? "text-win" : s.net < 0 ? "text-loss" : "text-muted"}`}
           >
             {boardMoney(s.net, detail.group.currency)}
           </Text>

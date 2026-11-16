@@ -1,45 +1,30 @@
-import {
-  createBottomTabNavigator,
-  type BottomTabNavigationOptions,
-} from "@react-navigation/bottom-tabs";
+import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/unstable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { GlassSurface } from "../components/ui/GlassSurface";
-import { Icon, type IconName } from "../components/ui/Icon";
+export const createPlaceTabs = createNativeBottomTabNavigator;
 
-export const createPlaceTabs = createBottomTabNavigator;
 export const placeTabsConfig = {
-  screenOptions: {
-    headerShown: false,
-    tabBarStyle: {
-      position: "absolute" as const,
-      left: 16,
-      right: 16,
-      bottom: 12,
-      borderTopWidth: 0,
-      borderRadius: 32,
-      elevation: 0,
-      backgroundColor: "transparent",
-    },
-    tabBarBackground: () => <GlassSurface className="flex-1 rounded-[32px]" />,
-  },
+  screenOptions: { headerShown: false, tabBarLabelVisibilityMode: "labeled" as const },
 };
 
-const icons: Record<string, IconName> = {
-  Play: "sessions",
-  Stats: "stats",
-  Map: "map",
-  Crew: "group",
+const drawables: Record<string, string> = {
+  Play: "tab_play",
+  Stats: "tab_stats",
+  Map: "tab_map",
+  Crew: "tab_crew",
 };
 
-export const placeTab = (title: string, _symbol: string): BottomTabNavigationOptions => ({
+/** Android's own navigation bar, with Material Symbols from `assets/tab-icons`: filled when selected. */
+export const placeTab = (title: string, _symbol: string) => ({
   title,
-  tabBarIcon: ({ focused, size }) => (
-    <Icon name={icons[title]!} color={focused ? "ink" : "muted"} size={size} filled={focused} />
-  ),
+  tabBarIcon: ({ focused }: { focused: boolean }) => ({
+    type: "image" as const,
+    source: { uri: focused ? `${drawables[title]}_selected` : drawables[title]! },
+  }),
 });
 
+/** Material's navigation bar is 80dp, drawn over the foot of the screens and the gesture inset. */
 export function useTabBarHeight() {
   const insets = useSafeAreaInsets();
-  return 61 + insets.bottom;
+  return 80 + insets.bottom;
 }
