@@ -1,5 +1,5 @@
 ---
-status: planned
+status: complete
 created: 2026-11-16
 priority: low
 tags:
@@ -7,7 +7,13 @@ tags:
   - api
   - contracts
 created_at: 2026-11-16T21:53:45.687580400Z
-updated_at: 2026-11-16T21:53:45.687580400Z
+updated_at: 2026-11-17T12:48:35.519026700Z
+completed_at: 2026-11-17T12:48:35.519026700Z
+transitions:
+  - status: in-progress
+    at: 2026-11-16T22:13:52.221162100Z
+  - status: complete
+    at: 2026-11-17T12:48:35.519026700Z
 ---
 
 # Rename groups and trips
@@ -28,10 +34,10 @@ audit hit this from Group settings and the trip menu.
 
 ## Plan
 
-- [ ] Contracts and API with permission tests
-- [ ] Group settings and trip menu
+- [x] Contracts and API with permission tests
+- [x] Group settings and trip menu
 
 ## Test
 
-- [ ] API tests: an allowed rename succeeds; a member without rights is refused
-- [ ] The new name shows on Crew, the trip page and Stats without a reload
+- [x] API tests: an allowed rename succeeds; a member without rights is refused
+- [x] The new name shows on Crew, the trip page and Stats without a reload

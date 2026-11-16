@@ -12,6 +12,7 @@ import {
   SessionId,
   TripId,
   type GroupListItem,
+  type RenameGroupRequest,
   type SetRoleRequest,
   UserId,
 } from "@stacks/contracts";
@@ -174,6 +175,17 @@ export const create = Effect.fn("Groups.create")(function* (
 
 export const get = Effect.fn("Groups.get")(function* (groupId: GroupId) {
   return yield* Views.groupDetail(yield* Access.membership(groupId));
+});
+
+export const rename = Effect.fn("Groups.rename")(function* (
+  groupId: GroupId,
+  request: typeof RenameGroupRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const member = yield* Access.membership(groupId);
+  yield* Access.requireAdmin(member);
+  yield* sql`update groups set name = ${request.name} where id = ${groupId}`;
+  return yield* Views.groupDetail(member);
 });
 
 export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {

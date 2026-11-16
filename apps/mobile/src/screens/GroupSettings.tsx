@@ -1,6 +1,6 @@
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { GroupId, type GroupDetail } from "@stacks/contracts";
-import { csvFilename } from "@stacks/client-runtime/format";
+import { csvFilename, isAdmin } from "@stacks/client-runtime/format";
 import { useState } from "react";
 
 import { Button } from "../components/ui/Button";
@@ -8,6 +8,7 @@ import { FormError } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { SettingsLayout, type SettingsLayoutProps } from "../components/ui/SettingsLayout";
 import { Sheet } from "../components/ui/Sheet";
+import { NameSheet } from "../features/NameSheet";
 import { SettingsSkeleton } from "../features/ScreenSkeletons";
 import { useLinkedScope } from "../lib/scope";
 import { shareCsv } from "../lib/share";
@@ -40,6 +41,7 @@ export function GroupSettingsScreen({ route }: Props) {
 function SettingsView({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
   const exportCsv = useAction(stacks.Client.mutation("groups", "exportCsv"));
+  const [renaming, setRenaming] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const exportLedger = async () => {
     const csv = await exportCsv.run({ params: { groupId: detail.group.id } });
@@ -47,6 +49,20 @@ function SettingsView({ detail }: { detail: GroupDetail }) {
     await shareCsv(csvFilename(detail.group.name), csv);
   };
   const sections: SettingsLayoutProps["sections"] = [
+    ...(isAdmin(detail)
+      ? [
+          {
+            rows: [
+              {
+                label: "Name",
+                value: detail.group.name,
+                disclosure: true,
+                onPress: () => setRenaming(true),
+              },
+            ],
+          },
+        ]
+      : []),
     {
       title: "Ledger",
       footer: "Every buy-in, cash-out, adjustment and void in this group.",
@@ -66,8 +82,29 @@ function SettingsView({ detail }: { detail: GroupDetail }) {
       currency={detail.group.currency}
       sections={sections}
     >
+      {renaming ? <RenameGroupSheet detail={detail} onClose={() => setRenaming(false)} /> : null}
       {leaving ? <LeaveSheet detail={detail} onClose={() => setLeaving(false)} /> : null}
     </SettingsLayout>
+  );
+}
+
+function RenameGroupSheet({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
+  const stacks = useStacks();
+  const rename = useAction(stacks.Client.mutation("groups", "rename"));
+  return (
+    <NameSheet
+      title="Rename group"
+      label="Group name"
+      initial={detail.group.name}
+      maxLength={80}
+      emptyError="Give the group a name."
+      pending={rename.pending}
+      error={rename.error}
+      onClose={onClose}
+      onSave={async (name) =>
+        Boolean(await rename.run({ params: { groupId: detail.group.id }, payload: { name } }))
+      }
+    />
   );
 }
 

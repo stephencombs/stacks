@@ -209,4 +209,50 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
       expect(detail.trips.map((t) => t.id)).toEqual([group.tripId]);
     }),
   );
+
+  it.effect("lets any member rename a trip and refuses outsiders", () =>
+    Effect.gen(function* () {
+      const { alex, bea, eve } = yield* users("alex", "bea", "eve");
+      const group = yield* groupWith(alex, bea);
+      const tripId = group.tripId;
+
+      expect(
+        yield* Effect.flip(
+          eve.trips.rename({ params: { tripId }, payload: { name: "Reno weekend" } }),
+        ),
+      ).toMatchObject({ _tag: "Forbidden", reason: "not_a_member" });
+
+      const renamed = yield* bea.trips.rename({
+        params: { tripId },
+        payload: { name: "Reno weekend" },
+      });
+      expect(renamed.name).toBe("Reno weekend");
+
+      const detail = yield* alex.trips.get({ params: { tripId } });
+      expect(detail.trip.name).toBe("Reno weekend");
+      const [listed] = yield* alex.groups.list();
+      expect(listed?.trips[0]?.name).toBe("Reno weekend");
+    }),
+  );
+
+  it.effect("refuses trip names that are blank, untrimmed or over 60 characters", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const group = yield* groupWith(alex);
+      const tripId = group.tripId;
+      const before = (yield* alex.trips.get({ params: { tripId } })).trip.name;
+
+      for (const name of ["", "   ", "  Reno  ", "x".repeat(61)]) {
+        const attempt = yield* Effect.exit(
+          alex.trips.rename({ params: { tripId }, payload: { name } }),
+        );
+        expect(attempt._tag).toBe("Failure");
+      }
+      expect((yield* alex.trips.get({ params: { tripId } })).trip.name).toBe(before);
+      const longest = "x".repeat(60);
+      expect(
+        (yield* alex.trips.rename({ params: { tripId }, payload: { name: longest } })).name,
+      ).toBe(longest);
+    }),
+  );
 });
