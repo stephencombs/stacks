@@ -480,6 +480,7 @@ it("offers only live trips in the recording currency, including when a mismatche
     myPlayerId: PlayerId.make(crypto.randomUUID()),
     myBalance: MinorUnits.make(0),
     liveSessionCount: 0,
+    liveTripIds: [],
     currentTripId: null,
     mySession: null,
     trips,

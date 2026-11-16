@@ -40,17 +40,15 @@ test.describe.serial("seats at a blackjack table on a phone", () => {
     const page = await hermesLike(await browser.newContext(test.info().project.use)).newPage();
     const visible = (locator: Locator) => locator.filter({ visible: true });
     await signIn(page, users[0]!.emailAddress);
-    await visible(page.getByRole("button", { name: "Groups", exact: true })).click();
+    await visible(page.getByRole("tab", { name: "Crew", exact: true })).click();
     await visible(page.getByRole("button", { name: "New group" })).click();
     await page.getByLabel("Group name").fill("Table crew");
     await visible(page.getByRole("button", { name: "Create group" })).click();
-    // People is pushed from the group hub; back returns to it.
-    await visible(page.getByRole("button", { name: /^Members and guests/ })).click();
+    // People are on the group's own page.
     await visible(page.getByRole("button", { name: "Add a guest" })).click();
     await page.getByLabel("Name", { exact: true }).fill("Gus");
     await visible(page.getByRole("button", { name: "Add guest" })).click();
     await expect(visible(page.getByRole("button", { name: "Send claim link" }))).toBeVisible();
-    await page.goBack();
     await visible(page.getByRole("button", { name: "Start a trip" })).click();
     await visible(page.getByLabel("Trip name")).fill("Seats");
     await visible(page.getByRole("button", { name: "Start trip" })).click();

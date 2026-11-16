@@ -1,12 +1,7 @@
-import { useAtomValue } from "@effect/atom-react";
-import { useParams } from "@tanstack/react-router";
-import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useState, type ReactNode } from "react";
 
 import { cn } from "~/components/ui/cn";
 import { Skeleton, Surface } from "~/components/ui/Surface";
-import { useLastTrip, useStacks } from "~/lib/stacks";
-import { TripLayout } from "./TripRail";
 
 /*
  * Each page's loading state is drawn at the size of the page it stands in for: the same header,
@@ -190,61 +185,7 @@ function HeroSkeleton({
   );
 }
 
-/** Your live table's card, as Sessions opens on it. */
-function LiveCardSkeleton() {
-  return (
-    <Surface className="flex flex-col gap-4 p-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-6 w-24 rounded-md" />
-        <SkeletonText size="sm" className="w-24" />
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="flex h-[30px] items-center">
-          <Skeleton className="h-6 w-44" />
-        </span>
-        <SkeletonText size="sm" className="w-36" />
-      </div>
-      <Skeleton className="h-12 w-full rounded-lg" />
-    </Surface>
-  );
-}
-
-function RailSkeleton() {
-  return (
-    <>
-      <Surface className="overflow-hidden">
-        <div className="flex min-h-12 items-center px-4">
-          <SkeletonText className="w-14" />
-        </div>
-        {keys(5).map((key) => (
-          <div key={key} className="flex min-h-12 items-center gap-3 px-4">
-            <Skeleton className="size-6 shrink-0 rounded-full" />
-            <SkeletonText className="flex-1" />
-            <SkeletonText className="w-12" />
-          </div>
-        ))}
-        <div className="h-1" />
-      </Surface>
-      <Surface className="flex flex-col p-4">
-        <SkeletonText size="sm" className="w-24" />
-        <span className="mt-2 flex h-9 items-center">
-          <Skeleton className="h-8 w-28" />
-        </span>
-        <SkeletonText size="sm" className="mt-1.5 w-44" />
-        <Skeleton className="mt-4 h-10 w-full rounded-lg" />
-      </Surface>
-    </>
-  );
-}
-
-/** Whether you're seated at a live table in this trip, which Sessions shows first. */
-function useSeatedIn(tripId: string | undefined) {
-  const stacks = useStacks();
-  const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
-  return groups.some((item) => item.mySession !== null && item.mySession.tripId === tripId);
-}
-
-/** A trip place loading: its title, then the place's own shape; Sessions keeps its rail. */
+/** A trip place loading: its title, then the place's own shape. */
 export function TripPageSkeleton({
   on,
   scope = "trip",
@@ -252,20 +193,14 @@ export function TripPageSkeleton({
   on: "sessions" | "board";
   scope?: "trip" | "all";
 }) {
-  const params: { tripId?: string } = useParams({ strict: false });
-  const { lastTripId } = useLastTrip();
-  const seated = useSeatedIn(params.tripId ?? lastTripId ?? undefined);
   if (on === "sessions")
     return (
       <SkeletonPage label="Loading the trip">
         <HeaderSkeleton back action menu />
-        <TripLayout rail={<RailSkeleton />}>
-          {seated ? <LiveCardSkeleton /> : null}
-          <HeroSkeleton />
-          <SectionSkeleton aside>
-            <RowsSkeleton rows={3} />
-          </SectionSkeleton>
-        </TripLayout>
+        <HeroSkeleton />
+        <SectionSkeleton aside>
+          <RowsSkeleton rows={3} />
+        </SectionSkeleton>
       </SkeletonPage>
     );
   return (
@@ -345,8 +280,8 @@ function TripRowsSkeleton() {
   );
 }
 
-/** A Group page loading: the hub's trips, people and settings, or People's lists, or Settings. */
-export function GroupPageSkeleton({ on }: { on: "hub" | "people" | "settings" }) {
+/** A Group page loading: the hub's trips, people and settings, or Settings. */
+export function GroupPageSkeleton({ on }: { on: "hub" | "settings" }) {
   return (
     <SkeletonPage label="Loading the group">
       {on === "hub" ? (
@@ -355,16 +290,6 @@ export function GroupPageSkeleton({ on }: { on: "hub" | "people" | "settings" })
           <SectionSkeleton>
             <TripRowsSkeleton />
           </SectionSkeleton>
-          <SectionSkeleton>
-            <RowsSkeleton rows={1} chip trailing={false} />
-          </SectionSkeleton>
-          <SectionSkeleton>
-            <RowsSkeleton rows={1} trailing={false} />
-          </SectionSkeleton>
-        </>
-      ) : on === "people" ? (
-        <>
-          <HeaderSkeleton back />
           <SectionSkeleton>
             <RowsSkeleton rows={4} chip trailing={false} />
           </SectionSkeleton>
@@ -420,7 +345,7 @@ export function FormPageSkeleton({ fields = 4 }: { fields?: number }) {
 export function InviteSkeleton() {
   return (
     <SkeletonPage label="Loading the invite">
-      <HeaderSkeleton context title="w-56 sm:w-72" />
+      <HeaderSkeleton back context action title="w-56 sm:w-72" />
       <Surface className="flex flex-col gap-3 p-4">
         <SkeletonText className="w-48" />
         <SkeletonText size="sm" className="w-64" />

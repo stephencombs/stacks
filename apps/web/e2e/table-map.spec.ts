@@ -34,13 +34,11 @@ test.describe.serial("seats at a blackjack table", () => {
     await page.getByRole("button", { name: "New group" }).click();
     await page.getByLabel("Group name").fill("Table crew");
     await page.getByRole("button", { name: "Create group" }).click();
-    await page.getByRole("link", { name: /^1 member/ }).click();
     await page.getByRole("button", { name: "Add a guest" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Gus");
     await page.getByRole("button", { name: "Add guest" }).click();
     await expect(page.getByRole("button", { name: "Copy claim link" })).toBeVisible();
     // The group's first trip opens straight onto its first session.
-    await page.getByRole("link", { name: "Table crew" }).click();
     await page.getByLabel("Trip name").fill("Seats");
     await page.getByRole("button", { name: "Start trip" }).click();
     await page.getByRole("button", { name: "Add a venue" }).click();

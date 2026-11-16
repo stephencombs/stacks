@@ -73,13 +73,10 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
   vi.doMock("~/features/TripHeader", () => ({
     TripHeader: ({ action }: { action: ReactNode }) => action,
   }));
-  vi.doMock("~/features/TripRail", () => ({ TripLayout: Container, TripRail: () => null }));
   vi.doMock("~/features/TripHero", () => ({ TripHero: () => null }));
   vi.doMock("~/features/SessionList", () => ({
-    LiveSessionCard: () => null,
     SessionList: () => null,
   }));
-  vi.doMock("~/features/Backing", () => ({ BackingSection: () => null }));
   const visitId = VisitId.make(crypto.randomUUID());
   vi.doMock("~/features/RecordingForms", () => ({
     StartDialog: ({
@@ -129,6 +126,35 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
     trip = { ...trip, trip: { ...trip.trip, endedAt: day } };
     await act(async () => root.render(<Page />));
     expect(host.textContent).not.toContain("Start a session");
+    trip = {
+      ...trip,
+      trip: { ...trip.trip, endedAt: null },
+      tables: [
+        {
+          table: {
+            id: crypto.randomUUID() as never,
+            tripId,
+            game: "poker_cash",
+            venueId: null,
+            highLimit: false,
+            starterPlayerId: group.myPlayerId,
+          },
+          venue: null,
+          startedAt: day,
+          endedAt: null,
+          minutesPlayed: 0,
+          playerIds: [group.myPlayerId],
+          playing: [group.myPlayerId],
+          results: [],
+          inPlay: [{ playerId: group.myPlayerId, buyIn: 100_00 as never }],
+          others: [],
+          myVisitId: visitId,
+        },
+      ],
+    };
+    await act(async () => root.render(<Page />));
+    expect(host.textContent).toContain("You're playing now");
+    expect(host.textContent).not.toContain("Nothing finished on this trip yet");
   } finally {
     await act(async () => root.unmount());
     vi.resetModules();

@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import { useNavigate } from "@tanstack/react-router";
 import { TripId, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
@@ -9,7 +10,9 @@ import {
   scopeTrips,
   tripDates,
 } from "@stacks/client-runtime/trip";
+import { tripIsLive } from "@stacks/client-runtime/scope";
 import { tripStandings } from "@stacks/shared/trips";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as DateTime from "effect/DateTime";
 import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -28,8 +31,11 @@ const localDay = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 
 /** The group's trips, going ones first, each with its leaders. */
-export function TripsSection({ detail, seatTripId }: { detail: GroupDetail; seatTripId?: TripId }) {
+export function TripsSection({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
+  const item = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []).find(
+    (group) => group.group.id === detail.group.id,
+  );
   if (detail.trips.length === 0) return <FirstTripSection detail={detail} />;
   return (
     <Section title="Trips" action={<StartTripButton detail={detail} />}>
@@ -40,7 +46,7 @@ export function TripsSection({ detail, seatTripId }: { detail: GroupDetail; seat
               <span className="flex min-w-0 flex-1 flex-col gap-2">
                 <span className="flex items-center gap-3">
                   <RowText title={trip.name} meta={tripDates(trip)} />
-                  {trip.id === seatTripId ? <Tag tone="live">Live</Tag> : null}
+                  {item && tripIsLive(item, trip) ? <Tag tone="live">Live</Tag> : null}
                 </span>
                 <Loaded
                   query={stacks.trip(trip.id)}
@@ -102,13 +108,15 @@ function StartTripButton({ detail }: { detail: GroupDetail }) {
   );
 }
 
-/** The top three on the trip's board so far. */
+/** The top three in the trip's standings so far. */
 function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const names = playerNames(detail);
   const closed = closedPlays(trip);
   const top = tripStandings(closed, localClock).slice(0, 3);
   if (top.length === 0)
-    return <span className="text-sm text-muted">Close a session to put it on the board.</span>;
+    return (
+      <span className="text-sm text-muted">Standings start when the first table finishes.</span>
+    );
   return (
     // One line, as tall as its skeleton: each leader's chip, which carries their initial, and result.
     <span className="flex gap-x-4 text-sm">
@@ -131,7 +139,7 @@ function StartTripDialog({ detail, onClose }: { detail: GroupDetail; onClose: ()
       open
       onOpenChange={(open) => (open ? undefined : onClose())}
       title="New trip"
-      description={`Sessions you start in it go on its board, in ${detail.group.name}.`}
+      description={`Tables you start in it count toward its standings, in ${detail.group.name}.`}
     >
       <TripForm
         detail={detail}

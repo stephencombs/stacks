@@ -143,6 +143,8 @@ export const GroupListItem = Schema.Struct({
   myBalance: MinorUnits,
   /** Live sessions, and tables in its trips with anyone still playing. */
   liveSessionCount: Schema.Int,
+  /** Trips in this group that currently have a live session or table. */
+  liveTripIds: Schema.Array(TripId),
   /** The trip still going, most recently started first; where the app opens. */
   currentTripId: Schema.NullOr(TripId),
   /** Newest first. */

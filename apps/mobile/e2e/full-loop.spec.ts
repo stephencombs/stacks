@@ -70,9 +70,7 @@ test.describe.serial("live mode on a phone", () => {
     const groupPath = await at(alex, `/groups/${id}`);
     await shoot(alex, "group-empty");
 
-    // People is pushed from the group hub, at its own address.
-    await visible(alex.getByRole("button", { name: /^Members and guests/ })).click();
-    await at(alex, `${groupPath}/people`);
+    // People are on the group's own page.
     await visible(alex.getByRole("button", { name: "New invite link" })).click();
     const inviteLink = (await alex
       .getByText(/\/join\//)

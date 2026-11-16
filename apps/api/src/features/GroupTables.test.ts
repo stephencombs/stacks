@@ -110,6 +110,9 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         expect(
           (yield* alex.groups.stats({ params: { groupId: group.group.id } })).sessionCount,
         ).toBe(0);
+        expect(
+          (yield* alex.groups.list()).find((item) => item.group.id === group.group.id)!,
+        ).toMatchObject({ liveSessionCount: 1, liveTripIds: [group.tripId] });
 
         // Each finishes on 12,000: Alex bought in 20,000 and Bea and Dave 10,000.
         expect(
@@ -161,9 +164,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
           { playerId: null, displayName: "Dave", net: 2000 },
         ]);
         expect(
-          (yield* alex.groups.list()).find((item) => item.group.id === group.group.id)!
-            .liveSessionCount,
-        ).toBe(0);
+          (yield* alex.groups.list()).find((item) => item.group.id === group.group.id)!,
+        ).toMatchObject({ liveSessionCount: 0, liveTripIds: [] });
       }),
   );
 
