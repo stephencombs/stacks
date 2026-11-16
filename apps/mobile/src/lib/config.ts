@@ -11,8 +11,23 @@ const devApiUrl = () => {
 
 export const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? devApiUrl();
 
-/** Links shared from the app open directly in Color Up's custom URL scheme. */
-export const appUrl = (path: string) => Linking.createURL(path.replace(/^\/+/, ""));
+const appScheme = () => {
+  const scheme = Constants.expoConfig?.scheme;
+  return (Array.isArray(scheme) ? scheme[0] : scheme) ?? "stacks";
+};
+
+/** The prefixes a link into the app can start with. */
+export const appLinkPrefixes = () => [
+  `${appScheme()}://`,
+  // Expo's own form of the same link, which carries Metro's host on a dev client.
+  Linking.createURL("/"),
+];
+
+/**
+ * Links shared from the app open directly in Color Up's custom URL scheme. Built from the scheme
+ * rather than `Linking.createURL`, which adds Metro's host on a dev client and breaks the path.
+ */
+export const appUrl = (path: string) => `${appScheme()}://${path.replace(/^\/+/, "")}`;
 
 // Expo strips android.config from the public manifest; expose availability without the key.
 export const googleMapsEnabled = Constants.expoConfig?.extra?.googleMapsEnabled === true;

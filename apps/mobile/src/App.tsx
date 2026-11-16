@@ -25,6 +25,7 @@ import { PersonalYouButton } from "./features/Personal";
 import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./features/PlaceTabs";
 import { YouButton } from "./features/You";
 import { AccountProvider, useAccount } from "./lib/account";
+import { appLinkPrefixes } from "./lib/config";
 import { markStartup, reportStartupError } from "./lib/diagnostics";
 import { useAppFonts } from "./lib/fonts";
 import { getInitialURL } from "./lib/initialUrl";
@@ -180,7 +181,7 @@ const Navigation = createStaticNavigation(RootStack);
 
 const linking = {
   enabled: "auto" as const,
-  prefixes: [Linking.createURL("/")],
+  prefixes: appLinkPrefixes(),
   // Back from any link lands on the tabs.
   config: { initialRouteName: "Tabs" as const },
   getStateFromPath: (path: string, options?: Parameters<typeof getStateFromPath>[1]) =>

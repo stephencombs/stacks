@@ -28,11 +28,17 @@ it("keeps maps disabled for existing builds without the flag", async () => {
   expect(config.googleMapsEnabled).toBe(false);
 });
 
-it("builds deep links using the app URL scheme", async () => {
-  const { appUrl } = await import("./config");
-  expect(appUrl("/t/abc")).toBe("stacks://t/abc");
-  expect(appUrl("invite/xyz")).toBe("stacks://invite/xyz");
-  expect(appUrl("/join/code")).toBe("stacks://join/code");
+it("builds deep links from the build's scheme, not Metro's host", async () => {
+  Constants.expoConfig = {
+    name: "Color Up Dev",
+    slug: "stacks",
+    scheme: "stacks-dev",
+    hostUri: "192.168.1.5:8081",
+  };
+  const { appUrl, appLinkPrefixes } = await import("./config");
+  expect(appUrl("/t/abc")).toBe("stacks-dev://t/abc");
+  expect(appUrl("invite/xyz")).toBe("stacks-dev://invite/xyz");
+  expect(appLinkPrefixes()[0]).toBe("stacks-dev://");
 });
 
 it.each(["test-map-key", ""])("publishes only map availability for key %s", async (key) => {

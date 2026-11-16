@@ -71,7 +71,11 @@ async function load({
   vi.doMock("expo", () => ({ reloadAppAsync: vi.fn() }));
   const markStartup = vi.fn();
   vi.doMock("./lib/diagnostics", () => ({ markStartup, reportStartupError: vi.fn() }));
-  vi.doMock("./lib/config", () => ({ clerkPublishableKey: key, apiUrl: "http://api.test" }));
+  vi.doMock("./lib/config", () => ({
+    clerkPublishableKey: key,
+    apiUrl: "http://api.test",
+    appLinkPrefixes: () => ["stacks://"],
+  }));
   vi.doMock("./lib/telemetry", () => ({ captureTestEvent: vi.fn() }));
   vi.doMock("expo-haptics", () => ({
     notificationAsync: vi.fn(),
