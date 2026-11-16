@@ -63,7 +63,7 @@ export const list = Effect.fn("Groups.list")(function* () {
 
   const groupIds = rows.map((row) => row.id);
   const seatedIds = rows.flatMap((row) => (row.mySessionId ? [row.mySessionId] : []));
-  const [seated, groupTrips, entries, stakedRows] = yield* Effect.all(
+  const [seated, groupTrips, liveTrips, entries, stakedRows] = yield* Effect.all(
     [
       seatedIds.length === 0
         ? Effect.succeed([])
@@ -86,6 +86,24 @@ export const list = Effect.fn("Groups.list")(function* () {
       sql`
         select * from trips where group_id in ${sql.in(groupIds)} order by started_at desc
       `.pipe(Effect.flatMap(Access.decodeRows(TripRow))),
+      sql`
+        select distinct group_id, trip_id from (
+          select s.group_id, s.trip_id from sessions s
+          where s.group_id in ${sql.in(groupIds)} and s.status = 'live'
+          union all
+          select tr.group_id, t.trip_id from tables t
+          join trips tr on tr.id = t.trip_id
+          where tr.group_id in ${sql.in(groupIds)}
+            and t.legacy_session_id is null
+            and t.deleted_at is null
+            and exists (
+              select 1 from personal_visits v
+              where v.table_id = t.id and v.finished_at is null and v.deleted_at is null
+            )
+        ) live_trips
+      `.pipe(
+        Effect.flatMap(Access.decodeRows(Schema.Struct({ groupId: GroupId, tripId: TripId }))),
+      ),
       sql`
         select * from entries
         where group_id in ${sql.in(groupIds)}
@@ -111,6 +129,7 @@ export const list = Effect.fn("Groups.list")(function* () {
         myPlayerId: row.playerId,
         myBalance: owed.get(row.playerId) ?? MinorUnits.make(0),
         liveSessionCount: row.liveSessionCount,
+        liveTripIds: liveTrips.filter((trip) => trip.groupId === row.id).map((trip) => trip.tripId),
         currentTripId: row.currentTripId,
         trips: groupTrips.filter((trip) => trip.groupId === row.id),
         mySession: seated.find((session) => session.id === row.mySessionId) ?? null,

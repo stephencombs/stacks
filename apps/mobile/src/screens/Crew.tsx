@@ -296,6 +296,13 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
       <Tag tone="live">Live</Tag>,
     );
   const results = item.players.toSorted((a, b) => b.net - a.net);
+  const seenGuests = new Map<string, number>();
+  const playerKey = (playerId: (typeof results)[number]["playerId"], displayName: string) => {
+    if (playerId) return playerId;
+    const n = (seenGuests.get(displayName) ?? 0) + 1;
+    seenGuests.set(displayName, n);
+    return `guest-${displayName}-${n}`;
+  };
   return row(
     venue,
     [game, item.trip.name, `${formatDay(item.endedAt)}, ${formatTime(item.endedAt)}`]
@@ -305,7 +312,7 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
     <View className="flex-row flex-wrap gap-x-3">
       {results.slice(0, 4).map((player) => (
         <Text
-          key={player.playerId ?? `guest-${player.displayName}`}
+          key={playerKey(player.playerId, player.displayName)}
           className="type-footnote text-ink"
         >
           {player.playerId === me ? "You" : player.displayName}{" "}

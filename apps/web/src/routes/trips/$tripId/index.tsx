@@ -38,6 +38,7 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
   const plays = tripPlays(trip);
+  const myLive = plays.some((s) => s.live && s.playing.includes(group.myPlayerId));
   const live = plays.filter((s) => s.live && !s.playing.includes(group.myPlayerId));
   const closed = plays.filter((s) => !s.live);
   const nights = tripNights(closed, localClock).toReversed();
@@ -107,11 +108,17 @@ function TripView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
         );
       })}
       {closed.length === 0 && live.length === 0 ? (
-        <EmptyState title="Nothing finished on this trip yet">
-          {trip.trip.endedAt === null
-            ? "Start one when you sit down to play."
-            : "This trip ended before anyone played."}
-        </EmptyState>
+        myLive ? (
+          <EmptyState title="You're playing now">
+            Results appear here once a table finishes.
+          </EmptyState>
+        ) : (
+          <EmptyState title="Nothing finished on this trip yet">
+            {trip.trip.endedAt === null
+              ? "Start one when you sit down to play."
+              : "This trip ended before anyone played."}
+          </EmptyState>
+        )
       ) : null}
       {startSession ? <ActionBar className="lg:hidden">{startSession}</ActionBar> : null}
     </>

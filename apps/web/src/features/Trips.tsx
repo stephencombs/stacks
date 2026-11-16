@@ -114,7 +114,9 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const closed = closedPlays(trip);
   const top = tripStandings(closed, localClock).slice(0, 3);
   if (top.length === 0)
-    return <span className="text-sm text-muted">Close a session to put it on the board.</span>;
+    return (
+      <span className="text-sm text-muted">Standings start when the first table finishes.</span>
+    );
   return (
     // One line, as tall as its skeleton: each leader's chip, which carries their initial, and result.
     <span className="flex gap-x-4 text-sm">

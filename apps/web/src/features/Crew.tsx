@@ -309,6 +309,13 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
       </ActivityLink>
     );
   const results = item.players.toSorted((a, b) => b.net - a.net);
+  const seenGuests = new Map<string, number>();
+  const playerKey = (playerId: (typeof results)[number]["playerId"], displayName: string) => {
+    if (playerId) return playerId;
+    const n = (seenGuests.get(displayName) ?? 0) + 1;
+    seenGuests.set(displayName, n);
+    return `guest-${displayName}-${n}`;
+  };
   return (
     <ActivityLink item={item}>
       <RowText
@@ -318,7 +325,7 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
             <span className="flex flex-wrap gap-x-3">
               {results.slice(0, 4).map((player) => (
                 <span
-                  key={player.playerId ?? `guest-${player.displayName}`}
+                  key={playerKey(player.playerId, player.displayName)}
                   className="whitespace-nowrap"
                 >
                   <span className="text-ink">

@@ -1,14 +1,13 @@
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import type { GroupDetail, TripDetail } from "@stacks/contracts";
-import { playerNames } from "@stacks/client-runtime/format";
+import { MinorUnits, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
-import { boardMoney, localClock, nightLabel, tripPlays } from "@stacks/client-runtime/trip";
+import { localClock, nightLabel, tripPlays } from "@stacks/client-runtime/trip";
 import { tripNights } from "@stacks/shared/trips";
 import { useState } from "react";
 import { Text, View } from "react-native";
 
+import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
-import { cn } from "../components/ui/cn";
 import { Screen, screenError } from "../components/ui/Screen";
 import { EmptyState, PageTitle, SectionHeading } from "../components/ui/Surface";
 import { StartSheet } from "../features/RecordingForms";
@@ -56,14 +55,14 @@ export function SessionsScreen({ route }: Props) {
   );
 }
 
-const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const go = useGo();
   const navigation = useNavigation();
   const [starting, setStarting] = useState(false);
-  const names = playerNames(group);
   const plays = tripPlays(trip);
+  const myLive = plays.some((s) => s.live && s.playing.includes(group.myPlayerId));
   const live = plays.filter((s) => s.live && !s.playing.includes(group.myPlayerId));
   const closed = plays.filter((s) => !s.live);
   const nights = tripNights(closed, localClock).toReversed();
@@ -113,25 +112,36 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
           <SessionList sessions={live} detail={group} />
         </View>
       ) : null}
-      {nights.map((night) => (
-        <View key={night.key} className="gap-2">
-          <SectionHeading
-            action={
-              night.winner ? (
+      {nights.map((night) => {
+        const played = night.sessions.flatMap((s) =>
+          s.results.filter((r) => r.playerId === group.myPlayerId),
+        );
+        return (
+          <View key={night.key} className="gap-2">
+            <SectionHeading
+              action={
                 <Text numberOfLines={1} className="shrink text-sm text-muted">
-                  {names.get(night.winner.playerId) ?? "Someone"}{" "}
-                  <Text className={cn("font-mono", tone(night.winner.net))}>
-                    {boardMoney(night.winner.net, group.group.currency)}
-                  </Text>
+                  {played.length === 0 ? (
+                    plural(night.sessions.length, "session")
+                  ) : (
+                    <>
+                      You{" "}
+                      <Money
+                        amount={MinorUnits.make(played.reduce((sum, r) => sum + r.net, 0))}
+                        currency={group.group.currency}
+                        tone="result"
+                      />
+                    </>
+                  )}
                 </Text>
-              ) : undefined
-            }
-          >
-            {nightLabel(night)}
-          </SectionHeading>
-          <SessionList sessions={night.sessions.toReversed()} detail={group} />
-        </View>
-      ))}
+              }
+            >
+              {nightLabel(night)}
+            </SectionHeading>
+            <SessionList sessions={night.sessions.toReversed()} detail={group} />
+          </View>
+        );
+      })}
       {starting ? (
         <StartSheet
           initialTripId={trip.trip.id}
@@ -143,11 +153,17 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
         />
       ) : null}
       {live.length === 0 && nights.length === 0 ? (
-        <EmptyState centered title="Nothing finished on this trip yet">
-          {going
-            ? "Start one when you sit down at a table. Everyone's buy-ins and cash-outs go on it."
-            : "Nothing was played on this trip."}
-        </EmptyState>
+        myLive ? (
+          <EmptyState centered title="You're playing now">
+            Results appear here once a table finishes.
+          </EmptyState>
+        ) : (
+          <EmptyState centered title="Nothing finished on this trip yet">
+            {going
+              ? "Start one when you sit down at a table. Everyone's buy-ins and cash-outs go on it."
+              : "Nothing was played on this trip."}
+          </EmptyState>
+        )
       ) : null}
     </Screen>
   );

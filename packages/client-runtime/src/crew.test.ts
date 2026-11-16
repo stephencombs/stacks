@@ -57,6 +57,7 @@ const group = (
   myPlayerId: me,
   myBalance: MinorUnits.make(0),
   liveSessionCount: 0,
+  liveTripIds: [],
   currentTripId: trips.find((t) => t.endedAt === null)?.id ?? null,
   trips,
   mySession: null,
@@ -77,6 +78,17 @@ it("pins a trip with someone playing over a newer quiet one", () => {
   const crew = group("crew", [vegas, tahoe]);
   const work = group("work", [poker], { liveSessionCount: 1 });
   expect(pinnedTrip([crew, work])).toEqual({ item: work, trip: poker });
+});
+
+it("pins the older open trip with a live table over a newer quiet open trip in the same group", () => {
+  const openTahoe = trip("tahoe", "crew", 2);
+  const crew = group("crew", [vegas, openTahoe], {
+    liveSessionCount: 1,
+    liveTripIds: [openTahoe.id],
+    currentTripId: vegas.id,
+  });
+  expect(pinnedTrip([crew])).toEqual({ item: crew, trip: openTahoe });
+  expect(groupHappening(crew)).toEqual({ kind: "live", trip: openTahoe });
 });
 
 it("pins nothing once every trip has ended", () => {
