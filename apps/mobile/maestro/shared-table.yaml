@@ -1,0 +1,80 @@
+# One phone starts a table and shares its stacks-preview:// link. With the app's data and keychain
+# wiped, the same simulator is a stranger who opens that link, joins as a new player and buys in.
+appId: com.stephencombs.colorup.preview
+name: Join a shared table from its link
+tags:
+  - shared
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible: "Start session"
+    timeout: 60000
+- tapOn: "Start session"
+- tapOn: "2"
+- tapOn: "0"
+- tapOn: "0"
+- tapOn:
+    id: "sheet-submit"
+- extendedWaitUntil:
+    visible: "Bought in"
+    timeout: 10000
+
+- tapOn: "Table actions"
+- tapOn: "Share table"
+# A table syncs before it can be shared, and needs no account to.
+- runFlow:
+    when:
+      visible: "Sync this table"
+    commands:
+      - tapOn: "Sync this table"
+- extendedWaitUntil:
+    visible: "Create link"
+    timeout: 60000
+- tapOn: "Create link"
+- extendedWaitUntil:
+    visible: "stacks-preview://t/.+"
+    timeout: 30000
+- copyTextFrom: "stacks-preview://t/.+"
+- evalScript: ${output.link = maestro.copiedText}
+
+# A stranger: nothing of the starter's is left on this phone.
+- stopApp
+- clearState
+# The device keys live in the iOS keychain, which outlasts the app's data.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - clearKeychain
+- openLink: ${output.link}
+# iOS may ask before a link opens an app.
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "Join this table"
+    timeout: 60000
+- assertVisible: "Read-only"
+
+- tapOn: "Join this table"
+- tapOn: "Your name"
+- inputText: "Sam"
+- tapOn: "Join as a new player"
+# Someone new to the table buys in, rather than sitting back down.
+- extendedWaitUntil:
+    visible: "Your buy-in as Sam\\."
+    timeout: 30000
+- assertNotVisible: "Sit back down"
+- tapOn: "1"
+- tapOn: "0"
+- tapOn: "0"
+- tapOn:
+    id: "sheet-submit"
+- extendedWaitUntil:
+    visible: "Bought in"
+    timeout: 15000
+- assertVisible: "\\$100"

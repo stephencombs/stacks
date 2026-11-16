@@ -54,6 +54,7 @@ export function Button({
   icon,
   haptic = false,
   accessibilityLabel,
+  testID,
   className,
 }: {
   label: string;
@@ -67,6 +68,8 @@ export function Button({
   /** A light tap on press, for actions repeated at the table. */
   haptic?: boolean;
   accessibilityLabel?: string;
+  /** For the simulator E2E flows in apps/mobile/maestro, where a label alone is ambiguous. */
+  testID?: string;
   className?: string;
 }) {
   const inactive = disabled || pending;
@@ -74,6 +77,7 @@ export function Button({
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
+      testID={testID}
       accessibilityState={{ disabled: inactive, busy: pending }}
       disabled={inactive}
       onPress={() => {

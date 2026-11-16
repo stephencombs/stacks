@@ -1,0 +1,46 @@
+name: E2E
+
+# Manual only. Each run spends EAS build and test minutes, and the flows write to the API the
+# preview build points at. Start it with:
+#   npx -y eas-cli@latest workflow:run .eas/workflows/e2e.yml
+# The account flows need MAESTRO_CLERK_SECRET_KEY, the Clerk development instance's secret key,
+# as a secret in the preview environment.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: e2e
+  cancel_in_progress: true
+
+jobs:
+  build_ios:
+    name: Build iOS Simulator app
+    type: build
+    params:
+      platform: ios
+      profile: preview-simulator
+  build_android:
+    name: Build Android Emulator app
+    type: build
+    params:
+      platform: android
+      profile: preview-simulator
+  maestro_ios:
+    name: Maestro on iOS Simulator
+    type: maestro
+    needs: [build_ios]
+    environment: preview
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      flow_path: ./maestro
+      record_screen: true
+  maestro_android:
+    name: Maestro on Android Emulator
+    type: maestro
+    needs: [build_android]
+    environment: preview
+    runs_on: linux-large-nested-virtualization
+    params:
+      build_id: ${{ needs.build_android.outputs.build_id }}
+      flow_path: ./maestro
+      record_screen: true

@@ -78,7 +78,7 @@ Executing after PRs `#101` (spec `006`, Crew tab) and `#102` (spec `011`, group 
 
 - [x] Merge or resolve `#101` and `#102`; remove web items from specs `012`, `016`, and `017`
 - [x] Phase 1A: Add `JoinSheet`, `SitDownSheet.returning`, `t/:token`, and `invite/:token` on `RootStack`; switch shared links to `appUrl()` (`Linking.createURL`) and drop `EXPO_PUBLIC_WEB_URL` from `eas.json`
-- [ ] Phase 1B: Migrate `tokens.test.ts`, `motion.test.ts`, `VenuePicker.test.tsx`, SQLite rollback/`retry()`/`version: 99` tests, and `hermesLike` checks; establish native simulator E2E
+- [x] Phase 1B: Migrate `tokens.test.ts`, `motion.test.ts`, `VenuePicker.test.tsx`, SQLite rollback/`retry()`/`version: 99` tests, and `hermesLike` checks; establish native simulator E2E
 - [ ] Phase 2: Delete `apps/web`, `*.web.*`, Playwright harnesses, IndexedDB runtime files, `chips-*.webp`, and `preview-color-up` skill + symlinks; clean `Platform.OS` branches and mobile/workspace deps (keeping `react-dom` in mobile `devDependencies`)
 - [ ] Update `wrangler.jsonc`, `Clerk.ts`, `preview.mjs`, `preview-comment.mjs`, `ci-changes.mjs`, CI workflows, `knip.json`, `vite.config.ts`, `.gitignore`, and docs
 

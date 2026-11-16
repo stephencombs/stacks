@@ -52,6 +52,7 @@ A change that works on the path you tested and is missing everywhere else is the
 - `docs/internals/navigation.md` decides where content lives and how people move between it. Read it before adding a page, tab, menu or route.
 - `DESIGN.md` is the design system: read it before building UI. `/design.html` on the web dev server shows the shared web parts and their states.
 - `apps/web/e2e` holds the Playwright test of the full loop against the real Clerk development instance (`pnpm --filter @stacks/web test:e2e`). Run it after changing a flow it covers.
+- `apps/mobile/maestro` holds the Maestro flows for the native apps: signed-out recording, sign-in and Crew, and joining a shared table. `apps/mobile/.eas/workflows/e2e.yml` runs them on EAS simulators, by hand. Run it after changing a flow it covers.
 - `apps/mobile`: Expo with a dev client, React Navigation native-stack (static config), Uniwind. Expo, EAS, and React Native API work follows [Expo](#expo).
 - `packages/contracts`: Effect Schema types and the `StacksApi` definition. No runtime logic.
 - `packages/shared`: pure ledger logic shared by the API and clients: `money`, `results`, `balances`. Import a subpath; there's no root export.
