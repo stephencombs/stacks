@@ -200,6 +200,7 @@ function StartTripSheet({
     >
       <TextField
         label="Trip name"
+        testID="trip-name"
         value={name}
         onChangeText={setName}
         maxLength={60}

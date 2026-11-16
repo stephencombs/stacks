@@ -39,6 +39,15 @@
         "simulator": true
       }
     },
+    "e2e-simulator": {
+      "ios": { "image": "macos-tahoe-26.6-xcode-27.1", "simulator": true },
+      "android": { "buildType": "apk" },
+      "env": {
+        "APP_VARIANT": "preview",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_cmljaC1qYWd1YXItNjczOS5jbGVyay5hY2NvdW50cy5kZXYk"
+      },
+      "distribution": "internal"
+    },
     "production": {
       "uploadSourceMaps": true,
       "ios": { "image": "macos-tahoe-26.6-xcode-27.1" },

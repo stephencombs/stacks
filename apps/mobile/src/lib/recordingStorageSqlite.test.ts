@@ -67,7 +67,8 @@ vi.mock("expo-sqlite", () => ({
 
 import { openSQLiteRecordingStorage } from "./recordingStorageSqlite";
 import { openRecordingStorage } from "./recordingStorage";
-import { makeRecordingStore } from "@stacks/client-runtime/recording";
+import { makeRecordingStore, type CachedVenue } from "@stacks/client-runtime/recording";
+import { VenueId } from "@stacks/contracts";
 
 beforeEach(() => {
   driver.directory = mkdtempSync(join(tmpdir(), "color-up-sqlite-"));
@@ -273,4 +274,102 @@ it("runs private recording through real SQLite across reopen and a rolled-back f
   expect(store.getSnapshot()).toMatchObject({ publication: "private", state: { self: identity } });
   expect(store.getSnapshot().state!.receipts.at(-1)).toEqual(receipt);
   await store.close();
+});
+
+const openStore = async () => {
+  const store = makeRecordingStore(await openRecordingStorage("runtime"));
+  await store.ready;
+  return store;
+};
+
+const bellagio: CachedVenue = {
+  id: VenueId.make("0192e7a0-0000-7000-8000-0000000000b1"),
+  name: "Bellagio",
+  kind: "casino",
+  city: "Las Vegas",
+  region: "NV",
+  country: "US",
+  lat: 36.11,
+  lng: -115.17,
+};
+
+it.each(["start", "finish", "correct", "venue"] as const)(
+  "%s rolls back an interrupted SQLite write and retries the identical command",
+  async (operation) => {
+    let store = await openStore();
+    if (operation !== "start") await store.execute(store.prepare({ type: "start", buyIn: 20000 }));
+    const before = store.getSnapshot();
+    const state = before.state!;
+    const command =
+      operation === "start"
+        ? store.prepare({ type: "start", buyIn: 20000 })
+        : operation === "finish"
+          ? store.prepare({ type: "finish", visitId: state.visits[0]!.id, amount: 25000 })
+          : operation === "venue"
+            ? store.prepare({
+                type: "edit_visit",
+                visitId: state.visits[0]!.id,
+                table: { game: null, venueId: bellagio.id, highLimit: false },
+              })
+            : store.prepare({
+                type: "correct",
+                visitId: state.visits[0]!.id,
+                entryId: state.entries[0]!.id,
+                reason: "wrong amount",
+                replacement: { amount: 18000 },
+              });
+    driver.failAfterWrite = true;
+    await expect(
+      store.execute(command, operation === "venue" ? [bellagio] : []),
+    ).rejects.toMatchObject({ reason: "write" });
+    driver.failAfterWrite = false;
+    expect(store.getSnapshot()).toMatchObject({
+      status: "save_failed",
+      revision: before.revision,
+      state: before.state,
+      failedCommand: { operationId: command.operationId },
+    });
+
+    // Retry runs the same operation, with the venue it was given, not a new one.
+    const receipt = await store.retry();
+    expect(receipt.command.operationId).toBe(command.operationId);
+    expect(store.getSnapshot()).toMatchObject({ status: "saved", failedCommand: null });
+    await store.close();
+
+    store = await openStore();
+    const saved = store.getSnapshot().state!;
+    expect(saved.receipts.at(-1)).toEqual(receipt);
+    expect(
+      saved.receipts.filter((r) => r.command.operationId === command.operationId),
+    ).toHaveLength(1);
+    if (operation === "venue") {
+      expect(saved.venues).toMatchObject([{ id: bellagio.id, name: "Bellagio" }]);
+      expect(saved.tables[0]!.venueId).toBe(bellagio.id);
+    }
+    await store.close();
+  },
+);
+
+it("refuses with nothing to retry", async () => {
+  const store = await openStore();
+  await expect(store.retry()).rejects.toMatchObject({ reason: "invalid" });
+  await store.close();
+});
+
+it("exposes an unsupported saved document without replacing history", async () => {
+  const store = await openStore();
+  await store.execute(store.prepare({ type: "start", buyIn: 20000 }));
+  await store.close();
+  const storage = await openRecordingStorage("runtime");
+  const saved = await storage.load();
+  const payload = JSON.parse(saved.payload!);
+  payload.version = 99;
+  const future = JSON.stringify(payload);
+  await storage.commit(saved.revision, future);
+
+  const refused = makeRecordingStore(storage);
+  await expect(refused.ready).rejects.toMatchObject({ reason: "load" });
+  expect(refused.getSnapshot()).toMatchObject({ state: null, status: "load_failed" });
+  expect(await storage.load()).toEqual({ revision: saved.revision + 1, payload: future });
+  await refused.close();
 });

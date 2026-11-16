@@ -1,0 +1,83 @@
+# Signs in, makes a group and a trip from Crew, plays a session in the trip, and finds its result
+# on the trip. Needs MAESTRO_CLERK_SECRET_KEY, the development instance's secret key.
+appId: com.stephencombs.colorup.preview
+name: Sign in and play a trip from Crew
+tags:
+  - account
+onFlowStart:
+  - runScript:
+      file: scripts/create-clerk-user.js
+      env:
+        NAME: Alex
+        CLERK_SECRET_KEY: ${MAESTRO_CLERK_SECRET_KEY}
+onFlowComplete:
+  - runScript:
+      file: scripts/delete-clerk-user.js
+      env:
+        CLERK_SECRET_KEY: ${MAESTRO_CLERK_SECRET_KEY}
+---
+# Amounts follow the device's locale; on iOS this pins it to en-US for the app.
+- launchApp:
+    clearState: true
+    clearKeychain: true
+    arguments:
+      AppleLocale: en_US
+      AppleLanguages: (en)
+- extendedWaitUntil:
+    visible: "Start session"
+    timeout: 60000
+
+# Groups need an account: Crew opens on the welcome until you sign in.
+- tapOn: "Crew"
+- runFlow: subflows/sign-in.yaml
+- extendedWaitUntil:
+    visible: "Start a group for the people you play with"
+    timeout: 60000
+
+- tapOn: "New group"
+# A field's caption and the field share its label, so fields are tapped by id.
+- tapOn:
+    id: "group-name"
+- inputText: "Vegas crew"
+- tapOn: "Create group"
+- extendedWaitUntil:
+    visible: "No trips yet"
+    timeout: 30000
+
+- tapOn: "Start a trip"
+- tapOn:
+    id: "trip-name"
+- inputText: "Vegas weekend"
+- tapOn: "Start trip"
+- tapOn: "Vegas weekend, going"
+
+- tapOn: "Start a session"
+- tapOn: "1"
+- tapOn: "0"
+- tapOn: "0"
+- tapOn:
+    id: "sheet-submit"
+- extendedWaitUntil:
+    visible:
+      id: "live-buy-in"
+      text: "\\$100"
+    timeout: 15000
+
+- tapOn: "Cash out"
+- tapOn: "1"
+- tapOn: "7"
+- tapOn: "0"
+- tapOn:
+    id: "sheet-submit"
+- assertVisible:
+    id: "visit-result"
+    text: "\\+\\$70"
+
+# The trip counts it once the table syncs: back on the trip, the night shows the win.
+- tapOn: "Back to your play"
+- assertVisible: "Vegas weekend"
+- extendedWaitUntil:
+    visible:
+      id: "night-result"
+      text: "You \\+\\$70"
+    timeout: 60000

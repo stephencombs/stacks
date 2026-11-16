@@ -456,6 +456,7 @@ function CreateGroupSheet({ onClose }: { onClose: () => void }) {
     >
       <TextField
         label="Group name"
+        testID="group-name"
         value={name}
         onChangeText={setName}
         placeholder="Vegas crew"

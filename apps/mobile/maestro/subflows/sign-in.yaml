@@ -1,0 +1,30 @@
+# Signs in as output.user through Clerk's hosted pages, from the Crew tab's welcome.
+appId: com.stephencombs.colorup.preview
+---
+- tapOn: "Skip"
+- tapOn: "Sign in"
+# iOS may ask before it opens the sign-in pages in a browser sheet; Android doesn't. Either the
+# prompt or the page comes up first.
+- extendedWaitUntil:
+    visible: "Continue|Email address"
+    timeout: 30000
+- runFlow:
+    when:
+      notVisible: "Email address"
+    commands:
+      - tapOn: "Continue"
+- extendedWaitUntil:
+    visible: "Email address"
+    timeout: 30000
+# The page's caption and its field both read "Email address". Either one focuses the field, so
+# take the first rather than leave the match ambiguous.
+- tapOn:
+    text: "Email address"
+    index: 0
+- inputText: ${output.user.email}
+- tapOn: "Continue"
+- extendedWaitUntil:
+    visible: "Check your email"
+    timeout: 30000
+# The code field has focus, and a full code submits it.
+- inputText: "424242"

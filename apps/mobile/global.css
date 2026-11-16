@@ -7,9 +7,9 @@
   --font-mono: "JetBrainsMono-Medium";
 }
 
-/* The Color Up palette from docs/design/tokens.json. Keep in step with apps/web/src/index.css; its
-   src/design/tokens.test.ts fails when either drifts from the tokens. The theme follows the system
-   unless the You sheet saved a choice; see lib/theme.ts. */
+/* The Color Up palette from docs/design/tokens.json; src/design/tokens.test.ts fails when it drifts
+   from the tokens. Keep in step with apps/web/src/index.css while web lasts. The theme follows the
+   system unless the You sheet saved a choice; see lib/theme.ts. */
 @layer theme {
   :root {
     @variant light {

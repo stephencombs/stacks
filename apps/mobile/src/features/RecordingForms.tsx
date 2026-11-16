@@ -247,6 +247,8 @@ function RecordingSheet({
             variant={submitVariant}
             size="lg"
             haptic
+            // A sheet's title and submit often say the same as the button that opened it.
+            testID="sheet-submit"
             pending={save.pending}
             onPress={onSubmit}
           />
@@ -1267,6 +1269,7 @@ export function JoinSheet({
     >
       <TextField
         label="Your name"
+        testID="join-name"
         hint="Others at the table see it."
         value={name}
         error={nameError}
