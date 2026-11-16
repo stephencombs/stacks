@@ -216,7 +216,7 @@ function Bar({
         <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
           {title}
         </Text>
-        <Text className="font-mono text-xs text-muted">{trailing}</Text>
+        <Text className="tabular-nums text-xs text-muted">{trailing}</Text>
         <Icon name="chevron-right" color="muted" size={16} />
       </GlassSurface>
     </PressableScale>

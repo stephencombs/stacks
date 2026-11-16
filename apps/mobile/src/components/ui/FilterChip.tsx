@@ -74,12 +74,7 @@ export function ChipShell({
   children,
 }: Pick<FilterChipProps<string>, "name" | "applied" | "onClear"> & { children: ReactNode }) {
   return (
-    <View
-      className={cn(
-        "h-11 flex-row items-center rounded-full",
-        applied ? "bg-ink" : "border border-line bg-surface",
-      )}
-    >
+    <View className={cn("h-11 flex-row items-center rounded-full", applied ? "bg-ink" : "bg-fill")}>
       {children}
       {applied ? (
         <Pressable

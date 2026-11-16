@@ -210,7 +210,7 @@ function CasinoRows({
             </Text>
             <Text className="type-footnote text-muted">{row.meta}</Text>
           </View>
-          <Money amount={row.result} currency={currency} tone="result" className="font-semibold" />
+          <Money amount={row.result} currency={currency} tone="result" className="type-number" />
           <Icon name="chevron-right" color="faint" size={16} />
         </Row>
       ))}
@@ -231,7 +231,7 @@ export function Figure({
     <View className="w-1/2 min-w-0 gap-1 pr-2">
       <Text className="type-label text-muted">{label}</Text>
       {children}
-      {sub ? <Text className="type-label text-muted">{sub}</Text> : null}
+      {sub ? <Text className="type-footnote text-muted">{sub}</Text> : null}
     </View>
   );
 }

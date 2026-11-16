@@ -374,7 +374,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
           {quick.error ? <FormError>{quick.error}</FormError> : null}
           {live ? (
             <>
-              <Text className="type-footnote font-medium text-felt-soft">Rebuy</Text>
+              <Text className="type-label text-[13px] text-felt-ink">Rebuy</Text>
               <View
                 className="flex-row gap-2"
                 accessibilityRole="toolbar"
@@ -458,13 +458,17 @@ function Visit({ visitId }: { visitId: VisitId }) {
         </>
       ) : (
         <>
-          <Text accessibilityRole="header" className="type-title text-ink">
+          <Text
+            accessibilityRole="header"
+            className="type-title text-[28px] leading-[34px] text-ink"
+          >
             {own
               ? visitTitle(visit.table)
               : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
           </Text>
           <Text className="type-footnote text-muted">
             {[
+              "Finished",
               visit.venue?.name,
               formatDay(start),
               `${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`,
@@ -666,13 +670,7 @@ function VisitHeader({
   return (
     <View className="flex-row items-center justify-between gap-3">
       <BackButton />
-      {live ? (
-        <LiveClock since={since} />
-      ) : (
-        <Text accessibilityRole="header" className="type-headline text-ink">
-          Finished
-        </Text>
-      )}
+      {live ? <LiveClock since={since} /> : <View className="flex-1" />}
       <ActionSlot actions={actions} onAction={onAction} />
     </View>
   );
@@ -701,21 +699,15 @@ export function BackButton() {
 function LiveHero({ visit, name }: { visit: RecordingVisitView; name?: string | undefined }) {
   const summary = sessionReadout(visit, visit.visit.startedAt);
   return (
-    <View className="items-center gap-3 pt-20">
-      <Text accessibilityRole="header" className="type-body font-medium text-felt-soft">
+    <View className="gap-2.5 px-3 pt-16">
+      <Text accessibilityRole="header" className="type-label text-[13px] text-felt-ink">
         {name ? `${name} · Bought in` : "Bought in"}
       </Text>
-      <Money
-        amount={visit.totals.buyIn}
-        currency={RECORDING_CURRENCY}
-        fit
-        testID="live-buy-in"
-        className="w-full text-center text-7xl leading-[88px] text-felt-ink"
-      />
-      <Text className="mt-3 text-center type-headline text-felt-ink">
+      <BuyInFigure amount={visit.totals.buyIn} />
+      <Text className="type-heading font-medium text-felt-ink">
         {[visitTitle(visit.table), visit.venue?.name].filter(Boolean).join(" · ")}
       </Text>
-      <Text className="text-center type-footnote text-felt-soft">
+      <Text className="type-footnote text-felt-soft">
         Started {formatTime(visit.visit.startedAt)} ·{" "}
         {summary.corrected
           ? "buy-in corrected"
@@ -725,10 +717,27 @@ function LiveHero({ visit, name }: { visit: RecordingVisitView; name?: string | 
   );
 }
 
+/** The live buy-in: whole dollars big, the cents small beside them. */
+function BuyInFigure({ amount }: { amount: MinorUnits }) {
+  const text = formatMoney(amount, RECORDING_CURRENCY, { trailingZeroDisplay: "auto" });
+  const [, whole = text, cents = ""] = /^(.*\d)([.,]\d+\D*)$/.exec(text) ?? [];
+  return (
+    <Text
+      testID="live-buy-in"
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      className="text-[88px] leading-[92px] font-bold tracking-[-3px] text-felt-ink tabular-nums"
+    >
+      {whole}
+      <Text className="text-[36px] font-medium tracking-normal text-felt-soft">{cents}</Text>
+    </Text>
+  );
+}
+
 function VisitHero({ visit }: { visit: RecordingVisitView }) {
   const summary = sessionReadout(visit, visit.visit.finishedAt!);
   return (
-    <View className="gap-5 rounded-2xl bg-surface p-5">
+    <View className="gap-5 rounded-[22px] bg-surface p-4">
       <View className="gap-1">
         <Text className="type-footnote text-muted">Your result</Text>
         <Money
@@ -743,17 +752,25 @@ function VisitHero({ visit }: { visit: RecordingVisitView }) {
       <View className="flex-row gap-4">
         <View className="flex-1 gap-1">
           <Text className="type-footnote text-muted">Bought in</Text>
-          <Money amount={visit.totals.buyIn} currency={RECORDING_CURRENCY} />
+          <Money
+            amount={visit.totals.buyIn}
+            currency={RECORDING_CURRENCY}
+            className="type-number"
+          />
         </View>
         <View className="flex-1 gap-1">
           <Text className="type-footnote text-muted">Cashed out</Text>
-          <Money amount={visit.totals.cashOut} currency={RECORDING_CURRENCY} />
+          <Money
+            amount={visit.totals.cashOut}
+            currency={RECORDING_CURRENCY}
+            className="type-number"
+          />
         </View>
       </View>
       <View className="flex-row gap-4">
         <View className="flex-1 gap-1">
           <Text className="type-footnote text-muted">Duration</Text>
-          <Text className="type-body text-ink tabular-nums">
+          <Text className="type-number text-ink">
             {formatDuration(visit.visit.startedAt, visit.visit.finishedAt!)}
           </Text>
         </View>
@@ -762,7 +779,7 @@ function VisitHero({ visit }: { visit: RecordingVisitView }) {
           {summary.hourly === null ? (
             <Text className="text-muted">—</Text>
           ) : (
-            <Text>
+            <Text className="type-number">
               <Money
                 amount={MinorUnits.make(summary.hourly)}
                 currency={RECORDING_CURRENCY}
@@ -868,7 +885,7 @@ function History({
               <Money
                 amount={item.amount}
                 currency={RECORDING_CURRENCY}
-                className={voided ? "text-muted line-through" : "font-semibold"}
+                className={voided ? "type-number text-muted line-through" : "type-number"}
               />
             </Row>
           );
@@ -925,7 +942,7 @@ function EntryInspector({
           <Money
             amount={entry.amount}
             currency={RECORDING_CURRENCY}
-            className={cn("text-base", voided && "line-through")}
+            className={cn("type-number", voided && "line-through")}
           />
         </Detail>
         <Detail label="Time">

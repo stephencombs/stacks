@@ -46,7 +46,7 @@ export function TripHero({
   const end = { x: plot.x(mine.line.length - 1), y: plot.y(mine.line.at(-1)!) };
 
   return (
-    <View onLayout={onLayout} className="overflow-hidden rounded-2xl border border-line bg-surface">
+    <View onLayout={onLayout} className="overflow-hidden rounded-[22px] bg-surface">
       <View className="px-5 pt-5">
         <View className="flex-row items-baseline justify-between">
           <Text accessibilityRole="header" className="type-label text-muted">

@@ -167,7 +167,7 @@ export function EntrySheet({
             adjustsFontSizeToFit
             numberOfLines={1}
             style={{ lineHeight: 72 }}
-            className={cn("font-mono text-6xl", amount ? "text-ink" : "text-faint")}
+            className={cn("font-bold tabular-nums text-6xl", amount ? "text-ink" : "text-faint")}
           >
             {value === null
               ? amount || formatMoney(MinorUnits.make(0), currency)

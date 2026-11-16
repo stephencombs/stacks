@@ -105,14 +105,14 @@ function KeypadAmount({
             amount={parsed.amount}
             currency={RECORDING_CURRENCY}
             fit
-            className="text-6xl leading-[72px]"
+            className="text-[52px] leading-[58px] font-bold tracking-[-1px]"
           />
         ) : (
           <Text
             numberOfLines={1}
             adjustsFontSizeToFit
             className={cn(
-              "font-mono text-6xl leading-[72px]",
+              "text-[52px] leading-[58px] font-bold tracking-[-1px] tabular-nums",
               amount.text ? "text-ink" : "text-faint",
             )}
           >
@@ -153,7 +153,7 @@ function TypedAmount({ label, amount }: { label: string; amount: Amount }) {
       autoComplete="off"
       autoCorrect={false}
       className="flex-1"
-      inputClassName="font-mono"
+      inputClassName="tabular-nums"
     />
   );
 }

@@ -121,38 +121,47 @@
   }
 }
 
-/* Type roles, the same names as apps/web/src/index.css. Text doesn't inherit color here: pair each
-   with text-ink or another palette color. */
+/* Type roles, from the type styles in docs/design/tokens.json. Money and text both use the system
+   face (SF Pro on iOS, Roboto on Android): money with tabular figures, and no mono or condensed face
+   outside the wordmark. Text doesn't inherit color here: pair each with text-ink or another color. */
+/* money-hero: the one figure a screen is about. */
 @utility type-hero {
-  @apply font-sans text-[38px] leading-[41px] font-semibold tracking-[-1px] tabular-nums;
+  @apply font-sans text-[44px] leading-[46px] font-bold tracking-[-1px] tabular-nums;
 }
+/* title: a card's heading, a profile name, a sheet with a big subject. */
 @utility type-title {
-  @apply font-sans text-[28px] leading-[32px] font-bold tracking-[-0.7px];
+  @apply font-sans text-[22px] leading-[28px] font-bold;
 }
+/* title-large: a pushed page's own title. Tab roots have none. */
 @utility type-headline {
-  @apply font-sans text-[32px] leading-[36px] font-bold tracking-[-0.8px];
+  @apply font-sans text-[34px] leading-[41px] font-bold tracking-[-0.5px];
 }
+/* headline: row titles, sheet titles, navigation titles. */
 @utility type-heading {
-  @apply font-sans text-[17px] leading-[22px] font-semibold tracking-[-0.25px];
+  @apply font-sans text-[17px] leading-[22px] font-semibold;
 }
 @utility type-body {
-  @apply text-[17px] leading-[24px];
+  @apply text-[17px] leading-[23px];
 }
 @utility type-callout {
-  @apply text-[15px] leading-[20px] font-medium;
+  @apply text-[15px] leading-[20px];
 }
+/* A section's title over a list, beside its count or link. */
 @utility type-section {
   @apply text-[13px] leading-[18px] font-medium;
 }
 @utility type-footnote {
   @apply text-[13px] leading-[18px] tabular-nums;
 }
+/* label: the uppercase stat label over a figure. */
 @utility type-label {
-  @apply text-[12px] leading-[16px] font-medium tabular-nums;
+  @apply text-[11px] leading-[14px] font-semibold tracking-[0.6px] uppercase tabular-nums;
 }
+/* money-row: the amount at the end of a session or player row. */
 @utility type-number {
-  @apply text-[16px] leading-[22px] font-semibold tabular-nums;
+  @apply text-[17px] leading-[22px] font-semibold tabular-nums;
 }
+/* money-lg: a stat card's figure. */
 @utility type-number-lg {
-  @apply text-[20px] leading-[26px] font-semibold tabular-nums;
+  @apply text-[28px] leading-[31px] font-bold tracking-[-0.5px] tabular-nums;
 }

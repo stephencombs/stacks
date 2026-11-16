@@ -13,7 +13,7 @@ tags:
       AppleLocale: en_US
       AppleLanguages: (en)
 - extendedWaitUntil:
-    visible: "Start session|Start or add a session"
+    visible: "Start or add a session"
     timeout: 60000
 - runFlow: subflows/start-session.yaml
 - tapOn: "2"
@@ -24,7 +24,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "live-buy-in"
-      text: "\\$200"
+      text: "\\$200\\.00"
     timeout: 10000
 
 - tapOn: "Table actions"
@@ -54,7 +54,7 @@ tags:
       AppleLocale: en_US
       AppleLanguages: (en)
 - extendedWaitUntil:
-    visible: "Start session|Start or add a session"
+    visible: "Start or add a session"
     timeout: 60000
 - openLink: ${output.link}
 # iOS may ask before a link opens an app.
@@ -86,5 +86,5 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "live-buy-in"
-      text: "\\$100"
+      text: "\\$100\\.00"
     timeout: 15000

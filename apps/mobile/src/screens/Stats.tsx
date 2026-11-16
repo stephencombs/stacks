@@ -277,7 +277,7 @@ function Breakdown({
 }) {
   return (
     <>
-      <View className="gap-2 rounded-2xl border border-line bg-surface p-4">
+      <View className="gap-2 rounded-[22px] bg-surface p-4">
         <Text className="type-label text-muted">{view.title}</Text>
         <Money
           amount={view.result}
@@ -331,7 +331,7 @@ function Breakdown({
                   amount={row.result}
                   currency={RECORDING_CURRENCY}
                   tone="result"
-                  className="font-semibold"
+                  className="type-number"
                 />
               </Row>
             ))}

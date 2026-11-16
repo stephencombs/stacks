@@ -23,7 +23,7 @@ A personal session lives at `/play/:visitId`. While it's live it fills the scree
 
 Deleting asks first, then voids every entry of your visit and hides it, with an undo. It works on your own visits, live or finished; on a shared table it removes only your visit.
 
-While a session is live, or a table you record for everyone at has players and none of them is you, one LiveBar floats above the tabs, and tapping it returns there. On Play it sits in the action bar, above Start session. With several live sessions, such as one you record for a second player, the bar names the newest with "+1 live" and opens a list to pick from. A session's own page shows the bar above its dock only when another session is live, and then it refers to the others. A live session never shows as a list on a tab.
+While a session is live, or a table you record for everyone at has players and none of them is you, one LiveBar floats above the tabs, and tapping it returns there. On Play it floats above the tabs, under the `+` button. With several live sessions, such as one you record for a second player, the bar names the newest with "+1 live" and opens a list to pick from. A session's own page shows the bar above its dock only when another session is live, and then it refers to the others. A live session never shows as a list on a tab.
 
 ## Shared tables
 

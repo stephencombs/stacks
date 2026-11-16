@@ -93,7 +93,7 @@ A place can open on one hero card: the figure that place exists to show, big eno
 
 One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure.
 
-On web, a hero is a `Surface` with `Glow` inside it in the tone of the figure (`win`, `loss`, `ink`, or `felt` while live). On mobile, hero cards are **glow-free** `rounded-2xl bg-surface p-5` cards (`emil-unslop-design`: no decorative radial `Glow` blobs behind the figure). A sentence-case `type-label text-muted` kicker (`Net bankroll`, `Trip total`) sits over the `type-hero` `Money` figure (`36px–40px` `tabular-nums`), followed by a `type-footnote text-muted` subtitle (`Across 14 sessions`), the clean chart (`rx={4}` rounded-cap vertical session bars or running `RaceChart` lines), bottom-corner date range labels (`Oct 11` … `Nov 9`), and an inline color-dot legend along the bottom edge. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`) so both clients say the same thing.
+On web, a hero is a `Surface` with `Glow` inside it in the tone of the figure (`win`, `loss`, `ink`, or `felt` while live). On mobile, hero cards are **glow-free** `rounded-[22px] bg-surface p-4` cards with no border (`emil-unslop-design`: no decorative radial `Glow` blobs behind the figure). An uppercase `type-label text-muted` kicker (`RESULT · ALL TIME`, `TRIP TOTAL`) sits over the `type-hero` `Money` figure (`money-hero`, 44px), followed by a `type-footnote text-muted` subtitle (`Across 14 sessions`), the clean chart (`rx={4}` rounded-cap vertical session bars or running `RaceChart` lines), bottom-corner date range labels (`Oct 11` … `Nov 9`), and an inline color-dot legend along the bottom edge. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`) so both clients say the same thing.
 
 ## Charts
 
@@ -127,7 +127,7 @@ One page title per page. On web that's `PageHeader`, which also takes the `back`
 
 Each group of content is a `Section` on web (`title`, plus an `action` or a quiet `aside`) and a `SectionHeading` on mobile (`components/ui/Surface.tsx`). Mobile `SectionHeading` has two variants:
 
-1. **Grouped Card Header (`SectionHeading`)**: Sentence-case `type-section text-muted` label sitting above a `rounded-2xl` `Surface` card (`Standings`, `By game`, `People`).
+1. **Grouped Card Header (`SectionHeading`)**: Sentence-case `type-section text-muted` label over a borderless `rounded-[22px]` `Surface` card (`Recent sessions`, `People`), with its count or a link such as See all at the right. No rule beside it.
 2. **Inline-Rule Header (`AccordionSectionHeading`)**: Sentence-case `type-section text-muted` label (with optional count, e.g. `Finished (16)`) followed by a `flex-1 h-[0.5px] bg-line` horizontal separator rule and optional collapse chevron for collapsible feed sections.
 
 A section's action is a `ghost` or `sm` button or a `Segmented`. Supporting text on web is `Note`.

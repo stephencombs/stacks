@@ -158,7 +158,7 @@ export function Race<S extends RaceSession>({
         >
           <Text className="text-xl font-semibold text-ink">{headline}</Text>
           {lead === null ? null : (
-            <Text className="font-mono text-3xl leading-10 text-win">{lead}</Text>
+            <Text className="tabular-nums text-3xl leading-10 text-win">{lead}</Text>
           )}
         </View>
         <Text className="text-sm text-muted">

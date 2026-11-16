@@ -8,7 +8,7 @@ Keep React Navigation native-stack. Both use the native bottom tab navigator: SF
 
 Use native iOS header items for Groups and You. Related items may share the system glass background. Keep the header transparent, with a centred native glass title capsule instead of a large body heading. The title expands into a popover with its full title and context; group destination titles open the group/trip selection sheet. Scope is never the back action.
 
-The live-session return strip and bottom actions float above content without a full-width background or divider. Scroll content must reserve their measured height as well as the tab bar, so the final row remains reachable. Only the individual controls carry a surface. On Android, Play's actions are a Material FAB (56dp, 16dp corners, ink) at the right gutter, floating above the live bar. It opens the system menu with Start session and Add past session; iOS and web keep the dock.
+The live-session return strip and bottom actions float above content without a full-width background or divider. Scroll content must reserve their measured height as well as the tab bar, so the final row remains reachable. Only the individual controls carry a surface. Play's actions sit behind one `+` button at the right gutter, floating above the live bar, which opens the system menu with Start session and Add past session: a round glass button on iOS, and Material's FAB (56dp, 16dp corners, ink) on Android.
 
 ## Selection and forms
 

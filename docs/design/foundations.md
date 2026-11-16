@@ -44,7 +44,7 @@ The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame
 
 ## Type
 
-`tokens.json` names the type styles. Money styles use its `display` family (SF Pro Display, falling back to the system sans) with tabular figures; text styles use `sans`. Neither is Barlow Condensed, which belongs to the wordmark and the web page title; web hero figures still use it until their screens move to `money-hero`.
+`tokens.json` names the type styles. Money styles use its `display` family and text styles use `sans`. On mobile both are the system face (SF Pro on iOS, Roboto on Android), money with tabular figures. No mono face, and no Barlow Condensed outside the wordmark.
 
 | Style         | Use it for                                                                         |
 | ------------- | ---------------------------------------------------------------------------------- |
@@ -62,7 +62,7 @@ The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame
 
 The clock on a live session stays small, in the LIVE pill; the big number is the amount.
 
-In code, a style is a `type-*` utility in both CSS files. Web defines `type-title` (the page title, condensed uppercase) and `type-callout`; mobile defines the rest of its roles (`type-hero`, `type-title`, `type-heading`, `type-body`, `type-section`, `type-footnote`, `type-label`, `type-number`). When a screen moves to a token style that has no utility yet, add it to both files under the token's name with the token's size, weight and tracking.
+In code, a style is a `type-*` utility in both CSS files, at the token's size, weight and tracking. Mobile's names: `type-hero` is `money-hero`, `type-number-lg` `money-lg`, `type-number` `money-row`, `type-headline` `title-large`, `type-title` `title`, `type-heading` `headline`, and `type-body`, `type-callout`, `type-footnote` and `type-label` keep the token's name. `type-section` is a list's title, 13px medium. The live amount is drawn on the live screen itself.
 
 - Amounts are `Money` with a weight or size beside it. Never give `Money` a text color; its `tone` picks one.
 - Don't add `text-*` sizes, `leading-*` or `tracking-*` beside a `type-*` role, because they fight over the same properties. Color is fine, and mobile needs it: `type-title text-ink`.

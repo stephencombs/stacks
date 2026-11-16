@@ -21,7 +21,7 @@ import { Button } from "./components/ui/Button";
 import { HeaderTitle } from "./components/ui/HeaderTitle";
 import { TabBarHeight } from "./components/ui/Screen";
 import { Landing } from "./features/Landing";
-import { PersonalYouButton } from "./features/Personal";
+import { PersonalYouButton, PlayBrand } from "./features/Personal";
 import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./features/PlaceTabs";
 import { YouButton } from "./features/You";
 import { AccountProvider, useAccount } from "./lib/account";
@@ -67,7 +67,9 @@ const crewOptions = { ...headerOptions, headerRight: () => <YouButton /> };
 
 const PlayStack = createNativeStackNavigator({
   screenOptions: personalOptions,
-  screens: { Home: { screen: HomeScreen, linking: "" } },
+  screens: {
+    Home: { screen: HomeScreen, linking: "", options: { headerLeft: () => <PlayBrand /> } },
+  },
 });
 
 const StatsStack = createNativeStackNavigator({

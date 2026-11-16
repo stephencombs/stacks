@@ -363,6 +363,7 @@ it("keeps deleted visits at their month end, outside Play, table and history tot
   const [month] = recordingMonths(home);
   expect(month!.count).toBe(1);
   expect(month!.result).toBe(-5000);
+  expect(month!.minutes).toBe(60);
   expect(month!.visits.map((item) => item.visit.id)).toEqual([visible, deleted]);
   await store.close();
 });

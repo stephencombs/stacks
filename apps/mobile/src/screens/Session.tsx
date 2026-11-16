@@ -508,7 +508,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                   const actionable = live && !item.saving && !voided && canVoid(item.entry);
                   const content = (
                     <>
-                      <Text numberOfLines={1} className="w-20 font-mono text-xs text-muted">
+                      <Text numberOfLines={1} className="w-20 tabular-nums text-xs text-muted">
                         {formatTime(entry.occurredAt)}
                       </Text>
                       <View className="flex-1 gap-0.5">
@@ -814,7 +814,7 @@ function CashOutField({
           invalid && "border-loss",
         )}
       >
-        <Text className={cn("font-mono type-body", value ? "text-ink" : "text-muted")}>
+        <Text className={cn("tabular-nums type-body", value ? "text-ink" : "text-muted")}>
           {value || "0 if they busted"}
         </Text>
       </Pressable>
@@ -1035,7 +1035,7 @@ function TicketStub({
           { label: "Out", value: <Money amount={cashOut} currency={currency} /> },
         ];
   return (
-    <View className="flex-row overflow-hidden rounded-2xl border border-line bg-surface">
+    <View className="flex-row overflow-hidden rounded-[22px] bg-surface">
       {cells.map((cell, index) => (
         <View
           key={cell.label}

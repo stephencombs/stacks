@@ -28,7 +28,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "live-buy-in"
-      text: "\\$200"
+      text: "\\$200\\.00"
     timeout: 10000
 
 - tapOn: "Other"
@@ -40,7 +40,7 @@ tags:
 - assertVisible: "Rebuy of \\$100 recorded\\."
 - assertVisible:
     id: "live-buy-in"
-    text: "\\$300"
+    text: "\\$300\\.00"
 
 # Saved on the device: a cold start comes back to the same live session.
 - stopApp
@@ -55,7 +55,7 @@ tags:
       - tapOn: "Back to your session, Session, .*"
 - assertVisible:
     id: "live-buy-in"
-    text: "\\$300"
+    text: "\\$300\\.00"
 
 - tapOn: "Cash out"
 - tapOn: "4"
@@ -67,7 +67,6 @@ tags:
 - assertVisible:
     id: "visit-result"
     text: "\\+\\$150"
-- assertVisible: "Saved on this device"
 
 - tapOn: "Back to your play"
 - assertNotVisible: "Back to your session.*"

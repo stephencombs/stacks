@@ -22,6 +22,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  User,
   UserPlus,
   Users,
   X,
@@ -53,6 +54,7 @@ const icons = {
   download: Download,
   sparkles: Sparkles,
   "add-person": UserPlus,
+  person: User,
   share: Share2,
   trash: Trash2,
 };

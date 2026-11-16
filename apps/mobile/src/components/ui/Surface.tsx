@@ -8,18 +8,14 @@ import { HeaderTitle } from "./HeaderTitle";
 
 export function Surface({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <View className={cn("overflow-hidden rounded-2xl border border-line bg-surface", className)}>
-      {children}
-    </View>
+    <View className={cn("overflow-hidden rounded-[22px] bg-surface", className)}>{children}</View>
   );
 }
 
 /** @public */
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <View
-      className={cn("overflow-hidden rounded-2xl border border-line bg-surface p-4", className)}
-    >
+    <View className={cn("overflow-hidden rounded-[22px] bg-surface p-4", className)}>
       {children}
     </View>
   );
@@ -131,11 +127,19 @@ export function SectionHeading({
   onToggle?: () => void;
 }) {
   const content = (
-    <View className="min-h-7 flex-row items-center gap-2 py-1">
-      <Text accessibilityRole="header" className="type-section text-muted">
-        {count !== undefined ? `${children} (${count})` : children}
+    <View className="min-h-7 flex-row items-center gap-2 px-1 py-1">
+      <Text
+        accessibilityRole="header"
+        accessibilityLabel={count !== undefined ? `${children}, ${count}` : undefined}
+        className="flex-1 type-section text-muted"
+      >
+        {children}
       </Text>
-      <View className="h-px flex-1 bg-line" />
+      {count !== undefined ? (
+        <Text importantForAccessibility="no" className="type-section text-muted">
+          {count}
+        </Text>
+      ) : null}
       {action}
       {collapsible ? (
         <Icon name={collapsed ? "chevron-right" : "chevron-down"} color="muted" size={14} />
@@ -213,7 +217,7 @@ export function EmptyState({
 }) {
   if (centered) {
     return (
-      <View className="items-center gap-2 rounded-2xl border border-line bg-surface p-6 text-center">
+      <View className="items-center gap-2 rounded-[22px] bg-surface p-6 text-center">
         <Text className="text-center text-[19px] font-bold text-ink">{title}</Text>
         {children ? <Text className="text-center type-callout text-muted">{children}</Text> : null}
         {action}

@@ -1,14 +1,15 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Pressable } from "react-native";
 import { Button, IconButton } from "./Button";
+import { GlassSurface } from "./GlassSurface";
 import { Icon, type IconName } from "./Icon";
 import { Sheet } from "./Sheet";
 
 export type ActionMenuProps = {
   label: string;
   disabled?: boolean;
-  /** What opens the menu, in place of the "…" button: a floating action button. */
-  trigger?: ReactNode;
+  /** Opens from a floating "+" button, a screen's main way to add, instead of the "…" button. */
+  fab?: boolean;
   actions: ReadonlyArray<{
     label: string;
     icon?: IconName;
@@ -18,11 +19,11 @@ export type ActionMenuProps = {
   }>;
 };
 
-export function ActionMenu({ label, actions, disabled = false, trigger }: ActionMenuProps) {
+export function ActionMenu({ label, actions, disabled = false, fab = false }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      {trigger ? (
+      {fab ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={label}
@@ -30,7 +31,9 @@ export function ActionMenu({ label, actions, disabled = false, trigger }: Action
           disabled={disabled}
           onPress={() => setOpen(true)}
         >
-          {trigger}
+          <GlassSurface className="size-14 items-center justify-center rounded-full">
+            <Icon name="plus" color="ink" size={26} />
+          </GlassSurface>
         </Pressable>
       ) : (
         <IconButton
