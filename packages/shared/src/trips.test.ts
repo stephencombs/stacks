@@ -157,13 +157,18 @@ describe("tripStandings", () => {
         ),
       );
       const standings = tripStandings(sessions, clock);
-      expect(standings.map((s) => s.rank)).toEqual(standings.map((_, i) => i + 1));
+      expect(standings.map((s) => s.rank)).toEqual(
+        standings.map((s) => 1 + standings.filter((other) => other.net > s.net).length),
+      );
       expect(standings.reduce((sum, s) => sum + s.net, 0)).toBe(
         table.flat().reduce((a, b) => a + b, 0),
       );
       for (let i = 1; i < standings.length; i++)
         expect(standings[i - 1]!.net).toBeGreaterThanOrEqual(standings[i]!.net);
-      expect(standings.reduce((sum, s) => sum + s.moved, 0)).toBeLessThanOrEqual(0);
+      for (const s of standings) {
+        expect(s.rank + s.moved).toBeGreaterThanOrEqual(1);
+        expect(s.rank + s.moved).toBeLessThanOrEqual(standings.length);
+      }
     },
   );
 });
