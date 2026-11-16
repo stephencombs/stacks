@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { Icon } from "./Icon";
 import type { ActionMenuProps } from "./ActionMenu";
 
-export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps) {
+export function ActionMenu({ label, actions, disabled = false, trigger }: ActionMenuProps) {
   return (
     <MenuView
       actions={actions.map((action, index) => ({
@@ -18,9 +18,9 @@ export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps
         accessibilityLabel={label}
         accessibilityRole="button"
         accessibilityState={{ disabled }}
-        className="size-11 items-center justify-center rounded-full bg-fill"
+        className={trigger ? undefined : "size-11 items-center justify-center rounded-full bg-fill"}
       >
-        <Icon name="more" color="ink" size={20} />
+        {trigger ?? <Icon name="more" color="ink" size={20} />}
       </View>
     </MenuView>
   );

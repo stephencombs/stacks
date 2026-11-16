@@ -20,6 +20,9 @@ import { SignInButton } from "./SignInButton";
 import { PersonalLiveBar } from "./LiveBar";
 import { useNativeHeaderActions } from "./NativeHeaderActions";
 
+/** The 56px floating action button and the 16px around it, which the list scrolls clear of. */
+const FAB_ROOM = 88;
+
 /**
  * A screen of your own play: it scrolls under the header, and its main actions sit in a dock
  * within thumb reach above the tab bar or the home indicator, stacked unless the caller puts them
@@ -29,12 +32,15 @@ import { useNativeHeaderActions } from "./NativeHeaderActions";
 export function PersonalScreen({
   children,
   dock,
+  fab,
   live = false,
   felt = false,
   session = false,
 }: {
   children: ReactNode;
   dock?: ReactNode;
+  /** A floating action button, bottom right above the live bar: Android's stand-in for the dock. */
+  fab?: ReactNode;
   live?: boolean;
   felt?: boolean;
   session?: boolean;
@@ -63,8 +69,22 @@ export function PersonalScreen({
         }}
       >
         {children}
-        <View style={{ height: (dock ? dockHeight : bar) + liveBarHeight }} />
+        <View
+          style={{ height: (dock ? dockHeight : bar) + liveBarHeight + (fab ? FAB_ROOM : 0) }}
+        />
       </ScrollView>
+      {fab ? (
+        <View
+          pointerEvents="box-none"
+          className="absolute"
+          style={{
+            right: sides.paddingRight,
+            bottom: bar + (liveBarHeight > 0 ? liveBarHeight + 8 : 0) + 16,
+          }}
+        >
+          {fab}
+        </View>
+      ) : null}
       {dock ? (
         <View
           pointerEvents="box-none"

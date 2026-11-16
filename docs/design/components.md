@@ -177,7 +177,7 @@ A page-level destructive action, like deleting a trip, goes in the menu and open
 
 ## GlassSurface (mobile), glass (web)
 
-The one way to draw glass. Use it only on the parts [Glass](foundations.md#glass) lists. On web it's the `glass` or `glass-sheet` class on the part's own element. On mobile wrap the content in `GlassSurface`, inside a `PressableScale` when the whole surface is a control, and pass `interactive` so iOS glass answers the touch. On Android `GlassSurface` is a solid `fill` with a shadow, and a round icon control's surface is `ControlSurface`, a filled tonal circle.
+The one way to draw glass. Use it only on the parts [Glass](foundations.md#glass) lists. On web it's the `glass` or `glass-sheet` class on the part's own element. On mobile wrap the content in `GlassSurface`, inside a `PressableScale` when the whole surface is a control, and pass `interactive` so iOS glass answers the touch. On Android `GlassSurface` is a solid `raised` surface with a shadow, and a round icon control's surface is `ControlSurface`, a filled tonal circle.
 
 ## Toast (mobile), Undo bar (web)
 

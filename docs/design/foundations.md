@@ -114,7 +114,7 @@ Is this glass?
 
 - On web, glass is the `glass` utility (a floating thing) or `glass-sheet` (a sheet, whose shadow falls upward): the `glass` token as a translucent fill, a backdrop blur, a bright top edge and the shadow. Under `prefers-reduced-transparency` it becomes a plain `surface` card.
 - On mobile, glass is `GlassSurface`. iOS 26 draws the native material, and its `interactive` prop lets glass that is itself a control answer a touch. Earlier iOS draws the `glass` token as a translucent fill with an edge and a shadow. With Reduce Transparency on, iOS draws a solid card.
-- Android has no glass, so it doesn't imitate it: `GlassSurface` is a solid `fill`, a tone above the cards, with a shadow, and round icon controls are filled tonal circles, as in Material.
+- Android has no glass, so it doesn't imitate it: `GlassSurface` is a solid `raised` surface, a step above the cards, with a shadow, and round icon controls are filled tonal circles, as in Material.
 - Give `GlassSurface` its rounding both as a class and as `radius`, which is what the native material uses.
 - Don't fade a native glass surface: iOS stops drawing glass at low opacity. Move it with transform instead.
 - Mobile sheets and menus are the system's own, which bring their own material.

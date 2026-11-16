@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { Pressable } from "react-native";
 import { Button, IconButton } from "./Button";
 import { Icon, type IconName } from "./Icon";
 import { Sheet } from "./Sheet";
@@ -6,6 +7,8 @@ import { Sheet } from "./Sheet";
 export type ActionMenuProps = {
   label: string;
   disabled?: boolean;
+  /** What opens the menu, in place of the "…" button: a floating action button. */
+  trigger?: ReactNode;
   actions: ReadonlyArray<{
     label: string;
     icon?: IconName;
@@ -15,16 +18,28 @@ export type ActionMenuProps = {
   }>;
 };
 
-export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps) {
+export function ActionMenu({ label, actions, disabled = false, trigger }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <IconButton
-        accessibilityLabel={label}
-        disabled={disabled}
-        icon={<Icon name="more" color="ink" size={20} />}
-        onPress={() => setOpen(true)}
-      />
+      {trigger ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityState={{ disabled }}
+          disabled={disabled}
+          onPress={() => setOpen(true)}
+        >
+          {trigger}
+        </Pressable>
+      ) : (
+        <IconButton
+          accessibilityLabel={label}
+          disabled={disabled}
+          icon={<Icon name="more" color="ink" size={20} />}
+          onPress={() => setOpen(true)}
+        />
+      )}
       {open ? (
         <Sheet open title={label} onClose={() => setOpen(false)}>
           {actions.map((action) => (

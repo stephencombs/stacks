@@ -9,10 +9,12 @@ import {
 import type { MinorUnits, VisitId } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
+import { ActionMenu } from "../components/ui/ActionMenu";
 import { Button } from "../components/ui/Button";
+import { Icon } from "../components/ui/Icon";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet, StartSheet } from "../features/RecordingForms";
@@ -37,28 +39,49 @@ export function HomeScreen() {
     open(visitId);
   };
   const playing = (home?.active.length ?? 0) > 0;
+  const android = Platform.OS === "android";
   return (
     <PersonalScreen
       live
-      dock={
-        <>
-          <Button
-            label="Start session"
-            variant={playing ? "secondary" : "primary"}
-            size="lg"
-            haptic
-            disabled={home === null}
-            onPress={() => setSheet("start")}
-          />
-          <Button
-            label="Add past session"
-            variant="ghost"
-            size="lg"
-            disabled={home === null}
-            onPress={() => setSheet("past")}
-          />
-        </>
-      }
+      {...(android
+        ? {
+            fab: (
+              <ActionMenu
+                label="Start or add a session"
+                disabled={home === null}
+                trigger={
+                  <View className="size-14 items-center justify-center rounded-2xl bg-ink shadow-lg">
+                    <Icon name="plus" color="ink-inverse" size={28} />
+                  </View>
+                }
+                actions={[
+                  { label: "Start session", onPress: () => setSheet("start") },
+                  { label: "Add past session", onPress: () => setSheet("past") },
+                ]}
+              />
+            ),
+          }
+        : {
+            dock: (
+              <>
+                <Button
+                  label="Start session"
+                  variant={playing ? "secondary" : "primary"}
+                  size="lg"
+                  haptic
+                  disabled={home === null}
+                  onPress={() => setSheet("start")}
+                />
+                <Button
+                  label="Add past session"
+                  variant="ghost"
+                  size="lg"
+                  disabled={home === null}
+                  onPress={() => setSheet("past")}
+                />
+              </>
+            ),
+          })}
     >
       <View className="gap-2">
         <SaveStatus status={status} error={error} onRetry={retryLoad} />
