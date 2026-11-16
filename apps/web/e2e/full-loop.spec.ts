@@ -61,9 +61,7 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByRole("heading", { name: "Vegas crew" })).toBeVisible();
     await expect(alex).toHaveTitle("Vegas crew · Color Up");
 
-    // Alex invites Bea and adds Gus as a guest.
-    await alex.getByRole("link", { name: /^1 member/ }).click();
-    await expect(alex).toHaveTitle("People · Vegas crew · Color Up");
+    // Alex invites Bea and adds Gus as a guest, from the group's own page.
     await alex.getByRole("button", { name: "New invite link" }).click();
     const inviteLink = (await alex.getByText(/\/join\//).textContent())!;
     await alex.getByRole("button", { name: "Add a guest" }).click();
@@ -83,7 +81,6 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByText("Make a link and send it", { exact: false })).toBeVisible();
 
     // Alex starts the group's first trip, then a session in it at a venue he adds.
-    await alex.getByRole("link", { name: "Vegas crew" }).click();
     await alex.getByLabel("Trip name").fill("Vegas weekend");
     await alex.getByRole("button", { name: "Start trip" }).click();
     await expect(alex.getByRole("heading", { name: "Start a session" })).toBeVisible();
@@ -160,10 +157,12 @@ test.describe.serial("a group's first night out", () => {
       .click();
     await expect(alex.getByText("Voided by Alex: Undone")).toBeVisible();
     await expect(gus).toContainText("In $100");
-    // The trip's board is a step back from the table, and the table stays in reach from there.
+    // The trip is a step back from the table, and the table stays in reach from there. Its Board
+    // has no link while it moves into Stats (spec 011), so the test opens it by its address.
     const toBoard = async () => {
       await alex.getByRole("link", { name: "Vegas weekend" }).first().click();
-      await alex.getByRole("link", { name: "Board", exact: true }).click();
+      await alex.waitForURL(/\/trips\/[^/]+$/);
+      await alex.goto(`${new URL(alex.url()).pathname}/board`);
     };
     await toBoard();
     await expect(alex.getByText("Nothing on the board yet")).toBeVisible();
@@ -218,19 +217,6 @@ test.describe.serial("a group's first night out", () => {
     await expect(alex.getByRole("heading", { name: /^Day 1 · / })).toBeVisible();
     await shoot(alex, "trip-sessions");
 
-    // Alex backs Bea; the stake stays listed until it's voided.
-    await alex.getByRole("button", { name: "Back a player" }).click();
-    await alex.getByLabel("Who's playing it").selectOption({ label: "Bea" });
-    await alex.getByLabel("Amount").fill("100");
-    await alex.getByRole("button", { name: "Back them" }).click();
-    await expect(alex.getByText("Alex backed Bea $100 · 50% of winnings")).toBeVisible();
-    await expect(alex.getByText("Bea is even · owes back $100")).toBeVisible();
-    await shoot(alex, "backing");
-    await alex.getByRole("button", { name: /^Actions for Alex backed Bea/ }).click();
-    await alex.getByRole("menuitem", { name: "Void" }).click();
-    await alex.getByRole("button", { name: "Void stake" }).click();
-    await expect(alex.getByText("Voided")).toBeVisible();
-
     // The trip ends and reopens from its Sessions; a trip with nothing in it can be deleted.
     await alex.getByRole("button", { name: "Actions for Vegas weekend" }).click();
     await alex.getByRole("menuitem", { name: "End trip" }).click();
@@ -249,11 +235,7 @@ test.describe.serial("a group's first night out", () => {
     await shoot(alex, "group-home");
 
     // The board's All time races every trip; the stat sheet opens on you, and anyone else is a tap away.
-    await alex
-      .getByRole("link", { name: /^Vegas weekend/ })
-      .first()
-      .click();
-    await alex.getByRole("link", { name: "Board", exact: true }).click();
+    await toBoard();
     await alex.getByRole("button", { name: "All time" }).click();
     await expect(alex).toHaveURL(/scope=all/);
     await expect(alex.getByRole("cell", { name: "Craps" })).toBeVisible();

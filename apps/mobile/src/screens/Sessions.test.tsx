@@ -46,10 +46,9 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   vi.doMock("@react-navigation/native", () => ({ useNavigation: () => ({ navigate }) }));
   vi.doMock("react-native", () => ({ View: Container, Text: Container }));
-  vi.doMock("../lib/go", () => ({ useGo: () => ({ newSession: vi.fn() }) }));
+  vi.doMock("../lib/go", () => ({ useGo: () => ({ stats: vi.fn() }) }));
   vi.doMock("../lib/scope", () => ({
     usePlaceAddress: () => {},
-    useScope: () => ({ scope: { trip: trip.trip, item: {} } }),
     ScopeLoaded: ({ children }: { children: (scope: { trip: TripDetail["trip"] }) => ReactNode }) =>
       children({ trip: trip.trip }),
   }));
@@ -88,11 +87,7 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
     ReopenTrip: () => null,
     TripOptionsButton: () => null,
   }));
-  vi.doMock("../features/SessionList", () => ({
-    LiveSessionCard: () => null,
-    SessionList: () => null,
-  }));
-  vi.doMock("../features/Backing", () => ({ BackingSection: () => null }));
+  vi.doMock("../features/SessionList", () => ({ SessionList: () => null }));
   const visitId = VisitId.make(crypto.randomUUID());
   vi.doMock("../features/RecordingForms", () => ({
     StartSheet: ({

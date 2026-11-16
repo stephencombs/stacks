@@ -1,6 +1,7 @@
 // Preview only: one realistic group, encoded through the real contract schemas.
 import { JoinedTable, PlayerInvitePreview, TableView } from "@stacks/contracts/recordingCommands";
 import {
+  CrewActivityPage,
   GroupDetail,
   GroupListItem,
   GroupStats,
@@ -343,6 +344,69 @@ const invites = [
   },
 ];
 
+/** Crew's feed, newest first: a table and your session going now, finished tables, trips starting. */
+const activityGroup = { id: ids.group, name: "Thursday crew", currency: "USD" };
+const activityTrip = { id: ids.trip, name: trip.name };
+const named = (playerId: string) => ({
+  playerId,
+  displayName: players.find((player) => player.id === playerId)!.displayName,
+});
+const crewActivity = {
+  items: [
+    {
+      kind: "table_live",
+      group: activityGroup,
+      trip: activityTrip,
+      tableId: tripTables[1]!.table.id,
+      venue: venue(21, "Aria"),
+      game: "blackjack",
+      myVisitId: null,
+      players: [named(P[3]!), named(P[1]!)],
+      startedAt: liveStart,
+    },
+    {
+      kind: "session_live",
+      group: activityGroup,
+      trip: activityTrip,
+      sessionId: ids.live,
+      venue: liveSummary.venue,
+      players: liveSummary.playerIds.map((id) => named(id!)),
+      startedAt: liveStart,
+    },
+    {
+      kind: "table_finished",
+      group: activityGroup,
+      trip: activityTrip,
+      tableId: tripTables[0]!.table.id,
+      venue: tripTables[0]!.venue,
+      game: "blackjack",
+      myVisitId: tripTables[0]!.myVisitId,
+      players: [
+        ...tripTables[0]!.results.map((r) => ({ ...named(r.playerId!), net: r.net })),
+        { playerId: null, displayName: "Dave", net: -15000 },
+      ],
+      endedAt: tripTables[0]!.endedAt,
+    },
+    ...summaries.toReversed().map((s) => ({
+      kind: "session_finished",
+      group: activityGroup,
+      trip: activityTrip,
+      sessionId: s.session.id,
+      venue: s.venue,
+      players: s.results.map((r) => ({ ...named(r.playerId!), net: r.net })),
+      endedAt: s.session.endedAt,
+    })),
+    { kind: "trip_started", group: activityGroup, trip: activityTrip, startedAt: trip.startedAt },
+    {
+      kind: "trip_started",
+      group: { id: work.group.id, name: work.group.name, currency: "USD" },
+      trip: { id: work.trip.id, name: work.trip.name },
+      startedAt: work.trip.startedAt,
+    },
+  ],
+  nextCursor: null,
+};
+
 const shared = (n: number) => `0192e7a0-0000-7000-8000-0000000009${n.toString().padStart(2, "0")}`;
 /** A table its starter shared, as the read-only link shows it. */
 const sharedTable = {
@@ -432,6 +496,7 @@ export const routes: Record<string, unknown> = {
     catalog.map((item) => [`/api/public/venues/${item.id}`, check(Venue, item)]),
   ),
   "/api/groups": check(Schema.Array(GroupListItem), groupList),
+  "/api/crew/activity": check(CrewActivityPage, crewActivity),
   [`/api/groups/${ids.group}`]: check(GroupDetail, groupDetail),
   [`/api/groups/${ids.group}/stats`]: check(GroupStats, stats),
   [`/api/groups/${ids.group}/invites`]: check(Schema.Array(Invite), invites),

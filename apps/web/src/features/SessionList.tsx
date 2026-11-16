@@ -1,24 +1,31 @@
 import type { GroupDetail, SessionSummary } from "@stacks/contracts";
 import type { TripPlay } from "@stacks/client-runtime/trip";
 
-import * as DateTime from "effect/DateTime";
-import { ArrowRight } from "lucide-react";
+import { nameList } from "@stacks/client-runtime/crew";
+import { formatTime, gameNames, playerNames, venueLabel } from "@stacks/client-runtime/format";
 
 import { Money } from "~/components/Money";
-import { ButtonLink } from "~/components/ui/Button";
-import { Glow, List, Row, RowLink, RowText, Surface, Tag } from "~/components/ui/Surface";
-import { formatDuration, formatTime, gameNames, venueLabel } from "@stacks/client-runtime/format";
+import { List, Row, RowLink, RowText, Tag } from "~/components/ui/Surface";
+
+/** Who's still at a live table, by name, members first. */
+const playingLine = (
+  playing: ReadonlyArray<string>,
+  others: ReadonlyArray<{ readonly displayName: string; readonly playing: boolean }> = [],
+) => nameList([...playing, ...others.filter((o) => o.playing).map((o) => o.displayName)]) || null;
 
 function SessionRow({ summary, detail }: { summary: SessionSummary; detail: GroupDetail }) {
   const { session, venue, results } = summary;
   const live = session.status === "live";
   const mine = results.find((result) => result.playerId === detail.myPlayerId);
+  const names = playerNames(detail);
+  const who = live ? playingLine(summary.playing.map((id) => names.get(id) ?? "Someone")) : null;
   return (
     <RowLink to="/sessions/$sessionId" params={{ sessionId: session.id }}>
       <RowText
         title={venue.name}
         meta={
           <span className="tabular-nums">
+            {who ? `${who} · ` : ""}
             {gameNames[session.game]} · {live ? "since " : ""}
             {formatTime(session.startedAt)}
           </span>
@@ -46,12 +53,20 @@ function TableRow({
   detail: GroupDetail;
 }) {
   const mine = play.results.find((result) => result.playerId === detail.myPlayerId);
+  const names = playerNames(detail);
+  const who = play.live
+    ? playingLine(
+        play.playing.map((id) => names.get(id) ?? "Someone"),
+        play.others,
+      )
+    : null;
   const content = (
     <>
       <RowText
         title={venueLabel(play.venue)}
         meta={
           <span className="tabular-nums">
+            {who ? `${who} · ` : ""}
             {play.table.game ? gameNames[play.table.game] : "No game set"} ·{" "}
             {play.live ? "since " : ""}
             {formatTime(play.startedAt)}
@@ -99,58 +114,5 @@ export function SessionList({
         ),
       )}
     </List>
-  );
-}
-
-/** Your live session, one tap from the table: where, how long, and what you have in play. */
-export function LiveSessionCard({
-  summary,
-  detail,
-}: {
-  summary: SessionSummary;
-  detail: GroupDetail;
-}) {
-  const { session, venue, results, playing } = summary;
-  const mine = results.find((result) => result.playerId === detail.myPlayerId);
-  return (
-    <Surface className="relative overflow-hidden">
-      <Glow tone="felt" />
-      <div className="relative flex flex-col gap-4 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <Tag tone="live">Live · {formatDuration(session.startedAt, DateTime.nowUnsafe())}</Tag>
-          <span className="text-sm text-muted tabular-nums">
-            since {formatTime(session.startedAt)}
-          </span>
-        </div>
-        <div className="flex items-end justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="truncate font-display text-3xl leading-none uppercase">{venue.name}</h2>
-            <p className="text-sm text-muted">
-              {gameNames[session.game]} · {playing.length} at the table
-            </p>
-          </div>
-          {mine && mine.buyIn > 0 ? (
-            <div className="flex shrink-0 flex-col items-end gap-1">
-              <span className="text-sm text-muted">In play</span>
-              <Money
-                amount={mine.buyIn}
-                currency={detail.group.currency}
-                className="text-2xl font-semibold"
-              />
-            </div>
-          ) : null}
-        </div>
-        <ButtonLink
-          to="/sessions/$sessionId"
-          params={{ sessionId: session.id }}
-          variant="primary"
-          size="lg"
-          className="hidden pr-4.5 lg:inline-flex"
-        >
-          Back to the table
-          <ArrowRight className="size-4" aria-hidden />
-        </ButtonLink>
-      </div>
-    </Surface>
   );
 }

@@ -1,37 +1,24 @@
 import type { StaticScreenProps } from "@react-navigation/native";
-import { InviteId, type GroupDetail } from "@stacks/contracts";
+import type { GroupDetail } from "@stacks/contracts";
 import { isFormerMember, isGuest } from "@stacks/client-runtime/format";
-import { newId } from "@stacks/client-runtime/ids";
-import { chipOf } from "@stacks/client-runtime/trip";
-import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { Button } from "../components/ui/Button";
-import { FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Screen } from "../components/ui/Screen";
-import {
-  List,
-  PageTitle,
-  SectionHeading,
-  SettingsGroup,
-  SettingsRow,
-} from "../components/ui/Surface";
-import { Chip } from "../features/Chip";
+import { PageTitle, SettingsGroup, SettingsRow } from "../components/ui/Surface";
+import { GroupPeople } from "../features/GroupPeople";
 import { GroupSkeleton } from "../features/ScreenSkeletons";
 import { TripsSection } from "../features/Trips";
-import { webUrl } from "../lib/config";
 import { useGo } from "../lib/go";
 import { ScopeLoaded, usePlaceAddress } from "../lib/scope";
-import { shareLink } from "../lib/share";
-import { Loaded, useAction, useStacks } from "../lib/stacks";
+import { Loaded, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ groupId?: string } | undefined>;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 
-/** The group in scope: its trips, its people, its settings. */
+/** The group in scope: its trips, its people, its settings, and a way into its stats. */
 export function GroupScreen({ route }: Props) {
   const stacks = useStacks();
   usePlaceAddress(route.params, "groupId");
@@ -56,38 +43,21 @@ function GroupHub({ detail }: { detail: GroupDetail }) {
   const members = people.length - guests;
   return (
     <>
-      <PageTitle
-        context={`${plural(members, "member")}${guests ? ` · ${plural(guests, "guest")}` : ""} · plays in ${detail.group.currency}`}
-      >
-        {detail.group.name}
-      </PageTitle>
-      <TripsSection detail={detail} />
-      <View className="gap-2">
-        <SectionHeading action={<InviteButton detail={detail} />}>People</SectionHeading>
-        <List>
-          <View className="flex-row flex-wrap gap-x-4 gap-y-3 px-4 py-3.5">
-            {people.map((player) => (
-              <View key={player.id} className="w-16 items-center gap-1">
-                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={34} />
-                <Text numberOfLines={1} className="text-xs font-medium text-ink">
-                  {player.id === detail.myPlayerId ? "You" : player.displayName}
-                </Text>
-                <Text numberOfLines={1} className="text-xs text-muted">
-                  {player.role ? roleNames[player.role] : "Guest"}
-                </Text>
-              </View>
-            ))}
-          </View>
-          <SettingsRow
-            icon={<Icon name="group" color="ink" size={16} />}
-            title="Members and guests"
-            subtitle="Roles, invite links, guest claims"
-            value={people.length}
-            accessibilityHint="Opens the group's people"
-            onPress={() => go.people(groupId)}
-          />
-        </List>
+      <View className="gap-3">
+        <PageTitle
+          context={`${plural(members, "member")}${guests ? ` · ${plural(guests, "guest")}` : ""} · plays in ${detail.group.currency}`}
+        >
+          {detail.group.name}
+        </PageTitle>
+        <Button
+          label="Stats"
+          variant="secondary"
+          className="self-start"
+          onPress={() => go.stats({ groupId })}
+        />
       </View>
+      <TripsSection detail={detail} />
+      <GroupPeople detail={detail} />
       <SettingsGroup title="Settings">
         <SettingsRow
           icon={<Icon name="settings" color="ink" size={16} />}
@@ -98,36 +68,5 @@ function GroupHub({ detail }: { detail: GroupDetail }) {
         />
       </SettingsGroup>
     </>
-  );
-}
-
-/** Makes a fresh invite link and hands it straight to the share sheet. */
-function InviteButton({ detail }: { detail: GroupDetail }) {
-  const stacks = useStacks();
-  const create = useAction(stacks.Client.mutation("invites", "create"));
-  const [copied, setCopied] = useState(false);
-  const invite = async () => {
-    const made = await create.run({
-      params: { groupId: detail.group.id },
-      payload: { id: InviteId.make(newId()), maxUses: null },
-    });
-    if (!made) return;
-    const how = await shareLink(
-      `${webUrl}/join/${made.code}`,
-      `Join ${detail.group.name} on Color Up:`,
-    );
-    setCopied(how === "copied");
-  };
-  return (
-    <View className="items-end gap-1">
-      <Button
-        label={copied ? "Link copied" : "Invite"}
-        size="sm"
-        variant="ghost"
-        pending={create.pending}
-        onPress={() => void invite()}
-      />
-      {create.error ? <FormError>{create.error}</FormError> : null}
-    </View>
   );
 }

@@ -149,14 +149,13 @@ function HeroSkeleton({
  * Sessions loading: the title beside the trip's "…", your live table when you're at one, the trip
  * card, Start a session, and the latest night.
  */
-export function SessionsSkeleton({ live = false }: { live?: boolean }) {
+export function SessionsSkeleton() {
   return (
     <SkeletonScreen label="Loading sessions">
       <View className="flex-row items-center justify-between gap-3">
         <SkeletonText size="title" className="w-40" />
         <Skeleton className="size-11 rounded-full" />
       </View>
-      {live ? <Skeleton className="h-[200px] rounded-xl" /> : null}
       <HeroSkeleton />
       <Skeleton className="h-[52px] rounded-full" />
       <SectionSkeleton>
@@ -215,6 +214,7 @@ export function GroupSkeleton() {
   return (
     <SkeletonScreen label="Loading the group">
       <TitleSkeleton />
+      <Skeleton className="h-11 w-24 rounded-full" />
       <SectionSkeleton action>
         <View className="gap-3 rounded-xl bg-surface p-4">
           <View className="gap-1">
@@ -229,24 +229,8 @@ export function GroupSkeleton() {
         </View>
         <RowsSkeleton rows={1} meta={false} />
       </SectionSkeleton>
-      <SectionSkeleton action>
-        <View className="overflow-hidden rounded-xl bg-surface">
-          <View className="flex-row gap-4 px-4 py-3.5">
-            {keys(4).map((key) => (
-              <View key={key} className="w-16 items-center gap-1">
-                <Skeleton className="size-[34px] rounded-full" />
-                <SkeletonText size="sm" className="w-12" />
-                <SkeletonText size="sm" className="w-10" />
-              </View>
-            ))}
-          </View>
-          <View className="flex-row items-center gap-3 border-t border-line px-4 py-3.5">
-            <View className="flex-1 gap-0.5">
-              <SkeletonText className="w-40" />
-              <SkeletonText size="sm" className="w-52" />
-            </View>
-          </View>
-        </View>
+      <SectionSkeleton>
+        <MembersSkeleton />
       </SectionSkeleton>
       <SectionSkeleton>
         <RowsSkeleton rows={1} trailing={false} />
@@ -315,33 +299,23 @@ export function InviteLinkSkeleton() {
   );
 }
 
-/** People loading, titled by its header: invite links, then members with their roles. */
-export function PeopleSkeleton() {
+/** A group's members, each with their chip and role. */
+function MembersSkeleton() {
   return (
-    <SkeletonScreen label="Loading people">
-      <SectionSkeleton action>
-        <InviteLinkSkeleton />
-      </SectionSkeleton>
-      <SectionSkeleton>
-        <View className="overflow-hidden rounded-xl bg-surface">
-          {keys(4).map((key, i) => (
-            <View
-              key={key}
-              className={cn(
-                "flex-row items-center gap-3 px-4 py-3.5",
-                i > 0 && "border-t border-line",
-              )}
-            >
-              <Skeleton className="size-[26px] rounded-full" />
-              <View className="flex-1">
-                <SkeletonText className={titleWidths[i % titleWidths.length]!} />
-              </View>
-              <Skeleton className="h-6 w-16" />
-            </View>
-          ))}
+    <View className="overflow-hidden rounded-xl bg-surface">
+      {keys(4).map((key, i) => (
+        <View
+          key={key}
+          className={cn("flex-row items-center gap-3 px-4 py-3.5", i > 0 && "border-t border-line")}
+        >
+          <Skeleton className="size-[26px] rounded-full" />
+          <View className="flex-1">
+            <SkeletonText className={titleWidths[i % titleWidths.length]!} />
+          </View>
+          <Skeleton className="h-6 w-16" />
         </View>
-      </SectionSkeleton>
-    </SkeletonScreen>
+      ))}
+    </View>
   );
 }
 

@@ -36,11 +36,10 @@ import { HistoryScreen } from "./screens/History";
 import { HomeScreen } from "./screens/Home";
 import { MapScreen } from "./screens/Map";
 import { ClaimScreen, JoinScreen } from "./screens/Invites";
+import { CrewScreen } from "./screens/Crew";
 import { GroupScreen } from "./screens/Group";
 import { GroupSettingsScreen } from "./screens/GroupSettings";
-import { GroupsScreen } from "./screens/Groups";
 import { NewSessionScreen } from "./screens/NewSession";
-import { PeopleScreen } from "./screens/People";
 import { PlayScreen } from "./screens/Play";
 import { TableScreen } from "./screens/Table";
 import { SessionScreen } from "./screens/Session";
@@ -59,7 +58,7 @@ const headerOptions = {
 /** Your own play: You for anyone, signed in or not. */
 const personalOptions = { ...headerOptions, title: "", headerRight: () => <PersonalYouButton /> };
 
-/** Groups and trips: You with your chip in the group in scope. */
+/** Crew, groups and trips: You with your chip in the group in scope. */
 const crewOptions = { ...headerOptions, headerRight: () => <YouButton /> };
 
 const PlayStack = createNativeStackNavigator({
@@ -80,20 +79,15 @@ const MapStack = createNativeStackNavigator({
 /**
  * Groups, trips and their sessions belong to an account. One gate in front of them all: they wait
  * for sign-in, and share one API client and cache for whoever is signed in. Each is pushed onto
- * your groups, so back always lands in Crew.
+ * Crew, so back always lands there.
  */
 const CrewStack = createNativeStackNavigator({
   initialRouteName: "Crew",
   screenOptions: crewOptions,
   layout: ({ children }) => <AccountGate>{children}</AccountGate>,
   screens: {
-    Crew: { screen: GroupsScreen, options: { title: "" }, linking: "crew" },
+    Crew: { screen: CrewScreen, options: { title: "" }, linking: "crew" },
     Group: { screen: GroupScreen, options: { title: "" }, linking: "groups/:groupId" },
-    People: {
-      screen: PeopleScreen,
-      options: { title: "People" },
-      linking: "groups/:groupId/people",
-    },
     GroupSettings: {
       screen: GroupSettingsScreen,
       options: { title: "Settings" },
@@ -102,8 +96,10 @@ const CrewStack = createNativeStackNavigator({
     Sessions: { screen: SessionsScreen, options: { title: "" }, linking: "trips/:tripId" },
     Board: { screen: BoardScreen, options: { title: "" }, linking: "trips/:tripId/board" },
     // Old addresses. A linking alias here would leave every screen in this stack without typed
-    // params, so each is a screen of its own: your groups, a trip's Results and a group's Stats.
-    Groups: { screen: GroupsScreen, options: { title: "" }, linking: "groups" },
+    // params, so each is a screen of its own: your groups, a group's People, a trip's Results and
+    // a group's Stats.
+    Groups: { screen: CrewScreen, options: { title: "" }, linking: "groups" },
+    People: { screen: GroupScreen, options: { title: "" }, linking: "groups/:groupId/people" },
     Results: { screen: BoardScreen, options: { title: "" }, linking: "trips/:tripId/results" },
     GroupStats: { screen: BoardScreen, options: { title: "" }, linking: "groups/:groupId/stats" },
     Session: { screen: SessionScreen, options: { title: "" }, linking: "sessions/:sessionId" },

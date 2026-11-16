@@ -73,13 +73,10 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
   vi.doMock("~/features/TripHeader", () => ({
     TripHeader: ({ action }: { action: ReactNode }) => action,
   }));
-  vi.doMock("~/features/TripRail", () => ({ TripLayout: Container, TripRail: () => null }));
   vi.doMock("~/features/TripHero", () => ({ TripHero: () => null }));
   vi.doMock("~/features/SessionList", () => ({
-    LiveSessionCard: () => null,
     SessionList: () => null,
   }));
-  vi.doMock("~/features/Backing", () => ({ BackingSection: () => null }));
   const visitId = VisitId.make(crypto.randomUUID());
   vi.doMock("~/features/RecordingForms", () => ({
     StartDialog: ({

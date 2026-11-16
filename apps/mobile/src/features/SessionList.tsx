@@ -1,13 +1,13 @@
 import { useNavigation } from "@react-navigation/native";
 import { useGo } from "../lib/go";
-import type { GroupDetail, SessionSummary } from "@stacks/contracts";
-import { formatDuration, formatTime, gameNames, venueLabel } from "@stacks/client-runtime/format";
+import type { GroupDetail } from "@stacks/contracts";
+import { nameList } from "@stacks/client-runtime/crew";
+import { formatTime, gameNames, playerNames, venueLabel } from "@stacks/client-runtime/format";
 import { chipOf, type TripPlay } from "@stacks/client-runtime/trip";
-import * as DateTime from "effect/DateTime";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { Badge, Card, List, Row } from "../components/ui/Surface";
+import { Badge, List, Row } from "../components/ui/Surface";
 import { Chip } from "./Chip";
 
 /**
@@ -23,6 +23,7 @@ export function SessionList({
 }) {
   const go = useGo();
   const navigation = useNavigation();
+  const names = playerNames(detail);
   return (
     <List>
       {sessions.map((play) => {
@@ -42,6 +43,15 @@ export function SessionList({
               ? () => navigation.navigate("Play", { visitId })
               : undefined;
         const mine = results.find((result) => result.playerId === detail.myPlayerId);
+        // Who's still at a live table, members first.
+        const who = live
+          ? nameList([
+              ...play.playing.map((id) => names.get(id) ?? "Someone"),
+              ...(play.kind === "table"
+                ? play.others.filter((o) => o.playing).map((o) => o.displayName)
+                : []),
+            ])
+          : "";
         return (
           <Row
             key={session.id}
@@ -56,6 +66,7 @@ export function SessionList({
                 {live ? <Badge tone="live">Live</Badge> : null}
               </View>
               <Text className="type-footnote text-muted">
+                {who ? `${who} · ` : ""}
                 {game} · {live ? "since " : ""}
                 {formatTime(session.startedAt)}
               </Text>
@@ -73,44 +84,5 @@ export function SessionList({
         );
       })}
     </List>
-  );
-}
-
-export function LiveSessionCard({
-  summary,
-  detail,
-}: {
-  summary: SessionSummary;
-  detail: GroupDetail;
-}) {
-  const { session, venue, results, playing } = summary;
-  const mine = results.find((result) => result.playerId === detail.myPlayerId);
-  return (
-    <Card className="gap-4 p-5">
-      <View className="flex-row items-center justify-between gap-3">
-        <Badge tone="live">{`Live · ${formatDuration(session.startedAt, DateTime.nowUnsafe())}`}</Badge>
-        <Text className="type-footnote text-muted">since {formatTime(session.startedAt)}</Text>
-      </View>
-      <View className="flex-row items-end justify-between gap-3">
-        <View className="min-w-0 flex-1 gap-1">
-          <Text accessibilityRole="header" numberOfLines={1} className="type-title text-ink">
-            {venue.name}
-          </Text>
-          <Text className="type-footnote text-muted">
-            {gameNames[session.game]} · {playing.length} at the table
-          </Text>
-        </View>
-        {mine && mine.buyIn > 0 ? (
-          <View className="items-end gap-1">
-            <Text className="type-label text-muted">In play</Text>
-            <Money
-              amount={mine.buyIn}
-              currency={detail.group.currency}
-              className="type-number-lg"
-            />
-          </View>
-        ) : null}
-      </View>
-    </Card>
   );
 }

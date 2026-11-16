@@ -1,3 +1,5 @@
+import type { StaticScreenProps } from "@react-navigation/native";
+import type { StatsPick } from "../lib/go";
 import { runningLine } from "@stacks/client-runtime/chart";
 import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
@@ -51,8 +53,11 @@ const chipColor: Record<GameChip, string> = {
 const signed = (amount: number) =>
   formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY, { signDisplay: "exceptZero" });
 
-/** Your own play, broken down, from this device's sessions: it works signed out and offline. */
-export function StatsScreen() {
+/**
+ * Your own play, broken down, from this device's sessions: it works signed out and offline. A trip
+ * or group page opens it with that group (and trip) picked.
+ */
+export function StatsScreen(_props: StaticScreenProps<StatsPick | undefined>) {
   return <TripNames>{(tripNames) => <StatsView tripNames={tripNames} />}</TripNames>;
 }
 

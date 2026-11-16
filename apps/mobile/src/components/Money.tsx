@@ -39,35 +39,3 @@ export function Money({
     </Text>
   );
 }
-
-export function BalanceLabel({
-  amount,
-  currency,
-  subject = "third",
-  className,
-}: {
-  amount: MinorUnits;
-  currency: CurrencyCode;
-  subject?: "you" | "third";
-  className?: string;
-}) {
-  if (amount === 0)
-    return (
-      <Text className={cn("text-sm text-muted", className)}>
-        {subject === "you" ? "You're square" : "Square"}
-      </Text>
-    );
-  const verb =
-    amount > 0
-      ? subject === "you"
-        ? "You're owed"
-        : "Owed"
-      : subject === "you"
-        ? "You owe"
-        : "Owes";
-  return (
-    <Text className={cn("text-sm tabular-nums", amount > 0 ? "text-win" : "text-loss", className)}>
-      {verb} {formatMoney(MinorUnits.make(Math.abs(amount)), currency)}
-    </Text>
-  );
-}

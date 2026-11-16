@@ -12,29 +12,28 @@ import { cn } from "../components/ui/cn";
 import { Screen, screenError } from "../components/ui/Screen";
 import { EmptyState, PageTitle, SectionHeading } from "../components/ui/Surface";
 import { StartSheet } from "../features/RecordingForms";
-import { BackingSection } from "../features/Backing";
 import { SessionsSkeleton } from "../features/ScreenSkeletons";
-import { LiveSessionCard, SessionList } from "../features/SessionList";
+import { SessionList } from "../features/SessionList";
 import { ReopenTrip, TripOptionsButton } from "../features/TripOptions";
 import { TripHero } from "../features/TripHero";
 import { useGo } from "../lib/go";
-import { ScopeLoaded, usePlaceAddress, useScope } from "../lib/scope";
+import { ScopeLoaded, usePlaceAddress } from "../lib/scope";
 import { TripLoaded } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ tripId?: string } | undefined>;
 
-/** What's being played: your live table first, then the trip, then its sessions night by night. */
+/**
+ * The trip: how it's going for you, who's at a table now, then its sessions and tables night by
+ * night. Your own live play is the LiveBar's.
+ */
 export function SessionsScreen({ route }: Props) {
   usePlaceAddress(route.params, "tripId");
-  const { scope } = useScope();
-  // Your table comes first when it's on this trip, so the skeleton holds its place.
-  const live = scope?.trip !== undefined && scope.item.mySession?.tripId === scope.trip.id;
   return (
     <ScopeLoaded
       renderError={screenError}
       skeleton={
         <Screen>
-          <SessionsSkeleton live={live} />
+          <SessionsSkeleton />
         </Screen>
       }
     >
@@ -45,7 +44,7 @@ export function SessionsScreen({ route }: Props) {
             tripId={trip.id}
             skeleton={
               <Screen>
-                <SessionsSkeleton live={live} />
+                <SessionsSkeleton />
               </Screen>
             }
           >
@@ -64,13 +63,8 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
   const navigation = useNavigation();
   const [starting, setStarting] = useState(false);
   const names = playerNames(group);
-  const mine = trip.sessions.find(
-    (s) => s.session.status === "live" && s.playerIds.includes(group.myPlayerId),
-  );
   const plays = tripPlays(trip);
-  const live = plays.filter(
-    (s) => s.live && !(s.kind === "session" && s.session.id === mine?.session.id),
-  );
+  const live = plays.filter((s) => s.live && !s.playing.includes(group.myPlayerId));
   const closed = plays.filter((s) => !s.live);
   const nights = tripNights(closed, localClock).toReversed();
   const going = trip.trip.endedAt === null;
@@ -79,26 +73,14 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
     <Screen
       shows={{ trip: trip.trip.id }}
       renderFooter={
-        going && (mine || canStart)
+        canStart
           ? () => (
-              <>
-                {mine ? (
-                  <Button
-                    label="Back to your table"
-                    variant="primary"
-                    size="lg"
-                    onPress={() => go.session(mine.session.id)}
-                  />
-                ) : null}
-                {canStart ? (
-                  <Button
-                    label="Start a session"
-                    variant={mine ? "secondary" : "primary"}
-                    size="lg"
-                    onPress={() => setStarting(true)}
-                  />
-                ) : null}
-              </>
+              <Button
+                label="Start a session"
+                variant="primary"
+                size="lg"
+                onPress={() => setStarting(true)}
+              />
             )
           : undefined
       }
@@ -111,13 +93,12 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
           {trip.trip.name}
         </PageTitle>
         <Button
-          label="Board"
+          label="Stats"
           variant="secondary"
           className="self-start"
-          onPress={() => go.trip(trip.trip.id, "Board")}
+          onPress={() => go.stats({ groupId: group.group.id, tripId: trip.trip.id })}
         />
       </View>
-      {mine ? <LiveSessionCard summary={mine} detail={group} /> : null}
       <TripHero currency={group.group.currency} me={group.myPlayerId} sessions={closed} />
       {!going ? (
         <View className="gap-3">
@@ -128,7 +109,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
 
       {live.length > 0 ? (
         <View className="gap-2">
-          <SectionHeading>{mine ? "Other live sessions" : "Live now"}</SectionHeading>
+          <SectionHeading>Live now</SectionHeading>
           <SessionList sessions={live} detail={group} />
         </View>
       ) : null}
@@ -161,9 +142,8 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
           }}
         />
       ) : null}
-      <BackingSection detail={group} trip={trip} />
-      {plays.length === 0 ? (
-        <EmptyState centered title="No sessions on this trip yet">
+      {live.length === 0 && nights.length === 0 ? (
+        <EmptyState centered title="Nothing finished on this trip yet">
           {going
             ? "Start one when you sit down at a table. Everyone's buy-ins and cash-outs go on it."
             : "Nothing was played on this trip."}
