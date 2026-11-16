@@ -1178,17 +1178,19 @@ export function AddPlayerSheet({
 }
 
 /**
- * Sits a player down at a table again with a new buy-in: a new visit, since their last one is
- * over. It records on this device, so it works offline.
+ * Sits a player down at a table with a buy-in: either joining it for the first time or starting a
+ * new visit after finishing an earlier one. It records on this device, so it works offline.
  */
 export function SitDownSheet({
   tableId,
   player,
+  returning = true,
   onClose,
   onSeated,
 }: {
   tableId: TableId;
   player: PlayerIdentity;
+  returning?: boolean;
   onClose: () => void;
   onSeated: (visitId: VisitId) => void;
 }) {
@@ -1196,8 +1198,13 @@ export function SitDownSheet({
   const amount = useAmount("", 1);
   return (
     <RecordingSheet
-      title="Back at the table"
-      submitLabel="Sit back down"
+      title={returning ? "Back at the table" : "Buy in"}
+      description={
+        returning
+          ? "This starts a new session at the same table. Your last one stays as it finished."
+          : `Your buy-in as ${player.displayName}.`
+      }
+      submitLabel={returning ? "Sit back down" : "Buy in"}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -1214,5 +1221,63 @@ export function SitDownSheet({
     >
       <KeypadAmount label="Buy-in" amount={amount} />
     </RecordingSheet>
+  );
+}
+
+/**
+ * Joins a shared table as a new player. It asks only for a name, and says what joining does:
+ * it never picks someone already at the table.
+ */
+export function JoinSheet({
+  join,
+  onClose,
+  onJoined,
+}: {
+  join: { pending: boolean; error: string | null; join: (name: string) => Promise<unknown> };
+  onClose: () => void;
+  onJoined: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const submit = async () => {
+    const trimmed = name.trim();
+    setNameError(trimmed === "" ? "Enter your name." : null);
+    if (trimmed === "") return;
+    if (await join.join(trimmed)) onJoined();
+  };
+  return (
+    <Sheet
+      open
+      busy={join.pending}
+      onClose={onClose}
+      title="Join this table"
+      description="This adds you to the table as a new player. You record your own buy-ins and cash-outs; whoever started the table can record and correct everyone's."
+      footer={
+        <View className="gap-2">
+          <Button
+            label="Join as a new player"
+            variant="primary"
+            size="lg"
+            pending={join.pending}
+            onPress={() => void submit()}
+          />
+          <Button label="Cancel" size="lg" disabled={join.pending} onPress={onClose} />
+        </View>
+      }
+    >
+      <TextField
+        label="Your name"
+        hint="Others at the table see it."
+        value={name}
+        error={nameError}
+        maxLength={60}
+        autoComplete="given-name"
+        autoFocus
+        onChangeText={setName}
+        returnKeyType="done"
+        onSubmitEditing={() => void submit()}
+      />
+      {join.error ? <FormError>{join.error}</FormError> : null}
+    </Sheet>
   );
 }

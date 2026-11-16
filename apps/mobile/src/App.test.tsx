@@ -71,7 +71,11 @@ async function load({
   vi.doMock("expo", () => ({ reloadAppAsync: vi.fn() }));
   const markStartup = vi.fn();
   vi.doMock("./lib/diagnostics", () => ({ markStartup, reportStartupError: vi.fn() }));
-  vi.doMock("./lib/config", () => ({ clerkPublishableKey: key, apiUrl: "http://api.test" }));
+  vi.doMock("./lib/config", () => ({
+    clerkPublishableKey: key,
+    apiUrl: "http://api.test",
+    appLinkPrefixes: () => ["stacks://"],
+  }));
   vi.doMock("./lib/telemetry", () => ({ captureTestEvent: vi.fn() }));
   vi.doMock("expo-haptics", () => ({
     notificationAsync: vi.fn(),
@@ -108,7 +112,7 @@ async function load({
     };
   });
   vi.doMock("expo-linking", () => ({
-    createURL: () => "stacks://",
+    createURL: (path = "") => `stacks://${path}`,
     getInitialURL: () => new Promise<string | null>(() => {}),
   }));
   vi.doMock("expo-status-bar", () => ({ StatusBar: () => null }));
@@ -186,8 +190,10 @@ async function load({
     "./screens/Map": ["MapScreen"],
     "./screens/NewSession": ["NewSessionScreen"],
     "./screens/Play": ["PlayScreen"],
+    "./screens/RedeemInvite": ["RedeemInviteScreen"],
     "./screens/Session": ["SessionScreen"],
     "./screens/Sessions": ["SessionsScreen"],
+    "./screens/SharedTable": ["SharedTableScreen"],
     "./screens/Stats": ["StatsScreen"],
     "./screens/Table": ["TableScreen"],
   }))
@@ -331,6 +337,8 @@ it("keeps every address: your play in the first tab, groups in Crew, invites abo
   expect(root.screens.Tabs!.screen).toEqual({ config: tabs });
   expect(root.screens.Play!.linking).toBe("play/:visitId");
   expect(root.screens.Table!.linking).toBe("tables/:tableId");
+  expect(root.screens.SharedTable!.linking).toBe("t/:token");
+  expect(root.screens.RedeemInvite!.linking).toBe("invite/:token");
   expect(root.screens.Invites!.screen).toEqual({ config: invites });
   expect(Object.keys(tabs.screens)).toEqual(["PlayTab", "StatsTab", "MapTab", "CrewTab"]);
   expect(tabs.initialRouteName).toBe("PlayTab");

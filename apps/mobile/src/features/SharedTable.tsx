@@ -18,7 +18,7 @@ import { FormError } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { useAccount } from "../lib/account";
-import { webUrl } from "../lib/config";
+import { appUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
 import { AddPlayerSheet } from "./RecordingForms";
 
@@ -121,7 +121,7 @@ export function TableSection({
 /** Creates, shares and revokes the table's read-only link. Only the starter sees this. */
 export function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: () => void }) {
   const sharing = useTableSharing(tableId);
-  const url = sharing.token ? `${webUrl}/t/${sharing.token}` : null;
+  const url = sharing.token ? appUrl(`t/${sharing.token}`) : null;
   return (
     <Sheet
       open
@@ -408,11 +408,11 @@ export function TableSettingsSheet({
 
 /**
  * A single-use link that lets one more device record as this player, and the devices that already
- * do. The link opens on the web, so it works for people without the app.
+ * do.
  */
 function InviteSheet({ player, onClose }: { player: PlayerIdentity; onClose: () => void }) {
   const invite = usePlayerInvite(player.id);
-  const url = invite.link ? `${webUrl}/invite/${invite.link.token}` : null;
+  const url = invite.link ? appUrl(`invite/${invite.link.token}`) : null;
   const devices = invite.access?.devices ?? [];
   return (
     <Sheet

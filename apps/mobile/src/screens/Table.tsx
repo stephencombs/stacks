@@ -218,6 +218,7 @@ function Table({ tableId }: { tableId: TableId }) {
         <SitDownSheet
           tableId={tableId}
           player={table.you.player}
+          returning={table.visits.some((item) => item.isSelf)}
           onClose={close}
           onSeated={(visitId) => {
             close();

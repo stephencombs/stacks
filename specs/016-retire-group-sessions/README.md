@@ -5,13 +5,12 @@ priority: medium
 tags:
   - api
   - migration
-  - web
   - mobile
 depends_on:
   - "015"
 parent: "001"
 created_at: 2026-11-14T20:21:34.790856353Z
-updated_at: 2026-11-14T20:21:34.790856353Z
+updated_at: 2026-11-16T03:54:17.491230885Z
 ---
 
 # Retire the older group sessions
@@ -25,7 +24,7 @@ With group play recorded from Play (specs 013, 015), the older group sessions (`
 - Freeze new group sessions; existing ones stay readable.
 - Import each group session as a table in its trip, keeping ids, amounts, voids, players and provenance. Imported participations that can't establish visit boundaries stay marked as imported (`PLAN.md`, Architecture constraints).
 - A read-only preflight lists histories needing reconciliation before cutover.
-- Retire the group session recording screens (`apps/web/src/features/SessionView.tsx` group path, `apps/mobile/src/screens/Session.tsx` group path) and their endpoints; `/sessions/:id` redirects to the table.
+- Retire the group session recording screen (`apps/mobile/src/screens/Session.tsx` group path) and its endpoints; `/sessions/:id` redirects to the table.
 - Stakes and backing stay on the older data until `PLAN.md` phase 5.
 
 ## Plan

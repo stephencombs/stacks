@@ -11,7 +11,7 @@ import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
-import { webUrl } from "../lib/config";
+import { appUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { AddGuestSheet } from "./AddGuestSheet";
@@ -104,7 +104,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
                         size="sm"
                         onPress={() =>
                           void share(
-                            `${webUrl}/claim/${player.claimCode}`,
+                            appUrl(`claim/${player.claimCode}`),
                             `Claim your Color Up history in ${detail.group.name}:`,
                             player.id,
                           )
@@ -169,7 +169,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
           ) : (
             <List>
               {invites.map((invite) => {
-                const url = `${webUrl}/join/${invite.code}`;
+                const url = appUrl(`join/${invite.code}`);
                 return (
                   <Row key={invite.id} className="flex-col items-stretch gap-2">
                     <Text selectable numberOfLines={1} className="font-mono text-sm text-ink">
