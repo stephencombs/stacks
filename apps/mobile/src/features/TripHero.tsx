@@ -122,7 +122,7 @@ export function TripHero({
             <Text className="type-number text-ink">–</Text>
           )}
         </Tile>
-        <Tile label="Standing" divided>
+        <Tile label="Place" divided>
           <Text className="type-number text-ink">
             {rank === undefined ? "–" : ordinal(rank)}
             <Text className="type-footnote text-muted"> of {standings.length}</Text>

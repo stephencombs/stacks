@@ -2,10 +2,9 @@ import { useAuth } from "@clerk/react";
 import { useNavigate } from "@tanstack/react-router";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
-import { ChartColumn } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
-import { Button, ButtonLink } from "~/components/ui/Button";
+import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { FormError } from "~/components/ui/Field";
 import { Menu, MenuItem } from "~/components/ui/Menu";
@@ -13,10 +12,11 @@ import { BackLink } from "~/components/ui/Nav";
 import { PageHeader } from "~/components/ui/Page";
 import { Tag } from "~/components/ui/Surface";
 import { useAction, useLastTrip, useRememberTrip, useStacks } from "~/lib/stacks";
+import { StatsLink } from "./StatsLink";
 
 /**
  * A trip page's title: named for the trip, going back to its group, with a link to the trip's
- * Stats. It also says when the trip has ended and holds the trip's own menu.
+ * Stats (`StatsLink`). It also says when the trip has ended and holds the trip's own menu.
  */
 export function TripHeader({
   group,
@@ -70,14 +70,7 @@ export function TripHeader({
         tag={ended ? <Tag>Ended</Tag> : null}
         action={
           <div className="flex items-center gap-2">
-            <ButtonLink
-              to="/stats"
-              state={{ statsPick: { groupId: group.group.id, tripId: trip.trip.id } }}
-              variant="ghost"
-            >
-              <ChartColumn className="size-4" aria-hidden />
-              Stats
-            </ButtonLink>
+            <StatsLink pick={{ groupId: group.group.id, tripId: trip.trip.id }} variant="ghost" />
             {action}
             {menu}
           </div>

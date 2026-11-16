@@ -33,14 +33,15 @@ export const resolveScope = (
 };
 
 /**
- * Whether a trip has a table going: yours, or any while it's the group's only trip still going.
- * Groups count live sessions, not which trip they're in, so with two trips going only yours shows.
+ * Whether a trip has a live session or table going.
  */
 export const tripIsLive = (
-  item: Pick<GroupListItem, "mySession" | "liveSessionCount" | "trips">,
+  item: Pick<GroupListItem, "mySession" | "liveSessionCount" | "liveTripIds" | "trips">,
   trip: Pick<Trip, "id" | "endedAt">,
 ) =>
+  item.liveTripIds.includes(trip.id) ||
   item.mySession?.tripId === trip.id ||
-  (trip.endedAt === null &&
+  (item.liveTripIds.length === 0 &&
+    trip.endedAt === null &&
     item.liveSessionCount > 0 &&
     item.trips.filter((other) => other.endedAt === null).length === 1);

@@ -89,7 +89,7 @@ Don't put a `Surface` inside a `Surface`. A card on a card is `bg-raised`.
 
 ## Hero cards: TripHero, BalanceHero
 
-A place can open on one hero card: the figure that place exists to show, big enough to read across a table. Sessions has `TripHero` (your trip total, your running line, win rate, best session, standing). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. When you're seated at a live session, Sessions opens on `LiveSessionCard`, above the hero, with "Back to the table" as the screen's primary action.
+A place can open on one hero card: the figure that place exists to show, big enough to read across a table. A trip has `TripHero` (your trip total, your running line, win rate, best session, your place). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. Your own live session is never a card on a page: the LiveBar holds it.
 
 One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure.
 
@@ -117,13 +117,13 @@ See [mobile controls](mobile-redesign.md) for platform selection, native sheet s
 
 Groups, trips and sessions are pushed onto Crew. They take a `BackLink` in `PageHeader`'s `back` (or the stack's back button on mobile). The back slot only ever goes back.
 
-## Wide screens: TripLayout, TripRail (web)
+## Wide screens (web)
 
-Pages keep the 672px reading column beside the sidebar. Sessions is the one exception: from `xl` it widens to take a 320px rail through `TripLayout`, where `TripRail` shows the standings and your balance, a glance before going to Stats. Below `xl` the rail drops away, and nothing moves into it that isn't also elsewhere.
+Pages keep the 672px reading column beside the sidebar, the trip included.
 
 ## PageHeader, Section, Note (web); PageTitle, SectionHeading, AccordionSectionHeading (mobile)
 
-One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `children` for what sits under the title (a session's notes), and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip's sessions are titled with the trip, through `TripHeader`, which carries the trip's ⋯ menu and a link to Stats with the trip picked.
+One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `children` for what sits under the title (a session's notes), and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip is titled with the trip, through `TripHeader`, which carries the trip's ⋯ menu and a **Stats** link (`StatsLink`, which opens Stats with the group and trip picked).
 
 Each group of content is a `Section` on web (`title`, plus an `action` or a quiet `aside`) and a `SectionHeading` on mobile (`components/ui/Surface.tsx`). Mobile `SectionHeading` has two variants:
 

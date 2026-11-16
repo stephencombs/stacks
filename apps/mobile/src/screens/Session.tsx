@@ -474,7 +474,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
               <Button
                 label="See the trip's stats"
                 className="flex-1"
-                onPress={() => go.stats(session.groupId, session.tripId)}
+                onPress={() => go.stats({ groupId: session.groupId, tripId: session.tripId })}
               />
             </View>
           ) : null}

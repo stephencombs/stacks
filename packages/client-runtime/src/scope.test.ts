@@ -34,6 +34,7 @@ const group = (name: string, trips: ReadonlyArray<Trip>): GroupListItem => ({
   myPlayerId: PlayerId.make(uuid("me")),
   myBalance: MinorUnits.make(0),
   liveSessionCount: 0,
+  liveTripIds: [],
   currentTripId: null,
   trips: trips.toSorted(
     (a, b) => DateTime.toEpochMillis(b.startedAt) - DateTime.toEpochMillis(a.startedAt),
@@ -82,14 +83,18 @@ it("keeps the remembered trip when the picked group already holds it", () => {
   expect(resolveScope([crew], tripId("tahoe"), groupId("crew"))?.trip).toBe(tahoe);
 });
 
-it("calls a trip live when you're at its table, or it's the only one going and someone plays", () => {
+it("calls a trip live when its id is in liveTripIds, mySession matches, or it's the only open trip", () => {
   const playing = { ...crew, liveSessionCount: 1 };
   expect(tripIsLive(playing, vegas)).toBe(true);
   expect(tripIsLive(playing, tahoe)).toBe(false);
   expect(tripIsLive(crew, vegas)).toBe(false);
 
-  const twoGoing = { ...group("crew", [vegas, trip("old", "crew", 15)]), liveSessionCount: 1 };
+  const older = trip("old", "crew", 15);
+  const twoGoing = { ...group("crew", [vegas, older]), liveSessionCount: 1 };
   expect(tripIsLive(twoGoing, vegas)).toBe(false);
+  const liveTableInOlder = { ...twoGoing, liveTripIds: [older.id] };
+  expect(tripIsLive(liveTableInOlder, vegas)).toBe(false);
+  expect(tripIsLive(liveTableInOlder, older)).toBe(true);
   const seated = {
     ...twoGoing,
     mySession: { id: undefined as never, tripId: vegas.id, venueName: "Aria", startedAt: day(20) },

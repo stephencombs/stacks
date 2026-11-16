@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { GroupsList } from "~/features/GroupsList";
+import { Crew } from "~/features/Crew";
 
-export const Route = createFileRoute("/crew")({ component: GroupsList });
+export const Route = createFileRoute("/crew")({ component: Crew });

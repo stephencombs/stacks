@@ -1,6 +1,5 @@
 import { useAuth } from "@clerk/expo";
-import type { StaticScreenProps } from "@react-navigation/native";
-import { GroupId, InviteId, UserId, type GroupDetail, type Player } from "@stacks/contracts";
+import { InviteId, UserId, type GroupDetail, type Player } from "@stacks/contracts";
 import { formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
@@ -10,38 +9,19 @@ import { Text, View } from "react-native";
 import { confirmAction } from "../components/ui/confirmAction";
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
-import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
-import { AddGuestSheet } from "../features/AddGuestSheet";
 import { webUrl } from "../lib/config";
-import { useLinkedScope } from "../lib/scope";
 import { shareLink } from "../lib/share";
-import { Chip } from "../features/Chip";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
-import { InviteLinkSkeleton, PeopleSkeleton } from "../features/ScreenSkeletons";
-
-type Props = StaticScreenProps<{ groupId: string }>;
-
-/** Everyone in the group: members and their roles, invite links, guests, and who left. */
-export function PeopleScreen({ route }: Props) {
-  const stacks = useStacks();
-  useLinkedScope(route.params);
-  return (
-    <Screen>
-      <Loaded
-        query={stacks.group(GroupId.make(route.params.groupId))}
-        skeleton={<PeopleSkeleton />}
-      >
-        {(detail) => <PeopleView detail={detail} />}
-      </Loaded>
-    </Screen>
-  );
-}
+import { AddGuestSheet } from "./AddGuestSheet";
+import { Chip } from "./Chip";
+import { InviteLinkSkeleton } from "./ScreenSkeletons";
 
 const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 
-function PeopleView({ detail }: { detail: GroupDetail }) {
+/** Everyone in the group: members and their roles, guests, invite links, and who left. */
+export function GroupPeople({ detail }: { detail: GroupDetail }) {
   const [addingGuest, setAddingGuest] = useState(false);
   const [managing, setManaging] = useState<Player | null>(null);
   const [shared, setShared] = useState<string | null>(null);
@@ -61,7 +41,6 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
 
   return (
     <>
-      <InviteSection detail={detail} />
       <View className="gap-2">
         <SectionHeading>Members</SectionHeading>
         <List>
@@ -139,6 +118,7 @@ function PeopleView({ detail }: { detail: GroupDetail }) {
           </List>
         )}
       </View>
+      <InviteSection detail={detail} />
       {former.length > 0 ? (
         <View className="gap-2">
           <SectionHeading>Former members</SectionHeading>

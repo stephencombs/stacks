@@ -116,7 +116,9 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const closed = closedPlays(trip);
   const top = tripStandings(closed, localClock).slice(0, 3);
   if (top.length === 0)
-    return <Text className="text-sm text-muted">Finish a session to start the standings.</Text>;
+    return (
+      <Text className="text-sm text-muted">Standings start when the first table finishes.</Text>
+    );
   return (
     <View className="flex-row flex-wrap gap-x-4 gap-y-2">
       {top.map((s) => (
@@ -185,7 +187,7 @@ function StartTripSheet({
       open
       onClose={onClose}
       title="Start a trip"
-      description="Sessions you start in it count toward its stats."
+      description="Tables you start in it count toward its standings."
       footer={
         <Button
           label="Start trip"

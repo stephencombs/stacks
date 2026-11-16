@@ -49,7 +49,7 @@ Group stats live in Stats, not on the trip, so a group's numbers and yours read 
 
 Crew needs an account. It opens on activity from every group you're in: who is playing where right now, sessions that finished, trips that started. Each row opens that session or trip. It is private to your groups; there are no likes, comments or profiles of strangers, because a player's identity must never become a way to discover their sessions.
 
-The current trip is pinned above the list, showing who's live and the top of its standings. A trip, `/trips/:id`, holds its tables and a **Stats** button. A group, `/groups/:id`, holds its trips and people and a **Stats** button, and its settings at `/groups/:id/settings`.
+The current trip is pinned above the list, showing who's live and the top of its standings. Your own live play stays out of the feed, since the LiveBar already holds it. A **Groups** button opens your groups in a sheet with no address of its own, each with its people and what it has going, and no amounts while debts are deferred. A trip, `/trips/:id`, holds its tables and a **Stats** button. A group, `/groups/:id`, holds its trips and people and a **Stats** button, and its settings at `/groups/:id/settings`.
 
 ## Why it changed
 

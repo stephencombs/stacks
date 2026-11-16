@@ -20,6 +20,10 @@
       "types": "./src/counterparties.ts",
       "import": "./src/counterparties.ts"
     },
+    "./crew": {
+      "types": "./src/crew.ts",
+      "import": "./src/crew.ts"
+    },
     "./errors": {
       "types": "./src/errors.ts",
       "import": "./src/errors.ts"

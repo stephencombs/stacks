@@ -29,8 +29,6 @@ export function AppShell({
 }) {
   const { pathname } = useLocation();
   const current = tabOf(pathname);
-  // A trip's sessions is the one page with a rail beside it, once there's room.
-  const wide = /^\/trips\/[^/]+\/?$/.test(pathname);
   return (
     <>
       <a
@@ -54,13 +52,7 @@ export function AppShell({
         onClickCapture={onClickCapture}
         className="pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] lg:pr-10 lg:pl-70"
       >
-        <div
-          className={
-            wide
-              ? "mx-auto flex min-h-dvh w-full max-w-2xl flex-col xl:max-w-[1040px]"
-              : "mx-auto flex min-h-dvh w-full max-w-2xl flex-col"
-          }
-        >
+        <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col">
           <header className="box-content flex h-16 shrink-0 items-center justify-between gap-3 pt-[env(safe-area-inset-top)] lg:hidden">
             <Wordmark />
             <You layout="bar" />

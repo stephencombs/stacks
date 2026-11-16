@@ -1,18 +1,131 @@
 import { useNavigation } from "@react-navigation/native";
 import { useGo } from "../lib/go";
-import type { GroupDetail, SessionSummary } from "@stacks/contracts";
-import { formatDuration, formatTime, gameNames, venueLabel } from "@stacks/client-runtime/format";
+import type { GroupDetail } from "@stacks/contracts";
+import { nameList } from "@stacks/client-runtime/crew";
+import {
+  formatDay,
+  formatDuration,
+  formatTime,
+  gameNames,
+  playerNames,
+  venueLabel,
+} from "@stacks/client-runtime/format";
 import { chipOf, type TripPlay } from "@stacks/client-runtime/trip";
-import * as DateTime from "effect/DateTime";
+import { useState } from "react";
 import { Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { Badge, Card, List, Row } from "../components/ui/Surface";
+import { Sheet } from "../components/ui/Sheet";
+import { Badge, List, Row } from "../components/ui/Surface";
 import { Chip } from "./Chip";
 
+function TableSummarySheet({
+  play,
+  detail,
+  onClose,
+}: {
+  play: Extract<TripPlay, { kind: "table" }>;
+  detail: GroupDetail;
+  onClose: () => void;
+}) {
+  const names = playerNames(detail);
+  const when = play.live
+    ? `Since ${formatTime(play.startedAt)}`
+    : play.endedAt
+      ? `${formatDay(play.startedAt)} · ${formatTime(play.startedAt)} – ${formatTime(play.endedAt)} (${formatDuration(play.startedAt, play.endedAt)})`
+      : `${formatDay(play.startedAt)} · ${formatTime(play.startedAt)}`;
+  const description = [
+    play.table.game ? gameNames[play.table.game] : "No game set",
+    play.table.highLimit ? "High limit" : null,
+    when,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const seenGuests = new Map<string, number>();
+  const guestKey = (name: string) => {
+    const n = (seenGuests.get(name) ?? 0) + 1;
+    seenGuests.set(name, n);
+    return `guest-${name}-${n}`;
+  };
+
+  return (
+    <Sheet open onClose={onClose} title={venueLabel(play.venue)} description={description}>
+      {play.playerIds.length === 0 && play.others.length === 0 ? (
+        <Text className="type-callout text-muted">No players recorded at this table yet.</Text>
+      ) : (
+        <List>
+          {play.playerIds.map((playerId) => {
+            const name =
+              playerId === detail.myPlayerId ? "You" : (names.get(playerId) ?? "Someone");
+            const isPlaying = play.playing.includes(playerId);
+            const open = play.inPlay.find((item) => item.playerId === playerId);
+            const result = play.results.find((item) => item.playerId === playerId);
+            return (
+              <Row key={playerId}>
+                <Chip chip={chipOf(detail, playerId)} name={name} size={28} />
+                <View className="flex-1 gap-0.5">
+                  <Text numberOfLines={1} className="type-heading text-ink">
+                    {name}
+                  </Text>
+                  {isPlaying ? (
+                    <Text className="type-footnote text-muted">
+                      {open && open.buyIn > 0 ? (
+                        <>
+                          In for <Money amount={open.buyIn} currency={detail.group.currency} />
+                        </>
+                      ) : (
+                        "Playing"
+                      )}
+                    </Text>
+                  ) : result ? (
+                    <Text className="type-footnote text-muted">
+                      In <Money amount={result.buyIn} currency={detail.group.currency} /> · Out{" "}
+                      <Money amount={result.cashOut} currency={detail.group.currency} />
+                    </Text>
+                  ) : null}
+                </View>
+                {isPlaying ? (
+                  <Badge tone="live">Live</Badge>
+                ) : result ? (
+                  <Money
+                    amount={result.net}
+                    currency={detail.group.currency}
+                    tone="result"
+                    className="type-number"
+                  />
+                ) : null}
+              </Row>
+            );
+          })}
+          {play.others.map((other) => (
+            <Row key={guestKey(other.displayName)}>
+              <View className="flex-1 gap-0.5">
+                <Text numberOfLines={1} className="type-heading text-ink">
+                  {other.displayName}
+                </Text>
+                <Text className="type-footnote text-muted">Guest</Text>
+              </View>
+              {other.playing ? (
+                <Badge tone="live">Live</Badge>
+              ) : (
+                <Money
+                  amount={other.net}
+                  currency={detail.group.currency}
+                  tone="result"
+                  className="type-number"
+                />
+              )}
+            </Row>
+          ))}
+        </List>
+      )}
+    </Sheet>
+  );
+}
+
 /**
- * A trip's sessions and tables. A table opens your own visit there; one you didn't play has no
- * screen yet.
+ * A trip's sessions and tables. A table opens your own visit if you played, or a read-only summary
+ * if you didn't.
  */
 export function SessionList({
   sessions,
@@ -23,94 +136,72 @@ export function SessionList({
 }) {
   const go = useGo();
   const navigation = useNavigation();
-  return (
-    <List>
-      {sessions.map((play) => {
-        const { session, results, live } = play;
-        const venue = venueLabel(play.venue);
-        const game =
-          play.kind === "session"
-            ? gameNames[play.session.game]
-            : play.table.game
-              ? gameNames[play.table.game]
-              : "No game set";
-        const visitId = play.kind === "table" ? play.myVisitId : null;
-        const open =
-          play.kind === "session"
-            ? () => go.session(play.session.id)
-            : visitId
-              ? () => navigation.navigate("Play", { visitId })
-              : undefined;
-        const mine = results.find((result) => result.playerId === detail.myPlayerId);
-        return (
-          <Row
-            key={session.id}
-            {...(open ? { accessibilityHint: "Opens the session", onPress: open } : {})}
-          >
-            <Chip chip={chipOf(detail, detail.myPlayerId)} name={venue} size={28} />
-            <View className="flex-1 gap-0.5">
-              <View className="flex-row items-center gap-2">
-                <Text numberOfLines={1} className="shrink type-heading text-ink">
-                  {venue}
-                </Text>
-                {live ? <Badge tone="live">Live</Badge> : null}
-              </View>
-              <Text className="type-footnote text-muted">
-                {game} · {live ? "since " : ""}
-                {formatTime(session.startedAt)}
-              </Text>
-            </View>
-            {/* A live table's result is only its finished visits; it isn't settled yet. */}
-            {mine && !(live && play.kind === "table") ? (
-              <Money
-                amount={mine.net}
-                currency={detail.group.currency}
-                tone="result"
-                className="type-number"
-              />
-            ) : null}
-          </Row>
-        );
-      })}
-    </List>
-  );
-}
+  const names = playerNames(detail);
+  const [selected, setSelected] = useState<Extract<TripPlay, { kind: "table" }> | null>(null);
 
-export function LiveSessionCard({
-  summary,
-  detail,
-}: {
-  summary: SessionSummary;
-  detail: GroupDetail;
-}) {
-  const { session, venue, results, playing } = summary;
-  const mine = results.find((result) => result.playerId === detail.myPlayerId);
   return (
-    <Card className="gap-4 p-5">
-      <View className="flex-row items-center justify-between gap-3">
-        <Badge tone="live">{`Live · ${formatDuration(session.startedAt, DateTime.nowUnsafe())}`}</Badge>
-        <Text className="type-footnote text-muted">since {formatTime(session.startedAt)}</Text>
-      </View>
-      <View className="flex-row items-end justify-between gap-3">
-        <View className="min-w-0 flex-1 gap-1">
-          <Text accessibilityRole="header" numberOfLines={1} className="type-title text-ink">
-            {venue.name}
-          </Text>
-          <Text className="type-footnote text-muted">
-            {gameNames[session.game]} · {playing.length} at the table
-          </Text>
-        </View>
-        {mine && mine.buyIn > 0 ? (
-          <View className="items-end gap-1">
-            <Text className="type-label text-muted">In play</Text>
-            <Money
-              amount={mine.buyIn}
-              currency={detail.group.currency}
-              className="type-number-lg"
-            />
-          </View>
-        ) : null}
-      </View>
-    </Card>
+    <>
+      <List>
+        {sessions.map((play) => {
+          const { session, results, live } = play;
+          const venue = venueLabel(play.venue);
+          const game =
+            play.kind === "session"
+              ? gameNames[play.session.game]
+              : play.table.game
+                ? gameNames[play.table.game]
+                : "No game set";
+          const visitId = play.kind === "table" ? play.myVisitId : null;
+          const open =
+            play.kind === "session"
+              ? () => go.session(play.session.id)
+              : visitId
+                ? () => navigation.navigate("Play", { visitId })
+                : () => setSelected(play);
+          const accessibilityHint =
+            play.kind === "table" && !visitId ? "Opens the table summary" : "Opens the session";
+          const mine = results.find((result) => result.playerId === detail.myPlayerId);
+          // Who's still at a live table, members first.
+          const who = live
+            ? nameList([
+                ...play.playing.map((id) => names.get(id) ?? "Someone"),
+                ...(play.kind === "table"
+                  ? play.others.filter((o) => o.playing).map((o) => o.displayName)
+                  : []),
+              ])
+            : "";
+          return (
+            <Row key={session.id} accessibilityHint={accessibilityHint} onPress={open}>
+              <Chip chip={chipOf(detail, detail.myPlayerId)} name={venue} size={28} />
+              <View className="flex-1 gap-0.5">
+                <View className="flex-row items-center gap-2">
+                  <Text numberOfLines={1} className="shrink type-heading text-ink">
+                    {venue}
+                  </Text>
+                  {live ? <Badge tone="live">Live</Badge> : null}
+                </View>
+                <Text className="type-footnote text-muted">
+                  {who ? `${who} · ` : ""}
+                  {game} · {live ? "since " : ""}
+                  {formatTime(session.startedAt)}
+                </Text>
+              </View>
+              {/* A live table's result is only its finished visits; it isn't settled yet. */}
+              {mine && !(live && play.kind === "table") ? (
+                <Money
+                  amount={mine.net}
+                  currency={detail.group.currency}
+                  tone="result"
+                  className="type-number"
+                />
+              ) : null}
+            </Row>
+          );
+        })}
+      </List>
+      {selected ? (
+        <TableSummarySheet play={selected} detail={detail} onClose={() => setSelected(null)} />
+      ) : null}
+    </>
   );
 }

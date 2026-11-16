@@ -34,6 +34,7 @@ const crew = (trips: ReadonlyArray<Trip>): GroupListItem => ({
   myPlayerId: PlayerId.make("0192e7a0-0000-7000-8000-000000000008"),
   myBalance: MinorUnits.make(0),
   liveSessionCount: 0,
+  liveTripIds: [],
   currentTripId: null,
   trips,
   mySession: null,
