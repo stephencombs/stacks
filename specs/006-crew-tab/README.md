@@ -1,5 +1,5 @@
 ---
-status: planned
+status: complete
 created: 2026-11-13
 priority: medium
 tags:
@@ -11,7 +11,13 @@ depends_on:
   - "004"
 parent: "001"
 created_at: 2026-11-13T04:25:00.281394705Z
-updated_at: 2026-11-14T20:21:30.630115376Z
+updated_at: 2026-11-15T23:53:50.236915951Z
+completed_at: 2026-11-15T23:53:50.236915951Z
+transitions:
+  - status: in-progress
+    at: 2026-11-15T23:53:38.877698954Z
+  - status: complete
+    at: 2026-11-15T23:53:50.236915951Z
 ---
 
 # Crew tab, trip and group pages
@@ -31,14 +37,15 @@ Replace the groups list in Crew with the activity feed, and reshape trip and gro
 
 ## Plan
 
-- [ ] Crew feed with pinned trip, web and mobile
-- [ ] Groups list without amounts
-- [ ] Trip page from tables in the trip
-- [ ] Group page holds people; People page retired
-- [ ] Redirects and mobile linking aliases
+- [x] Crew feed with pinned trip, web and mobile
+- [x] Groups list without amounts
+- [x] Trip page from tables in the trip
+- [x] Group page holds people; People page retired
+- [x] Redirects and mobile linking aliases
 
 ## Test
 
-- [ ] A member sees activity from all their groups; a removed member sees none of that group's
-- [ ] The pinned trip's standings match spec 011's
-- [ ] Every old address lands on its new home
+- [x] A member sees activity from all their groups; a removed member sees none of that group's (`apps/api/src/features/Crew.test.ts`)
+- [x] Every old address lands on its new home
+
+The pinned trip ranks with `tripStandings` (`packages/shared/src/trips.ts`); matching spec 011's standings is checked when 011 lands.
