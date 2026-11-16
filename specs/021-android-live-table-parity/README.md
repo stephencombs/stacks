@@ -56,6 +56,29 @@ Page 003 · Live session: `AndLive`, `AndMenu`, `AndRebuy`, `AndLiveEdit`, `AndD
 - **Finished** (`AndFinished`): back and pencil; game tile, title and two meta lines; the result
   card with sentence-case labels; "At this table" and "Your history" sections (voided entries
   struck through); the outlined **Undo cash-out** and filled **Back at the table**.
+- **Back button label:** "Back to your play" only while you're playing; otherwise it names where
+  it goes.
+
+## Audit findings (2026-11-16)
+
+What the audit found against these frames, beyond the Design above:
+
+- **The felt:**
+  - The app bar uses solid white or charcoal circles.
+  - The dock has no darker felt background, and its colours are inverted: white rebuy pills and a
+    black Cash out in light.
+- **Snackbars** are sometimes light and sometimes dark, with 14–16dp corners and a pill Undo.
+- **Add player** hides saved players behind a dropdown.
+- **Shared tables** wrap players in an "At this table" card with no avatars or cents, and list the
+  You row twice.
+- **The recorder and cashed-out-starter heroes** are centred, without cents, venue or start time,
+  and Sit down is black.
+- **Finished:**
+  - Has no game chip or result divider.
+  - Shows an unstyled Add player / Share / Table settings row, even on a closed table. Drop it.
+  - Uses the labels "History" and "Final cash-out".
+- **"Other" game:** Start session's "Other" has no field for its name.
+- **Add past session:** amounts have no currency prefix and no result preview.
 
 ## Non-goals
 
@@ -73,6 +96,8 @@ Page 003 · Live session: `AndLive`, `AndMenu`, `AndRebuy`, `AndLiveEdit`, `AndD
 - [ ] Shared-table player list, recorder button, Add player text fields
 - [ ] Snackbar shape
 - [ ] Finished layout and copy
+- [ ] Back button label per role
+- [ ] "Other" game name; past-session amount prefix and result preview
 
 ## Test
 

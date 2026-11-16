@@ -50,6 +50,33 @@ Page 005 · Stats: `AndStats`, `AndStMPeriodMenu`, `AndStMTripSheet`, `AndStMTri
 - **States**: offline banner with the cloud-off icon (`AndStGGroupOffline`); empty, unavailable
   and no-match states with a bare icon, headline, body and a wide filled button.
 
+## Audit findings (2026-11-16)
+
+What the audit found against these frames, beyond the Design above:
+
+- **Top of the screen:** about 300dp of empty space sits above the filter row, and the row scrolls
+  away.
+- **Chips:**
+  - Chips are 44dp filled pills.
+  - Applied chips show a round × badge.
+  - Menus have no icons or subtitles.
+  - The trip filter is a dropdown.
+- **Hero:**
+  - Has no info button.
+  - Uses a 2×2 grid.
+  - Its tooltip is uppercase with a border.
+- **Standings:**
+  - Use striped chips and have no chevrons.
+  - The "you" row's left border clips at its rounded corners.
+  - The provenance note is missing.
+  - The member sheet's layout differs.
+- **The race chart** adds a headline and a Money / % of buy-in toggle, and greys out the other
+  players. The frame has neither. Drop them, or put them on the canvas first (019).
+- **Empty and no-match states** sit in cards with other copy, and **Change game** is missing.
+- **Section headers** are sentence case, and the casinos list shows 2 before See all.
+- **Offline states** (`features/GroupStats.tsx:58-85`) don't follow `AndStGGroupOffline` or
+  `AndStGGroupUnavailable`.
+
 ## Non-goals
 
 - New statistics or API changes; this is presentation only.

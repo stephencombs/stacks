@@ -48,6 +48,26 @@ the method and global rules.
   an unclaimed guest is a tonal button with a link icon.
 - **Crew** (`AndCrew`): no LiveBar on Crew. The pinned trip card and activity cards as drawn,
   including a trip-started item with its icon.
+- **Pushed pages** (Group settings, Session, Invite, Claim): a large title, as for every pushed page
+  (019). Today they have a small inline title and the You chip, which belongs on tab roots only.
+- **Map placeholder** (`AndMapSoon`): centred, with its icon.
+
+## Audit findings (2026-11-16)
+
+What the audit found against these frames, beyond the Design above:
+
+- The LiveBar reads "LIVE · Blackjack · since 2:05 PM" and doesn't update when the casino changes.
+- Groups opens as a full-screen sheet rather than a page.
+- Crew's Groups button sits on a second row.
+- The trip card's order, its Stats link and the activity cards differ from the frame.
+- The Group page:
+  - Splits into Members, Guests, Invite links and Settings sections.
+  - Shows a leaderboard card on the live trip.
+- The Trip page:
+  - Has ⋯ on its own row.
+  - Shows a "YOUR TRIP" chart card instead of the four stat cells, and no live session card.
+  - Uses "Day 3 · Monday" headers.
+  - Has rows without player counts or chevrons.
 
 ## Non-goals
 
@@ -62,6 +82,8 @@ the method and global rules.
 - [ ] Groups and Trip extended FABs and large titles
 - [ ] Group page header and sections
 - [ ] Crew without the LiveBar; activity item kinds
+- [ ] Large titles on pushed pages
+- [ ] Map placeholder
 
 ## Test
 

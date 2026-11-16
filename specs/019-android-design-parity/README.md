@@ -35,7 +35,10 @@ child uses to prove it.
   - Copy, amounts and type roles come from the frame; sample data doesn't.
 - **iOS stays put.** Shared components may change only when the iOS frames agree. Otherwise branch
   per platform (`*.android.tsx`) as `ActionMenu` and `PlaceTabs` already do.
-- **Children:** 020 shell, Play and Crew; 021 live table and sheets; 022 Stats; 023 Live Updates.
+- **Children:** 024 shared parts (sheets, footers, insets, pickers, dialogs) comes first, because
+  the 2026-11-16 audit found them broken on every screen. Then 020 shell, Play and Crew; 021 live
+  table and sheets; 022 Stats; 023 Live Updates. The audit's behaviour bugs are spec 025, outside
+  this umbrella.
 
 ## Verification protocol (every child)
 
@@ -46,6 +49,9 @@ child uses to prove it.
 3. In the PR, a table per frame: reference, after screenshot, and any difference that stays with
    its reason. Images go on `pr-assets/<branch>`.
 4. Update the Maestro flows a change breaks (`apps/mobile/maestro`), and run the checks CI runs.
+5. Check light, dark and 1.35× font scale (`adb shell settings put system font_scale 1.35`).
+6. To test offline states, stop the API or remove the port forward (`adb reverse --remove tcp:8787`).
+   Airplane mode doesn't work, because `adb reverse` keeps reaching the API.
 
 ## Non-goals
 
@@ -55,6 +61,7 @@ child uses to prove it.
 ## Plan
 
 - [ ] Push the `design-frames` reference branch and keep it current with the canvas
+- [ ] 024 shared parts
 - [ ] 020 shell, Play and Crew
 - [ ] 021 live table and sheets
 - [ ] 022 Stats
