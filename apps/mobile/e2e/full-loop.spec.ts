@@ -218,9 +218,7 @@ test.describe.serial("live mode on a phone", () => {
     await visible(alex.getByRole("button", { name: "See the trip's stats" })).click();
     await at(alex, `/stats(?:\\?.*)?`);
     await expect(visible(alex.getByRole("button", { name: "Group: Vegas crew" }))).toBeVisible();
-    await expect(
-      visible(alex.getByRole("button", { name: "Period: Vegas weekend" })),
-    ).toBeVisible();
+    await expect(visible(alex.getByRole("button", { name: "Trip: Vegas weekend" }))).toBeVisible();
     await expect(visible(alex.getByLabel(/^Rank 1, Alex, you, .*\+\$170/))).toBeVisible();
     await expect(alex.getByText("Biggest hit").filter({ visible: true }).first()).toBeVisible();
     await visible(alex.getByLabel(/^Rank 1, Alex, you, /)).click();
@@ -240,7 +238,7 @@ test.describe.serial("live mode on a phone", () => {
     await visible(alex.getByRole("button", { name: "Close", exact: true })).click();
 
     // Clearing the trip filter shows All time for the group; tapping a row opens their stat sheet.
-    await visible(alex.getByRole("button", { name: "Clear period filter" })).click();
+    await visible(alex.getByRole("button", { name: "Clear trip filter" })).click();
     await expect(visible(alex.getByRole("button", { name: "Period: All time" }))).toBeVisible();
     await expect(visible(alex.getByRole("button", { name: /^Craps, / }))).toBeVisible();
     await visible(alex.getByLabel(/^Rank 1, Alex, you, /)).click();
@@ -256,9 +254,7 @@ test.describe.serial("live mode on a phone", () => {
     await expect(visible(alex.getByRole("button", { name: "Period: All time" }))).toBeVisible();
     await expect(visible(alex.getByLabel(/^Rank 1, Alex, you, .*\+\$170/))).toBeVisible();
     await alex.goto(`${tripPath}/results`);
-    await expect(
-      visible(alex.getByRole("button", { name: "Period: Vegas weekend" })),
-    ).toBeVisible();
+    await expect(visible(alex.getByRole("button", { name: "Trip: Vegas weekend" }))).toBeVisible();
     await expect(visible(alex.getByLabel(/^Rank 1, Alex, you, .*\+\$170/))).toBeVisible();
 
     // The group hub lists the trip; its settings are pushed from it, at their own address.

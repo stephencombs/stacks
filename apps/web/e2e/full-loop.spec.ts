@@ -162,7 +162,11 @@ test.describe.serial("a group's first night out", () => {
     await expect(gus).toContainText("In $100");
     // The trip's stats wait on a finished session, and Crew keeps the live bar one click away.
     await alex.getByRole("link", { name: "Vegas weekend" }).first().click();
-    await alex.getByRole("link", { name: "Stats", exact: true }).click();
+    await alex
+      .getByRole("main")
+      .locator("header")
+      .getByRole("link", { name: "Stats", exact: true })
+      .click();
     await expect(alex.getByText("No finished sessions yet")).toBeVisible();
     await alex
       .getByRole("navigation", { name: "Tabs" })
@@ -257,8 +261,12 @@ test.describe.serial("a group's first night out", () => {
       .getByRole("link", { name: /^Vegas weekend/ })
       .first()
       .click();
-    await alex.getByRole("link", { name: "Stats", exact: true }).click();
-    await alex.getByRole("button", { name: "Clear period filter" }).click();
+    await alex
+      .getByRole("main")
+      .locator("header")
+      .getByRole("link", { name: "Stats", exact: true })
+      .click();
+    await alex.getByRole("button", { name: "Clear trip filter" }).click();
     await expect(alex.getByRole("button", { name: "Period: All time" })).toBeVisible();
     await expect(alex.getByRole("button", { name: /^Craps, / })).toBeVisible();
     await alex.getByRole("button", { name: /Alex/ }).click();
