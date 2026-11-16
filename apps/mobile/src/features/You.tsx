@@ -9,7 +9,7 @@ import { Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Choice } from "../components/ui/Field";
-import { GlassSurface } from "../components/ui/GlassSurface";
+import { ControlSurface } from "../components/ui/ControlSurface";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Sheet } from "../components/ui/Sheet";
 import { Card } from "../components/ui/Surface";
@@ -34,17 +34,13 @@ export function YouButton() {
         hitSlop={6}
         className="size-11"
       >
-        <GlassSurface
-          radius={22}
-          interactive
-          className="size-11 items-center justify-center rounded-full"
-        >
+        <ControlSurface>
           {scope ? (
             <MyChip item={scope.item} name={name} size={32} />
           ) : (
             <Chip chip={1} name={name} size={32} />
           )}
-        </GlassSurface>
+        </ControlSurface>
       </PressableScale>
       {open ? <YouSheet name={name} onClose={() => setOpen(false)} /> : null}
     </>

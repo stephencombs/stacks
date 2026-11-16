@@ -16,6 +16,7 @@
       ]
     },
     "apps/mobile": {
+      "entry": ["plugins/*.ts"],
       "ignoreDependencies": ["@babel/core", "@react-navigation/elements", "serve"]
     }
   }

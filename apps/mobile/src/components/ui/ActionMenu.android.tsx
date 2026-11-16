@@ -18,7 +18,7 @@ export function ActionMenu({ label, actions, disabled = false }: ActionMenuProps
         accessibilityLabel={label}
         accessibilityRole="button"
         accessibilityState={{ disabled }}
-        className="size-11 items-center justify-center rounded-full bg-surface"
+        className="size-11 items-center justify-center rounded-full bg-fill"
       >
         <Icon name="more" color="ink" size={20} />
       </View>

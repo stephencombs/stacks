@@ -69,6 +69,7 @@ export default (): ExpoConfig => ({
       },
     ],
     "./plugins/withStartupCrashRecovery",
+    "./plugins/withAndroidTabIcons",
   ],
   web: { bundler: "metro", output: "single" },
   extra: {

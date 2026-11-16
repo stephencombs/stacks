@@ -95,7 +95,7 @@ export function AmountKeypad({
                 onPressIn={key === "back" ? pressDelete : undefined}
                 onPressOut={key === "back" ? releaseDelete : undefined}
                 onPress={key === "back" ? activateDelete : () => tap(key)}
-                className="min-w-0 flex-1 items-center justify-center rounded-full active:bg-fill"
+                className="min-w-0 flex-1 items-center justify-center rounded-full active:bg-fill-strong"
               >
                 {key === "back" ? (
                   <Icon name="delete" color="ink" size={24} />

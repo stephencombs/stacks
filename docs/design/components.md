@@ -4,7 +4,7 @@ Parts live in `apps/web/src/components/ui` and `apps/mobile/src/components/ui`; 
 
 ## Button
 
-Use for an action. Going to another page on web is a `ButtonLink`, which takes the same variants. Floating icon controls use `IconButton`; web navigation uses `IconLink`. They own their round glass surface and require an accessible action label.
+Use for an action. Going to another page on web is a `ButtonLink`, which takes the same variants. Floating icon controls use `IconButton`; web navigation uses `IconLink`. They own their round surface (glass, or a filled tonal circle on Android) and require an accessible action label.
 
 Variants: `primary`, `tint`, `secondary`, `ghost`, `danger`. Sizes: `sm`, `md`, `lg`, plus `xl` on mobile. Nothing else exists.
 
@@ -111,7 +111,7 @@ Where content lives is decided in [docs/internals/navigation.md](../internals/na
 
 On web, `AppShell` (`features/Shell.tsx`) draws the tabs with **`TabLink`** (`ui/Nav.tsx`): `layout="bar"` stacks icon over label in the bottom bar below `lg`; `layout="side"` is a sidebar row above it. The current tab is `ink`, the rest `muted`. Below `lg` the bottom bar is glass, so the page shows through it as it scrolls. The shell reads nothing from an account or the network, so it opens offline and signed out; Crew asks for sign-in inside the tab. A tab page's main actions go in an `ActionBar`, which sits above the bottom bar. You opens from the avatar. `LiveBar` floats above the tabs while you're playing, in glass: your own session first, and on Crew's pages your seat at a group's table. The bottom actions above the tabs (`ActionBar`, `Dock`) stay solid.
 
-On mobile, keep React Navigation native-stack, one stack per tab. iOS uses native bottom tabs, which bring their own Liquid Glass, and grouped native header actions; Android floats the tab bar on a `GlassSurface`. The `LiveBar`, the You button and an `IconButton` are glass too. Screens learn the tab bar's height from `TabBarHeight` and keep their content and docks clear of it, and reserve the measured LiveBar height above it.
+On mobile, keep React Navigation native-stack, one stack per tab. Both platforms use native bottom tabs. On iOS they bring their own Liquid Glass, beside grouped native header actions. On Android they're Material's navigation bar, with Material Symbols from `assets/tab-icons` that a config plugin turns into drawables. The `LiveBar`, the You button and an `IconButton` are glass on iOS; on Android they're a solid surface and filled tonal circles. iOS tabs float over the screens, so screens learn their height from `TabBarHeight` and keep content and docks clear of it; Android's bar takes its own space, so the height there is zero. Screens also reserve the measured LiveBar height.
 
 See [mobile controls](mobile-redesign.md) for platform selection, native sheet sizing and chart interaction.
 
@@ -177,7 +177,7 @@ A page-level destructive action, like deleting a trip, goes in the menu and open
 
 ## GlassSurface (mobile), glass (web)
 
-The one way to draw glass. Use it only on the parts [Glass](foundations.md#glass) lists. On web it's the `glass` or `glass-sheet` class on the part's own element. On mobile wrap the content in `GlassSurface`, inside a `PressableScale` when the whole surface is a control, and pass `interactive` so iOS glass answers the touch.
+The one way to draw glass. Use it only on the parts [Glass](foundations.md#glass) lists. On web it's the `glass` or `glass-sheet` class on the part's own element. On mobile wrap the content in `GlassSurface`, inside a `PressableScale` when the whole surface is a control, and pass `interactive` so iOS glass answers the touch. On Android `GlassSurface` is a solid `fill` with a shadow, and a round icon control's surface is `ControlSurface`, a filled tonal circle.
 
 ## Toast (mobile), Undo bar (web)
 
