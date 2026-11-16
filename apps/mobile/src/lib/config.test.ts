@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 vi.mock("expo-constants", () => ({ default: { expoConfig: {} } }));
+vi.mock("expo-linking", () => ({ createURL: (path = "") => `stacks://${path}` }));
 import Constants from "expo-constants";
 
 afterEach(() => {
@@ -25,6 +26,13 @@ it("keeps maps disabled for existing builds without the flag", async () => {
   Constants.expoConfig = { name: "Color Up", slug: "stacks" };
   const config = await import("./config");
   expect(config.googleMapsEnabled).toBe(false);
+});
+
+it("builds deep links using the app URL scheme", async () => {
+  const { appUrl } = await import("./config");
+  expect(appUrl("/t/abc")).toBe("stacks://t/abc");
+  expect(appUrl("invite/xyz")).toBe("stacks://invite/xyz");
+  expect(appUrl("/join/code")).toBe("stacks://join/code");
 });
 
 it.each(["test-map-key", ""])("publishes only map availability for key %s", async (key) => {

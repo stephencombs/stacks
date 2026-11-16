@@ -42,9 +42,11 @@ import { GroupScreen } from "./screens/Group";
 import { GroupSettingsScreen } from "./screens/GroupSettings";
 import { NewSessionScreen } from "./screens/NewSession";
 import { PlayScreen } from "./screens/Play";
+import { RedeemInviteScreen } from "./screens/RedeemInvite";
 import { TableScreen } from "./screens/Table";
 import { SessionScreen } from "./screens/Session";
 import { SessionsScreen } from "./screens/Sessions";
+import { SharedTableScreen } from "./screens/SharedTable";
 import { StatsScreen } from "./screens/Stats";
 
 const headerOptions = {
@@ -153,6 +155,16 @@ const RootStack = createNativeStackNavigator({
     Tabs: { screen: Tabs, options: { headerShown: false } },
     Play: { screen: PlayScreen, linking: "play/:visitId" },
     Table: { screen: TableScreen, linking: "tables/:tableId", options: { headerShown: false } },
+    SharedTable: {
+      screen: SharedTableScreen,
+      linking: "t/:token",
+      options: { title: "Shared table" },
+    },
+    RedeemInvite: {
+      screen: RedeemInviteScreen,
+      linking: "invite/:token",
+      options: { title: "Invite" },
+    },
     History: { screen: HistoryScreen, linking: "history", options: { title: "All sessions" } },
     Invites: { screen: InvitesStack, options: { headerShown: false } },
   },

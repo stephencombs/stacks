@@ -5,13 +5,12 @@ priority: medium
 tags:
   - recording
   - api
-  - web
   - mobile
 depends_on:
   - "003"
 parent: "001"
 created_at: 2026-11-14T20:21:35.164878914Z
-updated_at: 2026-11-15T19:47:59.092651854Z
+updated_at: 2026-11-16T03:54:17.874076651Z
 completed_at: 2026-11-15T19:47:59.092651854Z
 transitions:
   - status: in-progress
@@ -39,7 +38,7 @@ The live screen's edit sheet ends with **Delete session**. The ledger never eras
 ## Plan
 
 - [x] Commands, shared logic and API, with unit and API tests
-- [x] Delete and undo on the live screen and Finished, web and mobile
+- [x] Delete and undo on the live screen and Finished on mobile
 - [x] Deleted visits in All sessions with Restore
 
 ## Test
