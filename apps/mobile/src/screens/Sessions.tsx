@@ -74,8 +74,8 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
   return (
     <Screen
       shows={{ trip: trip.trip.id }}
-      {...(canStart && Platform.OS === "android" ? { fab: startButton } : {})}
-      {...(canStart && Platform.OS !== "android" ? { renderFooter: () => startButton } : {})}
+      fab={canStart && Platform.OS === "android" ? startButton : undefined}
+      renderFooter={canStart && Platform.OS !== "android" ? () => startButton : undefined}
     >
       <View className="gap-3">
         <PageTitle

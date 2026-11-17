@@ -30,7 +30,7 @@ frame work sits on top of these parts. Parent 019 has the verification protocol.
   its content up to the screen, not full-screen. Short sheets (member actions, Leave group, the
   "+1 live" picker) stay short. The header follows 021's Android sheet header.
 - **Bottom bars** (Finished, a closed table, a session page, the felt's Rebuy / Cash out dock): a
-  pinned footer has the surface background and a top edge, so content and the LiveBar never show
+  pinned footer has the canvas background, as AndFinished draws it, and a hairline top edge, so content and the LiveBar never show
   through it. Scrolled content stops at the status bar instead of drawing under it.
 - **Keypad** (`features/AmountKeypad.tsx` in Cash out and Cash out a player): the whole keypad stays
   above the footer and the navigation bar, at 1.0× and 1.35× font scale.

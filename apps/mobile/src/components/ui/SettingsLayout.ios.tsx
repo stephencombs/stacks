@@ -13,7 +13,7 @@ import { useCSSVariable, useUniwind } from "uniwind";
 
 import { LiveBar } from "../../features/LiveBar";
 import { useNativeHeaderActions } from "../../features/NativeHeaderActions";
-import { TabBarHeight } from "./Screen";
+import { TabBarHeight } from "./tabBar";
 import type { SettingsLayoutProps } from "./SettingsLayout";
 
 export function SettingsLayout({ groupName, currency, sections, children }: SettingsLayoutProps) {

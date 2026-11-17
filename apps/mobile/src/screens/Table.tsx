@@ -114,7 +114,7 @@ function Table({ tableId }: { tableId: TableId }) {
       felt={!view.closed}
       dock={
         <>
-          <LiveSessionsBar except={tableId} spaced />
+          <LiveSessionsBar except={tableId} />
           {notice ? (
             <View accessibilityLiveRegion="polite" className="rounded-xl bg-fill px-4 py-2">
               <Text className="text-sm text-ink">{notice}</Text>

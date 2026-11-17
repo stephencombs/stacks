@@ -10,23 +10,11 @@ import { dismissConfirmation, useConfirmation } from "./confirmStore";
  */
 export function ConfirmDialogHost() {
   const confirmation = useConfirmation();
-  const [surface, ink, muted, loss] = useCSSVariable([
-    "--color-surface",
-    "--color-ink",
-    "--color-muted",
-    "--color-loss",
-  ]).map(String);
+  const loss = String(useCSSVariable("--color-loss"));
   if (!confirmation) return null;
   return (
     <Host style={{ position: "absolute", width: 0, height: 0 }}>
-      <AlertDialog
-        onDismissRequest={dismissConfirmation}
-        colors={{
-          containerColor: surface,
-          titleContentColor: ink,
-          textContentColor: muted,
-        }}
-      >
+      <AlertDialog onDismissRequest={dismissConfirmation}>
         <AlertDialog.Title>
           <Text>{confirmation.title}</Text>
         </AlertDialog.Title>
@@ -34,7 +22,7 @@ export function ConfirmDialogHost() {
           <Text>{confirmation.message}</Text>
         </AlertDialog.Text>
         <AlertDialog.DismissButton>
-          <TextButton onClick={dismissConfirmation} colors={{ contentColor: ink }}>
+          <TextButton onClick={dismissConfirmation}>
             <Text>Cancel</Text>
           </TextButton>
         </AlertDialog.DismissButton>

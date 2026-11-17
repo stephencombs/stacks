@@ -1,15 +1,13 @@
-import { use, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 
 import { LiveBar, type ShowsTable } from "../../features/LiveBar";
 import { useNativeHeaderActions } from "../../features/NativeHeaderActions";
 import { FormError } from "./Field";
-import { FAB_ROOM, FloatingAction } from "./FloatingAction";
+import { FloatingAction } from "./FloatingAction";
 import { PinnedFooter } from "./PinnedFooter";
-import { TabBarHeight, useBottomClearance, useListEnd } from "./tabBar";
+import { useScreenFoot } from "./tabBar";
 import { ToastHost, useToast, type Toast } from "./Toast";
-
-export { TabBarHeight };
 
 type Content = ReactNode | ((toast: (toast: Toast) => void) => ReactNode);
 
@@ -31,56 +29,45 @@ export function Screen({
 }: {
   children: Content;
   shows?: ShowsTable;
-  renderFooter?: (toast: (toast: Toast) => void) => ReactNode;
+  renderFooter?: ((toast: (toast: Toast) => void) => ReactNode) | undefined;
   /** A floating action button, bottom right above the live bar. */
   fab?: ReactNode;
 }) {
   const footer = renderFooter;
   const header = useNativeHeaderActions();
-  const bar = use(TabBarHeight);
-  const clearance = useBottomClearance(12);
-  const [footerHeight, setFooterHeight] = useState(0);
-  const [liveBarHeight, setLiveBarHeight] = useState(0);
-  const end = useListEnd(liveBarHeight);
+  const foot = useScreenFoot({ footer: !!footer, fab: !!fab, footerGap: 12 });
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-canvas"
     >
       {header}
-      <ToastHost {...(footer ? { above: footerHeight } : bar ? { above: bar } : {})}>
+      <ToastHost {...(foot.above === undefined ? {} : { above: foot.above })}>
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
           className="flex-1"
-          style={footer ? undefined : { marginBottom: end.margin }}
+          style={foot.scrollStyle}
           contentContainerClassName="gap-6 px-4 pt-4 pb-24"
         >
           <Content>{children}</Content>
-          <View
-            style={{
-              height: (footer ? footerHeight + end.above : end.spacer) + (fab ? FAB_ROOM : 0),
-            }}
-          />
+          <View style={{ height: foot.endSpace }} />
         </ScrollView>
         {fab ? (
-          <FloatingAction right={16} bottom={end.fab}>
+          <FloatingAction right={16} bottom={foot.fabBottom}>
             {fab}
           </FloatingAction>
         ) : null}
         {footer ? (
-          <PinnedFooter
-            onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
-            inset={clearance + 12}
-          >
+          <PinnedFooter onLayout={foot.onFooterLayout} inset={foot.footerInset}>
             <Content>{footer}</Content>
           </PinnedFooter>
         ) : null}
       </ToastHost>
       <LiveBar
-        onHeightChange={setLiveBarHeight}
+        onHeightChange={foot.onLiveBarHeight}
         {...(shows ? { shows } : {})}
-        {...(footer ? { bottom: footerHeight } : bar ? { bottom: bar } : {})}
+        {...(foot.above === undefined ? {} : { bottom: foot.above })}
       />
     </KeyboardAvoidingView>
   );

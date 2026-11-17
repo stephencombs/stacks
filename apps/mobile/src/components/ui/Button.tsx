@@ -101,8 +101,8 @@ export function Button({
           disabled && !pending ? "text-muted" : labels[variant],
           text[size],
         )}
-        // At large text a label wraps on Android rather than hide the action's name.
-        numberOfLines={Platform.OS === "android" ? undefined : 1}
+        // At large text a label wraps to two lines on Android rather than hide the action's name.
+        numberOfLines={Platform.OS === "android" ? 2 : 1}
       >
         {label}
       </Text>

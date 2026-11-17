@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { fieldDate, fieldText } from "./dateTimeValue";
+import { fieldDate, fieldText, pickerStart, pickerText } from "./dateTimeValue";
 
 describe("native date/time field values", () => {
   it("keeps local calendar dates and clock times without UTC conversion", () => {
@@ -17,5 +17,20 @@ describe("native date/time field values", () => {
     expect(fieldDate("2026-02-30", "date")).toBeNull();
     expect(fieldDate("24:00", "time")).toBeNull();
     expect(fieldDate("12:60", "time")).toBeNull();
+  });
+});
+
+describe("Material picker values", () => {
+  it("round-trips a calendar day through UTC midnight in any time zone", () => {
+    const start = pickerStart("2026-11-07", "date");
+    expect(start).toBe("2026-11-07T00:00:00.000Z");
+    expect(pickerText(new Date(start), "date")).toBe("2026-11-07");
+  });
+
+  it("starts an unset field on today, or now", () => {
+    const now = new Date(2026, 10, 7, 9, 5);
+    expect(pickerStart("", "date", now)).toBe("2026-11-07T00:00:00.000Z");
+    expect(pickerStart("", "time", now)).toBe(now.toISOString());
+    expect(pickerText(new Date(pickerStart("09:05", "time")), "time")).toBe("09:05");
   });
 });

@@ -3,8 +3,7 @@ import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import type { VisitId } from "@stacks/contracts";
-import { StatusBar } from "expo-status-bar";
-import { use, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ActivityIndicator, Platform, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,15 +13,16 @@ import { ControlSurface } from "../components/ui/ControlSurface";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Choice } from "../components/ui/Field";
 import { Icon, type IconName } from "../components/ui/Icon";
-import { FAB_ROOM, FloatingAction } from "../components/ui/FloatingAction";
+import { FloatingAction } from "../components/ui/FloatingAction";
 import { PinnedFooter } from "../components/ui/PinnedFooter";
 import { Sheet } from "../components/ui/Sheet";
-import { TabBarHeight, useBottomClearance, useListEnd } from "../components/ui/tabBar";
+import { useScreenFoot } from "../components/ui/tabBar";
 import { SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useAccount } from "../lib/account";
 import { setTheme, useTheme } from "../lib/theme";
 import { Chip } from "./Chip";
+import { FeltStatusBar } from "./FeltStatusBar";
 import { SignInButton } from "./SignInButton";
 import { PersonalLiveBar } from "./LiveBar";
 import { useNativeHeaderActions } from "./NativeHeaderActions";
@@ -50,12 +50,8 @@ export function PersonalScreen({
   session?: boolean;
 }) {
   const header = useNativeHeaderActions(true);
-  const bar = use(TabBarHeight);
-  const [dockHeight, setDockHeight] = useState(0);
-  const [liveBarHeight, setLiveBarHeight] = useState(0);
   const insets = useSafeAreaInsets();
-  const clearance = useBottomClearance(12);
-  const end = useListEnd(liveBarHeight);
+  const foot = useScreenFoot({ footer: !!dock, fab: !!fab });
   const sides = {
     paddingLeft: Math.max(16, insets.left),
     paddingRight: Math.max(16, insets.right),
@@ -69,11 +65,10 @@ export function PersonalScreen({
       style={clipped ? { paddingTop: insets.top } : undefined}
     >
       {header}
-      {/* Light icons on the dark green, in either theme; the app's own bar follows the theme. */}
-      {felt && Platform.OS === "android" ? <StatusBar style="light" /> : null}
+      <FeltStatusBar felt={felt} />
       <ScrollView
         className="flex-1"
-        style={dock ? undefined : { marginBottom: end.margin }}
+        style={foot.scrollStyle}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         contentContainerClassName="gap-6 pt-4 pb-8"
@@ -84,12 +79,10 @@ export function PersonalScreen({
         }}
       >
         {children}
-        <View
-          style={{ height: (dock ? dockHeight + end.above : end.spacer) + (fab ? FAB_ROOM : 0) }}
-        />
+        <View style={{ height: foot.endSpace }} />
       </ScrollView>
       {fab ? (
-        <FloatingAction right={sides.paddingRight} bottom={end.fab}>
+        <FloatingAction right={sides.paddingRight} bottom={foot.fabBottom}>
           {fab}
         </FloatingAction>
       ) : null}
@@ -97,16 +90,16 @@ export function PersonalScreen({
         <PinnedFooter
           felt={felt}
           sides={sides}
-          onLayout={(event) => setDockHeight(event.nativeEvent.layout.height)}
-          inset={clearance}
+          onLayout={foot.onFooterLayout}
+          inset={foot.footerInset}
         >
           {dock}
         </PinnedFooter>
       ) : null}
       {live ? (
         <PersonalLiveBar
-          onHeightChange={setLiveBarHeight}
-          {...(dock ? { bottom: dockHeight } : bar ? { bottom: bar } : {})}
+          onHeightChange={foot.onLiveBarHeight}
+          {...(foot.above === undefined ? {} : { bottom: foot.above })}
         />
       ) : null}
     </View>
@@ -251,7 +244,15 @@ function SaveLine({
   // Saved and in step needs no line; the You sheet says where your sessions are kept. On the
   // felt of Android the room stays, so a rebuy's "Syncing…" doesn't push the table down.
   if (!busy && !failed && (sync.kind === "device" || sync.kind === "synced"))
-    return felt && Platform.OS === "android" ? <View className="h-5" /> : null;
+    return felt && Platform.OS === "android" ? (
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className="min-h-5 flex-row items-center"
+      >
+        <Text className="text-sm opacity-0">Syncing…</Text>
+      </View>
+    ) : null;
   const text =
     status === "loading"
       ? "Opening…"

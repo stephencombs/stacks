@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/ui/Button";
 import { cn } from "../components/ui/cn";
-import { useBottomClearance } from "../components/ui/tabBar";
+import { useScreenFoot } from "../components/ui/tabBar";
 import { animate, ease, useReducedMotion } from "../components/ui/motion";
 import { SignInButton } from "./SignInButton";
 import { TripHero } from "./TripHero";
@@ -116,9 +116,7 @@ export function Landing({
 }) {
   const copy = invited ? invitedCopy : accountCopy;
   const insets = useSafeAreaInsets();
-  // Android's navigation bar floats over the foot of the screen; iOS's already insets it.
-  const bar = useBottomClearance();
-  const clearance = Platform.OS === "android" ? bar : insets.bottom;
+  const { clearance } = useScreenFoot();
   const { width } = useWindowDimensions();
   const frame = Math.min(width, FRAME);
   const pager = useRef<ComponentRef<typeof ScrollView>>(null);

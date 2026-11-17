@@ -10,10 +10,14 @@ import {
   TextField,
   useNativeState,
 } from "@expo/ui/jetpack-compose";
-import { defaultMinSize, fillMaxWidth, menuAnchor } from "@expo/ui/jetpack-compose/modifiers";
+import {
+  defaultMinSize,
+  fillMaxWidth,
+  menuAnchor,
+  semantics,
+} from "@expo/ui/jetpack-compose/modifiers";
 import { useEffect, useState } from "react";
 import { Text as NativeText, View, useWindowDimensions } from "react-native";
-import { useCSSVariable } from "uniwind";
 
 import { ComposeHost as Host } from "./ComposeHost.android";
 import type { FieldChoiceProps } from "./FieldChoice";
@@ -59,7 +63,7 @@ export function FieldChoice<A extends string>({
             ))}
           </SingleChoiceSegmentedButtonRow>
         ) : (
-          <Dropdown options={options} value={value} onChange={onChange} />
+          <Dropdown label={label} options={options} value={value} onChange={onChange} />
         )}
       </Host>
     </View>
@@ -68,16 +72,12 @@ export function FieldChoice<A extends string>({
 
 /** Material's exposed dropdown: a full-width field with a trailing arrow that opens on one tap. */
 function Dropdown<A extends string>({
+  label,
   options,
   value,
   onChange,
-}: Pick<FieldChoiceProps<A>, "options" | "value" | "onChange">) {
+}: Pick<FieldChoiceProps<A>, "label" | "options" | "value" | "onChange">) {
   const [expanded, setExpanded] = useState(false);
-  const [ink, surface, muted] = useCSSVariable([
-    "--color-ink",
-    "--color-surface",
-    "--color-muted",
-  ]).map(String);
   const shown = options.find((option) => option.value === value)?.label ?? "";
   const text = useNativeState(shown);
   useEffect(() => {
@@ -90,26 +90,18 @@ function Dropdown<A extends string>({
         readOnly
         singleLine
         shape={fieldShape}
-        modifiers={[fillMaxWidth(), menuAnchor("primaryNotEditable")]}
-        colors={{
-          focusedContainerColor: surface,
-          unfocusedContainerColor: surface,
-          focusedTextColor: ink,
-          unfocusedTextColor: ink,
-          focusedIndicatorColor: "transparent",
-          unfocusedIndicatorColor: "transparent",
-          cursorColor: ink,
-        }}
+        modifiers={[
+          fillMaxWidth(),
+          menuAnchor("primaryNotEditable"),
+          semantics({ contentDescription: `${label}, ${shown}` }),
+        ]}
+        colors={{ focusedIndicatorColor: "transparent", unfocusedIndicatorColor: "transparent" }}
       >
         <TextField.TrailingIcon>
-          <Icon source={arrow} tint={muted} size={24} />
+          <Icon source={arrow} size={24} />
         </TextField.TrailingIcon>
       </TextField>
-      <ExposedDropdownMenu
-        expanded={expanded}
-        containerColor={surface}
-        onDismissRequest={() => setExpanded(false)}
-      >
+      <ExposedDropdownMenu expanded={expanded} onDismissRequest={() => setExpanded(false)}>
         {options.map((option) => (
           <DropdownMenuItem
             key={option.value}

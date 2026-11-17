@@ -20,7 +20,7 @@ import { useCSSVariable, useUniwind } from "uniwind";
 import { Button } from "./components/ui/Button";
 import { ConfirmDialogHost } from "./components/ui/ConfirmDialogHost";
 import { HeaderTitle } from "./components/ui/HeaderTitle";
-import { TabBarHeight } from "./components/ui/Screen";
+import { TabBarHeight } from "./components/ui/tabBar";
 import { Landing } from "./features/Landing";
 import { PersonalYouButton, PlayBrand } from "./features/Personal";
 import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./features/PlaceTabs";
