@@ -55,9 +55,14 @@ export function NameSheet({
       <TextField
         label={label}
         value={name}
-        onChangeText={setName}
+        onChangeText={(text) => {
+          setName(text);
+          if (text.trim()) setNameError(null);
+        }}
         maxLength={maxLength}
         autoFocus
+        returnKeyType="done"
+        onSubmitEditing={() => void submit()}
         error={nameError}
       />
       {error ? <FormError>{error}</FormError> : null}

@@ -45,7 +45,9 @@ export function SettingsLayout({ groupName, currency, sections, children }: Sett
                   {row.pending ? "Exporting…" : row.label}
                 </Text>
                 {row.value ? (
-                  <Text className="shrink type-callout text-muted">{row.value}</Text>
+                  <Text numberOfLines={1} className="shrink type-callout text-muted">
+                    {row.value}
+                  </Text>
                 ) : null}
                 {row.disclosure ? <Icon name="chevron-right" color="faint" size={18} /> : null}
               </Row>
