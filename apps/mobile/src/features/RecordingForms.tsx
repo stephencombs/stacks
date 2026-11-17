@@ -725,7 +725,7 @@ export function CashOutSheet({
         />
       </View>
       <ClockField label="Finished at" clock={clock} />
-      <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface p-4">
+      <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
         <View>
           <Text className="type-footnote text-muted">
             {who ? `${who}'s result` : "Your result"}

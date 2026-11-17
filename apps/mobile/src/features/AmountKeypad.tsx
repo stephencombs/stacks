@@ -79,7 +79,10 @@ export function AmountKeypad({
   return (
     <View className="w-full">
       {[...digitRows, [bottomLeft, "0", "back"]].map((row) => (
-        <View key={row[1]} className="h-16 flex-row">
+        <View
+          key={row[1]}
+          className={Platform.OS === "android" ? "h-12 flex-row" : "h-16 flex-row"}
+        >
           {row.map((key) =>
             key === null ? (
               <View key="gap" className="flex-1" />

@@ -194,7 +194,7 @@ export function Sheet({
                   );
                 });
               }}
-              contentContainerClassName="gap-5 px-4 pt-2 pb-8"
+              contentContainerClassName={footer ? "gap-4 px-4 pt-2 pb-3" : "gap-5 px-4 pt-2 pb-8"}
             >
               {description ? (
                 <Text className="px-1 text-center type-callout text-muted">{description}</Text>
