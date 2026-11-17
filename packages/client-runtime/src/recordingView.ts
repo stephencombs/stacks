@@ -721,6 +721,9 @@ const syncView = (
   };
 };
 
+/** The reason an undo saves, which tells a correction from taking a rebuy back. */
+export const UNDONE_REASON = "Undone";
+
 export const LIVE_REBUY_AMOUNTS = [10000, 20000] as const;
 
 /** Time since `start` as the LIVE pill reads it: "1:48:22". */
@@ -738,7 +741,10 @@ export const sessionReadout = (visit: RecordingVisitView, now: DateTime.Utc) => 
     clock: elapsedClock(visit.visit.startedAt, end),
     buyIns: visit.entries.filter((entry) => entry.kind === "buy_in" && entry.voidedAt === null)
       .length,
-    corrected: visit.entries.some((entry) => entry.kind === "buy_in" && entry.voidedAt !== null),
+    corrected: visit.entries.some(
+      (entry) =>
+        entry.kind === "buy_in" && entry.voidedAt !== null && entry.voidReason !== UNDONE_REASON,
+    ),
     hourly:
       visit.finalResult === null || elapsed === 0
         ? null

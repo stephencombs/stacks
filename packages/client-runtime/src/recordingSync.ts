@@ -671,6 +671,8 @@ export const makeRecordingSync = (
   userId: UserId | null,
   transport: RecordingTransport,
   keys: ActorKeyStorage,
+  /** Called each time the server accepted a push, so what the app shows from it can refetch. */
+  onPushed: () => void = () => {},
 ) => {
   let status: RecordingSyncStatus = { phase: "idle", error: null, claim: null };
   const listeners = new Set<() => void>();
@@ -773,6 +775,7 @@ export const makeRecordingSync = (
           ),
         );
       yield* transform((current) => applyPushResults(current, response.results));
+      onPushed();
       // A refusal can mean another device changed the visit: converge on the server's ledger.
       if (response.results.some((result) => result.status === "rejected")) pull = true;
     }

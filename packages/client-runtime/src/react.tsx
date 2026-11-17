@@ -26,7 +26,14 @@ import {
 
 import { LEDGER_KEYS, type Stacks } from "./api.ts";
 import { describeError } from "./errors.ts";
-import { CACHE_MS, shouldRevalidate } from "./freshness.ts";
+import {
+  CACHE_MS,
+  ledgerChanged,
+  ledgerSyncCount,
+  lastLedgerChange,
+  shouldRevalidate,
+  subscribeLedgerSynced,
+} from "./freshness.ts";
 import { makeOutbox, type Outbox, type OutboxStorage, type Pending } from "./outbox.ts";
 import { makeStatsCopies, statsState, type StatsCopyStorage } from "./statsCopy.ts";
 import { makeLastTripStore, type LastTripStorage } from "./trip.ts";
@@ -316,12 +323,6 @@ export function useGroupStats(groupId: GroupId, onWake: (revalidate: () => void)
 
 /** When each query last refetched in the background, so screens sharing one ask only once. */
 const lastRevalidated = new WeakMap<object, number>();
-/** When this client last wrote to the ledger. */
-let ledgerChangedAt = 0;
-const ledgerChanged = () => {
-  ledgerChangedAt = Date.now();
-};
-
 /**
  * Keeps a shown query fresh without ever blanking it: when the screen mounts, and whenever
  * `onWake` reports the app coming back (focus, reconnect, foreground), stale data refetches in the
@@ -335,7 +336,7 @@ export function useRevalidate<A, E>(
   const refresh = useAtomRefresh(query);
   const revalidate = useEffectEvent(() => {
     const now = Date.now();
-    if (!shouldRevalidate(result, now, lastRevalidated.get(query), ledgerChangedAt)) return;
+    if (!shouldRevalidate(result, now, lastRevalidated.get(query), lastLedgerChange())) return;
     lastRevalidated.set(query, now);
     refresh();
   });
@@ -343,4 +344,12 @@ export function useRevalidate<A, E>(
     revalidate();
     return onWake(() => revalidate());
   }, [onWake]);
+  // Changes that reached the server by sync didn't refetch anything; do it now, not on next mount.
+  const syncs = useSyncExternalStore(subscribeLedgerSynced, ledgerSyncCount);
+  const first = useRef(syncs);
+  useEffect(() => {
+    if (first.current === syncs) return;
+    first.current = syncs;
+    revalidate();
+  }, [syncs]);
 }

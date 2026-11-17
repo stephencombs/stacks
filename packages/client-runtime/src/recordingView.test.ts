@@ -35,6 +35,7 @@ import {
   venueChoices,
   venuePlace,
   tableTripOptions,
+  UNDONE_REASON,
 } from "./recordingView.ts";
 
 const at = (hour: number) =>
@@ -461,6 +462,35 @@ describe("live session readouts", () => {
       buyIns: 1,
       corrected: true,
       hourly: null,
+    });
+    await store.close();
+  });
+
+  it("doesn't call a buy-in corrected when a rebuy was only undone", async () => {
+    const { store } = await open();
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(9) });
+    const id = state(store).visits[0]!.id;
+    await save(store, { type: "add", visitId: id, kind: "buy_in", amount: 10000 });
+    const rebuy = recordingVisit(state(store), id)!.entries.find((e) => e.amount === 10000)!;
+    await save(store, {
+      type: "correct",
+      visitId: id,
+      entryId: rebuy.id,
+      reason: UNDONE_REASON,
+      replacement: null,
+    });
+    const undone = recordingVisit(state(store), id)!;
+    expect(sessionReadout(undone, at(10))).toMatchObject({ buyIns: 1, corrected: false });
+
+    await save(store, {
+      type: "correct",
+      visitId: id,
+      entryId: undone.entries.find((e) => e.amount === 20000)!.id,
+      reason: "Typo",
+      replacement: { amount: 15000 },
+    });
+    expect(sessionReadout(recordingVisit(state(store), id)!, at(10))).toMatchObject({
+      corrected: true,
     });
     await store.close();
   });

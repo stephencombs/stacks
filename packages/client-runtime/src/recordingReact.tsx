@@ -37,6 +37,7 @@ import {
   type RecordingReceipt,
   type RecordingStore,
 } from "./recording.ts";
+import { ledgerSynced } from "./freshness.ts";
 import type { RecordingStorage, RecordingStorageChange } from "./recordingStorage.ts";
 import {
   makeRecordingSync,
@@ -211,7 +212,13 @@ export function RecordingSyncRoot({
   const store = useRecordingStore();
   const hold = (id: string | null) => ({
     userId: id,
-    sync: makeRecordingSync(store, id === null ? null : UserId.make(id), connect(), keys),
+    sync: makeRecordingSync(
+      store,
+      id === null ? null : UserId.make(id),
+      connect(),
+      keys,
+      ledgerSynced,
+    ),
   });
   const [held, setHeld] = useState(() => hold(userId));
   if (held.userId !== userId) setHeld(hold(userId));

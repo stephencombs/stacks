@@ -20,6 +20,7 @@ import {
   sessionReadout,
   sessionEditFields,
   RECORDING_CURRENCY,
+  UNDONE_REASON,
   visitTitle,
   type RecordingEvent,
   type RecordingVisitView,
@@ -249,7 +250,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       type: "correct",
       visitId: of,
       entryId,
-      reason: "Undone",
+      reason: UNDONE_REASON,
       replacement: null,
     });
     if (receipt) setSaved({ entryId, text: "Rebuy undone. It stays in the history, voided." });
