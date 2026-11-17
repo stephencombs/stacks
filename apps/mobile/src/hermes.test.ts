@@ -45,7 +45,7 @@ it("takes away what Hermes lacks", () => {
 
 it("records, reviews and formats a solo session without them", async () => {
   const { makeRecordingStore } = await import("@stacks/client-runtime/recording");
-  const { recordingHome, recordingMonths } = await import("@stacks/client-runtime/recordingView");
+  const { recordingHome, recordingPeriods } = await import("@stacks/client-runtime/recordingView");
   const { decimalSeparator, formatMoney, parseMoney } = await import("@stacks/shared/money");
   let document: RecordingStorageDocument = { revision: 0 };
   const store = makeRecordingStore({
@@ -71,7 +71,7 @@ it("records, reviews and formats a solo session without them", async () => {
   });
   const home = recordingHome(store.getSnapshot().state!);
   expect(home.finished).toHaveLength(1);
-  expect(recordingMonths(home)).toHaveLength(1);
+  expect(recordingPeriods(home, "year")).toHaveLength(1);
 
   const usd = CurrencyCode.make("USD");
   expect(formatMoney(MinorUnits.make(15000), usd)).toContain("150");

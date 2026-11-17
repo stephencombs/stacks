@@ -37,6 +37,10 @@ export const formatDuration = (start: DateTime.Utc, end: DateTime.Utc) => {
   return hours === 0 ? `${minutes}m` : `${hours}h ${String(minutes % 60).padStart(2, "0")}m`;
 };
 
+/** Time played in a header: "45m" under an hour, then whole hours, "4h". */
+export const formatPlayed = (minutes: number) =>
+  minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`;
+
 export const gameNames = {
   slots: "Slots",
   blackjack: "Blackjack",

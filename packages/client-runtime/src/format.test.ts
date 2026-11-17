@@ -12,7 +12,25 @@ import {
   type StakeView,
 } from "@stacks/contracts";
 
-import { csvFilename, isFormerMember, isGuest, playedSummary, stakeLines } from "./format.ts";
+import {
+  csvFilename,
+  formatPlayed,
+  isFormerMember,
+  isGuest,
+  playedSummary,
+  stakeLines,
+} from "./format.ts";
+
+it("says how long was played in minutes, then whole hours", () => {
+  expect([0, 45, 60, 89, 90, 600].map(formatPlayed)).toEqual([
+    "0m",
+    "45m",
+    "1h",
+    "1h",
+    "2h",
+    "10h",
+  ]);
+});
 
 it("sums up what the group has played", () => {
   expect(playedSummary(29, 8100)).toBe("The group has played 29 sessions over 135 hours.");
