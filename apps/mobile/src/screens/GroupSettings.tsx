@@ -9,6 +9,7 @@ import { Screen } from "../components/ui/Screen";
 import { SettingsLayout, type SettingsLayoutProps } from "../components/ui/SettingsLayout";
 import { Sheet } from "../components/ui/Sheet";
 import { SettingsSkeleton } from "../features/ScreenSkeletons";
+import { afterLeavingGroup } from "../lib/crewRoutes";
 import { useLinkedScope } from "../lib/scope";
 import { shareCsv } from "../lib/share";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
@@ -78,7 +79,7 @@ function LeaveSheet({ detail, onClose }: { detail: GroupDetail; onClose: () => v
   const confirm = async () => {
     if (await leave.run({ params: { groupId: detail.group.id } })) {
       onClose();
-      navigation.navigate("Tabs", { screen: "CrewTab", params: { screen: "Crew" } });
+      navigation.dispatch(afterLeavingGroup());
     }
   };
   return (

@@ -57,7 +57,12 @@ export function StatsScreen({ route }: Props) {
       <YourGroups>
         {(groups) => (
           // Each arrival with a group picked starts fresh, even when Stats is already open.
-          <StatsView key={`${pick.groupId}:${pick.tripId}`} pick={pick} groups={groups} />
+          // Signed out there's no group to show, whatever the address still names.
+          <StatsView
+            key={`${pick.groupId}:${pick.tripId}`}
+            pick={groups ? pick : justMe}
+            groups={groups ?? noGroups}
+          />
         )}
       </YourGroups>
     </PersonalScreen>
@@ -66,17 +71,18 @@ export function StatsScreen({ route }: Props) {
 
 type Pick = { readonly groupId?: GroupId; readonly tripId?: TripId };
 
+const justMe: Pick = {};
 const noGroups: ReadonlyArray<GroupListItem> = [];
 const remembered = new WeakSet<object>();
 
-/** Your groups when you're signed in; signed out, or before they load, there are none. */
+/** Your groups when you're signed in, none before they load; null signed out. */
 function YourGroups({
   children,
 }: {
-  children: (groups: ReadonlyArray<GroupListItem>) => ReactNode;
+  children: (groups: ReadonlyArray<GroupListItem> | null) => ReactNode;
 }) {
   const account = useAccount();
-  if (!account.available || !account.isSignedIn || !account.userId) return children(noGroups);
+  if (!account.available || !account.isSignedIn || !account.userId) return children(null);
   return (
     <StacksProvider>
       <SignedInGroups>{children}</SignedInGroups>

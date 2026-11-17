@@ -293,6 +293,8 @@ export const ClaimPreview = Schema.Struct({
   groupName: Schema.String,
   playerId: PlayerId,
   displayName: Schema.String,
+  /** A claim is how a guest joins, so someone already in the group can't make one. */
+  alreadyMember: Schema.Boolean,
 });
 export type ClaimPreview = typeof ClaimPreview.Type;
 

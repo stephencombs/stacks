@@ -73,6 +73,7 @@
     "@clerk/backend": "catalog:",
     "@clerk/testing": "^2.2.40",
     "@playwright/test": "1.63.0",
+    "@react-navigation/routers": "7.6.5",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { CommonActions, useNavigation } from "@react-navigation/native";
-import { GroupId, TripId } from "@stacks/contracts";
+import { GroupId, TripId, type Trip } from "@stacks/contracts";
 import { tripInScope } from "@stacks/client-runtime/trip";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import {
@@ -14,7 +14,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { resolveScope, type Scope } from "@stacks/client-runtime/scope";
+import { resolveScope, withStartedTrip, type Scope } from "@stacks/client-runtime/scope";
 import { Loaded, useLastTrip, useStacks } from "./stacks";
 
 /**
@@ -25,12 +25,20 @@ type Picked = { readonly groupId: GroupId; readonly whileTrip: TripId | null };
 
 const PickedContext = createContext<Picked | null>(null);
 const SetPickedContext = createContext<(picked: Picked | null) => void>(() => {});
+/** The trip just started, until the groups list holds it. */
+const StartedContext = createContext<readonly [Trip | null, (trip: Trip) => void]>([
+  null,
+  () => {},
+]);
 
 export function ScopeProvider({ children }: { children: ReactNode }) {
   const [picked, setPicked] = useState<Picked | null>(null);
+  const [started, setStarted] = useState<Trip | null>(null);
   return (
     <SetPickedContext value={setPicked}>
-      <PickedContext value={picked}>{children}</PickedContext>
+      <StartedContext value={[started, setStarted]}>
+        <PickedContext value={picked}>{children}</PickedContext>
+      </StartedContext>
     </SetPickedContext>
   );
 }
@@ -46,9 +54,17 @@ export function useScope() {
   const picked = use(PickedContext);
   const setPicked = use(SetPickedContext);
   const groupId = picked?.whileTrip === lastTripId ? picked.groupId : null;
-  const list = AsyncResult.getOrElse(groups, () => null);
+  const [started, setStarted] = use(StartedContext);
+  const loaded = AsyncResult.getOrElse(groups, () => null);
+  const list = loaded && withStartedTrip(loaded, started);
   return {
     scope: list ? resolveScope(list, lastTripId, groupId) : undefined,
+    /** A trip you just made, in scope before your groups list knows about it. */
+    startTrip: (trip: Trip) => {
+      setStarted(trip);
+      setPicked(null);
+      setLastTripId(trip.id);
+    },
     setTrip: (tripId: TripId) => {
       setPicked(null);
       setLastTripId(tripId);

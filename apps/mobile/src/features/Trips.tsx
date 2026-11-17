@@ -153,7 +153,7 @@ function StartTripSheet({
   onStarted?: () => void;
 }) {
   const go = useGo();
-  const { setTrip } = useScope();
+  const { startTrip } = useScope();
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("trips", "create"));
   const [now] = useState(() => new Date());
@@ -178,8 +178,8 @@ function StartTripSheet({
     if (!saved) return;
     onClose();
     onStarted?.();
-    if (first) setTrip(saved.id);
-    else go.trip(saved.id);
+    startTrip(saved);
+    if (!first) go.trip(saved.id);
   };
 
   return (

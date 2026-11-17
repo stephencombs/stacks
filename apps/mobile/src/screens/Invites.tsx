@@ -111,23 +111,40 @@ export function ClaimScreen({ route }: Props) {
   return (
     <Screen>
       <Loaded query={stacks.claimPreview(route.params.code)} skeleton={<InviteScreenSkeleton />}>
-        {(preview) => (
-          <Surface className="gap-5 p-5">
-            <PageTitle context={preview.groupName}>{`Are you ${preview.displayName}?`}</PageTitle>
-            <Text className="text-base text-muted">
-              {preview.displayName} has been playing in {preview.groupName} as a guest. Claim it to
-              join the group and make their sessions, results and balance yours.
-            </Text>
-            {claim.error ? <FormError>{claim.error}</FormError> : null}
-            <Button
-              label={`Yes, I'm ${preview.displayName}`}
-              variant="primary"
-              size="lg"
-              pending={claim.pending}
-              onPress={() => void confirm()}
-            />
-          </Surface>
-        )}
+        {(preview) =>
+          preview.alreadyMember ? (
+            <Surface className="gap-5 p-5">
+              <PageTitle context={preview.groupName}>You're already in this group</PageTitle>
+              <Text className="text-base text-muted">
+                This link is for {preview.displayName}, who has been playing in {preview.groupName}{" "}
+                as a guest. Opening it is how they join and keep their history. You already play
+                here, so there's nothing for you to claim.
+              </Text>
+              <Button
+                label="Open group"
+                variant="primary"
+                size="lg"
+                onPress={() => go.group(preview.groupId)}
+              />
+            </Surface>
+          ) : (
+            <Surface className="gap-5 p-5">
+              <PageTitle context={preview.groupName}>{`Are you ${preview.displayName}?`}</PageTitle>
+              <Text className="text-base text-muted">
+                {preview.displayName} has been playing in {preview.groupName} as a guest. Claim it
+                to join the group and make their sessions, results and balance yours.
+              </Text>
+              {claim.error ? <FormError>{claim.error}</FormError> : null}
+              <Button
+                label={`Yes, I'm ${preview.displayName}`}
+                variant="primary"
+                size="lg"
+                pending={claim.pending}
+                onPress={() => void confirm()}
+              />
+            </Surface>
+          )
+        }
       </Loaded>
     </Screen>
   );

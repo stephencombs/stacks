@@ -11,7 +11,7 @@ import {
 import { expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 
-import { resolveScope, tripIsLive } from "./scope.ts";
+import { resolveScope, tripIsLive, withStartedTrip } from "./scope.ts";
 
 const day = (n: number) => DateTime.makeUnsafe(Date.UTC(2026, 9, n));
 const names = ["crew", "work", "fresh", "old", "vegas", "tahoe", "poker", "deleted", "user", "me"];
@@ -100,4 +100,19 @@ it("calls a trip live when its id is in liveTripIds, mySession matches, or it's 
     mySession: { id: undefined as never, tripId: vegas.id, venueName: "Aria", startedAt: day(20) },
   };
   expect(tripIsLive(seated, vegas)).toBe(true);
+});
+
+it("puts a trip just started in its group before the groups list holds it", () => {
+  const reno = trip("deleted", "fresh", 25);
+  // Remembered alone, a trip the list doesn't know falls back to another group's.
+  expect(resolveScope([crew, work, fresh], reno.id, null)).toEqual({ item: crew, trip: vegas });
+  const groups = withStartedTrip([crew, work, fresh], reno);
+  expect(resolveScope(groups, reno.id, null)).toEqual({
+    item: { ...fresh, trips: [reno] },
+    trip: reno,
+  });
+  // Once the list has it, there's nothing to add.
+  const caught = [crew, work, group("fresh", [reno])];
+  expect(withStartedTrip(caught, reno)).toEqual(caught);
+  expect(withStartedTrip(caught, null)).toBe(caught);
 });

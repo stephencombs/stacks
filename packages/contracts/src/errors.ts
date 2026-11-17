@@ -49,6 +49,7 @@ export const ConflictReason = Schema.Literals([
   "invite_revoked",
   "invite_used_up",
   "claim_has_history",
+  "claim_already_member",
   "player_not_in_group",
   "player_not_in_session",
   "seat_taken",

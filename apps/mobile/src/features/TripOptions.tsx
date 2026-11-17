@@ -1,4 +1,5 @@
 import { useAuth } from "@clerk/expo";
+import { useNavigation } from "@react-navigation/native";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
 import { View } from "react-native";
@@ -7,12 +8,14 @@ import { confirmAction } from "../components/ui/confirmAction";
 import { ActionMenu } from "../components/ui/ActionMenu";
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
+import { afterDeletingTrip } from "../lib/crewRoutes";
 import { useGo } from "../lib/go";
 import { useScope } from "../lib/scope";
 import { useAction, useStacks } from "../lib/stacks";
 
 export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const go = useGo();
+  const navigation = useNavigation();
   const stacks = useStacks();
   const { userId } = useAuth();
   const end = useAction(stacks.Client.mutation("trips", "end"));
@@ -54,7 +57,9 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
                 "Delete trip",
                 () => {
                   void remove.run({ params }).then((ok) => {
-                    if (ok) forgetTrip(group.group.id);
+                    if (!ok) return;
+                    forgetTrip(group.group.id);
+                    navigation.dispatch(afterDeletingTrip(group.group.id));
                   });
                 },
               ),
