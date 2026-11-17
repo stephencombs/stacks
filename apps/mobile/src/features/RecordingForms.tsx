@@ -227,7 +227,7 @@ function RecordingSheet({
   submitLabel: string;
   submitVariant?: "primary" | "danger";
   cancelLabel?: string;
-  /** Android pins it above the action so the fields scroll behind it; iOS scrolls it last. */
+  /** Android pins it under the action, as the frames do, so the fields scroll above it; iOS scrolls it last. */
   keypad?: ReactNode;
   save: { readonly pending: boolean; readonly error: string | null };
   onSubmit: () => void;
@@ -243,7 +243,6 @@ function RecordingSheet({
       {...(description ? { description } : {})}
       footer={
         <>
-          {Platform.OS === "android" ? keypad : null}
           {save.error ? (
             <FormError>{save.error} What you entered is still here. Try again.</FormError>
           ) : null}
@@ -260,6 +259,7 @@ function RecordingSheet({
           {cancelLabel ? (
             <Button label={cancelLabel} size="lg" disabled={save.pending} onPress={onClose} />
           ) : null}
+          {Platform.OS === "android" ? keypad : null}
         </>
       }
     >

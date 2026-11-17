@@ -69,7 +69,7 @@ frame work sits on top of these parts. Parent 019 has the verification protocol.
 
 - [x] Sheet: position, tappable close, height to content
 - [x] Footer surface and status-bar edge
-- [x] Keypad fits above the footer at 1.0× and 1.35×
+- [x] Keypad pinned under the action row, never clipped, at 1.0× and 1.35×
 - [x] Tab-bar inset on Landing, Stats, trip and LiveBar
 - [x] Material exposed dropdowns for pickers
 - [x] App tokens replace the system teal
