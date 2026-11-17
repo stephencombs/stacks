@@ -10,6 +10,7 @@ import { expect, it, vi } from "vite-plus/test";
 const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
 
 vi.mock("react-native", () => ({
+  Platform: { OS: "ios" },
   Pressable: ({
     accessibilityLabel,
     accessibilityState,
