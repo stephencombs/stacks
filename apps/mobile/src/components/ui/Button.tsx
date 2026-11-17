@@ -97,10 +97,12 @@ export function Button({
       <Text
         className={cn(
           "font-semibold",
+          Platform.OS === "android" && "shrink text-center",
           disabled && !pending ? "text-muted" : labels[variant],
           text[size],
         )}
-        numberOfLines={1}
+        // At large text a label wraps on Android rather than hide the action's name.
+        numberOfLines={Platform.OS === "android" ? undefined : 1}
       >
         {label}
       </Text>

@@ -67,20 +67,20 @@ frame work sits on top of these parts. Parent 019 has the verification protocol.
 
 ## Plan
 
-- [ ] Sheet: position, tappable close, height to content
-- [ ] Footer surface and status-bar edge
-- [ ] Keypad fits above the footer at 1.0× and 1.35×
-- [ ] Tab-bar inset on Landing, Stats, trip and LiveBar
-- [ ] Material exposed dropdowns for pickers
-- [ ] App tokens replace the system teal
-- [ ] Material alert dialogs for confirmations
-- [ ] Large-text fixes
-- [ ] Smaller chrome items
+- [x] Sheet: position, tappable close, height to content
+- [x] Footer surface and status-bar edge
+- [x] Keypad fits above the footer at 1.0× and 1.35×
+- [x] Tab-bar inset on Landing, Stats, trip and LiveBar
+- [x] Material exposed dropdowns for pickers
+- [x] App tokens replace the system teal
+- [x] Material alert dialogs for confirmations
+- [x] Large-text fixes
+- [x] Smaller chrome items
 
 ## Test
 
-- [ ] On the Pixel 10 emulator, light and dark, at 1.0× and 1.35×: every sheet listed in the audit
+- [x] On the Pixel 10 emulator, light and dark, at 1.0× and 1.35×: every sheet listed in the audit
       opens below the status bar and closes from its × button
-- [ ] A new signed-out user gets through the Crew intro without leaving it
-- [ ] No teal (`#008577`) in any screenshot
+- [x] A new signed-out user gets through the Crew intro without leaving it
+- [x] No teal (`#008577`) in any screenshot
 - [ ] iOS screenshots of the touched shared screens are unchanged
