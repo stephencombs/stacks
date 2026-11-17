@@ -21,6 +21,7 @@ import { Text as NativeText, View, useWindowDimensions } from "react-native";
 
 import { ComposeHost as Host } from "./ComposeHost.android";
 import type { FieldChoiceProps } from "./FieldChoice";
+import { fitsSegments } from "./segmentFit";
 
 const arrow = require("../../../assets/field-icons/arrow_drop_down.xml");
 const fieldShape = Shape.RoundedCorner({
@@ -36,11 +37,13 @@ export function FieldChoice<A extends string>({
   presentation = "automatic",
 }: FieldChoiceProps<A>) {
   const { width, fontScale } = useWindowDimensions();
-  const segmentWidth = (width - 64) / Math.max(1, options.length);
   const segmented =
     presentation !== "menu" &&
-    options.length <= 3 &&
-    options.every((option) => option.label.length * 8 * fontScale + 48 <= segmentWidth);
+    fitsSegments(
+      options.map((option) => option.label),
+      width - 64,
+      fontScale,
+    );
   return (
     <View className="gap-1.5">
       {labelHidden ? null : (
