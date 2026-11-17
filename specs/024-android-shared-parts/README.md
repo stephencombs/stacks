@@ -27,7 +27,7 @@ frame work sits on top of these parts. Parent 019 has the verification protocol.
 
 - **Sheets** (`components/ui/Sheet.tsx`, the Android `Modal` path): the sheet stays below the status
   bar; the close button is tappable (today only system Back closes a sheet); a sheet is as tall as
-  its content up to the screen, not full-screen. Short sheets (member actions, Leave group, the
+  its content up to the screen, not full-screen. Short sheets (member actions, the
   "+1 live" picker) stay short. The header follows 021's Android sheet header.
 - **Bottom bars** (Finished, a closed table, a session page, the felt's Rebuy / Cash out dock): a
   pinned footer has the canvas background, as AndFinished draws it, and a hairline top edge, so content and the LiveBar never show

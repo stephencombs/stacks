@@ -1,41 +1,43 @@
-import { AlertDialog, Text, TextButton } from "@expo/ui/jetpack-compose";
+import { AlertDialog, Column, Text, TextButton } from "@expo/ui/jetpack-compose";
 import { useCSSVariable } from "uniwind";
 
 import { ComposeHost as Host } from "./ComposeHost.android";
-import { dismissConfirmation, useConfirmation } from "./confirmStore";
+import { answerConfirmation, dismissConfirmation, useConfirmation } from "./confirmStore";
 
 /**
  * A Material 3 alert dialog: sentence-case text buttons, with the destructive one in loss red.
- * It renders nothing until `confirmAction` asks.
+ * It renders nothing until `confirmAction` asks. While an async action runs it can't be dismissed,
+ * and if the action fails it says why.
  */
 export function ConfirmDialogHost() {
-  const confirmation = useConfirmation();
+  const asking = useConfirmation();
   const loss = String(useCSSVariable("--color-loss"));
-  if (!confirmation) return null;
+  if (!asking) return null;
+  const { confirmation, pending, error } = asking;
   return (
     <Host style={{ position: "absolute", width: 0, height: 0 }}>
-      <AlertDialog onDismissRequest={dismissConfirmation}>
+      <AlertDialog onDismissRequest={pending ? () => {} : dismissConfirmation}>
         <AlertDialog.Title>
           <Text>{confirmation.title}</Text>
         </AlertDialog.Title>
         <AlertDialog.Text>
-          <Text>{confirmation.message}</Text>
+          <Column>
+            <Text>{confirmation.message}</Text>
+            {error ? <Text color={loss}>{"\n" + error}</Text> : null}
+          </Column>
         </AlertDialog.Text>
         <AlertDialog.DismissButton>
-          <TextButton onClick={dismissConfirmation}>
+          <TextButton enabled={!pending} onClick={dismissConfirmation}>
             <Text>Cancel</Text>
           </TextButton>
         </AlertDialog.DismissButton>
         <AlertDialog.ConfirmButton>
           <TextButton
-            onClick={() => {
-              const { onConfirm } = confirmation;
-              dismissConfirmation();
-              onConfirm();
-            }}
-            colors={{ contentColor: loss }}
+            enabled={!pending}
+            onClick={answerConfirmation}
+            colors={{ contentColor: loss, disabledContentColor: loss }}
           >
-            <Text>{confirmation.label}</Text>
+            <Text>{pending ? confirmation.label + "…" : confirmation.label}</Text>
           </TextButton>
         </AlertDialog.ConfirmButton>
       </AlertDialog>

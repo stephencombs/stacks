@@ -16,7 +16,7 @@ import { useNativeHeaderActions } from "../../features/NativeHeaderActions";
 import { TabBarHeight } from "./tabBar";
 import type { SettingsLayoutProps } from "./SettingsLayout";
 
-export function SettingsLayout({ groupName, currency, sections, children }: SettingsLayoutProps) {
+export function SettingsLayout({ groupName, currency, sections }: SettingsLayoutProps) {
   const header = useNativeHeaderActions();
   const { theme } = useUniwind();
   const [canvas, surface, ink, muted, loss] = useCSSVariable([
@@ -89,7 +89,6 @@ export function SettingsLayout({ groupName, currency, sections, children }: Sett
         </FieldGroup>
       </Host>
       <LiveBar bottom={bar} onHeightChange={setLiveBarHeight} />
-      {children}
     </View>
   );
 }
