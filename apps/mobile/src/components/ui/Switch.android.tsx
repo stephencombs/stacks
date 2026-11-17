@@ -1,19 +1,39 @@
-import { Switch as NativeSwitch, type SwitchProps } from "react-native";
+import { Switch as ComposeSwitch } from "@expo/ui/jetpack-compose";
+import { semantics } from "@expo/ui/jetpack-compose/modifiers";
+import type { SwitchProps } from "react-native";
 import { useCSSVariable } from "uniwind";
 
-/** Android draws a switch from the app's tokens, not the system accent. */
-export function Switch(props: SwitchProps) {
-  const [ink, inverse, strong, faint] = useCSSVariable([
+import { ComposeHost as Host } from "./ComposeHost.android";
+
+/**
+ * Material 3's switch, drawn from the app's tokens. On, the track is ink and the thumb sits inside
+ * it in the inverse colour; off, an outlined track holds a faint thumb. Both read in light and dark.
+ */
+export function Switch({ value, onValueChange, disabled, accessibilityLabel }: SwitchProps) {
+  const [ink, inverse, fill, faint] = useCSSVariable([
     "--color-ink",
     "--color-ink-inverse",
-    "--color-fill-strong",
+    "--color-fill",
     "--color-faint",
-  ]).map(String);
+  ]);
   return (
-    <NativeSwitch
-      trackColor={{ false: strong, true: ink }}
-      thumbColor={props.value ? inverse : faint}
-      {...props}
-    />
+    <Host matchContents>
+      <ComposeSwitch
+        value={!!value}
+        enabled={!disabled}
+        {...(onValueChange ? { onCheckedChange: onValueChange } : {})}
+        colors={{
+          checkedTrackColor: ink,
+          checkedThumbColor: inverse,
+          checkedBorderColor: ink,
+          uncheckedTrackColor: fill,
+          uncheckedThumbColor: faint,
+          uncheckedBorderColor: faint,
+        }}
+        modifiers={
+          accessibilityLabel ? [semantics({ contentDescription: accessibilityLabel })] : []
+        }
+      />
+    </Host>
   );
 }
