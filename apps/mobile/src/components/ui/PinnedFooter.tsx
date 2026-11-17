@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { View, type LayoutChangeEvent } from "react-native";
 
 import { cn } from "./cn";
+import { pinnedFooterChrome } from "./pinnedFooterChrome";
 
 export type PinnedFooterProps = {
   /** Space below the buttons: a tab bar or the home indicator. */
@@ -25,14 +26,24 @@ export function PinnedFooter({
   onLayout,
   children,
 }: PinnedFooterProps) {
+  const [filled, setFilled] = useState(true);
   return (
     <View
       pointerEvents="box-none"
       onLayout={onLayout}
-      className={cn("absolute inset-x-0 bottom-0 gap-2 pt-3", felt && "bg-felt")}
+      className={cn(
+        "absolute inset-x-0 bottom-0",
+        pinnedFooterChrome({ filled, felt, surface: false }),
+      )}
       style={{ paddingLeft: 16, paddingRight: 16, ...sides, paddingBottom: inset }}
     >
-      {children}
+      <View
+        pointerEvents="box-none"
+        className="gap-2"
+        onLayout={(event) => setFilled(event.nativeEvent.layout.height > 0)}
+      >
+        {children}
+      </View>
     </View>
   );
 }
