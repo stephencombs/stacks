@@ -43,3 +43,21 @@ it("a screen off the tabs clears the gesture inset by at least 12, plus the foot
   expect(screenFoot({ ...off, platform: "android" }).above).toBeUndefined();
   expect(screenFoot({ ...off, platform: "android" }).clearance).toBe(24);
 });
+
+it("at the end of a list, nothing floating covers the last row", () => {
+  const FAB = 56;
+  for (const platform of ["android", "ios"]) {
+    for (const footer of [null, 96]) {
+      for (const live of [0, 52, 76]) {
+        const foot = screenFoot({ ...base, platform, footer, fab: true, live });
+        // Where the list's bottom edge sits above the screen's: Android's list stops at the tab bar.
+        const listBottom = footer === null && platform === "android" ? base.bar : 0;
+        const fabTop = foot.fabBottom + FAB - listBottom;
+        const liveTop = (foot.above ?? 0) + 8 + live - listBottom;
+        expect(foot.endSpace, `${platform} footer ${footer} live ${live}`).toBeGreaterThanOrEqual(
+          Math.max(fabTop, live > 0 ? liveTop : 0),
+        );
+      }
+    }
+  }
+});
