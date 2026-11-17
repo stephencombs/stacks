@@ -26,6 +26,7 @@ import {
   sessionReadout,
   sessionEditFields,
   parsePastSessionTimes,
+  parseStartedAt,
   parseTimeNear,
   parseRecordingAmount,
   PRIVATE_RECORDING_NAMESPACE,
@@ -36,6 +37,8 @@ import {
   venuePlace,
   tableTripOptions,
   UNDONE_REASON,
+  historyLines,
+  historyEntryName,
 } from "./recordingView.ts";
 
 const at = (hour: number) =>
@@ -399,6 +402,40 @@ it.each(["delete_visit", "restore_visit"] as const)("names a refused %s change",
   await store.close();
 });
 
+describe("editing when a session started", () => {
+  const local = (day: number, hour: number, minute = 0, second = 0) =>
+    DateTime.makeUnsafe(new Date(2026, 10, day, hour, minute, second));
+  const initial = local(6, 21, 30, 12);
+  const first = local(6, 22, 0);
+
+  it("moves the date as well as the time", () => {
+    expect(parseStartedAt({ date: "2026-11-05", time: "21:30" }, initial, first)).toEqual({
+      startedAt: local(5, 21, 30),
+      error: null,
+    });
+  });
+
+  it("keeps the second when neither field was touched", () => {
+    expect(parseStartedAt({ date: "2026-11-06", time: "21:30" }, initial, first)).toEqual({
+      startedAt: initial,
+      error: null,
+    });
+  });
+
+  it("names the field that's wrong", () => {
+    expect(parseStartedAt({ date: "11/06", time: "21:30" }, initial, first)).toMatchObject({
+      field: "date",
+    });
+    expect(parseStartedAt({ date: "2026-11-06", time: "9pm" }, initial, first)).toMatchObject({
+      field: "time",
+    });
+    expect(parseStartedAt({ date: "2026-11-07", time: "21:30" }, initial, first)).toMatchObject({
+      field: "date",
+      error: "The start can't be after your first buy-in.",
+    });
+  });
+});
+
 describe("live session readouts", () => {
   it("keeps the result pending while live and freezes duration and hourly result at finish", async () => {
     const { store } = await open();
@@ -493,6 +530,65 @@ describe("live session readouts", () => {
       corrected: true,
     });
     await store.close();
+  });
+
+  describe("a visit's history", () => {
+    it("labels rebuys and corrections, and lists standing entries above voided ones", async () => {
+      const { store } = await open();
+      await save(store, { type: "start", buyIn: 20000, startedAt: at(9) });
+      const id = state(store).visits[0]!.id;
+      await save(store, {
+        type: "add",
+        visitId: id,
+        kind: "buy_in",
+        amount: 10000,
+        occurredAt: at(10),
+      });
+      await save(store, {
+        type: "add",
+        visitId: id,
+        kind: "buy_in",
+        amount: 30000,
+        occurredAt: at(11),
+      });
+      const view = () => recordingVisit(state(store), id)!;
+      const first = view().entries.find((e) => e.amount === 20000)!;
+      const third = view().entries.find((e) => e.amount === 30000)!;
+      await save(store, {
+        type: "correct",
+        visitId: id,
+        entryId: first.id,
+        reason: "Typo",
+        replacement: { amount: 25000 },
+      });
+      await save(store, {
+        type: "correct",
+        visitId: id,
+        entryId: third.id,
+        reason: UNDONE_REASON,
+        replacement: null,
+      });
+      await save(store, { type: "finish", visitId: id, amount: 35000, finishedAt: at(12) });
+
+      const lines = historyLines(view());
+      // Every row counts, the finish included, so a header can say how many there are.
+      expect(lines.map((line) => (line.type === "event" ? "finished" : line.entry.amount))).toEqual(
+        ["finished", 35000, 10000, 25000, 30000, 20000],
+      );
+      const names = lines.flatMap((line) =>
+        line.type === "entry"
+          ? [`${line.entry.amount}:${historyEntryName(view(), line.entry)}`]
+          : [],
+      );
+      expect(names).toEqual([
+        "35000:Final cash-out",
+        "10000:Rebuy",
+        "25000:Corrected buy-in",
+        "30000:Rebuy",
+        "20000:Buy-in",
+      ]);
+      await store.close();
+    });
   });
 
   it("previews whole-cent add, subtract and set totals without displaying unsafe values", () => {

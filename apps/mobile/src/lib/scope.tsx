@@ -9,6 +9,7 @@ import {
   useEffect,
   useEffectEvent,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -34,9 +35,10 @@ const StartedContext = createContext<readonly [Trip | null, (trip: Trip) => void
 export function ScopeProvider({ children }: { children: ReactNode }) {
   const [picked, setPicked] = useState<Picked | null>(null);
   const [started, setStarted] = useState<Trip | null>(null);
+  const startedValue = useMemo(() => [started, setStarted] as const, [started]);
   return (
     <SetPickedContext value={setPicked}>
-      <StartedContext value={[started, setStarted]}>
+      <StartedContext value={startedValue}>
         <PickedContext value={picked}>{children}</PickedContext>
       </StartedContext>
     </SetPickedContext>

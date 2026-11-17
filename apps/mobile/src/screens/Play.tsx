@@ -7,7 +7,6 @@ import {
   liveTable,
   tableActions,
   type TableAction,
-  type TableSeat,
 } from "@stacks/client-runtime/liveTable";
 import {
   useRecordingSubmit,
@@ -16,6 +15,8 @@ import {
   useServerTable,
 } from "@stacks/client-runtime/recordingReact";
 import {
+  historyEntryName,
+  historyLines,
   LIVE_REBUY_AMOUNTS,
   sessionReadout,
   sessionEditFields,
@@ -60,6 +61,7 @@ import {
 import { LiveSessionsBar } from "../features/LiveBar";
 import { TableSection } from "../features/SharedTable";
 import { TableTripSheet, TableTripButton } from "../features/TableTrip";
+import { afterClosing, type OpenSheet } from "../features/visitSheets";
 import {
   ActionSlot,
   LiveClock,
@@ -140,31 +142,12 @@ function Missing() {
   );
 }
 
-type Open =
-  | {
-      readonly type:
-        | "trip"
-        | "edit"
-        | "history"
-        | "rebuy"
-        | "cash_out"
-        | "reopen"
-        | "return"
-        | "buy_in"
-        | "start_time"
-        | "game"
-        | "venue";
-    }
-  | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId }
-  | { readonly type: "action"; readonly action: Exclude<TableAction, "edit" | "delete_table"> }
-  | { readonly type: "seat"; readonly seat: TableSeat };
-
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
 
 function Visit({ visitId }: { visitId: VisitId }) {
   const { visit, status, error, retryLoad } = useRecordingVisit(visitId);
   const navigation = useNavigation();
-  const [open, setOpen] = useState<Open | null>(null);
+  const [open, setOpen] = useState<OpenSheet | null>(null);
   // The toast for the last write here: yours, or one for another player at the table.
   const [saved, setSaved] = useState<{
     entryId: EntryId;
@@ -191,7 +174,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       </PersonalScreen>
     );
   const live = visit.visit.finishedAt === null;
-  const close = () => setOpen(null);
+  const close = () => setOpen(afterClosing);
   const entry = (id: EntryId) => visit.entries.find((item) => item.id === id)!;
   const recorded = (entryId: EntryId, input: RecordingInput) => {
     close();
@@ -223,6 +206,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const start = visit.visit.startedAt;
   const player = table?.visits.find((item) => item.visit.id === visitId);
   const own = player?.isSelf ?? true;
+  const name = player?.player.displayName ?? "Their";
   // Back at the table: a new visit for whoever this was, once they aren't playing here.
   const canReturn =
     !live &&
@@ -441,6 +425,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
         since={seats?.startedAt ?? visit.visit.startedAt}
         actions={actions}
         onAction={act}
+        who={own ? undefined : name}
       />
       {live ? (
         <>
@@ -494,7 +479,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       {open?.type === "edit" ? (
         <Sheet
           open
-          title={own ? "Edit my session" : `Edit ${player?.player.displayName ?? "their"} session`}
+          title={own ? "Edit my session" : `Edit ${name}'s session`}
           onClose={close}
           footer={<Button label="Done" onPress={close} />}
         >
@@ -514,7 +499,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
             />
           ) : null}
           <Button
-            label={own ? "Your history" : "History"}
+            label={own ? "Your history" : `${name}'s history`}
             variant="ghost"
             className="self-start"
             onPress={() => setOpen({ type: "history" })}
@@ -548,7 +533,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
           }}
         />
       ) : open?.type === "history" ? (
-        <Sheet open title="Your history" onClose={close}>
+        <Sheet open title={own ? "Your history" : `${name}'s history`} onClose={close}>
           <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
         </Sheet>
       ) : null}
@@ -656,11 +641,13 @@ function VisitHeader({
   since,
   actions,
   onAction,
+  who,
 }: {
   visit: RecordingVisitView;
   since: DateTime.Utc;
   actions: ReadonlyArray<TableAction>;
   onAction: (action: TableAction) => void;
+  who?: string | undefined;
 }) {
   const navigation = useNavigation();
   useLayoutEffect(() => {
@@ -672,7 +659,7 @@ function VisitHeader({
     <View className="flex-row items-center justify-between gap-3">
       <BackButton />
       {live ? <LiveClock since={since} /> : <View className="flex-1" />}
-      <ActionSlot actions={actions} onAction={onAction} />
+      <ActionSlot actions={actions} onAction={onAction} who={who} />
     </View>
   );
 }
@@ -795,19 +782,8 @@ function VisitHero({ visit }: { visit: RecordingVisitView }) {
   );
 }
 
-const entryName = (visit: RecordingVisitView, entry: PlayEntry) =>
-  entry.kind === "buy_in"
-    ? "Buy-in"
-    : visit.finishCashOuts.has(entry.id)
-      ? "Final cash-out"
-      : "Cash-out";
-
 const eventText = (event: RecordingEvent) =>
   event.type === "finished" ? "Finished playing" : `Reopened: ${event.reason}`;
-
-type Line =
-  | { readonly type: "entry"; readonly at: DateTime.Utc; readonly entry: PlayEntry }
-  | { readonly type: "event"; readonly at: DateTime.Utc; readonly event: RecordingEvent };
 
 function History({
   visit,
@@ -825,15 +801,10 @@ function History({
       people.find((person) => person.id === item.counterpartyId)?.displayName ?? "someone";
     return `${item.kind === "cash_out" ? "Paid to" : "Paid by"} ${name}`;
   };
-  const lines: Line[] = [
-    ...visit.entries.map((entry) => ({ type: "entry" as const, at: entry.occurredAt, entry })),
-    ...visit.events.map((event) => ({ type: "event" as const, at: event.at, event })),
-  ].toSorted((a, b) => DateTime.toEpochMillis(b.at) - DateTime.toEpochMillis(a.at));
+  const lines = historyLines(visit);
   return (
     <View className="gap-2">
-      <SectionHeading
-        count={visit.entries.length === 1 ? "1 entry" : `${visit.entries.length} entries`}
-      >
+      <SectionHeading count={lines.length === 1 ? "1 entry" : `${lines.length} entries`}>
         History
       </SectionHeading>
       <List>
@@ -853,7 +824,7 @@ function History({
             );
           const item = line.entry;
           const voided = item.voidedAt !== null;
-          const name = entryName(visit, item);
+          const name = historyEntryName(visit, item);
           const time = formatTime(item.occurredAt);
           return (
             <Row
@@ -927,7 +898,7 @@ function EntryInspector({
     <Sheet
       open
       onClose={onClose}
-      title={entryName(visit, entry)}
+      title={historyEntryName(visit, entry)}
       {...(voided ? { description: "Voided. It no longer counts toward this session." } : {})}
       footer={
         voided ? undefined : (

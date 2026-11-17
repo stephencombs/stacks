@@ -821,3 +821,62 @@ export const tableTripOptions = (groups: ReadonlyArray<GroupListItem>, selected:
     ...live,
   ];
 };
+
+export type HistoryLine =
+  | { readonly type: "entry"; readonly at: DateTime.Utc; readonly entry: PlayEntry }
+  | { readonly type: "event"; readonly at: DateTime.Utc; readonly event: RecordingEvent };
+
+/**
+ * A visit's history, newest first, with the entries that still stand above the voided ones so a
+ * correction never sinks under what it replaced. A finish is a line like any other.
+ */
+export const historyLines = (visit: RecordingVisitView): ReadonlyArray<HistoryLine> =>
+  [
+    ...visit.entries.map((entry): HistoryLine => ({ type: "entry", at: entry.occurredAt, entry })),
+    ...visit.events.map((event): HistoryLine => ({ type: "event", at: event.at, event })),
+  ].toSorted((a, b) => {
+    const voided = (line: HistoryLine) =>
+      line.type === "entry" && line.entry.voidedAt !== null ? 1 : 0;
+    return (
+      voided(a) - voided(b) ||
+      ms(b.at) - ms(a.at) ||
+      (a.type === "event" ? 0 : 1) - (b.type === "event" ? 0 : 1) ||
+      (a.type === "entry" && b.type === "entry" ? ms(b.entry.createdAt) - ms(a.entry.createdAt) : 0)
+    );
+  });
+
+/** What a history row calls an entry: the first buy-in, later rebuys, and a buy-in total's fix. */
+export const historyEntryName = (visit: RecordingVisitView, entry: PlayEntry) => {
+  if (entry.kind === "cash_out")
+    return visit.finishCashOuts.has(entry.id) ? "Final cash-out" : "Cash-out";
+  if (entry.replacesEntryId !== null) return "Corrected buy-in";
+  const first = visit.entries
+    .filter((item) => item.kind === "buy_in" && item.replacesEntryId === null)
+    .toSorted(
+      (a, b) => ms(a.occurredAt) - ms(b.occurredAt) || ms(a.createdAt) - ms(b.createdAt),
+    )[0];
+  return first?.id === entry.id ? "Buy-in" : "Rebuy";
+};
+
+/**
+ * A start edited as a date ("2026-11-06") and a time ("21:30"), local: the moment, or which field
+ * is wrong. Fields left as they were keep `initial` to the second, so a session that finished within
+ * its first minute still follows it. It can't be after `latest`, the first thing recorded.
+ */
+export const parseStartedAt = (
+  input: { readonly date: string; readonly time: string },
+  initial: DateTime.Utc,
+  latest: DateTime.Utc,
+):
+  | { readonly startedAt: DateTime.Utc; readonly error: null }
+  | { readonly field: "date" | "time"; readonly error: string } => {
+  if (input.date === localDateText(new Date(ms(initial))) && input.time === localTimeText(initial))
+    return { startedAt: initial, error: null };
+  if (!localTime(input.date, "00:00"))
+    return { field: "date", error: "Enter a date like 2026-11-07." };
+  const value = localTime(input.date, input.time);
+  if (!value) return { field: "time", error: "Enter a time like 21:30." };
+  if (value.getTime() > ms(latest))
+    return { field: "date", error: "The start can't be after your first buy-in." };
+  return { startedAt: DateTime.makeUnsafe(value), error: null };
+};

@@ -27,6 +27,7 @@ import {
   localDateText,
   localTimeText,
   parsePastSessionTimes,
+  parseStartedAt,
   parseRecordingAmount,
   parseTimeNear,
   RECORDING_CURRENCY,
@@ -830,8 +831,11 @@ export function StartTimeSheet({
   onSaved: () => void;
 }) {
   const save = useRecordingSubmit();
-  const clock = useClock(visit.visit.startedAt);
   const [now] = useState(() => DateTime.makeUnsafe(Date.now()));
+  const initial = visit.visit.startedAt;
+  const [date, setDate] = useState(() => localDateText(new Date(DateTime.toEpochMillis(initial))));
+  const [time, setTime] = useState(() => localTimeText(initial));
+  const [problem, setProblem] = useState<{ field: "date" | "time"; error: string } | null>(null);
   const first = visit.entries.reduce(
     (earliest, entry) =>
       DateTime.toEpochMillis(entry.occurredAt) < DateTime.toEpochMillis(earliest)
@@ -839,6 +843,10 @@ export function StartTimeSheet({
         : earliest,
     visit.visit.finishedAt ?? now,
   );
+  const change = (set: (value: string) => void) => (value: string) => {
+    set(value);
+    setProblem(null);
+  };
   return (
     <RecordingSheet
       title="Start time"
@@ -847,20 +855,31 @@ export function StartTimeSheet({
       save={save}
       onClose={onClose}
       onSubmit={async () => {
-        const startedAt = clock.read(
-          { at: first, error: "The start can't be after your first buy-in." },
-          null,
-        );
-        if (startedAt === null) return;
+        const parsed = parseStartedAt({ date, time }, initial, first);
+        if (parsed.error !== null) return setProblem(parsed);
         const receipt = await save.submit({
           type: "edit_visit",
           visitId: visit.visit.id,
-          startedAt,
+          startedAt: parsed.startedAt,
         });
         if (receipt) onSaved();
       }}
     >
-      <ClockField label="Started at" clock={clock} />
+      <DateTimeField
+        label="Date"
+        kind="date"
+        value={date}
+        onChange={change(setDate)}
+        error={problem?.field === "date" ? problem.error : null}
+        maximumDate={new Date(DateTime.toEpochMillis(now))}
+      />
+      <DateTimeField
+        label="Started at"
+        kind="time"
+        value={time}
+        onChange={change(setTime)}
+        error={problem?.field === "time" ? problem.error : null}
+      />
     </RecordingSheet>
   );
 }

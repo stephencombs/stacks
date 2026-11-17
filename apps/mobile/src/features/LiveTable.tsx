@@ -181,16 +181,21 @@ const actionIcons: Record<TableAction, IconName> = {
 export function ActionSlot({
   actions,
   onAction,
+  who,
 }: {
   actions: ReadonlyArray<TableAction>;
   onAction: (action: TableAction) => void;
+  /** Whose session this is, when it isn't yours: "Priya". */
+  who?: string | undefined;
 }) {
+  const label = (action: TableAction) =>
+    action === "edit" && who ? `Edit ${who}'s session` : actionLabels[action];
   const [only] = actions;
   if (!only) return <View className="size-11" />;
   if (actions.length === 1)
     return (
       <IconButton
-        accessibilityLabel={actionLabels[only]}
+        accessibilityLabel={label(only)}
         icon={<Icon name={actionIcons[only]} color="ink" />}
         onPress={() => onAction(only)}
       />
@@ -199,7 +204,7 @@ export function ActionSlot({
     <ActionMenu
       label="Table actions"
       actions={actions.map((action) => ({
-        label: actionLabels[action],
+        label: label(action),
         icon: actionIcons[action],
         destructive: action === "delete_table",
         onPress: () => onAction(action),
