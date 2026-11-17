@@ -1,14 +1,15 @@
-import { createContext, use, useState, type ReactNode } from "react";
+import { use, useState, type ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { LiveBar, type ShowsTable } from "../../features/LiveBar";
 import { useNativeHeaderActions } from "../../features/NativeHeaderActions";
 import { FormError } from "./Field";
+import { FAB_ROOM, FloatingAction } from "./FloatingAction";
+import { PinnedFooter } from "./PinnedFooter";
+import { TabBarHeight, useBottomClearance, useListEnd } from "./tabBar";
 import { ToastHost, useToast, type Toast } from "./Toast";
 
-/** How tall the tab bar is under the current screen: zero outside the places. */
-export const TabBarHeight = createContext(0);
+export { TabBarHeight };
 
 type Content = ReactNode | ((toast: (toast: Toast) => void) => ReactNode);
 
@@ -26,17 +27,21 @@ export function Screen({
   children,
   shows,
   renderFooter,
+  fab,
 }: {
   children: Content;
   shows?: ShowsTable;
   renderFooter?: (toast: (toast: Toast) => void) => ReactNode;
+  /** A floating action button, bottom right above the live bar. */
+  fab?: ReactNode;
 }) {
   const footer = renderFooter;
   const header = useNativeHeaderActions();
   const bar = use(TabBarHeight);
-  const insets = useSafeAreaInsets();
+  const clearance = useBottomClearance(12);
   const [footerHeight, setFooterHeight] = useState(0);
   const [liveBarHeight, setLiveBarHeight] = useState(0);
+  const end = useListEnd(liveBarHeight);
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -48,23 +53,28 @@ export function Screen({
           contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
           className="flex-1"
+          style={footer ? undefined : { marginBottom: end.margin }}
           contentContainerClassName="gap-6 px-4 pt-4 pb-24"
         >
           <Content>{children}</Content>
-          {/* The floating tab bar sits over the scene's foot on every platform, so the list ends clear of it. */}
-          <View style={{ height: (footer ? footerHeight : bar) + liveBarHeight }} />
-        </ScrollView>
-        {footer ? (
           <View
-            pointerEvents="box-none"
+            style={{
+              height: (footer ? footerHeight + end.above : end.spacer) + (fab ? FAB_ROOM : 0),
+            }}
+          />
+        </ScrollView>
+        {fab ? (
+          <FloatingAction right={16} bottom={end.fab}>
+            {fab}
+          </FloatingAction>
+        ) : null}
+        {footer ? (
+          <PinnedFooter
             onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
-            style={{ paddingBottom: bar || Math.max(insets.bottom, 12) }}
-            className="absolute inset-x-0 bottom-0"
+            inset={clearance + 12}
           >
-            <View className="gap-2 px-4 py-3">
-              <Content>{footer}</Content>
-            </View>
-          </View>
+            <Content>{footer}</Content>
+          </PinnedFooter>
         ) : null}
       </ToastHost>
       <LiveBar

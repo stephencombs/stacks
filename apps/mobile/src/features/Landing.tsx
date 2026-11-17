@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/ui/Button";
 import { cn } from "../components/ui/cn";
+import { useBottomClearance } from "../components/ui/tabBar";
 import { animate, ease, useReducedMotion } from "../components/ui/motion";
 import { SignInButton } from "./SignInButton";
 import { TripHero } from "./TripHero";
@@ -115,6 +116,9 @@ export function Landing({
 }) {
   const copy = invited ? invitedCopy : accountCopy;
   const insets = useSafeAreaInsets();
+  // Android's navigation bar floats over the foot of the screen; iOS's already insets it.
+  const bar = useBottomClearance();
+  const clearance = Platform.OS === "android" ? bar : insets.bottom;
   const { width } = useWindowDimensions();
   const frame = Math.min(width, FRAME);
   const pager = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -320,7 +324,7 @@ export function Landing({
                       </ScrollView>
                     ) : null}
                   </View>
-                  <View className="gap-2 px-6 pt-2" style={{ paddingBottom: insets.bottom + 16 }}>
+                  <View className="gap-2 px-6 pt-2" style={{ paddingBottom: clearance + 16 }}>
                     <View className="flex-row items-center justify-center">
                       {steps.map((step, i) => (
                         <Pressable
@@ -360,7 +364,7 @@ export function Landing({
                     <DisplayTitle compact={compact}>{copy.title}</DisplayTitle>
                     <StepBody>{copy.body}</StepBody>
                   </View>
-                  <View className="gap-3 px-6" style={{ paddingBottom: insets.bottom + 16 }}>
+                  <View className="gap-3 px-6" style={{ paddingBottom: clearance + 16 }}>
                     <SignInButton mode="sign-up" label="Create an account" variant="primary" />
                     <SignInButton mode="sign-in" label="Sign in" variant="secondary" />
                     {onRecord ? (

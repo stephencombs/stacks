@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-16
 priority: critical
 tags:
@@ -8,7 +8,10 @@ tags:
   - design
 parent: "019"
 created_at: 2026-11-16T21:53:43.036558900Z
-updated_at: 2026-11-16T21:53:43.036558900Z
+updated_at: 2026-11-17T03:16:03.088960300Z
+transitions:
+  - status: in-progress
+    at: 2026-11-17T03:16:03.088960300Z
 ---
 
 # Android sheets, insets and native controls

@@ -6,7 +6,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation } from "@react-navigation/native";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useEffect, useState, type ReactNode } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "../components/ui/Button";
@@ -88,9 +88,10 @@ export function PersonalLiveBar(placement: Placement) {
 
 /**
  * One bar for your live sessions other than `except`. It goes straight to a single session; with
- * several it names the newest and opens a sheet to pick one. Nothing when there are none.
+ * several it names the newest and opens a sheet to pick one. Nothing when there are none. In a
+ * dock, `spaced` keeps Android's shadow off the label below.
  */
-export function LiveSessionsBar({ except }: { except?: string }) {
+export function LiveSessionsBar({ except, spaced = false }: { except?: string; spaced?: boolean }) {
   const navigation = useNavigation();
   const live = useLiveSessions(except);
   const [picking, setPicking] = useState(false);
@@ -111,6 +112,7 @@ export function LiveSessionsBar({ except }: { except?: string }) {
         title={title}
         trailing={newest.trailing}
         onPress={() => open(newest)}
+        spaced={spaced}
       />
     );
   return (
@@ -121,6 +123,7 @@ export function LiveSessionsBar({ except }: { except?: string }) {
         title={title}
         trailing={`+${rest.length} live`}
         onPress={() => setPicking(true)}
+        spaced={spaced}
       />
       {picking ? (
         <Sheet open title="Live sessions" onClose={() => setPicking(false)}>
@@ -192,15 +195,18 @@ function Bar({
   title,
   trailing,
   onPress,
+  spaced = false,
 }: {
   label: string;
   hint: string;
   title: string;
   trailing: string;
   onPress: () => void;
+  spaced?: boolean;
 }) {
   return (
     <PressableScale
+      style={spaced && Platform.OS === "android" ? { marginBottom: 8 } : undefined}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}

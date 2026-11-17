@@ -364,7 +364,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       felt={live}
       dock={
         <>
-          <LiveSessionsBar except={visitId} />
+          <LiveSessionsBar except={visitId} spaced />
           {notice ? (
             <View accessibilityLiveRegion="polite" className="rounded-xl bg-fill px-4 py-2">
               <Text className="text-sm text-ink">{notice}</Text>

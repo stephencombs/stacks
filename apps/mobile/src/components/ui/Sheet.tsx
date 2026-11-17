@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type LayoutChangeEvent,
   type ScrollViewInstance,
 } from "react-native";
@@ -19,8 +20,10 @@ import { keyboardOverlap, sheetBottomEdge } from "./keyboardInset";
 import { useReducedMotion } from "./motion";
 
 /**
- * A form or confirmation that slides up over the current screen, laid out like an iOS sheet: a
- * grabber, a centred title with a close button, and the main action pinned to the bottom.
+ * A form or confirmation that slides up over the current screen. On Android and the web it is a
+ * bottom sheet: as tall as its content up to the screen below the status bar, with a dimmed scrim
+ * above that closes it, a grabber, a centred title with a close button, and the main action
+ * pinned to the bottom. iOS draws its own in `Sheet.ios.tsx`.
  */
 export function Sheet({
   open,
@@ -42,6 +45,7 @@ export function Sheet({
   children?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const [keyboard, setKeyboard] = useState(0);
   const sheetBottom = useRef(0);
@@ -82,13 +86,12 @@ export function Sheet({
   return (
     <Modal
       visible={open}
+      transparent
       animationType={reducedMotion ? "none" : "slide"}
-      presentationStyle="pageSheet"
       onRequestClose={busy ? () => {} : onClose}
     >
       <View
-        className="flex-1 bg-canvas"
-        style={{ paddingBottom: bottom }}
+        className="flex-1 justify-end"
         onLayout={(event) => {
           measureInWindow(event.target, (y, height) => {
             const edge = sheetBottomEdge(Dimensions.get("screen").height, { y, height });
@@ -98,9 +101,18 @@ export function Sheet({
           });
         }}
       >
-        <View className="flex-1">
-          <View className="items-center pt-2">
-            <View className="h-[5px] w-9 rounded-full bg-fill-strong" />
+        <Pressable
+          accessible={false}
+          disabled={busy}
+          onPress={onClose}
+          className="absolute inset-0 bg-scrim"
+        />
+        <View
+          className="overflow-hidden rounded-t-[28px] border-t border-line bg-canvas"
+          style={{ maxHeight: screenHeight - insets.top - 8, paddingBottom: bottom }}
+        >
+          <View className="items-center pt-3">
+            <View className="h-1 w-8 rounded-full bg-fill-strong" />
           </View>
           <View className="min-h-14 flex-row items-center px-4">
             <View className="w-11" />
@@ -127,7 +139,7 @@ export function Sheet({
           </View>
           <ScrollView
             ref={scroll}
-            className="flex-1"
+            className="shrink"
             keyboardShouldPersistTaps="handled"
             scrollEventThrottle={32}
             onScroll={(event) => {
