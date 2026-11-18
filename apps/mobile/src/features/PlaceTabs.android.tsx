@@ -14,7 +14,7 @@ const drawables: Record<string, string> = {
   Crew: "tab_crew",
 };
 
-/** Android's own navigation bar, with Material Symbols from `assets/tab-icons`: filled when selected. */
+/** Android's own tab bar, with Material Symbols from `assets/tab-icons`: filled when selected. */
 export const placeTab = (title: string, _symbol: string) => ({
   title,
   tabBarIcon: ({ focused }: { focused: boolean }) => ({
@@ -23,7 +23,7 @@ export const placeTab = (title: string, _symbol: string) => ({
   }),
 });
 
-/** Material's navigation bar is 80dp, drawn over the foot of the screens and the gesture inset. */
+/** Material's tab bar (its navigation bar) is 80dp, drawn over the foot of the screens and the gesture inset. */
 export function useTabBarHeight() {
   const insets = useSafeAreaInsets();
   return 80 + insets.bottom;

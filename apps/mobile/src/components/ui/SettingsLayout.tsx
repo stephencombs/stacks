@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 
 import { Icon } from "./Icon";
@@ -21,10 +20,9 @@ export type SettingsLayoutProps = {
       onPress: () => void;
     }>;
   }>;
-  children?: ReactNode;
 };
 
-export function SettingsLayout({ groupName, currency, sections, children }: SettingsLayoutProps) {
+export function SettingsLayout({ groupName, currency, sections }: SettingsLayoutProps) {
   return (
     <Screen>
       <View className="gap-1">
@@ -63,7 +61,6 @@ export function SettingsLayout({ groupName, currency, sections, children }: Sett
           ) : null}
         </View>
       ))}
-      {children}
     </Screen>
   );
 }
