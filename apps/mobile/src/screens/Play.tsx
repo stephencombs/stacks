@@ -243,7 +243,8 @@ function Visit({ visitId }: { visitId: VisitId }) {
       reason: UNDONE_REASON,
       replacement: null,
     });
-    if (receipt) setSaved({ entryId, text: "Rebuy undone. It stays in the history, voided." });
+    if (receipt)
+      setSaved({ entryId, visitId: of, text: "Rebuy undone. It stays in the history, voided." });
   };
   const fromTable = ({ entryId, ...rest }: TableRecorded) => {
     close();
@@ -468,7 +469,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
               .filter(Boolean)
               .join(" · ")}
           </Text>
-          <VisitHero visit={visit} />
+          <VisitHero visit={visit} own={own} />
           <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
           <TableSection
             tableId={visit.visit.tableId}
@@ -559,7 +560,12 @@ function Visit({ visitId }: { visitId: VisitId }) {
           onSaved={recorded}
         />
       ) : open?.type === "buy_in" ? (
-        <BuyInTotalSheet visit={visit} onClose={close} onSaved={() => edited("Buy-in saved.")} />
+        <BuyInTotalSheet
+          visit={visit}
+          own={own}
+          onClose={close}
+          onSaved={() => edited("Buy-in saved.")}
+        />
       ) : open?.type === "start_time" ? (
         <StartTimeSheet visit={visit} onClose={close} onSaved={() => edited("Start time saved.")} />
       ) : open?.type === "game" ? (
@@ -731,12 +737,12 @@ function BuyInFigure({ amount }: { amount: MinorUnits }) {
   );
 }
 
-function VisitHero({ visit }: { visit: RecordingVisitView }) {
+function VisitHero({ visit, own }: { visit: RecordingVisitView; own: boolean }) {
   const summary = sessionReadout(visit, visit.visit.finishedAt!);
   return (
     <View className="gap-5 rounded-[22px] bg-surface p-4">
       <View className="gap-1">
-        <Text className="type-footnote text-muted">Your result</Text>
+        <Text className="type-footnote text-muted">{own ? "Your result" : "Result"}</Text>
         <Money
           amount={visit.finalResult!}
           currency={RECORDING_CURRENCY}

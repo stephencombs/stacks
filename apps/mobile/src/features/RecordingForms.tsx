@@ -757,10 +757,12 @@ const totalModes = [
  */
 export function BuyInTotalSheet({
   visit,
+  own,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  own: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -804,7 +806,7 @@ export function BuyInTotalSheet({
             )
           ) : (
             <>
-              Your buy-in becomes{" "}
+              {own ? "Your buy-in becomes" : "New buy-in total"}{" "}
               <Money
                 amount={MinorUnits.make(total)}
                 currency={RECORDING_CURRENCY}

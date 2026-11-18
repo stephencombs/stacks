@@ -42,7 +42,19 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.doMock("react-native", () => ({
     Text: Container,
     View: Container,
-    Pressable: Container,
+    Pressable: ({
+      accessibilityLabel,
+      children,
+      onPress,
+    }: {
+      accessibilityLabel?: string;
+      children?: ReactNode;
+      onPress?: () => void;
+    }) => (
+      <button aria-label={accessibilityLabel} onClick={onPress}>
+        {children}
+      </button>
+    ),
     Platform: { OS: "ios" },
     Animated: { Value, View: Container },
   }));
@@ -65,7 +77,9 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     ActionMenu: ({ actions }: { actions: { label: string; onPress: () => void }[] }) =>
       actions.map((a) => <Button key={a.label} {...a} />),
   }));
-  vi.doMock("../components/ui/Sheet", () => ({ Sheet: Container }));
+  vi.doMock("../components/ui/Sheet", () => ({
+    Sheet: ({ children }: { children: ReactNode }) => <section>{children}</section>,
+  }));
   vi.doMock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
   vi.doMock("../components/ui/HeaderTitle", () => ({ HeaderTitle: () => null }));
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
@@ -114,8 +128,10 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   const { PlayScreen } = await import("./Play");
   const element = document.createElement("div");
   const root = createRoot(element);
-  const click = async (label: string) => {
-    const button = [...element.querySelectorAll("button")].find((b) => b.textContent === label);
+  const click = async (label: string, within: ParentNode = element) => {
+    const button = [...within.querySelectorAll("button")].find(
+      (b) => b.textContent === label || b.getAttribute("aria-label")?.startsWith(label + ","),
+    );
     expect(button, label).toBeDefined();
     await act(async () => button!.click());
   };
@@ -127,6 +143,12 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
         </RecordingProvider>,
       ),
     );
+    await click("Bea");
+    await click("+ $100", element.querySelector("section")!);
+    await click("Undo");
+    expect(element.textContent).toContain("Rebuy undone.");
+    expect(element.textContent).not.toContain("View entry");
+    await click("Dismiss");
     await click("Edit my session");
     // Bea is at the table too, so this removes only your visit.
     await click("Delete my visit");
