@@ -169,7 +169,11 @@ const RootStack = createNativeStackNavigator({
       linking: "invite/:token",
       options: { title: "Invite" },
     },
-    History: { screen: HistoryScreen, linking: "history", options: { title: "All sessions" } },
+    History: {
+      screen: HistoryScreen,
+      linking: "history/:period?",
+      options: { title: "All sessions" },
+    },
     Invites: { screen: InvitesStack, options: { headerShown: false } },
   },
 });

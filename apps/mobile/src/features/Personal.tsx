@@ -3,8 +3,15 @@ import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import type { VisitId } from "@stacks/contracts";
-import { useState, type ReactNode } from "react";
-import { ActivityIndicator, Platform, ScrollView, Text, View } from "react-native";
+import { useState, type ReactNode, type Ref } from "react";
+import {
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  Text,
+  View,
+  type ScrollViewInstance,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BrandMark } from "../components/BrandMark";
@@ -40,6 +47,7 @@ export function PersonalScreen({
   live = false,
   felt = false,
   session = false,
+  scrollRef,
 }: {
   children: ReactNode;
   dock?: ReactNode;
@@ -48,6 +56,7 @@ export function PersonalScreen({
   live?: boolean;
   felt?: boolean;
   session?: boolean;
+  scrollRef?: Ref<ScrollViewInstance>;
 }) {
   const header = useNativeHeaderActions(true);
   const insets = useSafeAreaInsets();
@@ -67,6 +76,7 @@ export function PersonalScreen({
       {header}
       <FeltStatusBar felt={felt} />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         style={foot.scrollStyle}
         contentInsetAdjustmentBehavior="automatic"

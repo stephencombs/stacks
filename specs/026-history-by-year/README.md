@@ -1,11 +1,14 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-16
 priority: medium
 tags:
   - mobile
 created_at: 2026-11-16T21:53:44.385062Z
-updated_at: 2026-11-16T21:53:44.385062Z
+updated_at: 2026-11-17T03:29:48.606562Z
+transitions:
+  - status: in-progress
+    at: 2026-11-17T03:18:38.092643700Z
 ---
 
 # All sessions by month and by year
@@ -32,11 +35,11 @@ and leaves out hours. Deleted sessions also sit among the rest with no details.
 
 ## Plan
 
-- [ ] Year grouping in `recordingView` with tests
-- [ ] Segmented control and headers in `screens/Sessions.tsx`
-- [ ] Month and year deep links
+- [x] Year grouping in `recordingView` with tests
+- [x] Segmented control and headers in `screens/History.tsx`
+- [x] Month and year deep links
 
 ## Test
 
-- [ ] Unit tests for year totals that exclude live play
+- [x] Unit tests for year totals that exclude live play
 - [ ] iOS and Android screenshots, both groupings, light and dark
