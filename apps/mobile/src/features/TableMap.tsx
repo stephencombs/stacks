@@ -596,7 +596,7 @@ function TableScene({
         <View
           style={{ height, overflow: "hidden" }}
           accessibilityRole="image"
-          accessibilityLabel={`Blackjack table, ${shown.seats.length} of ${seatNumbers.length} seats taken`}
+          accessibilityLabel={`Blackjack table, ${view.seats.length} of ${seatNumbers.length} seats taken`}
         >
           <Animated.View style={[{ position: "absolute", width, height }, world]}>
             {FRAMES.map((frame, i) => (

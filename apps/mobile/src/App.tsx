@@ -18,8 +18,9 @@ import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-c
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { Button } from "./components/ui/Button";
+import { ConfirmDialogHost } from "./components/ui/ConfirmDialogHost";
 import { HeaderTitle } from "./components/ui/HeaderTitle";
-import { TabBarHeight } from "./components/ui/Screen";
+import { TabBarHeight } from "./components/ui/tabBar";
 import { Landing } from "./features/Landing";
 import { PersonalYouButton, PlayBrand } from "./features/Personal";
 import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./features/PlaceTabs";
@@ -341,6 +342,7 @@ export default function App() {
       <RecordingProvider store={recordingStore}>
         <AccountProvider>
           <Root />
+          <ConfirmDialogHost />
           <StatusBar style={theme === "light" ? "dark" : "light"} />
         </AccountProvider>
       </RecordingProvider>

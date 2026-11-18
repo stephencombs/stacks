@@ -1,4 +1,4 @@
-import { MenuView } from "@expo/ui/community/menu";
+import { MenuView } from "./MenuView";
 import { View } from "react-native";
 import { useUniwind } from "uniwind";
 

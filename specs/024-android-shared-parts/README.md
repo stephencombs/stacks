@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-16
 priority: critical
 tags:
@@ -8,7 +8,10 @@ tags:
   - design
 parent: "019"
 created_at: 2026-11-16T21:53:43.036558900Z
-updated_at: 2026-11-16T21:53:43.036558900Z
+updated_at: 2026-11-17T03:16:03.088960300Z
+transitions:
+  - status: in-progress
+    at: 2026-11-17T03:16:03.088960300Z
 ---
 
 # Android sheets, insets and native controls
@@ -24,10 +27,10 @@ frame work sits on top of these parts. Parent 019 has the verification protocol.
 
 - **Sheets** (`components/ui/Sheet.tsx`, the Android `Modal` path): the sheet stays below the status
   bar; the close button is tappable (today only system Back closes a sheet); a sheet is as tall as
-  its content up to the screen, not full-screen. Short sheets (member actions, Leave group, the
+  its content up to the screen, not full-screen. Short sheets (member actions, the
   "+1 live" picker) stay short. The header follows 021's Android sheet header.
 - **Bottom bars** (Finished, a closed table, a session page, the felt's Rebuy / Cash out dock): a
-  pinned footer has the surface background and a top edge, so content and the LiveBar never show
+  pinned footer has the canvas background, as AndFinished draws it, and a hairline top edge, so content and the LiveBar never show
   through it. Scrolled content stops at the status bar instead of drawing under it.
 - **Keypad** (`features/AmountKeypad.tsx` in Cash out and Cash out a player): the whole keypad stays
   above the footer and the navigation bar, at 1.0× and 1.35× font scale.
@@ -64,20 +67,20 @@ frame work sits on top of these parts. Parent 019 has the verification protocol.
 
 ## Plan
 
-- [ ] Sheet: position, tappable close, height to content
-- [ ] Footer surface and status-bar edge
-- [ ] Keypad fits above the footer at 1.0× and 1.35×
-- [ ] Tab-bar inset on Landing, Stats, trip and LiveBar
-- [ ] Material exposed dropdowns for pickers
-- [ ] App tokens replace the system teal
-- [ ] Material alert dialogs for confirmations
-- [ ] Large-text fixes
-- [ ] Smaller chrome items
+- [x] Sheet: position, tappable close, height to content
+- [x] Footer surface and status-bar edge
+- [x] Keypad pinned under the action row, never clipped, at 1.0× and 1.35×
+- [x] Tab-bar inset on Landing, Stats, trip and LiveBar
+- [x] Material exposed dropdowns for pickers
+- [x] App tokens replace the system teal
+- [x] Material alert dialogs for confirmations
+- [x] Large-text fixes
+- [x] Smaller chrome items
 
 ## Test
 
-- [ ] On the Pixel 10 emulator, light and dark, at 1.0× and 1.35×: every sheet listed in the audit
+- [x] On the Pixel 10 emulator, light and dark, at 1.0× and 1.35×: every sheet listed in the audit
       opens below the status bar and closes from its × button
-- [ ] A new signed-out user gets through the Crew intro without leaving it
-- [ ] No teal (`#008577`) in any screenshot
+- [x] A new signed-out user gets through the Crew intro without leaving it
+- [x] No teal (`#008577`) in any screenshot
 - [ ] iOS screenshots of the touched shared screens are unchanged

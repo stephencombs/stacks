@@ -4,7 +4,7 @@ import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import { localClock, nightLabel, tripPlays } from "@stacks/client-runtime/trip";
 import { tripNights } from "@stacks/shared/trips";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -68,21 +68,14 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
   const nights = tripNights(closed, localClock).toReversed();
   const going = trip.trip.endedAt === null;
   const canStart = going && group.group.currency === RECORDING_CURRENCY;
+  const startButton = (
+    <Button label="Start a session" variant="primary" size="lg" onPress={() => setStarting(true)} />
+  );
   return (
     <Screen
       shows={{ trip: trip.trip.id }}
-      renderFooter={
-        canStart
-          ? () => (
-              <Button
-                label="Start a session"
-                variant="primary"
-                size="lg"
-                onPress={() => setStarting(true)}
-              />
-            )
-          : undefined
-      }
+      fab={canStart && Platform.OS === "android" ? startButton : undefined}
+      renderFooter={canStart && Platform.OS !== "android" ? () => startButton : undefined}
     >
       <View className="gap-3">
         <PageTitle

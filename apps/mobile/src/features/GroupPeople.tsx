@@ -4,7 +4,7 @@ import { formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/forma
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { confirmAction } from "../components/ui/confirmAction";
 import { Button } from "../components/ui/Button";
@@ -193,7 +193,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
                       <Button
                         label="Revoke"
                         size="sm"
-                        variant="ghost"
+                        variant={Platform.OS === "android" ? "danger" : "ghost"}
                         pending={revoke.pending}
                         onPress={() =>
                           confirmAction(

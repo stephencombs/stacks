@@ -70,6 +70,7 @@ export default (): ExpoConfig => ({
     ],
     "./plugins/withStartupCrashRecovery",
     "./plugins/withAndroidTabIcons",
+    "./plugins/withAndroidTheme",
   ],
   web: { bundler: "metro", output: "single" },
   extra: {
