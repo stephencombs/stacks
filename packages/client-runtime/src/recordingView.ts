@@ -178,34 +178,50 @@ export const recordingHome = (state: RecordingState): RecordingHome => {
   };
 };
 
-/** Own sessions by local start month, with deleted visits after that month's visible play. */
-export const recordingMonths = (home: RecordingHome) => {
+export type RecordingGrouping = "month" | "year";
+
+/** A history address's period: "2026-11" opens months there, "2026" years. */
+export const recordingGroupingOf = (period: string | undefined): RecordingGrouping | null =>
+  period === undefined
+    ? null
+    : /^\d{4}-(0[1-9]|1[0-2])$/.test(period)
+      ? "month"
+      : /^\d{4}$/.test(period)
+        ? "year"
+        : null;
+
+/**
+ * Own sessions by local start month ("2026-11") or year ("2026"), newest first, with deleted
+ * visits after that period's visible play. Totals leave out live play and deleted visits.
+ */
+export const recordingPeriods = (home: RecordingHome, by: RecordingGrouping) => {
   const groups = new Map<string, RecordedVisit[]>();
   for (const item of [...home.active, ...home.finished, ...home.deleted]) {
-    const key = localDateText(DateTime.toDateUtc(item.visit.startedAt)).slice(0, 7);
+    const key = localDateText(DateTime.toDateUtc(item.visit.startedAt)).slice(
+      0,
+      by === "month" ? 7 : 4,
+    );
     const group = groups.get(key) ?? [];
     group.push(item);
     groups.set(key, group);
   }
   return [...groups]
     .toSorted(([a], [b]) => b.localeCompare(a))
-    .map(([month, items]) => {
-      const visible = items.filter((item) => item.visit.deletedAt === undefined);
-      const result = visible.reduce((sum, item) => sum + BigInt(item.finalResult ?? 0), 0n);
-      const minutes = visible.reduce(
+    .map(([period, items]) => {
+      const done = items.filter(
+        (item) => item.visit.deletedAt === undefined && item.visit.finishedAt,
+      );
+      const result = done.reduce((sum, item) => sum + BigInt(item.finalResult ?? 0), 0n);
+      const minutes = done.reduce(
         (sum, item) =>
-          item.visit.finishedAt
-            ? sum + Math.round((ms(item.visit.finishedAt) - ms(item.visit.startedAt)) / 60_000)
-            : sum,
+          sum + Math.round((ms(item.visit.finishedAt!) - ms(item.visit.startedAt)) / 60_000),
         0,
       );
       return {
-        month,
+        period,
         result: MinorUnits.make(Number(result)),
-        count: visible.length,
-        /** Finished sessions only, to sit beside the result and minutes, which leave out live play. */
-        finished: visible.filter((item) => item.visit.finishedAt).length,
-        /** Minutes played in finished sessions; live play counts once it finishes. */
+        /** Finished sessions; live play counts once it finishes. */
+        finished: done.length,
         minutes,
         visits: items.toSorted(
           (a, b) =>

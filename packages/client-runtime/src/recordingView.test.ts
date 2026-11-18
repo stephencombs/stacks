@@ -31,7 +31,8 @@ import {
   parseRecordingAmount,
   PRIVATE_RECORDING_NAMESPACE,
   recordingHome,
-  recordingMonths,
+  recordingGroupingOf,
+  recordingPeriods,
   recordingVisit,
   venueChoices,
   venuePlace,
@@ -380,8 +381,8 @@ it("keeps deleted visits at their month end, outside Play, table and history tot
   expect(home.finishedResult).toBe(-5000);
   expect(home.finished.map((item) => item.visit.id)).toEqual([visible]);
   expect(home.deleted.map((item) => item.visit.id)).toEqual([deleted]);
-  const [month] = recordingMonths(home);
-  expect(month!.count).toBe(1);
+  const [month] = recordingPeriods(home, "month");
+  expect(month!.finished).toBe(1);
   expect(month!.result).toBe(-5000);
   expect(month!.minutes).toBe(60);
   expect(month!.visits.map((item) => item.visit.id)).toEqual([visible, deleted]);
@@ -398,10 +399,96 @@ it("counts a month's finished sessions apart from live play", async () => {
     finishedAt: at(2),
   });
   await save(store, { type: "start", buyIn: 5000, startedAt: at(9) });
-  const [month] = recordingMonths(recordingHome(state(store)));
-  expect(month!.count).toBe(2);
+  const [month] = recordingPeriods(recordingHome(state(store)), "month");
   expect(month!.finished).toBe(1);
+  expect(month!.visits).toHaveLength(2);
   await store.close();
+});
+
+it("reads a history address as months or years", () => {
+  expect(["2026-11", "2026", "2026-13", "26", "", undefined].map(recordingGroupingOf)).toEqual([
+    "month",
+    "year",
+    null,
+    null,
+    null,
+    null,
+  ]);
+});
+
+describe("recordingPeriods by year", () => {
+  const on = (day: string, hour: number) =>
+    DateTime.makeUnsafe(`${day}T${hour.toString().padStart(2, "0")}:00:00.000Z`);
+
+  it("totals each year from finished play only, newest year first", async () => {
+    const { store } = await open();
+    await save(store, {
+      type: "record_completed",
+      buyIn: 10000,
+      cashOut: 25000,
+      startedAt: on("2025-03-10", 12),
+      finishedAt: on("2025-03-10", 14),
+    });
+    const deleted = state(store).visits[0]!.id;
+    await save(store, {
+      type: "record_completed",
+      buyIn: 20000,
+      cashOut: 5000,
+      startedAt: on("2025-08-20", 12),
+      finishedAt: on("2025-08-20", 13),
+    });
+    await save(store, {
+      type: "record_completed",
+      buyIn: 30000,
+      cashOut: 40000,
+      startedAt: on("2026-06-01", 12),
+      finishedAt: on("2026-06-01", 15),
+    });
+    await save(store, { type: "start", buyIn: 50000, startedAt: on("2026-06-02", 12) });
+    await save(store, { type: "delete_visit", visitId: deleted });
+
+    const years = recordingPeriods(recordingHome(state(store)), "year");
+    expect(
+      years.map(({ period, result, finished, minutes }) => ({ period, result, finished, minutes })),
+    ).toEqual([
+      { period: "2026", result: 10000, finished: 1, minutes: 180 },
+      { period: "2025", result: -15000, finished: 1, minutes: 60 },
+    ]);
+    expect(years[0]!.visits).toHaveLength(2);
+    expect(years[1]!.visits.map((item) => item.visit.id).at(-1)).toBe(deleted);
+    await store.close();
+  });
+
+  it("adds up to the same visits and totals as its months", async () => {
+    const { store } = await open();
+    for (const [day, cashOut] of [
+      ["2025-02-14", 0],
+      ["2025-11-02", 30000],
+      ["2026-01-20", 12500],
+    ] as const)
+      await save(store, {
+        type: "record_completed",
+        buyIn: 10000,
+        cashOut,
+        startedAt: on(day, 12),
+        finishedAt: on(day, 13),
+      });
+    const home = recordingHome(state(store));
+    const months = recordingPeriods(home, "month");
+    expect(months.map((month) => month.period)).toEqual(["2026-01", "2025-11", "2025-02"]);
+    const years = recordingPeriods(home, "year");
+    expect(years.map((year) => year.period)).toEqual(["2026", "2025"]);
+    for (const year of years) {
+      const inYear = months.filter((month) => month.period.startsWith(`${year.period}-`));
+      const sum = (pick: (month: (typeof months)[number]) => number) =>
+        inYear.reduce((total, month) => total + pick(month), 0);
+      expect(year.result).toBe(sum((month) => month.result));
+      expect(year.finished).toBe(sum((month) => month.finished));
+      expect(year.minutes).toBe(sum((month) => month.minutes));
+      expect(year.visits).toHaveLength(sum((month) => month.visits.length));
+    }
+    await store.close();
+  });
 });
 
 it.each(["delete_visit", "restore_visit"] as const)("names a refused %s change", async (type) => {

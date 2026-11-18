@@ -188,6 +188,7 @@ async function load({
     "./screens/Crew": ["CrewScreen"],
     "./screens/Group": ["GroupScreen"],
     "./screens/GroupSettings": ["GroupSettingsScreen"],
+    "./screens/History": ["HistoryScreen"],
     "./screens/Map": ["MapScreen"],
     "./screens/NewSession": ["NewSessionScreen"],
     "./screens/Play": ["PlayScreen"],

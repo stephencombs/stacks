@@ -1,10 +1,10 @@
 import { useNavigation } from "@react-navigation/native";
-import { formatDay, formatDuration, formatTime } from "@stacks/client-runtime/format";
+import { formatDay, formatDuration, formatPlayed, formatTime } from "@stacks/client-runtime/format";
 import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
 import {
   localDateText,
   RECORDING_CURRENCY,
-  recordingMonths,
+  recordingPeriods,
   visitTitle,
   type RecordedVisit,
   type RecordingHome,
@@ -127,10 +127,8 @@ export function HomeScreen() {
 /** The month you're in: its result from finished sessions, hours and how many you played. */
 function MonthHero({ home }: { home: RecordingHome }) {
   const key = localDateText().slice(0, 7);
-  const month = recordingMonths(home).find((item) => item.month === key);
+  const month = recordingPeriods(home, "month").find((item) => item.period === key);
   const count = month?.finished ?? 0;
-  const minutes = month?.minutes ?? 0;
-  const played = minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`;
   return (
     <View className="gap-1 rounded-[22px] bg-surface p-4">
       <Text accessibilityRole="header" className="type-title text-ink">
@@ -148,7 +146,7 @@ function MonthHero({ home }: { home: RecordingHome }) {
       <Text className="type-footnote text-muted">
         {count === 0
           ? "No sessions yet this month"
-          : `${played} · ${count === 1 ? "1 session" : `${count} sessions`}`}
+          : `${formatPlayed(month?.minutes ?? 0)} · ${count === 1 ? "1 session" : `${count} sessions`}`}
         . Live play counts once you finish.
       </Text>
     </View>

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { formatDay, formatTime } from "@stacks/client-runtime/format";
 import { useRecordingHome, useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
 import {
-  recordingMonths,
+  recordingPeriods,
   RECORDING_CURRENCY,
   visitTitle,
 } from "@stacks/client-runtime/recordingView";
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/history")({ component: History });
 function History() {
   const { home, status, error, retryLoad } = useRecordingHome();
   const restore = useRecordingSubmit();
-  const months = home ? recordingMonths(home) : [];
+  const months = home ? recordingPeriods(home, "month") : [];
   return (
     <>
       <PageHeader title="All sessions" back={<BackLink to="/">Your play</BackLink>}>
@@ -36,7 +36,7 @@ function History() {
           Your sessions will appear here, including ones you delete.
         </EmptyState>
       ) : (
-        months.map(({ month, result, count, visits }) => (
+        months.map(({ period: month, result, finished: count, visits }) => (
           <Section
             key={month}
             title={new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(
