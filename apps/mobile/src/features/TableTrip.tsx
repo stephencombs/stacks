@@ -60,9 +60,11 @@ function SignedInChoice({
             value={value ?? ""}
             onChange={(key) => onChange(key ? TripId.make(key) : null)}
           />
-          <Text className="text-sm text-muted">
-            A trip shares this whole table's play with the group, including return visits.
-          </Text>
+          {value ? (
+            <Text className="text-sm text-muted">
+              A trip shares this whole table's play with the group, including return visits.
+            </Text>
+          ) : null}
         </>
       )}
     </Loaded>

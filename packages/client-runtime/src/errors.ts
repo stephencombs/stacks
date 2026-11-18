@@ -15,6 +15,7 @@ const conflictMessages: Record<ConflictReason, string> = {
   invite_used_up: "This invite has been used up. Ask for a new one.",
   claim_has_history:
     "You already have history in this group, so this guest can't be merged into you.",
+  claim_already_member: "You're already in this group, so you can't claim a guest's history here.",
   player_not_in_group: "That player isn't in this group.",
   player_not_in_session: "That player isn't in this session.",
   seat_taken: "Someone's already in that seat.",

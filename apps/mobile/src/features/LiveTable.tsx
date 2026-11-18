@@ -22,6 +22,7 @@ import {
   type TableId,
   type VisitId,
 } from "@stacks/contracts";
+import { shortName } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
 import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
@@ -181,16 +182,21 @@ const actionIcons: Record<TableAction, IconName> = {
 export function ActionSlot({
   actions,
   onAction,
+  who,
 }: {
   actions: ReadonlyArray<TableAction>;
   onAction: (action: TableAction) => void;
+  /** Whose session this is, when it isn't yours: "Priya". */
+  who?: string | undefined;
 }) {
+  const label = (action: TableAction) =>
+    action === "edit" && who ? `Edit ${who}'s session` : actionLabels[action];
   const [only] = actions;
   if (!only) return <View className="size-11" />;
   if (actions.length === 1)
     return (
       <IconButton
-        accessibilityLabel={actionLabels[only]}
+        accessibilityLabel={label(only)}
         icon={<Icon name={actionIcons[only]} color="ink" />}
         onPress={() => onAction(only)}
       />
@@ -199,7 +205,7 @@ export function ActionSlot({
     <ActionMenu
       label="Table actions"
       actions={actions.map((action) => ({
-        label: actionLabels[action],
+        label: label(action),
         icon: actionIcons[action],
         destructive: action === "delete_table",
         onPress: () => onAction(action),
@@ -353,7 +359,13 @@ export function SeatSheet({
     (item) => item.playerId === seat.playerId && item.playing && item.visitId !== seat.visitId,
   );
   return (
-    <Sheet open busy={quick.pending} title={seat.name} description={seat.status} onClose={onClose}>
+    <Sheet
+      open
+      busy={quick.pending}
+      title={shortName(seat.name)}
+      description={seat.status}
+      onClose={onClose}
+    >
       <View className="flex-row items-baseline justify-between gap-3 rounded-xl bg-surface p-4">
         <Text className="type-footnote text-muted">{seat.playing ? "Bought in" : "Result"}</Text>
         <Money
@@ -390,7 +402,7 @@ export function SeatSheet({
             />
           </View>
           <Button
-            label={`Cash out ${seat.name}`}
+            label={`Cash out ${shortName(seat.name)}`}
             variant="primary"
             size="lg"
             haptic
@@ -419,7 +431,7 @@ export function SeatSheet({
       )}
       {quick.error ? <FormError>{quick.error}</FormError> : null}
       <Button
-        label={`${seat.name}'s history`}
+        label={`${shortName(seat.name)}'s history`}
         variant="ghost"
         onPress={() => onHistory(seat.visitId)}
       />

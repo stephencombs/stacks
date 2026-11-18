@@ -143,6 +143,10 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
             setStarting(false);
             navigation.navigate("Play", { visitId });
           }}
+          onOpened={(tableId) => {
+            setStarting(false);
+            navigation.navigate("Table", { tableId });
+          }}
         />
       ) : null}
       {live.length === 0 && nights.length === 0 ? (

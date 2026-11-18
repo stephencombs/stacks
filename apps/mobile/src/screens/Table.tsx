@@ -10,7 +10,11 @@ import {
   useRecordingTable,
   useServerTable,
 } from "@stacks/client-runtime/recordingReact";
-import { RECORDING_CURRENCY, tableTitle } from "@stacks/client-runtime/recordingView";
+import {
+  RECORDING_CURRENCY,
+  tableTitle,
+  UNDONE_REASON,
+} from "@stacks/client-runtime/recordingView";
 import { TableId, type EntryId, type VisitId } from "@stacks/contracts";
 import * as Option from "effect/Option";
 import { useState } from "react";
@@ -92,7 +96,7 @@ function Table({ tableId }: { tableId: TableId }) {
       type: "correct",
       visitId,
       entryId,
-      reason: "Undone",
+      reason: UNDONE_REASON,
       replacement: null,
     });
     if (receipt) {

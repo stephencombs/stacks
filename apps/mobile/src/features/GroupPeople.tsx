@@ -60,7 +60,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
                   <Text numberOfLines={1} className="text-base text-ink">
                     {player.displayName}
                     {player.id === detail.myPlayerId ? (
-                      <Text className="text-muted"> (you)</Text>
+                      <Text className="text-muted"> · you</Text>
                     ) : null}
                   </Text>
                 </View>

@@ -9,6 +9,7 @@ import { Screen } from "../components/ui/Screen";
 import { SettingsLayout, type SettingsLayoutProps } from "../components/ui/SettingsLayout";
 import { NameSheet } from "../features/NameSheet";
 import { SettingsSkeleton } from "../features/ScreenSkeletons";
+import { afterLeavingGroup } from "../lib/crewRoutes";
 import { useLinkedScope } from "../lib/scope";
 import { shareCsv } from "../lib/share";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
@@ -56,7 +57,7 @@ function SettingsView({ detail }: { detail: GroupDetail }) {
       async () => {
         const { error } = await leave.attempt({ params: { groupId: detail.group.id } });
         if (error !== null) return error;
-        navigation.navigate("Tabs", { screen: "CrewTab", params: { screen: "Crew" } });
+        navigation.dispatch(afterLeavingGroup());
         return null;
       },
     );

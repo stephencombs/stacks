@@ -113,7 +113,7 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
                   </Text>
                   <Text className="type-footnote text-muted">
                     {item.finalResult === null
-                      ? `Playing · in ${formatMoneyText(item.totals.buyIn)}, out ${formatMoneyText(item.totals.cashOut)}`
+                      ? `Playing · in ${formatMoneyText(item.totals.buyIn)}`
                       : `Finished ${formatTime(item.visit.finishedAt!)}`}
                   </Text>
                 </View>
@@ -133,13 +133,15 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
           {local.you.playing ? (
             <Button
               label="Open your session"
-              className="self-start"
+              variant="primary"
+              size="lg"
               onPress={() => openVisit(local.you.playing!)}
             />
           ) : (
             <Button
               label="Open the table"
-              className="self-start"
+              variant="primary"
+              size="lg"
               onPress={() =>
                 navigation.dispatch(StackActions.replace("Table", { tableId: view.table.id }))
               }

@@ -809,6 +809,35 @@ describe("engine", () => {
       }),
   );
 
+  it.effect("says when changes reached the server, so what's on screen can refetch", () =>
+    Effect.gen(function* () {
+      const store = yield* Effect.promise(() => open());
+      yield* Effect.promise(() => save(store, { type: "start", buyIn: 20000, startedAt: at(10) }));
+      let pushed = 0;
+      const sync = makeRecordingSync(
+        store,
+        alex,
+        transportFor(server()),
+        memoryKeys(),
+        () => (pushed += 1),
+      );
+      const fiber = yield* Effect.forkChild(sync.run);
+      yield* TestClock.adjust("1 second");
+      expect(pushed).toBe(1);
+      // A wake with nothing new to send changes nothing on the server.
+      sync.wake();
+      yield* TestClock.adjust("1 second");
+      expect(pushed).toBe(1);
+      const visitId = state(store).visits[0]!.id;
+      yield* Effect.promise(() =>
+        save(store, { type: "finish", visitId, amount: 30000, finishedAt: at(11) }),
+      );
+      yield* TestClock.adjust("1 second");
+      expect(pushed).toBe(2);
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+
   it.effect("backs off on the test clock, and a wake cuts the wait short", () =>
     Effect.gen(function* () {
       const store = yield* Effect.promise(() => open());

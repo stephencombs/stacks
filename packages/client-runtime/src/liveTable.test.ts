@@ -166,6 +166,22 @@ describe("liveTable", () => {
   });
 });
 
+it("tells two players with the same name apart", async () => {
+  const store = await open();
+  await save(store, { type: "open_table" });
+  const tableId = state(store).tables[0]!.id;
+  for (const buyIn of [20000, 10000])
+    await save(store, {
+      type: "join_table",
+      tableId,
+      displayName: "Priya",
+      buyIn,
+      startedAt: at(21),
+    });
+  const table = liveTable(recordingTable(state(store), tableId)!, undefined);
+  expect(table.seats.map((seat) => seat.name)).toEqual(["Priya", "Priya 2"]);
+});
+
 describe("tableActions", () => {
   it("gives each role only what its permissions allow, and never names the role", () => {
     const live = { playing: true, closed: false, empty: false };

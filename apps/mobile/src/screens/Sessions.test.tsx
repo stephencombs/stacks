@@ -5,6 +5,7 @@ import {
   PlayerId,
   TripId,
   UserId,
+  TableId,
   VisitId,
   type GroupDetail,
   type TripDetail,
@@ -89,18 +90,22 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
   }));
   vi.doMock("../features/SessionList", () => ({ SessionList: () => null }));
   const visitId = VisitId.make(crypto.randomUUID());
+  const tableId = TableId.make(crypto.randomUUID());
   vi.doMock("../features/RecordingForms", () => ({
     StartSheet: ({
       initialTripId,
       onStarted,
+      onOpened,
       onClose,
     }: {
       initialTripId: TripId;
       onStarted: (id: VisitId) => void;
+      onOpened?: (id: TableId) => void;
       onClose: () => void;
     }) => (
       <div role="dialog" data-trip={initialTripId}>
         <button onClick={() => onStarted(visitId)}>Record</button>
+        {onOpened ? <button onClick={() => onOpened(tableId)}>Record a table</button> : null}
         <button onClick={onClose}>Cancel</button>
       </div>
     ),
@@ -125,6 +130,13 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
       [...host.querySelectorAll("button")].find((b) => b.textContent === "Record")!.click(),
     );
     expect(navigate).toHaveBeenCalledWith("Play", { visitId });
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    // Recording without playing is offered from a trip too, and opens that table.
+    await act(async () => start!.click());
+    await act(async () =>
+      [...host.querySelectorAll("button")].find((b) => b.textContent === "Record a table")!.click(),
+    );
+    expect(navigate).toHaveBeenCalledWith("Table", { tableId });
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     const usdGroup = group;
     for (const currency of ["EUR", "JPY"]) {

@@ -1,4 +1,5 @@
 import { DatePickerDialog, TimePickerDialog } from "@expo/ui/jetpack-compose";
+import { getCalendars } from "expo-localization";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
@@ -15,6 +16,8 @@ export function DateTimeField({
   maximumDate,
 }: DateTimeFieldProps) {
   const [open, setOpen] = useState(false);
+  const uses24Hour = getCalendars()[0]?.uses24hourClock ?? undefined;
+  const shown = fieldDisplay(value, kind, uses24Hour);
   const pick = (picked: Date) => {
     onChange(pickerText(picked, kind));
     setOpen(false);
@@ -24,11 +27,11 @@ export function DateTimeField({
       <Text className="px-1 type-footnote font-medium text-muted">{label}</Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}, ${fieldDisplay(value, kind)}`}
+        accessibilityLabel={`${label}, ${shown}`}
         onPress={() => setOpen(true)}
         className="min-h-12 justify-center rounded-2xl bg-surface px-4 py-3"
       >
-        <Text className="type-body text-ink">{fieldDisplay(value, kind)}</Text>
+        <Text className="type-body text-ink">{shown}</Text>
       </Pressable>
       {open ? (
         <Host style={{ position: "absolute", width: 0, height: 0 }}>
@@ -41,6 +44,7 @@ export function DateTimeField({
             />
           ) : (
             <TimePickerDialog
+              is24Hour={uses24Hour}
               initialDate={pickerStart(value, kind)}
               onDateSelected={pick}
               onDismissRequest={() => setOpen(false)}

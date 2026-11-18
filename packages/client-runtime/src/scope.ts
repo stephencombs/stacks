@@ -7,6 +7,20 @@ import { tripInScope } from "./trip.ts";
 export type Scope = { readonly item: GroupListItem; readonly trip: Trip | undefined };
 
 /**
+ * Your groups with a trip you just started in its group, until the list itself has caught up. Left
+ * out, the remembered trip is one no group holds yet, and the scope lands on another group's.
+ */
+export const withStartedTrip = (
+  groups: ReadonlyArray<GroupListItem>,
+  started: Trip | null,
+): ReadonlyArray<GroupListItem> =>
+  started === null || groups.some((item) => item.trips.some((trip) => trip.id === started.id))
+    ? groups
+    : groups.map((item) =>
+        item.group.id === started.groupId ? { ...item, trips: [started, ...item.trips] } : item,
+      );
+
+/**
  * What's in scope: a group picked on its own (one with no trips, or one whose trip isn't known
  * yet), else the remembered trip and its group, else the newest trip still going, else any trip.
  * `null` means you're in no group at all.

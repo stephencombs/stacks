@@ -153,20 +153,21 @@ function StartTripSheet({
   onStarted?: () => void;
 }) {
   const go = useGo();
-  const { setTrip } = useScope();
+  const { startTrip } = useScope();
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("trips", "create"));
   const [now] = useState(() => new Date());
   const [name, setName] = useState("");
   const [started, setStarted] = useState(() => localDateText(now));
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<{ field: "name" | "started"; error: string } | null>(null);
 
   const submit = async () => {
-    if (!name.trim()) return setProblem("Give the trip a name.");
+    if (!name.trim()) return setProblem({ field: "name", error: "Give the trip a name." });
     setProblem(null);
     // A trip starts at midnight of its first day.
     const start = fieldDate(started, "date");
-    if (!start || start > now) return setProblem("Choose a start date today or earlier.");
+    if (!start || start > now)
+      return setProblem({ field: "started", error: "Choose a start date today or earlier." });
     const saved = await create.run({
       params: { groupId },
       payload: {
@@ -178,8 +179,8 @@ function StartTripSheet({
     if (!saved) return;
     onClose();
     onStarted?.();
-    if (first) setTrip(saved.id);
-    else go.trip(saved.id);
+    startTrip(saved);
+    if (!first) go.trip(saved.id);
   };
 
   return (
@@ -202,18 +203,26 @@ function StartTripSheet({
         label="Trip name"
         testID="trip-name"
         value={name}
-        onChangeText={setName}
+        onChangeText={(value) => {
+          setName(value);
+          setProblem(null);
+        }}
         maxLength={60}
         placeholder={`Vegas ${now.getFullYear()}`}
+        error={problem?.field === "name" ? problem.error : null}
       />
       <DateTimeField
         label="Started"
         kind="date"
         value={started}
-        onChange={setStarted}
+        onChange={(value) => {
+          setStarted(value);
+          setProblem(null);
+        }}
         maximumDate={now}
+        error={problem?.field === "started" ? problem.error : null}
       />
-      {(problem ?? create.error) ? <FormError>{problem ?? create.error}</FormError> : null}
+      {create.error ? <FormError>{create.error}</FormError> : null}
     </Sheet>
   );
 }

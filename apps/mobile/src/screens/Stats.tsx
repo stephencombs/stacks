@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { StaticScreenProps } from "@react-navigation/native";
+import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { runningLine } from "@stacks/client-runtime/chart";
 import { groupChip } from "@stacks/client-runtime/groupStats";
 import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
@@ -10,7 +10,7 @@ import {
   type StatsFilters,
 } from "@stacks/client-runtime/stats";
 import { tripNames } from "@stacks/client-runtime/trip";
-import { GroupId, TripId, type GroupListItem } from "@stacks/contracts";
+import { GroupId, TripId, VisitId, type GroupListItem } from "@stacks/contracts";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
@@ -31,6 +31,7 @@ import { Button } from "../components/ui/Button";
 import { FilterChip } from "../components/ui/FilterChip";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
+import { Icon } from "../components/ui/Icon";
 import { GroupStatsView } from "../features/GroupStats";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet } from "../features/RecordingForms";
@@ -57,7 +58,12 @@ export function StatsScreen({ route }: Props) {
       <YourGroups>
         {(groups) => (
           // Each arrival with a group picked starts fresh, even when Stats is already open.
-          <StatsView key={`${pick.groupId}:${pick.tripId}`} pick={pick} groups={groups} />
+          // Signed out there's no group to show, whatever the address still names.
+          <StatsView
+            key={`${pick.groupId}:${pick.tripId}`}
+            pick={groups ? pick : justMe}
+            groups={groups ?? noGroups}
+          />
         )}
       </YourGroups>
     </PersonalScreen>
@@ -66,17 +72,18 @@ export function StatsScreen({ route }: Props) {
 
 type Pick = { readonly groupId?: GroupId; readonly tripId?: TripId };
 
+const justMe: Pick = {};
 const noGroups: ReadonlyArray<GroupListItem> = [];
 const remembered = new WeakSet<object>();
 
-/** Your groups when you're signed in; signed out, or before they load, there are none. */
+/** Your groups when you're signed in, none before they load; null signed out. */
 function YourGroups({
   children,
 }: {
-  children: (groups: ReadonlyArray<GroupListItem>) => ReactNode;
+  children: (groups: ReadonlyArray<GroupListItem> | null) => ReactNode;
 }) {
   const account = useAccount();
-  if (!account.available || !account.isSignedIn || !account.userId) return children(noGroups);
+  if (!account.available || !account.isSignedIn || !account.userId) return children(null);
   return (
     <StacksProvider>
       <SignedInGroups>{children}</SignedInGroups>
@@ -275,6 +282,7 @@ function Breakdown({
   view: Summary;
   onFilter: (filters: StatsFilters) => void;
 }) {
+  const navigation = useNavigation();
   return (
     <>
       <View className="gap-2 rounded-[22px] bg-surface p-4">
@@ -319,7 +327,10 @@ function Breakdown({
           </SectionHeading>
           <List>
             {view.list.map((row) => (
-              <Row key={row.key}>
+              <Row
+                key={row.key}
+                onPress={() => navigation.navigate("Play", { visitId: VisitId.make(row.key) })}
+              >
                 <View className={cn("w-1 self-stretch rounded-full", chipColor[row.chip])} />
                 <View className="min-w-0 flex-1 gap-0.5">
                   <Text numberOfLines={1} className="type-heading text-ink">
@@ -333,6 +344,7 @@ function Breakdown({
                   tone="result"
                   className="type-number"
                 />
+                <Icon name="chevron-right" color="faint" size={18} />
               </Row>
             ))}
           </List>

@@ -458,7 +458,10 @@ function CreateGroupSheet({ onClose }: { onClose: () => void }) {
         label="Group name"
         testID="group-name"
         value={name}
-        onChangeText={setName}
+        onChangeText={(value) => {
+          setName(value);
+          setNameError(null);
+        }}
         placeholder="Vegas crew"
         maxLength={80}
         error={nameError}

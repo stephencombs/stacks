@@ -11,7 +11,7 @@ import {
 } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { act, createElement, useState } from "react";
+import { act, createElement, useLayoutEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
@@ -87,14 +87,15 @@ it("keeps a just-started trip in scope while the groups list catches up", async 
   let start: (id: TripId) => void = () => {};
   function Sessions() {
     const [params, set] = useState<{ tripId?: string }>({ tripId: vegas.id });
-    setParams = (next) => set((current) => ({ ...current, ...next }));
     usePlaceAddress(params, "tripId");
     const { setTrip } = useScope();
-    // Starting a trip puts it in scope and opens Sessions with no address of its own.
-    start = (id) => {
-      setTrip(id);
-      set({});
-    };
+    useLayoutEffect(() => {
+      setParams = (next) => set((current) => ({ ...current, ...next }));
+      start = (id) => {
+        setTrip(id);
+        set({});
+      };
+    }, [setTrip]);
     return null;
   }
   const root = createRoot(document.createElement("div"));
@@ -106,5 +107,76 @@ it("keeps a just-started trip in scope while the groups list catches up", async 
   groups = AsyncResult.success([crew([reno, vegas])]);
   await act(async () => notify());
   expect(lastTripId).toBe(reno.id);
+  await act(async () => root.unmount());
+});
+
+it("opens a trip just started in a second group, not another group's trip", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const workId = GroupId.make("0192e7a0-0000-7000-8000-000000000004");
+  const work: GroupListItem = {
+    ...crew([]),
+    group: { id: workId, name: "Work", currency: CurrencyCode.make("USD"), createdAt: day },
+  };
+  const tahoe: Trip = { ...trip("0192e7a0-0000-7000-8000-000000000005", "Tahoe"), groupId: workId };
+  let groups = AsyncResult.success([crew([vegas]), work]);
+  let lastTripId: TripId | null = vegas.id;
+  const listeners = new Set<() => void>();
+  const notify = () => listeners.forEach((listener) => listener());
+  const store = {
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+    get: () => lastTripId,
+    set: (id: TripId | null) => {
+      lastTripId = id;
+      notify();
+    },
+  };
+  vi.doMock("@react-navigation/native", () => ({
+    CommonActions: { setParams: (params: object) => params },
+    useNavigation: () => ({ dispatch: () => {} }),
+  }));
+  vi.doMock("@effect/atom-react", async () => {
+    const { useSyncExternalStore } = await import("react");
+    return { useAtomValue: () => useSyncExternalStore(store.subscribe, () => groups) };
+  });
+  vi.doMock("./stacks", async () => {
+    const { useSyncExternalStore } = await import("react");
+    return {
+      Loaded: () => null,
+      useStacks: () => ({ groups: null }),
+      useLastTrip: () => ({
+        lastTripId: useSyncExternalStore(store.subscribe, store.get),
+        setLastTripId: store.set,
+      }),
+    };
+  });
+  const { ScopeProvider, useScope } = await import("./scope");
+
+  let current: ReturnType<typeof useScope> | undefined;
+  function Probe() {
+    const scope = useScope();
+    useLayoutEffect(() => {
+      current = scope;
+    }, [scope]);
+    return null;
+  }
+  const shown = () => ({ group: current?.scope?.item.group.id, trip: current?.scope?.trip?.id });
+  const root = createRoot(document.createElement("div"));
+  await act(async () => root.render(createElement(ScopeProvider, null, createElement(Probe))));
+  expect(shown()).toEqual({ group: crewId, trip: vegas.id });
+
+  // The groups list still says Work has no trips.
+  await act(async () => current!.startTrip(tahoe));
+  expect(shown()).toEqual({ group: workId, trip: tahoe.id });
+
+  groups = AsyncResult.success([crew([vegas]), { ...work, trips: [tahoe] }]);
+  await act(async () => notify());
+  expect(shown()).toEqual({ group: workId, trip: tahoe.id });
+
+  groups = AsyncResult.success([crew([vegas]), work]);
+  await act(async () => current!.forgetTrip(workId, tahoe.id));
+  expect(shown()).toEqual({ group: workId, trip: undefined });
   await act(async () => root.unmount());
 });

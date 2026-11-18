@@ -35,3 +35,28 @@ export const shouldRevalidate = <A, E>(
   !result.waiting &&
   (now - result.timestamp >= STALE_MS || result.timestamp < ledgerChangedAt) &&
   (lastRevalidatedAt === undefined || now - lastRevalidatedAt >= DEDUPE_MS);
+
+let changedAt = 0;
+let ledgerSyncs = 0;
+const syncListeners = new Set<() => void>();
+
+/** This client just wrote to the ledger itself; the mutation refetches what's on screen. */
+export const ledgerChanged = () => {
+  changedAt = Date.now();
+};
+export const lastLedgerChange = () => changedAt;
+
+/**
+ * Changes reached the server by sync rather than a mutation, so nothing refetched what's on
+ * screen: a table everyone cashed out of still reads live on Crew until this runs.
+ */
+export const ledgerSynced = () => {
+  ledgerChanged();
+  ledgerSyncs += 1;
+  for (const listener of syncListeners) listener();
+};
+export const subscribeLedgerSynced = (listener: () => void) => {
+  syncListeners.add(listener);
+  return () => void syncListeners.delete(listener);
+};
+export const ledgerSyncCount = () => ledgerSyncs;

@@ -15,6 +15,7 @@ import { Platform, Text, View, type ScrollViewInstance } from "react-native";
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
+import { Icon } from "../components/ui/Icon";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
@@ -131,7 +132,7 @@ export function HistoryScreen({ route }: Props) {
                         </Text>
                       </View>
                       {item.finalResult === null ? (
-                        <Text className="text-sm text-muted">Live</Text>
+                        <Text className="type-label text-live">Live</Text>
                       ) : (
                         <Money
                           amount={item.finalResult}
@@ -139,6 +140,7 @@ export function HistoryScreen({ route }: Props) {
                           tone="result"
                         />
                       )}
+                      <Icon name="chevron-right" color="faint" size={18} />
                     </Row>
                   ),
                 )}

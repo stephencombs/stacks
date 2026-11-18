@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { fieldDate, fieldText, pickerStart, pickerText } from "./dateTimeValue";
+import { fieldDate, fieldDisplay, fieldText, pickerStart, pickerText } from "./dateTimeValue";
 
 describe("native date/time field values", () => {
   it("keeps local calendar dates and clock times without UTC conversion", () => {
@@ -17,6 +17,13 @@ describe("native date/time field values", () => {
     expect(fieldDate("2026-02-30", "date")).toBeNull();
     expect(fieldDate("24:00", "time")).toBeNull();
     expect(fieldDate("12:60", "time")).toBeNull();
+  });
+});
+
+describe("a time field's display", () => {
+  it("follows the phone's 12 or 24-hour setting when it says", () => {
+    expect(fieldDisplay("21:30", "time", true)).toContain("21:30");
+    expect(fieldDisplay("21:30", "time", false)).toMatch(/9:30\s?PM/i);
   });
 });
 

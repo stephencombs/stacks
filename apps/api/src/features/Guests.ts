@@ -19,12 +19,18 @@ const ClaimRow = Schema.Struct({
   groupId: GroupId,
   displayName: Schema.String,
   groupName: Schema.String,
+  alreadyMember: Schema.Boolean,
 });
 
 const findClaim = Effect.fn("Guests.findClaim")(function* (code: string, lock = false) {
   const sql = yield* SqlClient.SqlClient;
+  const { userId } = yield* CurrentUser;
   const [claim] = yield* sql`
-    select p.id as player_id, p.group_id, p.display_name, g.name as group_name
+    select p.id as player_id, p.group_id, p.display_name, g.name as group_name,
+      exists (
+        select 1 from memberships m
+        where m.group_id = p.group_id and m.user_id = ${userId} and m.left_at is null
+      ) as already_member
     from players p join groups g on g.id = p.group_id
     where p.claim_code = ${code.trim().toUpperCase()}
     ${lock ? sql`for update of p` : sql``}
@@ -57,13 +63,15 @@ export const previewClaim = Effect.fn("Guests.previewClaim")(function* (code: st
     groupName: claim.groupName,
     playerId: claim.playerId,
     displayName: claim.displayName,
+    alreadyMember: claim.alreadyMember,
   } satisfies ClaimPreview;
 });
 
 /**
- * Makes a guest's history the current user's. Someone who already joined the group has an
- * empty player row of their own; it's dropped. If that row has history, two players would need
- * merging, which isn't supported, so the claim is refused.
+ * Makes a guest's history the current user's, and is how that guest joins the group. A member is
+ * refused: they already have a player, and the claim would swap it for the guest's. Someone who
+ * left the group has an old player row of their own; it's dropped when empty. If that row has
+ * history, two players would need merging, which isn't supported, so the claim is refused.
  */
 export const claim = Effect.fn("Guests.claim")(function* (code: string) {
   const sql = yield* SqlClient.SqlClient;
@@ -72,6 +80,7 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
   const groupId = yield* sql.withTransaction(
     Effect.gen(function* () {
       const guest = yield* findClaim(code, true);
+      if (guest.alreadyMember) return yield* new Conflict({ reason: "claim_already_member" });
       const [own] = yield* sql`
         select p.id,
           exists (
