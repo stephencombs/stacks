@@ -30,7 +30,7 @@ import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
-import { Animated, Platform, Text, View } from "react-native";
+import { Animated, Platform, Text, View, useWindowDimensions } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button, IconButton } from "../components/ui/Button";
@@ -178,6 +178,9 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const table = useRecordingTable(visit?.visit.tableId ?? null);
   const server = useServerTable(visit?.visit.tableId ?? null);
   const seats = table ? liveTable(table, server) : null;
+  // Two side-by-side actions don't fit at large text on Android, so they stack.
+  const { fontScale } = useWindowDimensions();
+  const stacked = Platform.OS === "android" && fontScale > 1.2;
   if (visit === null) return <Missing />;
   if (visit === undefined)
     return (
@@ -413,11 +416,11 @@ function Visit({ visitId }: { visitId: VisitId }) {
               <Text className="type-footnote text-muted">
                 Undo reopens this session. Returning starts a new one.
               </Text>
-              <View className="flex-row gap-2">
+              <View className={stacked ? "gap-2" : "flex-row gap-2"}>
                 <Button
                   label="Undo cash-out"
                   size="lg"
-                  className="flex-1"
+                  {...(stacked ? {} : { className: "flex-1" })}
                   onPress={() => setOpen({ type: "reopen" })}
                 />
                 {canReturn ? (
@@ -425,7 +428,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
                     label="Back at the table"
                     variant="primary"
                     size="lg"
-                    className="flex-1"
+                    {...(stacked ? {} : { className: "flex-1" })}
                     onPress={() => setOpen({ type: "return" })}
                   />
                 ) : null}

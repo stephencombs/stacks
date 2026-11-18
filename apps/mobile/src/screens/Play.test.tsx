@@ -44,6 +44,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     View: Container,
     Pressable: Container,
     Platform: { OS: "ios" },
+    useWindowDimensions: () => ({ fontScale: 1 }),
     Animated: { Value, View: Container },
   }));
   vi.doMock("../components/ui/motion", () => ({ animate: () => {}, duration: {}, ease: {} }));

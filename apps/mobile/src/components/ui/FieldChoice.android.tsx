@@ -1,10 +1,32 @@
-import { Host, Picker } from "@expo/ui";
-import { SegmentedButton, SingleChoiceSegmentedButtonRow, Text } from "@expo/ui/jetpack-compose";
-import { defaultMinSize, fillMaxWidth } from "@expo/ui/jetpack-compose/modifiers";
+import {
+  DropdownMenuItem,
+  ExposedDropdownMenu,
+  ExposedDropdownMenuBox,
+  Icon,
+  SegmentedButton,
+  Shape,
+  SingleChoiceSegmentedButtonRow,
+  Text,
+  TextField,
+  useNativeState,
+} from "@expo/ui/jetpack-compose";
+import {
+  defaultMinSize,
+  fillMaxWidth,
+  menuAnchor,
+  semantics,
+} from "@expo/ui/jetpack-compose/modifiers";
+import { useEffect, useState } from "react";
 import { Text as NativeText, View, useWindowDimensions } from "react-native";
-import { useCSSVariable, useUniwind } from "uniwind";
 
+import { ComposeHost as Host } from "./ComposeHost.android";
 import type { FieldChoiceProps } from "./FieldChoice";
+import { fitsSegments } from "./segmentFit";
+
+const arrow = require("../../../assets/field-icons/arrow_drop_down.xml");
+const fieldShape = Shape.RoundedCorner({
+  cornerRadii: { topStart: 16, topEnd: 16, bottomStart: 16, bottomEnd: 16 },
+});
 
 export function FieldChoice<A extends string>({
   label,
@@ -15,23 +37,19 @@ export function FieldChoice<A extends string>({
   presentation = "automatic",
 }: FieldChoiceProps<A>) {
   const { width, fontScale } = useWindowDimensions();
-  const { theme } = useUniwind();
-  const tint = useCSSVariable("--color-ink");
-  const segmentWidth = (width - 64) / Math.max(1, options.length);
   const segmented =
     presentation !== "menu" &&
-    options.length <= 3 &&
-    options.every((option) => option.label.length * 8 * fontScale + 48 <= segmentWidth);
+    fitsSegments(
+      options.map((option) => option.label),
+      width - 64,
+      fontScale,
+    );
   return (
     <View className="gap-1.5">
       {labelHidden ? null : (
         <NativeText className="px-1 type-footnote font-medium text-muted">{label}</NativeText>
       )}
-      <Host
-        matchContents={{ vertical: true }}
-        colorScheme={theme === "dark" ? "dark" : "light"}
-        seedColor={typeof tint === "string" ? tint : undefined}
-      >
+      <Host matchContents={{ vertical: true }}>
         {segmented ? (
           <SingleChoiceSegmentedButtonRow modifiers={[fillMaxWidth()]}>
             {options.map((option) => (
@@ -48,13 +66,59 @@ export function FieldChoice<A extends string>({
             ))}
           </SingleChoiceSegmentedButtonRow>
         ) : (
-          <Picker selectedValue={value} onValueChange={onChange}>
-            {options.map((option) => (
-              <Picker.Item key={option.value} label={option.label} value={option.value} />
-            ))}
-          </Picker>
+          <Dropdown label={label} options={options} value={value} onChange={onChange} />
         )}
       </Host>
     </View>
+  );
+}
+
+/** Material's exposed dropdown: a full-width field with a trailing arrow that opens on one tap. */
+function Dropdown<A extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: Pick<FieldChoiceProps<A>, "label" | "options" | "value" | "onChange">) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = options.find((option) => option.value === value)?.label ?? "";
+  const text = useNativeState(shown);
+  useEffect(() => {
+    text.set(shown);
+  }, [text, shown]);
+  return (
+    <ExposedDropdownMenuBox expanded={expanded} onExpandedChange={setExpanded}>
+      <TextField
+        value={text}
+        readOnly
+        singleLine
+        shape={fieldShape}
+        modifiers={[
+          fillMaxWidth(),
+          menuAnchor("primaryNotEditable"),
+          semantics({ contentDescription: `${label}, ${shown}` }),
+        ]}
+        colors={{ focusedIndicatorColor: "transparent", unfocusedIndicatorColor: "transparent" }}
+      >
+        <TextField.TrailingIcon>
+          <Icon source={arrow} size={24} />
+        </TextField.TrailingIcon>
+      </TextField>
+      <ExposedDropdownMenu expanded={expanded} onDismissRequest={() => setExpanded(false)}>
+        {options.map((option) => (
+          <DropdownMenuItem
+            key={option.value}
+            onClick={() => {
+              setExpanded(false);
+              onChange(option.value);
+            }}
+          >
+            <DropdownMenuItem.Text>
+              <Text>{option.label}</Text>
+            </DropdownMenuItem.Text>
+          </DropdownMenuItem>
+        ))}
+      </ExposedDropdownMenu>
+    </ExposedDropdownMenuBox>
   );
 }

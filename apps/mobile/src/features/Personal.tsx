@@ -3,8 +3,15 @@ import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import type { VisitId } from "@stacks/contracts";
-import { use, useState, type ReactNode, type Ref } from "react";
-import { ActivityIndicator, ScrollView, Text, View, type ScrollViewInstance } from "react-native";
+import { useState, type ReactNode, type Ref } from "react";
+import {
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  Text,
+  View,
+  type ScrollViewInstance,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BrandMark } from "../components/BrandMark";
@@ -13,19 +20,19 @@ import { ControlSurface } from "../components/ui/ControlSurface";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Choice } from "../components/ui/Field";
 import { Icon, type IconName } from "../components/ui/Icon";
+import { FloatingAction } from "../components/ui/FloatingAction";
+import { PinnedFooter } from "../components/ui/PinnedFooter";
 import { Sheet } from "../components/ui/Sheet";
-import { TabBarHeight } from "../components/ui/Screen";
+import { useScreenFoot } from "../components/ui/tabBar";
 import { SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useAccount } from "../lib/account";
 import { setTheme, useTheme } from "../lib/theme";
 import { Chip } from "./Chip";
+import { FeltStatusBar } from "./FeltStatusBar";
 import { SignInButton } from "./SignInButton";
 import { PersonalLiveBar } from "./LiveBar";
 import { useNativeHeaderActions } from "./NativeHeaderActions";
-
-/** The 56px floating action button and the 16px around it, which the list scrolls clear of. */
-const FAB_ROOM = 88;
 
 /**
  * A screen of your own play: it scrolls under the header, and its main actions sit in a dock
@@ -52,60 +59,57 @@ export function PersonalScreen({
   scrollRef?: Ref<ScrollViewInstance>;
 }) {
   const header = useNativeHeaderActions(true);
-  const bar = use(TabBarHeight);
-  const [dockHeight, setDockHeight] = useState(0);
-  const [liveBarHeight, setLiveBarHeight] = useState(0);
   const insets = useSafeAreaInsets();
+  const foot = useScreenFoot({ footer: !!dock, fab: !!fab });
   const sides = {
     paddingLeft: Math.max(16, insets.left),
     paddingRight: Math.max(16, insets.right),
   };
+  // A session hides the native header and draws its own top. On Android the list stops at the
+  // status bar instead of scrolling under it.
+  const clipped = session && Platform.OS === "android";
   return (
-    <View className={felt ? "flex-1 bg-felt" : "flex-1 bg-canvas"}>
+    <View
+      className={felt ? "flex-1 bg-felt" : "flex-1 bg-canvas"}
+      style={clipped ? { paddingTop: insets.top } : undefined}
+    >
       {header}
+      <FeltStatusBar felt={felt} />
       <ScrollView
         ref={scrollRef}
         className="flex-1"
+        style={foot.scrollStyle}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         contentContainerClassName="gap-6 pt-4 pb-8"
         contentContainerStyle={{
           ...sides,
           flexGrow: 1,
-          ...(session ? { paddingTop: insets.top + 12 } : {}),
+          ...(session ? { paddingTop: clipped ? 12 : insets.top + 12 } : {}),
         }}
       >
         {children}
-        <View
-          style={{ height: (dock ? dockHeight : bar) + liveBarHeight + (fab ? FAB_ROOM : 0) }}
-        />
+        <View style={{ height: foot.endSpace }} />
       </ScrollView>
       {fab ? (
-        <View
-          pointerEvents="box-none"
-          className="absolute"
-          style={{
-            right: sides.paddingRight,
-            bottom: bar + (liveBarHeight > 0 ? liveBarHeight + 8 : 0) + 16,
-          }}
-        >
+        <FloatingAction right={sides.paddingRight} bottom={foot.fabBottom}>
           {fab}
-        </View>
+        </FloatingAction>
       ) : null}
       {dock ? (
-        <View
-          pointerEvents="box-none"
-          onLayout={(event) => setDockHeight(event.nativeEvent.layout.height)}
-          className={cn("absolute inset-x-0 bottom-0 gap-2 pt-3", felt && "bg-felt")}
-          style={{ ...sides, paddingBottom: bar || Math.max(insets.bottom, 12) }}
+        <PinnedFooter
+          felt={felt}
+          sides={sides}
+          onLayout={foot.onFooterLayout}
+          inset={foot.footerInset}
         >
           {dock}
-        </View>
+        </PinnedFooter>
       ) : null}
       {live ? (
         <PersonalLiveBar
-          onHeightChange={setLiveBarHeight}
-          {...(dock ? { bottom: dockHeight } : bar ? { bottom: bar } : {})}
+          onHeightChange={foot.onLiveBarHeight}
+          {...(foot.above === undefined ? {} : { bottom: foot.above })}
         />
       ) : null}
     </View>
@@ -159,9 +163,12 @@ export function SaveStatus({
           key={line.kind}
           accessibilityRole={line.kind === "refused" ? "alert" : undefined}
           accessibilityLiveRegion="polite"
-          className="gap-3 rounded-lg bg-fill px-3 py-2.5"
+          className={cn(
+            "gap-3 rounded-lg bg-fill px-3 py-2.5",
+            Platform.OS === "android" && "flex-row items-center",
+          )}
         >
-          <View className="min-w-0 flex-row gap-2">
+          <View className={cn("min-w-0 flex-row gap-2", Platform.OS === "android" && "flex-1")}>
             <Icon
               name={line.kind === "refused" ? "alert" : "cloud-check"}
               color={line.kind === "refused" ? "loss" : "muted"}
@@ -244,8 +251,18 @@ function SaveLine({
     );
   const busy = status === "loading" || status === "saving" || sync.kind === "syncing";
   const failed = status === "save_failed";
-  // Saved and in step needs no line; the You sheet says where your sessions are kept.
-  if (!busy && !failed && (sync.kind === "device" || sync.kind === "synced")) return null;
+  // Saved and in step needs no line; the You sheet says where your sessions are kept. On the
+  // felt of Android the room stays, so a rebuy's "Syncing…" doesn't push the table down.
+  if (!busy && !failed && (sync.kind === "device" || sync.kind === "synced"))
+    return felt && Platform.OS === "android" ? (
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className="min-h-5 flex-row items-center"
+      >
+        <Text className="text-sm opacity-0">Syncing…</Text>
+      </View>
+    ) : null;
   const text =
     status === "loading"
       ? "Opening…"

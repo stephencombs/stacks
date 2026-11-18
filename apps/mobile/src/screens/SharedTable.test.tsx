@@ -106,6 +106,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
     },
   }));
   vi.doMock("react-native", () => ({
+    Platform: { OS: "ios" },
     Pressable: Container,
     Switch: () => null,
     Text: Container,
