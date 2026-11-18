@@ -73,6 +73,8 @@ export const CreateGroupRequest = Schema.Struct({
   displayName: Name(60),
 });
 
+export const RenameGroupRequest = Schema.Struct({ name: Name(80) });
+
 export const SetRoleRequest = Schema.Struct({ role: Schema.Literals(["admin", "member"]) });
 
 export const CreateInviteRequest = Schema.Struct({
@@ -177,6 +179,8 @@ export const CreateTripRequest = Schema.Struct({
   startedAt: Schema.optionalKey(Schema.DateTimeUtc),
 });
 
+export const RenameTripRequest = Schema.Struct({ name: Name(60) });
+
 export const EndTripRequest = Schema.Struct({ endedAt: Schema.optionalKey(Schema.DateTimeUtc) });
 
 const groupParams = Schema.Struct({ groupId: GroupId });
@@ -205,6 +209,14 @@ const GroupsGroup = HttpApiGroup.make("groups")
   .add(
     HttpApiEndpoint.get("get", "/groups/:groupId", {
       params: groupParams,
+      success: GroupDetail,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("rename", "/groups/:groupId/rename", {
+      params: groupParams,
+      payload: RenameGroupRequest,
       success: GroupDetail,
       error: [Forbidden, NotFound],
     }),
@@ -507,6 +519,14 @@ const TripsGroup = HttpApiGroup.make("trips")
     HttpApiEndpoint.get("get", "/trips/:tripId", {
       params: tripParams,
       success: TripDetail,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("rename", "/trips/:tripId/rename", {
+      params: tripParams,
+      payload: RenameTripRequest,
+      success: Trip,
       error: [Forbidden, NotFound],
     }),
   )

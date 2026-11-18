@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/expo";
 import { useNavigation } from "@react-navigation/native";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
+import { useState } from "react";
 import { View } from "react-native";
 
 import { confirmAction } from "../components/ui/confirmAction";
@@ -12,12 +13,14 @@ import { afterDeletingTrip } from "../lib/crewRoutes";
 import { useGo } from "../lib/go";
 import { useScope } from "../lib/scope";
 import { useAction, useStacks } from "../lib/stacks";
+import { NameSheet } from "./NameSheet";
 
 export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const go = useGo();
   const navigation = useNavigation();
   const stacks = useStacks();
   const { userId } = useAuth();
+  const [renaming, setRenaming] = useState(false);
   const end = useAction(stacks.Client.mutation("trips", "end"));
   const reopen = useAction(stacks.Client.mutation("trips", "reopen"));
   const remove = useAction(stacks.Client.mutation("trips", "delete"));
@@ -30,6 +33,10 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
     trip.tables.length === 0 &&
     (isAdmin(group) || trip.trip.createdBy === userId);
   const actions = [
+    {
+      label: "Rename",
+      onPress: () => setRenaming(true),
+    },
     trip.trip.endedAt === null
       ? {
           label: "End trip",
@@ -71,7 +78,28 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
     <View className="gap-2">
       <ActionMenu label="Trip options" disabled={pending} actions={actions} />
       {error ? <FormError>{error}</FormError> : null}
+      {renaming ? <RenameTripSheet trip={trip} onClose={() => setRenaming(false)} /> : null}
     </View>
+  );
+}
+
+function RenameTripSheet({ trip, onClose }: { trip: TripDetail; onClose: () => void }) {
+  const stacks = useStacks();
+  const rename = useAction(stacks.Client.mutation("trips", "rename"));
+  return (
+    <NameSheet
+      title="Rename trip"
+      label="Trip name"
+      initial={trip.trip.name}
+      maxLength={60}
+      emptyError="Give the trip a name."
+      pending={rename.pending}
+      error={rename.error}
+      onClose={onClose}
+      onSave={async (name) =>
+        Boolean(await rename.run({ params: { tripId: trip.trip.id }, payload: { name } }))
+      }
+    />
   );
 }
 

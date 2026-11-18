@@ -10,6 +10,7 @@ import {
   type CreateTripRequest,
   type EndTripRequest,
   type GroupId,
+  type RenameTripRequest,
   type TripId,
 } from "@stacks/contracts";
 
@@ -49,6 +50,17 @@ export const get = Effect.fn("Trips.get")(function* (tripId: TripId) {
   const trip = yield* load(tripId);
   yield* Access.membership(trip.groupId);
   return yield* Views.tripDetail(trip, yield* TripTables.load({ tripIds: [trip.id] }));
+});
+
+export const rename = Effect.fn("Trips.rename")(function* (
+  tripId: TripId,
+  request: typeof RenameTripRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const trip = yield* load(tripId);
+  yield* Access.membership(trip.groupId);
+  yield* sql`update trips set name = ${request.name} where id = ${tripId}`;
+  return yield* load(tripId);
 });
 
 /** Ending a trip stops new sessions going in. */

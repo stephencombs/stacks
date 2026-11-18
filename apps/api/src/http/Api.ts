@@ -30,6 +30,7 @@ const groups = HttpApiBuilder.group(StacksApi, "groups", (handlers) =>
     .handle("list", () => serve(Groups.list()))
     .handle("create", ({ payload }) => serve(Groups.create(payload)))
     .handle("get", ({ params }) => serve(Groups.get(params.groupId)))
+    .handle("rename", ({ params, payload }) => serve(Groups.rename(params.groupId, payload)))
     .handle("stats", ({ params }) => serve(Stats.forGroup(params.groupId)))
     .handle("exportCsv", ({ params }) => serve(Export.forGroup(params.groupId)))
     .handle("leave", ({ params }) => serve(Groups.leave(params.groupId)))
@@ -111,6 +112,7 @@ const trips = HttpApiBuilder.group(StacksApi, "trips", (handlers) =>
   handlers
     .handle("create", ({ params, payload }) => serve(Trips.create(params.groupId, payload)))
     .handle("get", ({ params }) => serve(Trips.get(params.tripId)))
+    .handle("rename", ({ params, payload }) => serve(Trips.rename(params.tripId, payload)))
     .handle("end", ({ params, payload }) => serve(Trips.end(params.tripId, payload)))
     .handle("reopen", ({ params }) => serve(Trips.reopen(params.tripId)))
     .handle("delete", ({ params }) => serve(Trips.remove(params.tripId))),

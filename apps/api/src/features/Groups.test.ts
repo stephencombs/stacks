@@ -125,4 +125,62 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
       expect(session.playerIds).toEqual([group.players[1]!.id]);
     }),
   );
+
+  it.effect("lets owners and admins rename a group and refuses regular members", () =>
+    Effect.gen(function* () {
+      const { alex, bea, cal, eve } = yield* users("alex", "bea", "cal", "eve");
+      const group = yield* groupWith(alex, bea, cal);
+      const groupId = group.group.id;
+      yield* alex.groups.setRole({
+        params: { groupId, userId: group.players[1]!.userId! },
+        payload: { role: "admin" },
+      });
+
+      expect(
+        yield* Effect.flip(
+          eve.groups.rename({ params: { groupId }, payload: { name: "Reno crew" } }),
+        ),
+      ).toMatchObject({ _tag: "Forbidden", reason: "not_a_member" });
+      expect(
+        yield* Effect.flip(
+          cal.groups.rename({ params: { groupId }, payload: { name: "Reno crew" } }),
+        ),
+      ).toMatchObject({ _tag: "Forbidden", reason: "admins_only" });
+
+      const byOwner = yield* alex.groups.rename({
+        params: { groupId },
+        payload: { name: "Reno crew" },
+      });
+      expect(byOwner.group.name).toBe("Reno crew");
+      expect(byOwner.group.currency).toBe(group.group.currency);
+
+      const byAdmin = yield* bea.groups.rename({
+        params: { groupId },
+        payload: { name: "Tahoe crew" },
+      });
+      expect(byAdmin.group.name).toBe("Tahoe crew");
+      const [listed] = yield* cal.groups.list();
+      expect(listed?.group.name).toBe("Tahoe crew");
+    }),
+  );
+
+  it.effect("refuses group names that are blank, untrimmed or over 80 characters", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const group = yield* groupWith(alex);
+      const groupId = group.group.id;
+
+      for (const name of ["", "   ", "  Reno  ", "x".repeat(81)]) {
+        const attempt = yield* Effect.exit(
+          alex.groups.rename({ params: { groupId }, payload: { name } }),
+        );
+        expect(attempt._tag).toBe("Failure");
+      }
+      expect((yield* alex.groups.get({ params: { groupId } })).group.name).toBe("Vegas crew");
+      const longest = "x".repeat(80);
+      expect(
+        (yield* alex.groups.rename({ params: { groupId }, payload: { name: longest } })).group.name,
+      ).toBe(longest);
+    }),
+  );
 });
