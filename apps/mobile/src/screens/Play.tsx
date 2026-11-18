@@ -1,4 +1,9 @@
-import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import {
+  CommonActions,
+  StackActions,
+  useNavigation,
+  type StaticScreenProps,
+} from "@react-navigation/native";
 import { formatDay, formatDuration, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
 import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
@@ -62,6 +67,7 @@ import { LiveSessionsBar } from "../features/LiveBar";
 import { TableSection } from "../features/SharedTable";
 import { TableTripSheet, TableTripButton } from "../features/TableTrip";
 import { afterClosing, type OpenSheet } from "../features/visitSheets";
+import { withoutTable } from "../lib/tableRoutes";
 import {
   ActionSlot,
   LiveClock,
@@ -569,6 +575,9 @@ function Visit({ visitId }: { visitId: VisitId }) {
           onReopened={() => {
             close();
             setSaved(null);
+            navigation.dispatch((state) =>
+              CommonActions.reset(withoutTable(state, visit.visit.tableId)),
+            );
           }}
         />
       ) : open?.type === "return" && player ? (

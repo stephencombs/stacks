@@ -391,8 +391,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
                           {name}
                           {playerId === group.myPlayerId ? (
                             <Text className="font-sans text-sm tracking-normal text-muted normal-case">
-                              {" "}
-                              you
+                              {" · you"}
                             </Text>
                           ) : null}
                         </Text>
@@ -463,17 +462,15 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
           </View>
 
           {!live ? (
-            <View className="flex-row gap-2">
+            <View className="gap-2">
               {group.trips.some((trip) => trip.id === session.tripId && trip.endedAt === null) ? (
                 <Button
                   label="Start another session"
-                  className="flex-1"
                   onPress={() => go.newSession(session.tripId, session.id)}
                 />
               ) : null}
               <Button
                 label="See the trip's stats"
-                className="flex-1"
                 onPress={() => go.stats({ groupId: session.groupId, tripId: session.tripId })}
               />
             </View>

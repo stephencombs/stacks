@@ -13,12 +13,17 @@ export const fieldDate = (value: string, kind: DateTimeKind) => {
   return Number.isFinite(date.getTime()) && fieldText(date, kind) === value ? date : null;
 };
 
-export const fieldDisplay = (value: string, kind: DateTimeKind) => {
+/** `uses24Hour` is the phone's clock setting, which the locale alone doesn't say. */
+export const fieldDisplay = (value: string, kind: DateTimeKind, uses24Hour?: boolean) => {
   const date = fieldDate(value, kind);
   return date
     ? kind === "date"
       ? date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-      : date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+      : date.toLocaleTimeString(undefined, {
+          hour: "numeric",
+          minute: "2-digit",
+          ...(uses24Hour === undefined ? {} : { hour12: !uses24Hour }),
+        })
     : kind === "date"
       ? "Choose date"
       : "Choose time";

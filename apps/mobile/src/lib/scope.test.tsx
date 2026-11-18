@@ -11,7 +11,7 @@ import {
 } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { act, createElement, useState } from "react";
+import { act, createElement, useLayoutEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
@@ -87,14 +87,15 @@ it("keeps a just-started trip in scope while the groups list catches up", async 
   let start: (id: TripId) => void = () => {};
   function Sessions() {
     const [params, set] = useState<{ tripId?: string }>({ tripId: vegas.id });
-    setParams = (next) => set((current) => ({ ...current, ...next }));
     usePlaceAddress(params, "tripId");
     const { setTrip } = useScope();
-    // Starting a trip puts it in scope and opens Sessions with no address of its own.
-    start = (id) => {
-      setTrip(id);
-      set({});
-    };
+    useLayoutEffect(() => {
+      setParams = (next) => set((current) => ({ ...current, ...next }));
+      start = (id) => {
+        setTrip(id);
+        set({});
+      };
+    }, [setTrip]);
     return null;
   }
   const root = createRoot(document.createElement("div"));
@@ -155,7 +156,10 @@ it("opens a trip just started in a second group, not another group's trip", asyn
 
   let current: ReturnType<typeof useScope> | undefined;
   function Probe() {
-    current = useScope();
+    const scope = useScope();
+    useLayoutEffect(() => {
+      current = scope;
+    }, [scope]);
     return null;
   }
   const shown = () => ({ group: current?.scope?.item.group.id, trip: current?.scope?.trip?.id });
@@ -170,5 +174,9 @@ it("opens a trip just started in a second group, not another group's trip", asyn
   groups = AsyncResult.success([crew([vegas]), { ...work, trips: [tahoe] }]);
   await act(async () => notify());
   expect(shown()).toEqual({ group: workId, trip: tahoe.id });
+
+  groups = AsyncResult.success([crew([vegas]), work]);
+  await act(async () => current!.forgetTrip(workId, tahoe.id));
+  expect(shown()).toEqual({ group: workId, trip: undefined });
   await act(async () => root.unmount());
 });

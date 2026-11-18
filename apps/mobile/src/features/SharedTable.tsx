@@ -1,4 +1,4 @@
-import { formatTime } from "@stacks/client-runtime/format";
+import { formatTime, tellApart } from "@stacks/client-runtime/format";
 import {
   usePlayerInvite,
   useRecordingSubmit,
@@ -291,6 +291,7 @@ export function TableSettingsSheet({
       table.visits.filter((item) => !item.isSelf).map((item) => [item.player.id, item.player]),
     ).values(),
   ];
+  const playerLabels = tellApart(players.map((player) => player.displayName));
   const recorders = new Set(table.recorders.map((player) => player.id));
   const names = new Map(server?.players.map((player) => [player.id, player.displayName]));
   const toggle = (playerId: PlayerId) =>
@@ -331,10 +332,10 @@ export function TableSettingsSheet({
                 </Text>
               ) : (
                 <List>
-                  {players.map((player) => (
+                  {players.map((player, index) => (
                     <Row key={player.id}>
                       <Text className="min-w-0 flex-1 font-medium text-ink">
-                        {player.displayName}
+                        {playerLabels[index]}
                       </Text>
                       <Button
                         label="Invite this player"

@@ -272,7 +272,7 @@ export const personalStatsView = (
     winRate: `${Math.round((summary.winRate.wins * 100) / summary.winRate.sessions)}%`,
     winRateLine: `${summary.winRate.wins} of ${summary.winRate.sessions}`,
     chart:
-      summary.sessions <= FEW
+      summary.sessions <= FEW && filters.year === undefined
         ? null
         : {
             points: running,

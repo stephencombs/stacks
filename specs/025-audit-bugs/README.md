@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-16
 priority: high
 tags:
@@ -7,7 +7,10 @@ tags:
   - api
   - bug
 created_at: 2026-11-16T21:53:43.726402Z
-updated_at: 2026-11-16T21:53:43.726402Z
+updated_at: 2026-11-16T22:10:37.138090700Z
+transitions:
+  - status: in-progress
+    at: 2026-11-16T22:10:37.138090700Z
 ---
 
 # Fix the bugs from the Android audit

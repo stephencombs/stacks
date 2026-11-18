@@ -8,7 +8,7 @@ import {
   type TripId,
   type VisitId,
 } from "@stacks/contracts";
-import { gameNames } from "@stacks/client-runtime/format";
+import { gameNames, shortName, tellApart } from "@stacks/client-runtime/format";
 import type {
   CachedVenue,
   RecordingInput,
@@ -22,6 +22,7 @@ import {
 } from "@stacks/client-runtime/recordingReact";
 import {
   amountInputText,
+  buyInTotalLabel,
   buyInTotalPreview,
   cashOutResultPreview,
   localDateText,
@@ -430,15 +431,15 @@ export function PastSessionSheet({
     start: "",
     finish: "",
   }));
-  const [timeError, setTimeError] = useState<{ field: keyof Times; error: string } | null>(null);
+  const [timeErrors, setTimeErrors] = useState<Partial<Record<keyof Times, string>>>({});
   const [game, setGame] = useState<GameChoice>("none");
   const [highLimit, setHighLimit] = useState(false);
   const setTime = (field: keyof Times) => (value: string) => {
     const next = { ...times, [field]: value };
     setTimes(next);
-    if (timeError) {
+    if (Object.keys(timeErrors).length > 0) {
       const parsed = parsePastSessionTimes(next);
-      setTimeError(parsed.error === null ? null : parsed);
+      setTimeErrors(parsed.error === null ? {} : parsed.errors);
     }
   };
   const timeField = (field: keyof Times, label: string) => (
@@ -447,7 +448,7 @@ export function PastSessionSheet({
       kind={field === "date" ? "date" : "time"}
       value={times[field]}
       onChange={setTime(field)}
-      error={timeError?.field === field ? timeError.error : null}
+      error={timeErrors[field] ?? null}
       maximumDate={field === "date" ? now : undefined}
     />
   );
@@ -462,7 +463,7 @@ export function PastSessionSheet({
         const totalIn = buyIn.read();
         const totalOut = cashOut.read();
         const parsed = parsePastSessionTimes(times);
-        setTimeError(parsed.error === null ? null : parsed);
+        setTimeErrors(parsed.error === null ? {} : parsed.errors);
         if (totalIn === null || totalOut === null || parsed.error !== null) return;
         const receipt = await save.submit({
           type: "record_completed",
@@ -505,13 +506,14 @@ function usePaidBy(visit: RecordingVisitView) {
   const people = counterpartiesAt(state, visit.visit.tableId, visit.visit.playerId, view ?? null);
   const [value, setValue] = useState<"own" | PlayerId>("own");
   const own = visit.visit.playerId === state?.self.id ? "Me" : "Their own money";
+  const names = tellApart(people.map((person) => person.displayName));
   return {
     people,
     value,
     set: setValue,
     options: [
       { value: "own" as const, label: own },
-      ...people.map((person) => ({ value: person.id, label: person.displayName })),
+      ...people.map((person, index) => ({ value: person.id, label: names[index]! })),
     ],
     /** Spread into an add or finish input. */
     input: () => (value === "own" ? {} : { counterpartyId: value }),
@@ -540,7 +542,7 @@ export function RebuySheet({
   const paid = usePaidBy(visit);
   return (
     <RecordingSheet
-      title={who ? `${who}'s rebuy` : "Rebuy"}
+      title={who ? `${shortName(who)}'s rebuy` : "Rebuy"}
       submitLabel="Add rebuy"
       save={save}
       onClose={onClose}
@@ -669,9 +671,9 @@ export function CashOutSheet({
   const previous = visit.totals.cashOut;
   return (
     <RecordingSheet
-      title={who ? `Cash out ${who}` : "Cash out"}
+      title={who ? `Cash out ${shortName(who)}` : "Cash out"}
       description={note ?? "This finishes the session and works out its result."}
-      submitLabel={who ? `End ${who}'s visit` : "End session"}
+      submitLabel={who ? `End ${shortName(who)}'s visit` : "End session"}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -720,8 +722,8 @@ export function CashOutSheet({
       </View>
       <ClockField label="Finished at" clock={clock} />
       <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface p-4">
-        <View>
-          <Text className="type-footnote text-muted">
+        <View className="min-w-0 flex-1">
+          <Text numberOfLines={1} className="type-footnote text-muted">
             {who ? `${who}'s result` : "Your result"}
           </Text>
           <Text className="type-footnote text-muted">{money(visit.totals.buyIn)} bought in</Text>
@@ -771,7 +773,7 @@ export function BuyInTotalSheet({
     <RecordingSheet
       title="Edit buy-in"
       description={`Now ${money(current)} in.`}
-      submitLabel="Save total"
+      submitLabel={buyInTotalLabel(mode, amount.text)}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -1144,6 +1146,7 @@ export function AddPlayerSheet({
   const [choice, setChoice] = useState<string>(NEW_PLAYER);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+  const savedNames = tellApart(saved.map((player) => player.displayName));
   const chosen =
     choice === NEW_PLAYER
       ? name.trim()
@@ -1154,7 +1157,9 @@ export function AddPlayerSheet({
       title="Add player"
       description="Record their buy-ins and cash-outs from this device."
       submitLabel={
-        chosen && typed.error === null ? `Add ${chosen} · ${money(typed.amount)}` : "Add player"
+        chosen && typed.error === null
+          ? `Add ${shortName(chosen)} · ${money(typed.amount)}`
+          : "Add player"
       }
       save={save}
       onClose={onClose}
@@ -1179,7 +1184,7 @@ export function AddPlayerSheet({
           onChange={setChoice}
           options={[
             { value: NEW_PLAYER, label: "Someone new" },
-            ...saved.map((player) => ({ value: player.id, label: player.displayName })),
+            ...saved.map((player, index) => ({ value: player.id, label: savedNames[index]! })),
           ]}
         />
       ) : null}
@@ -1223,7 +1228,9 @@ export function SitDownSheet({
       description={
         returning
           ? "This starts a new session at the same table. Your last one stays as it finished."
-          : `Your buy-in as ${player.displayName}.`
+          : player.displayName === "You"
+            ? "Your buy-in."
+            : `Your buy-in as ${player.displayName}.`
       }
       submitLabel={returning ? "Sit back down" : "Buy in"}
       save={save}

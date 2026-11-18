@@ -58,7 +58,7 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
                 () => {
                   void remove.run({ params }).then((ok) => {
                     if (!ok) return;
-                    forgetTrip(group.group.id);
+                    forgetTrip(group.group.id, trip.trip.id);
                     navigation.dispatch(afterDeletingTrip(group.group.id));
                   });
                 },

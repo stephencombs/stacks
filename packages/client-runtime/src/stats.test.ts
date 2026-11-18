@@ -269,6 +269,8 @@ describe("personalStatsView", () => {
     if (stats.kind !== "stats") throw new Error(stats.kind);
     expect(stats.title).toBe("Result · 2026");
     expect(stats.result).toBe(-40_000 + 2_500 - 10_000);
+    expect(stats.chart?.points).toHaveLength(3);
+    expect(stats.list).toHaveLength(3);
     expect(stats.chips.map((chip) => [chip.label, chip.applied])).toEqual([
       ["2026", true],
       ["All games", false],
@@ -281,6 +283,7 @@ describe("personalStatsView", () => {
       stats.chips[1]!.options.find((option) => option.label === "Blackjack")!.filters,
     );
     if (blackjack.kind !== "stats") throw new Error(blackjack.kind);
+    expect(blackjack.chart?.points).toHaveLength(2);
     expect(blackjack.chips[1]!.label).toBe("Blackjack");
     expect(blackjack.byGame).toBeNull();
     expect(blackjack.byCasino).not.toBeNull();

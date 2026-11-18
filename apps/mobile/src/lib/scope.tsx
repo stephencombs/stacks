@@ -12,7 +12,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 
 import { resolveScope, withStartedTrip, type Scope } from "@stacks/client-runtime/scope";
@@ -27,10 +29,9 @@ type Picked = { readonly groupId: GroupId; readonly whileTrip: TripId | null };
 const PickedContext = createContext<Picked | null>(null);
 const SetPickedContext = createContext<(picked: Picked | null) => void>(() => {});
 /** The trip just started, until the groups list holds it. */
-const StartedContext = createContext<readonly [Trip | null, (trip: Trip) => void]>([
-  null,
-  () => {},
-]);
+const StartedContext = createContext<readonly [Trip | null, Dispatch<SetStateAction<Trip | null>>]>(
+  [null, () => {}],
+);
 
 export function ScopeProvider({ children }: { children: ReactNode }) {
   const [picked, setPicked] = useState<Picked | null>(null);
@@ -80,7 +81,8 @@ export function useScope() {
       } else setPicked({ groupId: id, whileTrip: lastTripId });
     },
     /** After the trip in scope is deleted: its group's next trip, or the group alone. */
-    forgetTrip: (id: GroupId) => {
+    forgetTrip: (id: GroupId, tripId: TripId) => {
+      setStarted((pending) => (pending?.id === tripId ? null : pending));
       setPicked({ groupId: id, whileTrip: null });
       setLastTripId(null);
     },

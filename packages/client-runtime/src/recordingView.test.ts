@@ -37,6 +37,7 @@ import {
   venuePlace,
   tableTripOptions,
   UNDONE_REASON,
+  buyInTotalLabel,
   historyLines,
   historyEntryName,
 } from "./recordingView.ts";
@@ -263,6 +264,21 @@ describe("parsePastSessionTimes", () => {
     [{ date: "2026-11-08", start: "11:00", finish: "13:00" }, "finish"],
   ] as const)("rejects %j at %s", (input, field) => {
     expect(parsePastSessionTimes(input, now)).toMatchObject({ field });
+  });
+
+  it("refuses a finish at the start, which would be a 0-minute session", () => {
+    expect(
+      parsePastSessionTimes({ date: "2026-11-06", start: "21:30", finish: "21:30" }, now),
+    ).toMatchObject({ field: "finish", errors: { finish: "Finish after the start." } });
+  });
+
+  it("names a missing finish while the start is still empty", () => {
+    expect(parsePastSessionTimes({ date: "2026-11-06", start: "", finish: "" }, now)).toMatchObject(
+      { errors: { start: "Choose a start time.", finish: "Choose a finish time." } },
+    );
+    expect(
+      parsePastSessionTimes({ date: "2026-11-06", start: "", finish: "23:00" }, now),
+    ).toMatchObject({ errors: { start: "Choose a start time." } });
   });
 });
 
@@ -589,6 +605,14 @@ describe("live session readouts", () => {
       ]);
       await store.close();
     });
+  });
+
+  it("names what saving a buy-in change does", () => {
+    expect(buyInTotalLabel("add", "50")).toBe("Add $50");
+    expect(buyInTotalLabel("subtract", "50")).toBe("Subtract $50");
+    expect(buyInTotalLabel("set", "300")).toBe("Set total $300");
+    expect(buyInTotalLabel("add", "")).toBe("Add");
+    expect(buyInTotalLabel("set", "")).toBe("Set total");
   });
 
   it("previews whole-cent add, subtract and set totals without displaying unsafe values", () => {

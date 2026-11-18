@@ -178,6 +178,7 @@ async function load({
   }));
   for (const [module, names] of Object.entries({
     "./components/ui/Field": ["FormError"],
+    "./components/ui/Icon": ["Icon"],
     "./components/ui/Screen": ["TabBarHeight"],
     "./components/ui/Surface": ["Skeleton"],
     "./features/Personal": ["PersonalYouButton"],

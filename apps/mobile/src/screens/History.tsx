@@ -11,6 +11,7 @@ import { Text, View } from "react-native";
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
+import { Icon } from "../components/ui/Icon";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 
@@ -32,7 +33,7 @@ export function HistoryScreen() {
           Your sessions will appear here, including ones you delete.
         </EmptyState>
       ) : (
-        months.map(({ month, result, count, visits }) => (
+        months.map(({ month, result, finished, visits }) => (
           <View key={month} className="gap-2">
             <SectionHeading>
               {new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(
@@ -40,7 +41,7 @@ export function HistoryScreen() {
               )}
             </SectionHeading>
             <Text className="text-sm text-muted">
-              {count} {count === 1 ? "session" : "sessions"} ·{" "}
+              {finished} {finished === 1 ? "session" : "sessions"} ·{" "}
               <Money amount={result} currency={RECORDING_CURRENCY} tone="result" />
             </Text>
             <List>
@@ -80,7 +81,7 @@ export function HistoryScreen() {
                       </Text>
                     </View>
                     {item.finalResult === null ? (
-                      <Text className="text-sm text-muted">Live</Text>
+                      <Text className="type-label text-live">Live</Text>
                     ) : (
                       <Money
                         amount={item.finalResult}
@@ -88,6 +89,7 @@ export function HistoryScreen() {
                         tone="result"
                       />
                     )}
+                    <Icon name="chevron-right" color="faint" size={18} />
                   </Row>
                 ),
               )}

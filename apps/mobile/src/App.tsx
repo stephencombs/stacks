@@ -141,10 +141,10 @@ const InvitesStack = createNativeStackNavigator({
   screenOptions: crewOptions,
   layout: ({ children }) => <AccountGate invited>{children}</AccountGate>,
   screens: {
-    Join: { screen: JoinScreen, options: { title: "Join a group" }, linking: "join/:code" },
+    Join: { screen: JoinScreen, options: { title: "Invite" }, linking: "join/:code" },
     Claim: {
       screen: ClaimScreen,
-      options: { title: "Claim your history" },
+      options: { title: "Invite" },
       linking: "claim/:code",
     },
   },

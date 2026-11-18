@@ -513,25 +513,45 @@ const localTime = (date: string, time: string) => {
     : null;
 };
 
+export type PastSessionField = "date" | "start" | "finish";
+
 /**
  * Reads a past session's local date ("2026-11-07") and start and finish times ("21:30"). A finish
- * earlier than the start is the next morning. A session can't finish in the future.
+ * earlier than the start is the next morning, but one at the start is no session at all. A session
+ * can't finish in the future. A bad form reports every field that's wrong, not just the first.
  */
 export const parsePastSessionTimes = (
   input: { readonly date: string; readonly start: string; readonly finish: string },
   now = Date.now(),
 ):
   | { readonly startedAt: DateTime.Utc; readonly finishedAt: DateTime.Utc; readonly error: null }
-  | { readonly field: "date" | "start" | "finish"; readonly error: string } => {
+  | {
+      readonly field: PastSessionField;
+      readonly error: string;
+      readonly errors: Partial<Record<PastSessionField, string>>;
+    } => {
+  const refused = (errors: Partial<Record<PastSessionField, string>>) => {
+    const [field, error] = (["date", "start", "finish"] as const)
+      .map((name) => [name, errors[name]] as const)
+      .find((entry): entry is readonly [PastSessionField, string] => entry[1] !== undefined)!;
+    return { field, error, errors };
+  };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date.trim()) || !localTime(input.date, "00:00"))
-    return { field: "date", error: "Enter a date like 2026-11-07." };
+    return refused({ date: "Enter a date like 2026-11-07." });
   const start = localTime(input.date, input.start);
-  if (!start) return { field: "start", error: "Enter a time like 21:30." };
   const finish = localTime(input.date, input.finish);
-  if (!finish) return { field: "finish", error: "Enter a time like 23:45." };
-  if (finish < start) finish.setDate(finish.getDate() + 1);
-  if (finish.getTime() > now)
-    return { field: "finish", error: "A past session can't finish in the future." };
+  const errors: Partial<Record<PastSessionField, string>> = {};
+  if (!start)
+    errors.start = input.start.trim() === "" ? "Choose a start time." : "Enter a time like 21:30.";
+  if (!finish)
+    errors.finish =
+      input.finish.trim() === "" ? "Choose a finish time." : "Enter a time like 23:45.";
+  if (start && finish) {
+    if (finish < start) finish.setDate(finish.getDate() + 1);
+    if (finish.getTime() === start.getTime()) errors.finish = "Finish after the start.";
+    else if (finish.getTime() > now) errors.finish = "A past session can't finish in the future.";
+  }
+  if (!start || !finish || errors.finish !== undefined) return refused(errors);
   return {
     startedAt: DateTime.makeUnsafe(start),
     finishedAt: DateTime.makeUnsafe(finish),
@@ -766,6 +786,13 @@ export const buyInTotalPreview = (
         ? current - typed.amount
         : typed.amount;
   return Number.isSafeInteger(total) && total > 0 ? total : null;
+};
+
+/** What saving a buy-in change does, in the button: "Add $50", "Subtract $50" or "Set total $300". */
+export const buyInTotalLabel = (mode: "add" | "subtract" | "set", text: string) => {
+  const verb = mode === "add" ? "Add" : mode === "subtract" ? "Subtract" : "Set total";
+  const typed = parseRecordingAmount(text, 1);
+  return typed.error === null ? `${verb} ${money(typed.amount)}` : verb;
 };
 
 export function applyAmountKey(amount: string, key: string, decimal: string): string {

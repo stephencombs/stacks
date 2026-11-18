@@ -51,6 +51,25 @@ export const gameNames = {
 export const playerNames = (detail: GroupDetail) =>
   new Map<PlayerId, string>(detail.players.map((player) => [player.id, player.displayName]));
 
+/**
+ * Names for people listed together, with a repeated name numbered after its first ("Priya",
+ * "Priya 2") so two of them can be told apart. Same order in, same order out.
+ */
+export const tellApart = (names: ReadonlyArray<string>) => {
+  const seen = new Map<string, number>();
+  return names.map((name) => {
+    const trimmed = name.trim();
+    const key = trimmed.toLowerCase();
+    const count = (seen.get(key) ?? 0) + 1;
+    seen.set(key, count);
+    return count === 1 ? name : `${trimmed} ${count}`;
+  });
+};
+
+/** A name where it shares a line with an amount or a title: long ones end in an ellipsis. */
+export const shortName = (name: string, max = 16) =>
+  name.length > max ? `${name.slice(0, max - 1).trimEnd()}…` : name;
+
 export const isGuest = (player: Player) => player.claimCode !== null;
 
 export const isFormerMember = (player: Player) => player.role === null && player.claimCode === null;

@@ -12,7 +12,15 @@ import {
   type StakeView,
 } from "@stacks/contracts";
 
-import { csvFilename, isFormerMember, isGuest, playedSummary, stakeLines } from "./format.ts";
+import {
+  csvFilename,
+  isFormerMember,
+  isGuest,
+  playedSummary,
+  stakeLines,
+  shortName,
+  tellApart,
+} from "./format.ts";
 
 it("sums up what the group has played", () => {
   expect(playedSummary(29, 8100)).toBe("The group has played 29 sessions over 135 hours.");
@@ -91,4 +99,20 @@ it("says how a stake stands", () => {
   expect(stakeLines(view({ endedAt: at }, -40000, 60000), names, usd).status).toMatch(
     /^Ended .+ · Nick was down \$400 · owes back \$600$/,
   );
+});
+
+it("shortens a long name for a button or title, and leaves a short one whole", () => {
+  expect(shortName("Bartholomew Alexander Montgomery-Fitzwilliam III")).toBe("Bartholomew Ale…");
+  expect(shortName("Priya")).toBe("Priya");
+});
+
+it("tells repeated names apart by number after the first, and leaves unique ones alone", () => {
+  expect(tellApart(["Priya", "Dev", "Priya", "priya ", "Priya"])).toEqual([
+    "Priya",
+    "Dev",
+    "Priya 2",
+    "priya 3",
+    "Priya 4",
+  ]);
+  expect(tellApart(["Alex", "Sam"])).toEqual(["Alex", "Sam"]);
 });

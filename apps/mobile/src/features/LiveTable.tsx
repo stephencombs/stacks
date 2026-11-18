@@ -22,6 +22,7 @@ import {
   type TableId,
   type VisitId,
 } from "@stacks/contracts";
+import { shortName } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
 import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
@@ -358,7 +359,13 @@ export function SeatSheet({
     (item) => item.playerId === seat.playerId && item.playing && item.visitId !== seat.visitId,
   );
   return (
-    <Sheet open busy={quick.pending} title={seat.name} description={seat.status} onClose={onClose}>
+    <Sheet
+      open
+      busy={quick.pending}
+      title={shortName(seat.name)}
+      description={seat.status}
+      onClose={onClose}
+    >
       <View className="flex-row items-baseline justify-between gap-3 rounded-xl bg-surface p-4">
         <Text className="type-footnote text-muted">{seat.playing ? "Bought in" : "Result"}</Text>
         <Money
@@ -395,7 +402,7 @@ export function SeatSheet({
             />
           </View>
           <Button
-            label={`Cash out ${seat.name}`}
+            label={`Cash out ${shortName(seat.name)}`}
             variant="primary"
             size="lg"
             haptic
@@ -424,7 +431,7 @@ export function SeatSheet({
       )}
       {quick.error ? <FormError>{quick.error}</FormError> : null}
       <Button
-        label={`${seat.name}'s history`}
+        label={`${shortName(seat.name)}'s history`}
         variant="ghost"
         onPress={() => onHistory(seat.visitId)}
       />

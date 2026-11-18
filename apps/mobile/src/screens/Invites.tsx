@@ -7,7 +7,7 @@ import { Text } from "react-native";
 import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
-import { PageTitle, Surface } from "../components/ui/Surface";
+import { EmptyState, PageTitle, Surface } from "../components/ui/Surface";
 import { useGo } from "../lib/go";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { InviteScreenSkeleton } from "../features/ScreenSkeletons";
@@ -20,11 +20,22 @@ const closedReasons = {
   used_up: "This invite has been used up.",
 } as const;
 
+/** A link that doesn't resolve, said the way the personal invite's page says it. */
+const invalidInvite = (message: string) => (
+  <EmptyState centered title="This invite can't be used">
+    {message}
+  </EmptyState>
+);
+
 export function JoinScreen({ route }: Props) {
   const stacks = useStacks();
   return (
     <Screen>
-      <Loaded query={stacks.invitePreview(route.params.code)} skeleton={<InviteScreenSkeleton />}>
+      <Loaded
+        query={stacks.invitePreview(route.params.code)}
+        skeleton={<InviteScreenSkeleton />}
+        renderError={invalidInvite}
+      >
         {(preview) => <JoinView code={route.params.code} preview={preview} />}
       </Loaded>
     </Screen>
@@ -110,7 +121,11 @@ export function ClaimScreen({ route }: Props) {
   };
   return (
     <Screen>
-      <Loaded query={stacks.claimPreview(route.params.code)} skeleton={<InviteScreenSkeleton />}>
+      <Loaded
+        query={stacks.claimPreview(route.params.code)}
+        skeleton={<InviteScreenSkeleton />}
+        renderError={invalidInvite}
+      >
         {(preview) =>
           preview.alreadyMember ? (
             <Surface className="gap-5 p-5">

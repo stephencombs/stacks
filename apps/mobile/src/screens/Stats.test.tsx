@@ -16,6 +16,8 @@ async function load(account: Account) {
   vi.doMock("@stacks/client-runtime/recordingReact", () => ({
     useRecordingHome: () => ({ home: null, status: "loading", error: null, retryLoad: () => {} }),
   }));
+  vi.doMock("@react-navigation/native", () => ({ useNavigation: () => ({ navigate: () => {} }) }));
+  vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
   vi.doMock("../components/Money", () => ({ Money: () => null }));
   vi.doMock("../components/ui/Button", () => ({ Button: () => null }));
   vi.doMock("../components/ui/FilterChip", () => ({ FilterChip: () => null }));

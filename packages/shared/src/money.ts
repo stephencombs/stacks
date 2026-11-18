@@ -33,10 +33,13 @@ export const formatMoney = (
   const whole =
     (options.trailingZeroDisplay ?? "stripIfInteger") === "stripIfInteger" &&
     amount % 10 ** digits === 0;
+  // Zero has no sign to show. Hermes on Android prints "+$0" for exceptZero, so don't ask it to.
+  const signDisplay =
+    amount === 0 && options.signDisplay === "exceptZero" ? "auto" : options.signDisplay;
   return new Intl.NumberFormat(options.locale, {
     style: "currency",
     currency,
-    signDisplay: options.signDisplay ?? "auto",
+    signDisplay: signDisplay ?? "auto",
     ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
   }).format(toDecimalString(amount, digits));
 };
