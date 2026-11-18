@@ -1,6 +1,6 @@
 import type { StaticScreenProps } from "@react-navigation/native";
 import type { GroupDetail } from "@stacks/contracts";
-import { isFormerMember, isGuest } from "@stacks/client-runtime/format";
+import { isAdmin, isFormerMember, isGuest } from "@stacks/client-runtime/format";
 import { View } from "react-native";
 
 import { Button } from "../components/ui/Button";
@@ -62,7 +62,7 @@ function GroupHub({ detail }: { detail: GroupDetail }) {
         <SettingsRow
           icon={<Icon name="settings" color="ink" size={16} />}
           title="Group settings"
-          subtitle="The ledger, leaving"
+          subtitle={isAdmin(detail) ? "Name, ledger, leaving" : "The ledger, leaving"}
           accessibilityHint="Opens the group's settings"
           onPress={() => go.settings(groupId)}
         />
