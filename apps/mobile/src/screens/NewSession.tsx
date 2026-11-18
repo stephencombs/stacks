@@ -14,13 +14,14 @@ import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Pressable, Switch, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Choice, FormError } from "../components/ui/Field";
 import { Screen, screenError } from "../components/ui/Screen";
 import { List, SectionHeading, Surface } from "../components/ui/Surface";
+import { Switch } from "../components/ui/Switch";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { VenuePicker } from "../features/VenuePicker";
 import { Chip } from "../features/Chip";

@@ -23,3 +23,16 @@ export const fieldDisplay = (value: string, kind: DateTimeKind) => {
       ? "Choose date"
       : "Choose time";
 };
+
+/**
+ * Material's pickers speak in UTC days, so a date field's calendar day goes in as that day at
+ * UTC midnight and comes back the same way. A time goes in as the local instant. An unset or
+ * invalid field starts on today, or now.
+ */
+export const pickerStart = (value: string, kind: DateTimeKind, now = new Date()) => {
+  const date = fieldDate(value, kind) ?? now;
+  return kind === "date" ? `${fieldText(date, "date")}T00:00:00.000Z` : date.toISOString();
+};
+
+export const pickerText = (picked: Date, kind: DateTimeKind) =>
+  kind === "date" ? picked.toISOString().slice(0, 10) : fieldText(picked, "time");

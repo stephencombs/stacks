@@ -35,7 +35,7 @@ import {
 import { decimalSeparator, formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import { useState, type ReactNode } from "react";
-import { Pressable, Switch, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -43,6 +43,7 @@ import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { DateTimeField } from "../components/ui/DateTimeField";
 import { Sheet } from "../components/ui/Sheet";
+import { Switch } from "../components/ui/Switch";
 import { cn } from "../components/ui/cn";
 import { useRecordingState } from "../lib/recording";
 import { GlassSurface } from "../components/ui/GlassSurface";
@@ -215,6 +216,7 @@ function RecordingSheet({
   submitLabel,
   submitVariant = "primary",
   cancelLabel,
+  keypad,
   save,
   onSubmit,
   onClose,
@@ -225,6 +227,8 @@ function RecordingSheet({
   submitLabel: string;
   submitVariant?: "primary" | "danger";
   cancelLabel?: string;
+  /** Android pins it under the action, as the frames do, so the fields scroll above it; iOS scrolls it last. */
+  keypad?: ReactNode;
   save: { readonly pending: boolean; readonly error: string | null };
   onSubmit: () => void;
   onClose: () => void;
@@ -255,10 +259,12 @@ function RecordingSheet({
           {cancelLabel ? (
             <Button label={cancelLabel} size="lg" disabled={save.pending} onPress={onClose} />
           ) : null}
+          {Platform.OS === "android" ? keypad : null}
         </>
       }
     >
       {children}
+      {Platform.OS === "android" ? null : keypad}
     </Sheet>
   );
 }
@@ -539,6 +545,7 @@ export function RebuySheet({
   const paid = usePaidBy(visit);
   return (
     <RecordingSheet
+      keypad={<RecordingKeypad amount={amount} />}
       title={who ? `${who}'s rebuy` : "Rebuy"}
       submitLabel="Add rebuy"
       save={save}
@@ -592,7 +599,6 @@ export function RebuySheet({
         </View>
       ) : null}
       <PaidField label="Paid by" paid={paid} />
-      <RecordingKeypad amount={amount} />
     </RecordingSheet>
   );
 }
@@ -668,6 +674,7 @@ export function CashOutSheet({
   const previous = visit.totals.cashOut;
   return (
     <RecordingSheet
+      keypad={<RecordingKeypad amount={amount} />}
       title={who ? `Cash out ${who}` : "Cash out"}
       description={note ?? "This finishes the session and works out its result."}
       submitLabel={who ? `End ${who}'s visit` : "End session"}
@@ -718,7 +725,7 @@ export function CashOutSheet({
         />
       </View>
       <ClockField label="Finished at" clock={clock} />
-      <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface p-4">
+      <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
         <View>
           <Text className="type-footnote text-muted">
             {who ? `${who}'s result` : "Your result"}
@@ -737,7 +744,6 @@ export function CashOutSheet({
         )}
       </View>
       <PaidField label="Paid to" paid={paid} />
-      <RecordingKeypad amount={amount} />
     </RecordingSheet>
   );
 }
@@ -768,6 +774,7 @@ export function BuyInTotalSheet({
   const total = buyInTotalPreview(current, amount.text, mode);
   return (
     <RecordingSheet
+      keypad={<RecordingKeypad amount={amount} />}
       title="Edit buy-in"
       description={`Now ${money(current)} in.`}
       submitLabel="Save total"
@@ -814,7 +821,6 @@ export function BuyInTotalSheet({
       <Text className="type-footnote text-muted">
         Was {money(current)}. Corrections void earlier buy-ins, which stay in history.
       </Text>
-      <RecordingKeypad amount={amount} />
     </RecordingSheet>
   );
 }
