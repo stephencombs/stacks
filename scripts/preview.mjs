@@ -3,7 +3,7 @@ import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { publishPreviewComment } from "./preview-comment.mjs";
+import { previewUrl, publishPreviewComment } from "./preview-comment.mjs";
 
 const number = process.argv[3];
 if (!/^[1-9]\d*$/.test(number ?? "")) throw new Error("Expected a PR number");
@@ -126,6 +126,7 @@ try {
       secretsPath,
       "--ignore-base-config",
     ]);
+    const url = previewUrl(number);
     const health = await fetch(`${url}/api/health`);
     if (!health.ok) throw new Error(`Preview health check failed (${health.status})`);
     console.log(`Preview: ${url}`);
