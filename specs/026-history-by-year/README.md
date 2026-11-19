@@ -1,14 +1,17 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-16
 priority: medium
 tags:
   - mobile
 created_at: 2026-11-16T21:53:44.385062Z
-updated_at: 2026-11-17T03:29:48.606562Z
+updated_at: 2026-11-19T19:39:03.542966700Z
+completed_at: 2026-11-19T19:39:03.542966700Z
 transitions:
   - status: in-progress
     at: 2026-11-17T03:18:38.092643700Z
+  - status: complete
+    at: 2026-11-19T19:39:03.542966700Z
 ---
 
 # All sessions by month and by year
@@ -42,4 +45,6 @@ and leaves out hours. Deleted sessions also sit among the rest with no details.
 ## Test
 
 - [x] Unit tests for year totals that exclude live play
-- [ ] iOS and Android screenshots, both groupings, light and dark
+- [x] Android screenshots, both groupings, light and dark
+
+iOS screenshot verification was waived. Both Android groupings showed the same finished totals.

@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-13
 priority: high
 tags:
@@ -8,7 +8,11 @@ tags:
   - mobile
 parent: "001"
 created_at: 2026-11-13T04:24:58.726712269Z
-updated_at: 2026-11-13T04:39:07.802951763Z
+updated_at: 2026-11-19T19:48:50.182670600Z
+completed_at: 2026-11-19T19:48:50.182670600Z
+transitions:
+  - status: complete
+    at: 2026-11-19T19:48:50.182670600Z
 ---
 
 # Navigation shell: four tabs, You sheet and LiveBar
@@ -38,11 +42,11 @@ First step of spec 001. Put the four tabs (Play, Stats, Map, Crew) around the ap
 
 ## Test
 
-- [ ] Signed out and offline, Play, Stats and Map open from the tabs; Crew shows sign-in
-- [ ] Signed in, Crew → group → trip → session and back work; old trip and group links still open
-- [ ] LiveBar appears while a personal session is live and hides on that session
+- [x] Signed out and offline, Play, Stats and Map open from the tabs; Crew shows sign-in
+- [x] Signed in, Crew → group → trip → session and back work; old trip and group links still open
+- [x] LiveBar appears while a personal session is live and hides on that session
 - [x] `pnpm fmt`, `lint`, `knip`, `typecheck`, `test` pass; web e2e updated
-- [ ] Screenshots: web (preview server) narrow and wide; mobile web build
+- [x] Narrow and wide web screenshots from [PR #86](https://github.com/stephencombs/stacks/pull/86). Native Android verification replaces the retired mobile web build.
 
 ## Notes
 

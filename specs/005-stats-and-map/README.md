@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-13
 priority: medium
 tags:
@@ -10,10 +10,13 @@ depends_on:
   - "002"
 parent: "001"
 created_at: 2026-11-13T04:24:59.890272699Z
-updated_at: 2026-11-15T05:33:19.638847724Z
+updated_at: 2026-11-19T19:48:22.785851200Z
+completed_at: 2026-11-19T19:48:22.785851200Z
 transitions:
   - status: in-progress
     at: 2026-11-14T21:41:20.546234145Z
+  - status: complete
+    at: 2026-11-19T19:48:22.785851200Z
 ---
 
 # Stats: Just me
@@ -45,4 +48,4 @@ Fill the Stats tab with the player's own play, from the recording store, so it w
 - [x] Stats match finished results for every filter combination (property tests)
 - [x] Win rate counts break-even sessions in the total
 - [x] Losses shown plainly; both empty states render
-- [ ] Works signed out and offline, and after relaunch
+- [x] Works signed out and offline, and after relaunch

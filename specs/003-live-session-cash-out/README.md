@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-13
 priority: high
 tags:
@@ -11,10 +11,13 @@ depends_on:
   - "002"
 parent: "001"
 created_at: 2026-11-13T04:24:59.125611136Z
-updated_at: 2026-11-14T21:22:56.014718237Z
+updated_at: 2026-11-19T19:36:49.330798100Z
+completed_at: 2026-11-19T19:36:49.330798100Z
 transitions:
   - status: in-progress
     at: 2026-11-13T05:26:32.385377986Z
+  - status: complete
+    at: 2026-11-19T19:36:49.330798100Z
 ---
 
 # Live session data: buy-in total, edits and cash out
