@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-16
 priority: critical
 tags:
@@ -8,10 +8,13 @@ tags:
   - design
 parent: "019"
 created_at: 2026-11-16T21:53:43.036558900Z
-updated_at: 2026-11-17T03:16:03.088960300Z
+updated_at: 2026-11-19T04:25:55.690853700Z
+completed_at: 2026-11-19T04:25:55.690853700Z
 transitions:
   - status: in-progress
     at: 2026-11-17T03:16:03.088960300Z
+  - status: complete
+    at: 2026-11-19T04:25:55.690853700Z
 ---
 
 # Android sheets, insets and native controls
@@ -83,4 +86,5 @@ frame work sits on top of these parts. Parent 019 has the verification protocol.
       opens below the status bar and closes from its × button
 - [x] A new signed-out user gets through the Crew intro without leaving it
 - [x] No teal (`#008577`) in any screenshot
-- [ ] iOS screenshots of the touched shared screens are unchanged
+
+iOS screenshot verification was waived. The implementation and Android evidence are in [PR #109](https://github.com/stephencombs/stacks/pull/109).

@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-13
 priority: medium
 tags:
@@ -8,7 +8,11 @@ tags:
   - client-runtime
 parent: "001"
 created_at: 2026-11-13T04:24:59.515886103Z
-updated_at: 2026-11-14T20:14:54.661634912Z
+updated_at: 2026-11-19T19:36:53.567674800Z
+completed_at: 2026-11-19T19:36:53.567674800Z
+transitions:
+  - status: complete
+    at: 2026-11-19T19:36:53.567674800Z
 ---
 
 # Crew activity API
@@ -34,6 +38,6 @@ Crew opens on activity from every group you're in. This adds the read endpoint a
 
 ## Test
 
-- [ ] Returns items from all of the caller's groups, newest first, paging stable
-- [ ] Excludes groups the caller isn't an active member of, including after leaving or removal
-- [ ] Voided entries don't count in finished-session results
+- [x] Returns items from all of the caller's groups, newest first, paging stable
+- [x] Excludes groups the caller isn't an active member of, including after leaving or removal
+- [x] Voided entries don't count in finished-session results
