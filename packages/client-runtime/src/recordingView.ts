@@ -532,12 +532,16 @@ const localTime = (date: string, time: string) => {
 export type PastSessionField = "date" | "start" | "finish";
 
 /**
- * Reads a past session's local date ("2026-11-07") and start and finish times ("21:30"). A finish
- * earlier than the start is the next morning, but one at the start is no session at all. A session
- * can't finish in the future. A bad form reports every field that's wrong, not just the first.
+ * Reads local start and finish times. An overnight session has an explicit next-day finish.
+ * A bad form reports every field that's wrong.
  */
 export const parsePastSessionTimes = (
-  input: { readonly date: string; readonly start: string; readonly finish: string },
+  input: {
+    readonly date: string;
+    readonly start: string;
+    readonly finish: string;
+    readonly finishNextDay?: boolean;
+  },
   now = Date.now(),
 ):
   | { readonly startedAt: DateTime.Utc; readonly finishedAt: DateTime.Utc; readonly error: null }
@@ -557,14 +561,11 @@ export const parsePastSessionTimes = (
   const start = localTime(input.date, input.start);
   const finish = localTime(input.date, input.finish);
   const errors: Partial<Record<PastSessionField, string>> = {};
-  if (!start)
-    errors.start = input.start.trim() === "" ? "Choose a start time." : "Enter a time like 21:30.";
-  if (!finish)
-    errors.finish =
-      input.finish.trim() === "" ? "Choose a finish time." : "Enter a time like 23:45.";
+  if (!start) errors.start = "Choose a start time.";
+  if (!finish) errors.finish = "Choose a finish time.";
   if (start && finish) {
-    if (finish < start) finish.setDate(finish.getDate() + 1);
-    if (finish.getTime() === start.getTime()) errors.finish = "Finish after the start.";
+    if (input.finishNextDay) finish.setDate(finish.getDate() + 1);
+    if (finish <= start) errors.finish = "Finish after the start.";
     else if (finish.getTime() > now) errors.finish = "A past session can't finish in the future.";
   }
   if (!start || !finish || errors.finish !== undefined) return refused(errors);

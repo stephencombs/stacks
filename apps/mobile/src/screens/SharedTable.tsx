@@ -1,6 +1,6 @@
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { fetchSharedTable } from "@stacks/client-runtime/api";
-import { formatDay, formatTime } from "@stacks/client-runtime/format";
+import { distinctPlayerNames, formatDay, formatTime } from "@stacks/client-runtime/format";
 import { useJoinTable, useRecordingTable } from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY, visitTitle } from "@stacks/client-runtime/recordingView";
 import type { MinorUnits, VisitId } from "@stacks/contracts";
@@ -72,8 +72,10 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
   const join = useJoinTable(token);
   const navigation = useNavigation();
   const [open, setOpen] = useState<"join" | "sit" | null>(null);
-  const names = new Map(view.players.map((player) => [player.id, player.displayName]));
   const you = local?.you.player ?? null;
+  const names = distinctPlayerNames(
+    view.players.map((player) => [player.id, player.id === you?.id ? "You" : player.displayName]),
+  );
   const visits = view.visits;
   const first = visits[0]?.visit;
   const live = visits.some((item) => item.finalResult === null);
@@ -107,9 +109,7 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
               <Row key={item.visit.id}>
                 <View className="min-w-0 flex-1 gap-0.5">
                   <Text className="type-heading text-ink">
-                    {item.visit.playerId === you?.id
-                      ? "You"
-                      : (names.get(item.visit.playerId) ?? "Player")}
+                    {names.get(item.visit.playerId) ?? "Player"}
                   </Text>
                   <Text className="type-footnote text-muted">
                     {item.finalResult === null

@@ -17,6 +17,7 @@ import type {
 import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import {
   useBuyInTotal,
+  useRecordingHome,
   useRecordingSubmit,
   useServerTable,
 } from "@stacks/client-runtime/recordingReact";
@@ -360,11 +361,14 @@ export function StartSheet({
   onOpened?: (tableId: TableId) => void;
 }) {
   const save = useRecordingSubmit();
+  const { home } = useRecordingHome();
   const [tripId, setTripId] = useState(initialTripId);
   const buyIn = useAmount("", 1);
   const [game, setGame] = useState<GameChoice>("none");
   const [highLimit, setHighLimit] = useState(false);
-  const [watching, setWatching] = useState(false);
+  const [recordingOnly, setRecordingOnly] = useState(false);
+  const alreadyPlaying = Boolean(home?.active.length);
+  const watching = recordingOnly && !alreadyPlaying;
   return (
     <RecordingSheet
       title={watching ? "Record a table" : "Start session"}
@@ -398,13 +402,17 @@ export function StartSheet({
       }}
     >
       {watching ? null : <KeypadAmount label="Buy-in" amount={buyIn} />}
-      {onOpened ? (
+      {onOpened && alreadyPlaying ? (
+        <Text className="text-sm text-muted">
+          Finish your live session before opening a table just to record for others.
+        </Text>
+      ) : onOpened ? (
         <View className="min-h-12 flex-row items-center justify-between gap-3 rounded-xl bg-surface px-4 py-2">
           <Text className="flex-1 type-body text-ink">I'm not playing, just recording</Text>
           <Switch
             accessibilityLabel="I'm not playing, just recording"
             value={watching}
-            onValueChange={setWatching}
+            onValueChange={setRecordingOnly}
           />
         </View>
       ) : null}
@@ -432,16 +440,16 @@ export function PastSessionSheet({
   const buyIn = useAmount("", 1);
   const cashOut = useAmount("", 0);
   const [now] = useState(() => new Date());
-  const [times, setTimes] = useState<Times>(() => ({
+  const [times, setTimes] = useState<Times & { readonly finishNextDay: boolean }>(() => ({
     date: localDateText(now),
     start: "",
     finish: "",
+    finishNextDay: false,
   }));
   const [timeErrors, setTimeErrors] = useState<Partial<Record<keyof Times, string>>>({});
   const [game, setGame] = useState<GameChoice>("none");
   const [highLimit, setHighLimit] = useState(false);
-  const setTime = (field: keyof Times) => (value: string) => {
-    const next = { ...times, [field]: value };
+  const updateTimes = (next: typeof times) => {
     setTimes(next);
     if (Object.keys(timeErrors).length > 0) {
       const parsed = parsePastSessionTimes(next);
@@ -453,7 +461,7 @@ export function PastSessionSheet({
       label={label}
       kind={field === "date" ? "date" : "time"}
       value={times[field]}
-      onChange={setTime(field)}
+      onChange={(value) => updateTimes({ ...times, [field]: value })}
       error={timeErrors[field] ?? null}
       maximumDate={field === "date" ? now : undefined}
     />
@@ -490,6 +498,14 @@ export function PastSessionSheet({
       {timeField("date", "Date")}
       {timeField("start", "Started")}
       {timeField("finish", "Finished")}
+      <View className="flex-row items-center justify-between gap-3">
+        <Text className="type-body text-ink">Finished the next day</Text>
+        <Switch
+          accessibilityLabel="Finished the next day"
+          value={times.finishNextDay}
+          onValueChange={(finishNextDay) => updateTimes({ ...times, finishNextDay })}
+        />
+      </View>
       <DetailsFields
         game={game}
         highLimit={highLimit}

@@ -70,6 +70,12 @@ export const tellApart = (names: ReadonlyArray<string>) => {
   });
 };
 
+export const distinctPlayerNames = (entries: Iterable<readonly [PlayerId, string]>) => {
+  const players = new Map(entries);
+  const names = tellApart([...players.values()]);
+  return new Map([...players.keys()].map((id, index) => [id, names[index]!]));
+};
+
 /** A name where it shares a line with an amount or a title: long ones end in an ellipsis. */
 export const shortName = (name: string, max = 16) =>
   name.length > max ? `${name.slice(0, max - 1).trimEnd()}…` : name;
