@@ -62,11 +62,11 @@ The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame
 
 The clock on a live session stays small, in the LIVE pill; the big number is the amount.
 
-In code, a style is a `type-*` utility in both CSS files, at the token's size, weight and tracking. Mobile's names: `type-hero` is `money-hero`, `type-number-lg` `money-lg`, `type-number` `money-row`, `type-headline` `title-large`, `type-title` `title`, `type-heading` `headline`, and `type-body`, `type-callout`, `type-footnote` and `type-label` keep the token's name. `type-section` is a list's title, 13px medium. The live amount is drawn on the live screen itself.
+In code, a style is a `type-*` utility in the mobile CSS file, at the token's size, weight and tracking. Mobile's names: `type-hero` is `money-hero`, `type-number-lg` `money-lg`, `type-number` `money-row`, `type-headline` `title-large`, `type-title` `title`, `type-heading` `headline`, and `type-body`, `type-callout`, `type-footnote` and `type-label` keep the token's name. `type-section` is a list's title, 13px medium. The live amount is drawn on the live screen itself.
 
 - Amounts are `Money` with a weight or size beside it. Never give `Money` a text color; its `tone` picks one.
 - Don't add `text-*` sizes, `leading-*` or `tracking-*` beside a `type-*` role, because they fight over the same properties. Color is fine, and mobile needs it: `type-title text-ink`.
-- New roles are `@utility type-*` in both CSS files, not `--text-*` tokens. `cn` runs tailwind-merge, which reads an unknown `text-foo` as a color and drops it when `text-ink` sits beside it. A test fails if web defines a role mobile doesn't.
+- New roles are `@utility type-*` in both CSS files, not `--text-*` tokens. `cn` runs tailwind-merge, which reads an unknown `text-foo` as a color and drops it when `text-ink` sits beside it.
 - `tabular-nums` on any number that changes.
 - Inputs stay at 16px or larger, because iOS zooms or clips smaller input text.
 - Keep strings in sentence case. Only `label` is uppercase, and only over a figure.
@@ -108,11 +108,10 @@ Is this glass?
  ├── A menu or popover → yes
  ├── A sheet, and the keypad it joins → yes, edge to edge and rounded on top only
  ├── A bottom action, a dock, an ActionBar → no, solid
- ├── A toast or the web Undo bar → no, solid with the float shadow
+ ├── A toast → no, solid with the float shadow
  └── A card, a row, anything in the page's flow → no
 ```
 
-- On web, glass is the `glass` utility (a floating thing) or `glass-sheet` (a sheet, whose shadow falls upward): the `glass` token as a translucent fill, a backdrop blur, a bright top edge and the shadow. Under `prefers-reduced-transparency` it becomes a plain `surface` card.
 - On mobile, glass is `GlassSurface`. iOS 26 draws the native material, and its `interactive` prop lets glass that is itself a control answer a touch. Earlier iOS draws the `glass` token as a translucent fill with an edge and a shadow. With Reduce Transparency on, iOS draws a solid card.
 - Android has no glass, so it doesn't imitate it: `GlassSurface` is a solid `raised` surface, a step above the cards, with a shadow, and round icon controls are filled tonal circles, as in Material.
 - Give `GlassSurface` its rounding both as a class and as `radius`, which is what the native material uses.
@@ -132,7 +131,7 @@ Web stacks fixed parts on four steps of Tailwind's scale. Anything else in a pag
 
 ## Motion
 
-Motion says what just happened. If it doesn't, cut it. The values live in `@stacks/client-runtime/motion`; mobile animates with them directly through React Native's `Animated`, and web mirrors them as CSS variables that a test holds to the same numbers. Don't add an animation library.
+Motion says what just happened. If it doesn't, cut it. The values live in `@stacks/client-runtime/motion`; the app animates with them through React Native's `Animated`. Don't add an animation library.
 
 | What        | Enter | Exit  | Easing                                                    |
 | ----------- | ----- | ----- | --------------------------------------------------------- |
@@ -143,10 +142,10 @@ Motion says what just happened. If it doesn't, cut it. The values live in `@stac
 | Press       | 100ms | 150ms | scale to 0.96 on `ease-press`, back on `ease-enter`       |
 
 - `ease-enter` is `cubic-bezier(0.32, 0.72, 0, 1)`: a fast start that reads as an instant answer. `ease-exit` accelerates away. An exit is always faster than its enter.
-- On web, read durations as `duration-(--duration-menu-in)` and easings as `ease-enter` / `ease-exit`. Press feedback is the `pressable` utility, which also eases a control's hover colors. On mobile, animate with `animate()` and press with `PressableScale`; `Button` and `IconButton` already do.
+- animate with `animate()` and press with `PressableScale`; `Button` and `IconButton` already do.
 - Animate only `transform` and `opacity`, plus colors and shadow on a control's own hover. Name the properties: `transition-[scale,opacity]`, never `transition-all`.
 - Menus scale from their trigger with `origin-[var(--transform-origin)]`, from 0.95, never from 0.
 - Paired parts share timing: a sheet and its scrim, a dialog and its backdrop.
 - A centered dialog on a wide screen uses the menu's timings; on a phone the same dialog is a sheet and uses the sheet's.
-- **One reduced-motion switch.** On web, `index.css` ends every CSS transition and animation at once under `prefers-reduced-motion`, and press feedback stops scaling. On mobile, every animation goes through `animate()`, which jumps to the end while Reduce Motion is on, and `useReducedMotion()` covers motion that isn't one animation, like a pager. Script-driven web motion (`TableMap`, the board's reordering) checks the preference itself.
+- **One reduced-motion switch.** every animation goes through `animate()`, which jumps to the end while Reduce Motion is on, and `useReducedMotion()` covers motion that isn't one animation, like a pager.
 - A change animates, a page load doesn't: a result already there when the page opens just sits there. One thing runs on its own, because it says the game is in play: the live dot.

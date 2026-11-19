@@ -4,20 +4,12 @@
   "ignoreDependencies": ["@leanspec/mcp"],
   "ignore": [".agents/skills/**", "apps/mobile/maestro/scripts/**"],
   "workspaces": {
-    "apps/web": {
-      "entry": [
-        "src/design/main.tsx",
-        "preview/boot.ts",
-        "preview/vite.config.ts",
-        "preview/clerk-stub.tsx",
-        "recording-storage/vite.config.ts",
-        "offline/worker.js",
-        "offline/playwright.config.ts"
-      ]
-    },
     "apps/mobile": {
       "entry": ["plugins/*.ts"],
-      "ignoreDependencies": ["@babel/core", "serve"]
+      "ignoreDependencies": [
+        "@expo-google-fonts/barlow-condensed",
+        "@expo-google-fonts/jetbrains-mono"
+      ]
     }
   }
 }

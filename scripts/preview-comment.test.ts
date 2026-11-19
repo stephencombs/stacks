@@ -20,7 +20,11 @@ it("leaves the existing comment when the URL is unchanged", () => {
     action: "skip",
     id: 7,
   });
-  expect(commentUpdate([{ id: 8, body: `${url}\n` }], url)).toEqual({ action: "skip", id: 8 });
+  expect(commentUpdate([{ id: 8, body: `${url}\n` }], url)).toEqual({
+    action: "update",
+    id: 8,
+    body: commentBody(url),
+  });
 });
 
 it("updates the same comment when the URL changes", () => {

@@ -10,11 +10,12 @@ const GENERATED = [
   ".alchemy",
   "packages/client-runtime/src/tableArt.ts",
   "apps/mobile/src/features/tableImages.ts",
-  "**/routeTree.gen.ts",
   "apps/mobile/ios/**",
   "apps/mobile/android/**",
   "apps/mobile/.expo/**",
   "apps/mobile/uniwind-types.d.ts",
+  // Git can check out this symlink as plain text on Windows. Format its target instead.
+  ".mcp.json",
   // Agent skills are vendored and replaced as a whole when they update.
   ".agents/skills/**",
   ".claude/skills/**",
@@ -24,8 +25,7 @@ const GENERATED = [
 export default defineConfig({
   test: {
     environment: "node",
-    // e2e/ runs under Playwright (`pnpm test:e2e`), not vitest.
-    exclude: ["**/node_modules/**", "**/dist/**", "**/dist-web/**", "**/e2e/**"],
+    exclude: ["**/node_modules/**", "**/dist/**"],
     allowOnly: !process.env.CI,
     // Flaky tests are fixed, not retried.
     retry: 0,

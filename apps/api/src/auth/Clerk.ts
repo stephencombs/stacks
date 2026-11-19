@@ -4,7 +4,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
-import * as Schema from "effect/Schema";
 import {
   Authentication,
   CurrentUser,
@@ -19,14 +18,8 @@ const stringClaim = (claims: Record<string, unknown>, key: string) => {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 };
 
-/**
- * Whether a token's `azp` claim names a site we serve. Browser tokens name the page's origin;
- * tokens from the native app have no origin and no `azp`, and Clerk's own check refuses those.
- */
-export const fromAuthorizedParty = (
-  azp: string | undefined,
-  authorizedParties: ReadonlyArray<string>,
-) => authorizedParties.length === 0 || azp === undefined || authorizedParties.includes(azp);
+/** Native session tokens do not name a browser origin. */
+export const isNativeSession = (azp: string | undefined) => azp === undefined;
 
 /**
  * Verifies Clerk session tokens. With `CLERK_JWT_KEY` set, verification is networkless;
@@ -36,9 +29,6 @@ export const fromAuthorizedParty = (
 const makeVerify = Effect.gen(function* () {
   const secretKey = yield* Config.option(Config.Redacted("CLERK_SECRET_KEY"));
   const jwtKey = yield* Config.option(Config.String("CLERK_JWT_KEY"));
-  const authorizedParties = yield* Config.Array(Schema.String, "CLERK_AUTHORIZED_PARTIES").pipe(
-    Config.withDefault([]),
-  );
   return Effect.fn("Authentication.verify")(function* (credential: Redacted.Redacted) {
     const claims = yield* Effect.tryPromise(() =>
       verifyToken(Redacted.value(credential), {
@@ -50,7 +40,7 @@ const makeVerify = Effect.gen(function* () {
       }),
     ).pipe(
       Effect.filterOrFail(
-        (claims) => fromAuthorizedParty(claims.azp, authorizedParties),
+        (claims) => isNativeSession(claims.azp),
         () => new Unauthorized(),
       ),
       Effect.mapError(() => new Unauthorized()),

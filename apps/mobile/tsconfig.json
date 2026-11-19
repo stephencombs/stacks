@@ -8,5 +8,5 @@
     "types": ["node"]
   },
   "include": ["**/*.ts", "**/*.tsx", "uniwind-types.d.ts"],
-  "exclude": ["node_modules", "dist", "dist-web"]
+  "exclude": ["node_modules", "dist"]
 }

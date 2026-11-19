@@ -7,7 +7,7 @@ export function previewUrl(pr) {
 }
 
 export function commentBody(url) {
-  return `${MARKER}\n${url}`;
+  return `${MARKER}\nAPI health: ${url}/api/health\n\nMobile: \`EXPO_PUBLIC_API_URL=${url}\``;
 }
 
 function urlIn(body) {
@@ -29,7 +29,7 @@ export function commentUpdate(comments, url) {
   const existing = previewComment(comments);
   const body = commentBody(url);
   if (!existing) return { action: "create", body };
-  if (urlIn(existing.body) === url) return { action: "skip", id: existing.id };
+  if (existing.body === body) return { action: "skip", id: existing.id };
   return { action: "update", id: existing.id, body };
 }
 

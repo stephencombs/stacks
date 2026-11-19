@@ -44,6 +44,45 @@ onFlowComplete:
     visible: "No trips yet"
     timeout: 30000
 
+# Starting a trip in a second group should use that group's scope. Deleting
+# the empty trip returns to its group, and leaving returns to Crew's root.
+- back
+- tapOn: "Groups"
+- tapOn: "New group"
+- tapOn:
+    id: "group-name"
+- inputText: "Audit crew"
+- tapOn: "Create group"
+- extendedWaitUntil:
+    visible: "No trips yet"
+    timeout: 30000
+- tapOn: "Start a trip"
+- tapOn:
+    id: "trip-name"
+- inputText: "Audit weekend"
+- tapOn: "Start trip"
+- tapOn: "Audit weekend, going"
+- assertVisible: "Audit crew"
+- tapOn: "Trip options"
+- tapOn: "Delete trip"
+- tapOn: "Delete trip"
+- extendedWaitUntil:
+    visible: "No trips yet"
+    timeout: 30000
+- assertVisible: "Audit crew"
+- scrollUntilVisible:
+    element: "Group settings.*"
+    direction: DOWN
+- tapOn: "Group settings.*"
+- tapOn: "Leave group"
+- tapOn: "Leave group"
+- extendedWaitUntil:
+    visible: "Groups"
+    timeout: 30000
+- tapOn: "Groups"
+- assertNotVisible: "Audit crew"
+- tapOn: "Vegas crew"
+
 - tapOn: "Start a trip"
 - tapOn:
     id: "trip-name"
@@ -81,3 +120,48 @@ onFlowComplete:
       id: "night-result"
       text: "You \\+\\$70"
     timeout: 60000
+
+# An existing member cannot claim a guest's identity.
+- back
+- scrollUntilVisible:
+    element: "Add a guest"
+    direction: DOWN
+- tapOn: "Add a guest"
+- tapOn:
+    text: "Name"
+    index: 0
+- inputText: "Jonah"
+- tapOn: "Add guest"
+- tapOn: "Send claim link"
+- copyTextFrom: ".*stacks-preview://claim/[A-Za-z0-9]+.*"
+- evalScript: ${output.claimLink = maestro.copiedText.match(/stacks-preview:\/\/claim\/[A-Za-z0-9]+/)[0]}
+- back
+- openLink: ${output.claimLink}
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "You're already in this group"
+    timeout: 30000
+- assertNotVisible: "Yes, I'm Jonah"
+- tapOn: "Open group"
+
+# Signing out from group Stats must return to personal Stats without crashing.
+- tapOn: "Stats"
+- extendedWaitUntil:
+    visible: "Standings"
+    timeout: 30000
+- tapOn: "You"
+- tapOn: "Sign out"
+- extendedWaitUntil:
+    visible: "Sign in"
+    timeout: 30000
+- tapOn: "Close"
+- extendedWaitUntil:
+    notVisible: "Standings"
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Your stats start here|All games"
+    timeout: 30000

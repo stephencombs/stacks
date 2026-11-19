@@ -11,7 +11,7 @@ Color Up has four tabs and a You sheet. Each tab answers one question:
 
 **You** opens from the avatar on every tab: account, recording defaults, display (cents, privacy mode, theme) and export. It is a sheet, not a tab, because nobody opens the app to change a setting.
 
-Mobile draws the tabs as native tabs on iOS and the platform destination bar on Android. Web draws them as a bottom bar below `lg` and a left sidebar above it. The tabs and their names are the same everywhere.
+iOS uses native bottom tabs and Android uses the platform destination bar. Both have the same destinations and names.
 
 ## Play
 
@@ -31,11 +31,11 @@ A personal session is one player's visit to a table. Its live page lists everyon
 
 A table has its own page, `/tables/:tableId`, for whoever records there without a visit in play: someone who started a table without playing, a recorder who never sits down, or a starter who cashed out while others play (cashing out takes them there). It leads with what's in play at the table, lists everyone, and offers **Sit down and play**. Everyone else reaches a table through their visit at it. A table nobody has played at can be deleted from its page.
 
-The starter's Share sheet makes a link, `/t/:token`, which opens on the web with no account and shows that one table and nothing else. The same page offers **Join this table**. It asks only for a name and always creates a new player on this device, so a link can never be used to record as someone already there. Joining needs the network once; everything after it records offline on the joiner's own `/play/:visitId`. A participant's controls act only on their own visits; the starter's act on everyone's. When a visit finishes, **Back at the table** starts a new visit for the same player at the same table. Revoking the link stops new joins. The app shares it in its own scheme (`stacks://t/:token`), so it opens only where Color Up is installed; https links that fall back to the stores wait until the apps are listed.
+The starter's Share sheet makes a link, `/t/:token`, which opens in the app with no account and shows that one table and nothing else. The same page offers **Join this table**. It asks only for a name and always creates a new player on this device, so a link can never be used to record as someone already there. Joining needs the network once; everything after it records offline on the joiner's own `/play/:visitId`. A participant's controls act only on their own visits; the starter's act on everyone's. When a visit finishes, **Back at the table** starts a new visit for the same player at the same table. Revoking the link stops new joins. The app shares it in its own scheme (`stacks://t/:token`), so it opens only where Color Up is installed; https links that fall back to the stores wait until the apps are listed.
 
 Group play is recorded the same way. Signed in, starting a session can put the table in one of your groups' trips, and a trip page's **Start a session** does so for you. The whole table belongs to that trip: its players' visits, return visits included, show in the trip, the group's stats and Crew, and nothing else of theirs does. The older group session screens retire once their sessions move to tables.
 
-To record as a player already at the table, the starter opens **Table settings** and picks **Invite this player**. The link, `/invite/:token`, opens on the web, says whose play it records and works once. Table settings is the starter's alone: it also lists and stops the devices recording as each player, appoints **Recorders** (account holders who record for everyone) and holds **Stop sharing**. A recorder never sees Share or Table settings.
+To record as a player already at the table, the starter opens **Table settings** and picks **Invite this player**. The link, `/invite/:token`, opens in the app, says whose play it records and works once. Table settings is the starter's alone: it also lists and stops the devices recording as each player, appoints **Recorders** (account holders who record for everyone) and holds **Stop sharing**. A recorder never sees Share or Table settings.
 
 ## Stats
 
@@ -61,7 +61,7 @@ The previous design treated group and trip as a scope chosen at the top of every
 2. **One row of peer navigation per screen.** A segmented control may change the scope or measure of the same data (`By month | By year`). It may not switch to different content; that's a link.
 3. **One home per thing.** If two screens need the same chart or list, one links to the other.
 4. **Tabs are not actions.** Starting a session, a new trip and invites are buttons inside tabs.
-5. **Same tabs on every surface.** Web and mobile differ in their container, never in their destinations or names.
+5. **Same tabs on every surface.** iOS and Android differ in their container, never in their destinations or names.
 
 ## Addresses
 

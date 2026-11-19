@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,8 +11,6 @@ const none = {
   api: "false",
   build: "false",
   preview: "false",
-  e2e_web: "false",
-  e2e_mobile: "false",
 };
 
 const all = {
@@ -20,8 +18,6 @@ const all = {
   api: "true",
   build: "true",
   preview: "true",
-  e2e_web: "true",
-  e2e_mobile: "true",
 };
 
 const checks = { ...all, preview: "false" };
@@ -35,7 +31,6 @@ describe("plan", () => {
   it.each([
     "README.md",
     "docs/internals/navigation.md",
-    "apps/web/README.md",
     ".github/workflows/mobile.yml",
     ".github/workflows/testflight.yml",
     ".github/dependabot.yml",
@@ -57,33 +52,11 @@ describe("plan", () => {
     expect(output(plan([path])).typecheck_args).toBe("-r --cache");
   });
 
-  it("typechecks and tests the web app without the mobile suite or the database", () => {
-    const result = output(plan(["apps/web/src/main.tsx"]));
-    expect(jobs(["apps/web/src/main.tsx"])).toEqual({
-      ...all,
-      api: "false",
-      e2e_mobile: "false",
-    });
-    expect(result.typecheck_args).toBe("--cache --filter @stacks/web");
-    expect(result.test_args).toBe("--filter @stacks/web");
-  });
-
-  it("treats the web Playwright suite as browser coverage, not a worker build", () => {
-    expect(jobs(["apps/web/e2e/full-loop.spec.ts"])).toEqual({
-      ...none,
-      check: "true",
-      e2e_web: "true",
-    });
-    expect(output(plan(["apps/web/playwright.config.ts"])).build).toBe("false");
-    expect(output(plan(["apps/web/e2e/full-loop.spec.ts"])).test_args).toBe("");
-  });
-
   it("checks mobile without building the worker", () => {
     const result = output(plan(["apps/mobile/src/App.tsx"]));
     expect(jobs(["apps/mobile/src/App.tsx"])).toEqual({
       ...none,
       check: "true",
-      e2e_mobile: "true",
     });
     expect(result.typecheck_args).toBe("--cache --filter @stacks/mobile");
     expect(result.test_args).toBe("--filter @stacks/mobile");
@@ -100,26 +73,20 @@ describe("plan", () => {
     expect(shared.api).toBe("true");
     expect(shared.build).toBe("true");
     expect(shared.preview).toBe("true");
-    expect(shared.e2e_web).toBe("true");
-    expect(shared.e2e_mobile).toBe("true");
     expect(shared.typecheck_args).toContain("--filter @stacks/api");
     expect(shared.test_args).not.toContain("@stacks/api");
     expect(shared.test_args).toContain("--filter @stacks/shared");
     expect(shared.test_args).toContain("--filter @stacks/client-runtime");
-    expect(shared.test_args).toContain("--filter @stacks/web");
     expect(shared.test_args).toContain("--filter @stacks/mobile");
     expect(shared.typecheck_args).not.toContain("@stacks/contracts");
   });
 
-  it("rechecks both clients when shared client code changes, and not the API tests", () => {
+  it("checks shared client code and mobile without rebuilding the API", () => {
     const result = output(plan(["packages/client-runtime/src/format.ts"]));
     expect(result.api).toBe("false");
-    expect(result.build).toBe("true");
-    expect(result.preview).toBe("true");
-    expect(result.e2e_web).toBe("true");
-    expect(result.e2e_mobile).toBe("true");
+    expect(result.build).toBe("false");
+    expect(result.preview).toBe("false");
     expect(result.test_args).toContain("--filter @stacks/client-runtime");
-    expect(result.test_args).toContain("--filter @stacks/web");
     expect(result.test_args).toContain("--filter @stacks/mobile");
     expect(result.test_args).not.toContain("@stacks/api");
   });
@@ -130,15 +97,9 @@ describe("plan", () => {
     expect(ci.api).toBe("true");
     expect(ci.build).toBe("true");
     expect(ci.preview).toBe("false");
-    expect(ci.e2e_web).toBe("false");
     expect(ci.typecheck_args).toBe("-r --cache");
     expect(ci.test_args).not.toContain("@stacks/api");
 
-    expect(jobs([".github/workflows/e2e.yml"])).toEqual({
-      ...none,
-      e2e_web: "true",
-      e2e_mobile: "true",
-    });
     expect(jobs([".github/workflows/preview.yml"])).toEqual({ ...none, check: "true" });
     expect(jobs(["scripts/preview.mjs"])).toEqual({ ...none, check: "true" });
     expect(jobs(["scripts/preview-comment.mjs"])).toEqual({ ...none, check: "true" });
@@ -149,7 +110,6 @@ describe("plan", () => {
     expect(jobs(["README.md", "apps/mobile/src/App.tsx"])).toEqual({
       ...none,
       check: "true",
-      e2e_mobile: "true",
     });
   });
 
@@ -157,7 +117,7 @@ describe("plan", () => {
     expect(jobs(["README.md", "somewhere/new.ts"])).toEqual(checks);
   });
 
-  it("deploys a preview only when the worker or the web app changed", () => {
+  it("deploys a preview only when the API changed", () => {
     expect(
       jobs([
         "package.json",
@@ -167,7 +127,6 @@ describe("plan", () => {
         "scripts/ci-changes.mjs",
       ]).preview,
     ).toBe("false");
-    expect(jobs(["package.json", "apps/web/src/main.tsx"]).preview).toBe("true");
     expect(jobs(["pnpm-lock.yaml", "apps/api/src/worker.ts"]).preview).toBe("true");
   });
 
@@ -196,11 +155,11 @@ describe("decide", () => {
       decide({
         event: "pull_request",
         base: "abc",
-        diff: () => ["apps/web/src/main.tsx"],
+        diff: () => ["apps/mobile/src/App.tsx"],
       }),
     );
     expect(result.api).toBe("false");
-    expect(result.build).toBe("true");
+    expect(result.build).toBe("false");
   });
 });
 
@@ -221,7 +180,9 @@ describe("dependents", () => {
     for (const parent of ["apps", "packages"]) {
       for (const name of readdirSync(join(repo, "..", parent))) {
         const dir = join(repo, "..", parent, name);
-        const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+        const manifest = join(dir, "package.json");
+        if (!existsSync(manifest)) continue;
+        const pkg = JSON.parse(readFileSync(manifest, "utf8")) as {
           name: string;
           dependencies?: Record<string, string>;
           devDependencies?: Record<string, string>;

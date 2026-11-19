@@ -132,15 +132,28 @@ const newSecret = () =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
 
-/** The saved credential for `actorId`, or a new one, saved before it's used. */
-const actorCredential = async (
+const pendingActorKeys = new WeakMap<ActorKeyStorage, Map<ActorId, Promise<ActorCredential>>>();
+
+/** Share the first key load and save across requests so registration and sharing use the same key. */
+const actorCredential = (
   keys: ActorKeyStorage,
   actorId: ActorCredential["actorId"],
 ): Promise<ActorCredential> => {
-  const saved = await keys.load();
-  if (saved?.actorId === actorId) return saved;
-  const credential = { actorId, secret: newSecret() };
-  await keys.save(credential);
+  const pending = pendingActorKeys.get(keys) ?? new Map<ActorId, Promise<ActorCredential>>();
+  const existing = pending.get(actorId);
+  if (existing) return existing;
+
+  const credential = keys
+    .load()
+    .then(async (saved) => {
+      if (saved?.actorId === actorId) return saved;
+      const created = { actorId, secret: newSecret() };
+      await keys.save(created);
+      return created;
+    })
+    .finally(() => pending.delete(actorId));
+  pending.set(actorId, credential);
+  pendingActorKeys.set(keys, pending);
   return credential;
 };
 

@@ -150,7 +150,7 @@ export function Landing({
     accountRef.current = false;
     setAccount(false);
     shift(0);
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     const step = steps[indexRef.current];
     if (step)
       AccessibilityInfo.announceForAccessibility(
@@ -175,14 +175,14 @@ export function Landing({
     accountRef.current = true;
     setAccount(true);
     shift(-frame);
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     AccessibilityInfo.announceForAccessibility(copy.title);
   };
 
   const show = (next: number) => {
     indexRef.current = next;
     setIndex(next);
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     const step = steps[next];
     if (step)
       AccessibilityInfo.announceForAccessibility(

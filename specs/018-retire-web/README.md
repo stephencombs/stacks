@@ -79,14 +79,23 @@ Executing after PRs `#101` (spec `006`, Crew tab) and `#102` (spec `011`, group 
 - [x] Merge or resolve `#101` and `#102`; remove web items from specs `012`, `016`, and `017`
 - [x] Phase 1A: Add `JoinSheet`, `SitDownSheet.returning`, `t/:token`, and `invite/:token` on `RootStack`; switch shared links to `appUrl()` (`Linking.createURL`) and drop `EXPO_PUBLIC_WEB_URL` from `eas.json`
 - [x] Phase 1B: Migrate `tokens.test.ts`, `motion.test.ts`, `VenuePicker.test.tsx`, SQLite rollback/`retry()`/`version: 99` tests, and `hermesLike` checks; write the native simulator E2E (Maestro flows and `apps/mobile/.eas/workflows/e2e.yml`), not yet run
-- [ ] Run the native simulator E2E against a test API and fix what it finds
-- [ ] Phase 2: Delete `apps/web`, `*.web.*`, Playwright harnesses, IndexedDB runtime files, `chips-*.webp`, and `preview-color-up` skill + symlinks; clean `Platform.OS` branches and mobile/workspace deps (keeping `react-dom` in mobile `devDependencies`)
-- [ ] Update `wrangler.jsonc`, `Clerk.ts`, `preview.mjs`, `preview-comment.mjs`, `ci-changes.mjs`, CI workflows, `knip.json`, `vite.config.ts`, `.gitignore`, and docs
+- [x] Run the native simulator E2E against a test API and fix what it finds
+- [x] Phase 2: Delete `apps/web`, `*.web.*`, Playwright harnesses, IndexedDB runtime files, `chips-*.webp`, and `preview-color-up` skill + symlinks; clean `Platform.OS` branches and mobile/workspace deps (keeping `react-dom` in mobile `devDependencies`)
+- [x] Update `wrangler.jsonc`, `Clerk.ts`, `preview.mjs`, `preview-comment.mjs`, `ci-changes.mjs`, CI workflows, `knip.json`, `vite.config.ts`, `.gitignore`, and docs
 
 ## Test
 
-- [ ] Deep links `stacks://t/:token`, `stacks://invite/:token`, `stacks://join/:code`, and `stacks://claim/:code` open and complete signed-out/signed-in flows on iOS and Android
-- [ ] `pnpm fmt:check && pnpm lint && pnpm knip && pnpm typecheck && pnpm test` passes with zero web workspaces or Playwright deps
-- [ ] `pnpm --filter @stacks/api test` (Postgres) and `pnpm --filter @stacks/api build` pass without `apps/web/dist`
-- [ ] `pnpm --filter @stacks/mobile build` (`expo export --platform ios --platform android`) succeeds and native simulator E2E passes
-- [ ] PR preview workflow deploys an API-only Worker + Neon branch and `/api/health` responds 200
+- [x] Deep links `stacks://t/:token`, `stacks://invite/:token`, `stacks://join/:code`, and `stacks://claim/:code` open and complete signed-out/signed-in flows on Android
+- [x] `pnpm fmt:check && pnpm lint && pnpm knip && pnpm typecheck && pnpm test` passes with zero web workspaces or Playwright deps
+- [x] `pnpm --filter @stacks/api test` (Postgres) and `pnpm --filter @stacks/api build` pass without `apps/web/dist`
+- [x] `pnpm --filter @stacks/mobile build` (`expo export --platform ios --platform android`) succeeds and native simulator E2E passes
+- [x] PR preview workflow deploys an API-only Worker + Neon branch and `/api/health` responds 200
+
+iOS device verification was waived. Both native exports and the API dry run pass. The isolated
+API Worker returns 200 for `/api/health` and 404 for `/`. Android passed the solo recording,
+shared table, and signed-in Crew flows against an isolated test API. Crew also opened a guest
+claim link and verified the existing-member guard. A second test account joined a group from
+its invite link. A fresh install redeemed a personal table invite and showed the player's live
+session. The [hosted preview](https://github.com/stephencombs/stacks/actions/runs/44613921877)
+deployed an API-only Worker and Neon branch for PR #111. Its `/api/health` returned 200 and its
+root returned 404.

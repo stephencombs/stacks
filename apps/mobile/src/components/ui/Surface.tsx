@@ -78,7 +78,7 @@ export function PageTitle({
 }) {
   const navigation = use(NavigationContext);
   const route = use(NavigationRouteContext);
-  const nativeTitle = Platform.OS !== "web" && navigation !== undefined;
+  const nativeTitle = navigation !== undefined;
   const headerTitle = useCallback(
     () => <HeaderTitle title={children} context={context} />,
     [children, context],

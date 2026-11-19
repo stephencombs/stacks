@@ -4,13 +4,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Which CI jobs a diff can affect. An unrecognized path runs every check.
-// A preview deploys only when the worker or the web app it serves changed.
+// A preview deploys only when the API changes.
 // The mobile bundle workflow keeps its own path filter.
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const API = "@stacks/api";
-const WEB = "@stacks/web";
-const MOBILE = "@stacks/mobile";
 
 const SKIP_PREFIXES = [
   ".agents/",
@@ -46,7 +44,7 @@ const TOOLING = new Set([
   "vite.config.ts",
 ]);
 
-const JOB_NAMES = ["check", "api", "build", "preview", "e2eWeb", "e2eMobile"];
+const JOB_NAMES = ["check", "api", "build", "preview"];
 
 let workspaces;
 
@@ -56,8 +54,6 @@ function blank(value) {
     api: value,
     build: value,
     preview: value,
-    e2eWeb: value,
-    e2eMobile: value,
   };
 }
 
@@ -130,14 +126,11 @@ function affected(name) {
   const packages = dependentsOf(name, load());
   const jobs = blank(false);
   jobs.check = true;
-  if (packages.has(API)) jobs.api = true;
-  // The worker serves the built web app, so either one needs both builds.
-  if (packages.has(WEB) || packages.has(API)) {
+  if (packages.has(API)) {
+    jobs.api = true;
     jobs.build = true;
     jobs.preview = true;
-    jobs.e2eWeb = true;
   }
-  if (packages.has(MOBILE) || packages.has(API)) jobs.e2eMobile = true;
   return { all: false, packages, jobs };
 }
 
@@ -159,14 +152,8 @@ function tooling(path) {
   return TOOLING.has(path) || path.startsWith("patches/");
 }
 
-function webSuite(path) {
-  // Playwright is not part of the worker bundle.
-  return path.startsWith("apps/web/e2e/") || path === "apps/web/playwright.config.ts";
-}
-
 function special(path) {
   if (path === ".github/workflows/ci.yml") return fullCheck();
-  if (path === ".github/workflows/e2e.yml") return jobsOnly({ e2eWeb: true, e2eMobile: true });
   if (path === ".github/workflows/preview.yml" || path.startsWith("scripts/preview"))
     return jobsOnly({ check: true });
   if (path === "scripts/ci-changes.mjs" || path === "scripts/ci-changes.test.ts")
@@ -186,7 +173,6 @@ function packageFor(path) {
 
 function classify(path) {
   if (skipped(path)) return jobsOnly({});
-  if (webSuite(path)) return jobsOnly({ check: true, e2eWeb: true });
   if (tooling(path)) return everything();
   const known = special(path);
   if (known) return known;
@@ -244,8 +230,6 @@ export function output(result) {
     api: result.jobs.api ? "true" : "false",
     build: result.jobs.build ? "true" : "false",
     preview: result.jobs.preview ? "true" : "false",
-    e2e_web: result.jobs.e2eWeb ? "true" : "false",
-    e2e_mobile: result.jobs.e2eMobile ? "true" : "false",
     typecheck_args:
       names.length === 0 ? "" : samePackages(names) ? "-r --cache" : `--cache ${filters(names)}`,
     // API tests need Postgres, so they stay on their own job.

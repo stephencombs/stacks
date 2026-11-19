@@ -3,11 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp run --parallel --filter @stacks/api --filter @stacks/web dev",
+    "dev": "vp run --filter @stacks/api dev",
     "dev:api": "vp run --filter @stacks/api dev",
-    "dev:web": "vp run --filter @stacks/web dev",
     "dev:mobile": "vp run --filter @stacks/mobile dev",
-    "build": "vp run --filter @stacks/web build && vp run --filter @stacks/api build && vp run --filter @stacks/mobile build",
+    "build": "vp run --filter @stacks/api build && vp run --filter @stacks/mobile build",
     "typecheck": "vp run -r --cache typecheck",
     "lint": "vp lint --report-unused-disable-directives",
     "fmt": "vp fmt",
@@ -16,7 +15,7 @@
     "knip": "knip",
     "leanspec": "leanspec",
     "prepare": "vp config --hooks --no-agent",
-    "deploy": "vp run --filter @stacks/web build && vp run --filter @stacks/api deploy"
+    "deploy": "vp run --filter @stacks/api deploy"
   },
   "devDependencies": {
     "@leanspec/cli": "0.3.0",

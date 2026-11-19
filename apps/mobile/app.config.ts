@@ -72,7 +72,6 @@ export default (): ExpoConfig => ({
     "./plugins/withAndroidTabIcons",
     "./plugins/withAndroidTheme",
   ],
-  web: { bundler: "metro", output: "single" },
   extra: {
     appVariant: variant,
     googleMapsEnabled: Boolean(process.env.GOOGLE_MAPS_API_KEY),
