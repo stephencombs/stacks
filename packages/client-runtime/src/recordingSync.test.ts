@@ -1551,6 +1551,24 @@ describe("shared tables", () => {
     expect(upgraded).toEqual(state(store));
   });
 
+  it("uses the same device key for concurrent signed-out requests", async () => {
+    const store = await open();
+    const tableId = TableId.make("10000000-0000-4000-8000-000000000001");
+    const credentials: Array<ActorCredential | null> = [];
+    const transport = {
+      ...transportFor(server()),
+      table: (_tableId: TableId, actor: ActorCredential | null) => {
+        credentials.push(actor);
+        return Effect.fail(new NotFound({ resource: "table" }));
+      },
+    } satisfies RecordingTransport;
+    const sync = makeRecordingSync(store, null, transport, memoryKeys());
+    await Promise.allSettled([sync.table(tableId), sync.table(tableId)]);
+    expect(credentials).toHaveLength(2);
+    expect(credentials[0]).not.toBeNull();
+    expect(credentials[0]?.secret === credentials[1]?.secret).toBe(true);
+  });
+
   it("keeps solo play on a signed-out device, and syncs a shared table as the device's actor", () =>
     Effect.gen(function* () {
       const store = yield* Effect.promise(() => open());

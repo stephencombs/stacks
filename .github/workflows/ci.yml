@@ -97,7 +97,7 @@ jobs:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 
   build:
-    name: Build web, api and mobile
+    name: Build API and mobile
     needs: changes
     if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-latest
@@ -109,31 +109,12 @@ jobs:
           node-version-file: .node-version
           cache: true
           run-install: true
-      # The API bundle includes the built web app, so web builds first.
-      - run: vp run --filter @stacks/web build
       - run: vp run --filter @stacks/api build
       - run: vp run --filter @stacks/mobile build
 
-  recording-storage:
-    name: IndexedDB recording storage
-    needs: changes
-    # The web app depends on client-runtime, so `build` covers every change to the adapter.
-    if: needs.changes.outputs.build == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with:
-          node-version-file: .node-version
-          cache: true
-          run-install: true
-      - run: pnpm --filter @stacks/web exec playwright install --with-deps chromium
-      - run: vp run --filter @stacks/web test:recording-storage
-
   deploy:
     name: Deploy development
-    needs: [changes, check, api, build, recording-storage]
+    needs: [changes, check, api, build]
     if: >-
       github.event_name == 'push' &&
       always() &&
@@ -141,7 +122,6 @@ jobs:
       needs.changes.result == 'success' &&
       needs.check.result == 'success' &&
       needs.build.result == 'success' &&
-      needs.recording-storage.result == 'success' &&
       contains(fromJSON('["success","skipped"]'), needs.api.result)
     runs-on: ubuntu-latest
     timeout-minutes: 15

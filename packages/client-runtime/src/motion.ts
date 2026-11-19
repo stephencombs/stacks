@@ -1,8 +1,4 @@
-/**
- * Color Up's motion, for both clients. Mobile animates with these directly; web mirrors them as CSS
- * variables in `apps/web/src/index.css`, and `apps/web/src/design/motion.test.ts` holds the two
- * together.
- */
+/** Color Up's shared motion timings. */
 
 /** Cubic-bezier control points. Enter on `enter`, leave on `exit`, and press down on `press`. */
 export const easing = {

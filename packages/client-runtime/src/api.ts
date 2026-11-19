@@ -23,7 +23,7 @@ import type { RecordingTransport } from "./recordingSync.ts";
 export const LEDGER_KEYS = ["stacks"] as const;
 
 export interface StacksClientOptions {
-  /** "" for same-origin web; the API origin on mobile. */
+  /** The API origin. */
   readonly baseUrl: string;
   /** The signed-in user's Clerk session token, fetched fresh for each request. */
   readonly getToken: () => Promise<string | null>;

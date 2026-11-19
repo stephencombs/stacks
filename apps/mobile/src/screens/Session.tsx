@@ -29,7 +29,7 @@ import * as DateTime from "effect/DateTime";
 import { useKeepAwake } from "expo-keep-awake";
 import { useState } from "react";
 import * as Haptics from "expo-haptics";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -665,8 +665,7 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
 }
 
 const succeed = () => {
-  if (Platform.OS !== "web")
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 };
 
 const verbs = {

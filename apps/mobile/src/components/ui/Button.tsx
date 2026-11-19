@@ -81,8 +81,7 @@ export function Button({
       accessibilityState={{ disabled: inactive, busy: pending }}
       disabled={inactive}
       onPress={() => {
-        if (haptic && Platform.OS !== "web")
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (haptic) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
       className={cn(
@@ -136,8 +135,7 @@ export function IconButton({
       disabled={disabled}
       hitSlop={4}
       onPress={() => {
-        if (haptic && Platform.OS !== "web")
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (haptic) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
       className={cn("size-11", disabled && "opacity-50", className)}

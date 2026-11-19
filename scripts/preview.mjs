@@ -3,7 +3,7 @@ import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { previewUrl, publishPreviewComment } from "./preview-comment.mjs";
+import { publishPreviewComment } from "./preview-comment.mjs";
 
 const number = process.argv[3];
 if (!/^[1-9]\d*$/.test(number ?? "")) throw new Error("Expected a PR number");
@@ -87,21 +87,12 @@ try {
         caching: { disabled: true },
       });
     }
-    const url = previewUrl(number);
     const config = {
       name: "colorup",
       main: join(process.cwd(), "apps/api/src/worker.ts"),
       compatibility_date: "2026-10-01",
       compatibility_flags: ["nodejs_compat"],
-      assets: {
-        directory: join(process.cwd(), "apps/web/dist"),
-        not_found_handling: "single-page-application",
-        run_worker_first: ["/api/*"],
-      },
       previews: {
-        vars: {
-          CLERK_AUTHORIZED_PARTIES: `${url},https://${name}.colorup.stephencodes.dev`,
-        },
         hyperdrive: [{ binding: "HYPERDRIVE", id: hyperdrive.id }],
       },
     };
@@ -121,7 +112,6 @@ try {
         mode: 0o600,
       },
     );
-    run(["--filter", "@stacks/web", "build"]);
     run([
       "--filter",
       "@stacks/api",

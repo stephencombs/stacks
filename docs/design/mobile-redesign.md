@@ -1,10 +1,10 @@
 # Mobile controls
 
-Color Up keeps the same ledger meaning and destinations on web, iOS and Android. Each platform supplies its own controls. A pill-shaped React Native view does not replace the behavior of a native tab bar, picker or menu.
+Color Up keeps the same ledger meaning and destinations on iOS and Android. Each platform supplies its own controls. A pill-shaped React Native view does not replace the behavior of a native tab bar, picker or menu.
 
 ## Navigation
 
-Keep React Navigation native-stack. Both use the native bottom tab navigator: SF Symbols on iOS, and on Android Material's navigation bar with Material Symbols, filled when selected. The mobile web build keeps its floating capsule. A trip's Stats button opens the Stats tab with its group and trip picked.
+Keep React Navigation native-stack. Both use the native bottom tab navigator: SF Symbols on iOS, and on Android Material's navigation bar with Material Symbols, filled when selected. A trip's Stats button opens the Stats tab with its group and trip picked.
 
 Use native iOS header items for Groups and You. Related items may share the system glass background. Keep the header transparent, with a centred native glass title capsule instead of a large body heading. The title expands into a popover with its full title and context; group destination titles open the group/trip selection sheet. Scope is never the back action.
 

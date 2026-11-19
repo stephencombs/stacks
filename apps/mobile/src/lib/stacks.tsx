@@ -26,7 +26,7 @@ import {
 } from "@stacks/client-runtime/react";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, type ReactNode } from "react";
-import { AppState, Platform } from "react-native";
+import { AppState } from "react-native";
 
 import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
@@ -140,7 +140,7 @@ function RefusalHaptic() {
     () =>
       outbox?.subscribe(() => {
         const now = outbox.pending().filter((p) => p.failed !== null);
-        if (now.some((p) => !refused.current.has(p.entry.id)) && Platform.OS !== "web")
+        if (now.some((p) => !refused.current.has(p.entry.id)))
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         refused.current = new Set(now.map((p) => p.entry.id));
       }),

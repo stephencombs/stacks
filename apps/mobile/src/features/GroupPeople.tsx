@@ -24,7 +24,6 @@ const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 export function GroupPeople({ detail }: { detail: GroupDetail }) {
   const [addingGuest, setAddingGuest] = useState(false);
   const [managing, setManaging] = useState<Player | null>(null);
-  const [shared, setShared] = useState<string | null>(null);
   const { userId } = useAuth();
   const members = detail.players.filter((player) => player.role !== null);
   const guests = detail.players.filter(isGuest);
@@ -34,10 +33,6 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
     player.userId !== userId &&
     player.role !== "owner" &&
     (detail.role === "owner" || (detail.role === "admin" && player.role === "member"));
-
-  const share = async (url: string, message: string, key: string) => {
-    if ((await shareLink(url, message)) === "copied") setShared(key);
-  };
 
   return (
     <>
@@ -100,13 +95,12 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
                   <View className="ml-auto flex-row items-center gap-2">
                     {player.claimCode ? (
                       <Button
-                        label={shared === player.id ? "Copied" : "Send claim link"}
+                        label="Send claim link"
                         size="sm"
                         onPress={() =>
-                          void share(
+                          void shareLink(
                             appUrl(`claim/${player.claimCode}`),
                             `Claim your Color Up history in ${detail.group.name}:`,
-                            player.id,
                           )
                         }
                       />
@@ -140,7 +134,6 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("invites", "create"));
   const revoke = useAction(stacks.Client.mutation("invites", "revoke"));
-  const [copied, setCopied] = useState<string | null>(null);
   return (
     <View className="gap-2">
       <SectionHeading
@@ -181,13 +174,11 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
                     </Text>
                     <View className="flex-row gap-2">
                       <Button
-                        label={copied === invite.id ? "Copied" : "Share"}
+                        label="Share"
                         size="sm"
                         className="flex-1"
                         onPress={() =>
-                          void shareLink(url, `Join ${detail.group.name} on Color Up:`).then(
-                            (how) => (how === "copied" ? setCopied(invite.id) : undefined),
-                          )
+                          void shareLink(url, `Join ${detail.group.name} on Color Up:`)
                         }
                       />
                       <Button

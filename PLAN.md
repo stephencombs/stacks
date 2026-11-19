@@ -100,7 +100,6 @@ Keep the existing monorepo and shared core:
 - `packages/shared` owns pure money, results, balances and backing calculations.
 - `packages/client-runtime` owns shared client state, persistence and synchronization behavior.
 - `apps/api` owns authoritative shared writes and permission checks in thin handlers and feature services.
-- `apps/web` uses React, TanStack Router, Tailwind and the existing component system.
 - `apps/mobile` uses Expo, React Navigation native-stack and Uniwind. Do not migrate it to Expo Router.
 
 Local recording must work before an account or network is available. Synchronization sends pending operations to the API, which validates access before accepting authoritative shared changes. Stable client-generated IDs make retries idempotent. Persistence failures and rejected writes must be visible.
@@ -119,7 +118,7 @@ Reconcile contracts, pure ledger calculations and database relationships with th
 
 ### 2. Independent recording and review
 
-Implement the real signed-out solo flow on web and mobile using shared client-runtime behavior. Starting, rebuying, changing the buy-in total, cashing out, corrections and reviewing history work offline and survive relaunch.
+Implement the real signed-out solo flow on iOS and Android using shared client-runtime behavior. Starting, rebuying, changing the buy-in total, cashing out, corrections and reviewing history work offline and survive relaunch.
 
 The first milestone is $200 in and a $100 rebuy, then the buy-in total corrected to $250 and a $350 cash-out that finishes the session. Before the cash-out, the screen shows $250 in with final win/loss pending. Review shows $250 in, $350 out and a finalized $100 gain, with the corrected buy-in still visible in history. No account, Trip or Group is needed.
 
@@ -137,4 +136,4 @@ Adapt agreements, funding additions, profit splits, loss allocation and coverage
 
 ### 6. Verification and release readiness
 
-Run the scoped formatting, lint, unused-code, type and test checks required by `AGENTS.md`. Money calculations need unit and property tests; API behavior and migrations need a real seeded Postgres database. Verify the complete recording loop in the actual web and mobile apps, including offline persistence, sync failures, guest permissions, corrections and review. Use the existing authenticated end-to-end flow where it still applies.
+Run the scoped formatting, lint, unused-code, type and test checks required by `AGENTS.md`. Money calculations need unit and property tests; API behavior and migrations need a real seeded Postgres database. Verify the complete recording loop in the actual iOS and Android apps, including offline persistence, sync failures, guest permissions, corrections and review. Use the existing authenticated end-to-end flow where it still applies.

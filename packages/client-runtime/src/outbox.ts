@@ -16,7 +16,7 @@ const Stored = Schema.toCodecJson(Schema.Array(Pending));
 const encode = Schema.encodeSync(Stored);
 const decode = Schema.decodeUnknownSync(Stored);
 
-/** Where the outbox keeps itself between launches: localStorage on web, a file on a phone. */
+/** Where the outbox keeps itself between launches: a file on the device. */
 export interface OutboxStorage {
   readonly load: () => string | null;
   readonly save: (value: string) => void;

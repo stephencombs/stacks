@@ -22,7 +22,7 @@ import { keyboardOverlap, sheetBottomEdge } from "./keyboardInset";
 import { animate, duration, ease, isReducedMotion } from "./motion";
 
 /**
- * A form or confirmation that slides up over the current screen. On Android and the web it is a
+ * A form or confirmation that slides up over the current screen. On Android it is a
  * bottom sheet: as tall as its content up to the screen below the status bar, with a dimmed scrim
  * above that closes it, a grabber, a centred title with a close button, and the main action
  * pinned to the bottom. iOS draws its own in `Sheet.ios.tsx`.

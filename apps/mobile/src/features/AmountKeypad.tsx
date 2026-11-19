@@ -40,7 +40,7 @@ export function AmountKeypad({
   const pressDelete = () => {
     deletePress.current += 1;
     deletedOnPressIn.current = true;
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     releaseRepeat.current?.();
     // Empty is a no-op in the parent, which applies each delete to the latest amount.
     releaseRepeat.current = holdBackspace(() => {
@@ -67,12 +67,12 @@ export function AmountKeypad({
       deletedOnPressIn.current = false;
       return;
     }
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     onKey("back");
   };
 
   const tap = (key: string) => {
-    if (Platform.OS !== "web") void Haptics.selectionAsync();
+    void Haptics.selectionAsync();
     onKey(key);
   };
 

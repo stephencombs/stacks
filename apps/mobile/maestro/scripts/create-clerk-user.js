@@ -9,6 +9,7 @@ const response = http.post("https://api.clerk.com/v1/users", {
   body: JSON.stringify({
     email_address: [email],
     first_name: NAME,
+    last_name: "Test",
     skip_password_requirement: true,
   }),
 });

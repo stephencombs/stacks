@@ -4,10 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./actorKeysIndexedDB": {
-      "types": "./src/actorKeysIndexedDB.ts",
-      "import": "./src/actorKeysIndexedDB.ts"
-    },
     "./api": {
       "types": "./src/api.ts",
       "import": "./src/api.ts"
@@ -71,10 +67,6 @@
     "./recordingStorage": {
       "types": "./src/recordingStorage.ts",
       "import": "./src/recordingStorage.ts"
-    },
-    "./recordingStorageIndexedDB": {
-      "types": "./src/recordingStorageIndexedDB.ts",
-      "import": "./src/recordingStorageIndexedDB.ts"
     },
     "./recordingView": {
       "types": "./src/recordingView.ts",

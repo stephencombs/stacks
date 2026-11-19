@@ -81,7 +81,7 @@ async function load({
     notificationAsync: vi.fn(),
     NotificationFeedbackType: { Error: "error" },
   }));
-  // The browser run's storage: the outbox in localStorage, as on web.
+  // Use the test DOM's storage so the outbox survives a remount.
   vi.doMock("./lib/outbox", () => ({
     outboxStorage: (userId: string) => ({
       load: () => localStorage.getItem(`stacks-outbox-${userId}`),

@@ -100,15 +100,14 @@ function Title({
     [children, context],
   );
   useLayoutEffect(() => {
-    if (Platform.OS !== "web")
-      navigation.setOptions({
-        title: children,
-        ...(Platform.OS === "ios"
-          ? {
-              headerTitle,
-            }
-          : {}),
-      });
+    navigation.setOptions({
+      title: children,
+      ...(Platform.OS === "ios"
+        ? {
+            headerTitle,
+          }
+        : {}),
+    });
   }, [navigation, children, headerTitle]);
   return (
     <View className="gap-1">

@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from "react";
-import { Platform, Pressable, Text, TextInput, View, type TextInputProps } from "react-native";
+import { Text, TextInput, View, type TextInputProps } from "react-native";
 
 import { Icon } from "./Icon";
 import { cn } from "./cn";
@@ -90,79 +90,5 @@ export function Choice<A extends string>({
   labelHidden?: boolean;
   presentation?: "automatic" | "menu";
 }) {
-  if (Platform.OS !== "web")
-    return (
-      <FieldChoice
-        label={label}
-        options={options}
-        value={value}
-        onChange={onChange}
-        labelHidden={labelHidden}
-        presentation={presentation}
-      />
-    );
-  if (options.length <= 4)
-    return (
-      <View className="gap-1.5" accessibilityRole="radiogroup" accessibilityLabel={label}>
-        {labelHidden ? null : <FieldLabel>{label}</FieldLabel>}
-        <View className="flex-row rounded-full bg-fill p-1">
-          {options.map((option) => {
-            const selected = option.value === value;
-            return (
-              <Pressable
-                key={option.value}
-                accessibilityRole="radio"
-                accessibilityLabel={option.label}
-                accessibilityState={{ checked: selected }}
-                onPress={() => onChange(option.value)}
-                className={cn(
-                  "min-h-11 flex-1 items-center justify-center rounded-full px-3 active:scale-[0.98]",
-                  selected && "bg-surface shadow-sm",
-                )}
-              >
-                <Text
-                  numberOfLines={1}
-                  className={cn(
-                    "type-callout",
-                    selected ? "font-semibold text-ink" : "font-medium text-muted",
-                  )}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-    );
-  return (
-    <View className="gap-1.5" accessibilityRole="radiogroup" accessibilityLabel={label}>
-      {labelHidden ? null : <FieldLabel>{label}</FieldLabel>}
-      <View className="overflow-hidden rounded-2xl border border-line bg-surface">
-        {options.map((option, index) => {
-          const selected = option.value === value;
-          return (
-            <Pressable
-              key={option.value}
-              accessibilityRole="radio"
-              accessibilityLabel={option.label}
-              accessibilityState={{ checked: selected }}
-              onPress={() => onChange(option.value)}
-              className="min-h-12 flex-row items-center pl-4 active:bg-fill"
-            >
-              <View
-                className={cn(
-                  "min-h-12 flex-1 flex-row items-center justify-between pr-4",
-                  index > 0 && "border-t border-line",
-                )}
-              >
-                <Text className="type-body text-ink">{option.label}</Text>
-                {selected ? <Icon name="check" color="ink" size={18} /> : null}
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
+  return <FieldChoice {...{ label, options, value, onChange, labelHidden, presentation }} />;
 }

@@ -1,10 +1,10 @@
 # Components
 
-Parts live in `apps/web/src/components/ui` and `apps/mobile/src/components/ui`; `Money` sits one level up and `Chip` in `features`. Check here before writing a `<button>`, `<Pressable>` or a styled `<div>`.
+Parts live in `apps/mobile/src/components/ui`; `Money` sits one level up and `Chip` in `features`. Check here before writing a new `<Pressable>`.
 
 ## Button
 
-Use for an action. Going to another page on web is a `ButtonLink`, which takes the same variants. Floating icon controls use `IconButton`; web navigation uses `IconLink`. They own their round surface (glass, or a filled tonal circle on Android) and require an accessible action label.
+Use for an action. Floating icon controls use `IconButton`. They own their round surface (glass, or a filled tonal circle on Android) and require an accessible action label.
 
 Variants: `primary`, `tint`, `secondary`, `ghost`, `danger`. Sizes: `sm`, `md`, `lg`, plus `xl` on mobile. Nothing else exists.
 
@@ -18,68 +18,31 @@ Is it the single next step on this screen?
       └── Default → secondary, which is what you get with no variant prop
 ```
 
-While a request is in flight, pass `pending`. It shows a spinner and blocks presses. On web it also holds the button's width. Use `disabled` only for an action that isn't available yet. When one request blocks two buttons, only the one the user pressed is `pending`, and the other is `disabled`. The seat dialog is the one exception: its long list of equal choices only disables while a seat saves.
+While a request is in flight, pass `pending`. It shows a spinner and blocks presses. Use `disabled` only for an action that isn't available yet. When one request blocks two buttons, only the one the user pressed is `pending`, and the other is `disabled`. The seat dialog is the one exception: its long list of equal choices only disables while a seat saves.
 
 ```tsx
 // Correct
-<Button type="submit" variant="primary" pending={create.pending}>Start session</Button>
+<Button label="Start session" variant="primary" pending={create.pending} onPress={start} />
 
 // Incorrect: reads as unavailable, not as working, and the swapped label moves the layout
-<Button type="submit" variant="primary" disabled={create.pending}>
-  {create.pending ? "Starting…" : "Start session"}
-</Button>
+<Button label="Start session" variant="primary" disabled={create.pending} onPress={start} />
 ```
 
 Labels name the outcome: "Void entry", not "Confirm".
 
-Press feedback is built in on both clients: the shared press scale and timing. Don't add your own `active:scale` to a `Button` or wrap one in another pressable.
+Press feedback is built in throughout the native apps: the shared press scale and timing. Don't add your own `active:scale` to a `Button` or wrap one in another pressable.
 
-A one-tap write, like a rebuy, keeps its button where it was, so a second tap does it again. Taking it back is an Undo somewhere else: a toast on mobile, and on web a bar floating where the `LiveBar` sits. A button that turns into its own undo makes a double-tap cancel itself. Outside the felt screen, a repeat-amount button reads "Rebuy $300". The felt screen labels the whole row "Rebuy" and uses three equal controls: "+ $100", "+ $200" and "Other". Its undo toast sits above that row.
+A one-tap write, like a rebuy, keeps its button where it was, so a second tap does it again. Taking it back is an Undo somewhere else: a toast on mobile. A button that turns into its own undo makes a double-tap cancel itself. Outside the felt screen, a repeat-amount button reads "Rebuy $300". The felt screen labels the whole row "Rebuy" and uses three equal controls: "+ $100", "+ $200" and "Other". Its undo toast sits above that row.
 
-## Segmented (web), Choice (mobile)
+## Choice and TextField
 
-Pick one of a few options, all in sight. Web `Segmented` lives in its own file, `Segmented.tsx`.
+Use `Choice` for an exclusive value. SwiftUI and Compose use a segmented control when labels fit and a picker otherwise. Use `presentation="menu"` for compact player or counterparty choices. Narrow a page with `FilterChip`.
 
-```
-How do the choices fit?
- ├── A few short labels → web Segmented; native Choice uses a system segmented picker
- └── Long labels or more options → web Select; native Choice uses a menu picker
-```
-
-```tsx
-// Correct
-<Segmented label="Show" options={views} value={view} onChange={setView} />
-
-// Incorrect: a hand-built toggle row repeats the look and drifts from the others
-<div role="group">{views.map((v) => <button aria-pressed={v.key === view}>…</button>)}</div>
-```
-
-On native mobile, `Choice` uses SwiftUI or Compose controls and accounts for label length and text scale. Use `presentation="menu"` for compact player or counterparty selection. The mobile web build retains its custom controls.
-
-A form value from a few short options, where the choice deserves weight, is `RadioCards` on web: `kind` of an entry or venue, the game of a session. Set columns with `className`.
-
-Moving between tabs and pages is the app's navigation (see Navigation below; `PlaceTabs` on mobile), never `Segmented` or `Choice`. The same data at another measure is `Segmented`: the race's Money / % of buy-in. Narrowing a page, such as Stats to a group or a trip, is a `FilterChip`.
-
-## Field, Input, Select (web), TextField (mobile)
-
-Every input has a visible label. A placeholder is an example, not a label.
-
-```tsx
-// Correct: Field wires the label, hint and error to the input
-<Field label="Amount" error={error}>{(props) => <Input {...props} inputMode="decimal" />}</Field>
-
-// Incorrect: nothing connects this label, and the error is color alone
-<label>Amount</label>
-<Input className="border-red-500" />
-```
-
-A yes-or-no option on web is `Checkbox`, wrapped in a `<label>` with its text: the label gives it a name and a bigger target.
-
-An error beside one field goes in `error`. A failure of the whole form, such as the API refusing it, is `FormError`.
+Give each `TextField` a visible label. A field-specific error goes in `error`. A submission error goes in `FormError`.
 
 ## Surface, List, Row
 
-`Surface` is a solid card on the page: `surface` fill, no border, the card shadow. A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the hairline dividers, and `Row` the padding. On web, a row that goes somewhere is `RowLink`, which adds the pressed state and a chevron, a row that acts in place (Stats' rows apply a filter) is `RowButton`, and a row's main text is `RowText`: a `title`, a quieter `meta` line, and `struck` for something voided. On mobile, a pressable `Row` takes `onPress`.
+`Surface` is a solid card on the page: `surface` fill, no border, the card shadow. A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the hairline dividers, and `Row` the padding. A pressable `Row` takes `onPress`.
 
 A row runs chip, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` text, not display type.
 
@@ -93,11 +56,11 @@ A place can open on one hero card: the figure that place exists to show, big eno
 
 One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure.
 
-On web, a hero is a `Surface` with `Glow` inside it in the tone of the figure (`win`, `loss`, `ink`, or `felt` while live). On mobile, hero cards are **glow-free** `rounded-[22px] bg-surface p-4` cards with no border (`emil-unslop-design`: no decorative radial `Glow` blobs behind the figure). An uppercase `type-label text-muted` kicker (`RESULT · ALL TIME`, `TRIP TOTAL`) sits over the `type-hero` `Money` figure (`money-hero`, 44px), followed by a `type-footnote text-muted` subtitle (`Across 14 sessions`), the clean chart (`rx={4}` rounded-cap vertical session bars or running `RaceChart` lines), bottom-corner date range labels (`Oct 11` … `Nov 9`), and an inline color-dot legend along the bottom edge. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`) so both clients say the same thing.
+Hero cards are **glow-free** `rounded-[22px] bg-surface p-4` cards with no border (`emil-unslop-design`: no decorative radial `Glow` blobs behind the figure). An uppercase `type-label text-muted` kicker (`RESULT · ALL TIME`, `TRIP TOTAL`) sits over the `type-hero` `Money` figure (`money-hero`, 44px), followed by a `type-footnote text-muted` subtitle (`Across 14 sessions`), the clean chart (`rx={4}` rounded-cap vertical session bars or running `RaceChart` lines), bottom-corner date range labels (`Oct 11` … `Nov 9`), and an inline color-dot legend along the bottom edge. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`).
 
 ## Charts
 
-Every chart that compares players draws the same way: lines start at break-even, a dashed `line-strong` rule; the line you're following is `ink`, 3px with a halo on its current point; everyone else is `muted` at 45%; each line ends on a dot and the player's initial, spread apart with `spreadLabels` so none overlap. No chip colors on lines: the chip next to a name is identity, the ink line is focus. Scales come from `@stacks/client-runtime/chart` and draw per platform, SVG on web and `react-native-svg` on mobile.
+Every chart that compares players draws the same way: lines start at break-even, a dashed `line-strong` rule; the line you're following is `ink`, 3px with a halo on its current point; everyone else is `muted` at 45%; each line ends on a dot and the player's initial, spread apart with `spreadLabels` so none overlap. No chip colors on lines: the chip next to a name is identity, the ink line is focus. Scales come from `@stacks/client-runtime/chart` and draw with `react-native-svg`.
 
 Players at very different stakes would flatten each other, so:
 
@@ -105,32 +68,24 @@ Players at very different stakes would flatten each other, so:
 - **A race can compare stakes fairly.** The running result in Stats has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
 - **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
 
-## Navigation: AppShell, TabLink, LiveBar (web); PlaceTabs, LiveBar (mobile)
+## Navigation: PlaceTabs and LiveBar
 
 Where content lives is decided in [docs/internals/navigation.md](../internals/navigation.md). Every page sits in the four tabs, Play, Stats, Map and Crew, except the ones that fill the screen: a live session, a shared table's links and an invitation. Those use `PersonalFrame` (`features/Personal.tsx`): the wordmark and You, with nothing read from an account. A full-screen page's main actions go in its `Dock`, pinned above the home indicator on a phone and in the page's flow from `sm` up. Save state is `SaveStatus`, which only ever says "Saved on this device" after the device has it.
-
-On web, `AppShell` (`features/Shell.tsx`) draws the tabs with **`TabLink`** (`ui/Nav.tsx`): `layout="bar"` stacks icon over label in the bottom bar below `lg`; `layout="side"` is a sidebar row above it. The current tab is `ink`, the rest `muted`. Below `lg` the bottom bar is glass, so the page shows through it as it scrolls. The shell reads nothing from an account or the network, so it opens offline and signed out; Crew asks for sign-in inside the tab. A tab page's main actions go in an `ActionBar`, which sits above the bottom bar. You opens from the avatar. `LiveBar` floats above the tabs while you're playing, in glass: your own session first, and on Crew's pages your seat at a group's table. The bottom actions above the tabs (`ActionBar`, `Dock`) stay solid.
 
 On mobile, keep React Navigation native-stack, one stack per tab. Both platforms use native bottom tabs. On iOS they bring their own Liquid Glass, beside grouped native header actions. On Android they're Material's navigation bar, with Material Symbols from `assets/tab-icons` that a config plugin turns into drawables. The `LiveBar`, the You button and an `IconButton` are glass on iOS; on Android they're a solid surface and filled tonal circles. Both bars sit over the foot of the screens, so screens learn their height from `TabBarHeight` and keep content and docks clear of it: `useScreenFoot` (`components/ui/tabBar.ts`) gives a screen every number at its foot: where its list ends, the footer's inset, and where the FAB and LiveBar sit. Don't redo that arithmetic in a screen. iOS's bar is glass, so a list scrolls under it; Android's is opaque, so a list ends above it and nothing can be tapped through the bar. Screens also reserve the measured LiveBar height.
 
 See [mobile controls](mobile-redesign.md) for platform selection, native sheet sizing and chart interaction.
 
-Groups, trips and sessions are pushed onto Crew. They take a `BackLink` in `PageHeader`'s `back` (or the stack's back button on mobile). The back slot only ever goes back.
+Groups, trips and sessions are pushed onto Crew. Use the stack's back button. The back slot only ever goes back.
 
-## Wide screens (web)
+## PageTitle and SectionHeading
 
-Pages keep the 672px reading column beside the sidebar, the trip included.
-
-## PageHeader, Section, Note (web); PageTitle, SectionHeading, AccordionSectionHeading (mobile)
-
-One page title per page. On web that's `PageHeader`, which also takes the `back` link, an `options` menu, a `tag`, an `action` and `children` for what sits under the title (a session's notes), and sets the browser tab's title. `context` is the line saying where the page sits, or what it covers: "Poker · Sat 12 Oct". A trip is titled with the trip, through `TripHeader`, which carries the trip's ⋯ menu and a **Stats** link (`StatsLink`, which opens Stats with the group and trip picked).
-
-Each group of content is a `Section` on web (`title`, plus an `action` or a quiet `aside`) and a `SectionHeading` on mobile (`components/ui/Surface.tsx`). Mobile `SectionHeading` has two variants:
+Use one `PageTitle` per page. Section headings have two variants:
 
 1. **Grouped Card Header (`SectionHeading`)**: Sentence-case `type-section text-muted` label over a borderless `rounded-[22px]` `Surface` card (`Recent sessions`, `People`), with its count or a link such as See all at the right. No rule beside it.
 2. **Inline-Rule Header (`AccordionSectionHeading`)**: Sentence-case `type-section text-muted` label (with optional count, e.g. `Finished (16)`) followed by a `flex-1 h-[0.5px] bg-line` horizontal separator rule and optional collapse chevron for collapsible feed sections.
 
-A section's action is a `ghost` or `sm` button or a `Segmented`. Supporting text on web is `Note`.
+A section's action is a `ghost` or `sm` button or a `Choice`.
 
 ## Tag vs. Badge
 
@@ -148,24 +103,24 @@ Every amount goes through `Money`, the hero figures included, except the compact
 <Money amount={result.net} currency={currency} tone="result" />
 
 // Incorrect: loses the sign, the figures and the color rule
-<span className="text-win">${result.net / 100}</span>
+<Text className="text-win">${result.net / 100}</Text>
 ```
 
 ## Chip
 
-A player's identity: `chip` comes from `chipOf(group, playerId)`. Pair it with the player's name. Size 28 in web rows, `28×28px` (`rounded-lg` monogram/color badge) in mobile feed and breakdown rows, and smaller in dense lists and awards.
+A player's identity: `chip` comes from `chipOf(group, playerId)`. Pair it with the player's name. Use `28×28px` (`rounded-lg` monogram/color badge) in mobile feed and breakdown rows, and smaller in dense lists and awards.
 
 ## Page actions
 
-On phones, keep a live session's Buy in / Rebuy and Cash out above the places, labeled with the player they affect. Desktop keeps these in the seat card. Keep Undo separate and above the buttons so a second tap still rebuys.
+On phones, keep a live session's Buy in / Rebuy and Cash out above the places, labeled with the player they affect. Keep Undo separate and above the buttons so a second tap still rebuys.
 
-A long form's submit action stays visible: use `ActionBar` on web and `Screen`'s `renderFooter` on mobile. Keep the live-session return link above the submit action when it appears on the same screen.
+A long form's submit action stays visible: use `Screen`'s `renderFooter`. Keep the live-session return link above the submit action when it appears on the same screen.
 
-## Dialog (web), Sheet (mobile)
+## Sheet
 
-On a phone, a web `Dialog` is a glass sheet: edge to edge, rounded on top only, over the `scrim`, sliding up on the sheet's timing. From `sm` up it's a centered glass dialog on the menu's timing. On iOS, `Sheet` is the system's sheet, with its own material and motion. On Android it is a bottom sheet we draw: as tall as its content up to the screen below the status bar, 28dp top corners, a grabber, a scrim above it that closes it, and the keyboard clearing its footer.
+On iOS, `Sheet` is the system's sheet, with its own material and motion. On Android it is a bottom sheet we draw: as tall as its content up to the screen below the status bar, 28dp top corners, a grabber, a scrim above it that closes it, and the keyboard clearing its footer.
 
-Keep a form's submit action and submission errors in `footer`, outside the scrolling fields. Secondary outcomes stay in the body so the keyboard leaves room for inputs. A web submit button in the footer links to its form with the `form` attribute.
+Keep a form's submit action and submission errors in `footer`, outside the scrolling fields. Secondary outcomes stay in the body so the keyboard leaves room for inputs.
 
 A screen's main actions go in a `PinnedFooter` (the `dock` of `PersonalScreen`, the `renderFooter` of `Screen`). On Android it is a `canvas` block with a hairline top edge (AndFinished), so nothing scrolled behind it, nor the LiveBar, shows through. A floating action goes through `fab`, which keeps its content's width.
 
@@ -173,40 +128,35 @@ On Android, `confirmAction` shows a Material 3 alert dialog from `ConfirmDialogH
 
 Use native action menus for short choices and confirmations for destructive outcomes. iOS Sheet uses native detents and title/close controls; pass `busy` while saving to prevent dismissal. A reason field stays in a form sheet. The title says what's being decided, and a confirmation names the outcome on its button. Keep the safe choice beside it: "Keep it" and "Void entry".
 
-## Menu, MenuItem, MenuChoice (web); ActionMenu (mobile)
+## ActionMenu
 
-Secondary actions behind "…", with destructive items as `tone="danger"`. On web the menu is glass and scales from its trigger on the menu's timing; on mobile `ActionMenu` is the system menu (on Android, Material's dropdown drawn from the tokens through `MenuView`). If a section's main action sits in a menu, promote it to a `Button`.
+Secondary actions behind "…", with destructive items as `tone="danger"`. `ActionMenu` is the system menu (on Android, Material's dropdown drawn from the tokens through `MenuView`). If a section's main action sits in a menu, promote it to a `Button`.
 
-A page-level destructive action, like deleting a trip, goes in the menu and opens a `Dialog`, where the confirming button is `danger`. A `danger` button sitting in the open beside the primary competes with it.
+A page-level destructive action, like deleting a trip, goes in the menu and opens `confirmAction`. A `danger` button sitting in the open beside the primary competes with it.
 
-## GlassSurface (mobile), glass (web)
+## GlassSurface
 
-The one way to draw glass. Use it only on the parts [Glass](foundations.md#glass) lists. On web it's the `glass` or `glass-sheet` class on the part's own element. On mobile wrap the content in `GlassSurface`, inside a `PressableScale` when the whole surface is a control, and pass `interactive` so iOS glass answers the touch. On Android `GlassSurface` is a solid `raised` surface with a shadow, and a round icon control's surface is `ControlSurface`, a filled tonal circle.
+The one way to draw glass. Use it only on the parts [Glass](foundations.md#glass) lists. Wrap the content in `GlassSurface`, inside a `PressableScale` when the whole surface is a control, and pass `interactive` so iOS glass answers the touch. On Android `GlassSurface` is a solid `raised` surface with a shadow, and a round icon control's surface is `ControlSurface`, a filled tonal circle.
 
-## Toast (mobile), Undo bar (web)
+## Toast
 
 A one-tap write's Undo. Solid, not glass, with the float shadow, entering and leaving on the toast's timing. One shows at a time; a new one replaces it.
 
 ## FilterChip
 
-A filter that narrows a page, such as Stats' period, game and casino: a pill naming the current choice that opens the choices. An applied filter fills with `ink` and gains a button that clears it. Web builds it on `Menu`; mobile uses the platform's own menu (`FilterChip.native.tsx`) and a `Sheet` in the web build. A row of chips scrolls sideways and ends with "Reset all" once any is applied.
-
-## CopyButton (web)
-
-Copies a link or code and confirms it. Use it instead of writing to the clipboard from a screen.
+A filter that narrows a page, such as Stats' period, game and casino: a pill naming the current choice that opens the choices. An applied filter fills with `ink` and gains a button that clears it. Use the platform menu. A row of chips scrolls sideways and ends with "Reset all" once any is applied.
 
 ## EmptyState
 
-`EmptyState` says what's missing and what to do: "No matching sessions" or "No sessions on this trip yet", then a `text-muted` sentence explaining what appears here or how to start. On mobile it centers vertically in the available viewport (`flex-1 items-center justify-center px-8`) with a bold sentence-case heading, muted body copy, and an optional pill `action`; on web it sits beside the page's own action. Never "No data". It's in `Page.tsx` on web and `Surface.tsx` on mobile.
+`EmptyState` says what's missing and what to do: "No matching sessions" or "No sessions on this trip yet", then a `text-muted` sentence explaining what appears here or how to start. On mobile it centers vertically in the available viewport (`flex-1 items-center justify-center px-8`) with a bold sentence-case heading, muted body copy, and an optional pill `action`. Never "No data". It's in `Surface.tsx`.
 
 ## Loading
 
 A page waits in its own shape, then appears once, whole, and nothing on it moves after.
 
-- **Skeletons are the page, unfilled.** Use the page skeletons in `PageSkeletons.tsx` (web) and `ScreenSkeletons.tsx` (mobile): the same header, cards, rows and gaps as the real page, with `SkeletonText` bars sitting in line boxes the height of the text they replace. Never one tall `Skeleton` block for a whole page; a page that doesn't have a skeleton yet gets one built from those parts.
+- **Skeletons are the page, unfilled.** Use the page skeletons in `ScreenSkeletons.tsx`: the same header, cards, rows and gaps as the real page, with `SkeletonText` bars sitting in line boxes the height of the text they replace. Never one tall `Skeleton` block for a whole page; a page that doesn't have a skeleton yet gets one built from those parts.
 - **One wait, not a staircase.** A page that needs several queries passes the same skeleton to each stage. Trip pages use `TripLoaded`, which starts the trip and group requests together and paints once they're all in. `Prefetch` starts a query early; `Settled` waits on one without failing the page when it fails.
 - **Nothing pops in above content.** Anything the page shows near the top waits with the page (the group does), rather than arriving after it and pushing everything down. Something that loads on its own further down reserves its height (`RowsSkeleton rows={1}` for a single row).
 - **Once loaded, never blank again.** Queries behave like TanStack Query's defaults: whatever a page loaded stays cached for five minutes after nothing shows it (`CACHE_MS`, the atom registry's default lifetime), so going back to a page shows it at once. Data older than 30 seconds (`STALE_MS`) refetches in the background when a page mounts, when the window regains focus or comes back online, and on mobile when the app returns to the foreground, while the old copy stays on screen. A refresh or a write's refetch keeps showing the previous data; only a first load ever shows a skeleton. `Loaded` does all of this; don't read a query's result without it unless you mean to.
-- **Slow loads only.** Web skeletons fade in after 300ms measured from the navigation, so a quick load goes straight from the last page to this one with no grey flash.
 - **Display type doesn't jump.** Until Barlow Condensed loads, web sets display text in a fallback face scaled to Barlow's width and line box (`Barlow Condensed Fallback` in `index.css`). If the display font changes, recalibrate it.
 - **The frame stays put.** `AppShell` renders once and never waits on a page, and page skeletons cover the content column only.
