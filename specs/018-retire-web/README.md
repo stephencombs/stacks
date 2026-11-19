@@ -85,13 +85,17 @@ Executing after PRs `#101` (spec `006`, Crew tab) and `#102` (spec `011`, group 
 
 ## Test
 
-- [ ] Deep links `stacks://t/:token`, `stacks://invite/:token`, `stacks://join/:code`, and `stacks://claim/:code` open and complete signed-out/signed-in flows on Android
+- [x] Deep links `stacks://t/:token`, `stacks://invite/:token`, `stacks://join/:code`, and `stacks://claim/:code` open and complete signed-out/signed-in flows on Android
 - [x] `pnpm fmt:check && pnpm lint && pnpm knip && pnpm typecheck && pnpm test` passes with zero web workspaces or Playwright deps
 - [x] `pnpm --filter @stacks/api test` (Postgres) and `pnpm --filter @stacks/api build` pass without `apps/web/dist`
 - [x] `pnpm --filter @stacks/mobile build` (`expo export --platform ios --platform android`) succeeds and native simulator E2E passes
-- [ ] PR preview workflow deploys an API-only Worker + Neon branch and `/api/health` responds 200
+- [x] PR preview workflow deploys an API-only Worker + Neon branch and `/api/health` responds 200
 
 iOS device verification was waived. Both native exports and the API dry run pass. The isolated
 API Worker returns 200 for `/api/health` and 404 for `/`. Android passed the solo recording,
 shared table, and signed-in Crew flows against an isolated test API. Crew also opened a guest
-claim link and verified the existing-member guard. The hosted PR preview still needs a run.
+claim link and verified the existing-member guard. A second test account joined a group from
+its invite link. A fresh install redeemed a personal table invite and showed the player's live
+session. The [hosted preview](https://github.com/stephencombs/stacks/actions/runs/44613921877)
+deployed an API-only Worker and Neon branch for PR #111. Its `/api/health` returned 200 and its
+root returned 404.
