@@ -1,6 +1,11 @@
 import { useAuth } from "@clerk/expo";
 import { InviteId, UserId, type GroupDetail, type Player } from "@stacks/contracts";
-import { formatDay, isFormerMember, isGuest } from "@stacks/client-runtime/format";
+import {
+  distinctPlayerNames,
+  formatDay,
+  isFormerMember,
+  isGuest,
+} from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { useState } from "react";
@@ -28,6 +33,9 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
   const members = detail.players.filter((player) => player.role !== null);
   const guests = detail.players.filter(isGuest);
   const former = detail.players.filter(isFormerMember);
+  const names = distinctPlayerNames(
+    [...members, ...guests, ...former].map((player) => [player.id, player.displayName]),
+  );
   const canManage = (player: Player) =>
     player.userId !== null &&
     player.userId !== userId &&
@@ -53,7 +61,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
                 <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
                 <View className="flex-1">
                   <Text numberOfLines={1} className="text-base text-ink">
-                    {player.displayName}
+                    {names.get(player.id)}
                     {player.id === detail.myPlayerId ? (
                       <Text className="text-muted"> · you</Text>
                     ) : null}
@@ -90,7 +98,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
                 <Row key={player.id} className="flex-wrap">
                   <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
                   <View className="flex-1 basis-32">
-                    <Text className="text-base text-ink">{player.displayName}</Text>
+                    <Text className="text-base text-ink">{names.get(player.id)}</Text>
                   </View>
                   <View className="ml-auto flex-row items-center gap-2">
                     {player.claimCode ? (
@@ -117,7 +125,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
         <View className="gap-2">
           <SectionHeading>Former members</SectionHeading>
           <Text className="text-sm text-muted">
-            {former.map((player) => player.displayName).join(", ")}. Their history stays in the
+            {former.map((player) => names.get(player.id)).join(", ")}. Their history stays in the
             ledger.
           </Text>
         </View>

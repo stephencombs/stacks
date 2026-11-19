@@ -182,6 +182,22 @@ it("tells two players with the same name apart", async () => {
   expect(table.seats.map((seat) => seat.name)).toEqual(["Priya", "Priya 2"]);
 });
 
+it("keeps the same label when a player returns to the table", async () => {
+  const store = await open();
+  const first = await save(store, { type: "start", buyIn: 20000, startedAt: at(21) });
+  const tableId = state(store).tables[0]!.id;
+  await save(store, { type: "finish", visitId: visitOf(first), amount: 20000, finishedAt: at(22) });
+  await save(store, {
+    type: "join_table",
+    tableId,
+    playerId: state(store).self.id,
+    buyIn: 10000,
+    startedAt: at(23),
+  });
+  const table = liveTable(recordingTable(state(store), tableId)!, undefined);
+  expect(table.seats.map((seat) => seat.name)).toEqual(["You", "You"]);
+});
+
 describe("tableActions", () => {
   it("gives each role only what its permissions allow, and never names the role", () => {
     const live = { playing: true, closed: false, empty: false };

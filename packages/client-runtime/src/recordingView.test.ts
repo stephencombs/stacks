@@ -248,7 +248,7 @@ describe("parsePastSessionTimes", () => {
 
   it("reads local times and rolls a finish past midnight into the next day", () => {
     const result = parsePastSessionTimes(
-      { date: "2026-11-06", start: "21:30", finish: "01:15" },
+      { date: "2026-11-06", start: "21:30", finish: "01:15", finishNextDay: true },
       now,
     );
     expect(result.error).toBeNull();
@@ -270,6 +270,12 @@ describe("parsePastSessionTimes", () => {
   it("refuses a finish at the start, which would be a 0-minute session", () => {
     expect(
       parsePastSessionTimes({ date: "2026-11-06", start: "21:30", finish: "21:30" }, now),
+    ).toMatchObject({ field: "finish", errors: { finish: "Finish after the start." } });
+  });
+
+  it("refuses an earlier time on the same day", () => {
+    expect(
+      parsePastSessionTimes({ date: "2026-11-06", start: "21:30", finish: "01:15" }, now),
     ).toMatchObject({ field: "finish", errors: { finish: "Finish after the start." } });
   });
 

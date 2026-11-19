@@ -1,4 +1,4 @@
-import { formatTime, tellApart } from "@stacks/client-runtime/format";
+import { distinctPlayerNames, formatTime } from "@stacks/client-runtime/format";
 import {
   usePlayerInvite,
   useRecordingSubmit,
@@ -43,6 +43,9 @@ export function TableSection({
   const [open, setOpen] = useState<"add" | "share" | "settings" | null>(null);
   if (!table) return null;
   if (table.role === "participant") return <JoinedTableSection tableId={tableId} onOpen={onOpen} />;
+  const names = distinctPlayerNames(
+    table.visits.map((item) => [item.player.id, item.isSelf ? "You" : item.player.displayName]),
+  );
   const others = table.visits.some((item) => !item.isSelf);
   const signedOut = account.available && account.isLoaded && !account.isSignedIn;
   return (
@@ -63,9 +66,7 @@ export function TableSection({
             accessibilityHint="Opens their session"
           >
             <View className="min-w-0 flex-1 gap-0.5">
-              <Text className="font-medium text-ink">
-                {item.isSelf ? "You" : item.player.displayName}
-              </Text>
+              <Text className="font-medium text-ink">{names.get(item.player.id)}</Text>
               <Text className="text-sm text-muted">
                 {item.finalResult === null
                   ? `Playing since ${formatTime(item.visit.startedAt)}`
@@ -226,6 +227,7 @@ function JoinedTableSection({
       .filter((item) => item.visit.playerId !== table.you.player.id)
       .map((item) => ({ ...item, name: names.get(item.visit.playerId) ?? "Player", mine: false })),
   ];
+  const labels = distinctPlayerNames(rows.map((item) => [item.visit.playerId, item.name]));
   return (
     <View className="gap-2">
       <SectionHeading
@@ -245,7 +247,7 @@ function JoinedTableSection({
               : {})}
           >
             <View className="min-w-0 flex-1 gap-0.5">
-              <Text className="font-medium text-ink">{item.name}</Text>
+              <Text className="font-medium text-ink">{labels.get(item.visit.playerId)}</Text>
               <Text className="text-sm text-muted">
                 {item.finalResult === null
                   ? `Playing since ${formatTime(item.visit.startedAt)}`
@@ -291,7 +293,9 @@ export function TableSettingsSheet({
       table.visits.filter((item) => !item.isSelf).map((item) => [item.player.id, item.player]),
     ).values(),
   ];
-  const playerLabels = tellApart(players.map((player) => player.displayName));
+  const playerLabels = distinctPlayerNames(
+    players.map((player) => [player.id, player.displayName]),
+  );
   const recorders = new Set(table.recorders.map((player) => player.id));
   const names = new Map(server?.players.map((player) => [player.id, player.displayName]));
   const toggle = (playerId: PlayerId) =>
@@ -332,10 +336,10 @@ export function TableSettingsSheet({
                 </Text>
               ) : (
                 <List>
-                  {players.map((player, index) => (
+                  {players.map((player) => (
                     <Row key={player.id}>
                       <Text className="min-w-0 flex-1 font-medium text-ink">
-                        {playerLabels[index]}
+                        {playerLabels.get(player.id)}
                       </Text>
                       <Button
                         label="Invite this player"

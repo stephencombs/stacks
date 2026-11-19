@@ -2,7 +2,7 @@ import { MinorUnits, type PlayerId, type TableView, type VisitId } from "@stacks
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 
-import { formatTime, tellApart } from "./format.ts";
+import { distinctPlayerNames, formatTime } from "./format.ts";
 import { RECORDING_CURRENCY, type RecordingTableView } from "./recordingView.ts";
 
 /** One player's visit at the table, as the live screen lists it. */
@@ -63,8 +63,11 @@ export const liveTable = (
           isSelf: false,
         }));
   const listed = [...local, ...remote];
-  const named = tellApart(listed.map((item) => item.name));
-  const all = listed.map((item, index) => ({ ...item, name: named[index]! }));
+  const named = distinctPlayerNames(listed.map((item) => [item.summary.visit.playerId, item.name]));
+  const all = listed.map((item) => ({
+    ...item,
+    name: named.get(item.summary.visit.playerId)!,
+  }));
   const first = all
     .map((item) => item.summary.visit.startedAt)
     .toSorted((a, b) => ms(a) - ms(b))[0];
