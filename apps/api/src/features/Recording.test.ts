@@ -343,4 +343,40 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       ]);
     }),
   );
+
+  it.effect("stores, edits, and returns custom names for Other games", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const identity = device();
+      const opened = RecordingCommand.make({
+        ...start(identity),
+        game: "other",
+        gameName: "  Ultimate Texas Hold'em  ",
+      }) as Extract<RecordingCommand, { type: "start" }>;
+      const pushed = yield* alex.recording.push({ payload: { identity, commands: [opened] } });
+      expect(pushed.results.map((result) => result.status)).toEqual(["accepted"]);
+
+      const loaded = yield* alex.recording.history();
+      expect(loaded.tables).toMatchObject([
+        { id: opened.tableId, game: "other", gameName: "Ultimate Texas Hold'em" },
+      ]);
+
+      const renamed = RecordingCommand.make({
+        type: "edit_visit",
+        operationId: RecordingOperationId.make(uuid()),
+        actorId: identity.actorId,
+        preparedAt: at(25),
+        visitId: opened.visitId,
+        expectedRevision: 0,
+        table: { game: "other", gameName: "Mississippi Stud", venueId: null, highLimit: true },
+      });
+      const edited = yield* alex.recording.push({ payload: { identity, commands: [renamed] } });
+      expect(edited.results.map((result) => result.status)).toEqual(["accepted"]);
+
+      const afterEdit = yield* alex.recording.history();
+      expect(afterEdit.tables).toMatchObject([
+        { id: opened.tableId, game: "other", gameName: "Mississippi Stud", highLimit: true },
+      ]);
+    }),
+  );
 });

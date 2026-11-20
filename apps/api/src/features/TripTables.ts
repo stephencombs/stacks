@@ -152,6 +152,7 @@ export const load = Effect.fn("TripTables.load")(function* (
             id: row.id,
             tripId: row.tripId,
             game: row.game,
+            ...(row.gameName === null ? {} : { gameName: row.gameName }),
             venueId: row.venueId,
             highLimit: row.highLimit,
             starterPlayerId: row.starterPlayerId,

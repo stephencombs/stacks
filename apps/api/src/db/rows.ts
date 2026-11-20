@@ -159,6 +159,7 @@ export const TableRow = Schema.Struct({
   id: TableId,
   starterPlayerId: Schema.NullOr(PlayerId),
   game: Schema.NullOr(Game),
+  gameName: Schema.NullOr(Schema.String),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
   shareTokenHash: Schema.NullOr(Schema.String),

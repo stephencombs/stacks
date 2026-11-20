@@ -38,6 +38,7 @@ type StartInput = {
   readonly buyIn: number;
   readonly startedAt?: DateTime.Utc;
   readonly game?: Game;
+  readonly gameName?: string | null;
   readonly venueId?: VenueId;
   readonly highLimit?: boolean;
 };
@@ -47,6 +48,7 @@ export type RecordingInput =
       /** A table to record at without playing. */
       readonly type: "open_table";
       readonly game?: Game;
+      readonly gameName?: string | null;
       readonly venueId?: VenueId;
       readonly highLimit?: boolean;
     }
@@ -143,6 +145,7 @@ export const prepareRecordingCommand = (
       buyIn: MinorUnits.make(input.buyIn),
       startedAt: input.startedAt ?? preparedAt,
       game: input.game ?? null,
+      ...(input.gameName === undefined ? {} : { gameName: input.gameName }),
       venueId: input.venueId ?? null,
       highLimit: input.highLimit ?? false,
     };
@@ -186,6 +189,7 @@ export const prepareRecordingCommand = (
       tableId: TableId.make(newId()),
       playerId: state.self.id,
       game: input.game ?? null,
+      ...(input.gameName === undefined ? {} : { gameName: input.gameName }),
       venueId: input.venueId ?? null,
       highLimit: input.highLimit ?? false,
     });

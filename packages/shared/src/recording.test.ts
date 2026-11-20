@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { EntryId, MinorUnits, PlayerId, PlayerIdentity, VisitId } from "@stacks/contracts";
+import { EntryId, MinorUnits, PlayerId, PlayerIdentity, TableId, VisitId } from "@stacks/contracts";
 import { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
@@ -517,4 +517,53 @@ it("keeps a table someone played at, even after they deleted their visit, and re
     tables: played.tables.map((table) => ({ ...table, deletedAt: at(40) })),
   };
   expect(() => change(gone, "restore_visit")).toThrow("This table was deleted");
+});
+
+it("stores a trimmed custom game name only for Other and enforces the 60-character cap", () => {
+  const custom = applyRecordingCommand(
+    initial(),
+    RecordingCommand.make({
+      ...common(),
+      type: "start",
+      tableId: visit.tableId,
+      visitId: visit.id,
+      playerId: visit.playerId,
+      buyInId: EntryId.make(uuid()),
+      buyIn: MinorUnits.make(20000),
+      startedAt: at(0),
+      game: "other",
+      gameName: "  Pai Gow Tiles  ",
+      venueId: null,
+      highLimit: false,
+    }),
+  );
+  expect(custom.tables[0]?.gameName).toBe("Pai Gow Tiles");
+
+  const switched = applyRecordingCommand(
+    custom,
+    RecordingCommand.make({
+      ...common(),
+      type: "edit_visit",
+      visitId: visit.id,
+      expectedRevision: 0,
+      table: { game: "blackjack", gameName: "Pai Gow Tiles", venueId: null, highLimit: false },
+    }),
+  );
+  expect(switched.tables[0]?.gameName).toBeUndefined();
+
+  expect(() =>
+    applyRecordingCommand(
+      initial(),
+      RecordingCommand.make({
+        ...common(),
+        type: "open_table",
+        tableId: TableId.make(uuid()),
+        playerId: visit.playerId,
+        game: "other",
+        gameName: "x".repeat(61),
+        venueId: null,
+        highLimit: false,
+      }),
+    ),
+  ).toThrow("Keep the game name to 60 characters.");
 });

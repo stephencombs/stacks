@@ -42,6 +42,7 @@ const visit = {
 const start = {
   ...visit,
   game: Schema.NullOr(Game),
+  gameName: Schema.optionalKey(Schema.NullOr(Schema.String)),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
 };
@@ -62,6 +63,7 @@ export type RecordingReplacement = typeof RecordingReplacement.Type;
 
 export const TableDetails = Schema.Struct({
   game: Schema.NullOr(Game),
+  gameName: Schema.optionalKey(Schema.NullOr(Schema.String)),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
 });
@@ -77,6 +79,7 @@ export const RecordingCommand = Schema.Union([
     tableId: TableId,
     playerId: PlayerId,
     game: Schema.NullOr(Game),
+    gameName: Schema.optionalKey(Schema.NullOr(Schema.String)),
     venueId: Schema.NullOr(VenueId),
     highLimit: Schema.Boolean,
   }),
