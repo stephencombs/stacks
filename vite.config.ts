@@ -9,7 +9,6 @@ const GENERATED = [
   ".wrangler",
   ".alchemy",
   "packages/client-runtime/src/tableArt.ts",
-  "apps/mobile/src/features/tableImages.ts",
   "apps/mobile/ios/**",
   "apps/mobile/android/**",
   "apps/mobile/.expo/**",

@@ -158,7 +158,7 @@ export function GroupStatsView({
             title="No finished sessions yet"
             body={`When someone finishes a session in ${name}, everyone’s results will appear here.`}
             button="Start a group session"
-            onPress={() => (activeTrip ? go.newSession(activeTrip) : go.group(groupId))}
+            onPress={() => (activeTrip ? go.trip(activeTrip) : go.group(groupId))}
             note="Only play recorded in this group counts here."
           />
         ) : (

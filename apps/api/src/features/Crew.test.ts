@@ -5,6 +5,12 @@ import type { CrewActivityItem, EntryId, PlayerId, SessionId, TripId } from "@st
 
 import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
+import {
+  finishHistoricalSession,
+  seedEntry,
+  seedSession,
+  voidHistoricalEntry,
+} from "../testing/legacySessions.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
@@ -18,32 +24,32 @@ const startSession = Effect.fn("test.startSession")(function* (
 ) {
   const venue = yield* catalogVenue(client);
   const id = ids.session();
-  yield* client.sessions.create({
-    params: { tripId },
-    payload: { id, venueId: venue.id, game: "blackjack", playerIds, notes: null, startedAt },
+  yield* seedSession(tripId, {
+    id,
+    venueId: venue.id,
+    game: "blackjack",
+    playerIds,
+    notes: null,
+    startedAt,
   });
   return id;
 });
 
 const buyIn = Effect.fn("test.buyIn")(function* (
-  client: Client,
   sessionId: SessionId,
   playerId: PlayerId,
   amount: number,
   replacesEntryId: EntryId | null = null,
 ) {
   const id = ids.entry();
-  yield* client.ledger.addEntry({
-    params: { sessionId },
-    payload: {
-      id,
-      kind: "buy_in",
-      playerId,
-      counterpartyId: null,
-      amount: usd(amount),
-      note: null,
-      replacesEntryId,
-    },
+  yield* seedEntry(sessionId, {
+    id,
+    kind: "buy_in",
+    playerId,
+    counterpartyId: null,
+    amount: usd(amount),
+    note: null,
+    replacesEntryId,
   });
   return id;
 });
@@ -80,16 +86,13 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
       const alexInReno = reno.players.find((p) => p.id !== reno.myPlayerId)!.id;
 
       const finished = yield* startSession(alex, vegas.tripId, [vegas.myPlayerId, beaId], day(1));
-      yield* buyIn(alex, finished, vegas.myPlayerId, 1000);
-      yield* alex.sessions.close({
-        params: { sessionId: finished },
-        payload: {
-          endedAt: day(2),
-          cashOuts: [
-            { id: ids.entry(), playerId: vegas.myPlayerId, amount: usd(2500) },
-            { id: ids.entry(), playerId: beaId, amount: usd(0) },
-          ],
-        },
+      yield* buyIn(finished, vegas.myPlayerId, 1000);
+      yield* finishHistoricalSession(finished, {
+        endedAt: day(2),
+        cashOuts: [
+          { id: ids.entry(), playerId: vegas.myPlayerId, amount: usd(2500) },
+          { id: ids.entry(), playerId: beaId, amount: usd(0) },
+        ],
       });
       const live = yield* startSession(cal, reno.tripId, [alexInReno], day(3));
 
@@ -196,20 +199,17 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
       const group = yield* groupWith(alex, bea);
       const beaId = group.players.find((p) => p.id !== group.myPlayerId)!.id;
       const sessionId = yield* startSession(alex, group.tripId, [group.myPlayerId, beaId], day(1));
-      const mistake = yield* buyIn(alex, sessionId, group.myPlayerId, 1000);
-      yield* buyIn(alex, sessionId, group.myPlayerId, 400, mistake);
-      yield* buyIn(alex, sessionId, beaId, 200);
-      const voided = yield* buyIn(alex, sessionId, beaId, 500);
-      yield* alex.ledger.voidEntry({ params: { entryId: voided }, payload: { reason: null } });
-      yield* alex.sessions.close({
-        params: { sessionId },
-        payload: {
-          endedAt: day(2),
-          cashOuts: [
-            { id: ids.entry(), playerId: group.myPlayerId, amount: usd(900) },
-            { id: ids.entry(), playerId: beaId, amount: usd(0) },
-          ],
-        },
+      const mistake = yield* buyIn(sessionId, group.myPlayerId, 1000);
+      yield* buyIn(sessionId, group.myPlayerId, 400, mistake);
+      yield* buyIn(sessionId, beaId, 200);
+      const voided = yield* buyIn(sessionId, beaId, 500);
+      yield* voidHistoricalEntry(voided, null);
+      yield* finishHistoricalSession(sessionId, {
+        endedAt: day(2),
+        cashOuts: [
+          { id: ids.entry(), playerId: group.myPlayerId, amount: usd(900) },
+          { id: ids.entry(), playerId: beaId, amount: usd(0) },
+        ],
       });
 
       const finished = (yield* feed(bea)).items.find((item) => itemId(item) === sessionId);

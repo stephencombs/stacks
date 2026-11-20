@@ -71,7 +71,7 @@ export const recent = Effect.fn("Venues.recent")(function* (groupId: GroupId) {
   `.pipe(Effect.flatMap(Access.decodeRows(VenueRow)));
 });
 
-export const findVisible = Effect.fn("Venues.findVisible")(function* (
+const findVisible = Effect.fn("Venues.findVisible")(function* (
   venueId: VenueId,
   groupId: GroupId | null,
 ) {

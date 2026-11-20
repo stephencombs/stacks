@@ -1,14 +1,13 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
-import { StacksApi } from "@stacks/contracts";
+import { Conflict, StacksApi } from "@stacks/contracts";
 
 import * as Crew from "../features/Crew.ts";
 import * as Export from "../features/Export.ts";
 import * as Groups from "../features/Groups.ts";
 import * as Guests from "../features/Guests.ts";
 import * as Invites from "../features/Invites.ts";
-import * as Ledger from "../features/Ledger.ts";
 import * as PlayerInvites from "../features/PlayerInvites.ts";
 import * as Recording from "../features/Recording.ts";
 import * as Sessions from "../features/Sessions.ts";
@@ -75,29 +74,23 @@ const publicVenues = HttpApiBuilder.group(StacksApi, "publicVenues", (handlers) 
     .handle("get", ({ params }) => serve(Venues.getPublic(params.venueId))),
 );
 
+const retireLegacyWrite = () => Effect.fail(new Conflict({ reason: "legacy_sessions_retired" }));
+
 const sessions = HttpApiBuilder.group(StacksApi, "sessions", (handlers) =>
   handlers
-    .handle("create", ({ params, payload }) => serve(Sessions.create(params.tripId, payload)))
+    .handle("create", retireLegacyWrite)
     .handle("get", ({ params }) => serve(Sessions.get(params.sessionId)))
-    .handle("addPlayer", ({ params, payload }) =>
-      serve(Sessions.addPlayer(params.sessionId, payload.playerId)),
-    )
-    .handle("seat", ({ params, payload }) => serve(Sessions.seat(params.sessionId, payload)))
-    .handle("setHighLimit", ({ params, payload }) =>
-      serve(Sessions.setHighLimit(params.sessionId, payload)),
-    )
-    .handle("setTable", ({ params, payload }) =>
-      serve(Sessions.setTable(params.sessionId, payload)),
-    )
-    .handle("close", ({ params, payload }) => serve(Ledger.close(params.sessionId, payload)))
-    .handle("reopen", ({ params }) => serve(Sessions.reopen(params.sessionId)))
-    .handle("move", ({ params, payload }) => serve(Sessions.move(params.sessionId, payload))),
+    .handle("addPlayer", retireLegacyWrite)
+    .handle("seat", retireLegacyWrite)
+    .handle("setHighLimit", retireLegacyWrite)
+    .handle("setTable", retireLegacyWrite)
+    .handle("close", retireLegacyWrite)
+    .handle("reopen", retireLegacyWrite)
+    .handle("move", retireLegacyWrite),
 );
 
 const ledger = HttpApiBuilder.group(StacksApi, "ledger", (handlers) =>
-  handlers
-    .handle("addEntry", ({ params, payload }) => serve(Ledger.addEntry(params.sessionId, payload)))
-    .handle("voidEntry", ({ params, payload }) => serve(Ledger.voidEntry(params.entryId, payload))),
+  handlers.handle("addEntry", retireLegacyWrite).handle("voidEntry", retireLegacyWrite),
 );
 
 const stakes = HttpApiBuilder.group(StacksApi, "stakes", (handlers) =>

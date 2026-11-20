@@ -14,9 +14,6 @@ import {
   TelemetryContext,
   makeSignedIn,
   useAction,
-  useOutbox,
-  usePending,
-  useUnsaved,
   useStacks,
   useLastTrip,
   useStatsCopies,
@@ -86,7 +83,7 @@ export function StacksProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export { useAction, useLastTrip, useOutbox, usePending, useStacks, useStatsCopies, useUnsaved };
+export { useAction, useLastTrip, useStacks, useStatsCopies };
 
 /** Renders a query: a skeleton while it first loads, an explanation if it fails. */
 /** The app coming back to the foreground: shown data may be stale. */
@@ -149,24 +146,8 @@ function RefusalHaptic() {
   return null;
 }
 
-/**
- * Waits for a query without depending on it: renders once it has answered either way, so a screen
- * can hold its first paint until a side query is in, and still render if that query fails.
- */
-export function Settled<A, E>({
-  query,
-  skeleton,
-  children,
-}: {
-  query: Atom.Atom<AsyncResult.AsyncResult<A, E>>;
-  skeleton: ReactNode;
-  children: ReactNode;
-}) {
-  return AsyncResult.isInitial(useAtomValue(query)) ? skeleton : children;
-}
-
 /** Starts a query early, so whatever reads it later finds it loading or loaded. */
-export function Prefetch<A, E>({ query }: { query: Atom.Atom<AsyncResult.AsyncResult<A, E>> }) {
+function Prefetch<A, E>({ query }: { query: Atom.Atom<AsyncResult.AsyncResult<A, E>> }) {
   useAtomValue(query);
   return null;
 }

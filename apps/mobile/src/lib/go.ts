@@ -20,14 +20,7 @@ export function useGo() {
   const crew = (params: CrewParams) => navigation.navigate("Tabs", { screen: "CrewTab", params });
   return {
     groups: () => crew({ screen: "Groups", initial: false }),
-    session: (sessionId: SessionId) =>
-      crew({ screen: "Session", params: { sessionId }, initial: false }),
-    newSession: (tripId: TripId, from?: SessionId) =>
-      crew({
-        screen: "NewSession",
-        params: { tripId, ...(from ? { from } : {}) },
-        initial: false,
-      }),
+    session: (sessionId: SessionId) => navigation.navigate("Session", { sessionId }),
     /** Puts a trip in scope and opens its sessions. */
     trip: (tripId: TripId) => {
       setTrip(tripId);

@@ -6,6 +6,7 @@ import {
   PlayerId,
   PlayerInviteId,
   TableId,
+  SessionId,
   TripId,
   VenueId,
   VisitId,
@@ -261,7 +262,8 @@ export type RecordingHistory = typeof RecordingHistory.Type;
 export const TableView = Schema.Struct({
   /** Whole-table facts for an active group member reading through the table's trip. */
   entries: Schema.optionalKey(Schema.Array(PlayEntry)),
-  table: Table,
+  table: Schema.Struct({ ...Table.fields, starterPlayerId: Schema.NullOr(PlayerId) }),
+  legacySessionId: Schema.optionalKey(SessionId),
   players: Schema.Array(PlayerIdentity),
   visits: Schema.Array(VisitSummary),
   viewerRole: Schema.Literals(["starter", "recorder", "participant", "viewer"]),

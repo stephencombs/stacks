@@ -126,6 +126,7 @@ export type TripTable = typeof TripTable.Type;
 
 export const SessionDetail = Schema.Struct({
   session: Session,
+  importedTableId: Schema.optionalKey(TableId),
   venue: Venue,
   playerIds: Schema.Array(PlayerId),
   myJoinedAt: Schema.optionalKey(Schema.NullOr(Schema.DateTimeUtc)),

@@ -190,7 +190,6 @@ async function load({
     "./screens/GroupSettings": ["GroupSettingsScreen"],
     "./screens/History": ["HistoryScreen"],
     "./screens/Map": ["MapScreen"],
-    "./screens/NewSession": ["NewSessionScreen"],
     "./screens/Play": ["PlayScreen"],
     "./screens/RedeemInvite": ["RedeemInviteScreen"],
     "./screens/Session": ["SessionScreen"],
@@ -339,6 +338,7 @@ it("keeps every address: your play in the first tab, groups in Crew, invites abo
   expect(root.screens.Tabs!.screen).toEqual({ config: tabs });
   expect(root.screens.Play!.linking).toBe("play/:visitId");
   expect(root.screens.Table!.linking).toBe("tables/:tableId");
+  expect(root.screens.Session!.linking).toBe("sessions/:sessionId");
   expect(root.screens.SharedTable!.linking).toBe("t/:token");
   expect(root.screens.RedeemInvite!.linking).toBe("invite/:token");
   expect(root.screens.Invites!.screen).toEqual({ config: invites });

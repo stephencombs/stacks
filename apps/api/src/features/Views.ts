@@ -10,6 +10,7 @@ import {
   type GroupId,
   type PlayerResult,
   type SessionDetail,
+  type TableId,
   SessionId,
   type SessionSummary,
   type TripDetail,
@@ -123,7 +124,7 @@ export const loadSession = Effect.fn("Views.loadSession")(function* (sessionId: 
 export const sessionDetail = Effect.fn("Views.sessionDetail")(function* (sessionId: SessionId) {
   const sql = yield* SqlClient.SqlClient;
   const session = yield* loadSession(sessionId);
-  const [[summary], playerIds, entries, seatings] = yield* Effect.all(
+  const [[summary], playerIds, entries, seatings, [table]] = yield* Effect.all(
     [
       summaries([session]),
       sql`
@@ -136,11 +137,15 @@ export const sessionDetail = Effect.fn("Views.sessionDetail")(function* (session
         select id, session_id, player_id, seat, occurred_at from seatings
         where session_id = ${sessionId} order by occurred_at, created_at
       `.pipe(Effect.flatMap(decodeRows(SeatingRow))),
+      sql<{
+        id: TableId;
+      }>`select id from tables where legacy_session_id = ${sessionId} and deleted_at is null`,
     ],
     { concurrency: "unbounded" },
   );
   return {
     session,
+    ...(table ? { importedTableId: table.id } : {}),
     venue: summary!.venue,
     playerIds: playerIds.map((row) => row.playerId),
     myJoinedAt: summary!.myJoinedAt ?? null,

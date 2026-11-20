@@ -5,6 +5,7 @@ import { StakeId, type PlayerId } from "@stacks/contracts";
 
 import { catalogVenue, groupWith, ids, usd, users, type TestGroup } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
+import { seedEntry, seedSession } from "../testing/legacySessions.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
@@ -20,28 +21,22 @@ const play = Effect.fn("test.play")(function* (
 ) {
   const venue = yield* catalogVenue(client);
   const sessionId = ids.session();
-  yield* client.sessions.create({
-    params: { tripId: group.tripId },
-    payload: {
-      id: sessionId,
-      venueId: venue.id,
-      game: "blackjack",
-      playerIds: [playerId],
-      notes: null,
-      startedAt: day(on),
-    },
+  yield* seedSession(group.tripId, {
+    id: sessionId,
+    venueId: venue.id,
+    game: "blackjack",
+    playerIds: [playerId],
+    notes: null,
+    startedAt: day(on),
   });
-  yield* client.ledger.addEntry({
-    params: { sessionId },
-    payload: {
-      id: ids.entry(),
-      kind: "adjustment",
-      playerId,
-      counterpartyId: null,
-      amount: usd(net),
-      note: null,
-      replacesEntryId: null,
-    },
+  yield* seedEntry(sessionId, {
+    id: ids.entry(),
+    kind: "adjustment",
+    playerId,
+    counterpartyId: null,
+    amount: usd(net),
+    note: null,
+    replacesEntryId: null,
   });
 });
 

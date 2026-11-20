@@ -4,7 +4,9 @@ The Group- and Trip-bound ledger (`sessions`, `entries`, `stakes`) moves into th
 without losing or inventing facts. `apps/api/src/features/LegacyMigration.ts` holds two functions:
 a read-only `preflight` and an `importLegacy` that copies legacy play into the new tables. Run them
 with `pnpm --filter @stacks/api legacy:preflight` and `legacy:import` (a dry run unless `--apply`).
-Neither changes what the app reads or writes; that is the cutover, which comes later.
+The API rejects legacy session and entry writes after cutover. Group members can still read and
+export their ledger, and stakes still use it. Old session links open the imported table when
+available and show the read-only legacy session otherwise.
 
 ## Mapping
 
@@ -40,7 +42,9 @@ never sees them, so they need no synthetic command.
 The import runs on one repeatable-read snapshot in one transaction. It refuses to write while the
 preflight finds a blocking issue. It only inserts rows that are missing, and brings over a later
 void or a session's later close, so a second run reports zeros. A dry run does the same work and
-rolls back. At the cutover, freeze legacy writes, close every open session and run it once more.
+rolls back. Before deploying the write freeze, run preflight and finish any open USD sessions through the
+old recorder. Pause legacy recording during deployment, then run preflight again against the
+frozen ledger before applying the import.
 
 ## Preflight
 

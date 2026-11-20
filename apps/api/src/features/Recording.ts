@@ -185,17 +185,18 @@ export const principal = Effect.fn("Recording.principal")(function* () {
   return principal;
 });
 
+const tableFields = (row: typeof TableRow.Type) => ({
+  id: row.id,
+  tripId: row.tripId,
+  game: row.game,
+  ...(row.gameName === null ? {} : { gameName: row.gameName }),
+  venueId: row.venueId,
+  highLimit: row.highLimit,
+  ...(row.deletedAt === null ? {} : { deletedAt: row.deletedAt }),
+});
+
 const tableOf = (row: typeof TableRow.Type, starterPlayerId: PlayerId) =>
-  Table.make({
-    id: row.id,
-    tripId: row.tripId,
-    game: row.game,
-    ...(row.gameName === null ? {} : { gameName: row.gameName }),
-    venueId: row.venueId,
-    highLimit: row.highLimit,
-    starterPlayerId,
-    ...(row.deletedAt === null ? {} : { deletedAt: row.deletedAt }),
-  });
+  Table.make({ ...tableFields(row), starterPlayerId });
 
 const visitOf = (visit: typeof PersonalVisitRow.Type) =>
   Visit.make({
@@ -808,7 +809,7 @@ export const history = Effect.fn("Recording.history")(function* () {
 });
 
 const viewOf = Effect.fn("Recording.viewOf")(function* (
-  row: typeof TableRow.Type & { readonly starterPlayerId: PlayerId },
+  row: typeof TableRow.Type,
   viewerRole: TableView["viewerRole"],
   viewerPlayerId: PlayerId | null,
   includeEntries = false,
@@ -844,7 +845,8 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
     where v.table_id = ${row.id}
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalEntryRow)));
   const view: TableView = {
-    table: tableOf(row, row.starterPlayerId),
+    table: { ...tableFields(row), starterPlayerId: row.starterPlayerId },
+    ...(row.legacySessionId ? { legacySessionId: row.legacySessionId } : {}),
     ...(includeEntries ? { entries: entries.map(entryOf) } : {}),
     players: players.map((player) => PlayerIdentity.make(player)),
     visits: visits
@@ -911,6 +913,15 @@ const startedTable = Effect.fn("Recording.startedTable")(function* (tableId: Tab
 });
 
 export const table = Effect.fn("Recording.table")(function* (tableId: TableId) {
+  const sql = yield* SqlClient.SqlClient;
+  const [legacy] = yield* sql`
+    select t.*, s.trip_id from tables t join sessions s on s.id = t.legacy_session_id
+    where t.id = ${tableId} and t.deleted_at is null
+  `.pipe(Effect.flatMap(Access.decodeRows(TableRow)));
+  if (legacy) {
+    if (!(yield* tripMember(legacy.tripId))) return yield* new NotFound({ resource: "table" });
+    return yield* viewOf(legacy, "viewer", null, true);
+  }
   const { row, role, playerId } = yield* tableAccess(tableId);
   return yield* viewOf(row, role, playerId, yield* tripMember(row.tripId));
 });

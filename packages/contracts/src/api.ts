@@ -423,7 +423,7 @@ const SessionsGroup = HttpApiGroup.make("sessions")
       params: sessionParams,
       payload: HighLimitRequest,
       success: SessionDetail,
-      error: [Forbidden, NotFound],
+      error: [Forbidden, NotFound, Conflict],
     }),
   )
   .add(

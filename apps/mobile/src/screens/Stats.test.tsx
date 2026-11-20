@@ -140,7 +140,7 @@ async function load(
   }));
   vi.doMock("../features/Race", () => ({ Race: () => null }));
   vi.doMock("../features/Chip", () => ({ Chip: () => null }));
-  vi.doMock("../lib/go", () => ({ useGo: () => ({ newSession: vi.fn(), group: vi.fn() }) }));
+  vi.doMock("../lib/go", () => ({ useGo: () => ({ trip: vi.fn(), group: vi.fn() }) }));
   vi.doMock("../features/GroupStats", async () => {
     if (groupState) return vi.importActual("../features/GroupStats");
     const { useStacks } = await vi.importActual<typeof import("@stacks/client-runtime/react")>(
