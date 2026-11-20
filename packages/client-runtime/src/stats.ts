@@ -1,4 +1,4 @@
-import type { Game, TripId, VenueId } from "@stacks/contracts";
+import type { Game, Trip, TripId, VenueId } from "@stacks/contracts";
 import { personalStats, type PersonalStatsFilters } from "@stacks/shared/stats";
 import * as DateTime from "effect/DateTime";
 
@@ -13,6 +13,85 @@ const FEW = 3;
 
 /** How many casinos show before "See all". */
 export const TOP_CASINOS = 2;
+
+export const finishedSessions = (count: number) =>
+  `${count} finished ${count === 1 ? "session" : "sessions"}`;
+
+type TripSession = {
+  readonly tripId: TripId | null;
+  readonly game: Game | null;
+  readonly venueId: VenueId | null;
+  readonly startedAt: DateTime.Utc;
+  readonly endedAt: DateTime.Utc;
+};
+
+export type StatsTrip = {
+  readonly sessions: number;
+  readonly range: string;
+};
+
+/** Trip counts ignore the period but keep the game and casino filters. */
+export function statsTrips(
+  sessions: ReadonlyArray<TripSession>,
+  trips: ReadonlyArray<Trip>,
+  filters: StatsFilters,
+  timeZone: DateTime.TimeZone,
+) {
+  const counts = new Map<TripId, number>();
+  const ranges = new Map<TripId, { start: number; end: number }>();
+  let total = 0;
+  for (const session of sessions) {
+    const matches =
+      (filters.game === undefined || filters.game === session.game) &&
+      (filters.venueId === undefined || filters.venueId === session.venueId);
+    if (matches) total++;
+    const id = session.tripId;
+    if (id === null) continue;
+    if (matches) counts.set(id, (counts.get(id) ?? 0) + 1);
+    const start = DateTime.toEpochMillis(session.startedAt);
+    const end = DateTime.toEpochMillis(session.endedAt);
+    const range = ranges.get(id);
+    ranges.set(id, {
+      start: Math.min(start, range?.start ?? start),
+      end: Math.max(end, range?.end ?? end),
+    });
+  }
+  for (const { id, startedAt, endedAt } of trips) {
+    const start = DateTime.toEpochMillis(startedAt);
+    ranges.set(id, {
+      start,
+      end:
+        endedAt === null
+          ? Math.max(start, ranges.get(id)?.end ?? start)
+          : DateTime.toEpochMillis(endedAt),
+    });
+  }
+  const rangeLabel = (start: number, end: number) => {
+    const from = DateTime.setZone(DateTime.makeUnsafe(start), timeZone);
+    const to = DateTime.setZone(DateTime.makeUnsafe(Math.max(start, end)), timeZone);
+    const first = DateTime.toParts(from);
+    const last = DateTime.toParts(to);
+    const full = { month: "short", day: "numeric", year: "numeric" } as const;
+    if (first.year !== last.year)
+      return `${DateTime.format(from, full)} – ${DateTime.format(to, full)}`;
+    if (first.month !== last.month)
+      return `${DateTime.format(from, { month: "short", day: "numeric" })} – ${DateTime.format(to, full)}`;
+    if (first.day !== last.day)
+      return `${DateTime.format(from, { month: "short", day: "numeric" })}–${last.day}, ${last.year}`;
+    return DateTime.format(from, full);
+  };
+  return {
+    total,
+    byId: new Map<string, StatsTrip>(
+      [...ranges].map(([id, { start, end }]) => [
+        id,
+        { sessions: counts.get(id) ?? 0, range: rangeLabel(start, end) },
+      ]),
+    ),
+  };
+}
+
+export type StatsTrips = ReturnType<typeof statsTrips>;
 
 export const gameName = (game: Game | null) => (game === null ? "No game set" : gameNames[game]);
 
@@ -209,9 +288,11 @@ export const personalStatsView = (
   {
     timeZone = DateTime.zoneMakeLocal(),
     tripNames = new Map(),
+    trips = [],
   }: {
     readonly timeZone?: DateTime.TimeZone;
     readonly tripNames?: ReadonlyMap<TripId, string>;
+    readonly trips?: ReadonlyArray<Trip>;
   } = {},
 ) => {
   const venues = new Map(
@@ -221,7 +302,15 @@ export const personalStatsView = (
     id === null ? "No casino set" : (venues.get(id) ?? "Casino");
   const tripName = (id: TripId) => tripNames.get(id) ?? "Group trip";
   const stats = personalStats(visits, timeZone, filters);
-  const head = filterChips(filters, stats.options, { venueName, tripName });
+  const finished = visits.flatMap(({ visit, table, finalResult }) =>
+    visit.deletedAt !== undefined || visit.finishedAt === null || finalResult === null
+      ? []
+      : [{ ...table, startedAt: visit.startedAt, endedAt: visit.finishedAt }],
+  );
+  const head = {
+    ...filterChips(filters, stats.options, { venueName, tripName }),
+    trips: statsTrips(finished, trips, filters, timeZone),
+  };
   if (stats.options.years.length === 0) return { ...head, kind: "empty" as const };
   const { summary } = stats;
   if (summary.sessions === 0)
@@ -247,16 +336,17 @@ export const personalStatsView = (
       day: "numeric",
       year: "numeric",
     });
-  const day =
-    filters.year === undefined
-      ? fullDay
-      : (at: DateTime.DateTime) =>
-          DateTime.format(DateTime.setZone(at, timeZone), { month: "short", day: "numeric" });
+  const shortDay = (at: DateTime.DateTime) =>
+    DateTime.format(DateTime.setZone(at, timeZone), { month: "short", day: "numeric" });
+  const day = filters.year === undefined ? fullDay : shortDay;
+  const yearOf = (at: DateTime.DateTime) => DateTime.toParts(DateTime.setZone(at, timeZone)).year;
   const running = stats.runningResult.map((point) => ({
     ...point,
     at: DateTime.toEpochMillis(point.finishedAt),
     day: fullDay(point.finishedAt),
   }));
+  const from = running[0]!.finishedAt;
+  const to = running.at(-1)!.finishedAt;
   const visit = new Map(visits.map((item) => [item.visit.id, item]));
   const matching = running.map((point) => visit.get(point.sessionId)!);
   const biggest = Math.max(...stats.byGame.map((row) => Math.abs(row.result)));
@@ -276,8 +366,27 @@ export const personalStatsView = (
         ? null
         : {
             points: running,
-            from: day(running[0]!.finishedAt),
-            to: day(running.at(-1)!.finishedAt),
+            from: day(from),
+            to: day(to),
+            androidAxis:
+              filters.year !== undefined
+                ? { from: "Jan", to: "Dec" }
+                : filters.tripId !== undefined
+                  ? { from: shortDay(from), to: shortDay(to) }
+                  : {
+                      from: fullDay(from),
+                      middle:
+                        yearOf(from) === yearOf(to)
+                          ? undefined
+                          : String(
+                              yearOf(
+                                DateTime.makeUnsafe(
+                                  Math.floor((running[0]!.at + running.at(-1)!.at) / 2),
+                                ),
+                              ),
+                            ),
+                      to: fullDay(to),
+                    },
           },
     list:
       summary.sessions > FEW
@@ -327,6 +436,10 @@ export const personalStatsView = (
               result: row.result,
               filters: { ...filters, venueId: row.venueId },
             })),
+    liveCasino: visits.find(
+      ({ visit, finalResult }) =>
+        visit.deletedAt === undefined && visit.finishedAt === null && finalResult === null,
+    )?.venue?.name,
     casinosLine: `${period === "all time" ? "All time" : period} · ${summary.sessions} finished ${summary.sessions === 1 ? "session" : "sessions"}`,
   };
 };

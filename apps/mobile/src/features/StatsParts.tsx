@@ -1,21 +1,149 @@
 import {
   TOP_CASINOS,
+  finishedSessions,
+  type StatsTrips,
   type GameChip,
   type StatsChip,
   type StatsFilters,
 } from "@stacks/client-runtime/stats";
 import { MinorUnits, type CurrencyCode } from "@stacks/contracts";
 import { useState, type ReactNode } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { FilterChip } from "../components/ui/FilterChip";
-import { Icon } from "../components/ui/Icon";
+import { Icon, type IconName } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading } from "../components/ui/Surface";
+import { useScreenFoot } from "../components/ui/tabBar";
 import { cn } from "../components/ui/cn";
 import { formatDisplayMoney, usePreferences, type DevicePreferences } from "../lib/preferences";
+
+import { FeltStatusBar } from "./FeltStatusBar";
+import { PersonalLiveBar } from "./LiveBar";
+import { PersonalYouButton } from "./Personal";
+
+import { StatsChipTrigger, StatsMenu, StatsRadio } from "./StatsMenus.android";
+
+export { StatsMenu as AndroidGroupChip };
+
+export function StatsContent({ filters, children }: { filters?: ReactNode; children?: ReactNode }) {
+  if (Platform.OS !== "android")
+    return (
+      <>
+        {filters}
+        {children}
+      </>
+    );
+  return <AndroidStatsContent filters={filters}>{children}</AndroidStatsContent>;
+}
+
+function AndroidStatsContent({ filters, children }: { filters?: ReactNode; children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  const foot = useScreenFoot();
+  const [scrolled, setScrolled] = useState(false);
+  return (
+    <View className="flex-1 bg-canvas">
+      <FeltStatusBar felt={false} />
+      <View
+        testID="stats-filter-bar"
+        className={cn("flex-row items-center gap-1 pb-2", scrolled ? "bg-surface" : "bg-canvas")}
+        style={{
+          paddingTop: insets.top + 10,
+          paddingLeft: insets.left,
+          paddingRight: Math.max(12, insets.right),
+        }}
+      >
+        <View className="min-w-0 flex-1">{filters}</View>
+        <PersonalYouButton />
+      </View>
+      <ScrollView
+        testID="stats-content"
+        className="flex-1"
+        keyboardShouldPersistTaps="handled"
+        style={foot.scrollStyle}
+        contentInsetAdjustmentBehavior="never"
+        scrollEventThrottle={16}
+        onScroll={(event) => setScrolled(event.nativeEvent.contentOffset.y > 0)}
+        contentContainerClassName="gap-4 pt-2 pb-5"
+        contentContainerStyle={{
+          paddingLeft: Math.max(16, insets.left),
+          paddingRight: Math.max(16, insets.right),
+        }}
+      >
+        {children}
+        {foot.endSpace > 0 ? <View style={{ height: foot.endSpace }} /> : null}
+      </ScrollView>
+      <PersonalLiveBar
+        onHeightChange={foot.onLiveBarHeight}
+        {...(foot.above === undefined ? {} : { bottom: foot.above })}
+      />
+    </View>
+  );
+}
+
+export function StatsHeading({
+  children,
+  count,
+  action,
+}: {
+  children: string;
+  count?: string;
+  action?: ReactNode;
+}) {
+  return Platform.OS === "android" ? (
+    <View className="min-h-5 flex-row items-center justify-between gap-2 px-1">
+      <Text accessibilityRole="header" className="flex-1 type-label text-muted">
+        {children.toUpperCase()}
+      </Text>
+      {count ? <Text className="type-footnote text-muted">{count}</Text> : null}
+      {action}
+    </View>
+  ) : (
+    <SectionHeading count={count} action={action}>
+      {children}
+    </SectionHeading>
+  );
+}
+
+export function AndroidStatsEmpty({
+  icon,
+  title,
+  body,
+  button,
+  onPress,
+  note,
+  extra,
+}: {
+  icon: IconName;
+  title: string;
+  body: string;
+  button: string;
+  onPress: () => void;
+  note?: string;
+  extra?: ReactNode;
+}) {
+  return (
+    <View className="items-center px-1 pt-26">
+      <Icon name={icon} color="muted" size={28} />
+      <Text accessibilityRole="header" className="mt-5 text-center type-title text-ink">
+        {title}
+      </Text>
+      <Text className="mt-2.5 max-w-80 text-center type-callout text-muted">{body}</Text>
+      <Button
+        label={button}
+        onPress={onPress}
+        variant="primary"
+        size="lg"
+        className="mt-6 w-full max-w-66"
+      />
+      {note ? <Text className="mt-2.5 text-center type-footnote text-muted">{note}</Text> : null}
+      {extra}
+    </View>
+  );
+}
 
 export const chipColor: Record<GameChip, string> = {
   red: "bg-chip-red",
@@ -44,38 +172,169 @@ export function Filters({
   chips,
   filtered,
   onChange,
+  trips,
+  groupName,
+  liveTrips,
+  gameMenu,
 }: {
   lead?: ReactNode;
   chips: ReadonlyArray<StatsChip>;
   filtered: boolean;
   onChange: (filters: StatsFilters) => void;
+  trips?: StatsTrips;
+  groupName?: string;
+  liveTrips?: ReadonlySet<string>;
+  gameMenu?: { readonly open: boolean; readonly setOpen: (open: boolean) => void };
 }) {
+  const android = Platform.OS === "android";
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       accessibilityLabel="Stats filters"
-      className="-mx-4"
+      className={android ? "flex-1" : "-mx-4"}
       contentContainerClassName="items-center gap-2 px-4"
+      keyboardShouldPersistTaps={android ? "handled" : undefined}
     >
       {lead}
-      {chips.map((chip) => (
-        <FilterChip
-          key={chip.key}
-          name={chip.name}
-          options={chip.options}
-          value={chip.value}
-          applied={chip.applied}
-          onChange={(value) =>
-            onChange(chip.options.find((option) => option.value === value)!.filters)
-          }
-          onClear={() => onChange(chip.cleared)}
-        />
-      ))}
+      {chips.map((chip) => {
+        const onPick = (value: string) => {
+          const option = chip.options.find((item) => item.value === value);
+          if (option) onChange(option.filters);
+        };
+        const props = {
+          name: chip.name,
+          value: chip.value,
+          applied: chip.applied,
+          onChange: onPick,
+          onClear: () => onChange(chip.cleared),
+        };
+        if (android && chip.key === "tripId" && trips)
+          return (
+            <TripFilter
+              key={chip.key}
+              chip={chip}
+              trips={trips}
+              groupName={groupName}
+              liveTrips={liveTrips}
+              onChange={onChange}
+            />
+          );
+        if (android && (chip.key === "year" || (chip.key === "game" && gameMenu))) {
+          return (
+            <StatsMenu
+              key={chip.key}
+              {...props}
+              menuState={chip.key === "game" ? gameMenu : undefined}
+              options={chip.options.map(({ value, label }) => ({
+                value,
+                label,
+                icon: chip.key === "year" ? (value === "" ? "all" : "year") : undefined,
+              }))}
+            />
+          );
+        }
+        return <FilterChip key={chip.key} {...props} options={chip.options} />;
+      })}
       {filtered ? (
         <Button label="Reset all" variant="ghost" size="sm" onPress={() => onChange({})} />
       ) : null}
     </ScrollView>
+  );
+}
+
+function TripFilter({
+  chip,
+  trips,
+  groupName,
+  liveTrips,
+  onChange,
+}: {
+  chip: StatsChip;
+  trips: StatsTrips;
+  groupName?: string;
+  liveTrips?: ReadonlySet<string>;
+  onChange: (filters: StatsFilters) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const selected = chip.options.find((option) => option.value === draft);
+  const count = trips.byId.get(draft ?? "")?.sessions ?? 0;
+  return (
+    <>
+      <StatsChipTrigger
+        name={chip.name}
+        label={chip.label}
+        applied={chip.applied}
+        onClear={() => onChange(chip.cleared)}
+        onPress={() => setDraft(chip.value)}
+      />
+      {selected ? (
+        <Sheet
+          open
+          title="Trip"
+          onClose={() => setDraft(null)}
+          footer={
+            <Button
+              label={
+                draft === ""
+                  ? "Show all trips"
+                  : `Show ${count} ${count === 1 ? "session" : "sessions"}`
+              }
+              variant="primary"
+              size="lg"
+              onPress={() => {
+                setDraft(null);
+                onChange(selected.filters);
+              }}
+            />
+          }
+        >
+          <Text className="type-footnote text-muted">
+            {groupName
+              ? `${groupName}’s trips, from start to finish.`
+              : "Choose a trip to see it from start to finish."}
+          </Text>
+          <View accessibilityRole="radiogroup">
+            {chip.options.map(({ value, label }) => {
+              const trip = trips.byId.get(value);
+              const checked = draft === value;
+              const isLive = liveTrips?.has(value);
+              const line =
+                value === ""
+                  ? `${groupName ? `Every trip in ${groupName}` : "Every trip and sessions without a trip"} · ${finishedSessions(trips.total)}`
+                  : [trip?.range, finishedSessions(trip?.sessions ?? 0)]
+                      .filter(Boolean)
+                      .join(" · ");
+              return (
+                <Pressable
+                  key={value}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked }}
+                  onPress={() => setDraft(value)}
+                  className={cn(
+                    "min-h-15 flex-row items-center gap-4 rounded-2xl px-2 py-2",
+                    checked && "bg-fill",
+                  )}
+                >
+                  <StatsRadio selected={checked} />
+                  <View className="min-w-0 flex-1 gap-0.5">
+                    <Text className="text-sm font-semibold text-ink">{label}</Text>
+                    <Text className="type-footnote text-muted">
+                      {isLive ? <Text className="text-live">Live now · </Text> : null}
+                      {line}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text className="type-footnote text-muted">
+            Choosing a trip replaces the period filter.
+            {groupName ? " Game and casino filters still apply." : ""}
+          </Text>
+        </Sheet>
+      ) : null}
+    </>
   );
 }
 
@@ -100,9 +359,14 @@ export function ByGame({
   onFilter: (filters: StatsFilters) => void;
 }) {
   const prefs = usePreferences();
+  const android = Platform.OS === "android";
   return (
     <View className="gap-2">
-      <SectionHeading>By game</SectionHeading>
+      <StatsHeading
+        count={android ? `${rows.length} ${rows.length === 1 ? "game" : "games"}` : undefined}
+      >
+        By game
+      </StatsHeading>
       <List>
         {rows.map((row) => (
           <Row
@@ -110,17 +374,26 @@ export function ByGame({
             onPress={() => onFilter(row.filters)}
             accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result, currency, prefs, true)}`}
             accessibilityHint={`Shows only ${row.label}`}
+            className={android ? "gap-2 px-4 py-2.5" : undefined}
           >
             <View className={cn("size-2 rounded-full", chipColor[row.chip])} />
             <View className="min-w-0 flex-1 gap-0.5">
-              <Text numberOfLines={1} className="type-heading text-ink">
+              <Text
+                numberOfLines={android ? 2 : 1}
+                className={cn("text-ink", android ? "text-sm font-semibold" : "type-heading")}
+              >
                 {row.label}
               </Text>
               <Text numberOfLines={1} className="type-footnote text-muted">
                 {row.meta}
               </Text>
             </View>
-            <View className="h-1.5 w-10 overflow-hidden rounded-full bg-fill">
+            <View
+              className={cn(
+                "overflow-hidden rounded-full bg-fill",
+                android ? "h-1.5 w-15" : "h-1.5 w-10",
+              )}
+            >
               <View
                 className={cn(
                   "h-full rounded-full",
@@ -133,6 +406,7 @@ export function ByGame({
               amount={row.result}
               currency={currency}
               tone="result"
+              fit={android}
               className="min-w-18 text-right font-semibold"
             />
           </Row>
@@ -155,42 +429,66 @@ export function ByCasino({
   rows,
   currency,
   line,
+  group = false,
+  liveCasino,
   onFilter,
 }: {
   rows: ReadonlyArray<CasinoRow>;
   currency: CurrencyCode;
   /** What See all covers: "All time · 12 finished sessions". */
   line: string;
+  group?: boolean;
+  liveCasino?: string | undefined;
   onFilter: (filters: StatsFilters) => void;
 }) {
   const [all, setAll] = useState(false);
+  const android = Platform.OS === "android";
+  const limit = android ? (group ? 4 : 3) : TOP_CASINOS;
+  const more = rows.length > limit;
   return (
     <View className="gap-2">
-      <SectionHeading
+      <StatsHeading
+        count={
+          android && !more
+            ? `${rows.length} ${rows.length === 1 ? "casino" : "casinos"}`
+            : undefined
+        }
         action={
-          rows.length > TOP_CASINOS ? (
+          more ? (
             <Button label="See all" variant="ghost" size="sm" onPress={() => setAll(true)} />
           ) : undefined
         }
       >
         By casino
-      </SectionHeading>
-      <CasinoRows rows={rows.slice(0, TOP_CASINOS)} currency={currency} onFilter={onFilter} />
+      </StatsHeading>
+      <CasinoRows rows={rows.slice(0, limit)} currency={currency} onFilter={onFilter} />
       {all ? (
-        <Sheet open title="Casinos" description={line} onClose={() => setAll(false)}>
+        <Sheet
+          open
+          title="Casinos"
+          description={android ? undefined : line}
+          onClose={() => setAll(false)}
+        >
           <View className="gap-2">
-            <View className="flex-row justify-between px-4">
-              <Text className="type-footnote text-muted">Most played first</Text>
+            {android ? <Text className="mb-2 type-footnote text-muted">{line}</Text> : null}
+            <View className={cn("flex-row justify-between", android ? "px-1" : "px-4")}>
+              <Text className={cn("text-muted", android ? "type-label" : "type-footnote")}>
+                {android ? "MOST PLAYED FIRST" : "Most played first"}
+              </Text>
               <Text className="type-footnote text-muted">Result</Text>
             </View>
             <CasinoRows
               rows={rows}
               currency={currency}
+              inSheet={android}
               onFilter={(filters) => {
                 setAll(false);
                 onFilter(filters);
               }}
             />
+            {android && liveCasino ? (
+              <Text className="mt-2 type-footnote text-muted">{`A live session at ${liveCasino} isn’t included yet.`}</Text>
+            ) : null}
           </View>
         </Sheet>
       ) : null}
@@ -202,20 +500,24 @@ function CasinoRows({
   rows,
   currency,
   onFilter,
+  inSheet = false,
 }: {
   rows: ReadonlyArray<CasinoRow>;
   currency: CurrencyCode;
+  inSheet?: boolean;
   onFilter: (filters: StatsFilters) => void;
 }) {
   const prefs = usePreferences();
+  const android = Platform.OS === "android";
   return (
-    <List>
+    <List className={inSheet ? "bg-fill" : undefined}>
       {rows.map((row) => (
         <Row
           key={row.key}
           onPress={() => onFilter(row.filters)}
           accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result, currency, prefs, true)}`}
           accessibilityHint="Shows only this casino"
+          className={android ? "gap-2.5 py-2.5" : undefined}
         >
           <View className="min-w-0 flex-1 gap-0.5">
             <Text numberOfLines={1} className="type-heading text-ink">
@@ -234,15 +536,17 @@ function CasinoRows({
 export function Figure({
   label,
   sub,
+  compact = false,
   children,
 }: {
   label: string;
   sub?: string;
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
-    <View className="w-1/2 min-w-0 gap-1 pr-2">
-      <Text className="type-label text-muted">{label}</Text>
+    <View className={cn("min-w-0 gap-1 pr-2", compact ? "flex-1" : "w-1/2")}>
+      <Text className={cn("type-label text-muted", compact && "text-[10px]")}>{label}</Text>
       {children}
       {sub ? <Text className="type-footnote text-muted">{sub}</Text> : null}
     </View>

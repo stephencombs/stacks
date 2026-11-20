@@ -155,6 +155,37 @@ describe("groupStatsView", () => {
     expect(view.chips.map((chip) => chip.label)).toEqual(["Vegas", "All games", "All casinos"]);
   });
 
+  it("supplies a trip's date range and each player's best session in scope", () => {
+    const view = groupStatsView(stats, detail, { tripId: vegas }, { timeZone: zone, clock });
+    if (view.kind !== "stats") throw new Error(view.kind);
+    expect(view.trips.total).toBe(3);
+    expect(view.trips.byId.get(vegas)).toEqual({ sessions: 2, range: "Oct 1–3, 2026" });
+    expect(view.standings.find((row) => row.playerId === bea)?.best).toEqual({
+      line: "Wynn · Oct 3",
+      result: 10000,
+    });
+    expect(view.standings.find((row) => row.playerId === cal)?.best).toBeUndefined();
+  });
+
+  it("keeps cent and privacy preferences in trip awards", () => {
+    const visible = groupStatsView(
+      stats,
+      detail,
+      { tripId: vegas },
+      { timeZone: zone, clock, showCents: true },
+    );
+    const hidden = groupStatsView(
+      stats,
+      detail,
+      { tripId: vegas },
+      { timeZone: zone, clock, privacyMode: true },
+    );
+    if (visible.kind !== "stats" || hidden.kind !== "stats") throw new Error("Missing group stats");
+    expect(visible.awards?.[0]?.line).toBe("+$300.00 at Wynn");
+    expect(hidden.awards?.[0]?.line).not.toContain("300");
+    expect(hidden.awards?.[1]?.line).not.toContain("100");
+  });
+
   it("leaves the place off a biggest hit at a table with no casino set", () => {
     const [first] = stats.plays;
     const view = groupStatsView(
