@@ -45,6 +45,8 @@ it("shows board money signed, without cents when there are none", () => {
   expect(boardMoney(4115000, usd)).toBe("+$41,150");
   expect(boardMoney(-48050, usd)).toBe("-$480.50");
   expect(boardMoney(100000, usd, false)).toBe("$1,000");
+  expect(boardMoney(4115000, usd, true, { showCents: true })).toBe("+$41,150.00");
+  expect(boardMoney(4115000, usd, true, { privacyMode: true })).toBe("••••");
 });
 
 it("lists a trip's sessions and tables together, oldest first, and says which are live", () => {

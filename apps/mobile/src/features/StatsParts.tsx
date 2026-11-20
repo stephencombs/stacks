@@ -5,7 +5,6 @@ import {
   type StatsFilters,
 } from "@stacks/client-runtime/stats";
 import { MinorUnits, type CurrencyCode } from "@stacks/contracts";
-import { formatMoney } from "@stacks/shared/money";
 import { useState, type ReactNode } from "react";
 import { ScrollView, Text, View } from "react-native";
 
@@ -16,6 +15,7 @@ import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
+import { formatDisplayMoney, usePreferences, type DevicePreferences } from "../lib/preferences";
 
 export const chipColor: Record<GameChip, string> = {
   red: "bg-chip-red",
@@ -27,8 +27,16 @@ export const chipColor: Record<GameChip, string> = {
   grey: "bg-chip-grey",
 };
 
-export const signed = (amount: number, currency: CurrencyCode) =>
-  formatMoney(MinorUnits.make(amount), currency, { signDisplay: "exceptZero" });
+export const signed = (
+  amount: number,
+  currency: CurrencyCode,
+  prefs: Pick<DevicePreferences, "showCents" | "privacyMode">,
+  forAccessibility = false,
+) =>
+  formatDisplayMoney(MinorUnits.make(amount), currency, prefs, {
+    signDisplay: "exceptZero",
+    forAccessibility,
+  });
 
 /** The row of filter chips, led by `lead` (the Group chip), ending in Reset all once any applies. */
 export function Filters({
@@ -91,6 +99,7 @@ export function ByGame({
   currency: CurrencyCode;
   onFilter: (filters: StatsFilters) => void;
 }) {
+  const prefs = usePreferences();
   return (
     <View className="gap-2">
       <SectionHeading>By game</SectionHeading>
@@ -99,7 +108,7 @@ export function ByGame({
           <Row
             key={row.key}
             onPress={() => onFilter(row.filters)}
-            accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result, currency)}`}
+            accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result, currency, prefs, true)}`}
             accessibilityHint={`Shows only ${row.label}`}
           >
             <View className={cn("size-2 rounded-full", chipColor[row.chip])} />
@@ -113,7 +122,10 @@ export function ByGame({
             </View>
             <View className="h-1.5 w-10 overflow-hidden rounded-full bg-fill">
               <View
-                className={cn("h-full rounded-full", row.result < 0 ? "bg-loss" : "bg-win")}
+                className={cn(
+                  "h-full rounded-full",
+                  prefs.privacyMode ? "bg-fill-strong" : row.result < 0 ? "bg-loss" : "bg-win",
+                )}
                 style={{ width: `${row.share * 100}%` }}
               />
             </View>
@@ -195,13 +207,14 @@ function CasinoRows({
   currency: CurrencyCode;
   onFilter: (filters: StatsFilters) => void;
 }) {
+  const prefs = usePreferences();
   return (
     <List>
       {rows.map((row) => (
         <Row
           key={row.key}
           onPress={() => onFilter(row.filters)}
-          accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result, currency)}`}
+          accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result, currency, prefs, true)}`}
           accessibilityHint="Shows only this casino"
         >
           <View className="min-w-0 flex-1 gap-0.5">

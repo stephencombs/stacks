@@ -1,16 +1,41 @@
 import { useClerk, useUser } from "@clerk/expo";
+import { describeError } from "@stacks/client-runtime/errors";
+import { exportPersonalSessionsCsv, personalCsvFilename } from "@stacks/client-runtime/export";
+import { gameNames } from "@stacks/client-runtime/format";
+import { useRecordingHome, useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import { themeChoices } from "@stacks/client-runtime/theme";
-import { useState } from "react";
+import { Game } from "@stacks/contracts";
+import { useState, type ReactNode } from "react";
 import { Platform, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
-import { Choice } from "../components/ui/Field";
 import { ControlSurface } from "../components/ui/ControlSurface";
+import { Choice, FormError } from "../components/ui/Field";
+import { Icon } from "../components/ui/Icon";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Sheet } from "../components/ui/Sheet";
-import { Card } from "../components/ui/Surface";
+import { Card, SettingsGroup, SettingsRow } from "../components/ui/Surface";
+import { Switch } from "../components/ui/Switch";
+import { useAccount } from "../lib/account";
+import {
+  setDefaultGame,
+  setDefaultVenue,
+  setPrivacyMode,
+  setShowCents,
+  usePreferences,
+} from "../lib/preferences";
+import { shareCsv } from "../lib/share";
 import { setTheme, useTheme } from "../lib/theme";
 import { Chip } from "./Chip";
+import { SignInButton } from "./SignInButton";
+import { SessionVenuePicker } from "./VenuePicker";
+
+type DefaultGameChoice = Game | "none";
+
+const defaultGameOptions: ReadonlyArray<{ value: DefaultGameChoice; label: string }> = [
+  { value: "none", label: "Not set" },
+  ...Game.literals.map((game) => ({ value: game, label: gameNames[game] })),
+];
 
 /**
  * Your chip, top right of every screen: everything that's only about you opens from it. It's one
@@ -26,7 +51,7 @@ export function YouButton() {
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel="You"
-        accessibilityHint="Your appearance and account"
+        accessibilityHint="Your settings and account"
         onPress={() => setOpen(true)}
         hitSlop={6}
         className="size-11 items-center justify-center"
@@ -44,32 +69,196 @@ export function YouButton() {
   );
 }
 
+/**
+ * The shared You settings sheet opened from Play, Stats, Map, and Crew. Safe both signed in and
+ * signed out by guarding Clerk hooks behind `AccountProvider`.
+ */
 export function YouSheet({ name = "You", onClose }: { name?: string; onClose: () => void }) {
-  const { user } = useUser();
-  const { signOut } = useClerk();
+  const account = useAccount();
+  const sync = useRecordingSync();
+  const { home } = useRecordingHome();
   const theme = useTheme();
+  const prefs = usePreferences();
+  const [picking, setPicking] = useState<"game" | "venue" | null>(null);
+  const [exportState, setExportState] = useState<{ pending: boolean; error: string | null }>({
+    pending: false,
+    error: null,
+  });
+
+  const signedIn = account.available && account.isLoaded && !!account.isSignedIn;
+  const finished = home?.finished ?? [];
+
+  const exportSessions = async () => {
+    if (exportState.pending || finished.length === 0) return;
+    setExportState({ pending: true, error: null });
+    try {
+      const csv = exportPersonalSessionsCsv(finished);
+      await shareCsv(personalCsvFilename(), csv);
+      setExportState({ pending: false, error: null });
+    } catch (error) {
+      setExportState({ pending: false, error: describeError(error) });
+    }
+  };
+
+  return (
+    <Sheet open onClose={onClose} title="You" footer={signedIn ? <SignOutFooter /> : undefined}>
+      {signedIn ? <SignedInCard fallbackName={name} /> : null}
+
+      <View className="gap-2">
+        <Text className="px-1 type-footnote font-medium text-muted">Your sessions</Text>
+        <Card className="gap-1 p-4">
+          <Text accessibilityLiveRegion="polite" className="type-body text-ink">
+            {sync.line.text}
+          </Text>
+          <Text className="type-footnote text-muted">
+            Sessions save on this device first. Sign in to sync them to your account. Signing in or
+            out leaves them on this device.
+          </Text>
+        </Card>
+      </View>
+
+      <SettingsGroup title="Recording defaults">
+        <SettingsRow
+          icon={<Icon name="sessions" color="ink" size={16} />}
+          title="Default game"
+          value={prefs.defaultGame ? gameNames[prefs.defaultGame] : "Not set"}
+          onPress={() => setPicking((current) => (current === "game" ? null : "game"))}
+          accessibilityHint="Changes the default game for new sessions"
+        />
+        <SettingsRow
+          icon={<Icon name="map" color="ink" size={16} />}
+          title="Default casino"
+          value={prefs.defaultVenue?.name ?? "Not set"}
+          onPress={() => setPicking((current) => (current === "venue" ? null : "venue"))}
+          accessibilityHint="Changes the default casino for new sessions"
+        />
+      </SettingsGroup>
+
+      {picking === "game" ? (
+        <Choice
+          label="Default game"
+          labelHidden
+          options={defaultGameOptions}
+          value={prefs.defaultGame ?? "none"}
+          onChange={(next) => {
+            setDefaultGame(next === "none" ? null : next);
+            setPicking(null);
+          }}
+        />
+      ) : picking === "venue" ? (
+        <View className="rounded-xl bg-surface p-3">
+          <SessionVenuePicker
+            selectedId={prefs.defaultVenue?.id ?? null}
+            selected={prefs.defaultVenue}
+            onSelect={(venue) => {
+              setDefaultVenue(venue);
+              setPicking(null);
+            }}
+          />
+        </View>
+      ) : null}
+
+      <SettingsGroup title="Display">
+        <SettingsRow
+          icon={<Icon name="filter" color="ink" size={16} />}
+          title="Show cents"
+          subtitle="Show .00 on whole amounts"
+          trailing={
+            <Switch
+              accessibilityLabel="Show cents"
+              value={prefs.showCents}
+              onValueChange={setShowCents}
+            />
+          }
+        />
+        <SettingsRow
+          icon={<Icon name="eye-off" color="ink" size={16} />}
+          title="Privacy mode"
+          subtitle="Hide amounts across the app"
+          trailing={
+            <Switch
+              accessibilityLabel="Privacy mode"
+              value={prefs.privacyMode}
+              onValueChange={setPrivacyMode}
+            />
+          }
+        />
+      </SettingsGroup>
+
+      <Choice label="Appearance" options={themeChoices} value={theme} onChange={setTheme} />
+
+      <SettingsGroup title="Export">
+        <SettingsRow
+          icon={<Icon name="download" color="ink" size={16} />}
+          title={exportState.pending ? "Exporting…" : "Export sessions (CSV)"}
+          subtitle={
+            finished.length === 0
+              ? "Finish a session to export it"
+              : `${finished.length} finished ${finished.length === 1 ? "session" : "sessions"}`
+          }
+          onPress={
+            finished.length > 0 && !exportState.pending ? () => void exportSessions() : undefined
+          }
+          accessibilityHint="Exports all recorded sessions as a CSV file"
+        />
+      </SettingsGroup>
+      {exportState.error ? <FormError>{exportState.error}</FormError> : null}
+      <Text className="-mt-3 px-1 type-footnote text-muted">
+        All of your session history can always be exported as a file.
+      </Text>
+
+      {!signedIn ? (
+        <SettingsGroup title="Account">
+          <View className="p-4">
+            <AccountActions />
+          </View>
+        </SettingsGroup>
+      ) : null}
+    </Sheet>
+  );
+}
+
+function SignedInCard({ fallbackName }: { fallbackName: string }) {
+  const { user } = useUser();
+  const displayName = user?.fullName ?? fallbackName;
   const email = user?.primaryEmailAddress?.emailAddress;
   return (
-    <Sheet
-      open
-      onClose={onClose}
-      title="You"
-      footer={<Button label="Sign out" variant="danger" onPress={() => void signOut()} />}
-    >
-      <Card className="flex-row items-center gap-3 p-4">
-        <Chip chip={1} name={name} size={46} />
-        <View className="min-w-0 flex-1">
-          <Text numberOfLines={1} className="text-lg font-semibold text-ink">
-            {user?.fullName ?? name}
+    <Card className="flex-row items-center gap-3 p-4">
+      <Chip chip={Platform.OS === "android" ? 5 : 1} name={displayName} size={46} />
+      <View className="min-w-0 flex-1">
+        <Text numberOfLines={1} className="text-lg font-semibold text-ink">
+          {displayName}
+        </Text>
+        {email ? (
+          <Text numberOfLines={1} className="text-sm text-muted">
+            {email}
           </Text>
-          {email ? (
-            <Text numberOfLines={1} className="text-sm text-muted">
-              {email}
-            </Text>
-          ) : null}
-        </View>
-      </Card>
-      <Choice label="Appearance" options={themeChoices} value={theme} onChange={setTheme} />
-    </Sheet>
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
+function SignOutFooter() {
+  const { signOut } = useClerk();
+  return <Button label="Sign out" variant="danger" onPress={() => void signOut()} />;
+}
+
+function Note({ children }: { children: ReactNode }) {
+  return <Text className="text-base text-muted">{children}</Text>;
+}
+
+function AccountActions() {
+  const account = useAccount();
+  if (!account.available)
+    return <Note>Sign-in isn't set up in this copy of Color Up. Recording works without it.</Note>;
+  if (!account.isLoaded)
+    return <Note>Sign-in hasn't loaded yet. Recording on this device works without it.</Note>;
+  return (
+    <View className="gap-3">
+      <Note>An account opens groups and trips with friends.</Note>
+      <SignInButton mode="sign-in" label="Sign in" variant="secondary" />
+      <SignInButton mode="sign-up" label="Create an account" variant="secondary" />
+    </View>
   );
 }

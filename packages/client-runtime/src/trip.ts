@@ -95,12 +95,19 @@ export const tripDates = (trip: Trip) => {
     : `${from} – ${shortDate.format(DateTime.toDateUtc(trip.endedAt))}`;
 };
 
-/** Money the way the board shows it: always signed, cents only when there are some. */
-export const boardMoney = (amount: number, currency: CurrencyCode, signed = true) =>
-  formatMoney(MinorUnits.make(amount), currency, {
+/** Money the way the board shows it: always signed, cents according to device preferences. */
+export const boardMoney = (
+  amount: number,
+  currency: CurrencyCode,
+  signed = true,
+  options: { readonly showCents?: boolean; readonly privacyMode?: boolean } = {},
+) => {
+  if (options.privacyMode) return "••••";
+  return formatMoney(MinorUnits.make(amount), currency, {
     signDisplay: signed ? "exceptZero" : "auto",
-    trailingZeroDisplay: "stripIfInteger",
+    trailingZeroDisplay: options.showCents ? "auto" : "stripIfInteger",
   });
+};
 
 /** Chip colors go to players in the order they joined, 1 to 8, then around again. */
 export const chipOf = (detail: GroupDetail, playerId: PlayerId) => {

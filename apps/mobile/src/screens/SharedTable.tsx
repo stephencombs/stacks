@@ -3,9 +3,8 @@ import { fetchSharedTable } from "@stacks/client-runtime/api";
 import { distinctPlayerNames, formatDay, formatTime } from "@stacks/client-runtime/format";
 import { useJoinTable, useRecordingTable } from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY, visitTitle } from "@stacks/client-runtime/recordingView";
-import type { MinorUnits, VisitId } from "@stacks/contracts";
+import type { VisitId } from "@stacks/contracts";
 import type { TableView } from "@stacks/contracts/recordingCommands";
-import { formatMoney } from "@stacks/shared/money";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { useEffect, useState } from "react";
@@ -25,6 +24,7 @@ import {
 import { PersonalScreen } from "../features/Personal";
 import { JoinSheet, SitDownSheet } from "../features/RecordingForms";
 import { apiUrl } from "../lib/config";
+import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 
 type Props = StaticScreenProps<{ token: string }>;
 
@@ -71,6 +71,7 @@ export function SharedTableScreen({ route }: Props) {
 }
 
 function SharedTable({ view, token }: { view: TableView; token: string }) {
+  const prefs = usePreferences();
   const local = useRecordingTable(view.table.id);
   const join = useJoinTable(token);
   const navigation = useNavigation();
@@ -117,7 +118,7 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
                   </Text>
                   <Text className="type-footnote text-muted">
                     {item.finalResult === null
-                      ? `Playing · in ${formatMoneyText(item.totals.buyIn)}`
+                      ? `Playing · in ${formatDisplayMoney(item.totals.buyIn, RECORDING_CURRENCY, prefs)}`
                       : `Finished ${formatTime(item.visit.finishedAt!)}`}
                   </Text>
                 </View>
@@ -198,5 +199,3 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
     </>
   );
 }
-
-const formatMoneyText = (amount: MinorUnits) => formatMoney(amount, RECORDING_CURRENCY);

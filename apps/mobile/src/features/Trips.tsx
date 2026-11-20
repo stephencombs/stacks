@@ -31,6 +31,7 @@ import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
 import { useGo } from "../lib/go";
+import { HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
 import { useScope } from "../lib/scope";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { Chip } from "./Chip";
@@ -182,6 +183,7 @@ function NoTrips({ onStart }: { onStart: () => void }) {
 
 /** The top three in the trip's standings so far. */
 function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
+  const prefs = usePreferences();
   const names = playerNames(detail);
   const closed = closedPlays(trip);
   const top = tripStandings(closed, localClock).slice(0, 3);
@@ -196,9 +198,18 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
           <Text className="tabular-nums text-sm text-ink">{s.rank}</Text>
           <Chip chip={chipOf(detail, s.playerId)} name={names.get(s.playerId) ?? ""} size={22} />
           <Text
-            className={`tabular-nums text-sm ${s.net > 0 ? "text-win" : s.net < 0 ? "text-loss" : "text-muted"}`}
+            accessibilityLabel={prefs.privacyMode ? HIDDEN_AMOUNT_LABEL : undefined}
+            className={`tabular-nums text-sm ${
+              prefs.privacyMode
+                ? "text-muted"
+                : s.net > 0
+                  ? "text-win"
+                  : s.net < 0
+                    ? "text-loss"
+                    : "text-muted"
+            }`}
           >
-            {boardMoney(s.net, detail.group.currency)}
+            {boardMoney(s.net, detail.group.currency, true, prefs)}
           </Text>
         </View>
       ))}

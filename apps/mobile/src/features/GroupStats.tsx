@@ -10,6 +10,7 @@ import { Button } from "../components/ui/Button";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
+import { usePreferences } from "../lib/preferences";
 import { useGroupStats } from "../lib/stacks";
 import { Chip } from "./Chip";
 import { Race } from "./Race";
@@ -36,6 +37,7 @@ export function GroupStatsView({
   onJustMe: () => void;
 }) {
   const state = useGroupStats(groupId);
+  const prefs = usePreferences();
   const justMe = (
     <Button
       label="Just me"
@@ -74,7 +76,7 @@ export function GroupStatsView({
     );
 
   const { detail, stats } = state.kind === "live" ? state : state.copy;
-  const view = groupStatsView(stats, detail, filters);
+  const view = groupStatsView(stats, detail, filters, prefs);
   return (
     <>
       <Filters lead={chip} chips={view.chips} filtered={view.filtered} onChange={onFilters} />
@@ -180,6 +182,7 @@ function ShownStats({
 
 /** Everyone ranked by result, you marked, the group's result under them. */
 function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => void }) {
+  const prefs = usePreferences();
   return (
     <View className="gap-2">
       <SectionHeading count={view.title}>Standings</SectionHeading>
@@ -188,7 +191,7 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
           <Row
             key={row.playerId}
             onPress={() => onOpen(row)}
-            accessibilityLabel={`${row.rank === null ? "Unranked" : `Rank ${row.rank}`}, ${row.name}${row.you ? ", you" : ""}, ${row.meta}, ${signed(row.result, view.currency)}`}
+            accessibilityLabel={`${row.rank === null ? "Unranked" : `Rank ${row.rank}`}, ${row.name}${row.you ? ", you" : ""}, ${row.meta}, ${signed(row.result, view.currency, prefs, true)}`}
             accessibilityHint="Shows their stats"
             className={cn(row.you && "border-l-[3px] border-l-ink")}
           >

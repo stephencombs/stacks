@@ -54,6 +54,7 @@ import {
 import { Chip } from "../features/Chip";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
 import { useGo } from "../lib/go";
+import { usePreferences } from "../lib/preferences";
 import { Loaded, TripLoaded, useAction, useStacks } from "../lib/stacks";
 
 /** Crew: the trip going now, pinned, then what everyone in your groups has been playing. */
@@ -368,6 +369,7 @@ const activityKey = (item: CrewActivityItem) => {
 
 /** A row of the feed: who's playing where, how a table went, or a trip starting. */
 function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | undefined }) {
+  const { privacyMode } = usePreferences();
   const go = useGo();
   const navigation = useNavigation();
   const target = activityTarget(item);
@@ -459,7 +461,9 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
       `${formatDay(item.endedAt)} · ${item.trip.name}`,
       undefined,
       <Text className="type-callout text-ink">
-        {player.net === 0 ? (
+        {privacyMode ? (
+          <Money amount={player.net} currency={item.group.currency} tone="result" />
+        ) : player.net === 0 ? (
           "Broke even"
         ) : (
           <>

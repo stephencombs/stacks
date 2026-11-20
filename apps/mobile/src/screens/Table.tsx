@@ -185,8 +185,9 @@ function Table({ tableId }: { tableId: TableId }) {
         <Money
           amount={view.inPlay}
           currency={RECORDING_CURRENCY}
+          felt={!view.closed}
           fit
-          className={cn("w-full text-center text-7xl leading-[88px]", ink)}
+          className="w-full text-center text-7xl leading-[88px]"
         />
         <Text className={cn("mt-3 text-center type-headline", ink)}>
           {[tableTitle(table.table), venue?.name].filter(Boolean).join(" · ")}

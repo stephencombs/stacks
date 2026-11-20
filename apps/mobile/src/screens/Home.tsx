@@ -11,7 +11,6 @@ import {
 } from "@stacks/client-runtime/recordingView";
 import { gameChip } from "@stacks/client-runtime/stats";
 import { MinorUnits, type VisitId } from "@stacks/contracts";
-import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
 import { Platform, Text, View } from "react-native";
@@ -25,13 +24,10 @@ import { cn } from "../components/ui/cn";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet, StartSheet } from "../features/RecordingForms";
 import { chipColor } from "../features/StatsParts";
+import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 
 /** How many finished sessions Play lists before See all. */
 const RECENT = 5;
-
-const money = (amount: MinorUnits) => formatMoney(amount, RECORDING_CURRENCY);
-const signed = (amount: MinorUnits) =>
-  formatMoney(amount, RECORDING_CURRENCY, { signDisplay: "exceptZero" });
 
 /** This month's result and your latest finished sessions; the LiveBar shows what's live. */
 export function HomeScreen() {
@@ -169,6 +165,7 @@ function MonthHero({ home }: { home: RecordingHome }) {
 
 function FinishedRow({ item, onPress }: { item: RecordedVisit; onPress: () => void }) {
   const android = Platform.OS === "android";
+  const prefs = usePreferences();
   const title = visitTitle(item.table);
   const finished = item.visit.finishedAt!;
   const when =
@@ -177,10 +174,20 @@ function FinishedRow({ item, onPress }: { item: RecordedVisit; onPress: () => vo
       : formatDay(finished);
   const duration = formatDuration(item.visit.startedAt, finished);
   const meta = [item.venue?.name, when, duration].filter(Boolean).join(" · ");
+  const buyInLabel = formatDisplayMoney(item.totals.buyIn, RECORDING_CURRENCY, prefs, {
+    forAccessibility: true,
+  });
+  const cashOutLabel = formatDisplayMoney(item.totals.cashOut, RECORDING_CURRENCY, prefs, {
+    forAccessibility: true,
+  });
+  const resultLabel = formatDisplayMoney(item.finalResult!, RECORDING_CURRENCY, prefs, {
+    signDisplay: "exceptZero",
+    forAccessibility: true,
+  });
   return (
     <Row
       onPress={onPress}
-      accessibilityLabel={`${when}, ${duration}, ${title},${item.venue ? ` ${item.venue.name},` : ""} in ${money(item.totals.buyIn)}, out ${money(item.totals.cashOut)}, result ${signed(item.finalResult!)}`}
+      accessibilityLabel={`${when}, ${duration}, ${title},${item.venue ? ` ${item.venue.name},` : ""} in ${buyInLabel}, out ${cashOutLabel}, result ${resultLabel}`}
       accessibilityHint="Opens the session"
     >
       <View className={cn("w-1 self-stretch rounded-full", chipColor[gameChip(item.table.game)])} />
