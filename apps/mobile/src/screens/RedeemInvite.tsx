@@ -6,11 +6,11 @@ import type { PlayerInvitePreview } from "@stacks/contracts/recordingCommands";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { useEffect, useState } from "react";
-import { Text } from "react-native";
+import { Platform, Text } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
-import { EmptyState, Skeleton } from "../components/ui/Surface";
+import { EmptyState, PageTitle, Skeleton } from "../components/ui/Surface";
 import { PersonalScreen } from "../features/Personal";
 import { apiUrl } from "../lib/config";
 
@@ -45,6 +45,7 @@ export function RedeemInviteScreen({ route }: Props) {
     navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } });
   return (
     <PersonalScreen>
+      {Platform.OS === "android" ? <PageTitle inContent>Invite</PageTitle> : null}
       {preview === undefined ? (
         <Skeleton className="h-40 w-full rounded-xl" />
       ) : "error" in preview ? (

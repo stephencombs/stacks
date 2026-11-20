@@ -11,13 +11,19 @@ import {
   venueLabel,
 } from "@stacks/client-runtime/format";
 import { chipOf, type TripPlay } from "@stacks/client-runtime/trip";
+import { gameChip } from "@stacks/client-runtime/stats";
+import { useRecordingClock } from "@stacks/client-runtime/recordingReact";
+import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
+import { Icon } from "../components/ui/Icon";
+import { cn } from "../components/ui/cn";
 import { Sheet } from "../components/ui/Sheet";
 import { Badge, List, Row } from "../components/ui/Surface";
 import { Chip } from "./Chip";
+import { chipColor } from "./StatsParts";
 
 function TableSummarySheet({
   play,
@@ -138,6 +144,7 @@ export function SessionList({
   const navigation = useNavigation();
   const names = playerNames(detail);
   const [selected, setSelected] = useState<Extract<TripPlay, { kind: "table" }> | null>(null);
+  const android = Platform.OS === "android";
 
   return (
     <>
@@ -145,12 +152,10 @@ export function SessionList({
         {sessions.map((play) => {
           const { session, results, live } = play;
           const venue = venueLabel(play.venue);
-          const game =
-            play.kind === "session"
-              ? gameNames[play.session.game]
-              : play.table.game
-                ? gameNames[play.table.game]
-                : "No game set";
+          const game = play.kind === "session" ? play.session.game : play.table.game;
+          const gameName = game ? gameNames[game] : "No game set";
+          const playerCount =
+            play.kind === "table" ? play.playerIds.length + play.others.length : results.length;
           const visitId = play.kind === "table" ? play.myVisitId : null;
           const open =
             play.kind === "session"
@@ -164,7 +169,9 @@ export function SessionList({
           // Who's still at a live table, members first.
           const who = live
             ? nameList([
-                ...play.playing.map((id) => names.get(id) ?? "Someone"),
+                ...play.playing.map((id) =>
+                  android && id === detail.myPlayerId ? "You" : (names.get(id) ?? "Someone"),
+                ),
                 ...(play.kind === "table"
                   ? play.others.filter((o) => o.playing).map((o) => o.displayName)
                   : []),
@@ -172,29 +179,41 @@ export function SessionList({
             : "";
           return (
             <Row key={session.id} accessibilityHint={accessibilityHint} onPress={open}>
-              <Chip chip={chipOf(detail, detail.myPlayerId)} name={venue} size={28} />
+              {android ? (
+                <View className={cn("w-1 self-stretch rounded-full", chipColor[gameChip(game)])} />
+              ) : (
+                <Chip chip={chipOf(detail, detail.myPlayerId)} name={venue} size={28} />
+              )}
               <View className="flex-1 gap-0.5">
                 <View className="flex-row items-center gap-2">
-                  <Text numberOfLines={1} className="shrink type-heading text-ink">
-                    {venue}
+                  <Text
+                    numberOfLines={android ? 2 : 1}
+                    className={cn("shrink type-heading text-ink", android && "font-bold")}
+                  >
+                    {android && game ? `${venue} · ${gameName}` : venue}
                   </Text>
-                  {live ? <Badge tone="live">Live</Badge> : null}
+                  {live && !android ? <Badge tone="live">Live</Badge> : null}
                 </View>
                 <Text className="type-footnote text-muted">
-                  {who ? `${who} · ` : ""}
-                  {game} · {live ? "since " : ""}
-                  {formatTime(session.startedAt)}
+                  {android
+                    ? live
+                      ? `${who ? `${who} · ` : ""}since ${formatTime(session.startedAt)}`
+                      : `${formatTime(session.startedAt)} · ${playerCount} ${playerCount === 1 ? "player" : "players"}`
+                    : `${who ? `${who} · ` : ""}${gameName} · ${live ? "since " : ""}${formatTime(session.startedAt)}`}
                 </Text>
               </View>
               {/* A live table's result is only its finished visits; it isn't settled yet. */}
-              {mine && !(live && play.kind === "table") ? (
+              {android && live ? (
+                <TripLiveDuration startedAt={session.startedAt} />
+              ) : mine && !(live && play.kind === "table") ? (
                 <Money
                   amount={mine.net}
                   currency={detail.group.currency}
                   tone="result"
-                  className="type-number"
+                  className={cn("type-number", android && "font-bold")}
                 />
               ) : null}
+              {android ? <Icon name="chevron-right" color="faint" size={18} /> : null}
             </Row>
           );
         })}
@@ -203,5 +222,18 @@ export function SessionList({
         <TableSummarySheet play={selected} detail={detail} onClose={() => setSelected(null)} />
       ) : null}
     </>
+  );
+}
+
+function TripLiveDuration({ startedAt }: { startedAt: DateTime.Utc }) {
+  const now = useRecordingClock();
+  const duration = formatDuration(startedAt, now);
+  return (
+    <Text
+      accessibilityLabel={`Live for ${duration}`}
+      className="type-footnote font-semibold text-live"
+    >
+      ● {duration}
+    </Text>
   );
 }

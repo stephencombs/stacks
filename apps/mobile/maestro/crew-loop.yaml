@@ -62,7 +62,7 @@ onFlowComplete:
 - inputText: "Audit weekend"
 - tapOn: "Start trip"
 - tapOn: "Audit weekend, going"
-- assertVisible: "Audit crew"
+- assertVisible: "Audit crew( · .*)?"
 - tapOn: "Trip options"
 - tapOn: "Delete trip"
 - tapOn: "Delete trip"
@@ -123,6 +123,14 @@ onFlowComplete:
 
 # An existing member cannot claim a guest's identity.
 - back
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element: "Invite"
+          direction: DOWN
+      - tapOn: "Invite"
 - scrollUntilVisible:
     element: "Add a guest"
     direction: DOWN
@@ -132,10 +140,27 @@ onFlowComplete:
     index: 0
 - inputText: "Jonah"
 - tapOn: "Add guest"
-- tapOn: "Send claim link"
-- copyTextFrom: ".*stacks-preview://claim/[A-Za-z0-9]+.*"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: "Send claim link"
+      - copyTextFrom: ".*stacks-preview://claim/[A-Za-z0-9]+.*"
+      - back
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: "Copy link"
+      - tapOn: "Invite"
+      - tapOn: "Add a guest"
+      - longPressOn:
+          id: "guest-name"
+      - tapOn: "Paste"
+      - copyTextFrom:
+          id: "guest-name"
+      - tapOn: "Close"
 - evalScript: ${output.claimLink = maestro.copiedText.match(/stacks-preview:\/\/claim\/[A-Za-z0-9]+/)[0]}
-- back
 - openLink: ${output.claimLink}
 - runFlow:
     when:

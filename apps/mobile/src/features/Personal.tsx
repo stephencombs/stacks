@@ -48,6 +48,7 @@ export function PersonalScreen({
   felt = false,
   session = false,
   scrollRef,
+  contentClassName,
 }: {
   children: ReactNode;
   dock?: ReactNode;
@@ -57,6 +58,7 @@ export function PersonalScreen({
   felt?: boolean;
   session?: boolean;
   scrollRef?: Ref<ScrollViewInstance>;
+  contentClassName?: string;
 }) {
   const header = useNativeHeaderActions(true);
   const insets = useSafeAreaInsets();
@@ -81,7 +83,7 @@ export function PersonalScreen({
         style={foot.scrollStyle}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
-        contentContainerClassName="gap-6 pt-4 pb-8"
+        contentContainerClassName={cn("gap-6 pt-4 pb-8", contentClassName)}
         contentContainerStyle={{
           ...sides,
           flexGrow: 1,
@@ -306,15 +308,19 @@ export function PersonalYouButton() {
         accessibilityHint="Your sessions, appearance and account"
         onPress={() => setOpen(true)}
         hitSlop={6}
-        className="size-11"
+        className="size-11 items-center justify-center"
       >
-        <ControlSurface>
-          {account.available && account.isSignedIn ? (
-            <SignedInChip />
-          ) : (
-            <Icon name="person" color="ink" size={20} />
-          )}
-        </ControlSurface>
+        {Platform.OS === "android" && account.available && account.isSignedIn ? (
+          <SignedInChip />
+        ) : (
+          <ControlSurface>
+            {account.available && account.isSignedIn ? (
+              <SignedInChip />
+            ) : (
+              <Icon name="person" color="ink" size={20} />
+            )}
+          </ControlSurface>
+        )}
       </PressableScale>
       {open ? <PersonalYou onClose={() => setOpen(false)} /> : null}
     </>
@@ -324,6 +330,9 @@ export function PersonalYouButton() {
 /** Your chip, once signed in. Only rendered under Clerk, which useUser needs. */
 function SignedInChip() {
   const { user } = useUser();
+  if (Platform.OS === "android") {
+    return <Chip chip={5} name={user?.fullName ?? user?.firstName ?? "You"} size={32} ring />;
+  }
   return <Chip chip={1} name={user?.firstName ?? user?.fullName ?? "You"} size={32} />;
 }
 
@@ -336,7 +345,7 @@ export function PlayBrand() {
       accessibilityLabel="Color Up"
       className="flex-row items-center gap-2.5"
     >
-      <BrandMark size={30} />
+      <BrandMark size={30} chip={Platform.OS === "android"} />
       <Text className="type-title text-ink">Color Up</Text>
     </View>
   );

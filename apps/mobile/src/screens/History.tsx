@@ -17,7 +17,14 @@ import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
-import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
+import {
+  EmptyState,
+  List,
+  PageTitle,
+  Row,
+  SectionHeading,
+  Skeleton,
+} from "../components/ui/Surface";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 
 type Props = StaticScreenProps<{ period?: string } | undefined>;
@@ -56,6 +63,7 @@ export function HistoryScreen({ route }: Props) {
   const groups = home ? recordingPeriods(home, by) : [];
   return (
     <PersonalScreen scrollRef={scroll}>
+      {Platform.OS === "android" ? <PageTitle inContent>All sessions</PageTitle> : null}
       <SaveStatus status={status} error={error} onRetry={retryLoad} />
       {restore.error ? <FormError>{restore.error}</FormError> : null}
       {home === null ? (

@@ -1,13 +1,21 @@
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { MinorUnits, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
-import { localClock, nightLabel, tripPlays } from "@stacks/client-runtime/trip";
-import { tripNights } from "@stacks/shared/trips";
-import { useState } from "react";
+import {
+  localClock,
+  nightLabel,
+  nightWeekday,
+  ordinal,
+  tripDates,
+  tripPlays,
+} from "@stacks/client-runtime/trip";
+import { playerTrip, tripNights, tripStandings, type TripSession } from "@stacks/shared/trips";
+import { useCallback, useState, type ReactNode } from "react";
 import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
+import { Icon } from "../components/ui/Icon";
 import { Screen, screenError } from "../components/ui/Screen";
 import { EmptyState, PageTitle, SectionHeading } from "../components/ui/Surface";
 import { StartSheet } from "../features/RecordingForms";
@@ -61,37 +69,55 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
   const go = useGo();
   const navigation = useNavigation();
   const [starting, setStarting] = useState(false);
+  const android = Platform.OS === "android";
   const plays = tripPlays(trip);
   const myLive = plays.some((s) => s.live && s.playing.includes(group.myPlayerId));
-  const live = plays.filter((s) => s.live && !s.playing.includes(group.myPlayerId));
+  const live = plays.filter((s) => s.live && (android || !s.playing.includes(group.myPlayerId)));
   const closed = plays.filter((s) => !s.live);
   const nights = tripNights(closed, localClock).toReversed();
   const going = trip.trip.endedAt === null;
   const canStart = going && group.group.currency === RECORDING_CURRENCY;
   const startButton = (
-    <Button label="Start a session" variant="primary" size="lg" onPress={() => setStarting(true)} />
+    <Button
+      label="Start a session"
+      variant="primary"
+      size={android ? "fab" : "lg"}
+      icon={android ? <Icon name="plus" color="ink-inverse" /> : undefined}
+      onPress={() => setStarting(true)}
+    />
   );
+  const headerRight = useCallback(() => <TripActions trip={trip} group={group} />, [trip, group]);
   return (
     <Screen
       shows={{ trip: trip.trip.id }}
+      contentClassName={android ? "gap-4 pt-1" : undefined}
+      live={!android || !myLive}
       fab={canStart && Platform.OS === "android" ? startButton : undefined}
       renderFooter={canStart && Platform.OS !== "android" ? () => startButton : undefined}
     >
       <View className="gap-3">
         <PageTitle
-          context={group.group.name}
-          right={<TripOptionsButton trip={trip} group={group} />}
+          context={android ? `${group.group.name} · ${tripDates(trip.trip)}` : group.group.name}
+          inContent={android}
+          headerRight={android ? headerRight : undefined}
+          right={android ? undefined : <TripOptionsButton trip={trip} group={group} />}
         >
           {trip.trip.name}
         </PageTitle>
-        <Button
-          label="Stats"
-          variant="secondary"
-          className="self-start"
-          onPress={() => go.stats({ groupId: group.group.id, tripId: trip.trip.id })}
-        />
+        {android ? (
+          <TripSummary group={group} closed={closed} nights={nights.length} />
+        ) : (
+          <Button
+            label="Stats"
+            variant="secondary"
+            className="self-start"
+            onPress={() => go.stats({ groupId: group.group.id, tripId: trip.trip.id })}
+          />
+        )}
       </View>
-      <TripHero currency={group.group.currency} me={group.myPlayerId} sessions={closed} />
+      {android ? null : (
+        <TripHero currency={group.group.currency} me={group.myPlayerId} sessions={closed} />
+      )}
       {!going ? (
         <View className="gap-3">
           <Text className="text-base text-muted">This trip has ended. Reopen it to play more.</Text>
@@ -101,7 +127,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
 
       {live.length > 0 ? (
         <View className="gap-2">
-          <SectionHeading>Live now</SectionHeading>
+          {android ? null : <SectionHeading>Live now</SectionHeading>}
           <SessionList sessions={live} detail={group} />
         </View>
       ) : null}
@@ -129,7 +155,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
                 </Text>
               }
             >
-              {nightLabel(night)}
+              {android ? nightWeekday(night) : nightLabel(night)}
             </SectionHeading>
             <SessionList sessions={night.sessions.toReversed()} detail={group} />
           </View>
@@ -163,5 +189,59 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
         )
       ) : null}
     </Screen>
+  );
+}
+
+function TripActions({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
+  const go = useGo();
+  return (
+    <View className="flex-row items-center gap-2">
+      <Button
+        label="Stats"
+        size="sm"
+        onPress={() => go.stats({ groupId: group.group.id, tripId: trip.trip.id })}
+      />
+      <TripOptionsButton trip={trip} group={group} />
+    </View>
+  );
+}
+
+function TripSummary({
+  group,
+  closed,
+  nights,
+}: {
+  group: GroupDetail;
+  closed: ReadonlyArray<TripSession>;
+  nights: number;
+}) {
+  const mine = playerTrip(closed, group.myPlayerId);
+  const standings = tripStandings(closed, localClock);
+  const rank = standings.find((standing) => standing.playerId === group.myPlayerId)?.rank;
+  return (
+    <View className="flex-row flex-wrap justify-between gap-x-3 gap-y-2">
+      <TripStat label="You">
+        <Money
+          amount={MinorUnits.make(mine.net)}
+          currency={group.group.currency}
+          tone="result"
+          className="type-heading font-bold"
+        />
+      </TripStat>
+      <TripStat label="Sessions">{closed.length}</TripStat>
+      <TripStat label="Nights">{nights}</TripStat>
+      <TripStat label="Place">
+        {rank === undefined ? "–" : `${ordinal(rank)} of ${standings.length}`}
+      </TripStat>
+    </View>
+  );
+}
+
+function TripStat({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View className="gap-1">
+      <Text className="type-label text-muted">{label}</Text>
+      <Text className="type-heading font-bold text-ink tabular-nums">{children}</Text>
+    </View>
   );
 }

@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { LiveBar, type ShowsTable } from "../../features/LiveBar";
 import { useNativeHeaderActions } from "../../features/NativeHeaderActions";
 import { FormError } from "./Field";
+import { cn } from "./cn";
 import { FloatingAction } from "./FloatingAction";
 import { PinnedFooter } from "./PinnedFooter";
 import { useScreenFoot } from "./tabBar";
@@ -24,14 +25,18 @@ function Content({ children }: { children: Content }) {
 export function Screen({
   children,
   shows,
+  live = true,
   renderFooter,
   fab,
+  contentClassName,
 }: {
   children: Content;
   shows?: ShowsTable;
+  live?: boolean;
   renderFooter?: ((toast: (toast: Toast) => void) => ReactNode) | undefined;
   /** A floating action button, bottom right above the live bar. */
   fab?: ReactNode;
+  contentClassName?: string;
 }) {
   const footer = renderFooter;
   const header = useNativeHeaderActions();
@@ -48,7 +53,7 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           className="flex-1"
           style={foot.scrollStyle}
-          contentContainerClassName="gap-6 px-4 pt-4 pb-24"
+          contentContainerClassName={cn("gap-6 px-4 pt-4 pb-24", contentClassName)}
         >
           <Content>{children}</Content>
           <View style={{ height: foot.endSpace }} />
@@ -64,11 +69,13 @@ export function Screen({
           </PinnedFooter>
         ) : null}
       </ToastHost>
-      <LiveBar
-        onHeightChange={foot.onLiveBarHeight}
-        {...(shows ? { shows } : {})}
-        {...(foot.above === undefined ? {} : { bottom: foot.above })}
-      />
+      {live ? (
+        <LiveBar
+          onHeightChange={foot.onLiveBarHeight}
+          {...(shows ? { shows } : {})}
+          {...(foot.above === undefined ? {} : { bottom: foot.above })}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }

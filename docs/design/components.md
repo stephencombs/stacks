@@ -6,7 +6,7 @@ Parts live in `apps/mobile/src/components/ui`; `Money` sits one level up and `Ch
 
 Use for an action. Floating icon controls use `IconButton`. They own their round surface (glass, or a filled tonal circle on Android) and require an accessible action label.
 
-Variants: `primary`, `tint`, `secondary`, `ghost`, `danger`. Sizes: `sm`, `md`, `lg`, plus `xl` on mobile. Nothing else exists.
+Variants: `primary`, `tint`, `secondary`, `ghost`, `link`, `danger`. Sizes: `sm`, `md`, `lg`, plus `xl` on mobile. Nothing else exists.
 
 ```
 Is it the single next step on this screen?
@@ -14,6 +14,7 @@ Is it the single next step on this screen?
  └── No
       ├── Destructive or hard to undo? → variant="danger"
       ├── A filled action that mustn't compete with the primary? → variant="tint"
+      ├── A blue navigation action in an Android section header? → variant="link"
       ├── In a toolbar or section header, repeated down a page? → variant="ghost"
       └── Default → secondary, which is what you get with no variant prop
 ```
@@ -122,7 +123,7 @@ On iOS, `Sheet` is the system's sheet, with its own material and motion. On Andr
 
 Keep a form's submit action and submission errors in `footer`, outside the scrolling fields. Secondary outcomes stay in the body so the keyboard leaves room for inputs.
 
-A screen's main actions go in a `PinnedFooter` (the `dock` of `PersonalScreen`, the `renderFooter` of `Screen`). On Android it is a `canvas` block with a hairline top edge (AndFinished), so nothing scrolled behind it, nor the LiveBar, shows through. A floating action goes through `fab`, which keeps its content's width.
+A screen's main actions go in a `PinnedFooter` (the `dock` of `PersonalScreen`, the `renderFooter` of `Screen`). On Android it is a `canvas` block with a hairline top edge (AndFinished), so nothing scrolled behind it, nor the LiveBar, shows through. A floating action goes through `fab`, which keeps its content's width. Android's extended FAB uses a primary `Button` with `size="fab"` and a leading icon.
 
 On Android, `confirmAction` shows a Material 3 alert dialog from `ConfirmDialogHost`: sentence-case text buttons, the destructive one in `loss`. Every Jetpack Compose control (pickers, the date and time dialogs, the confirmation, the action and filter menus) sits in `ComposeHost`, which sets every Material color role from the tokens so stock Android's teal and lavender never show. Don't theme a control by hand beside it; native controls outside Compose take the same tokens from the `withAndroidTheme` config plugin or a wrapper such as `Switch`. Pickers are exposed dropdowns: a full-width field with a trailing arrow.
 

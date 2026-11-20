@@ -2,11 +2,13 @@ import { useNavigation, type StaticScreenProps } from "@react-navigation/native"
 import { GroupId, type GroupDetail } from "@stacks/contracts";
 import { csvFilename, isAdmin } from "@stacks/client-runtime/format";
 import { useState } from "react";
+import { Platform } from "react-native";
 
 import { confirmAction } from "../components/ui/confirmAction";
 import { FormError } from "../components/ui/Field";
 import { Screen } from "../components/ui/Screen";
 import { SettingsLayout, type SettingsLayoutProps } from "../components/ui/SettingsLayout";
+import { PageTitle } from "../components/ui/Surface";
 import { NameSheet } from "../features/NameSheet";
 import { SettingsSkeleton } from "../features/ScreenSkeletons";
 import { afterLeavingGroup } from "../lib/crewRoutes";
@@ -24,11 +26,13 @@ export function GroupSettingsScreen({ route }: Props) {
       query={stacks.group(GroupId.make(route.params.groupId))}
       skeleton={
         <Screen>
+          {Platform.OS === "android" ? <PageTitle inContent>Group settings</PageTitle> : null}
           <SettingsSkeleton />
         </Screen>
       }
       renderError={(message) => (
         <Screen>
+          {Platform.OS === "android" ? <PageTitle inContent>Group settings</PageTitle> : null}
           <FormError>{message}</FormError>
         </Screen>
       )}

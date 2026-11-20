@@ -29,7 +29,7 @@ import * as DateTime from "effect/DateTime";
 import { useKeepAwake } from "expo-keep-awake";
 import { useState } from "react";
 import * as Haptics from "expo-haptics";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -289,7 +289,10 @@ function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDet
         <>
           {live ? <KeepAwake /> : null}
           <View className="gap-3">
-            <PageTitle context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}>
+            <PageTitle
+              inContent={Platform.OS === "android"}
+              context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}
+            >
               {venue.name}
             </PageTitle>
             <View className="flex-row items-center gap-2">

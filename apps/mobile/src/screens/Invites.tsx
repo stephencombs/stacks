@@ -1,8 +1,8 @@
 import { useUser } from "@clerk/expo";
 import type { StaticScreenProps } from "@react-navigation/native";
 import type { GroupDetail, InvitePreview } from "@stacks/contracts";
-import { useState } from "react";
-import { Text } from "react-native";
+import { useState, type ReactNode } from "react";
+import { Platform, Text } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
@@ -20,12 +20,49 @@ const closedReasons = {
   used_up: "This invite has been used up.",
 } as const;
 
+const inviteTitle = Platform.OS === "android" ? <PageTitle inContent>Invite</PageTitle> : null;
+const inviteSkeleton = (
+  <>
+    {inviteTitle}
+    <InviteScreenSkeleton />
+  </>
+);
+
 /** A link that doesn't resolve, said the way the personal invite's page says it. */
 const invalidInvite = (message: string) => (
-  <EmptyState centered title="This invite can't be used">
-    {message}
-  </EmptyState>
+  <>
+    {inviteTitle}
+    <EmptyState centered title="This invite can't be used">
+      {message}
+    </EmptyState>
+  </>
 );
+
+function InviteCard({
+  title,
+  context,
+  children,
+}: {
+  title: string;
+  context: string;
+  children: ReactNode;
+}) {
+  const android = Platform.OS === "android";
+  const heading = (
+    <PageTitle inContent={android} context={context}>
+      {title}
+    </PageTitle>
+  );
+  return (
+    <>
+      {android ? heading : null}
+      <Surface className="gap-5 p-5">
+        {android ? null : heading}
+        {children}
+      </Surface>
+    </>
+  );
+}
 
 export function JoinScreen({ route }: Props) {
   const stacks = useStacks();
@@ -33,7 +70,7 @@ export function JoinScreen({ route }: Props) {
     <Screen>
       <Loaded
         query={stacks.invitePreview(route.params.code)}
-        skeleton={<InviteScreenSkeleton />}
+        skeleton={inviteSkeleton}
         renderError={invalidInvite}
       >
         {(preview) => <JoinView code={route.params.code} preview={preview} />}
@@ -63,12 +100,10 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
   };
 
   return (
-    <Surface className="gap-5 p-5">
-      <PageTitle
-        context={`${preview.memberCount} ${preview.memberCount === 1 ? "member" : "members"}`}
-      >
-        {preview.groupName}
-      </PageTitle>
+    <InviteCard
+      title={preview.groupName}
+      context={`${preview.memberCount} ${preview.memberCount === 1 ? "member" : "members"}`}
+    >
       {preview.alreadyMember ? (
         <>
           <Text className="text-base text-muted">You're already in this group.</Text>
@@ -103,7 +138,7 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
           />
         </>
       )}
-    </Surface>
+    </InviteCard>
   );
 }
 
@@ -123,13 +158,12 @@ export function ClaimScreen({ route }: Props) {
     <Screen>
       <Loaded
         query={stacks.claimPreview(route.params.code)}
-        skeleton={<InviteScreenSkeleton />}
+        skeleton={inviteSkeleton}
         renderError={invalidInvite}
       >
         {(preview) =>
           preview.alreadyMember ? (
-            <Surface className="gap-5 p-5">
-              <PageTitle context={preview.groupName}>You're already in this group</PageTitle>
+            <InviteCard title="You're already in this group" context={preview.groupName}>
               <Text className="text-base text-muted">
                 This link is for {preview.displayName}, who has been playing in {preview.groupName}{" "}
                 as a guest. Opening it is how they join and keep their history. You already play
@@ -141,10 +175,9 @@ export function ClaimScreen({ route }: Props) {
                 size="lg"
                 onPress={() => go.group(preview.groupId)}
               />
-            </Surface>
+            </InviteCard>
           ) : (
-            <Surface className="gap-5 p-5">
-              <PageTitle context={preview.groupName}>{`Are you ${preview.displayName}?`}</PageTitle>
+            <InviteCard title={`Are you ${preview.displayName}?`} context={preview.groupName}>
               <Text className="text-base text-muted">
                 {preview.displayName} has been playing in {preview.groupName} as a guest. Claim it
                 to join the group and make their sessions, results and balance yours.
@@ -157,7 +190,7 @@ export function ClaimScreen({ route }: Props) {
                 pending={claim.pending}
                 onPress={() => void confirm()}
               />
-            </Surface>
+            </InviteCard>
           )
         }
       </Loaded>

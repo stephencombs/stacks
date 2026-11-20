@@ -1,21 +1,30 @@
-import type { SessionId, TableId, TripId, VisitId } from "@stacks/contracts";
+import type { Game, SessionId, TableId, TripId, VisitId } from "@stacks/contracts";
 import { formatTime } from "@stacks/client-runtime/format";
-import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
-import { tableTitle, visitTitle } from "@stacks/client-runtime/recordingView";
+import { useRecordingClock, useRecordingHome } from "@stacks/client-runtime/recordingReact";
+import {
+  elapsedClock,
+  RECORDING_CURRENCY,
+  tableTitle,
+  visitTitle,
+} from "@stacks/client-runtime/recordingView";
+import { gameChip } from "@stacks/client-runtime/stats";
+import { formatMoney } from "@stacks/shared/money";
 import { useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation } from "@react-navigation/native";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
+import type * as DateTime from "effect/DateTime";
 import { useEffect, useState, type ReactNode } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "../components/ui/Button";
-import { Icon } from "../components/ui/Icon";
+import { cn } from "../components/ui/cn";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Sheet } from "../components/ui/Sheet";
 import { useGo } from "../lib/go";
 import { useStacks } from "../lib/stacks";
+import { chipColor } from "./StatsParts";
 
 /** What of your table a screen already shows: the session itself, or a trip that pins it first. */
 export type ShowsTable = { readonly session: SessionId } | { readonly trip: TripId };
@@ -30,7 +39,9 @@ type Placement = {
 type LivePlace = {
   readonly key: string;
   readonly title: string;
-  readonly trailing: string;
+  readonly game: Game | null;
+  readonly startedAt: DateTime.Utc | null;
+  readonly detail: string;
   readonly to: { readonly visitId: VisitId } | { readonly tableId: TableId };
 };
 
@@ -44,13 +55,24 @@ function useLiveSessions(except?: string) {
     ...(home?.active ?? []).map((item) => ({
       key: item.visit.id,
       title: visitTitle(item.table),
-      trailing: `since ${formatTime(item.visit.startedAt)}`,
+      game: item.table.game,
+      startedAt: item.visit.startedAt,
+      detail: [
+        item.venue?.name,
+        `${formatMoney(item.totals.buyIn, RECORDING_CURRENCY, { trailingZeroDisplay: "auto" })} in`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       to: { visitId: item.visit.id },
     })),
     ...(home?.tables ?? []).map((item) => ({
       key: item.table.id,
       title: tableTitle(item.table),
-      trailing: item.startedAt ? `since ${formatTime(item.startedAt)}` : "Nobody playing yet",
+      game: item.table.game,
+      startedAt: item.startedAt,
+      detail: [item.venue?.name, item.playing ? `${item.playing} playing` : "Nobody playing yet"]
+        .filter(Boolean)
+        .join(" · "),
       to: { tableId: item.table.id },
     })),
   ];
@@ -102,14 +124,16 @@ export function LiveSessionsBar({ except }: { except?: string }) {
         ? StackActions.push("Play", { visitId: place.to.visitId })
         : StackActions.push("Table", { tableId: place.to.tableId }),
     );
-  const title = newest.title;
+  const { title, game, startedAt, detail } = newest;
   if (rest.length === 0)
     return (
       <Bar
-        label={`${"visitId" in newest.to ? "Back to your session" : "Back to the table"}, ${title}, ${newest.trailing}`}
+        label={`${"visitId" in newest.to ? "Back to your session" : "Back to the table"}, ${title}, ${startedAt ? `since ${formatTime(startedAt)}, ` : ""}${detail}`}
         hint={"visitId" in newest.to ? "Goes back to your session" : "Goes back to the table"}
         title={title}
-        trailing={newest.trailing}
+        game={game}
+        detail={detail}
+        startedAt={startedAt}
         onPress={() => open(newest)}
       />
     );
@@ -119,7 +143,9 @@ export function LiveSessionsBar({ except }: { except?: string }) {
         label={`${live.length} live sessions, newest ${title}`}
         hint="Lists your live sessions"
         title={title}
-        trailing={`+${rest.length} live`}
+        game={game}
+        detail={`+${rest.length} more · ${detail}`}
+        startedAt={startedAt}
         onPress={() => setPicking(true)}
       />
       {picking ? (
@@ -127,7 +153,7 @@ export function LiveSessionsBar({ except }: { except?: string }) {
           {live.map((item) => (
             <Button
               key={item.key}
-              label={`${item.title} · ${item.trailing}`}
+              label={`${item.title} · ${item.detail}`}
               variant="secondary"
               onPress={() => {
                 setPicking(false);
@@ -161,7 +187,8 @@ function Seat({ shows, ...placement }: Placement & { shows?: ShowsTable | undefi
         label={`Back to your table at ${seat.venueName}, since ${since}`}
         hint="Goes back to your table"
         title={seat.venueName}
-        trailing={`since ${since}`}
+        game={null}
+        startedAt={seat.startedAt}
         onPress={() => go.session(seat.id)}
       />
     </Pinned>
@@ -173,7 +200,7 @@ function Pinned({ bottom, onHeightChange, children }: Placement & { children: Re
   return (
     <View
       pointerEvents="box-none"
-      className="absolute inset-x-0 px-5"
+      className="absolute inset-x-0 px-4"
       onLayout={(event) => onHeightChange?.(event.nativeEvent.layout.height)}
       style={
         bottom === undefined
@@ -190,13 +217,17 @@ function Bar({
   label,
   hint,
   title,
-  trailing,
+  game,
+  detail,
+  startedAt,
   onPress,
 }: {
   label: string;
   hint: string;
   title: string;
-  trailing: string;
+  game: Game | null;
+  detail?: string;
+  startedAt: DateTime.Utc | null;
   onPress: () => void;
 }) {
   return (
@@ -207,18 +238,41 @@ function Bar({
       onPress={onPress}
     >
       <GlassSurface
-        radius={20}
+        radius={16}
         interactive
-        className="min-h-13 flex-row items-center gap-3 rounded-2xl px-4 py-3"
+        className="min-h-14 flex-row items-center gap-3 rounded-2xl px-4 py-2"
       >
-        <View className="size-2 rounded-full bg-live" />
-        <Text className="type-label text-live">Live</Text>
-        <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
-          {title}
-        </Text>
-        <Text className="tabular-nums text-xs text-muted">{trailing}</Text>
-        <Icon name="chevron-right" color="muted" size={16} />
+        <View
+          className={cn("size-8 rounded-full border-[3px] border-line", chipColor[gameChip(game)])}
+        />
+        <View className="min-w-0 flex-1">
+          <Text numberOfLines={1} className="type-callout font-semibold text-ink">
+            {title}
+          </Text>
+          {detail ? (
+            <Text numberOfLines={2} className="type-footnote text-muted">
+              {detail}
+            </Text>
+          ) : null}
+        </View>
+        {startedAt ? (
+          <>
+            <Elapsed since={startedAt} />
+            <View className="size-2 rounded-full bg-live" />
+          </>
+        ) : null}
       </GlassSurface>
     </PressableScale>
+  );
+}
+
+function Elapsed({ since }: { since: DateTime.Utc }) {
+  const now = useRecordingClock();
+  return (
+    <Text
+      className={cn("type-title text-ink tabular-nums", Platform.OS === "ios" && "font-semibold")}
+    >
+      {elapsedClock(since, now, "compact")}
+    </Text>
   );
 }

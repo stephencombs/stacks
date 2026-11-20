@@ -185,7 +185,7 @@ async function load({
     "./features/You": ["YouButton"],
     "./lib/scope": ["ScopeProvider"],
     "./screens/Invites": ["ClaimScreen", "JoinScreen"],
-    "./screens/Crew": ["CrewScreen"],
+    "./screens/Crew": ["CrewGroupsButton", "CrewScreen", "GroupsScreen"],
     "./screens/Group": ["GroupScreen"],
     "./screens/GroupSettings": ["GroupSettingsScreen"],
     "./screens/History": ["HistoryScreen"],

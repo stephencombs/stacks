@@ -1,7 +1,7 @@
 import { useClerk, useUser } from "@clerk/expo";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Choice } from "../components/ui/Field";
@@ -29,11 +29,15 @@ export function YouButton() {
         accessibilityHint="Your appearance and account"
         onPress={() => setOpen(true)}
         hitSlop={6}
-        className="size-11"
+        className="size-11 items-center justify-center"
       >
-        <ControlSurface>
-          <Chip chip={1} name={name} size={32} />
-        </ControlSurface>
+        {Platform.OS === "android" ? (
+          <Chip chip={5} name={user?.fullName ?? name} size={32} ring />
+        ) : (
+          <ControlSurface>
+            <Chip chip={1} name={name} size={32} />
+          </ControlSurface>
+        )}
       </PressableScale>
       {open ? <YouSheet name={name} onClose={() => setOpen(false)} /> : null}
     </>

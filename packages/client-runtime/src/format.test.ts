@@ -15,6 +15,7 @@ import {
 import {
   csvFilename,
   formatPlayed,
+  formatTime,
   isFormerMember,
   isGuest,
   playedSummary,
@@ -127,4 +128,10 @@ it("tells repeated names apart by number after the first, and leaves unique ones
     "Priya 4",
   ]);
   expect(tellApart(["Alex", "Sam"])).toEqual(["Alex", "Sam"]);
+});
+
+it("formats time in the provided timezone", () => {
+  const at = DateTime.makeUnsafe("2026-10-03T03:00:00Z");
+  expect(formatTime(at, DateTime.zoneMakeNamedUnsafe("UTC"))).toBe("3:00 AM");
+  expect(formatTime(at, DateTime.zoneMakeNamedUnsafe("America/New_York"))).toBe("11:00 PM");
 });

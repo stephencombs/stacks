@@ -10,6 +10,7 @@ export type ActionMenuProps = {
   disabled?: boolean;
   /** Opens from a floating "+" button, a screen's main way to add, instead of the "…" button. */
   fab?: boolean;
+  vertical?: boolean;
   actions: ReadonlyArray<{
     label: string;
     icon?: IconName;
@@ -19,7 +20,13 @@ export type ActionMenuProps = {
   }>;
 };
 
-export function ActionMenu({ label, actions, disabled = false, fab = false }: ActionMenuProps) {
+export function ActionMenu({
+  label,
+  actions,
+  disabled = false,
+  fab = false,
+  vertical = false,
+}: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -39,7 +46,7 @@ export function ActionMenu({ label, actions, disabled = false, fab = false }: Ac
         <IconButton
           accessibilityLabel={label}
           disabled={disabled}
-          icon={<Icon name="more" color="ink" size={20} />}
+          icon={<Icon name={vertical ? "more-vertical" : "more"} color="ink" size={20} />}
           onPress={() => setOpen(true)}
         />
       )}

@@ -39,7 +39,7 @@ import { HistoryScreen } from "./screens/History";
 import { HomeScreen } from "./screens/Home";
 import { MapScreen } from "./screens/Map";
 import { ClaimScreen, JoinScreen } from "./screens/Invites";
-import { CrewScreen } from "./screens/Crew";
+import { CrewGroupsButton, CrewScreen, GroupsScreen } from "./screens/Crew";
 import { GroupScreen } from "./screens/Group";
 import { GroupSettingsScreen } from "./screens/GroupSettings";
 import { NewSessionScreen } from "./screens/NewSession";
@@ -64,7 +64,10 @@ const headerOptions = {
 const personalOptions = { ...headerOptions, title: "", headerRight: () => <PersonalYouButton /> };
 
 /** Crew, groups and trips: You with your chip in the group in scope. */
-const crewOptions = { ...headerOptions, headerRight: () => <YouButton /> };
+const crewOptions = {
+  ...headerOptions,
+  ...(Platform.OS === "android" ? {} : { headerRight: () => <YouButton /> }),
+};
 
 const PlayStack = createNativeStackNavigator({
   screenOptions: personalOptions,
@@ -93,23 +96,43 @@ const CrewStack = createNativeStackNavigator({
   screenOptions: crewOptions,
   layout: ({ children }) => <AccountGate>{children}</AccountGate>,
   screens: {
-    Crew: { screen: CrewScreen, options: { title: "" }, linking: "crew" },
+    Crew: {
+      screen: CrewScreen,
+      options: {
+        title: "",
+        ...(Platform.OS === "android"
+          ? {
+              headerRight: () => (
+                <View className="flex-row items-center gap-2">
+                  <CrewGroupsButton />
+                  <YouButton />
+                </View>
+              ),
+            }
+          : {}),
+      },
+      linking: "crew",
+    },
     Group: { screen: GroupScreen, options: { title: "" }, linking: "groups/:groupId" },
     GroupSettings: {
       screen: GroupSettingsScreen,
-      options: { title: "Settings" },
+      options: { title: Platform.OS === "android" ? "" : "Settings" },
       linking: "groups/:groupId/settings",
     },
     Sessions: { screen: SessionsScreen, options: { title: "" }, linking: "trips/:tripId" },
     // An old address. A linking alias here would leave every screen in this stack without typed
     // params, so each is a screen of its own: your groups and a group's People. Old Board,
     // Results and Stats links go to Stats.
-    Groups: { screen: CrewScreen, options: { title: "" }, linking: "groups" },
+    Groups: {
+      screen: Platform.OS === "android" ? GroupsScreen : CrewScreen,
+      options: { title: "", headerShown: Platform.OS !== "android" },
+      linking: "groups",
+    },
     People: { screen: GroupScreen, options: { title: "" }, linking: "groups/:groupId/people" },
     Session: { screen: SessionScreen, options: { title: "" }, linking: "sessions/:sessionId" },
     NewSession: {
       screen: NewSessionScreen,
-      options: { title: "Start a session" },
+      options: { title: Platform.OS === "android" ? "" : "Start a session" },
       linking: "trips/:tripId/sessions/new",
     },
   },
@@ -142,10 +165,14 @@ const InvitesStack = createNativeStackNavigator({
   screenOptions: crewOptions,
   layout: ({ children }) => <AccountGate invited>{children}</AccountGate>,
   screens: {
-    Join: { screen: JoinScreen, options: { title: "Invite" }, linking: "join/:code" },
+    Join: {
+      screen: JoinScreen,
+      options: { title: Platform.OS === "android" ? "" : "Invite" },
+      linking: "join/:code",
+    },
     Claim: {
       screen: ClaimScreen,
-      options: { title: "Invite" },
+      options: { title: Platform.OS === "android" ? "" : "Invite" },
       linking: "claim/:code",
     },
   },
@@ -154,7 +181,7 @@ const InvitesStack = createNativeStackNavigator({
 /** The tabs, and above them the pages that fill the screen: a live session and invitations. */
 const RootStack = createNativeStackNavigator({
   initialRouteName: "Tabs",
-  screenOptions: personalOptions,
+  screenOptions: Platform.OS === "android" ? { ...headerOptions, title: "" } : personalOptions,
   screens: {
     Tabs: { screen: Tabs, options: { headerShown: false } },
     Play: { screen: PlayScreen, linking: "play/:visitId" },
@@ -162,17 +189,17 @@ const RootStack = createNativeStackNavigator({
     SharedTable: {
       screen: SharedTableScreen,
       linking: "t/:token",
-      options: { title: "Shared table" },
+      options: { title: Platform.OS === "android" ? "" : "Shared table" },
     },
     RedeemInvite: {
       screen: RedeemInviteScreen,
       linking: "invite/:token",
-      options: { title: "Invite" },
+      options: { title: Platform.OS === "android" ? "" : "Invite" },
     },
     History: {
       screen: HistoryScreen,
       linking: "history/:period?",
-      options: { title: "All sessions" },
+      options: { title: Platform.OS === "android" ? "" : "All sessions" },
     },
     Invites: { screen: InvitesStack, options: { headerShown: false } },
   },
@@ -249,15 +276,19 @@ function BackToYourPlay() {
 /** Headers and screen backgrounds in the palette, so navigation follows the theme too. */
 function useNavigationTheme() {
   const { theme } = useUniwind();
-  const [canvas, ink, line, loss] = useCSSVariable([
+  const [canvas, ink, line, loss, tabSurface, tabIndicator] = useCSSVariable([
     "--color-canvas",
     "--color-ink",
     "--color-line",
     "--color-loss",
+    "--color-surface",
+    "--color-fill-strong",
   ]).map(String);
   const base = theme === "light" ? DefaultTheme : DarkTheme;
   return {
     ...base,
+    tabSurface,
+    tabIndicator,
     colors: {
       ...base.colors,
       background: canvas!,

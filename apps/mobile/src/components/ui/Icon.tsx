@@ -13,7 +13,10 @@ import {
   Delete,
   Download,
   Ellipsis,
-  MapPinned,
+  EllipsisVertical,
+  Link2,
+  Map,
+  Plane,
   Plus,
   Pencil,
   Search,
@@ -34,6 +37,7 @@ const icons = {
   "chevron-right": ChevronRight,
   "chevron-down": ChevronDown,
   more: Ellipsis,
+  "more-vertical": EllipsisVertical,
   check: Check,
   "arrow-right": ArrowRight,
   close: X,
@@ -45,7 +49,9 @@ const icons = {
   board: ChartLine,
   group: Users,
   stats: ChartColumn,
-  map: MapPinned,
+  map: Map,
+  trip: Plane,
+  link: Link2,
   plus: Plus,
   edit: Pencil,
   search: Search,
@@ -68,6 +74,7 @@ export type IconColor =
   | "live"
   | "win"
   | "loss"
+  | "chip-orange"
   | "felt-soft";
 
 /** A decorative icon in a palette color; lucide here, SF Symbols on iOS (`Icon.ios.tsx`). */

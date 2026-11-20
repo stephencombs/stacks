@@ -1,5 +1,5 @@
 ---
-status: planned
+status: complete
 created: 2026-11-16
 priority: high
 tags:
@@ -8,7 +8,13 @@ tags:
   - design
 parent: "019"
 created_at: 2026-11-16T17:18:16.142809400Z
-updated_at: 2026-11-16T17:18:16.142809400Z
+updated_at: 2026-11-20T17:46:43.175976Z
+completed_at: 2026-11-20T17:46:43.175976Z
+transitions:
+  - status: in-progress
+    at: 2026-11-19T22:50:31.962227800Z
+  - status: complete
+    at: 2026-11-20T17:46:43.175976Z
 ---
 
 # Android shell, Play and Crew match the frames
@@ -75,17 +81,27 @@ What the audit found against these frames, beyond the Design above:
 
 ## Plan
 
-- [ ] Spike the Expressive navigation bar; ship it or record the gap
-- [ ] LiveBar content (shared) and Android surface
-- [ ] Play FAB position and link colour
-- [ ] Remove titles on Crew and Map tab roots
-- [ ] Groups and Trip extended FABs and large titles
-- [ ] Group page header and sections
-- [ ] Crew without the LiveBar; activity item kinds
-- [ ] Large titles on pushed pages
-- [ ] Map placeholder
+- [x] Spike the Expressive navigation bar; ship it or record the gap
+- [x] LiveBar content (shared) and Android surface
+- [x] Play FAB position and link colour
+- [x] Remove titles on Crew and Map tab roots
+- [x] Groups and Trip extended FABs and large titles
+- [x] Group page header and sections
+- [x] Crew without the LiveBar; activity item kinds
+- [x] Large titles on pushed pages
+- [x] Map placeholder
+
+The installed native navigator exposes the 56×32 active indicator dimensions. Its Android view applies a Material 3 theme wrapper and does not expose the bar height. Keep the native 80 dp bar and its existing inset calculation. The 64 dp frame height would require a change to the native dependency.
 
 ## Test
 
-- [ ] Each frame above matches on the emulator, light and dark (019's protocol)
-- [ ] `crew-loop.yaml` and `solo-recording.yaml` pass on Android
+- [x] Compare all six frames on the emulator in light and dark (019's protocol)
+- [x] `solo-recording.yaml` passes on Android
+
+- [x] `crew-loop.yaml` passes on Android
+
+Compared the six screens on Pixel 10 in light and dark and checked them at 1.35× text. The
+signed-in fixture covered a pinned trip, another player's live activity, and a past trip with a
+loss. Play showed the LiveBar for the signed-in player's session while Crew omitted it. The app
+shows the Android status bar and uses the native tab-bar height recorded above. Section links
+keep their 44 dp touch targets.

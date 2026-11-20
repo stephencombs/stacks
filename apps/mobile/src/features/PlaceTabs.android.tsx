@@ -1,10 +1,22 @@
+import type { Theme } from "@react-navigation/native";
 import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/unstable";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export const createPlaceTabs = createNativeBottomTabNavigator;
 
+type TabTheme = Theme & { tabSurface?: string; tabIndicator?: string };
+
 export const placeTabsConfig = {
-  screenOptions: { headerShown: false, tabBarLabelVisibilityMode: "labeled" as const },
+  screenOptions: ({ theme }: { theme: TabTheme }) => ({
+    headerShown: false,
+    tabBarLabelVisibilityMode: "labeled" as const,
+    tabBarActiveIndicatorWidth: 56,
+    tabBarActiveIndicatorHeight: 32,
+    tabBarActiveTintColor: theme.colors.text,
+    tabBarInactiveTintColor: theme.colors.text,
+    tabBarActiveIndicatorColor: theme.tabIndicator,
+    tabBarStyle: { backgroundColor: theme.tabSurface },
+  }),
 };
 
 const drawables: Record<string, string> = {

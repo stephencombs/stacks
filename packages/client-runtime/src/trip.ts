@@ -77,12 +77,15 @@ export const localClock: TripClock = {
   hour: (at) => new Date(DateTime.toEpochMillis(at)).getHours(),
 };
 
-/** "Day 3 · Friday", for the night the board is on. */
-export const nightLabel = (night: TripNight<TripSession>) => {
+export const nightWeekday = (night: TripNight<TripSession>) => {
   const first = night.sessions[0]!;
   const date = new Date(DateTime.toEpochMillis(first.session.startedAt) - NIGHT_ENDS * HOUR);
-  return `Day ${night.number} · ${weekday.format(date)}`;
+  return weekday.format(date);
 };
+
+/** "Day 3 · Friday", for the night the board is on. */
+export const nightLabel = (night: TripNight<TripSession>) =>
+  `Day ${night.number} · ${nightWeekday(night)}`;
 
 /** "Oct 21 – Oct 25", or "Since Oct 21" while the trip is going. */
 export const tripDates = (trip: Trip) => {

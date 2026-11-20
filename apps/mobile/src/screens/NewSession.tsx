@@ -14,13 +14,13 @@ import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Choice, FormError } from "../components/ui/Field";
-import { Screen, screenError } from "../components/ui/Screen";
-import { List, SectionHeading, Surface } from "../components/ui/Surface";
+import { Screen } from "../components/ui/Screen";
+import { List, PageTitle, SectionHeading, Surface } from "../components/ui/Surface";
 import { Switch } from "../components/ui/Switch";
 import { AddGuestSheet } from "../features/AddGuestSheet";
 import { VenuePicker } from "../features/VenuePicker";
@@ -35,15 +35,25 @@ type Props = StaticScreenProps<{
   from?: string;
 }>;
 
+const startTitle =
+  Platform.OS === "android" ? <PageTitle inContent>Start a session</PageTitle> : null;
+const startError = (message: string) => (
+  <Screen>
+    {startTitle}
+    <FormError>{message}</FormError>
+  </Screen>
+);
+
 export function NewSessionScreen({ route }: Props) {
   const stacks = useStacks();
   useLinkedScope(route.params);
   return (
     <TripLoaded
-      renderError={screenError}
+      renderError={startError}
       tripId={TripId.make(route.params.tripId)}
       skeleton={
         <Screen>
+          {startTitle}
           <FormScreenSkeleton />
         </Screen>
       }
@@ -51,10 +61,11 @@ export function NewSessionScreen({ route }: Props) {
       {(trip, detail) =>
         route.params.from ? (
           <Loaded
-            renderError={screenError}
+            renderError={startError}
             query={stacks.session(SessionId.make(route.params.from))}
             skeleton={
               <Screen>
+                {startTitle}
                 <FormScreenSkeleton />
               </Screen>
             }
@@ -156,6 +167,7 @@ function NewSessionForm({
         </>
       )}
     >
+      {startTitle}
       <View className="gap-2">
         <SectionHeading>Where</SectionHeading>
         <Surface className="p-4">

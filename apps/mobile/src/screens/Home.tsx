@@ -14,7 +14,7 @@ import { MinorUnits, type VisitId } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { ActionMenu } from "../components/ui/ActionMenu";
@@ -39,6 +39,7 @@ export function HomeScreen() {
   const navigation = useNavigation();
   const [sheet, setSheet] = useState<"start" | "past" | null>(null);
   const open = (visitId: VisitId) => navigation.navigate("Play", { visitId });
+  const showHistory = () => navigation.navigate("History");
   const opened = (visitId: VisitId) => {
     setSheet(null);
     open(visitId);
@@ -47,6 +48,7 @@ export function HomeScreen() {
   return (
     <PersonalScreen
       live
+      contentClassName={Platform.OS === "android" ? "gap-4 pt-2" : undefined}
       fab={
         <ActionMenu
           fab
@@ -73,15 +75,16 @@ export function HomeScreen() {
         <>
           <MonthHero home={home} />
           {home.finished.length > 0 ? (
-            <View className="gap-2">
+            <View className={Platform.OS === "android" ? "gap-0" : "gap-2"}>
               <SectionHeading
                 action={
                   <Button
                     label="See all"
                     accessibilityLabel="See all sessions"
-                    variant="ghost"
+                    variant={Platform.OS === "android" ? "link" : "ghost"}
                     size="sm"
-                    onPress={() => navigation.navigate("History")}
+                    className={Platform.OS === "android" ? "px-1" : undefined}
+                    onPress={showHistory}
                   />
                 }
               >
@@ -102,7 +105,7 @@ export function HomeScreen() {
               label="All sessions"
               variant="ghost"
               className="self-start"
-              onPress={() => navigation.navigate("History")}
+              onPress={showHistory}
             />
           )}
         </>
@@ -126,9 +129,11 @@ export function HomeScreen() {
 
 /** The month you're in: its result from finished sessions, hours and how many you played. */
 function MonthHero({ home }: { home: RecordingHome }) {
-  const key = localDateText().slice(0, 7);
+  const today = localDateText();
+  const key = today.slice(0, 7);
   const month = recordingPeriods(home, "month").find((item) => item.period === key);
   const count = month?.finished ?? 0;
+  const android = Platform.OS === "android";
   return (
     <View className="gap-1 rounded-[22px] bg-surface p-4">
       <Text accessibilityRole="header" className="type-title text-ink">
@@ -147,13 +152,23 @@ function MonthHero({ home }: { home: RecordingHome }) {
         {count === 0
           ? "No sessions yet this month"
           : `${formatPlayed(month?.minutes ?? 0)} · ${count === 1 ? "1 session" : `${count} sessions`}`}
-        . Live play counts once you finish.
+        {android ? (
+          count > 0 ? (
+            <Text className="font-semibold text-win">
+              {" "}
+              · Week {Math.ceil(Number(today.slice(8, 10)) / 7)}
+            </Text>
+          ) : null
+        ) : (
+          ". Live play counts once you finish."
+        )}
       </Text>
     </View>
   );
 }
 
 function FinishedRow({ item, onPress }: { item: RecordedVisit; onPress: () => void }) {
+  const android = Platform.OS === "android";
   const title = visitTitle(item.table);
   const finished = item.visit.finishedAt!;
   const when =
@@ -170,7 +185,7 @@ function FinishedRow({ item, onPress }: { item: RecordedVisit; onPress: () => vo
     >
       <View className={cn("w-1 self-stretch rounded-full", chipColor[gameChip(item.table.game)])} />
       <View className="min-w-0 flex-1 gap-0.5">
-        <Text numberOfLines={1} className="type-heading text-ink">
+        <Text numberOfLines={1} className={cn("type-heading text-ink", android && "font-bold")}>
           {title}
         </Text>
         <Text numberOfLines={1} className="type-footnote text-muted">
@@ -181,7 +196,7 @@ function FinishedRow({ item, onPress }: { item: RecordedVisit; onPress: () => vo
         amount={item.finalResult!}
         currency={RECORDING_CURRENCY}
         tone="result"
-        className="type-number"
+        className={cn("type-number", android && "font-bold")}
       />
       <Icon name="chevron-right" color="faint" size={16} />
     </Row>

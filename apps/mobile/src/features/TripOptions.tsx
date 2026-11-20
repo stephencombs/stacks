@@ -2,8 +2,8 @@ import { useAuth } from "@clerk/expo";
 import { useNavigation } from "@react-navigation/native";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
-import { useState } from "react";
-import { View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Platform, View } from "react-native";
 
 import { confirmAction } from "../components/ui/confirmAction";
 import { ActionMenu } from "../components/ui/ActionMenu";
@@ -28,6 +28,10 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
   const params = { tripId: trip.trip.id };
   const pending = end.pending || reopen.pending || remove.pending;
   const error = end.error ?? reopen.error ?? remove.error;
+  const android = Platform.OS === "android";
+  useEffect(() => {
+    if (android && error) Alert.alert("Trip update failed", error);
+  }, [android, error]);
   const canDelete =
     trip.sessions.length === 0 &&
     trip.tables.length === 0 &&
@@ -76,8 +80,8 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
   ];
   return (
     <View className="gap-2">
-      <ActionMenu label="Trip options" disabled={pending} actions={actions} />
-      {error ? <FormError>{error}</FormError> : null}
+      <ActionMenu label="Trip options" disabled={pending} actions={actions} vertical />
+      {!android && error ? <FormError>{error}</FormError> : null}
       {renaming ? <RenameTripSheet trip={trip} onClose={() => setRenaming(false)} /> : null}
     </View>
   );

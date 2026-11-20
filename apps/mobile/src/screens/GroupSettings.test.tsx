@@ -53,7 +53,11 @@ it("shows the Name row for owners and admins, hides it for members, and renames 
   );
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   vi.doMock("@react-navigation/native", () => ({ useNavigation: () => ({ navigate: vi.fn() }) }));
-  vi.doMock("react-native", () => ({ View: Container, Text: Container }));
+  vi.doMock("react-native", () => ({
+    View: Container,
+    Text: Container,
+    Platform: { OS: "ios" },
+  }));
   vi.doMock("../lib/scope", () => ({ useLinkedScope: () => {} }));
   vi.doMock("../lib/share", () => ({ shareCsv: vi.fn() }));
   vi.doMock("../lib/stacks", () => ({
@@ -94,6 +98,7 @@ it("shows the Name row for owners and admins, hides it for members, and renames 
     ),
   }));
   vi.doMock("../components/ui/Screen", () => ({ Screen: Container }));
+  vi.doMock("../components/ui/Surface", () => ({ PageTitle: Container }));
   vi.doMock("../components/ui/SettingsLayout", () => ({
     SettingsLayout: ({
       groupName,
