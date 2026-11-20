@@ -9,7 +9,7 @@ import {
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import type { PlayerId, PlayerIdentity, TableId, VisitId } from "@stacks/contracts";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { confirmAction } from "../components/ui/confirmAction";
@@ -20,6 +20,7 @@ import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { useAccount } from "../lib/account";
 import { appUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
+import { Chip } from "./Chip";
 import { AddPlayerSheet } from "./RecordingForms";
 
 /** How many played here, and whether the table has closed: it closes once nobody is playing. */
@@ -59,12 +60,20 @@ export function TableSection({
         At this table
       </SectionHeading>
       <List>
-        {table.visits.map((item) => (
+        {table.visits.map((item, index) => (
           <Row
             key={item.visit.id}
             onPress={() => onOpen(item.visit.id)}
             accessibilityHint="Opens their session"
           >
+            {Platform.OS === "android" ? (
+              <Chip
+                chip={(index % 8) + 1}
+                name={names.get(item.player.id) ?? item.player.displayName}
+                size={36}
+                ring
+              />
+            ) : null}
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="font-medium text-ink">{names.get(item.player.id)}</Text>
               <Text className="text-sm text-muted">
@@ -81,15 +90,17 @@ export function TableSection({
           </Row>
         ))}
       </List>
-      <View className="flex-row flex-wrap gap-2">
-        <Button label="Add player" onPress={() => setOpen("add")} />
-        {table.role === "starter" ? (
-          <>
-            <Button label="Share" variant="ghost" onPress={() => setOpen("share")} />
-            <Button label="Table settings" variant="ghost" onPress={() => setOpen("settings")} />
-          </>
-        ) : null}
-      </View>
+      {Platform.OS === "android" ? null : (
+        <View className="flex-row flex-wrap gap-2">
+          <Button label="Add player" onPress={() => setOpen("add")} />
+          {table.role === "starter" ? (
+            <>
+              <Button label="Share" variant="ghost" onPress={() => setOpen("share")} />
+              <Button label="Table settings" variant="ghost" onPress={() => setOpen("settings")} />
+            </>
+          ) : null}
+        </View>
+      )}
       {table.role === "recorder" ? (
         <Text className="text-sm text-muted">
           The player who started this table asked you to record for everyone here.
@@ -239,13 +250,21 @@ function JoinedTableSection({
         At this table
       </SectionHeading>
       <List>
-        {rows.map((item) => (
+        {rows.map((item, index) => (
           <Row
             key={item.visit.id}
             {...(item.mine
               ? { onPress: () => onOpen(item.visit.id), accessibilityHint: "Opens your session" }
               : {})}
           >
+            {Platform.OS === "android" ? (
+              <Chip
+                chip={(index % 8) + 1}
+                name={labels.get(item.visit.playerId) ?? item.name}
+                size={36}
+                ring
+              />
+            ) : null}
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="font-medium text-ink">{labels.get(item.visit.playerId)}</Text>
               <Text className="text-sm text-muted">

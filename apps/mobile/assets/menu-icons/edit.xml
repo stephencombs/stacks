@@ -1,0 +1,10 @@
+<!-- Material Symbols "edit", Apache License 2.0: https://github.com/google/material-design-icons -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M200,760L257,760L647,370L590,313L200,703L200,760ZM120,840L120,670L676,115Q688,104 703,98.5Q718,93 733,93Q748,93 762.5,98.5Q777,104 789,116L845,173Q857,185 862.5,199.5Q868,214 868,229Q868,244 862.5,259Q857,274 845,286L290,840L120,840ZM618,342L590,313L647,370L618,342Z"/>
+</vector>

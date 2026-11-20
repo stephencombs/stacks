@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  Calendar,
   Check,
   ChartColumn,
   ChartLine,
@@ -65,6 +66,7 @@ const icons = {
   person: User,
   share: Share2,
   trash: Trash2,
+  calendar: Calendar,
 };
 
 export type IconName = keyof typeof icons;
@@ -77,7 +79,8 @@ export type IconColor =
   | "win"
   | "loss"
   | "chip-orange"
-  | "felt-soft";
+  | "felt-soft"
+  | "felt-ink";
 
 /** A decorative icon in a palette color; lucide here, SF Symbols on iOS (`Icon.ios.tsx`). */
 export function Icon({

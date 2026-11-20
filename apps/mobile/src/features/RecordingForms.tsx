@@ -8,7 +8,7 @@ import {
   type TripId,
   type VisitId,
 } from "@stacks/contracts";
-import { gameNames, shortName, tellApart } from "@stacks/client-runtime/format";
+import { formatDay, gameNames, shortName, tellApart } from "@stacks/client-runtime/format";
 import type {
   CachedVenue,
   RecordingInput,
@@ -38,7 +38,7 @@ import {
 import { decimalSeparator, formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import { useState, type ReactNode } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, TextInput, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -46,12 +46,14 @@ import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { DateTimeField } from "../components/ui/DateTimeField";
 import { Sheet } from "../components/ui/Sheet";
+import { List, Row } from "../components/ui/Surface";
 import { Switch } from "../components/ui/Switch";
 import { cn } from "../components/ui/cn";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { useRecordingState } from "../lib/recording";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
+import { Chip } from "./Chip";
 import { SessionVenuePicker } from "./VenuePicker";
 import { applyAmountKey } from "./amountKey";
 import { TripChoice } from "./TableTrip";
@@ -103,11 +105,11 @@ function KeypadAmount({
     <View className="gap-2">
       <View
         accessible
-        accessibilityLabel={label}
+        accessibilityLabel={label || "Amount"}
         accessibilityValue={{ text: amount.text ? amount.text : "none" }}
         className="items-center gap-1 pt-1"
       >
-        <Text className="type-footnote font-medium text-muted">{label}</Text>
+        {label ? <Text className="type-footnote font-medium text-muted">{label}</Text> : null}
         {parsed.error === null ? (
           <Money
             amount={parsed.amount}
@@ -151,6 +153,38 @@ function RecordingKeypad({ amount }: { amount: Amount }) {
 
 /** An amount typed with the system keyboard, for a form with several fields. */
 function TypedAmount({ label, amount }: { label: string; amount: Amount }) {
+  if (Platform.OS === "android")
+    return (
+      <View className="flex-1 gap-1.5">
+        <Text className="px-1 type-footnote font-medium text-muted">{label}</Text>
+        <View
+          className={cn(
+            "min-h-12 flex-row items-center gap-1.5 rounded-2xl border border-line bg-surface px-3.5",
+            amount.error && "border-loss",
+          )}
+        >
+          <Text className="type-body font-medium text-muted">$</Text>
+          <TextInput
+            accessibilityLabel={label}
+            accessibilityHint={amount.error ?? undefined}
+            value={amount.text}
+            onChangeText={amount.set}
+            keyboardType="decimal-pad"
+            autoComplete="off"
+            autoCorrect={false}
+            placeholder="0"
+            placeholderTextColorClassName="accent-muted"
+            className="flex-1 py-2.5 type-body text-ink tabular-nums"
+          />
+        </View>
+        {amount.error ? (
+          <View accessibilityLiveRegion="polite" className="flex-row gap-1.5 px-1">
+            <Icon name="alert" color="loss" size={14} />
+            <Text className="flex-1 type-footnote text-loss">{amount.error}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
   return (
     <TextField
       label={label}
@@ -223,6 +257,8 @@ function RecordingSheet({
   submitLabel,
   submitVariant = "primary",
   cancelLabel,
+  secondaryAction,
+  back = false,
   keypad,
   save,
   onSubmit,
@@ -230,10 +266,12 @@ function RecordingSheet({
   children,
 }: {
   title: string;
-  description?: string;
+  description?: string | undefined;
   submitLabel: string;
   submitVariant?: "primary" | "danger";
   cancelLabel?: string;
+  secondaryAction?: { readonly label: string; readonly onPress: () => void };
+  back?: boolean;
   /** Android pins it under the action, as the frames do, so the fields scroll above it; iOS scrolls it last. */
   keypad?: ReactNode;
   save: { readonly pending: boolean; readonly error: string | null };
@@ -245,6 +283,7 @@ function RecordingSheet({
     <Sheet
       open
       busy={save.pending}
+      back={back}
       onClose={onClose}
       title={title}
       {...(description ? { description } : {})}
@@ -253,16 +292,39 @@ function RecordingSheet({
           {save.error ? (
             <FormError>{save.error} What you entered is still here. Try again.</FormError>
           ) : null}
-          <Button
-            label={submitLabel}
-            variant={submitVariant}
-            size="lg"
-            haptic
-            // A sheet's title and submit often say the same as the button that opened it.
-            testID="sheet-submit"
-            pending={save.pending}
-            onPress={onSubmit}
-          />
+          {Platform.OS === "android" && secondaryAction ? (
+            <View className="flex-row gap-2">
+              <Button
+                label={secondaryAction.label}
+                variant="ghost"
+                size="lg"
+                disabled={save.pending}
+                className="flex-1 border border-line bg-transparent"
+                onPress={secondaryAction.onPress}
+              />
+              <Button
+                label={submitLabel}
+                variant={submitVariant}
+                size="lg"
+                haptic
+                testID="sheet-submit"
+                pending={save.pending}
+                className="flex-1"
+                onPress={onSubmit}
+              />
+            </View>
+          ) : (
+            <Button
+              label={submitLabel}
+              variant={submitVariant}
+              size="lg"
+              haptic
+              // A sheet's title and submit often say the same as the button that opened it.
+              testID="sheet-submit"
+              pending={save.pending}
+              onPress={onSubmit}
+            />
+          )}
           {cancelLabel ? (
             <Button label={cancelLabel} size="lg" disabled={save.pending} onPress={onClose} />
           ) : null}
@@ -284,17 +346,22 @@ const games: ReadonlyArray<{ value: GameChoice; label: string }> = [
 
 function GameFields({
   game,
+  gameName = "",
   highLimit,
   onGame,
+  onGameName,
   onHighLimit,
 }: {
   game: GameChoice;
+  gameName?: string;
   highLimit: boolean;
   onGame: (game: GameChoice) => void;
+  onGameName?: (value: string) => void;
   onHighLimit: (highLimit: boolean) => void;
 }) {
   const [choosing, setChoosing] = useState(false);
-  const gameLabel = games.find((option) => option.value === game)!.label;
+  const baseLabel = games.find((option) => option.value === game)!.label;
+  const gameLabel = game === "other" && gameName.trim() ? gameName.trim() : baseLabel;
   return (
     <>
       <View className="overflow-hidden rounded-xl bg-surface">
@@ -319,6 +386,16 @@ function GameFields({
           <Switch accessibilityLabel="High limit" value={highLimit} onValueChange={onHighLimit} />
         </View>
       </View>
+      {game === "other" && onGameName ? (
+        <TextField
+          label="Game name"
+          placeholder="e.g. Pai Gow Poker"
+          maxLength={60}
+          autoComplete="off"
+          value={gameName}
+          onChangeText={onGameName}
+        />
+      ) : null}
       {choosing ? (
         <Choice
           label="Game"
@@ -327,6 +404,7 @@ function GameFields({
           value={game}
           onChange={(next) => {
             onGame(next);
+            if (next !== "other") onGameName?.("");
             setChoosing(false);
           }}
         />
@@ -390,8 +468,14 @@ function DetailsFields({
   );
 }
 
-const details = (game: GameChoice, highLimit: boolean, venue: CachedVenue | null = null) => ({
+const details = (
+  game: GameChoice,
+  highLimit: boolean,
+  venue: CachedVenue | null = null,
+  gameName = "",
+) => ({
   ...(game === "none" ? {} : { game }),
+  ...(game === "other" && gameName.trim() ? { gameName: gameName.trim() } : {}),
   ...(venue ? { venueId: venue.id } : {}),
   highLimit,
 });
@@ -417,6 +501,7 @@ export function StartSheet({
   const [tripId, setTripId] = useState(initialTripId);
   const buyIn = useAmount("", 1);
   const [game, setGame] = useState<GameChoice>(() => prefs.defaultGame ?? "none");
+  const [gameName, setGameName] = useState("");
   const [venue, setVenue] = useState<CachedVenue | null>(() => prefs.defaultVenue);
   const [highLimit, setHighLimit] = useState(false);
   const [recordingOnly, setRecordingOnly] = useState(false);
@@ -437,7 +522,7 @@ export function StartSheet({
         const venues = venue ? [venue] : [];
         if (watching) {
           const receipt = await save.submit(
-            { type: "open_table", ...details(game, highLimit, venue) },
+            { type: "open_table", ...details(game, highLimit, venue, gameName) },
             venues,
           );
           if (tripId && receipt && "tableId" in receipt.command)
@@ -451,7 +536,7 @@ export function StartSheet({
           {
             type: "start",
             buyIn: amount,
-            ...details(game, highLimit, venue),
+            ...details(game, highLimit, venue, gameName),
           },
           venues,
         );
@@ -479,9 +564,11 @@ export function StartSheet({
       <TripChoice value={tripId} onChange={setTripId} />
       <DetailsFields
         game={game}
+        gameName={gameName}
         highLimit={highLimit}
         venue={venue}
         onGame={setGame}
+        onGameName={setGameName}
         onHighLimit={setHighLimit}
         onVenue={setVenue}
       />
@@ -511,8 +598,13 @@ export function PastSessionSheet({
   }));
   const [timeErrors, setTimeErrors] = useState<Partial<Record<keyof Times, string>>>({});
   const [game, setGame] = useState<GameChoice>(() => prefs.defaultGame ?? "none");
+  const [gameName, setGameName] = useState("");
   const [venue, setVenue] = useState<CachedVenue | null>(() => prefs.defaultVenue);
   const [highLimit, setHighLimit] = useState(false);
+  const inParsed = parseRecordingAmount(buyIn.text, 1);
+  const outParsed = parseRecordingAmount(cashOut.text, 0);
+  const resultPreview =
+    inParsed.error === null && outParsed.error === null ? outParsed.amount - inParsed.amount : null;
   const updateTimes = (next: typeof times) => {
     setTimes(next);
     if (Object.keys(timeErrors).length > 0) {
@@ -550,7 +642,7 @@ export function PastSessionSheet({
             cashOut: totalOut,
             startedAt: parsed.startedAt,
             finishedAt: parsed.finishedAt,
-            ...details(game, highLimit, venue),
+            ...details(game, highLimit, venue, gameName),
           },
           venue ? [venue] : [],
         );
@@ -562,9 +654,29 @@ export function PastSessionSheet({
         <TypedAmount label="Total in" amount={buyIn} />
         <TypedAmount label="Total out" amount={cashOut} />
       </View>
+      {Platform.OS === "android" && resultPreview !== null ? (
+        <View className="flex-row items-center justify-between rounded-xl bg-surface px-4 py-3">
+          <Text className="type-footnote font-medium text-muted">Your result</Text>
+          <Money
+            amount={MinorUnits.make(resultPreview)}
+            currency={RECORDING_CURRENCY}
+            tone="result"
+            className="type-title"
+          />
+        </View>
+      ) : null}
       {timeField("date", "Date")}
-      {timeField("start", "Started")}
-      {timeField("finish", "Finished")}
+      {Platform.OS === "android" ? (
+        <View className="flex-row gap-3">
+          <View className="flex-1">{timeField("start", "Started")}</View>
+          <View className="flex-1">{timeField("finish", "Finished")}</View>
+        </View>
+      ) : (
+        <>
+          {timeField("start", "Started")}
+          {timeField("finish", "Finished")}
+        </>
+      )}
       <View className="flex-row items-center justify-between gap-3">
         <Text className="type-body text-ink">Finished the next day</Text>
         <Switch
@@ -575,9 +687,11 @@ export function PastSessionSheet({
       </View>
       <DetailsFields
         game={game}
+        gameName={gameName}
         highLimit={highLimit}
         venue={venue}
         onGame={setGame}
+        onGameName={setGameName}
         onHighLimit={setHighLimit}
         onVenue={setVenue}
       />
@@ -655,20 +769,41 @@ export function RebuySheet({
     >
       <KeypadAmount
         keypad={false}
-        label="Amount"
+        label={Platform.OS === "android" ? "" : "Amount"}
         amount={amount}
-        hint={
-          buyInTotalPreview(visit.totals.buyIn, amount.text, "add") === null ? undefined : (
+        hint={(() => {
+          const preview = buyInTotalPreview(visit.totals.buyIn, amount.text, "add");
+          const added = parseRecordingAmount(amount.text, 1);
+          if (preview === null) return undefined;
+          return (
             <>
               {who ? `${who}'s` : "Your"} buy-in becomes{" "}
               <Money
-                amount={MinorUnits.make(buyInTotalPreview(visit.totals.buyIn, amount.text, "add")!)}
+                amount={MinorUnits.make(preview)}
                 currency={RECORDING_CURRENCY}
-                className="type-footnote"
+                className="type-footnote font-medium text-ink"
               />
+              {Platform.OS === "android" && added.error === null ? (
+                <>
+                  {"\n"}
+                  <Text className="type-footnote text-faint">
+                    <Money
+                      amount={visit.totals.buyIn}
+                      currency={RECORDING_CURRENCY}
+                      className="type-footnote text-faint"
+                    />
+                    {" + "}
+                    <Money
+                      amount={added.amount}
+                      currency={RECORDING_CURRENCY}
+                      className="type-footnote text-faint"
+                    />
+                  </Text>
+                </>
+              ) : null}
             </>
-          )
-        }
+          );
+        })()}
       />
       {visit.presets.length > 0 ? (
         <View
@@ -762,12 +897,26 @@ export function CashOutSheet({
   const clock = useClock(now);
   const paid = usePaidBy(visit);
   const previous = visit.totals.cashOut;
+  const parsedCashOut = parseRecordingAmount(amount.text, 0);
+  const resultPreview = cashOutResultPreview(visit, amount.text);
   return (
     <RecordingSheet
       keypad={<RecordingKeypad amount={amount} />}
       title={who ? `Cash out ${shortName(who)}` : "Cash out"}
-      description={note ?? "This finishes the session and works out its result."}
+      description={
+        Platform.OS === "android"
+          ? note
+          : (note ?? "This finishes the session and works out its result.")
+      }
       submitLabel={who ? `End ${shortName(who)}'s visit` : "End session"}
+      secondaryAction={
+        Platform.OS === "android"
+          ? {
+              label: `${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`,
+              onPress: () => amount.set(amountInputText(0)),
+            }
+          : undefined
+      }
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -788,53 +937,133 @@ export function CashOutSheet({
         if (receipt?.command.type === "finish") onSaved(receipt.command.entryId, input);
       }}
     >
-      <KeypadAmount
-        keypad={false}
-        label="Amount"
-        amount={amount}
-        hint={
-          previous > 0 ? (
-            <>
-              Earlier cash-outs total{" "}
+      {Platform.OS === "android" ? (
+        <View className="overflow-hidden rounded-xl bg-surface">
+          <View className="gap-1 px-4 py-3">
+            <View className="flex-row items-center justify-between gap-3">
+              <Text className="type-body text-ink">Cash-out</Text>
+              {parsedCashOut.error === null ? (
+                <Money
+                  amount={parsedCashOut.amount}
+                  currency={RECORDING_CURRENCY}
+                  className="text-[28px] leading-[34px] font-bold tabular-nums"
+                />
+              ) : (
+                <Text
+                  className={cn(
+                    "text-[28px] leading-[34px] font-bold tabular-nums",
+                    amount.text ? "text-ink" : "text-faint",
+                  )}
+                >
+                  {amount.text || money(0, prefs.showCents)}
+                </Text>
+              )}
+            </View>
+            {amount.error ? (
+              <Text className="type-footnote text-loss">{amount.error}</Text>
+            ) : previous > 0 ? (
+              <Text className="type-footnote text-muted">
+                Earlier cash-outs total{" "}
+                <Money
+                  amount={previous}
+                  currency={RECORDING_CURRENCY}
+                  className="type-footnote text-muted"
+                />
+                .
+              </Text>
+            ) : null}
+          </View>
+          <View className="gap-1 border-t border-line px-4 py-2.5">
+            <View className="flex-row items-center justify-between gap-3">
+              <Text className="type-body text-ink">Finished</Text>
+              <View className="flex-row items-center gap-2">
+                <View className="flex-row items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5">
+                  <Icon name="calendar" color="muted" size={14} />
+                  <Text className="type-footnote font-medium text-muted">{formatDay(now)}</Text>
+                </View>
+                <DateTimeField
+                  compact
+                  label="Finished at"
+                  kind="time"
+                  value={clock.text}
+                  onChange={clock.set}
+                />
+              </View>
+            </View>
+            {clock.error ? <Text className="type-footnote text-loss">{clock.error}</Text> : null}
+          </View>
+          <View className="flex-row items-center justify-between gap-3 border-t border-line px-4 py-3">
+            <View className="min-w-0 flex-1">
+              <Text numberOfLines={1} className="type-footnote text-muted">
+                {who ? `${who}'s result` : "Your result"}
+              </Text>
+              <Text className="type-footnote text-muted">
+                {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
+              </Text>
+            </View>
+            {resultPreview === null ? (
+              <Text className="text-muted">—</Text>
+            ) : (
               <Money
-                amount={previous}
+                amount={MinorUnits.make(resultPreview)}
                 currency={RECORDING_CURRENCY}
-                className="type-footnote text-muted"
+                tone="result"
+                className="type-title"
               />
-              .
-            </>
-          ) : undefined
-        }
-      />
-      <View className="items-center">
-        <Button
-          label={`${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`}
-          size="sm"
-          // Fills the amount like a preset does: one stray tap shouldn't record anything.
-          onPress={() => amount.set(amountInputText(0))}
-        />
-      </View>
-      <ClockField label="Finished at" clock={clock} />
-      <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
-        <View className="min-w-0 flex-1">
-          <Text numberOfLines={1} className="type-footnote text-muted">
-            {who ? `${who}'s result` : "Your result"}
-          </Text>
-          <Text className="type-footnote text-muted">
-            {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
-          </Text>
+            )}
+          </View>
         </View>
-        {cashOutResultPreview(visit, amount.text) === null ? (
-          <Text className="text-muted">—</Text>
-        ) : (
-          <Money
-            amount={MinorUnits.make(cashOutResultPreview(visit, amount.text)!)}
-            currency={RECORDING_CURRENCY}
-            tone="result"
-            className="type-title"
+      ) : (
+        <>
+          <KeypadAmount
+            keypad={false}
+            label="Amount"
+            amount={amount}
+            hint={
+              previous > 0 ? (
+                <>
+                  Earlier cash-outs total{" "}
+                  <Money
+                    amount={previous}
+                    currency={RECORDING_CURRENCY}
+                    className="type-footnote text-muted"
+                  />
+                  .
+                </>
+              ) : undefined
+            }
           />
-        )}
-      </View>
+          <View className="items-center">
+            <Button
+              label={`${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`}
+              size="sm"
+              // Fills the amount like a preset does: one stray tap shouldn't record anything.
+              onPress={() => amount.set(amountInputText(0))}
+            />
+          </View>
+          <ClockField label="Finished at" clock={clock} />
+          <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
+            <View className="min-w-0 flex-1">
+              <Text numberOfLines={1} className="type-footnote text-muted">
+                {who ? `${who}'s result` : "Your result"}
+              </Text>
+              <Text className="type-footnote text-muted">
+                {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
+              </Text>
+            </View>
+            {resultPreview === null ? (
+              <Text className="text-muted">—</Text>
+            ) : (
+              <Money
+                amount={MinorUnits.make(resultPreview)}
+                currency={RECORDING_CURRENCY}
+                tone="result"
+                className="type-title"
+              />
+            )}
+          </View>
+        </>
+      )}
       <PaidField label="Paid to" paid={paid} />
     </RecordingSheet>
   );
@@ -868,11 +1097,29 @@ export function BuyInTotalSheet({
   const current = visit.totals.buyIn;
   const currentShown = formatDisplayMoney(current, RECORDING_CURRENCY, prefs);
   const total = buyInTotalPreview(current, amount.text, mode);
+  const preview =
+    total === null ? (
+      amount.text ? (
+        "The new total must be greater than zero and within the supported amount."
+      ) : (
+        "Enter an amount to see the new total."
+      )
+    ) : (
+      <>
+        {own ? "Your buy-in becomes" : "New buy-in total"}{" "}
+        <Money
+          amount={MinorUnits.make(total)}
+          currency={RECORDING_CURRENCY}
+          className="type-footnote text-muted"
+        />
+      </>
+    );
   return (
     <RecordingSheet
       keypad={<RecordingKeypad amount={amount} />}
+      back={Platform.OS === "android"}
       title="Edit buy-in"
-      description={`Now ${currentShown} in.`}
+      description={Platform.OS === "android" ? undefined : `Now ${currentShown} in.`}
       submitLabel={buyInTotalLabel(mode, amount.text)}
       save={save}
       onClose={onClose}
@@ -882,41 +1129,48 @@ export function BuyInTotalSheet({
         if (await save.set(total)) onSaved();
       }}
     >
-      <Choice
-        label="Change"
-        options={totalModes}
-        value={mode}
-        onChange={(next) => {
-          setMode(next);
-          save.clearError();
-        }}
-      />
-      <KeypadAmount
-        keypad={false}
-        label={mode === "set" ? "New total" : "Amount"}
-        amount={amount}
-        hint={
-          total === null ? (
-            amount.text ? (
-              "The new total must be greater than zero and within the supported amount."
-            ) : (
-              "Enter an amount to see the new total."
-            )
-          ) : (
-            <>
-              {own ? "Your buy-in becomes" : "New buy-in total"}{" "}
-              <Money
-                amount={MinorUnits.make(total)}
-                currency={RECORDING_CURRENCY}
-                className="type-footnote text-muted"
-              />
-            </>
-          )
-        }
-      />
-      <Text className="type-footnote text-muted">
-        Was {currentShown}. Corrections void earlier buy-ins, which stay in history.
-      </Text>
+      {Platform.OS === "android" ? (
+        <>
+          <KeypadAmount keypad={false} label="" amount={amount} />
+          <Choice
+            label="Change"
+            labelHidden
+            options={totalModes}
+            value={mode}
+            onChange={(next) => {
+              setMode(next);
+              save.clearError();
+            }}
+          />
+          <View className="items-center gap-1 px-2">
+            <Text className="text-center type-footnote text-muted">{preview}</Text>
+            <Text className="text-center type-footnote text-faint">
+              Was {currentShown}. Corrections void earlier buy-ins, which stay in history.
+            </Text>
+          </View>
+        </>
+      ) : (
+        <>
+          <Choice
+            label="Change"
+            options={totalModes}
+            value={mode}
+            onChange={(next) => {
+              setMode(next);
+              save.clearError();
+            }}
+          />
+          <KeypadAmount
+            keypad={false}
+            label={mode === "set" ? "New total" : "Amount"}
+            amount={amount}
+            hint={preview}
+          />
+          <Text className="type-footnote text-muted">
+            Was {currentShown}. Corrections void earlier buy-ins, which stay in history.
+          </Text>
+        </>
+      )}
     </RecordingSheet>
   );
 }
@@ -997,6 +1251,7 @@ export function GameSheet({
 }) {
   const save = useRecordingSubmit();
   const [game, setGame] = useState<GameChoice>(visit.table.game ?? "none");
+  const [gameName, setGameName] = useState(visit.table.gameName ?? "");
   const [highLimit, setHighLimit] = useState(visit.table.highLimit);
   return (
     <RecordingSheet
@@ -1010,6 +1265,7 @@ export function GameSheet({
           visitId: visit.visit.id,
           table: {
             game: game === "none" ? null : game,
+            gameName: game === "other" ? gameName.trim() || null : null,
             venueId: visit.table.venueId,
             highLimit,
           },
@@ -1018,7 +1274,14 @@ export function GameSheet({
       }}
     >
       <View className="gap-1.5">
-        <GameFields game={game} highLimit={highLimit} onGame={setGame} onHighLimit={setHighLimit} />
+        <GameFields
+          game={game}
+          gameName={gameName}
+          highLimit={highLimit}
+          onGame={setGame}
+          onGameName={setGameName}
+          onHighLimit={setHighLimit}
+        />
       </View>
     </RecordingSheet>
   );
@@ -1052,6 +1315,7 @@ export function VenueSheet({
             visitId: visit.visit.id,
             table: {
               game: visit.table.game,
+              gameName: visit.table.gameName ?? null,
               venueId: picked.venue?.id ?? null,
               highLimit: visit.table.highLimit,
             },
@@ -1249,14 +1513,29 @@ export function AddPlayerSheet({
   const [nameError, setNameError] = useState<string | null>(null);
   const savedNames = tellApart(saved.map((player) => player.displayName));
   const chosen =
-    choice === NEW_PLAYER
+    Platform.OS === "android" || choice === NEW_PLAYER
       ? name.trim()
       : (saved.find((player) => player.id === choice)?.displayName ?? "");
   const typed = parseRecordingAmount(amount.text, 1);
+  const submitSaved = async (playerId: PlayerId, label: string) => {
+    const value = amount.read();
+    if (value === null) return;
+    const receipt = await save.submit({
+      type: "join_table",
+      tableId,
+      playerId,
+      buyIn: value,
+    });
+    if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId, label);
+  };
   return (
     <RecordingSheet
       title="Add player"
-      description="Record their buy-ins and cash-outs from this device."
+      description={
+        Platform.OS === "android"
+          ? undefined
+          : "Record their buy-ins and cash-outs from this device."
+      }
       submitLabel={
         chosen && typed.error === null
           ? `Add ${shortName(chosen)} · ${money(typed.amount, prefs.showCents)}`
@@ -1265,7 +1544,7 @@ export function AddPlayerSheet({
       save={save}
       onClose={onClose}
       onSubmit={async () => {
-        const isNew = choice === NEW_PLAYER;
+        const isNew = Platform.OS === "android" || choice === NEW_PLAYER;
         const trimmed = name.trim();
         setNameError(isNew && trimmed === "" ? "Enter the player's name." : null);
         const value = amount.read();
@@ -1278,28 +1557,120 @@ export function AddPlayerSheet({
         if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId, chosen);
       }}
     >
-      {saved.length > 0 ? (
-        <Choice
-          label="Player"
-          value={choice}
-          onChange={setChoice}
-          options={[
-            { value: NEW_PLAYER, label: "Someone new" },
-            ...saved.map((player, index) => ({ value: player.id, label: savedNames[index]! })),
-          ]}
-        />
-      ) : null}
-      {choice === NEW_PLAYER ? (
-        <TextField
-          label="Name"
-          value={name}
-          maxLength={60}
-          autoComplete="off"
-          error={nameError}
-          onChangeText={setName}
-        />
-      ) : null}
-      <TypedAmount label="Buy-in" amount={amount} />
+      {Platform.OS === "android" ? (
+        <>
+          <View className="gap-1.5">
+            <View
+              className={cn(
+                "rounded-t-lg rounded-b-none border-b bg-fill px-3.5 py-2",
+                nameError ? "border-loss" : "border-ink/40",
+              )}
+            >
+              <Text className="type-footnote font-medium text-muted">Name</Text>
+              <TextInput
+                accessibilityLabel="Name"
+                value={name}
+                maxLength={60}
+                autoComplete="off"
+                placeholder="Player's name"
+                placeholderTextColorClassName="accent-muted"
+                onChangeText={(next) => {
+                  setName(next);
+                  if (nameError && next.trim()) setNameError(null);
+                }}
+                className="py-1 type-body text-ink"
+              />
+            </View>
+            {nameError ? (
+              <View accessibilityLiveRegion="polite" className="flex-row gap-1.5 px-1">
+                <Icon name="alert" color="loss" size={14} />
+                <Text className="flex-1 type-footnote text-loss">{nameError}</Text>
+              </View>
+            ) : null}
+          </View>
+          <View className="gap-1.5">
+            <View
+              className={cn(
+                "rounded-t-lg rounded-b-none border-b bg-fill px-3.5 py-2",
+                amount.error ? "border-loss" : "border-ink/40",
+              )}
+            >
+              <Text className="type-footnote font-medium text-muted">First buy-in</Text>
+              <View className="flex-row items-center gap-1.5">
+                <Text className="type-body font-medium text-muted">$</Text>
+                <TextInput
+                  accessibilityLabel="First buy-in"
+                  value={amount.text}
+                  onChangeText={amount.set}
+                  keyboardType="decimal-pad"
+                  autoComplete="off"
+                  autoCorrect={false}
+                  placeholder="0"
+                  placeholderTextColorClassName="accent-muted"
+                  className="flex-1 py-1 type-body text-ink tabular-nums"
+                />
+              </View>
+            </View>
+            {amount.error ? (
+              <View accessibilityLiveRegion="polite" className="flex-row gap-1.5 px-1">
+                <Icon name="alert" color="loss" size={14} />
+                <Text className="flex-1 type-footnote text-loss">{amount.error}</Text>
+              </View>
+            ) : null}
+          </View>
+          {saved.length > 0 ? (
+            <View className="gap-2 pt-1">
+              <Text className="px-1 type-label tracking-wider text-muted uppercase">
+                Saved on this phone
+              </Text>
+              <List>
+                {saved.map((player, index) => {
+                  const label = savedNames[index]!;
+                  return (
+                    <Row key={player.id}>
+                      <Chip chip={(index % 8) + 1} name={label} size={36} ring />
+                      <Text numberOfLines={1} className="min-w-0 flex-1 type-body text-ink">
+                        {label}
+                      </Text>
+                      <Button
+                        label="Add"
+                        size="sm"
+                        disabled={save.pending}
+                        onPress={() => void submitSaved(player.id, label)}
+                      />
+                    </Row>
+                  );
+                })}
+              </List>
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {saved.length > 0 ? (
+            <Choice
+              label="Player"
+              value={choice}
+              onChange={setChoice}
+              options={[
+                { value: NEW_PLAYER, label: "Someone new" },
+                ...saved.map((player, index) => ({ value: player.id, label: savedNames[index]! })),
+              ]}
+            />
+          ) : null}
+          {choice === NEW_PLAYER ? (
+            <TextField
+              label="Name"
+              value={name}
+              maxLength={60}
+              autoComplete="off"
+              error={nameError}
+              onChangeText={setName}
+            />
+          ) : null}
+          <TypedAmount label="Buy-in" amount={amount} />
+        </>
+      )}
     </RecordingSheet>
   );
 }

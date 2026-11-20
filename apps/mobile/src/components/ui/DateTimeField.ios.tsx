@@ -15,6 +15,7 @@ export function DateTimeField({
   onChange,
   error,
   maximumDate,
+  compact: _compact = false,
 }: DateTimeFieldProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => fieldDate(value, kind) ?? new Date());

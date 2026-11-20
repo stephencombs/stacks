@@ -1,4 +1,5 @@
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import { formatTime } from "@stacks/client-runtime/format";
 import {
   liveTable,
   tableActions,
@@ -18,7 +19,7 @@ import {
 import { TableId, type EntryId, type VisitId } from "@stacks/contracts";
 import * as Option from "effect/Option";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -126,16 +127,36 @@ function Table({ tableId }: { tableId: TableId }) {
           ) : null}
           {saved ? (
             <RecordingToast key={saved.entryId}>
-              <Text className="min-w-0 flex-1 text-sm text-ink-inverse">{saved.text}</Text>
+              <Text
+                className={cn(
+                  "min-w-0 flex-1 text-sm",
+                  Platform.OS === "android" ? "text-[#F9FAFB]" : "text-ink-inverse",
+                )}
+              >
+                {saved.text}
+              </Text>
               {saved.undo ? (
-                <Button
-                  label="Undo"
-                  size="sm"
-                  pending={quick.pending}
-                  onPress={() => void undo(saved)}
-                />
+                Platform.OS === "android" ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={quick.pending}
+                    onPress={() => void undo(saved)}
+                    className="px-2 py-1 active:opacity-70"
+                  >
+                    <Text className="type-callout font-semibold text-[#6EE7B7]">Undo</Text>
+                  </Pressable>
+                ) : (
+                  <Button
+                    label="Undo"
+                    size="sm"
+                    pending={quick.pending}
+                    onPress={() => void undo(saved)}
+                  />
+                )
               ) : null}
-              <Button label="Dismiss" size="sm" onPress={() => setSaved(null)} />
+              {Platform.OS === "android" ? null : (
+                <Button label="Dismiss" size="sm" onPress={() => setSaved(null)} />
+              )}
             </RecordingToast>
           ) : null}
           {quick.error ? <FormError>{quick.error}</FormError> : null}
@@ -143,14 +164,14 @@ function Table({ tableId }: { tableId: TableId }) {
           {table.you.playing ? (
             <Button
               label="Back to your session"
-              variant="primary"
+              variant={Platform.OS === "android" && !view.closed ? "feltPrimary" : "primary"}
               size="lg"
               onPress={() => toVisit(table.you.playing!)}
             />
           ) : view.closed ? null : (
             <Button
               label="Sit down and play"
-              variant="primary"
+              variant={Platform.OS === "android" ? "felt" : "primary"}
               size="lg"
               onPress={() => setOpen({ type: "sit" })}
             />
@@ -159,7 +180,7 @@ function Table({ tableId }: { tableId: TableId }) {
       }
     >
       <View className="flex-row items-center justify-between gap-3">
-        <BackButton />
+        <BackButton felt={!view.closed} />
         {view.closed ? (
           <Text accessibilityRole="header" className="type-headline text-ink">
             Finished
@@ -168,6 +189,7 @@ function Table({ tableId }: { tableId: TableId }) {
           <LiveClock since={view.startedAt} />
         )}
         <ActionSlot
+          felt={!view.closed}
           actions={actions}
           onAction={(action) =>
             action === "delete_table"
@@ -178,28 +200,51 @@ function Table({ tableId }: { tableId: TableId }) {
           }
         />
       </View>
-      <View className="items-center gap-3 pt-12">
-        <Text accessibilityRole="header" className={cn("type-body font-medium", soft)}>
-          In play at the table
-        </Text>
-        <Money
-          amount={view.inPlay}
-          currency={RECORDING_CURRENCY}
-          felt={!view.closed}
-          fit
-          className="w-full text-center text-7xl leading-[88px]"
-        />
-        <Text className={cn("mt-3 text-center type-headline", ink)}>
-          {[tableTitle(table.table), venue?.name].filter(Boolean).join(" · ")}
-        </Text>
-        <Text className={cn("text-center type-footnote", soft)}>
-          {view.seats.length === 0
-            ? "Nobody's playing yet"
-            : view.closed
-              ? "Everyone has cashed out"
-              : `${view.playing} playing`}
-        </Text>
-      </View>
+      {Platform.OS === "android" && !view.closed ? (
+        <View className="gap-2.5 px-3 pt-10">
+          <Text accessibilityRole="header" className="type-label text-[13px] text-felt-ink">
+            In play at the table
+          </Text>
+          <Money
+            amount={view.inPlay}
+            currency={RECORDING_CURRENCY}
+            felt
+            fit
+            className="text-[76px] leading-[84px] font-bold tracking-[-2.5px]"
+          />
+          <Text className="type-heading font-medium text-felt-ink">
+            {[tableTitle(table.table), venue?.name].filter(Boolean).join(" · ")}
+          </Text>
+          <Text className="type-footnote text-felt-soft">
+            {view.seats.length === 0
+              ? "Nobody's playing yet"
+              : `${view.startedAt ? `Started ${formatTime(view.startedAt)} · ` : ""}${view.playing} playing`}
+          </Text>
+        </View>
+      ) : (
+        <View className="items-center gap-3 pt-12">
+          <Text accessibilityRole="header" className={cn("type-body font-medium", soft)}>
+            In play at the table
+          </Text>
+          <Money
+            amount={view.inPlay}
+            currency={RECORDING_CURRENCY}
+            felt={!view.closed}
+            fit
+            className="w-full text-center text-7xl leading-[88px]"
+          />
+          <Text className={cn("mt-3 text-center type-headline", ink)}>
+            {[tableTitle(table.table), venue?.name].filter(Boolean).join(" · ")}
+          </Text>
+          <Text className={cn("text-center type-footnote", soft)}>
+            {view.seats.length === 0
+              ? "Nobody's playing yet"
+              : view.closed
+                ? "Everyone has cashed out"
+                : `${view.playing} playing`}
+          </Text>
+        </View>
+      )}
       {view.seats.length === 0 ? (
         <View className="rounded-2xl bg-felt-deep px-4 py-3">
           <Text className="type-footnote text-felt-soft">

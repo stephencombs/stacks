@@ -188,6 +188,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
   }));
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
   vi.doMock("../components/ui/DateTimeField", () => ({ DateTimeField: () => null }));
+  vi.doMock("../features/Chip", () => ({ Chip: () => null }));
   vi.doMock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
   vi.doMock("../components/Money", () => ({
     Money: ({ amount }: { amount: number }) => <span>${amount / 100}</span>,

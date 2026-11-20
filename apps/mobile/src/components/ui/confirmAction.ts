@@ -12,6 +12,7 @@ export function confirmAction(
   message: string,
   label: string,
   onConfirm: Confirmation["onConfirm"],
+  options?: { readonly dismissLabel?: string; readonly icon?: "trash" },
 ) {
   const failed = (error: string | null) => {
     if (error === null) return;
@@ -19,11 +20,11 @@ export function confirmAction(
   };
   const confirmed = () => void Promise.resolve(onConfirm()).then((error) => failed(error ?? null));
   if (Platform.OS === "android") {
-    requestConfirmation({ title, message, label, onConfirm });
+    requestConfirmation({ title, message, label, onConfirm, ...options });
     return;
   }
   Alert.alert(title, message, [
-    { text: "Cancel", style: "cancel" },
+    { text: options?.dismissLabel ?? "Cancel", style: "cancel" },
     { text: label, style: "destructive", onPress: confirmed },
   ]);
 }

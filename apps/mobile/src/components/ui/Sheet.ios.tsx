@@ -22,6 +22,7 @@ export function Sheet({
   description,
   footer,
   busy = false,
+  back: _back = false,
   children,
 }: {
   open: boolean;
@@ -30,6 +31,7 @@ export function Sheet({
   description?: string;
   footer?: ReactNode;
   busy?: boolean;
+  back?: boolean;
   children?: ReactNode;
 }) {
   const id = useId();

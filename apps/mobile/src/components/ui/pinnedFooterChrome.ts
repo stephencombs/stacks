@@ -16,5 +16,12 @@ export function pinnedFooterChrome({
   surface: boolean;
 }) {
   if (!filled) return "";
-  return cn("pt-3", felt ? "bg-felt" : surface && "border-t border-line bg-canvas");
+  return cn(
+    "pt-3",
+    felt
+      ? surface
+        ? "border-t border-white/10 bg-felt-deep"
+        : "bg-felt"
+      : surface && "border-t border-line bg-canvas",
+  );
 }

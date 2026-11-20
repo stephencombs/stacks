@@ -1,8 +1,16 @@
-import { AlertDialog, Column, Text, TextButton } from "@expo/ui/jetpack-compose";
+import {
+  AlertDialog,
+  Column,
+  Icon as ComposeIcon,
+  Text,
+  TextButton,
+} from "@expo/ui/jetpack-compose";
 import { useCSSVariable } from "uniwind";
 
 import { ComposeHost as Host } from "./ComposeHost.android";
 import { answerConfirmation, dismissConfirmation, useConfirmation } from "./confirmStore";
+
+const trashIcon = require("../../../assets/menu-icons/delete.xml");
 
 /**
  * A Material 3 alert dialog: sentence-case text buttons, with the destructive one in loss red.
@@ -17,6 +25,11 @@ export function ConfirmDialogHost() {
   return (
     <Host style={{ position: "absolute", width: 0, height: 0 }}>
       <AlertDialog onDismissRequest={pending ? () => {} : dismissConfirmation}>
+        {confirmation.icon === "trash" ? (
+          <AlertDialog.Icon>
+            <ComposeIcon source={trashIcon} tint={loss} size={24} />
+          </AlertDialog.Icon>
+        ) : null}
         <AlertDialog.Title>
           <Text>{confirmation.title}</Text>
         </AlertDialog.Title>
@@ -28,7 +41,7 @@ export function ConfirmDialogHost() {
         </AlertDialog.Text>
         <AlertDialog.DismissButton>
           <TextButton enabled={!pending} onClick={dismissConfirmation}>
-            <Text>Cancel</Text>
+            <Text>{confirmation.dismissLabel ?? "Cancel"}</Text>
           </TextButton>
         </AlertDialog.DismissButton>
         <AlertDialog.ConfirmButton>
