@@ -19,7 +19,7 @@ import {
 import { TableId, type EntryId, type VisitId } from "@stacks/contracts";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
@@ -58,13 +58,40 @@ export function TableScreen({ route }: Props) {
 }
 
 function Missing() {
+  const navigation = useNavigation();
+
   return (
     <PersonalScreen>
-      <EmptyState title="This table isn't on this device">
+      <EmptyState
+        title="This table isn't on this device"
+        action={
+          <Button
+            label="Back to your play"
+            variant="primary"
+            size="lg"
+            className="mt-2 self-start"
+            onPress={() =>
+              navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } })
+            }
+          />
+        }
+      >
         Tables are saved on the devices that record them.
       </EmptyState>
     </PersonalScreen>
   );
+}
+
+function HideNativeHeader() {
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+
+    return () => navigation.setOptions({ headerShown: true });
+  }, [navigation]);
+
+  return null;
 }
 
 type Open =
@@ -87,23 +114,19 @@ function Table({ tableId }: { tableId: TableId }) {
     navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } }),
   );
 
-  if (state === null) return <PersonalScreen session>{null}</PersonalScreen>;
+  if (state === null) return <PersonalScreen>{null}</PersonalScreen>;
   const signedIn = account.available && account.isSignedIn;
 
   if (!table) {
     if (server?.legacySessionId && signedIn) {
       return (
         <StacksProvider>
-          <ImportedSession
-            sessionId={server.legacySessionId}
-            table={server}
-            back={<BackButton />}
-          />
+          <ImportedSession sessionId={server.legacySessionId} table={server} />
         </StacksProvider>
       );
     }
 
-    if (signedIn && server === undefined) return <PersonalScreen session>{null}</PersonalScreen>;
+    if (signedIn && server === undefined) return <PersonalScreen>{null}</PersonalScreen>;
 
     return <Missing />;
   }
@@ -151,6 +174,52 @@ function Table({ tableId }: { tableId: TableId }) {
     <PersonalScreen
       session
       felt={!view.closed}
+      toast={
+        saved ? (
+          <RecordingToast key={saved.entryId} felt={!view.closed} onDismiss={() => setSaved(null)}>
+            <Text
+              className={cn(
+                "min-w-0 flex-1 text-sm",
+                Platform.OS === "android"
+                  ? "text-[#F9FAFB]"
+                  : view.closed
+                    ? "text-ink-inverse"
+                    : "text-felt-ink",
+              )}
+            >
+              {saved.text}
+            </Text>
+            {saved.undo ? (
+              Platform.OS === "android" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={quick.pending}
+                  onPress={() => void undo(saved)}
+                  className="px-2 py-1 active:opacity-70"
+                >
+                  <Text className="type-callout font-semibold text-[#6EE7B7]">Undo</Text>
+                </Pressable>
+              ) : (
+                <Button
+                  label="Undo"
+                  variant={view.closed ? "secondary" : "felt"}
+                  size="sm"
+                  pending={quick.pending}
+                  onPress={() => void undo(saved)}
+                />
+              )
+            ) : null}
+            {Platform.OS === "android" ? null : (
+              <Button
+                label="Dismiss"
+                variant={view.closed ? "secondary" : "felt"}
+                size="sm"
+                onPress={() => setSaved(null)}
+              />
+            )}
+          </RecordingToast>
+        ) : undefined
+      }
       dock={
         <>
           <LiveSessionsBar except={tableId} />
@@ -158,40 +227,6 @@ function Table({ tableId }: { tableId: TableId }) {
             <View accessibilityLiveRegion="polite" className="rounded-xl bg-fill px-4 py-2">
               <Text className="text-sm text-ink">{notice}</Text>
             </View>
-          ) : null}
-          {saved ? (
-            <RecordingToast key={saved.entryId}>
-              <Text
-                className={cn(
-                  "min-w-0 flex-1 text-sm",
-                  Platform.OS === "android" ? "text-[#F9FAFB]" : "text-ink-inverse",
-                )}
-              >
-                {saved.text}
-              </Text>
-              {saved.undo ? (
-                Platform.OS === "android" ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={quick.pending}
-                    onPress={() => void undo(saved)}
-                    className="px-2 py-1 active:opacity-70"
-                  >
-                    <Text className="type-callout font-semibold text-[#6EE7B7]">Undo</Text>
-                  </Pressable>
-                ) : (
-                  <Button
-                    label="Undo"
-                    size="sm"
-                    pending={quick.pending}
-                    onPress={() => void undo(saved)}
-                  />
-                )
-              ) : null}
-              {Platform.OS === "android" ? null : (
-                <Button label="Dismiss" size="sm" onPress={() => setSaved(null)} />
-              )}
-            </RecordingToast>
           ) : null}
           {quick.error ? <FormError>{quick.error}</FormError> : null}
           {deletion.error ? <FormError>{deletion.error}</FormError> : null}
@@ -213,6 +248,7 @@ function Table({ tableId }: { tableId: TableId }) {
         </>
       }
     >
+      <HideNativeHeader />
       <View className="flex-row items-center justify-between gap-3">
         <BackButton felt={!view.closed} />
         {view.closed ? (

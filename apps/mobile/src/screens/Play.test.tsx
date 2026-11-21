@@ -88,6 +88,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
       actions.map((a) => <Button key={a.label} {...a} />),
   }));
   vi.doMock("../components/ui/Sheet", () => ({
+    SheetHost: Container,
     Sheet: ({ children }: { children: ReactNode }) => <section>{children}</section>,
   }));
   vi.doMock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
@@ -105,10 +106,21 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     Skeleton: () => null,
   }));
   vi.doMock("../features/Personal", () => ({
-    PersonalScreen: ({ children, dock }: { children: ReactNode; dock?: ReactNode }) => (
+    PersonalScreen: ({
+      children,
+      dock,
+      toast,
+    }: {
+      children: ReactNode;
+      dock?: ReactNode;
+      toast?: ReactNode;
+    }) => (
       <main>
         {children}
-        <footer>{dock}</footer>
+        <footer>
+          {toast}
+          {dock}
+        </footer>
       </main>
     ),
     SaveStatus: () => null,

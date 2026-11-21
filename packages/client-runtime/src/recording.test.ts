@@ -588,6 +588,24 @@ it("bounds monetary totals and rejects invalid new facts before saving", async (
 });
 
 describe("persisted document validation", () => {
+  it("opens and keeps recording an older ledger with an empty repayments list", async () => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(start(store));
+    const id = visitId(store);
+    await store.close();
+    db.document = {
+      revision: db.document.revision,
+      payload: JSON.stringify({ ...JSON.parse(db.document.payload!), repayments: [] }),
+    };
+
+    store = await open(db);
+    await store.execute(store.prepare({ type: "finish", visitId: id, amount: 15000 }));
+    store = await reload(store, db);
+    expect(recordingHome(store.getSnapshot().state!).finished).toHaveLength(1);
+    await store.close();
+  });
+
   it.each([
     "json",
     "version",

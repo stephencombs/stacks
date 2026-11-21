@@ -8,6 +8,9 @@ import { Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { TextField } from "../components/ui/Field";
+import { Icon } from "../components/ui/Icon";
+import { Sheet } from "../components/ui/Sheet";
+import { Surface } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useDebounced } from "../lib/useDebounced";
 
@@ -49,27 +52,50 @@ function OptionRow({
       accessibilityLabel={title}
       accessibilityState={{ checked: selected }}
       onPress={onSelect}
-      className={cn("min-h-11 rounded-xl px-3 py-2.5", selected ? "bg-ink" : "active:bg-fill")}
+      className={cn(
+        "min-h-11 flex-row items-center gap-3 rounded-xl px-3 py-2.5",
+        selected ? "bg-fill" : "active:bg-fill",
+      )}
     >
-      <Text
-        numberOfLines={1}
-        className={cn("text-base font-medium", selected ? "text-ink-inverse" : "text-ink")}
-      >
-        {title}
-      </Text>
-      {detail ? (
-        <Text
-          numberOfLines={1}
-          className={cn("text-sm", selected ? "text-ink-inverse/70" : "text-muted")}
-        >
-          {detail}
+      <View className="min-w-0 flex-1">
+        <Text numberOfLines={1} className="text-base font-medium text-ink">
+          {title}
         </Text>
-      ) : null}
+        {detail ? (
+          <Text numberOfLines={1} className="text-sm text-muted">
+            {detail}
+          </Text>
+        ) : null}
+      </View>
+      {selected ? <Icon name="check" color="ink" size={18} /> : null}
     </Pressable>
   );
 }
 
 type Near = { lat: number; lng: number };
+
+export function CasinoPickerSheet({
+  onClose,
+  onSelect,
+  ...picker
+}: Parameters<typeof SessionVenuePicker>[0] & { onClose: () => void }) {
+  return (
+    <Sheet
+      open
+      back
+      title={picker.context === "default" ? "Default casino" : "Casino"}
+      onClose={onClose}
+    >
+      <SessionVenuePicker
+        {...picker}
+        onSelect={(venue) => {
+          onSelect(venue);
+          onClose();
+        }}
+      />
+    </Sheet>
+  );
+}
 
 const here = () =>
   Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).then(
@@ -86,10 +112,12 @@ export function SessionVenuePicker({
   selectedId,
   selected,
   onSelect,
+  context = "session",
 }: {
   selectedId: VenueId | null;
   selected: CachedVenue | null;
   onSelect: (venue: CachedVenue | null) => void;
+  context?: "session" | "default";
 }) {
   const [text, setText] = useState("");
   const q = useDebounced(text.trim());
@@ -154,6 +182,7 @@ export function SessionVenuePicker({
         placeholder="Search casinos"
         autoCorrect={false}
         returnKeyType="search"
+        inputClassName="rounded-[10px]"
       />
       {near ? null : (
         <Button
@@ -179,29 +208,35 @@ export function SessionVenuePicker({
           ) : null}
         </View>
       ) : null}
-      <View accessibilityRole="radiogroup">
-        {heading ? <Text className="pb-1 text-sm text-muted">{heading}</Text> : null}
-        {selectedId !== null && !shown.some((venue) => venue.id === selectedId) ? (
-          <Text accessibilityLiveRegion="polite" className="px-3 py-2 text-sm text-muted">
-            Current casino unavailable. This session keeps it until you choose another casino or Not
-            listed.
-          </Text>
-        ) : null}
-        {shown.map((venue) => (
-          <VenueOption
-            key={venue.id}
-            venue={venue}
-            selected={selectedId === venue.id}
-            onSelect={() => onSelect(venue)}
+      <Surface className="rounded-[14px] p-1">
+        <View accessibilityRole="radiogroup">
+          {heading ? <Text className="px-2 pb-1 text-sm text-muted">{heading}</Text> : null}
+          {selectedId !== null && !shown.some((venue) => venue.id === selectedId) ? (
+            <Text accessibilityLiveRegion="polite" className="px-3 py-2 text-sm text-muted">
+              Current casino unavailable. This session keeps it until you choose another casino or{" "}
+              {context === "default" ? "Not set" : "Not listed"}.
+            </Text>
+          ) : null}
+          {shown.map((venue) => (
+            <VenueOption
+              key={venue.id}
+              venue={venue}
+              selected={selectedId === venue.id}
+              onSelect={() => onSelect(venue)}
+            />
+          ))}
+          <OptionRow
+            title={context === "default" ? "Not set" : "Not listed"}
+            detail={
+              context === "default"
+                ? "Start new sessions without a casino"
+                : "Keep this session without a casino"
+            }
+            selected={selectedId === null}
+            onSelect={() => onSelect(null)}
           />
-        ))}
-        <OptionRow
-          title="Not listed"
-          detail="Keep this session without a casino"
-          selected={selectedId === null}
-          onSelect={() => onSelect(null)}
-        />
-      </View>
+        </View>
+      </Surface>
     </View>
   );
 }

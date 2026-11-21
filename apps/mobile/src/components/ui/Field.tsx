@@ -1,9 +1,10 @@
-import { useId, type ReactNode } from "react";
+import { use, useId, type ReactNode } from "react";
 import { Text, TextInput, View, type TextInputProps } from "react-native";
 
 import { Icon } from "./Icon";
 import { cn } from "./cn";
 import { FieldChoice } from "./FieldChoice";
+import { InSheet } from "./sheetContext";
 
 function FieldLabel({ id, children }: { id?: string; children: ReactNode }) {
   return (
@@ -32,6 +33,7 @@ export function TextField({
   inputClassName?: string;
 }) {
   const id = useId();
+  const inSheet = use(InSheet);
 
   return (
     <View className={cn("gap-1.5", className)}>
@@ -42,7 +44,8 @@ export function TextField({
         aria-labelledby={id}
         placeholderTextColorClassName="accent-muted"
         className={cn(
-          "min-h-12 rounded-2xl border border-line bg-surface px-4 py-3 type-body text-ink",
+          "min-h-12 rounded-2xl border border-line px-4 py-3 type-body text-ink",
+          inSheet ? "bg-raised" : "bg-surface",
           error && "border-loss",
           inputClassName,
         )}
@@ -81,6 +84,7 @@ export function Choice<A extends string>({
   onChange,
   labelHidden = false,
   presentation = "automatic",
+  inline = false,
 }: {
   label: string;
   options: ReadonlyArray<{ readonly value: A; readonly label: string }>;
@@ -89,6 +93,9 @@ export function Choice<A extends string>({
   /** Read out but not shown, where the options speak for themselves. */
   labelHidden?: boolean;
   presentation?: "automatic" | "menu";
+  inline?: boolean;
 }) {
-  return <FieldChoice {...{ label, options, value, onChange, labelHidden, presentation }} />;
+  return (
+    <FieldChoice {...{ label, options, value, onChange, labelHidden, presentation, inline }} />
+  );
 }

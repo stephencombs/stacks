@@ -6,17 +6,36 @@ import { Platform, Pressable, Text, View } from "react-native";
 import { cn } from "./cn";
 import { Icon } from "./Icon";
 import { HeaderTitle } from "./HeaderTitle";
+import { InSheet } from "./sheetContext";
 
 export function Surface({ children, className }: { children: ReactNode; className?: string }) {
+  const inSheet = use(InSheet);
+
   return (
-    <View className={cn("overflow-hidden rounded-[22px] bg-surface", className)}>{children}</View>
+    <View
+      className={cn(
+        "overflow-hidden rounded-[22px]",
+        inSheet ? "bg-raised" : "bg-surface",
+        className,
+      )}
+    >
+      {children}
+    </View>
   );
 }
 
 /** @public */
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
+  const inSheet = use(InSheet);
+
   return (
-    <View className={cn("overflow-hidden rounded-[22px] bg-surface p-4", className)}>
+    <View
+      className={cn(
+        "overflow-hidden rounded-[22px] p-4",
+        inSheet ? "bg-raised" : "bg-surface",
+        className,
+      )}
+    >
       {children}
     </View>
   );
@@ -97,10 +116,12 @@ export function PageTitle({
     navigation.setOptions({
       title: inContent ? "" : children,
       headerLargeTitle: false,
-      ...(Platform.OS === "ios" && !scoped && !inContent ? { headerTitle } : null),
+      ...(Platform.OS === "ios" && !scoped && !inContent
+        ? { headerTitle: context?.trim() ? headerTitle : undefined }
+        : null),
       ...(headerRight ? { headerRight } : null),
     });
-  }, [navigation, children, headerTitle, headerRight, inContent, route?.name]);
+  }, [navigation, children, context, headerTitle, headerRight, inContent, route?.name]);
 
   if (nativeTitle && !tag && !right && !context) return null;
 

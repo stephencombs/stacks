@@ -861,6 +861,8 @@ export const elapsedClock = (
   return `${hours}:${minutes.toString().padStart(2, "0")}:${secondsText}`;
 };
 
+const MIN_HOURLY_MS = 60_000;
+
 export const sessionReadout = (visit: RecordingVisitView, now: DateTime.Utc) => {
   const end = visit.visit.finishedAt ?? now;
   const elapsed = Math.max(0, ms(end) - ms(visit.visit.startedAt));
@@ -874,7 +876,7 @@ export const sessionReadout = (visit: RecordingVisitView, now: DateTime.Utc) => 
         entry.kind === "buy_in" && entry.voidedAt !== null && entry.voidReason !== UNDONE_REASON,
     ),
     hourly:
-      visit.finalResult === null || elapsed === 0
+      visit.finalResult === null || elapsed < MIN_HOURLY_MS
         ? null
         : personalStats([visit], DateTime.zoneMakeNamedUnsafe("UTC")).summary.hourlyResult,
   };

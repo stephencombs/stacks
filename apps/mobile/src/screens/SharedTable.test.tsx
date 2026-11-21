@@ -169,6 +169,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
     ),
   }));
   vi.doMock("../components/ui/Sheet", () => ({
+    SheetHost: Container,
     Sheet: ({
       title,
       description,

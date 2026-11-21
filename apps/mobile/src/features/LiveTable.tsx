@@ -25,7 +25,7 @@ import {
 import { shortName } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
 import type * as DateTime from "effect/DateTime";
-import { useState } from "react";
+import { use, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
@@ -37,6 +37,7 @@ import { FormError } from "../components/ui/Field";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
+import { InSheet } from "../components/ui/sheetContext";
 import { formatDisplayMoney, HIDDEN_AMOUNT, usePreferences } from "../lib/preferences";
 import {
   AddPlayerSheet,
@@ -349,6 +350,7 @@ export function SeatSheet({
   onHistory: (visitId: VisitId) => void;
 }) {
   const { visit } = useRecordingVisit(seat.visitId);
+  const inSheet = use(InSheet);
   const prefs = usePreferences();
   const quick = useRecordingSubmit();
   const [step, setStep] = useState<SeatStep>("menu");
@@ -365,6 +367,7 @@ export function SeatSheet({
       <RebuySheet
         visit={visit}
         who={seat.name}
+        back
         onClose={back}
         onSaved={(entryId, input) =>
           onRecorded({
@@ -383,6 +386,7 @@ export function SeatSheet({
         visit={visit}
         who={seat.name}
         note={cashOutNote(table.seats, seat.visitId)}
+        back
         onClose={back}
         onSaved={(entryId, input) =>
           onRecorded({
@@ -398,6 +402,7 @@ export function SeatSheet({
     return (
       <ReopenSheet
         visit={visit}
+        back
         onClose={back}
         onReopened={() =>
           onRecorded({ visitId: seat.visitId, text: `${seat.name} is playing again.` })
@@ -410,6 +415,7 @@ export function SeatSheet({
       <SitDownSheet
         tableId={visit.visit.tableId}
         player={PlayerIdentity.make({ id: seat.playerId, displayName: seat.name })}
+        back
         onClose={back}
         onSeated={(next) => onSeated(next, seat.name)}
       />
@@ -444,7 +450,12 @@ export function SeatSheet({
       description={seat.status}
       onClose={onClose}
     >
-      <View className="flex-row items-baseline justify-between gap-3 rounded-xl bg-surface p-4">
+      <View
+        className={cn(
+          "flex-row items-baseline justify-between gap-3 rounded-xl p-4",
+          inSheet ? "bg-raised" : "bg-surface",
+        )}
+      >
         <Text className="type-footnote text-muted">{seat.playing ? "Bought in" : "Result"}</Text>
         <Money
           amount={seat.amount}
@@ -488,7 +499,7 @@ export function SeatSheet({
             onPress={() => setStep("cash_out")}
           />
         </>
-      ) : (
+      ) : Platform.OS === "android" ? (
         <View className="flex-row gap-2">
           <Button
             label="Undo cash-out"
@@ -505,6 +516,23 @@ export function SeatSheet({
               onPress={() => setStep("return")}
             />
           )}
+        </View>
+      ) : (
+        <View className="gap-2">
+          {playingAgain ? null : (
+            <Button
+              label="Back at the table"
+              variant="primary"
+              size="lg"
+              onPress={() => setStep("return")}
+            />
+          )}
+          <Button
+            label="Undo cash-out"
+            variant="secondary"
+            size="lg"
+            onPress={() => setStep("reopen")}
+          />
         </View>
       )}
       {quick.error ? <FormError>{quick.error}</FormError> : null}

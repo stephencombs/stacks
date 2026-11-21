@@ -22,6 +22,10 @@ import { Icon } from "./Icon";
 import { keyboardOverlap, sheetBottomEdge } from "./keyboardInset";
 import { animate, duration, ease, isReducedMotion } from "./motion";
 
+export function SheetHost({ children }: { children?: ReactNode }) {
+  return children;
+}
+
 /**
  * A form or confirmation that slides up over the current screen. On Android it is a
  * bottom sheet: as tall as its content up to the screen below the status bar, with a dimmed scrim

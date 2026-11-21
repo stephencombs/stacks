@@ -69,11 +69,6 @@ function SignedInTripNames({
 
 /** Places you've played from this device's ledger: pins, chronological paths, and venue history. */
 export function MapScreen() {
-  const navigation = useNavigation();
-  useLayoutEffect(() => {
-    navigation.setOptions({ headerShown: false });
-  }, [navigation]);
-
   return <TripNames>{(names) => <MapContent tripNames={names} />}</TripNames>;
 }
 
@@ -95,8 +90,13 @@ function MapContent({ tripNames: names }: { tripNames: ReadonlyMap<string, strin
 }
 
 function EmptyMap() {
+  const navigation = useNavigation();
   const android = Platform.OS === "android";
   const muted = String(useCSSVariable("--color-muted"));
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: true });
+  }, [navigation]);
 
   return (
     <PersonalScreen live contentClassName={android ? "gap-0 pt-0" : undefined}>
@@ -128,6 +128,12 @@ function PopulatedMap({
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const barHeight = use(TabBarHeight);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+
+    return () => navigation.setOptions({ headerShown: true });
+  }, [navigation]);
   const [liveBarHeight, setLiveBarHeight] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedVenueId, setSelectedVenueId] = useState<VenueId | null>(null);

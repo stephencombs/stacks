@@ -5,7 +5,6 @@ import { gameNames } from "@stacks/client-runtime/format";
 import { useRecordingHome, useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { Game } from "@stacks/contracts";
-import * as Match from "effect/Match";
 import { useState, type ReactNode } from "react";
 import { Platform, Text, View } from "react-native";
 
@@ -14,7 +13,7 @@ import { ControlSurface } from "../components/ui/ControlSurface";
 import { Choice, FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { PressableScale } from "../components/ui/PressableScale";
-import { Sheet } from "../components/ui/Sheet";
+import { Sheet, SheetHost } from "../components/ui/Sheet";
 import { Card, SettingsGroup, SettingsRow } from "../components/ui/Surface";
 import { Switch } from "../components/ui/Switch";
 import { useAccount } from "../lib/account";
@@ -29,7 +28,7 @@ import { shareCsv } from "../lib/share";
 import { setTheme, useTheme } from "../lib/theme";
 import { Chip } from "./Chip";
 import { SignInButton } from "./SignInButton";
-import { SessionVenuePicker } from "./VenuePicker";
+import { CasinoPickerSheet } from "./VenuePicker";
 
 type DefaultGameChoice = Game | "none";
 
@@ -76,9 +75,17 @@ export function YouButton() {
  * signed out by guarding Clerk hooks behind `AccountProvider`.
  */
 export function YouSheet({ name = "You", onClose }: { name?: string; onClose: () => void }) {
+  return (
+    <SheetHost>
+      <YouSettings name={name} onClose={onClose} />
+    </SheetHost>
+  );
+}
+
+function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
   const account = useAccount();
   const sync = useRecordingSync();
-  const { home } = useRecordingHome();
+  const { home, status, error, retryLoad } = useRecordingHome();
   const theme = useTheme();
   const prefs = usePreferences();
   const [picking, setPicking] = useState<"game" | "venue" | null>(null);
@@ -104,6 +111,17 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
     }
   };
 
+  if (picking === "venue")
+    return (
+      <CasinoPickerSheet
+        context="default"
+        selectedId={prefs.defaultVenue?.id ?? null}
+        selected={prefs.defaultVenue}
+        onSelect={setDefaultVenue}
+        onClose={() => setPicking(null)}
+      />
+    );
+
   return (
     <Sheet open onClose={onClose} title="You" footer={signedIn ? <SignOutFooter /> : undefined}>
       {signedIn ? <SignedInCard fallbackName={name} /> : null}
@@ -112,12 +130,17 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
         <Text className="px-1 type-footnote font-medium text-muted">Your sessions</Text>
         <Card className="gap-1 p-4">
           <Text accessibilityLiveRegion="polite" className="type-body text-ink">
-            {sync.line.text}
+            {status === "load_failed" ? error : sync.line.text}
           </Text>
-          <Text className="type-footnote text-muted">
-            Sessions save on this device first. Sign in to sync them to your account. Signing in or
-            out leaves them on this device.
-          </Text>
+          {status === "load_failed" ? (
+            <Button label="Try again" variant="secondary" onPress={retryLoad} />
+          ) : (
+            <Text className="type-footnote text-muted">
+              {signedIn
+                ? "Sessions save on this device first, then sync to your account."
+                : "Sessions save on this device first. Sign in to sync them to your account."}
+            </Text>
+          )}
         </Card>
       </View>
 
@@ -125,46 +148,55 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
         <SettingsRow
           icon={<Icon name="sessions" color="ink" size={16} />}
           title="Default game"
-          value={prefs.defaultGame ? gameNames[prefs.defaultGame] : "Not set"}
-          onPress={() => setPicking((current) => (current === "game" ? null : "game"))}
-          accessibilityHint="Changes the default game for new sessions"
+          value={
+            Platform.OS === "ios"
+              ? undefined
+              : prefs.defaultGame
+                ? gameNames[prefs.defaultGame]
+                : "Not set"
+          }
+          trailing={
+            Platform.OS === "ios" ? (
+              <Choice
+                inline
+                label="Default game"
+                labelHidden
+                options={defaultGameOptions}
+                value={prefs.defaultGame ?? "none"}
+                onChange={(next) => setDefaultGame(next === "none" ? null : next)}
+              />
+            ) : undefined
+          }
+          onPress={
+            Platform.OS === "ios"
+              ? undefined
+              : () => setPicking((current) => (current === "game" ? null : "game"))
+          }
+          accessibilityHint={
+            Platform.OS === "ios" ? undefined : "Changes the default game for new sessions"
+          }
         />
         <SettingsRow
           icon={<Icon name="map" color="ink" size={16} />}
           title="Default casino"
           value={prefs.defaultVenue?.name ?? "Not set"}
-          onPress={() => setPicking((current) => (current === "venue" ? null : "venue"))}
+          onPress={() => setPicking("venue")}
           accessibilityHint="Changes the default casino for new sessions"
         />
       </SettingsGroup>
 
-      {Match.value(picking).pipe(
-        Match.when("game", () => (
-          <Choice
-            label="Default game"
-            labelHidden
-            options={defaultGameOptions}
-            value={prefs.defaultGame ?? "none"}
-            onChange={(next) => {
-              setDefaultGame(next === "none" ? null : next);
-              setPicking(null);
-            }}
-          />
-        )),
-        Match.when("venue", () => (
-          <View className="rounded-xl bg-surface p-3">
-            <SessionVenuePicker
-              selectedId={prefs.defaultVenue?.id ?? null}
-              selected={prefs.defaultVenue}
-              onSelect={(venue) => {
-                setDefaultVenue(venue);
-                setPicking(null);
-              }}
-            />
-          </View>
-        )),
-        Match.orElse(() => null),
-      )}
+      {picking === "game" ? (
+        <Choice
+          label="Default game"
+          labelHidden
+          options={defaultGameOptions}
+          value={prefs.defaultGame ?? "none"}
+          onChange={(next) => {
+            setDefaultGame(next === "none" ? null : next);
+            setPicking(null);
+          }}
+        />
+      ) : null}
 
       <SettingsGroup title="Display">
         <SettingsRow

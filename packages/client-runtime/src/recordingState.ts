@@ -743,9 +743,16 @@ const namedCommand = (command: typeof Schema.Unknown.Encoded, selfId: string) =>
 const withDefaults = (document: typeof Schema.Unknown.Encoded) => {
   const fields = Schema.decodeUnknownOption(Fields)(document);
 
-  return Option.isNone(fields)
-    ? document
-    : { participants: [], recorders: [], venues: [], ...fields.value };
+  if (Option.isNone(fields)) return document;
+
+  const { repayments, ...rest } = fields.value;
+
+  return {
+    participants: [],
+    recorders: [],
+    venues: [],
+    ...(Array.isArray(repayments) && repayments.length === 0 ? rest : fields.value),
+  };
 };
 
 const fromVersionOne = (document: typeof Schema.Unknown.Encoded) => {

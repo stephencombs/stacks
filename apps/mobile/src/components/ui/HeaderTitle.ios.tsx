@@ -12,7 +12,7 @@ import {
   padding,
 } from "@expo/ui/swift-ui/modifiers";
 import { useState } from "react";
-import { useWindowDimensions } from "react-native";
+import { Text as NativeText, useWindowDimensions } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import type { HeaderTitleProps } from "./HeaderTitle";
@@ -22,6 +22,16 @@ export function HeaderTitle({ title, context, onExpand }: HeaderTitleProps) {
   const { width } = useWindowDimensions();
   const { theme } = useUniwind();
   const ink = String(useCSSVariable("--color-ink"));
+
+  if (!title.trim()) return null;
+
+  if (!onExpand && !context?.trim()) {
+    return (
+      <NativeText numberOfLines={1} className="type-heading text-ink">
+        {title}
+      </NativeText>
+    );
+  }
 
   const trigger = (
     <Button
@@ -42,7 +52,11 @@ export function HeaderTitle({ title, context, onExpand }: HeaderTitleProps) {
   );
 
   return (
-    <Host matchContents colorScheme={theme === "light" ? "light" : "dark"}>
+    <Host
+      matchContents
+      style={{ minHeight: 44 }}
+      colorScheme={theme === "light" ? "light" : "dark"}
+    >
       {onExpand ? (
         trigger
       ) : (
