@@ -1,5 +1,5 @@
 ---
-status: planned
+status: complete
 created: 2026-11-16
 priority: medium
 tags:
@@ -8,7 +8,11 @@ tags:
   - design
 parent: "019"
 created_at: 2026-11-16T17:18:17.442404400Z
-updated_at: 2026-11-16T17:18:17.442404400Z
+updated_at: 2026-11-21T03:24:46.909106Z
+completed_at: 2026-11-21T03:24:46.909106Z
+transitions:
+  - status: complete
+    at: 2026-11-21T03:24:46.909106Z
 ---
 
 # Android Stats matches the frames
@@ -83,14 +87,14 @@ What the audit found against these frames, beyond the Design above:
 
 ## Plan
 
-- [ ] Top row with chips and avatar; scrolled fill
-- [ ] Android filter chip look and applied state with clear
-- [ ] Period and group dropdown menus
-- [ ] Trip radio sheets
-- [ ] Hero card, inspect tooltip
-- [ ] Lists and group sections
-- [ ] Offline, empty, unavailable and no-match states
+- [x] Top row with chips and avatar; scrolled fill
+- [x] Android filter chip look and applied state with clear
+- [x] Period and group dropdown menus
+- [x] Trip radio sheets
+- [x] Hero card, inspect tooltip
+- [x] Lists and group sections
+- [x] Offline, empty, unavailable and no-match states
 
 ## Test
 
-- [ ] Each frame above matches on the emulator, light and dark (019's protocol)
+- [x] Each frame above matches on the emulator, light and dark (019's protocol)
