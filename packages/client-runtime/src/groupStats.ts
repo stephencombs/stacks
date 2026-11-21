@@ -44,7 +44,12 @@ export const awardTitles: Record<AwardKey, string> = {
   night_owl: "Night owl",
 };
 
-const awardLine = (award: GroupAward, currency: CurrencyCode, casino: (id: VenueId) => string) => {
+const awardLine = (
+  award: GroupAward,
+  currency: CurrencyCode,
+  casino: (id: VenueId) => string,
+  timeZone: DateTime.TimeZone,
+) => {
   switch (award.key) {
     case "biggest_hit":
       return `${boardMoney(award.value, currency)}${award.play?.venueId ? ` at ${casino(award.play.venueId)}` : ""}`;
@@ -55,7 +60,7 @@ const awardLine = (award: GroupAward, currency: CurrencyCode, casino: (id: Venue
     case "hopper":
       return `Played ${award.value} different casinos`;
     case "night_owl":
-      return `Sat down at ${award.play ? formatTime(award.play.startedAt) : `${award.value}:00`}`;
+      return `Sat down at ${award.play ? formatTime(award.play.startedAt, timeZone) : `${award.value}:00`}`;
   }
 };
 
@@ -183,7 +188,7 @@ export const groupStatsView = (
             playerId: award.playerId,
             name: names.get(award.playerId) ?? "Someone",
             chip: chipOf(detail, award.playerId),
-            line: awardLine(award, currency, venueName),
+            line: awardLine(award, currency, venueName, timeZone),
           })),
     byGame:
       filters.game !== undefined

@@ -70,35 +70,44 @@ export function PageTitle({
   children,
   tag,
   right,
+  inContent = false,
+  headerRight,
 }: {
   context?: string;
   children: string;
   tag?: ReactNode;
   right?: ReactNode;
+  inContent?: boolean;
+  headerRight?: () => ReactNode;
 }) {
   const navigation = use(NavigationContext);
   const route = use(NavigationRouteContext);
-  const nativeTitle = navigation !== undefined;
+  const nativeTitle = navigation !== undefined && !inContent;
   const headerTitle = useCallback(
     () => <HeaderTitle title={children} context={context} />,
     [children, context],
   );
   useLayoutEffect(() => {
-    if (!nativeTitle) return;
+    if (!navigation) return;
     const scoped = ["Sessions", "Group"].includes(route?.name ?? "");
-    navigation?.setOptions({
-      title: children,
+    navigation.setOptions({
+      title: inContent ? "" : children,
       headerLargeTitle: false,
-      ...(Platform.OS === "ios" && !scoped ? { headerTitle } : {}),
+      ...(Platform.OS === "ios" && !scoped && !inContent ? { headerTitle } : {}),
+      ...(headerRight ? { headerRight } : {}),
     });
-  }, [navigation, children, headerTitle, nativeTitle, route?.name]);
+  }, [navigation, children, headerTitle, headerRight, inContent, route?.name]);
   if (nativeTitle && !tag && !right && !context) return null;
   return (
     <View className="gap-1">
+      {inContent && context ? <Text className="type-footnote text-muted">{context}</Text> : null}
       <View className="flex-row items-center justify-between gap-2">
-        <View className="min-w-0 flex-row items-center gap-2">
+        <View className="min-w-0 flex-1 flex-row items-center gap-2">
           {nativeTitle ? null : (
-            <Text accessibilityRole="header" className="type-title text-ink">
+            <Text
+              accessibilityRole="header"
+              className={cn("shrink text-ink", inContent ? "type-headline" : "type-title")}
+            >
               {children}
             </Text>
           )}
@@ -106,7 +115,7 @@ export function PageTitle({
         </View>
         {right}
       </View>
-      {context ? <Text className="type-footnote text-muted">{context}</Text> : null}
+      {!inContent && context ? <Text className="type-footnote text-muted">{context}</Text> : null}
     </View>
   );
 }

@@ -1,8 +1,8 @@
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Icon } from "./Icon";
 import { Screen } from "./Screen";
-import { List, Row, SectionHeading } from "./Surface";
+import { List, PageTitle, Row, SectionHeading } from "./Surface";
 
 export type SettingsLayoutProps = {
   groupName: string;
@@ -26,6 +26,7 @@ export function SettingsLayout({ groupName, currency, sections }: SettingsLayout
   return (
     <Screen>
       <View className="gap-1">
+        {Platform.OS === "android" ? <PageTitle inContent>Group settings</PageTitle> : null}
         <Text className="type-title text-ink">{groupName}</Text>
         <Text className="type-footnote text-muted">{currency} ledger</Text>
       </View>

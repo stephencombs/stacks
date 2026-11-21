@@ -20,6 +20,7 @@ import {
 } from "./recordingStorage.ts";
 import {
   describeRecordingRejection,
+  elapsedClock,
   localTimeText,
   buyInTotalPreview,
   cashOutResultPreview,
@@ -546,6 +547,12 @@ describe("editing when a session started", () => {
 });
 
 describe("live session readouts", () => {
+  it("uses minutes and seconds on the compact LiveBar until an hour elapses", () => {
+    const start = at(9);
+    expect(elapsedClock(start, DateTime.add(start, { seconds: 108 }), "compact")).toBe("1:48");
+    expect(elapsedClock(start, at(10), "compact")).toBe("1:00:00");
+  });
+
   it("keeps the result pending while live and freezes duration and hourly result at finish", async () => {
     const { store } = await open();
     await save(store, { type: "start", buyIn: 25000, startedAt: at(9) });

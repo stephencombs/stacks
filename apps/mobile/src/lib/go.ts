@@ -1,4 +1,4 @@
-import { useNavigation } from "@react-navigation/native";
+import { StackActions, useNavigation } from "@react-navigation/native";
 import type { GroupId, SessionId, TripId } from "@stacks/contracts";
 
 import { useScope } from "./scope";
@@ -19,6 +19,7 @@ export function useGo() {
   const { setTrip, setGroup } = useScope();
   const crew = (params: CrewParams) => navigation.navigate("Tabs", { screen: "CrewTab", params });
   return {
+    groups: () => crew({ screen: "Groups", initial: false }),
     session: (sessionId: SessionId) =>
       crew({ screen: "Session", params: { sessionId }, initial: false }),
     newSession: (tripId: TripId, from?: SessionId) =>
@@ -33,9 +34,10 @@ export function useGo() {
       crew({ screen: "Sessions", params: { tripId }, initial: false });
     },
     /** Puts a group in scope and opens it. */
-    group: (groupId: GroupId) => {
+    group: (groupId: GroupId, { replace = false } = {}) => {
       setGroup(groupId);
-      crew({ screen: "Group", params: { groupId }, initial: false });
+      if (replace) navigation.dispatch(StackActions.replace("Group", { groupId }));
+      else crew({ screen: "Group", params: { groupId }, initial: false });
     },
     /** Stats, with a group (and trip) picked. */
     stats: (pick: StatsPick) =>

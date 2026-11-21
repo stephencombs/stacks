@@ -18,15 +18,25 @@ import {
   nameList,
   pinnedTrip,
 } from "@stacks/client-runtime/crew";
-import { formatDay, formatTime, gameNames, playerNames } from "@stacks/client-runtime/format";
+import {
+  formatDay,
+  formatDuration,
+  formatTime,
+  gameNames,
+  playerNames,
+} from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
+import { useRecordingClock } from "@stacks/client-runtime/recordingReact";
 import { chipOf, closedPlays, localClock, tripDates, tripPlays } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
+import type * as DateTime from "effect/DateTime";
 import { useState, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Money } from "../components/Money";
-import { Button } from "../components/ui/Button";
+import { Button, IconButton } from "../components/ui/Button";
+import { cn } from "../components/ui/cn";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Screen } from "../components/ui/Screen";
@@ -34,6 +44,7 @@ import { Sheet } from "../components/ui/Sheet";
 import {
   EmptyState,
   List,
+  PageTitle,
   Row,
   SectionHeading,
   Skeleton,
@@ -50,7 +61,10 @@ export function CrewScreen() {
   const stacks = useStacks();
   const [sheet, setSheet] = useState<"groups" | "create" | null>(null);
   return (
-    <Screen>
+    <Screen
+      live={Platform.OS !== "android"}
+      contentClassName={Platform.OS === "android" ? "gap-4 pt-1" : undefined}
+    >
       <Loaded query={stacks.groups} skeleton={<CrewSkeleton />}>
         {(groups) => (
           <>
@@ -71,14 +85,16 @@ export function CrewScreen() {
               </EmptyState>
             ) : (
               <>
-                <Button
-                  label="Groups"
-                  variant="tint"
-                  size="sm"
-                  icon={<Icon name="group" color="ink" size={16} />}
-                  className="self-end"
-                  onPress={() => setSheet("groups")}
-                />
+                {Platform.OS === "android" ? null : (
+                  <Button
+                    label="Groups"
+                    variant="tint"
+                    size="sm"
+                    icon={<Icon name="group" color="ink" size={16} />}
+                    className="self-end"
+                    onPress={() => setSheet("groups")}
+                  />
+                )}
                 <Feed groups={groups} />
               </>
             )}
@@ -91,6 +107,62 @@ export function CrewScreen() {
           </>
         )}
       </Loaded>
+    </Screen>
+  );
+}
+
+export function CrewGroupsButton() {
+  const go = useGo();
+  return <Button label="Groups" size="sm" onPress={go.groups} />;
+}
+
+export function GroupsScreen() {
+  const stacks = useStacks();
+  const go = useGo();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const [creating, setCreating] = useState(false);
+  const select = (groupId: GroupId) => go.group(groupId, { replace: true });
+  return (
+    <Screen
+      live={false}
+      contentClassName="gap-3 pt-3"
+      fab={
+        <Button
+          label="New group"
+          size="fab"
+          variant="primary"
+          icon={<Icon name="plus" color="ink-inverse" />}
+          onPress={() => setCreating(true)}
+        />
+      }
+    >
+      <View style={{ paddingTop: insets.top }}>
+        <PageTitle
+          inContent
+          right={
+            <IconButton
+              accessibilityLabel="Close groups"
+              icon={<Icon name="close" color="ink" />}
+              onPress={() => navigation.goBack()}
+            />
+          }
+        >
+          Groups
+        </PageTitle>
+      </View>
+      <Loaded query={stacks.groups} skeleton={<RowsSkeleton rows={3} />}>
+        {(groups) =>
+          groups.length ? (
+            <GroupRows groups={groups} onSelect={select} />
+          ) : (
+            <EmptyState title="No groups yet">
+              Create a group for the people you play with.
+            </EmptyState>
+          )
+        }
+      </Loaded>
+      {creating ? <CreateGroupSheet onClose={() => setCreating(false)} onCreated={select} /> : null}
     </Screen>
   );
 }
@@ -129,6 +201,7 @@ function Feed({ groups }: { groups: ReadonlyArray<GroupListItem> }) {
 function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const go = useGo();
   const names = playerNames(group);
+  const android = Platform.OS === "android";
   const name = (id: PlayerId) => (id === group.myPlayerId ? "You" : (names.get(id) ?? "Someone"));
   const playing = livePlayerIds(tripPlays(trip));
   const top = tripStandings(closedPlays(trip), localClock)
@@ -143,16 +216,31 @@ function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
         className="flex-row items-center gap-3 px-4 pt-4 pb-3 active:bg-fill"
       >
         <View className="min-w-0 flex-1 gap-1">
+          {android ? (
+            <Text numberOfLines={1} className="type-footnote text-muted">
+              {group.group.name} · {tripDates(trip.trip)}
+            </Text>
+          ) : null}
           <Text numberOfLines={1} className="type-title text-ink">
             {trip.trip.name}
           </Text>
-          <Text className="type-footnote text-muted">
-            {group.group.name} · {tripDates(trip.trip)}
-          </Text>
+          {android ? null : (
+            <Text className="type-footnote text-muted">
+              {group.group.name} · {tripDates(trip.trip)}
+            </Text>
+          )}
         </View>
-        <Icon name="chevron-right" color="faint" />
+        {android ? (
+          playing.length > 0 ? (
+            <Text className="shrink type-footnote font-semibold text-live">
+              ● {playing.length} playing
+            </Text>
+          ) : null
+        ) : (
+          <Icon name="chevron-right" color="faint" />
+        )}
       </Pressable>
-      {playing.length > 0 ? (
+      {!android && playing.length > 0 ? (
         <View className="flex-row items-center gap-3 px-4 pb-3">
           <Tag tone="live">Live</Tag>
           <Text numberOfLines={1} className="min-w-0 flex-1 type-footnote text-ink">
@@ -172,14 +260,22 @@ function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
                 chip={chipOf(group, standing.playerId)}
                 name={names.get(standing.playerId) ?? ""}
                 size={24}
+                ring={android}
               />
-              <Text numberOfLines={1} className="min-w-0 flex-1 text-base text-ink">
-                {name(standing.playerId)}
+              <Text
+                numberOfLines={1}
+                className={cn("min-w-0 flex-1 text-base text-ink", android && "font-bold")}
+              >
+                {android ? (names.get(standing.playerId) ?? "Someone") : name(standing.playerId)}
+                {android && standing.playerId === group.myPlayerId ? (
+                  <Text className="text-muted"> · you</Text>
+                ) : null}
               </Text>
               <Money
                 amount={MinorUnits.make(standing.net)}
                 currency={group.group.currency}
                 tone="result"
+                className={android ? "font-bold" : undefined}
               />
             </View>
           ))}
@@ -189,14 +285,24 @@ function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
           Standings start when the first table finishes.
         </Text>
       )}
-      <View className="border-t border-line p-2">
-        <Button
-          label="Stats"
-          variant="ghost"
-          icon={<Icon name="stats" color="ink" size={16} />}
+      {android ? (
+        <Row
+          accessibilityLabel="Stats"
           onPress={() => go.stats({ groupId: group.group.id, tripId: trip.trip.id })}
-        />
-      </View>
+        >
+          <Text className="flex-1 type-footnote font-semibold text-chip-blue">Stats</Text>
+          <Icon name="chevron-right" color="faint" size={16} />
+        </Row>
+      ) : (
+        <View className="border-t border-line p-2">
+          <Button
+            label="Stats"
+            variant="ghost"
+            icon={<Icon name="stats" color="ink" size={16} />}
+            onPress={() => go.stats({ groupId: group.group.id, tripId: trip.trip.id })}
+          />
+        </View>
+      )}
     </Surface>
   );
 }
@@ -215,14 +321,17 @@ function ActivityPage({
     <Loaded query={stacks.crewActivity(cursor)} skeleton={<RowsSkeleton rows={cursor ? 2 : 4} />}>
       {(page) => {
         const items = crewFeed(page.items, groups);
+        const activity = items.map((item) => (
+          <ActivityRow key={activityKey(item)} item={item} me={myPlayer(groups, item)} />
+        ));
         return (
           <View className="gap-3">
             {items.length > 0 ? (
-              <List>
-                {items.map((item) => (
-                  <ActivityRow key={activityKey(item)} item={item} me={myPlayer(groups, item)} />
-                ))}
-              </List>
+              Platform.OS === "android" ? (
+                <View className="gap-3">{activity}</View>
+              ) : (
+                <List>{activity}</List>
+              )
             ) : cursor === undefined && page.nextCursor === null ? (
               <EmptyState title="Nothing here yet">
                 When someone in your groups sits down at a table or starts a trip, it shows here.
@@ -269,33 +378,103 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
         ? navigation.navigate("Play", { visitId: target.visitId })
         : go.trip(target.tripId);
   const hint = target.kind === "trip" ? "Opens the trip" : "Opens the session";
-  const row = (title: string, meta: string, trailing?: ReactNode, results?: ReactNode) => (
-    <Row accessibilityHint={hint} onPress={open}>
-      <View className="flex-1 gap-0.5">
-        <Text numberOfLines={2} className="type-heading text-ink">
-          {title}
-        </Text>
-        {results}
-        <Text className="type-footnote text-muted">{meta}</Text>
-      </View>
-      {trailing}
-      <Icon name="chevron-right" color="faint" />
-    </Row>
-  );
-  if (item.kind === "trip_started")
-    return row(`${item.trip.name} started`, `${item.group.name} · ${formatDay(item.startedAt)}`);
+  const android = Platform.OS === "android";
+  const finished = item.kind === "session_finished" || item.kind === "table_finished";
+  const firstPlayer =
+    item.kind === "trip_started" || (finished && item.players.length > 1)
+      ? undefined
+      : item.players[0];
+  const row = (title: string, meta: string, trailing?: ReactNode, results?: ReactNode) => {
+    const contents = (
+      <Row
+        accessibilityHint={hint}
+        onPress={open}
+        className={android ? "items-start gap-3 py-4" : undefined}
+      >
+        {android && item.kind === "trip_started" ? (
+          <View className="size-8 items-center justify-center rounded-full bg-tint-orange">
+            <Icon name="trip" color="chip-orange" size={18} />
+          </View>
+        ) : android && firstPlayer ? (
+          <ActivityChip groupId={item.group.id} player={firstPlayer} />
+        ) : null}
+        <View className="flex-1 gap-0.5">
+          <Text
+            numberOfLines={2}
+            className={android ? "type-callout font-semibold text-ink" : "type-heading text-ink"}
+          >
+            {title}
+          </Text>
+          {android ? null : results}
+          <Text className="type-footnote text-muted">{meta}</Text>
+          {android ? results : null}
+        </View>
+        {trailing}
+        {android ? null : <Icon name="chevron-right" color="faint" />}
+      </Row>
+    );
+    return android ? <List>{contents}</List> : contents;
+  };
+  if (item.kind === "trip_started") {
+    if (!android)
+      return row(`${item.trip.name} started`, `${item.group.name} · ${formatDay(item.startedAt)}`);
+    return row(
+      item.group.name,
+      formatDay(item.startedAt),
+      undefined,
+      <Text className="type-callout text-ink">Started {item.trip.name}</Text>,
+    );
+  }
   const venue = item.venue?.name ?? "a table";
   const game =
     item.kind === "table_live" || item.kind === "table_finished"
       ? item.game && gameNames[item.game]
       : null;
-  if (item.kind === "session_live" || item.kind === "table_live")
+  if (item.kind === "session_live" || item.kind === "table_live") {
+    if (android) {
+      const players = nameList(item.players.map((player) => player.displayName));
+      return row(
+        players || venue,
+        `Now · ${item.trip.name}`,
+        undefined,
+        <Text className="type-callout text-ink">
+          {game ? `Playing ${game.toLowerCase()} at ${venue}` : `Playing at ${venue}`}
+          {" · "}
+          <ActivityLiveDuration startedAt={item.startedAt} />
+        </Text>,
+      );
+    }
     return row(
       `${nameList(item.players.map((player) => player.displayName))} at ${venue}`,
       [game, item.trip.name, `since ${formatTime(item.startedAt)}`].filter(Boolean).join(" · "),
       <Tag tone="live">Live</Tag>,
     );
+  }
   const results = item.players.toSorted((a, b) => b.net - a.net);
+  if (android && results.length === 1 && firstPlayer) {
+    const player = results[0]!;
+    const name = player.playerId === me ? "You" : player.displayName;
+    return row(
+      name,
+      `${formatDay(item.endedAt)} · ${item.trip.name}`,
+      undefined,
+      <Text className="type-callout text-ink">
+        {player.net === 0 ? (
+          "Broke even"
+        ) : (
+          <>
+            {player.net > 0 ? "Won " : "Lost "}
+            <Money
+              amount={MinorUnits.make(Math.abs(player.net))}
+              currency={item.group.currency}
+              className={player.net > 0 ? "font-bold text-win" : "font-bold text-loss"}
+            />
+          </>
+        )}
+        {game ? ` playing ${game.toLowerCase()} at ${venue}` : ` at ${venue}`}
+      </Text>,
+    );
+  }
   const seenGuests = new Map<string, number>();
   const playerKey = (playerId: (typeof results)[number]["playerId"], displayName: string) => {
     if (playerId) return playerId;
@@ -326,6 +505,33 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
   );
 }
 
+function ActivityLiveDuration({ startedAt }: { startedAt: DateTime.Utc }) {
+  const now = useRecordingClock();
+  return <Text className="font-semibold text-live">live {formatDuration(startedAt, now)}</Text>;
+}
+
+function ActivityChip({
+  groupId,
+  player,
+}: {
+  groupId: GroupId;
+  player: { playerId: PlayerId | null; displayName: string };
+}) {
+  const stacks = useStacks();
+  const neutral = (
+    <View className="size-8 items-center justify-center rounded-full bg-fill">
+      <Icon name="person" color="muted" size={18} />
+    </View>
+  );
+  const { playerId, displayName } = player;
+  if (!playerId) return neutral;
+  return (
+    <Loaded query={stacks.group(groupId)} skeleton={neutral} renderError={() => neutral}>
+      {(detail) => <Chip chip={chipOf(detail, playerId)} name={displayName} size={32} ring />}
+    </Loaded>
+  );
+}
+
 const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "MXN", "JPY"] as const;
 
 /**
@@ -352,28 +558,86 @@ function GroupsSheet({
       title="Groups"
       footer={<Button label="New group" size="lg" onPress={() => onMode("create")} />}
     >
-      <List>
-        {groups.map((item) => (
-          <Row
-            key={item.group.id}
-            accessibilityHint="Opens the group"
-            onPress={() => {
-              onClose();
-              go.group(item.group.id);
-            }}
-          >
-            <GroupRow item={item} />
-            <Icon name="chevron-right" color="faint" />
-          </Row>
-        ))}
-      </List>
+      <GroupRows
+        groups={groups}
+        onSelect={(groupId) => {
+          onClose();
+          go.group(groupId);
+        }}
+      />
     </Sheet>
+  );
+}
+
+function GroupRows({
+  groups,
+  onSelect,
+}: {
+  groups: ReadonlyArray<GroupListItem>;
+  onSelect: (groupId: GroupId) => void;
+}) {
+  return (
+    <List>
+      {groups.map((item) => (
+        <Row
+          key={item.group.id}
+          accessibilityHint="Opens the group"
+          onPress={() => onSelect(item.group.id)}
+        >
+          <GroupRow item={item} />
+          <Icon name="chevron-right" color="faint" />
+        </Row>
+      ))}
+    </List>
   );
 }
 
 function GroupRow({ item }: { item: GroupListItem }) {
   const stacks = useStacks();
   const happening = groupHappening(item);
+  if (Platform.OS === "android") {
+    const status =
+      happening.kind === "live"
+        ? happening.trip
+          ? `${happening.trip.name} is live`
+          : "Live now"
+        : happening.kind === "started"
+          ? `${happening.trip.name} started ${formatDay(happening.trip.startedAt)}`
+          : "No trips yet";
+    return (
+      <Loaded
+        query={stacks.group(item.group.id)}
+        skeleton={<GroupListLabel name={item.group.name} status={status} />}
+        renderError={() => <GroupListLabel name={item.group.name} status={status} />}
+      >
+        {(detail) => {
+          const people = detail.players.filter(
+            (player) => player.role !== null || player.claimCode !== null,
+          );
+          return (
+            <>
+              <View className="flex-row">
+                {people.slice(0, 3).map((player, index) => (
+                  <View key={player.id} className={index ? "-ml-1.5" : undefined}>
+                    <Chip
+                      chip={chipOf(detail, player.id)}
+                      name={player.displayName}
+                      size={26}
+                      ring
+                    />
+                  </View>
+                ))}
+              </View>
+              <GroupListLabel
+                name={item.group.name}
+                status={`${people.length} ${people.length === 1 ? "person" : "people"} · ${status}`}
+              />
+            </>
+          );
+        }}
+      </Loaded>
+    );
+  }
   const line =
     happening.kind === "live"
       ? happening.trip
@@ -410,7 +674,22 @@ function GroupRow({ item }: { item: GroupListItem }) {
   );
 }
 
-function CreateGroupSheet({ onClose }: { onClose: () => void }) {
+function GroupListLabel({ name, status }: { name: string; status: string }) {
+  return (
+    <View className="min-w-0 flex-1 gap-0.5">
+      <Text className="type-heading font-bold text-ink">{name}</Text>
+      <Text className="type-footnote text-muted">{status}</Text>
+    </View>
+  );
+}
+
+function CreateGroupSheet({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated?: (groupId: GroupId) => void;
+}) {
   const stacks = useStacks();
   const go = useGo();
   const { user } = useUser();
@@ -433,7 +712,7 @@ function CreateGroupSheet({ onClose }: { onClose: () => void }) {
     });
     if (detail) {
       onClose();
-      go.group(detail.group.id);
+      (onCreated ?? go.group)(detail.group.id);
     }
   };
 

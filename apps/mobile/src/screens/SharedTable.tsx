@@ -9,7 +9,7 @@ import { formatMoney } from "@stacks/shared/money";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -44,6 +44,9 @@ export function SharedTableScreen({ route }: Props) {
   }, [token]);
   return (
     <PersonalScreen>
+      {Platform.OS === "android" && view == null ? (
+        <PageTitle inContent>Shared table</PageTitle>
+      ) : null}
       {view === undefined ? (
         <Skeleton className="h-40 w-full rounded-xl" />
       ) : view === null ? (
@@ -86,6 +89,7 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
   return (
     <>
       <PageTitle
+        inContent={Platform.OS === "android"}
         tag={<Tag tone={live ? "live" : "neutral"}>{live ? "Live" : "Finished"}</Tag>}
         context={
           first

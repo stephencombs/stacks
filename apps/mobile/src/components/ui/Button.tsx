@@ -6,14 +6,15 @@ import { cn } from "./cn";
 import { ControlSurface } from "./ControlSurface";
 import { PressableScale } from "./PressableScale";
 
-type Variant = "primary" | "tint" | "secondary" | "ghost" | "danger";
-type Size = "sm" | "md" | "lg" | "xl";
+type Variant = "primary" | "tint" | "secondary" | "ghost" | "link" | "danger";
+type Size = "sm" | "md" | "lg" | "xl" | "fab";
 
 const surfaces: Record<Variant, string> = {
   primary: "bg-ink active:opacity-85",
   tint: "bg-fill-strong active:opacity-70",
   secondary: "bg-fill active:opacity-70",
   ghost: "active:bg-fill",
+  link: "active:bg-fill",
   danger: "bg-fill active:opacity-70",
 };
 const spinners: Record<Variant, string> = {
@@ -21,6 +22,7 @@ const spinners: Record<Variant, string> = {
   tint: "accent-ink",
   secondary: "accent-ink",
   ghost: "accent-ink",
+  link: "accent-chip-blue",
   danger: "accent-loss",
 };
 const labels: Record<Variant, string> = {
@@ -28,6 +30,7 @@ const labels: Record<Variant, string> = {
   tint: "text-ink",
   secondary: "text-ink",
   ghost: "text-ink",
+  link: "text-chip-blue",
   danger: "text-loss",
 };
 // Minimum heights, so larger accessibility text sizes grow the button instead of clipping it.
@@ -36,12 +39,14 @@ const sizes: Record<Size, string> = {
   md: "min-h-11 px-5 py-2.5 rounded-full",
   lg: "min-h-13 px-6 py-3 rounded-full",
   xl: "min-h-14 px-6 py-4 rounded-full",
+  fab: "min-h-14 rounded-2xl px-4 py-3",
 };
 const text: Record<Size, string> = {
   sm: "type-callout",
   md: "type-callout",
   lg: "type-body",
   xl: "type-body",
+  fab: "type-callout",
 };
 
 export function Button({
@@ -88,7 +93,9 @@ export function Button({
         "flex-row items-center justify-center gap-2",
         surfaces[variant],
         sizes[size],
-        disabled && !pending && (variant === "ghost" ? "bg-transparent" : "bg-fill"),
+        disabled &&
+          !pending &&
+          (variant === "ghost" || variant === "link" ? "bg-transparent" : "bg-fill"),
         className,
       )}
     >
@@ -117,6 +124,7 @@ export function IconButton({
   disabled = false,
   haptic = false,
   className,
+  plain = false,
 }: {
   icon: ReactNode;
   accessibilityLabel: string;
@@ -125,6 +133,7 @@ export function IconButton({
   disabled?: boolean;
   haptic?: boolean;
   className?: string;
+  plain?: boolean;
 }) {
   return (
     <PressableScale
@@ -138,9 +147,14 @@ export function IconButton({
         if (haptic) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
-      className={cn("size-11", disabled && "opacity-50", className)}
+      className={cn(
+        "size-11",
+        plain && "items-center justify-center rounded-full active:bg-fill",
+        disabled && "opacity-50",
+        className,
+      )}
     >
-      <ControlSurface>{icon}</ControlSurface>
+      {plain ? icon : <ControlSurface>{icon}</ControlSurface>}
     </PressableScale>
   );
 }

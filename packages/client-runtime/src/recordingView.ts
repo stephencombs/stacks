@@ -764,11 +764,17 @@ export const UNDONE_REASON = "Undone";
 export const LIVE_REBUY_AMOUNTS = [10000, 20000] as const;
 
 /** Time since `start` as the LIVE pill reads it: "1:48:22". */
-export const elapsedClock = (start: DateTime.Utc, now: DateTime.Utc) => {
+export const elapsedClock = (
+  start: DateTime.Utc,
+  now: DateTime.Utc,
+  style: "full" | "compact" = "full",
+) => {
   const seconds = Math.floor(Math.max(0, ms(now) - ms(start)) / 1000);
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  return `${hours}:${minutes.toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  const secondsText = (seconds % 60).toString().padStart(2, "0");
+  if (style === "compact" && hours === 0) return `${minutes}:${secondsText}`;
+  return `${hours}:${minutes.toString().padStart(2, "0")}:${secondsText}`;
 };
 
 export const sessionReadout = (visit: RecordingVisitView, now: DateTime.Utc) => {

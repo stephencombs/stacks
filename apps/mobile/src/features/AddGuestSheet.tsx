@@ -57,6 +57,7 @@ export function AddGuestSheet({
     >
       <TextField
         label="Name"
+        testID="guest-name"
         value={name}
         onChangeText={setName}
         maxLength={60}

@@ -5,8 +5,18 @@ import { useCSSVariable } from "uniwind";
 const STRIPES = [0, 60, 120, 180, 240, 300];
 
 /** A player's casino chip: striped edge, solid face, their initial. `chip` is 1 to 8. */
-export function Chip({ chip, name, size = 32 }: { chip: number; name: string; size?: number }) {
-  const [face, ink, edge, ring] = useCSSVariable([
+export function Chip({
+  chip,
+  name,
+  size = 32,
+  ring = false,
+}: {
+  chip: number;
+  name: string;
+  size?: number;
+  ring?: boolean;
+}) {
+  const [face, ink, edge, border] = useCSSVariable([
     `--color-chip-${chip}`,
     `--color-chip-${chip}-ink`,
     "--color-chip-edge",
@@ -31,33 +41,43 @@ export function Chip({ chip, name, size = 32 }: { chip: number; name: string; si
           cy={r}
           r={r - 0.5}
           fill={String(face)}
-          stroke={String(ring)}
+          stroke={String(border)}
           strokeWidth={1}
+          opacity={ring ? 0.6 : 1}
         />
-        <G>
-          {STRIPES.map((angle) => (
-            <Rect
-              key={angle}
-              x={r - size * 0.07}
-              y={0}
-              width={size * 0.14}
-              height={size * 0.18}
-              fill={String(edge)}
-              transform={`rotate(${angle} ${r} ${r})`}
-            />
-          ))}
-        </G>
+        {ring ? null : (
+          <G>
+            {STRIPES.map((angle) => (
+              <Rect
+                key={angle}
+                x={r - size * 0.07}
+                y={0}
+                width={size * 0.14}
+                height={size * 0.18}
+                fill={String(edge)}
+                transform={`rotate(${angle} ${r} ${r})`}
+              />
+            ))}
+          </G>
+        )}
         <Circle
           cx={r}
           cy={r}
-          r={size * 0.33}
+          r={size * (ring ? 0.4 : 0.33)}
           fill={String(face)}
-          stroke="rgba(255,255,255,0.55)"
+          stroke={ring ? undefined : "rgba(255,255,255,0.55)"}
           strokeWidth={Math.max(1, size * 0.04)}
         />
       </Svg>
       <Text style={{ color: String(ink), fontSize: size * 0.34, fontWeight: "600" }}>
-        {name.slice(0, 1).toUpperCase()}
+        {(ring
+          ? name
+              .trim()
+              .split(/\s+/, 2)
+              .map((part) => part[0])
+              .join("")
+          : name.slice(0, 1)
+        ).toUpperCase()}
       </Text>
     </View>
   );

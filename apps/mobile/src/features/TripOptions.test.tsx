@@ -50,7 +50,11 @@ it("opens the Rename trip sheet from Trip options and saves the trimmed name", a
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   vi.doMock("@clerk/expo", () => ({ useAuth: () => ({ userId: "bea" }) }));
   vi.doMock("@react-navigation/native", () => ({ useNavigation: () => ({ dispatch: vi.fn() }) }));
-  vi.doMock("react-native", () => ({ View: Container, Text: Container }));
+  vi.doMock("react-native", () => ({
+    View: Container,
+    Text: Container,
+    Platform: { OS: "ios" },
+  }));
   vi.doMock("../lib/go", () => ({ useGo: () => ({ trip: vi.fn() }) }));
   vi.doMock("../lib/scope", () => ({ useScope: () => ({ forgetTrip: vi.fn() }) }));
   vi.doMock("../lib/stacks", () => ({

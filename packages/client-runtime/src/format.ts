@@ -28,7 +28,10 @@ export const formatDay = (value: DateTime.Utc) => {
     : dayWithYear.format(date);
 };
 
-export const formatTime = (value: DateTime.Utc) => time.format(DateTime.toDateUtc(value));
+export const formatTime = (value: DateTime.Utc, timeZone?: DateTime.TimeZone) =>
+  timeZone === undefined
+    ? time.format(DateTime.toDateUtc(value))
+    : DateTime.format(DateTime.setZone(value, timeZone), { hour: "numeric", minute: "2-digit" });
 
 export const formatDuration = (start: DateTime.Utc, end: DateTime.Utc) => {
   const millis = DateTime.toEpochMillis(end) - DateTime.toEpochMillis(start);

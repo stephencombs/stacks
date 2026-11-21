@@ -318,6 +318,7 @@ it("redeems a player invite to Home and shows Conflict errors clearly", async ()
   vi.doMock("react-native", () => ({
     Text: Container,
     View: Container,
+    Platform: { OS: "ios" },
   }));
   vi.doMock("../lib/config", () => ({ apiUrl: "https://api.example.com" }));
   vi.doMock("@stacks/client-runtime/api", () => ({

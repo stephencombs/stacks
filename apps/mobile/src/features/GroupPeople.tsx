@@ -8,12 +8,14 @@ import {
 } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
+import { setStringAsync } from "expo-clipboard";
 import { useState } from "react";
 import { Platform, Text, View } from "react-native";
 
 import { confirmAction } from "../components/ui/confirmAction";
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
+import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { appUrl } from "../lib/config";
@@ -27,8 +29,10 @@ const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 
 /** Everyone in the group: members and their roles, guests, invite links, and who left. */
 export function GroupPeople({ detail }: { detail: GroupDetail }) {
-  const [addingGuest, setAddingGuest] = useState(false);
+  const [action, setAction] = useState<"invite" | "guest" | null>(null);
   const [managing, setManaging] = useState<Player | null>(null);
+  const [copyError, setCopyError] = useState(false);
+  const android = Platform.OS === "android";
   const { userId } = useAuth();
   const members = detail.players.filter((player) => player.role !== null);
   const guests = detail.players.filter(isGuest);
@@ -41,86 +45,138 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
     player.userId !== userId &&
     player.role !== "owner" &&
     (detail.role === "owner" || (detail.role === "admin" && player.role === "member"));
+  const memberRows = members.map((player) => (
+    <Row
+      key={player.id}
+      {...(canManage(player)
+        ? {
+            onPress: () => setManaging(player),
+            accessibilityHint: "Change their role or remove them",
+          }
+        : {})}
+    >
+      <Chip
+        chip={chipOf(detail, player.id)}
+        name={player.displayName}
+        size={android ? 36 : 26}
+        ring={android}
+      />
+      <View className="min-w-0 flex-1">
+        <Text
+          numberOfLines={android ? 2 : 1}
+          className={android ? "type-heading font-bold text-ink" : "text-base text-ink"}
+        >
+          {names.get(player.id)}
+          {player.id === detail.myPlayerId ? <Text className="text-muted"> · you</Text> : null}
+        </Text>
+        {android && player.role ? (
+          <Text className="type-footnote text-muted">{roleNames[player.role]}</Text>
+        ) : null}
+      </View>
+      {!android && player.role ? <Tag>{roleNames[player.role]}</Tag> : null}
+    </Row>
+  ));
+  const guestRows = guests.map((player) => (
+    <Row key={player.id} className="flex-wrap">
+      <Chip
+        chip={chipOf(detail, player.id)}
+        name={player.displayName}
+        size={android ? 36 : 26}
+        ring={android}
+      />
+      <View className={android ? "min-w-0 flex-1 basis-24" : "flex-1 basis-32"}>
+        <Text className={android ? "type-heading font-bold text-ink" : "text-base text-ink"}>
+          {names.get(player.id)}
+        </Text>
+        {android ? (
+          <Text className="type-footnote text-muted">
+            {player.claimCode ? "Guest · hasn’t claimed their history" : "Guest"}
+          </Text>
+        ) : null}
+      </View>
+      {player.claimCode ? (
+        <Button
+          label={android ? "Copy link" : "Send claim link"}
+          size="sm"
+          className="ml-auto"
+          icon={android ? <Icon name="link" color="ink" size={16} /> : undefined}
+          onPress={() => {
+            const url = appUrl(`claim/${player.claimCode}`);
+            if (android) {
+              setCopyError(false);
+              void setStringAsync(url).then(
+                (copied) => setCopyError(!copied),
+                () => setCopyError(true),
+              );
+            } else {
+              void shareLink(url, `Claim your Color Up history in ${detail.group.name}:`);
+            }
+          }}
+        />
+      ) : null}
+    </Row>
+  ));
 
   return (
     <>
-      <View className="gap-2">
-        <SectionHeading>Members</SectionHeading>
-        <List>
-          {members.map((player) => {
-            return (
-              <Row
-                key={player.id}
-                {...(canManage(player)
-                  ? {
-                      onPress: () => setManaging(player),
-                      accessibilityHint: "Change their role or remove them",
-                    }
-                  : {})}
-              >
-                <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-                <View className="flex-1">
-                  <Text numberOfLines={1} className="text-base text-ink">
-                    {names.get(player.id)}
-                    {player.id === detail.myPlayerId ? (
-                      <Text className="text-muted"> · you</Text>
-                    ) : null}
-                  </Text>
-                </View>
-                {player.role ? <Tag>{roleNames[player.role]}</Tag> : null}
-              </Row>
-            );
-          })}
-        </List>
-      </View>
-      <View className="gap-2">
-        <SectionHeading
-          action={
-            <Button
-              label="Add a guest"
-              size="sm"
-              variant="ghost"
-              onPress={() => setAddingGuest(true)}
-            />
-          }
-        >
-          Guests
-        </SectionHeading>
-        {guests.length === 0 ? (
-          <Text className="text-sm text-muted">
-            Add friends who aren't on Color Up yet. Send them their claim link when they sign up and
-            their history becomes theirs.
-          </Text>
-        ) : (
+      {android ? (
+        <View className="gap-2">
+          <SectionHeading
+            action={
+              <Button
+                label="Invite"
+                size="sm"
+                variant="link"
+                className="px-1"
+                onPress={() => setAction("invite")}
+              />
+            }
+          >
+            People
+          </SectionHeading>
           <List>
-            {guests.map((player) => {
-              return (
-                <Row key={player.id} className="flex-wrap">
-                  <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} />
-                  <View className="flex-1 basis-32">
-                    <Text className="text-base text-ink">{names.get(player.id)}</Text>
-                  </View>
-                  <View className="ml-auto flex-row items-center gap-2">
-                    {player.claimCode ? (
-                      <Button
-                        label="Send claim link"
-                        size="sm"
-                        onPress={() =>
-                          void shareLink(
-                            appUrl(`claim/${player.claimCode}`),
-                            `Claim your Color Up history in ${detail.group.name}:`,
-                          )
-                        }
-                      />
-                    ) : null}
-                  </View>
-                </Row>
-              );
-            })}
+            {memberRows}
+            {guestRows}
           </List>
-        )}
-      </View>
-      <InviteSection detail={detail} />
+          {copyError ? <FormError>The claim link couldn’t be copied. Try again.</FormError> : null}
+        </View>
+      ) : (
+        <>
+          <View className="gap-2">
+            <SectionHeading>Members</SectionHeading>
+            <List>{memberRows}</List>
+          </View>
+          <View className="gap-2">
+            <SectionHeading
+              action={
+                <Button
+                  label="Add a guest"
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => setAction("guest")}
+                />
+              }
+            >
+              Guests
+            </SectionHeading>
+            {guests.length === 0 ? (
+              <Text className="text-sm text-muted">
+                Add friends who aren't on Color Up yet. Send them their claim link when they sign up
+                and their history becomes theirs.
+              </Text>
+            ) : (
+              <List>{guestRows}</List>
+            )}
+          </View>
+          <InviteSection detail={detail} />
+        </>
+      )}
+      {action === "invite" ? (
+        <Sheet open title="Invite" onClose={() => setAction(null)}>
+          <Button label="Add a guest" onPress={() => setAction("guest")} />
+          <InviteSection detail={detail} />
+        </Sheet>
+      ) : null}
       {former.length > 0 ? (
         <View className="gap-2">
           <SectionHeading>Former members</SectionHeading>
@@ -130,7 +186,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
           </Text>
         </View>
       ) : null}
-      <AddGuestSheet detail={detail} open={addingGuest} onClose={() => setAddingGuest(false)} />
+      <AddGuestSheet detail={detail} open={action === "guest"} onClose={() => setAction(null)} />
       {managing ? (
         <ManageMemberSheet detail={detail} player={managing} onClose={() => setManaging(null)} />
       ) : null}
