@@ -29,6 +29,7 @@ export const symbols: Record<IconName, SFSymbol> = {
   filter: "line.3.horizontal.decrease",
   settings: "gearshape",
   download: "square.and.arrow.up",
+  "eye-off": "eye.slash",
   sparkles: "sparkles",
   "add-person": "person.badge.plus",
   person: "person.crop.circle",

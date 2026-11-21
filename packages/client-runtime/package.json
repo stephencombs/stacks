@@ -24,6 +24,10 @@
       "types": "./src/errors.ts",
       "import": "./src/errors.ts"
     },
+    "./export": {
+      "types": "./src/export.ts",
+      "import": "./src/export.ts"
+    },
     "./format": {
       "types": "./src/format.ts",
       "import": "./src/format.ts"

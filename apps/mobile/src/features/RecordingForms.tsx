@@ -48,6 +48,7 @@ import { DateTimeField } from "../components/ui/DateTimeField";
 import { Sheet } from "../components/ui/Sheet";
 import { Switch } from "../components/ui/Switch";
 import { cn } from "../components/ui/cn";
+import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { useRecordingState } from "../lib/recording";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
@@ -55,7 +56,10 @@ import { SessionVenuePicker } from "./VenuePicker";
 import { applyAmountKey } from "./amountKey";
 import { TripChoice } from "./TableTrip";
 
-const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
+const money = (amount: number, showCents = false) =>
+  formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY, {
+    trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
+  });
 const decimal = decimalSeparator();
 
 /** An amount's text and its error, which shows from the first submit and follows what's typed. */
@@ -331,17 +335,64 @@ function GameFields({
   );
 }
 
-function DetailsFields(props: Parameters<typeof GameFields>[0]) {
+function DetailsFields({
+  venue,
+  onVenue,
+  ...gameProps
+}: Parameters<typeof GameFields>[0] & {
+  venue?: CachedVenue | null;
+  onVenue?: (venue: CachedVenue | null) => void;
+}) {
+  const [pickingVenue, setPickingVenue] = useState(false);
   return (
     <View className="gap-1.5">
       <Text className="px-1 type-footnote font-medium text-muted">Details (optional)</Text>
-      <GameFields {...props} />
+      <GameFields {...gameProps} />
+      {onVenue ? (
+        <>
+          <View className="overflow-hidden rounded-xl bg-surface">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Casino: ${venue?.name ?? "Not set"}. Change`}
+              accessibilityState={{ expanded: pickingVenue }}
+              onPress={() => setPickingVenue((open) => !open)}
+              className={cn(
+                "min-h-12 flex-row items-center gap-3 px-4 active:bg-fill",
+                pickingVenue && "bg-fill",
+              )}
+            >
+              <Text className="type-body text-ink">Casino</Text>
+              <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
+                {venue?.name ?? "Not set"}
+              </Text>
+              <Icon
+                name={pickingVenue ? "chevron-down" : "chevron-right"}
+                color="faint"
+                size={16}
+              />
+            </Pressable>
+          </View>
+          {pickingVenue ? (
+            <View className="rounded-xl bg-surface p-3">
+              <SessionVenuePicker
+                selectedId={venue?.id ?? null}
+                selected={venue ?? null}
+                onSelect={(next) => {
+                  onVenue(next);
+                  setPickingVenue(false);
+                }}
+              />
+            </View>
+          ) : null}
+        </>
+      ) : null}
     </View>
   );
 }
 
-const details = (game: GameChoice, highLimit: boolean) => ({
+const details = (game: GameChoice, highLimit: boolean, venue: CachedVenue | null = null) => ({
   ...(game === "none" ? {} : { game }),
+  ...(venue ? { venueId: venue.id } : {}),
   highLimit,
 });
 
@@ -362,9 +413,11 @@ export function StartSheet({
 }) {
   const save = useRecordingSubmit();
   const { home } = useRecordingHome();
+  const prefs = usePreferences();
   const [tripId, setTripId] = useState(initialTripId);
   const buyIn = useAmount("", 1);
-  const [game, setGame] = useState<GameChoice>("none");
+  const [game, setGame] = useState<GameChoice>(() => prefs.defaultGame ?? "none");
+  const [venue, setVenue] = useState<CachedVenue | null>(() => prefs.defaultVenue);
   const [highLimit, setHighLimit] = useState(false);
   const [recordingOnly, setRecordingOnly] = useState(false);
   const alreadyPlaying = Boolean(home?.active.length);
@@ -381,8 +434,12 @@ export function StartSheet({
       save={save}
       onClose={onClose}
       onSubmit={async () => {
+        const venues = venue ? [venue] : [];
         if (watching) {
-          const receipt = await save.submit({ type: "open_table", ...details(game, highLimit) });
+          const receipt = await save.submit(
+            { type: "open_table", ...details(game, highLimit, venue) },
+            venues,
+          );
           if (tripId && receipt && "tableId" in receipt.command)
             await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
           if (receipt && "tableId" in receipt.command) onOpened?.(receipt.command.tableId);
@@ -390,11 +447,14 @@ export function StartSheet({
         }
         const amount = buyIn.read();
         if (amount === null) return;
-        const receipt = await save.submit({
-          type: "start",
-          buyIn: amount,
-          ...details(game, highLimit),
-        });
+        const receipt = await save.submit(
+          {
+            type: "start",
+            buyIn: amount,
+            ...details(game, highLimit, venue),
+          },
+          venues,
+        );
         if (tripId && receipt && "tableId" in receipt.command)
           await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
         const visitId = receipt && startedVisit(receipt);
@@ -420,8 +480,10 @@ export function StartSheet({
       <DetailsFields
         game={game}
         highLimit={highLimit}
+        venue={venue}
         onGame={setGame}
         onHighLimit={setHighLimit}
+        onVenue={setVenue}
       />
     </RecordingSheet>
   );
@@ -437,6 +499,7 @@ export function PastSessionSheet({
   onAdded: (visitId: VisitId) => void;
 }) {
   const save = useRecordingSubmit();
+  const prefs = usePreferences();
   const buyIn = useAmount("", 1);
   const cashOut = useAmount("", 0);
   const [now] = useState(() => new Date());
@@ -447,7 +510,8 @@ export function PastSessionSheet({
     finishNextDay: false,
   }));
   const [timeErrors, setTimeErrors] = useState<Partial<Record<keyof Times, string>>>({});
-  const [game, setGame] = useState<GameChoice>("none");
+  const [game, setGame] = useState<GameChoice>(() => prefs.defaultGame ?? "none");
+  const [venue, setVenue] = useState<CachedVenue | null>(() => prefs.defaultVenue);
   const [highLimit, setHighLimit] = useState(false);
   const updateTimes = (next: typeof times) => {
     setTimes(next);
@@ -479,14 +543,17 @@ export function PastSessionSheet({
         const parsed = parsePastSessionTimes(times);
         setTimeErrors(parsed.error === null ? {} : parsed.errors);
         if (totalIn === null || totalOut === null || parsed.error !== null) return;
-        const receipt = await save.submit({
-          type: "record_completed",
-          buyIn: totalIn,
-          cashOut: totalOut,
-          startedAt: parsed.startedAt,
-          finishedAt: parsed.finishedAt,
-          ...details(game, highLimit),
-        });
+        const receipt = await save.submit(
+          {
+            type: "record_completed",
+            buyIn: totalIn,
+            cashOut: totalOut,
+            startedAt: parsed.startedAt,
+            finishedAt: parsed.finishedAt,
+            ...details(game, highLimit, venue),
+          },
+          venue ? [venue] : [],
+        );
         const visitId = receipt && startedVisit(receipt);
         if (visitId) onAdded(visitId);
       }}
@@ -509,8 +576,10 @@ export function PastSessionSheet({
       <DetailsFields
         game={game}
         highLimit={highLimit}
+        venue={venue}
         onGame={setGame}
         onHighLimit={setHighLimit}
+        onVenue={setVenue}
       />
     </RecordingSheet>
   );
@@ -560,6 +629,7 @@ export function RebuySheet({
   onSaved: Saved;
 }) {
   const save = useRecordingSubmit();
+  const prefs = usePreferences();
   const amount = useAmount("", 1);
   const paid = usePaidBy(visit);
   return (
@@ -609,8 +679,8 @@ export function RebuySheet({
           {visit.presets.map((preset) => (
             <Button
               key={preset}
-              label={money(preset)}
-              accessibilityLabel={`Fill ${money(preset)}`}
+              label={money(preset, prefs.showCents)}
+              accessibilityLabel={`Fill ${money(preset, prefs.showCents)}`}
               size="sm"
               onPress={() => amount.set(amountInputText(preset))}
             />
@@ -686,6 +756,7 @@ export function CashOutSheet({
   onSaved: Saved;
 }) {
   const save = useRecordingSubmit();
+  const prefs = usePreferences();
   const amount = useAmount("", 0);
   const [now] = useState(() => DateTime.makeUnsafe(Date.now()));
   const clock = useClock(now);
@@ -737,7 +808,7 @@ export function CashOutSheet({
       />
       <View className="items-center">
         <Button
-          label={`${previous > 0 ? "Nothing more" : "Busted"} · ${money(0)}`}
+          label={`${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`}
           size="sm"
           // Fills the amount like a preset does: one stray tap shouldn't record anything.
           onPress={() => amount.set(amountInputText(0))}
@@ -749,7 +820,9 @@ export function CashOutSheet({
           <Text numberOfLines={1} className="type-footnote text-muted">
             {who ? `${who}'s result` : "Your result"}
           </Text>
-          <Text className="type-footnote text-muted">{money(visit.totals.buyIn)} bought in</Text>
+          <Text className="type-footnote text-muted">
+            {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
+          </Text>
         </View>
         {cashOutResultPreview(visit, amount.text) === null ? (
           <Text className="text-muted">—</Text>
@@ -789,15 +862,17 @@ export function BuyInTotalSheet({
   onSaved: () => void;
 }) {
   const save = useBuyInTotal(visit.visit.id);
+  const prefs = usePreferences();
   const [mode, setMode] = useState<(typeof totalModes)[number]["value"]>("add");
   const amount = useAmount("", 1);
   const current = visit.totals.buyIn;
+  const currentShown = formatDisplayMoney(current, RECORDING_CURRENCY, prefs);
   const total = buyInTotalPreview(current, amount.text, mode);
   return (
     <RecordingSheet
       keypad={<RecordingKeypad amount={amount} />}
       title="Edit buy-in"
-      description={`Now ${money(current)} in.`}
+      description={`Now ${currentShown} in.`}
       submitLabel={buyInTotalLabel(mode, amount.text)}
       save={save}
       onClose={onClose}
@@ -840,7 +915,7 @@ export function BuyInTotalSheet({
         }
       />
       <Text className="type-footnote text-muted">
-        Was {money(current)}. Corrections void earlier buy-ins, which stay in history.
+        Was {currentShown}. Corrections void earlier buy-ins, which stay in history.
       </Text>
     </RecordingSheet>
   );
@@ -1064,6 +1139,7 @@ export function VoidSheet({
   onVoided: () => void;
 }) {
   const save = useRecordingSubmit();
+  const prefs = usePreferences();
   const reason = useReason("Say why it's being voided.");
   const submit = async () => {
     const why = reason.read();
@@ -1080,7 +1156,7 @@ export function VoidSheet({
   return (
     <RecordingSheet
       title="Void this entry?"
-      description={`The ${money(entry.amount)} ${kindName(entry)} stays in the history, crossed out, and stops counting toward this session.`}
+      description={`The ${formatDisplayMoney(entry.amount, RECORDING_CURRENCY, prefs)} ${kindName(entry)} stays in the history, crossed out, and stops counting toward this session.`}
       submitLabel="Void entry"
       submitVariant="danger"
       cancelLabel="Keep entry"
@@ -1166,6 +1242,7 @@ export function AddPlayerSheet({
   onAdded: (visitId: VisitId, name: string) => void;
 }) {
   const save = useRecordingSubmit();
+  const prefs = usePreferences();
   const amount = useAmount("", 1);
   const [choice, setChoice] = useState<string>(NEW_PLAYER);
   const [name, setName] = useState("");
@@ -1182,7 +1259,7 @@ export function AddPlayerSheet({
       description="Record their buy-ins and cash-outs from this device."
       submitLabel={
         chosen && typed.error === null
-          ? `Add ${shortName(chosen)} · ${money(typed.amount)}`
+          ? `Add ${shortName(chosen)} · ${money(typed.amount, prefs.showCents)}`
           : "Add player"
       }
       save={save}

@@ -1,7 +1,6 @@
-import { useClerk, useUser } from "@clerk/expo";
+import { useUser } from "@clerk/expo";
 import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
-import { themeChoices } from "@stacks/client-runtime/theme";
 import type { VisitId } from "@stacks/contracts";
 import { useState, type ReactNode, type Ref } from "react";
 import {
@@ -18,21 +17,17 @@ import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/ui/Button";
 import { ControlSurface } from "../components/ui/ControlSurface";
 import { PressableScale } from "../components/ui/PressableScale";
-import { Choice } from "../components/ui/Field";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { FloatingAction } from "../components/ui/FloatingAction";
 import { PinnedFooter } from "../components/ui/PinnedFooter";
-import { Sheet } from "../components/ui/Sheet";
 import { useScreenFoot } from "../components/ui/tabBar";
-import { SectionHeading } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useAccount } from "../lib/account";
-import { setTheme, useTheme } from "../lib/theme";
 import { Chip } from "./Chip";
 import { FeltStatusBar } from "./FeltStatusBar";
-import { SignInButton } from "./SignInButton";
 import { PersonalLiveBar } from "./LiveBar";
 import { useNativeHeaderActions } from "./NativeHeaderActions";
+import { YouSheet } from "./You";
 
 /**
  * A screen of your own play: it scrolls under the header, and its main actions sit in a dock
@@ -352,58 +347,5 @@ export function PlayBrand() {
 }
 
 export function PersonalYou({ onClose }: { onClose: () => void }) {
-  const sync = useRecordingSync();
-  const theme = useTheme();
-  return (
-    <Sheet open onClose={onClose} title="You">
-      <View className="gap-2">
-        <SectionHeading>Your sessions</SectionHeading>
-        <Text accessibilityLiveRegion="polite" className="text-base text-ink">
-          {sync.line.text}
-        </Text>
-        <Text className="text-base text-muted">
-          Sessions save on this device first. Sign in to sync them to your account. Signing in or
-          out leaves them on this device.
-        </Text>
-      </View>
-      <Choice label="Appearance" options={themeChoices} value={theme} onChange={setTheme} />
-      <View className="gap-2">
-        <SectionHeading>Account</SectionHeading>
-        <AccountActions />
-      </View>
-    </Sheet>
-  );
-}
-
-function Note({ children }: { children: ReactNode }) {
-  return <Text className="text-base text-muted">{children}</Text>;
-}
-
-function AccountActions() {
-  const account = useAccount();
-  if (!account.available)
-    return <Note>Sign-in isn't set up in this copy of Color Up. Recording works without it.</Note>;
-  if (!account.isLoaded)
-    return <Note>Sign-in hasn't loaded yet. Recording on this device works without it.</Note>;
-  if (!account.isSignedIn)
-    return (
-      <View className="gap-3">
-        <Note>An account opens groups and trips with friends.</Note>
-        <SignInButton mode="sign-in" label="Sign in" variant="secondary" />
-        <SignInButton mode="sign-up" label="Create an account" variant="secondary" />
-      </View>
-    );
-  return <SignedIn />;
-}
-
-function SignedIn() {
-  const { user } = useUser();
-  const { signOut } = useClerk();
-  const email = user?.primaryEmailAddress?.emailAddress;
-  return (
-    <View className="gap-3">
-      {user?.fullName || email ? <Note>Signed in as {user?.fullName ?? email}.</Note> : null}
-      <Button label="Sign out" variant="danger" onPress={() => void signOut()} />
-    </View>
-  );
+  return <YouSheet onClose={onClose} />;
 }

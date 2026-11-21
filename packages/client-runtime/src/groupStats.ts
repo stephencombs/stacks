@@ -49,14 +49,15 @@ const awardLine = (
   currency: CurrencyCode,
   casino: (id: VenueId) => string,
   timeZone: DateTime.TimeZone,
+  moneyOptions: { readonly showCents?: boolean; readonly privacyMode?: boolean },
 ) => {
   switch (award.key) {
     case "biggest_hit":
-      return `${boardMoney(award.value, currency)}${award.play?.venueId ? ` at ${casino(award.play.venueId)}` : ""}`;
+      return `${boardMoney(award.value, currency, true, moneyOptions)}${award.play?.venueId ? ` at ${casino(award.play.venueId)}` : ""}`;
     case "heater":
       return `${award.value} winning sessions in a row`;
     case "comeback":
-      return `Climbed ${boardMoney(award.value, currency, false)} from their low`;
+      return `Climbed ${boardMoney(award.value, currency, false, moneyOptions)} from their low`;
     case "hopper":
       return `Played ${award.value} different casinos`;
     case "night_owl":
@@ -80,7 +81,14 @@ export const groupStatsView = (
   {
     timeZone = DateTime.zoneMakeLocal(),
     clock = localClock,
-  }: { readonly timeZone?: DateTime.TimeZone; readonly clock?: TripClock } = {},
+    showCents = false,
+    privacyMode = false,
+  }: {
+    readonly timeZone?: DateTime.TimeZone;
+    readonly clock?: TripClock;
+    readonly showCents?: boolean;
+    readonly privacyMode?: boolean;
+  } = {},
 ) => {
   const currency = detail.group.currency;
   const names = playerNames(detail);
@@ -188,7 +196,7 @@ export const groupStatsView = (
             playerId: award.playerId,
             name: names.get(award.playerId) ?? "Someone",
             chip: chipOf(detail, award.playerId),
-            line: awardLine(award, currency, venueName, timeZone),
+            line: awardLine(award, currency, venueName, timeZone, { showCents, privacyMode }),
           })),
     byGame:
       filters.game !== undefined

@@ -50,6 +50,12 @@ import { animate, duration, ease } from "../components/ui/motion";
 import { cn } from "../components/ui/cn";
 import { confirmAction } from "../components/ui/confirmAction";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
+import {
+  formatDisplayMoney,
+  HIDDEN_AMOUNT,
+  HIDDEN_AMOUNT_LABEL,
+  usePreferences,
+} from "../lib/preferences";
 import { useRecordingState } from "../lib/recording";
 import {
   BuyInTotalSheet,
@@ -147,10 +153,14 @@ function Missing() {
   );
 }
 
-const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
+const money = (amount: number, showCents = false) =>
+  formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY, {
+    trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
+  });
 
 function Visit({ visitId }: { visitId: VisitId }) {
   const { visit, status, error, retryLoad } = useRecordingVisit(visitId);
+  const prefs = usePreferences();
   const navigation = useNavigation();
   const [open, setOpen] = useState<OpenSheet | null>(null);
   // The toast for the last write here: yours, or one for another player at the table.
@@ -198,16 +208,18 @@ function Visit({ visitId }: { visitId: VisitId }) {
       navigation.dispatch(StackActions.replace("Table", { tableId: table.table.id }));
       return;
     }
+    const shown = (amount: number) =>
+      formatDisplayMoney(MinorUnits.make(amount), RECORDING_CURRENCY, prefs);
     setSaved({
       entryId,
       undo: input.type === "add" && input.kind === "buy_in",
       text:
         input.type === "finish"
-          ? `Cash-out of ${money(input.amount)} recorded. You've finished this session.`
+          ? `Cash-out of ${shown(input.amount)} recorded. You've finished this session.`
           : input.type === "correct"
             ? "Correction saved."
             : input.type === "add" && input.kind === "buy_in"
-              ? `Rebuy of ${money(input.amount)} recorded.`
+              ? `Rebuy of ${shown(input.amount)} recorded.`
               : "Saved.",
     });
   };
@@ -232,7 +244,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
       setNotice(null);
       setSaved({
         entryId: receipt.command.entryId,
-        text: `Rebuy of ${money(amount)} recorded.`,
+        text: `Rebuy of ${formatDisplayMoney(MinorUnits.make(amount), RECORDING_CURRENCY, prefs)} recorded.`,
         undo: true,
       });
     }
@@ -280,7 +292,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
   const deleteVisit = () =>
     confirmAction(
       shared ? "Delete my visit?" : "Delete this session?",
-      `${visitTitle(visit.table)} · ${visit.venue?.name ?? "No casino set"}\n${formatDay(start)}, ${formatTime(start)} · Buy-in ${money(visit.totals.buyIn)}\n\nYour entries will be voided and this session will stop counting. Other players keep their sessions. You can restore yours later.`,
+      `${visitTitle(visit.table)} · ${visit.venue?.name ?? "No casino set"}\n${formatDay(start)}, ${formatTime(start)} · Buy-in ${formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)}\n\nYour entries will be voided and this session will stop counting. Other players keep their sessions. You can restore yours later.`,
       shared ? "Delete my visit" : "Delete session",
       () => {
         void (async () => {
@@ -377,7 +389,7 @@ function Visit({ visitId }: { visitId: VisitId }) {
                 {LIVE_REBUY_AMOUNTS.map((preset) => (
                   <Button
                     key={preset}
-                    label={`+ ${money(preset)}`}
+                    label={`+ ${money(preset, prefs.showCents)}`}
                     size="lg"
                     haptic
                     disabled={quick.pending}
@@ -724,7 +736,23 @@ function LiveHero({ visit, name }: { visit: RecordingVisitView; name?: string | 
 
 /** The live buy-in: whole dollars big, the cents small beside them. */
 function BuyInFigure({ amount }: { amount: MinorUnits }) {
-  const text = formatMoney(amount, RECORDING_CURRENCY, { trailingZeroDisplay: "auto" });
+  const { showCents, privacyMode } = usePreferences();
+  if (privacyMode) {
+    return (
+      <Text
+        testID="live-buy-in"
+        accessibilityLabel={HIDDEN_AMOUNT_LABEL}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        className="text-[88px] leading-[92px] font-bold tracking-[-3px] text-felt-soft tabular-nums"
+      >
+        {HIDDEN_AMOUNT}
+      </Text>
+    );
+  }
+  const text = formatMoney(amount, RECORDING_CURRENCY, {
+    trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
+  });
   const [, whole = text, cents = ""] = /^(.*\d)([.,]\d+\D*)$/.exec(text) ?? [];
   return (
     <Text
@@ -818,6 +846,7 @@ function History({
       people.find((person) => person.id === item.counterpartyId)?.displayName ?? "someone";
     return `${item.kind === "cash_out" ? "Paid to" : "Paid by"} ${name}`;
   };
+  const prefs = usePreferences();
   const lines = historyLines(visit);
   return (
     <View className="gap-2">
@@ -847,7 +876,7 @@ function History({
             <Row
               key={item.id}
               onPress={() => onInspect(item.id)}
-              accessibilityLabel={`${name}, ${money(item.amount)}, ${time}${voided ? ", voided" : ""}${item.replacesEntryId ? ", correction" : ""}`}
+              accessibilityLabel={`${name}, ${formatDisplayMoney(item.amount, RECORDING_CURRENCY, prefs, { forAccessibility: true })}, ${time}${voided ? ", voided" : ""}${item.replacesEntryId ? ", correction" : ""}`}
               accessibilityHint="Shows the entry, where you can correct or void it"
               className="min-h-14"
             >

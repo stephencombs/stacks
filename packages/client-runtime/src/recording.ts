@@ -31,8 +31,8 @@ import {
 } from "./recordingState.ts";
 import { RecordingStorageConflict, type RecordingStorage } from "./recordingStorage.ts";
 
-export { RecordingError } from "./recordingState.ts";
-export type { CachedVenue, RecordingReceipt, RecordingState } from "./recordingState.ts";
+export { CachedVenue, RecordingError } from "./recordingState.ts";
+export type { RecordingReceipt, RecordingState } from "./recordingState.ts";
 
 type StartInput = {
   readonly buyIn: number;

@@ -8,7 +8,6 @@ import {
   visitTitle,
 } from "@stacks/client-runtime/recordingView";
 import { gameChip } from "@stacks/client-runtime/stats";
-import { formatMoney } from "@stacks/shared/money";
 import { useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation } from "@react-navigation/native";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
@@ -23,6 +22,7 @@ import { GlassSurface } from "../components/ui/GlassSurface";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Sheet } from "../components/ui/Sheet";
 import { useGo } from "../lib/go";
+import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { useStacks } from "../lib/stacks";
 import { chipColor } from "./StatsParts";
 
@@ -51,6 +51,7 @@ type LivePlace = {
  */
 function useLiveSessions(except?: string) {
   const { home } = useRecordingHome();
+  const prefs = usePreferences();
   const places: ReadonlyArray<LivePlace> = [
     ...(home?.active ?? []).map((item) => ({
       key: item.visit.id,
@@ -59,7 +60,7 @@ function useLiveSessions(except?: string) {
       startedAt: item.visit.startedAt,
       detail: [
         item.venue?.name,
-        `${formatMoney(item.totals.buyIn, RECORDING_CURRENCY, { trailingZeroDisplay: "auto" })} in`,
+        `${formatDisplayMoney(item.totals.buyIn, RECORDING_CURRENCY, prefs)} in`,
       ]
         .filter(Boolean)
         .join(" · "),

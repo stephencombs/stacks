@@ -37,6 +37,7 @@ import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet } from "../features/RecordingForms";
 import { ByCasino, ByGame, Figure, Filters, chipColor, signed } from "../features/StatsParts";
 import { useAccount } from "../lib/account";
+import { usePreferences } from "../lib/preferences";
 import { StacksProvider, useStacks, useStatsCopies } from "../lib/stacks";
 
 type Summary = Extract<PersonalStatsView, { kind: "stats" }>;
@@ -380,6 +381,7 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
     "--color-surface",
     "--color-muted",
   ]).map(String);
+  const prefs = usePreferences();
   const [width, setWidth] = useState(0);
   const [inspect, setInspect] = useState<number | null>(null);
   const { points } = chart;
@@ -417,8 +419,8 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
         accessibilityLabel="Running result by finished session"
         accessibilityValue={{
           text: shown
-            ? `${shown.day}, session ${signed(shown.result, RECORDING_CURRENCY)}, running ${signed(shown.total, RECORDING_CURRENCY)}`
-            : signed(total, RECORDING_CURRENCY),
+            ? `${shown.day}, session ${signed(shown.result, RECORDING_CURRENCY, prefs, true)}, running ${signed(shown.total, RECORDING_CURRENCY, prefs, true)}`
+            : signed(total, RECORDING_CURRENCY, prefs, true),
         }}
         accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
         onAccessibilityAction={(event) =>

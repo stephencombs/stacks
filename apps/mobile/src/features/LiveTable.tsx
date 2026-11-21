@@ -37,6 +37,7 @@ import { FormError } from "../components/ui/Field";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
+import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import {
   AddPlayerSheet,
   CashOutSheet,
@@ -46,7 +47,10 @@ import {
 } from "./RecordingForms";
 import { ShareSheet, TableSettingsSheet } from "./SharedTable";
 
-const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
+const money = (amount: number, showCents = false) =>
+  formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY, {
+    trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
+  });
 
 /** The LIVE pill, timing the table from its first visit. With nobody there yet, it has no time. */
 export function LiveClock({ since }: { since: DateTime.Utc | null }) {
@@ -129,7 +133,8 @@ export function TableSeats({
                 amount={seat.amount}
                 currency={RECORDING_CURRENCY}
                 tone={seat.playing ? "plain" : "result"}
-                className={cn("type-number", felt && "text-felt-ink")}
+                felt={felt}
+                className="type-number"
               />
               {press ? (
                 <Icon name="chevron-right" color={felt ? "felt-soft" : "muted"} size={16} />
@@ -285,9 +290,12 @@ export function SeatSheet({
   onHistory: (visitId: VisitId) => void;
 }) {
   const { visit } = useRecordingVisit(seat.visitId);
+  const prefs = usePreferences();
   const quick = useRecordingSubmit();
   const [step, setStep] = useState<SeatStep>("menu");
   if (!visit) return null;
+  const shown = (amount: number) =>
+    formatDisplayMoney(MinorUnits.make(amount), RECORDING_CURRENCY, prefs);
   const back = () => setStep("menu");
   if (step === "rebuy")
     return (
@@ -300,7 +308,7 @@ export function SeatSheet({
             visitId: seat.visitId,
             entryId,
             undo: true,
-            text: `Rebuy of ${money(input.type === "add" ? input.amount : 0)} for ${seat.name} recorded.`,
+            text: `Rebuy of ${shown(input.type === "add" ? input.amount : 0)} for ${seat.name} recorded.`,
           })
         }
       />
@@ -316,7 +324,7 @@ export function SeatSheet({
           onRecorded({
             visitId: seat.visitId,
             entryId,
-            text: `${seat.name} cashed out ${money(input.type === "finish" ? input.amount : 0)}.`,
+            text: `${seat.name} cashed out ${shown(input.type === "finish" ? input.amount : 0)}.`,
           })
         }
       />
@@ -352,7 +360,7 @@ export function SeatSheet({
         visitId: seat.visitId,
         entryId: receipt.command.entryId,
         undo: true,
-        text: `Rebuy of ${money(amount)} for ${seat.name} recorded.`,
+        text: `Rebuy of ${shown(amount)} for ${seat.name} recorded.`,
       });
   };
   const playingAgain = table.seats.some(
@@ -385,7 +393,7 @@ export function SeatSheet({
             {LIVE_REBUY_AMOUNTS.map((preset) => (
               <Button
                 key={preset}
-                label={`+ ${money(preset)}`}
+                label={`+ ${money(preset, prefs.showCents)}`}
                 size="lg"
                 haptic
                 disabled={quick.pending}

@@ -17,6 +17,7 @@ import { useCSSVariable } from "uniwind";
 
 import { Choice } from "../components/ui/Field";
 import { cn } from "../components/ui/cn";
+import { HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
 
 const label = "text-sm";
 
@@ -70,6 +71,7 @@ export function Race<S extends RaceSession>({
   const at = pinned === null ? last : Math.min(pinned, last);
   const setAt = (next: number) => setPinned(next >= last ? null : next);
   const [measure, setMeasure] = useState<RaceMeasure>("money");
+  const prefs = usePreferences();
   const [width, setWidth] = useState(0);
   const [ink, muted, ring] = useCSSVariable([
     "--color-ink",
@@ -134,9 +136,11 @@ export function Race<S extends RaceSession>({
   const lead =
     second && leader!.now !== second.now
       ? measure === "money"
-        ? boardMoney(leader!.now! - second.now!, currency, false)
+        ? boardMoney(leader!.now! - second.now!, currency, false, prefs)
         : returnLabel(leader!.now)
       : null;
+  const leadLabel =
+    measure === "money" && prefs.privacyMode && lead !== null ? HIDDEN_AMOUNT_LABEL : lead;
   const headline = !second
     ? `${leader!.name} leads`
     : lead === null
@@ -153,12 +157,19 @@ export function Race<S extends RaceSession>({
         <View
           accessible
           accessibilityRole="header"
-          accessibilityLabel={lead === null ? headline : `${headline} ${lead}`}
+          accessibilityLabel={leadLabel === null ? headline : `${headline} ${leadLabel}`}
           className="flex-row flex-wrap items-baseline gap-x-2"
         >
           <Text className="text-xl font-semibold text-ink">{headline}</Text>
           {lead === null ? null : (
-            <Text className="tabular-nums text-3xl leading-10 text-win">{lead}</Text>
+            <Text
+              className={cn(
+                "tabular-nums text-3xl leading-10",
+                measure === "money" && prefs.privacyMode ? "text-muted" : "text-win",
+              )}
+            >
+              {lead}
+            </Text>
           )}
         </View>
         <Text className="text-sm text-muted">
