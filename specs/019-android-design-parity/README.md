@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-16
 priority: high
 tags:
@@ -7,7 +7,10 @@ tags:
   - android
   - design
 created_at: 2026-11-16T17:18:15.495532200Z
-updated_at: 2026-11-16T17:18:15.495532200Z
+updated_at: 2026-11-21T00:25:38.871405200Z
+transitions:
+  - status: in-progress
+    at: 2026-11-21T00:25:38.871405200Z
 ---
 
 # Android matches its design frames
@@ -60,12 +63,12 @@ child uses to prove it.
 
 ## Plan
 
-- [ ] Push the `design-frames` reference branch and keep it current with the canvas
-- [ ] 024 shared parts
-- [ ] 020 shell, Play and Crew
+- [x] Publish light and dark references for every indexed Android frame on `design-frames`
+- [x] 024 shared parts ([PR #109](https://github.com/stephencombs/stacks/pull/109))
+- [x] 020 shell, Play and Crew ([PR #114](https://github.com/stephencombs/stacks/pull/114))
 - [ ] 021 live table and sheets
 - [ ] 022 Stats
-- [ ] 023 Live Updates
+- [x] 023 Live Updates ([PR #117](https://github.com/stephencombs/stacks/pull/117))
 
 ## Test
 
