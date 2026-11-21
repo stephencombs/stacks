@@ -20,8 +20,14 @@ import { cn } from "../components/ui/cn";
 import { HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
 
 const label = "text-sm";
+const shortDay = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const lastDay = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
-type Racer = { readonly playerId: PlayerId; readonly name: string };
+type Racer = { readonly playerId: PlayerId; readonly name: string; readonly chip?: number };
 
 /** A finished session as the race sees it, oldest first. */
 type RaceSession = StatsSession & {
@@ -55,6 +61,8 @@ export function Race<S extends RaceSession>({
   marks,
   where,
   latest,
+  stats = false,
+  you,
 }: {
   sessions: ReadonlyArray<S>;
   players: ReadonlyArray<Racer>;
@@ -64,7 +72,10 @@ export function Race<S extends RaceSession>({
   where: (session: S) => string;
   /** The heading's lead-in at the latest session. */
   latest: string;
+  stats?: boolean;
+  you?: PlayerId;
 }) {
+  const height = stats ? Math.max(128, players.length * 15 + 12) : HEIGHT;
   const last = sessions.length - 1;
   // Unpinned, the race follows the latest session, including ones that arrive while it's open.
   const [pinned, setPinned] = useState<number | null>(null);
@@ -73,19 +84,23 @@ export function Race<S extends RaceSession>({
   const [measure, setMeasure] = useState<RaceMeasure>("money");
   const prefs = usePreferences();
   const [width, setWidth] = useState(0);
-  const [ink, muted, ring] = useCSSVariable([
+  const [ink, muted, ring, ...chips] = useCSSVariable([
     "--color-ink",
     "--color-muted",
     "--color-fill-strong",
+    ...Array.from({ length: 8 }, (_, index) => `--color-chip-${index + 1}`),
   ]).map(String);
 
   const lines = raceLines(
     sessions,
     players.map((p) => p.playerId),
-    measure,
+    stats ? "money" : measure,
   ).map((line, i) => ({ ...line, ...players[i]! }));
   const chartNames = new Map(
-    players.map(({ playerId, name }) => [playerId, name.trim().split(/\s+/)[0] || name]),
+    players.map(({ playerId, name }) => [
+      playerId,
+      stats && playerId === you ? "You" : name.trim().split(/\s+/)[0] || name,
+    ]),
   );
   const labelSpace = Math.min(
     100,
@@ -93,12 +108,14 @@ export function Race<S extends RaceSession>({
   );
   const plot = lineScale(
     lines.map((l) => l.line),
-    { width: Math.max(0, width - labelSpace), height: HEIGHT },
+    { width: Math.max(0, width - labelSpace), height },
     PAD,
-    around(
-      lines.findIndex((l) => l.playerId === picked),
-      lines.length,
-    ),
+    stats
+      ? undefined
+      : around(
+          lines.findIndex((l) => l.playerId === picked),
+          lines.length,
+        ),
   );
   const standing = lines
     .map((l) => ({ ...l, now: l.values[at]! }))
@@ -113,8 +130,14 @@ export function Race<S extends RaceSession>({
   const labels = spreadLabels(
     drawn.map(({ line }) => plot.y(line[point]!)),
     LETTER + 6,
-    { min: LETTER, max: HEIGHT - LETTER },
+    { min: LETTER, max: height - LETTER },
   );
+  const axis = stats
+    ? [
+        { index: 0, label: shortDay.format(sessions[0]!.session.startedAt.epochMilliseconds) },
+        { index: last, label: lastDay.format(sessions[last]!.session.startedAt.epochMilliseconds) },
+      ]
+    : marks;
   const edges = { min: INSET, max: Math.max(INSET, width - INSET) };
   const scrub = (locationX: number) =>
     setAt(
@@ -149,40 +172,44 @@ export function Race<S extends RaceSession>({
 
   return (
     <View className="gap-4">
-      <View className="gap-1">
-        <Text className={cn(label, "text-muted")}>
-          {at === last ? latest : `After session ${at + 1} of ${sessions.length}`} ·{" "}
-          {where(session)}
-        </Text>
-        <View
-          accessible
-          accessibilityRole="header"
-          accessibilityLabel={leadLabel === null ? headline : `${headline} ${leadLabel}`}
-          className="flex-row flex-wrap items-baseline gap-x-2"
-        >
-          <Text className="text-xl font-semibold text-ink">{headline}</Text>
-          {lead === null ? null : (
-            <Text
-              className={cn(
-                "tabular-nums text-3xl leading-10",
-                measure === "money" && prefs.privacyMode ? "text-muted" : "text-win",
-              )}
-            >
-              {lead}
+      {stats ? null : (
+        <>
+          <View className="gap-1">
+            <Text className={cn(label, "text-muted")}>
+              {at === last ? latest : `After session ${at + 1} of ${sessions.length}`} ·{" "}
+              {where(session)}
             </Text>
-          )}
-        </View>
-        <Text className="text-sm text-muted">
-          Session {at + 1}: {venueLabel(session.venue)}, {formatDay(session.session.startedAt)}
-        </Text>
-      </View>
-      <Choice
-        label="Measure"
-        labelHidden
-        options={measures}
-        value={measure}
-        onChange={setMeasure}
-      />
+            <View
+              accessible
+              accessibilityRole="header"
+              accessibilityLabel={leadLabel === null ? headline : `${headline} ${leadLabel}`}
+              className="flex-row flex-wrap items-baseline gap-x-2"
+            >
+              <Text className="text-xl font-semibold text-ink">{headline}</Text>
+              {lead === null ? null : (
+                <Text
+                  className={cn(
+                    "tabular-nums text-3xl leading-10",
+                    measure === "money" && prefs.privacyMode ? "text-muted" : "text-win",
+                  )}
+                >
+                  {lead}
+                </Text>
+              )}
+            </View>
+            <Text className="text-sm text-muted">
+              Session {at + 1}: {venueLabel(session.venue)}, {formatDay(session.session.startedAt)}
+            </Text>
+          </View>
+          <Choice
+            label="Measure"
+            labelHidden
+            options={measures}
+            value={measure}
+            onChange={setMeasure}
+          />
+        </>
+      )}
 
       <View
         accessible
@@ -202,11 +229,11 @@ export function Race<S extends RaceSession>({
         }
         onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
         {...drag.panHandlers}
-        className="overflow-hidden rounded-xl bg-surface"
-        style={{ height: HEIGHT + MARKS }}
+        className={cn("overflow-hidden bg-surface", stats ? "rounded-[22px]" : "rounded-xl")}
+        style={{ height: height + MARKS }}
       >
         {width > 0 ? (
-          <Svg width={width} height={HEIGHT + MARKS} pointerEvents="none">
+          <Svg width={width} height={height + MARKS} pointerEvents="none">
             <Line
               x1={0}
               x2={width - labelSpace}
@@ -215,9 +242,9 @@ export function Race<S extends RaceSession>({
               stroke={ring}
               strokeDasharray="3 4"
             />
-            {marks.map((mark) => {
+            {axis.map((mark, index) => {
               const place = placeLabel(
-                plot.x(mark.index + 1),
+                plot.x(stats && index === 0 ? 0 : mark.index + 1),
                 labelWidth(mark.label, MARK_FONT),
                 edges,
               );
@@ -225,7 +252,7 @@ export function Race<S extends RaceSession>({
                 <SvgText
                   key={mark.index}
                   x={place.x}
-                  y={HEIGHT + MARKS - 8}
+                  y={height + MARKS - 8}
                   textAnchor={place.anchor}
                   fill={muted}
                   fontSize={MARK_FONT}
@@ -234,16 +261,23 @@ export function Race<S extends RaceSession>({
                 </SvgText>
               );
             })}
-            <Line
-              x1={plot.x(point)}
-              x2={plot.x(point)}
-              y1={PAD.y / 2}
-              y2={HEIGHT - PAD.y / 2}
-              stroke={ring}
-            />
-            {drawn.map(({ playerId, line }, i) => {
+            {stats && at === last ? null : (
+              <Line
+                x1={plot.x(point)}
+                x2={plot.x(point)}
+                y1={PAD.y / 2}
+                y2={height - PAD.y / 2}
+                stroke={ring}
+              />
+            )}
+            {drawn.map(({ playerId, line, chip }, i) => {
               const yours = playerId === picked;
-              const color = yours ? ink : muted;
+              const color =
+                stats && !prefs.privacyMode
+                  ? (chips[(chip ?? 1) - 1] ?? muted)
+                  : yours
+                    ? ink
+                    : muted;
               const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
               const now = { x: plot.x(point), y: plot.y(line[point]!) };
               const off = plot.clipped(line[point]!);
@@ -265,22 +299,30 @@ export function Race<S extends RaceSession>({
                     points={points.slice(0, point + 1).join(" ")}
                     fill="none"
                     stroke={color}
-                    strokeOpacity={yours ? 1 : 0.45}
-                    strokeWidth={yours ? 3 : 2}
+                    strokeOpacity={stats || yours ? 1 : 0.45}
+                    strokeWidth={stats ? 1.8 : yours ? 3 : 2}
                     strokeLinejoin="round"
                     strokeLinecap="round"
                   />
-                  {yours ? (
+                  {yours && (!stats || at !== last) ? (
                     <Circle cx={now.x} cy={now.y} r={10} fill={color} fillOpacity={0.2} />
                   ) : null}
-                  <Circle cx={now.x} cy={now.y} r={yours ? 4.5 : 3} fill={color} />
+                  {stats ? (
+                    <Line x1={now.x} y1={now.y} x2={now.x + 8} y2={labels[i]} stroke={color} />
+                  ) : null}
+                  <Circle
+                    cx={now.x}
+                    cy={now.y}
+                    r={stats ? (yours ? 3 : 2.5) : yours ? 4.5 : 3}
+                    fill={color}
+                  />
                   <SvgText
                     x={seat.x}
                     y={labels[i]! + 4}
                     textAnchor={seat.anchor}
                     fontSize={LETTER}
-                    fontWeight={yours ? "600" : "400"}
-                    fill={yours ? ink : muted}
+                    fontWeight={stats || yours ? "600" : "400"}
+                    fill={stats || yours ? ink : muted}
                   >
                     {chartName}
                   </SvgText>

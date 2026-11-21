@@ -3,6 +3,8 @@ import type {
   GroupDetail,
   GroupId,
   GroupStats,
+  MinorUnits,
+  PlayerId,
   TripId,
   VenueId,
 } from "@stacks/contracts";
@@ -18,6 +20,7 @@ import {
   gameName,
   noMatch,
   played,
+  statsTrips,
   type StatsFilters,
 } from "./stats.ts";
 import { boardMoney, chipOf, localClock } from "./trip.ts";
@@ -106,7 +109,10 @@ export const groupStatsView = (
     ...computed.options,
     tripIds: [...new Set([...computed.options.tripIds, ...detail.trips.map((trip) => trip.id)])],
   };
-  const head = filterChips(filters, options, { venueName, tripName });
+  const head = {
+    ...filterChips(filters, options, { venueName, tripName }),
+    trips: statsTrips(stats.plays, detail.trips, filters, timeZone),
+  };
   if (stats.plays.length === 0) return { ...head, kind: "empty" as const };
   if (computed.plays.length === 0)
     return {
@@ -152,6 +158,24 @@ export const groupStatsView = (
         }));
   const biggest = Math.max(...computed.byGame.map((row) => Math.abs(row.result)));
   const meta = (sessions: number) => `${sessions} ${sessions === 1 ? "session" : "sessions"}`;
+  const guests = new Set(
+    detail.players.filter((player) => player.userId === null).map((p) => p.id),
+  );
+  const bests = new Map<PlayerId, { result: MinorUnits; line: string }>();
+  for (const play of computed.plays) {
+    for (const { playerId, net } of play.results) {
+      const best = bests.get(playerId);
+      if (best && best.result >= net) continue;
+      const day = DateTime.format(DateTime.setZone(play.endedAt, timeZone), {
+        month: "short",
+        day: "numeric",
+      });
+      bests.set(playerId, {
+        result: net,
+        line: play.venueId === null ? day : `${venueName(play.venueId)} · ${day}`,
+      });
+    }
+  }
 
   return {
     ...head,
@@ -164,6 +188,8 @@ export const groupStatsView = (
       name: names.get(row.playerId) ?? "Someone",
       you: row.playerId === detail.myPlayerId,
       chip: chipOf(detail, row.playerId),
+      guest: guests.has(row.playerId),
+      best: bests.get(row.playerId),
       meta: row.sessions === 0 ? "No sessions" : played(row.sessions, row.hours),
       result: row.result,
       sheet: {

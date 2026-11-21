@@ -111,6 +111,34 @@ describe("the trip chip", () => {
     ]);
   });
 
+  it("counts a whole trip with the game and casino still applied", async () => {
+    const visits = await inTrips();
+    const before = personalStatsView(
+      visits,
+      { year: 2026, venueId: wynn, game: "blackjack" },
+      {
+        timeZone: zone,
+        tripNames,
+      },
+    );
+    const option = before.chips
+      .find((chip) => chip.key === "tripId")!
+      .options.find((option) => option.value === vegas)!;
+    expect(before.trips.total).toBe(2);
+    expect(before.trips.byId.get(vegas)).toEqual({ sessions: 1, range: "Mar 1–2, 2025" });
+    expect(before.trips.byId.get(reno)?.sessions).toBe(0);
+    expect(option.filters).toEqual({
+      venueId: wynn,
+      game: "blackjack",
+      tripId: vegas,
+      year: undefined,
+    });
+    expect(personalStatsView(visits, option.filters, { timeZone: zone })).toMatchObject({
+      kind: "stats",
+      sessions: 1,
+    });
+  });
+
   it("says which trip matched nothing", async () => {
     const stats = personalStatsView(
       await inTrips(),
@@ -270,6 +298,7 @@ describe("personalStatsView", () => {
     expect(stats.title).toBe("Result · 2026");
     expect(stats.result).toBe(-40_000 + 2_500 - 10_000);
     expect(stats.chart?.points).toHaveLength(3);
+    expect(stats.chart?.androidAxis).toEqual({ from: "Jan", to: "Dec" });
     expect(stats.list).toHaveLength(3);
     expect(stats.chips.map((chip) => [chip.label, chip.applied])).toEqual([
       ["2026", true],

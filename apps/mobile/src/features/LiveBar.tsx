@@ -24,7 +24,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { useGo } from "../lib/go";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { useStacks } from "../lib/stacks";
-import { chipColor } from "./StatsParts";
+import { chipColor } from "./chipColor";
 
 /** What of your table a screen already shows: the session itself, or a trip that pins it first. */
 export type ShowsTable = { readonly session: SessionId } | { readonly trip: TripId };
