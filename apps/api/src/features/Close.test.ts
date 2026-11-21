@@ -1,102 +1,93 @@
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import type { PlayerId } from "@stacks/contracts";
+import { CurrencyCode } from "@stacks/contracts";
 
-import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
+import { catalogVenue, ids, usd, users } from "../testing/fixtures.ts";
+import { finishHistoricalSession, seedEntry, seedSession } from "../testing/legacySessions.ts";
 import { TestApi } from "../testing/TestApi.ts";
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("closing a table in one request", (it) => {
-  const table = Effect.gen(function* () {
-    const { alex, bea } = yield* users("alex", "bea");
-    const group = yield* groupWith(alex, bea);
-    const [alexId, beaId] = [group.myPlayerId, group.players[1]!.id];
-    const venue = yield* catalogVenue(alex);
-    const sessionId = ids.session();
-    yield* alex.sessions.create({
-      params: { tripId: group.tripId },
-      payload: {
-        id: sessionId,
-        venueId: venue.id,
-        game: "blackjack",
-        playerIds: [alexId, beaId],
-        notes: null,
-      },
-    });
-    const entry = (kind: "buy_in" | "cash_out", playerId: PlayerId, amount: number) =>
-      alex.ledger.addEntry({
-        params: { sessionId },
-        payload: {
+it.layer(TestApi.layer, { timeout: "30 seconds" })("retired sessions", (it) => {
+  it.effect("refuses every session write without changing historical data", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      for (const currency of ["USD", "JPY"]) {
+        const groupId = ids.group();
+        const group = yield* alex.groups.create({
+          payload: {
+            id: groupId,
+            name: "Crew",
+            currency: CurrencyCode.make(currency),
+            displayName: "Alex",
+          },
+        });
+        const trip = yield* alex.trips.create({
+          params: { groupId },
+          payload: { id: ids.trip(), name: "Vegas" },
+        });
+        const otherTrip = yield* alex.trips.create({
+          params: { groupId },
+          payload: { id: ids.trip(), name: "Reno" },
+        });
+        const venue = yield* catalogVenue(alex);
+        const playerId = group.myPlayerId;
+        const payload = {
+          id: ids.session(),
+          venueId: venue.id,
+          game: "blackjack" as const,
+          playerIds: [playerId] as const,
+          notes: null,
+        };
+        const sessionId = yield* seedSession(trip.id, payload);
+        const params = { sessionId };
+        const buyIn = yield* seedEntry(sessionId, {
           id: ids.entry(),
-          kind,
+          kind: "buy_in",
           playerId,
           counterpartyId: null,
-          amount: usd(amount),
+          amount: usd(10000),
           note: null,
           replacesEntryId: null,
-        },
-      });
-    yield* entry("buy_in", alexId, 30000);
-    yield* entry("buy_in", beaId, 20000);
-    const close = (
-      cashOuts: ReadonlyArray<{
-        id: ReturnType<typeof ids.entry>;
-        playerId: PlayerId;
-        amount: number;
-      }>,
-    ) =>
-      alex.sessions.close({
-        params: { sessionId },
-        payload: { cashOuts: cashOuts.map((c) => ({ ...c, amount: usd(c.amount) })) },
-      });
-    const get = alex.sessions.get({ params: { sessionId } });
-    return { alexId, beaId, close, entry, get };
-  });
+        });
+        const read = alex.sessions.get({ params });
+        const before = yield* read;
+        const create = (id: typeof sessionId) =>
+          alex.sessions.create({ params: { tripId: trip.id }, payload: { ...payload, id } });
+        const fresh = ids.session();
+        for (const request of [
+          create(fresh),
+          create(sessionId),
+          alex.sessions.addPlayer({ params, payload: { playerId } }),
+          alex.sessions.seat({ params, payload: { id: ids.seating(), playerId, seat: 1 } }),
+          alex.sessions.setTable({ params, payload: { seats: 7 } }),
+          alex.sessions.setHighLimit({ params, payload: { highLimit: true } }),
+          alex.sessions.move({ params, payload: { tripId: otherTrip.id } }),
+          alex.sessions.close({
+            params,
+            payload: { cashOuts: [{ id: ids.entry(), playerId, amount: usd(20000) }] },
+          }),
+        ]) {
+          expect(yield* Effect.flip(request)).toMatchObject({
+            _tag: "Conflict",
+            reason: "legacy_sessions_retired",
+          });
+        }
+        expect(
+          yield* Effect.flip(alex.sessions.get({ params: { sessionId: fresh } })),
+        ).toMatchObject({
+          _tag: "NotFound",
+        });
+        expect(yield* read).toEqual(before);
+        expect(before.entries.map((entry) => entry.id)).toEqual([buyIn.id]);
 
-  it.effect("records every cash-out and closes together", () =>
-    Effect.gen(function* () {
-      const { alexId, beaId, close } = yield* table;
-      const cashOuts = [
-        { id: ids.entry(), playerId: alexId, amount: 110000 },
-        { id: ids.entry(), playerId: beaId, amount: 0 },
-      ];
-      const closed = yield* close(cashOuts);
-      expect(closed.session.status).toBe("closed");
-      expect(closed.results).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ playerId: alexId, net: 80000 }),
-          expect.objectContaining({ playerId: beaId, net: -20000 }),
-        ]),
-      );
-      // The same request again, as a retry would send it, changes nothing.
-      const again = yield* close(cashOuts);
-      expect(again.entries).toHaveLength(closed.entries.length);
-    }),
-  );
-
-  it.effect("saves nothing when someone is left without a cash-out", () =>
-    Effect.gen(function* () {
-      const { alexId, close, get } = yield* table;
-      const refused = yield* Effect.flip(
-        close([{ id: ids.entry(), playerId: alexId, amount: 5000 }]),
-      );
-      expect(refused).toMatchObject({ _tag: "Conflict", reason: "players_not_cashed_out" });
-      const after = yield* get;
-      expect(after.session.status).toBe("live");
-      expect(after.entries.filter((e) => e.kind === "cash_out")).toEqual([]);
-    }),
-  );
-
-  it.effect("won't cash out a player twice", () =>
-    Effect.gen(function* () {
-      const { alexId, beaId, close, entry } = yield* table;
-      yield* entry("cash_out", beaId, 1000);
-      const twice = yield* Effect.flip(
-        close([
-          { id: ids.entry(), playerId: alexId, amount: 5000 },
-          { id: ids.entry(), playerId: beaId, amount: 1000 },
-        ]),
-      );
-      expect(twice).toMatchObject({ _tag: "InvalidRequest" });
+        yield* finishHistoricalSession(sessionId);
+        const closed = yield* read;
+        expect(closed.session.status).toBe("closed");
+        expect(yield* Effect.flip(alex.sessions.reopen({ params }))).toMatchObject({
+          _tag: "Conflict",
+          reason: "legacy_sessions_retired",
+        });
+        expect(yield* read).toEqual(closed);
+      }
     }),
   );
 });

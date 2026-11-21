@@ -23,10 +23,9 @@ import * as Database from "../src/db/Database.ts";
 import * as Groups from "../src/features/Groups.ts";
 import * as Guests from "../src/features/Guests.ts";
 import * as Invites from "../src/features/Invites.ts";
-import * as Ledger from "../src/features/Ledger.ts";
-import * as Sessions from "../src/features/Sessions.ts";
 import * as Trips from "../src/features/Trips.ts";
 import * as Venues from "../src/features/Venues.ts";
+import { finishHistoricalSession, seedEntry, seedSession } from "../src/testing/legacySessions.ts";
 
 // Usage: node scripts/seed.ts [--owner user_xxx]
 // Builds one realistic group. Pass your Clerk user ID as --owner to see it when signed in.
@@ -150,20 +149,20 @@ Effect.gen(function* () {
         : DateTime.add(tripStart, { hours: 10 + index * 4 + between(0, 2) });
       const seated = players.filter(() => random() < 0.75);
       const table = seated.length >= 2 ? seated : players.slice(0, 2);
-      yield* Sessions.create(tripId, {
+      yield* seedSession(tripId, {
         id: sessionId,
         venueId: pick(venues).id,
         game: pick(games),
         startedAt,
-        playerIds: [table[0]!, ...table.slice(1)],
+        playerIds: table,
         notes: null,
-      }).pipe(as(owner));
+      });
 
       for (const playerId of table) {
         const buyIns = Array.from({ length: between(1, 3) }, () => between(3, 25) * 20);
         for (const [n, amount] of buyIns.entries()) {
           const coveredBy = random() < 0.2 ? pick(table.filter((id) => id !== playerId)) : null;
-          yield* Ledger.addEntry(sessionId, {
+          yield* seedEntry(sessionId, {
             id: EntryId.make(uuid()),
             kind: "buy_in",
             playerId,
@@ -172,12 +171,12 @@ Effect.gen(function* () {
             occurredAt: DateTime.add(startedAt, { minutes: 5 + n * 40 }),
             note: null,
             replacesEntryId: null,
-          }).pipe(as(owner));
+          });
         }
         if (isLive) continue;
         const staked = buyIns.reduce((sum, amount) => sum + amount, 0);
         const keptBy = random() < 0.1 ? pick(table.filter((id) => id !== playerId)) : null;
-        yield* Ledger.addEntry(sessionId, {
+        yield* seedEntry(sessionId, {
           id: EntryId.make(uuid()),
           kind: "cash_out",
           playerId,
@@ -186,12 +185,12 @@ Effect.gen(function* () {
           occurredAt: DateTime.add(startedAt, { hours: 3 }),
           note: null,
           replacesEntryId: null,
-        }).pipe(as(owner));
+        });
       }
       if (isLive) continue;
-      yield* Ledger.close(sessionId, {
+      yield* finishHistoricalSession(sessionId, {
         endedAt: DateTime.add(startedAt, { hours: between(3, 4) }),
-      }).pipe(as(owner));
+      });
     }
 
     if (current) continue;

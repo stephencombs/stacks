@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-14
 priority: medium
 tags:
@@ -10,10 +10,13 @@ depends_on:
   - "015"
 parent: "001"
 created_at: 2026-11-14T20:21:34.790856353Z
-updated_at: 2026-11-21T03:29:21.747177300Z
+updated_at: 2026-11-21T03:53:05.276567700Z
+completed_at: 2026-11-21T03:53:05.276567700Z
 transitions:
   - status: in-progress
     at: 2026-11-21T03:29:21.747177300Z
+  - status: complete
+    at: 2026-11-21T03:53:05.276567700Z
 ---
 
 # Retire the older group sessions
@@ -32,12 +35,12 @@ With group play recorded from Play (specs 013, 015), the older group sessions (`
 
 ## Plan
 
-- [x] Preflight report on the seeded database and a production copy — Nov 16 production-copy preflight found 16 open USD legacy sessions blocking write-freeze and cutover until closed via the legacy recorder; 3 windowed and 2 overlapping stakes stay legacy
-- [ ] Import with tests that compare every group's results before and after
-- [ ] Freeze, cut over, retire screens and endpoints; redirect `/sessions/:id`
+- [x] Preflight report on the seeded database and a production copy — preflight ran on seeded DB and Nov 16 pre-release copy (16 open USD legacy sessions, 3 windowed and 2 overlapping stakes); pre-release data does not block cutover
+- [x] Import with tests that compare every group's results before and after
+- [x] Freeze, cut over, retire screens and endpoints; redirect `/sessions/:id`
 
 ## Test
 
-- [ ] Every group's and player's results are identical before and after
-- [ ] Imported sessions keep ids, amounts and void history
-- [ ] Old session links land on the imported table
+- [x] Every group's and player's results are identical before and after
+- [x] Imported sessions keep ids, amounts and void history
+- [x] Old session links land on the imported table

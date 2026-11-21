@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 
 import { catalogVenue, groupWith, ids, owe, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
+import { seedSession } from "../testing/legacySessions.ts";
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
   it.effect("hands a guest's history to whoever claims it", () =>
@@ -100,15 +101,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
       const group = yield* groupWith(alex, gus);
       const groupId = group.group.id;
       const venue = yield* catalogVenue(alex);
-      yield* alex.sessions.create({
-        params: { tripId: group.tripId },
-        payload: {
-          id: ids.session(),
-          venueId: venue.id,
-          game: "slots",
-          playerIds: [group.players[1]!.id],
-          notes: null,
-        },
+      yield* seedSession(group.tripId, {
+        id: ids.session(),
+        venueId: venue.id,
+        game: "slots",
+        playerIds: [group.players[1]!.id],
+        notes: null,
       });
       const guestId = ids.player();
       const withGuest = yield* alex.guests.add({

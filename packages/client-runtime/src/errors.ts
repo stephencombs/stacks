@@ -9,6 +9,7 @@ import {
 } from "@stacks/contracts";
 
 const conflictMessages: Record<ConflictReason, string> = {
+  legacy_sessions_retired: "This session is read-only. Record new play from Play.",
   id_taken: "That was already saved. Refresh and try again.",
   invite_expired: "This invite has expired. Ask for a new one.",
   invite_revoked: "This invite was cancelled. Ask for a new one.",

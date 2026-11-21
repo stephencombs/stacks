@@ -47,7 +47,9 @@ const loadToChange = Effect.fn("Stakes.loadToChange")(function* (stakeId: StakeI
 /** Call inside a transaction, after locking the trip as Recording.loadLedger does. */
 const requireNoTables = Effect.fn("Stakes.requireNoTables")(function* (tripId: TripId) {
   const sql = yield* SqlClient.SqlClient;
-  const tables = yield* sql`select 1 from tables where trip_id = ${tripId} limit 1`;
+  const tables = yield* sql`
+    select 1 from tables where trip_id = ${tripId} and legacy_session_id is null limit 1
+  `;
   if (tables.length > 0) return yield* new Conflict({ reason: "trip_has_tables" });
 });
 

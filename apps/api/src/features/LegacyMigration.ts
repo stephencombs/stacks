@@ -63,7 +63,7 @@ const findIssues = Effect.fn("LegacyMigration.findIssues")(function* (scope: Leg
       'Records money in ' || g.currency || '; it stays on the legacy ledger.' as detail
     from groups g
     where g.currency <> 'USD' and ${scope ? sql.in("g.id", scope) : sql.literal("true")}
-      and (exists (select 1 from entries e where e.group_id = g.id)
+      and (exists (select 1 from sessions s where s.group_id = g.id)
         or exists (select 1 from stakes k where k.group_id = g.id))
 
     union all
@@ -212,15 +212,15 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
     )`);
     // The session's table has no starter, so nobody records at it again.
     const tables = yield* sql`
-      insert into tables (id, starter_player_id, game, venue_id, high_limit, legacy_session_id)
-      select s.id, null, s.game, s.venue_id, s.high_limit, s.id
+      insert into tables (id, starter_player_id, game, venue_id, high_limit, legacy_session_id, trip_id)
+      select s.id, null, s.game, s.venue_id, s.high_limit, s.id, s.trip_id
       from sessions s
       where ${within("s.group_id")}
-        and exists (select 1 from ${participations} part where part.session_id = s.id)
       on conflict (id) do update
-        set game = excluded.game, venue_id = excluded.venue_id, high_limit = excluded.high_limit
-        where (tables.game, tables.venue_id, tables.high_limit) is distinct from
-          (excluded.game, excluded.venue_id, excluded.high_limit)
+        set game = excluded.game, venue_id = excluded.venue_id, high_limit = excluded.high_limit,
+          trip_id = excluded.trip_id
+        where (tables.game, tables.venue_id, tables.high_limit, tables.trip_id) is distinct from
+          (excluded.game, excluded.venue_id, excluded.high_limit, excluded.trip_id)
       returning id
     `;
     const visits = yield* sql`

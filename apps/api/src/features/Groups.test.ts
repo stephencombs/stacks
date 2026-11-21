@@ -4,6 +4,7 @@ import { CurrencyCode } from "@stacks/contracts";
 
 import { catalogVenue, groupWith, ids, owe, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
+import { seedSession } from "../testing/legacySessions.ts";
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
   it.effect("makes the creator the owner and treats a retried create as the same group", () =>
@@ -110,15 +111,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
       const groupId = group.group.id;
       const venue = yield* catalogVenue(alex);
       const sessionId = ids.session();
-      yield* alex.sessions.create({
-        params: { tripId: group.tripId },
-        payload: {
-          id: sessionId,
-          venueId: venue.id,
-          game: "craps",
-          playerIds: [group.players[1]!.id],
-          notes: null,
-        },
+      yield* seedSession(group.tripId, {
+        id: sessionId,
+        venueId: venue.id,
+        game: "craps",
+        playerIds: [group.players[1]!.id],
+        notes: null,
       });
       yield* alex.groups.removeMember({ params: { groupId, userId: group.players[1]!.userId! } });
       const session = yield* alex.sessions.get({ params: { sessionId } });

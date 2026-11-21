@@ -43,7 +43,6 @@ import { ClaimScreen, JoinScreen } from "./screens/Invites";
 import { CrewGroupsButton, CrewScreen, GroupsScreen } from "./screens/Crew";
 import { GroupScreen } from "./screens/Group";
 import { GroupSettingsScreen } from "./screens/GroupSettings";
-import { NewSessionScreen } from "./screens/NewSession";
 import { PlayScreen } from "./screens/Play";
 import { RedeemInviteScreen } from "./screens/RedeemInvite";
 import { TableScreen } from "./screens/Table";
@@ -130,12 +129,6 @@ const CrewStack = createNativeStackNavigator({
       linking: "groups",
     },
     People: { screen: GroupScreen, options: { title: "" }, linking: "groups/:groupId/people" },
-    Session: { screen: SessionScreen, options: { title: "" }, linking: "sessions/:sessionId" },
-    NewSession: {
-      screen: NewSessionScreen,
-      options: { title: Platform.OS === "android" ? "" : "Start a session" },
-      linking: "trips/:tripId/sessions/new",
-    },
   },
 });
 
@@ -186,6 +179,11 @@ const RootStack = createNativeStackNavigator({
   screens: {
     Tabs: { screen: Tabs, options: { headerShown: false } },
     Play: { screen: PlayScreen, linking: "play/:visitId" },
+    Session: {
+      screen: SessionScreen,
+      linking: "sessions/:sessionId",
+      layout: ({ children }) => <AccountGate>{children}</AccountGate>,
+    },
     Table: { screen: TableScreen, linking: "tables/:tableId", options: { headerShown: false } },
     SharedTable: {
       screen: SharedTableScreen,

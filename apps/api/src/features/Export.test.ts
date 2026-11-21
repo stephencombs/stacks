@@ -6,6 +6,7 @@ import { CurrencyCode, MinorUnits } from "@stacks/contracts";
 import { groupWith, ids, usd, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
 import { csvText } from "./Export.ts";
+import { seedEntry, seedSession, voidHistoricalEntry } from "../testing/legacySessions.ts";
 
 it("neutralizes spreadsheet formulas including leading whitespace", () => {
   expect(csvText("=1+1")).toBe("'=1+1");
@@ -94,62 +95,46 @@ layer(TestApi.layer)("Export", (it) => {
             groupId: null,
           },
         });
-        const session = yield* owner.sessions.create({
-          params: { tripId: trip.id },
-          payload: {
-            id: ids.session(),
-            venueId: venue.id,
-            game: "blackjack",
-            startedAt: DateTime.makeUnsafe("2026-10-21T20:00:00Z"),
-            playerIds: [alexPlayer!.id, beaPlayer!.id],
-            notes: null,
-          },
+        const sessionId = yield* seedSession(trip.id, {
+          id: ids.session(),
+          venueId: venue.id,
+          game: "blackjack",
+          startedAt: DateTime.makeUnsafe("2026-10-21T20:00:00Z"),
+          playerIds: [alexPlayer!.id, beaPlayer!.id],
+          notes: null,
         });
-        const sessionId = session.session.id;
 
-        const firstBuyIn = yield* owner.ledger.addEntry({
-          params: { sessionId },
-          payload: {
-            id: ids.entry(),
-            kind: "buy_in",
-            playerId: beaPlayer!.id,
-            counterpartyId: alexPlayer!.id,
-            amount: usd(10_050),
-            occurredAt: DateTime.makeUnsafe("2026-10-21T20:05:00Z"),
-            note: 'Fronted, "cash"\nline two',
-            replacesEntryId: null,
-          },
+        const firstBuyIn = yield* seedEntry(sessionId, {
+          id: ids.entry(),
+          kind: "buy_in",
+          playerId: beaPlayer!.id,
+          counterpartyId: alexPlayer!.id,
+          amount: usd(10_050),
+          occurredAt: DateTime.makeUnsafe("2026-10-21T20:05:00Z"),
+          note: 'Fronted, "cash"\nline two',
+          replacesEntryId: null,
         });
-        const correctedBuyIn = yield* owner.ledger.addEntry({
-          params: { sessionId },
-          payload: {
-            id: ids.entry(),
-            kind: "buy_in",
-            playerId: beaPlayer!.id,
-            counterpartyId: alexPlayer!.id,
-            amount: usd(20_005),
-            occurredAt: DateTime.makeUnsafe("2026-10-21T20:06:00Z"),
-            note: null,
-            replacesEntryId: firstBuyIn.id,
-          },
+        const correctedBuyIn = yield* seedEntry(sessionId, {
+          id: ids.entry(),
+          kind: "buy_in",
+          playerId: beaPlayer!.id,
+          counterpartyId: alexPlayer!.id,
+          amount: usd(20_005),
+          occurredAt: DateTime.makeUnsafe("2026-10-21T20:06:00Z"),
+          note: null,
+          replacesEntryId: firstBuyIn.id,
         });
-        const adjustment = yield* owner.ledger.addEntry({
-          params: { sessionId },
-          payload: {
-            id: ids.entry(),
-            kind: "adjustment",
-            playerId: alexPlayer!.id,
-            counterpartyId: null,
-            amount: usd(-1_525),
-            occurredAt: DateTime.makeUnsafe("2026-10-21T20:10:00Z"),
-            note: "Tip",
-            replacesEntryId: null,
-          },
+        const adjustment = yield* seedEntry(sessionId, {
+          id: ids.entry(),
+          kind: "adjustment",
+          playerId: alexPlayer!.id,
+          counterpartyId: null,
+          amount: usd(-1_525),
+          occurredAt: DateTime.makeUnsafe("2026-10-21T20:10:00Z"),
+          note: "Tip",
+          replacesEntryId: null,
         });
-        yield* owner.ledger.voidEntry({
-          params: { entryId: adjustment.id },
-          payload: { reason: 'Wrong "player", redo' },
-        });
+        yield* voidHistoricalEntry(adjustment.id, 'Wrong "player", redo');
         // Non-admin member exports freely.
         const csv = yield* bea.groups.exportCsv({ params: { groupId } });
         const [header, ...rows] = parseCsv(csv);
@@ -258,27 +243,21 @@ layer(TestApi.layer)("Export", (it) => {
           groupId: jpyGroupId,
         },
       });
-      const session = yield* owner.sessions.create({
-        params: { tripId: trip.id },
-        payload: {
-          id: ids.session(),
-          venueId: venue.id,
-          game: "poker_cash",
-          playerIds: [jpyGroup.players[0]!.id],
-          notes: null,
-        },
+      const sessionId = yield* seedSession(trip.id, {
+        id: ids.session(),
+        venueId: venue.id,
+        game: "poker_cash",
+        playerIds: [jpyGroup.players[0]!.id],
+        notes: null,
       });
-      yield* owner.ledger.addEntry({
-        params: { sessionId: session.session.id },
-        payload: {
-          id: ids.entry(),
-          kind: "buy_in",
-          playerId: jpyGroup.players[0]!.id,
-          counterpartyId: null,
-          amount: MinorUnits.make(15_000),
-          note: null,
-          replacesEntryId: null,
-        },
+      yield* seedEntry(sessionId, {
+        id: ids.entry(),
+        kind: "buy_in",
+        playerId: jpyGroup.players[0]!.id,
+        counterpartyId: null,
+        amount: MinorUnits.make(15_000),
+        note: null,
+        replacesEntryId: null,
       });
 
       const [, row] = parseCsv(yield* owner.groups.exportCsv({ params: { groupId: jpyGroupId } }));

@@ -1,1050 +1,208 @@
-import { useAuth } from "@clerk/expo";
-import type { StaticScreenProps } from "@react-navigation/native";
 import {
-  EntryId,
-  MinorUnits,
+  StackActions,
+  useFocusEffect,
+  useNavigation,
+  type StaticScreenProps,
+} from "@react-navigation/native";
+import {
   SessionId,
-  type CurrencyCode,
   type Entry,
-  type GroupDetail,
   type PlayerId,
   type SessionDetail,
+  type TableId,
+  type TableView,
 } from "@stacks/contracts";
-import {
-  formatDay,
-  formatDuration,
-  formatTime,
-  gameNames,
-  isAdmin,
-  playerNames,
-} from "@stacks/client-runtime/format";
-import { newId } from "@stacks/client-runtime/ids";
-import { tableView } from "@stacks/client-runtime/table";
-import { chipOf } from "@stacks/client-runtime/trip";
-import { decimalSeparator, formatMoney, minorUnitDigits } from "@stacks/shared/money";
+import { formatDay, formatTime, gameNames, playerNames } from "@stacks/client-runtime/format";
 import { playerResults } from "@stacks/shared/results";
-import { seatCount, seatsNow } from "@stacks/shared/seats";
-import { buyInPresets } from "@stacks/shared/table";
-import * as DateTime from "effect/DateTime";
-import { useKeepAwake } from "expo-keep-awake";
-import { useState } from "react";
-import * as Haptics from "expo-haptics";
-import { Platform, Pressable, Text, View } from "react-native";
+import { seatsNow } from "@stacks/shared/seats";
+import { useCallback, type ReactNode } from "react";
+import { Platform, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
-import { Button } from "../components/ui/Button";
-import { FormError, TextField } from "../components/ui/Field";
 import { Screen, screenError } from "../components/ui/Screen";
-import { Sheet } from "../components/ui/Sheet";
-import { Badge, List, PageTitle, Row, SectionHeading, Tag } from "../components/ui/Surface";
-import type { Toast } from "../components/ui/Toast";
-import { cn } from "../components/ui/cn";
-import { AddGuestSheet } from "../features/AddGuestSheet";
-import { Chip } from "../features/Chip";
-import { Reveal } from "../features/Reveal";
-import { SeatHero } from "../features/SeatHero";
-import { TableMap } from "../features/TableMap";
-import { AmountKeypad } from "../features/AmountKeypad";
-import { applyAmountKey, readCashOut } from "../features/amountKey";
-import { EntrySheet, type EntryDraft, type EntryInput } from "../features/EntrySheet";
+import { List, PageTitle, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { SessionScreenSkeleton } from "../features/ScreenSkeletons";
-import {
-  Loaded,
-  Prefetch,
-  Settled,
-  useAction,
-  useOutbox,
-  usePending,
-  useStacks,
-  useUnsaved,
-} from "../lib/stacks";
-import { useGo } from "../lib/go";
-import { useLinkedScope } from "../lib/scope";
+import { Loaded, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ sessionId: string }>;
 
+const skeleton = (
+  <Screen>
+    <SessionScreenSkeleton />
+  </Screen>
+);
+
 export function SessionScreen({ route }: Props) {
+  const id = SessionId.makeOption(route.params.sessionId);
+  if (id._tag === "None") return screenError("This session link is invalid.");
+  return (
+    <SessionData sessionId={id.value}>
+      {(detail) =>
+        detail.importedTableId ? (
+          <ImportedLink tableId={detail.importedTableId} />
+        ) : (
+          <SessionReceipt detail={detail} />
+        )
+      }
+    </SessionData>
+  );
+}
+
+function ImportedLink({ tableId }: { tableId: TableId }) {
+  const navigation = useNavigation();
+  useFocusEffect(
+    useCallback(() => {
+      navigation.dispatch(StackActions.replace("Table", { tableId }));
+    }, [navigation, tableId]),
+  );
+  return skeleton;
+}
+
+function SessionData({
+  sessionId,
+  children,
+}: {
+  sessionId: SessionId;
+  children: (detail: SessionDetail) => ReactNode;
+}) {
   const stacks = useStacks();
   return (
-    <Loaded
-      renderError={screenError}
-      query={stacks.session(SessionId.make(route.params.sessionId))}
-      skeleton={
-        <Screen>
-          <SessionScreenSkeleton />
-        </Screen>
-      }
-    >
-      {(session) => (
-        <>
-          <Prefetch query={stacks.trip(session.session.tripId)} />
-          <Prefetch query={stacks.group(session.session.groupId)} />
-          <Settled
-            query={stacks.trip(session.session.tripId)}
-            skeleton={
-              <Screen>
-                <SessionScreenSkeleton />
-              </Screen>
-            }
-          >
-            <Loaded
-              renderError={screenError}
-              query={stacks.group(session.session.groupId)}
-              skeleton={
-                <Screen>
-                  <SessionScreenSkeleton />
-                </Screen>
-              }
-            >
-              {(group) => <SessionView detail={session} group={group} />}
-            </Loaded>
-          </Settled>
-        </>
-      )}
+    <Loaded query={stacks.session(sessionId)} renderError={screenError} skeleton={skeleton}>
+      {children}
     </Loaded>
   );
 }
 
-function KeepAwake() {
-  useKeepAwake();
-  return null;
+export function ImportedSession({
+  sessionId,
+  table,
+  back,
+}: {
+  sessionId: SessionId;
+  table: TableView;
+  back: ReactNode;
+}) {
+  return (
+    <SessionData sessionId={sessionId}>
+      {(detail) => <SessionReceipt detail={detail} imported={table} back={back} />}
+    </SessionData>
+  );
 }
 
-function SessionView({ detail, group }: { detail: SessionDetail; group: GroupDetail }) {
+const verbs = {
+  buy_in: "Buy-in",
+  cash_out: "Cash-out",
+  adjustment: "Adjustment",
+} satisfies Record<Entry["kind"], string>;
+
+function SessionReceipt({
+  detail,
+  imported,
+  back,
+}: {
+  detail: SessionDetail;
+  imported?: TableView;
+  back?: ReactNode;
+}) {
   const stacks = useStacks();
-  const go = useGo();
-  const { userId } = useAuth();
   const { session, venue } = detail;
-  useLinkedScope({ tripId: session.tripId });
-  const live = session.status === "live";
-  const currency = group.group.currency;
-  const names = playerNames(group);
-  const voidEntry = useAction(stacks.Client.mutation("ledger", "voidEntry"));
-  const outbox = useOutbox();
-  const { pending: queued, sent } = useUnsaved(session.id, detail.entries);
-  // Entries undone here count as voided while the void saves.
-  const [undone, setUndone] = useState<ReadonlySet<EntryId>>(new Set());
-  const [draft, setDraft] = useState<EntryDraft | null>(null);
-  const [selected, setSelected] = useState<Entry | null>(null);
-  const [refused, setRefused] = useState<{ id: EntryId; reason: string } | null>(null);
-  const [closing, setClosing] = useState(false);
-  const [addingPlayer, setAddingPlayer] = useState(false);
-
-  // Entries recorded here count as if they were already saved until this screen has them back
-  // from the server, except ones it refused.
-  const unsaved = queued.map((p) => ({
-    ...p.entry,
-    occurredAt: p.entry.occurredAt!,
-    failed: p.failed,
+  const owners = new Map(imported?.visits.map(({ visit }) => [visit.id, visit.playerId]));
+  const entries = (imported?.entries ?? detail.entries).map((entry) => ({
+    ...entry,
+    playerId: "playerId" in entry ? entry.playerId : owners.get(entry.visitId)!,
   }));
-  const recorded = [
-    ...sent.map((p) => ({ ...p.entry, occurredAt: p.entry.occurredAt! })),
-    ...unsaved.filter((entry) => entry.failed === null),
-  ];
-  const replaced = new Set(recorded.map((entry) => entry.replacesEntryId));
-  const voidedHere = (id: EntryId) => replaced.has(id) || undone.has(id);
-  const counted = [
-    ...detail.entries.map((entry) =>
-      voidedHere(entry.id) ? { ...entry, voidedAt: entry.occurredAt } : entry,
-    ),
-    ...recorded.map((entry) => ({
-      ...entry,
-      voidedAt: voidedHere(entry.id) ? entry.occurredAt : null,
-    })),
-  ];
-  const results = playerResults(counted);
-  const cashedOut = new Set(
-    counted.filter((e) => e.kind === "cash_out" && e.voidedAt === null).map((e) => e.playerId),
-  );
-  const lastBuyIn = (playerId: PlayerId) =>
-    counted.findLast(
-      (e) =>
-        e.kind === "buy_in" &&
-        e.playerId === playerId &&
-        e.voidedAt === null &&
-        e.counterpartyId === null,
-    );
-
-  /** Records an entry at once; the outbox sends it now, or when there's signal again. */
-  const record = (input: EntryInput) => {
-    const id = EntryId.make(newId());
-    void outbox.add(session.id, { ...input, id, occurredAt: DateTime.nowUnsafe() });
-    return id;
-  };
-
-  const undo = async (id: EntryId, toast: (toast: Toast) => void) => {
-    setUndone((all) => new Set(all).add(id));
-    // An entry the server never got just leaves the outbox; one it has gets voided.
-    await outbox.flush();
-    if (outbox.pending().some((p) => p.entry.id === id)) return outbox.discard(id);
-    const { error } = await voidEntry.attempt({
-      params: { entryId: id },
-      payload: { reason: "Undone" },
-    });
-    if (error === null) return;
-    setUndone((all) => {
-      const next = new Set(all);
-      next.delete(id);
-      return next;
-    });
-    toast({ message: error });
-  };
-
-  // Rebuy stays where it is, so a second tap rebuys again; the toast is where to take one back.
-  const rebuy = (playerId: PlayerId, amount: Entry["amount"], toast: (toast: Toast) => void) => {
-    const id = record({
-      kind: "buy_in",
-      playerId,
-      counterpartyId: null,
-      amount,
-      note: null,
-      replacesEntryId: null,
-    });
-    toast({
-      message: `${names.get(playerId) ?? "Player"} bought in ${formatMoney(amount, currency)}`,
-      action: { label: "Undo", onPress: () => void undo(id, toast) },
-    });
-  };
-  // While playing you come first; once closed, the table reads like a receipt, best result first.
-  const seats = detail.playerIds.toSorted((a, b) =>
-    live
-      ? Number(b === group.myPlayerId) - Number(a === group.myPlayerId)
-      : (results.get(b)?.net ?? 0) - (results.get(a)?.net ?? 0),
-  );
-  // Results already in when the screen opened just sit there; ones that land here rack up.
-  const [settledAtOpen] = useState(() => (live ? cashedOut : new Set(detail.playerIds)));
-  const [closedAtOpen] = useState(!live);
-  const mySeated = detail.playerIds.includes(group.myPlayerId);
-  // While playing, the card follows you, or whoever's still in when you aren't; once closed, you.
-  const heroPlayerId = live
-    ? mySeated && !cashedOut.has(group.myPlayerId)
-      ? group.myPlayerId
-      : (seats.find((id) => !cashedOut.has(id)) ?? seats[0])
-    : mySeated
-      ? group.myPlayerId
-      : undefined;
-
-  const canVoid = (entry: Entry) =>
-    isAdmin(group) || entry.createdBy === userId || entry.playerId === group.myPlayerId;
-  const history: ReadonlyArray<
-    | { readonly saving: true; readonly entry: (typeof unsaved)[number] }
-    | { readonly saving: false; readonly entry: Entry }
-  > = [
-    ...unsaved.map((entry) => ({ saving: true as const, entry })),
-    ...detail.entries.map((entry) => ({ saving: false as const, entry })),
-  ].toSorted(
-    (a, b) =>
-      DateTime.toEpochMillis(b.entry.occurredAt) - DateTime.toEpochMillis(a.entry.occurredAt),
-  );
-
-  const heroBought = heroPlayerId !== undefined && (results.get(heroPlayerId)?.buyIn ?? 0) > 0;
-  const heroRebuyAmount = heroPlayerId === undefined ? undefined : lastBuyIn(heroPlayerId)?.amount;
-  const heroBuyInLabel = !heroBought
-    ? "Buy in"
-    : heroRebuyAmount === undefined
-      ? "Rebuy"
-      : `Rebuy ${formatMoney(heroRebuyAmount, currency)}`;
-
+  const results = playerResults(entries);
+  const players: ReadonlyArray<PlayerId> = imported
+    ? imported.visits.map(({ visit }) => visit.playerId)
+    : detail.playerIds;
+  const seats = seatsNow(detail.seatings);
   return (
-    <Screen
-      shows={{ session: session.id }}
-      renderFooter={
-        live && heroPlayerId && !cashedOut.has(heroPlayerId)
-          ? (toast) => (
-              <>
-                <Text className="text-sm text-muted">
-                  {names.get(heroPlayerId) ?? "Player"}
-                  {heroPlayerId === group.myPlayerId ? " · you" : ""}
-                </Text>
-                <View className="flex-row gap-3">
-                  <Button
-                    haptic
-                    label={heroBuyInLabel}
-                    accessibilityLabel={`${heroBuyInLabel} for ${names.get(heroPlayerId) ?? "Player"}`}
-                    variant="primary"
-                    size="lg"
-                    className="flex-1"
-                    onPress={() => {
-                      const last = lastBuyIn(heroPlayerId);
-                      if (last) rebuy(heroPlayerId, last.amount, toast);
-                      else setDraft({ kind: "buy_in", playerId: heroPlayerId });
-                    }}
-                  />
-                  {heroBought ? (
-                    <Button
-                      label="Cash out"
-                      accessibilityLabel={`Cash out for ${names.get(heroPlayerId) ?? "Player"}`}
-                      size="lg"
-                      className="flex-1"
-                      onPress={() => setDraft({ kind: "cash_out", playerId: heroPlayerId })}
-                    />
-                  ) : null}
-                </View>
-              </>
-            )
-          : undefined
-      }
-    >
-      {(toast) => (
-        <>
-          {live ? <KeepAwake /> : null}
-          <View className="gap-3">
+    <Loaded query={stacks.group(session.groupId)} renderError={screenError} skeleton={skeleton}>
+      {(group) => {
+        const names = playerNames(group);
+        const currency = group.group.currency;
+        return (
+          <Screen shows={{ session: session.id }}>
+            {back}
             <PageTitle
-              inContent={Platform.OS === "android"}
+              inContent={back !== undefined || Platform.OS === "android"}
               context={`${gameNames[session.game]} · ${formatDay(session.startedAt)}`}
             >
               {venue.name}
             </PageTitle>
             <View className="flex-row items-center gap-2">
-              {live ? <Badge tone="live">Live</Badge> : <Tag>Closed</Tag>}
-              <HighLimitToggle detail={detail} />
-              <Text className="flex-1 text-sm text-muted">
+              <Tag>Read-only</Tag>
+              {session.highLimit ? <Tag>High limit</Tag> : null}
+              <Text className="text-sm text-muted">
                 {formatTime(session.startedAt)}
-                {/* Imported sessions end when they start: no length was recorded. */}
-                {session.endedAt && DateTime.isGreaterThan(session.endedAt, session.startedAt)
-                  ? ` to ${formatTime(session.endedAt)} (${formatDuration(session.startedAt, session.endedAt)})`
-                  : ""}
+                {session.endedAt ? ` to ${formatTime(session.endedAt)}` : ""}
               </Text>
             </View>
             {session.notes ? <Text className="text-sm text-ink">{session.notes}</Text> : null}
-          </View>
-
-          {heroPlayerId ? (
-            <SeatHero
-              name={names.get(heroPlayerId) ?? "Player"}
-              chip={chipOf(group, heroPlayerId)}
-              seat={seatsNow(detail.seatings).get(heroPlayerId)}
-              you={heroPlayerId === group.myPlayerId}
-              result={results.get(heroPlayerId)}
-              live={live}
-              out={cashedOut.has(heroPlayerId)}
-              currency={currency}
-            />
-          ) : null}
-          {seatCount(session) ? (
-            <TableMap
-              detail={detail}
-              seats={seatCount(session)!}
-              view={tableView({
-                closed: !live,
-                seats: seatsNow(detail.seatings),
-                results,
-                cashedOut,
-              })}
-              currency={currency}
-              names={names}
-              chipOf={(playerId) => chipOf(group, playerId)}
-            />
-          ) : null}
-          <TicketStub
-            players={detail.playerIds.length}
-            results={[...results.values()]}
-            currency={currency}
-          />
-
-          <View className="gap-3">
-            <SectionHeading
-              action={
-                live ? (
-                  <Button
-                    label="Add player"
-                    size="sm"
-                    variant="ghost"
-                    onPress={() => setAddingPlayer(true)}
-                  />
-                ) : undefined
-              }
-            >
-              At the table
-            </SectionHeading>
-            <List>
-              {seats.map((playerId, rank) => {
-                const result = results.get(playerId);
-                const name = names.get(playerId) ?? "Player";
-                const lastRebuy = lastBuyIn(playerId);
-                const out = cashedOut.has(playerId);
-                const bought = result !== undefined && result.buyIn > 0;
-                // A closed session's results are final, cash-out or not.
-                const final = result !== undefined && (!live || out);
-                const status = final
-                  ? formatMoney(result.net, currency, { signDisplay: "exceptZero" })
-                  : bought
-                    ? `in ${formatMoney(result.buyIn, currency)}, playing`
-                    : "no buy-in yet";
-                return (
-                  <View
-                    key={playerId}
-                    className="flex-row items-center gap-3 border-t border-line pr-3"
-                  >
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`${name}, ${status}`}
-                      accessibilityHint={
-                        live ? "Record a buy-in, cash-out or adjustment" : undefined
-                      }
-                      disabled={!live}
-                      onPress={() =>
-                        setDraft({ kind: bought && !out ? "cash_out" : "buy_in", playerId })
-                      }
-                      className="min-h-16 flex-1 flex-row items-center gap-3 py-3 pl-4 active:bg-fill"
-                    >
-                      <Chip chip={chipOf(group, playerId)} name={name} size={30} />
-                      <View className="flex-1 gap-0.5">
-                        <Text numberOfLines={1} className="text-base font-medium text-ink">
-                          {name}
-                          {playerId === group.myPlayerId ? (
-                            <Text className="font-sans text-sm tracking-normal text-muted normal-case">
-                              {" · you"}
-                            </Text>
-                          ) : null}
-                        </Text>
-                        <Text className="text-sm text-muted tabular-nums">
-                          {result && result.buyIn === 0 && result.cashOut === 0 ? null : result ? (
-                            <>
-                              In{" "}
-                              <Money
-                                amount={result.buyIn}
-                                currency={currency}
-                                className="text-muted"
-                              />{" "}
-                              · Out{" "}
-                              <Money
-                                amount={result.cashOut}
-                                currency={currency}
-                                className="text-muted"
-                              />
-                            </>
-                          ) : (
-                            "No buy-ins yet"
-                          )}
-                        </Text>
-                      </View>
-                      {final ? (
-                        <Reveal
-                          key={live ? "live" : "closed"}
-                          animate={live ? !settledAtOpen.has(playerId) : !closedAtOpen}
-                          delay={live ? 0 : rank * 90}
-                        >
-                          <Money
-                            amount={result.net}
-                            currency={currency}
-                            tone="result"
-                            className="text-xl"
-                          />
-                        </Reveal>
-                      ) : null}
-                    </Pressable>
-                    {!live || out || playerId === heroPlayerId ? null : lastRebuy ? (
-                      <Button
-                        label={`Rebuy ${formatMoney(lastRebuy.amount, currency)}`}
-                        accessibilityLabel={`Rebuy ${formatMoney(lastRebuy.amount, currency)} for ${name}`}
-                        variant="tint"
-                        size="sm"
-                        className="min-w-20"
-                        haptic
-                        onPress={() => rebuy(playerId, lastRebuy.amount, toast)}
-                      />
-                    ) : (
-                      <Button
-                        label="Buy in"
-                        accessibilityLabel={`Buy in for ${name}`}
-                        size="sm"
-                        className="min-w-20"
-                        onPress={() => setDraft({ kind: "buy_in", playerId })}
-                      />
-                    )}
-                  </View>
-                );
-              })}
-            </List>
-            {live ? (
-              <Text className="text-sm text-muted">
-                Tap a player to cash them out or record anything else.
-              </Text>
-            ) : null}
-          </View>
-
-          {!live ? (
-            <View className="gap-2">
-              {group.trips.some((trip) => trip.id === session.tripId && trip.endedAt === null) ? (
-                <Button
-                  label="Start another session"
-                  onPress={() => go.newSession(session.tripId, session.id)}
-                />
-              ) : null}
-              <Button
-                label="See the trip's stats"
-                onPress={() => go.stats({ groupId: session.groupId, tripId: session.tripId })}
-              />
-            </View>
-          ) : null}
-          <View className="gap-2">
-            <SectionHeading>History</SectionHeading>
-            {history.length === 0 ? (
-              <Text className="text-sm text-muted">
-                Buy-ins and cash-outs show up here as you record them.
-              </Text>
-            ) : (
-              <List>
-                {history.map((item) => {
-                  const { entry, saving } = item;
-                  const locallyUndone = undone.has(entry.id);
-                  const voided = locallyUndone || (!item.saving && item.entry.voidedAt !== null);
-                  const voidReason = locallyUndone
-                    ? "Undone"
-                    : item.saving
-                      ? null
-                      : item.entry.voidReason;
-                  const voidedById = item.saving ? null : item.entry.voidedBy;
-                  const voidedBy = locallyUndone
-                    ? (names.get(group.myPlayerId) ?? null)
-                    : voidedById
-                      ? (group.players.find((player) => player.userId === voidedById)
-                          ?.displayName ?? null)
-                      : null;
-                  const counterparty = entry.counterpartyId
-                    ? names.get(entry.counterpartyId)
-                    : null;
-                  const actionable = live && !item.saving && !voided && canVoid(item.entry);
-                  const content = (
-                    <>
-                      <Text numberOfLines={1} className="w-20 tabular-nums text-xs text-muted">
-                        {formatTime(entry.occurredAt)}
-                      </Text>
-                      <View className="flex-1 gap-0.5">
-                        <Text
-                          className={cn(
-                            "text-base",
-                            voided ? "text-muted line-through" : "text-ink",
-                          )}
-                        >
-                          {names.get(entry.playerId)}{" "}
-                          {entry.kind === "cash_out" && entry.amount === 0 ? (
-                            "busted"
-                          ) : (
-                            <>
-                              {verbs[entry.kind]}{" "}
-                              <Money
-                                amount={entry.amount}
-                                currency={currency}
-                                tone={entry.kind === "adjustment" ? "result" : "plain"}
-                                className={cn("font-medium", voided && "text-muted")}
-                              />
-                            </>
-                          )}
-                        </Text>
-                        {counterparty || entry.note || voided || saving ? (
-                          <Text className="text-sm text-muted">
-                            {[
-                              counterparty && entry.kind === "buy_in"
-                                ? `${counterparty} paid`
-                                : null,
-                              counterparty && entry.kind === "cash_out"
-                                ? `${counterparty} has the cash`
-                                : null,
-                              entry.note,
-                              item.saving
-                                ? (item.entry.failed ?? "Saved on this phone, sending")
-                                : null,
-                              voided
-                                ? `${voidedBy ? `Voided by ${voidedBy}` : "Voided"}${voidReason ? `: ${voidReason}` : ""}`
-                                : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
+            {players.length > 0 ? (
+              <View className="gap-2">
+                <SectionHeading>At the table</SectionHeading>
+                <List>
+                  {players
+                    .toSorted((a, b) => (results.get(b)?.net ?? 0) - (results.get(a)?.net ?? 0))
+                    .map((id) => {
+                      const result = results.get(id);
+                      const seat = seats.get(id);
+                      return (
+                        <Row key={id}>
+                          <Text className="flex-1 text-base text-ink">
+                            {names.get(id) ?? "Player"}
+                            {seat ? ` · Seat ${seat}` : ""}
                           </Text>
-                        ) : null}
-                      </View>
-                      {entry.replacesEntryId ? <Tag>Corrected</Tag> : null}
-                    </>
-                  );
-                  if (item.saving && item.entry.failed !== null) {
-                    const reason = item.entry.failed;
-                    return (
-                      <Pressable
-                        key={entry.id}
-                        accessibilityRole="button"
-                        accessibilityHint="Try saving it again or discard it"
-                        onPress={() => setRefused({ id: entry.id, reason })}
-                        className="flex-row items-center gap-3 border-t border-line bg-loss/10 px-4 py-3 active:bg-fill"
-                      >
-                        {content}
-                      </Pressable>
-                    );
-                  }
-                  return actionable && !item.saving ? (
-                    <Pressable
-                      key={entry.id}
-                      accessibilityRole="button"
-                      accessibilityHint="Correct or void this entry"
-                      onPress={() => setSelected(item.entry)}
-                      className="flex-row items-center gap-3 border-t border-line px-4 py-3 active:bg-fill"
-                    >
-                      {content}
-                    </Pressable>
-                  ) : (
-                    <Row key={entry.id}>{content}</Row>
-                  );
-                })}
-              </List>
-            )}
-          </View>
-
-          <StatusActions detail={detail} group={group} onClose={() => setClosing(true)} />
-
-          {draft ? (
-            <EntrySheet
-              detail={group}
-              draft={draft}
-              presets={buyInPresets(counted, draft.playerId)}
-              onSubmit={(input) => {
-                record(input);
-                if (input.kind === "cash_out") succeed();
-              }}
-              onClose={() => setDraft(null)}
-            />
-          ) : null}
-          {selected ? (
-            <EntryActionsSheet
-              entry={selected}
-              onClose={() => setSelected(null)}
-              onCorrect={() => {
-                setSelected(null);
-                setDraft({
-                  kind: selected.kind,
-                  playerId: selected.playerId,
-                  replaces: selected,
-                });
-              }}
-            />
-          ) : null}
-          {refused ? (
-            <Sheet
-              open
-              onClose={() => setRefused(null)}
-              title="This didn't save"
-              description={refused.reason}
-              footer={
-                <>
-                  <Button
-                    label="Try again"
-                    variant="primary"
-                    size="lg"
-                    onPress={() => {
-                      void outbox.retry(refused.id);
-                      setRefused(null);
-                    }}
-                  />
-                  <Button
-                    label="Discard it"
-                    variant="danger"
-                    size="lg"
-                    onPress={() => {
-                      outbox.discard(refused.id);
-                      setRefused(null);
-                    }}
-                  />
-                </>
-              }
-            />
-          ) : null}
-          {closing ? (
-            <CloseSheet
-              detail={detail}
-              playing={seats
-                .filter((id) => (results.get(id)?.buyIn ?? 0) > 0 && !cashedOut.has(id))
-                .map((id) => ({ id, name: names.get(id) ?? "Player" }))}
-              currency={currency}
-              onClose={() => setClosing(false)}
-            />
-          ) : null}
-          {addingPlayer ? (
-            <AddPlayerSheet detail={detail} group={group} onClose={() => setAddingPlayer(false)} />
-          ) : null}
-        </>
-      )}
-    </Screen>
-  );
-}
-
-const succeed = () => {
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-};
-
-const verbs = {
-  buy_in: "bought in",
-  cash_out: "cashed out",
-  adjustment: "adjusted",
-} as const;
-
-function StatusActions({
-  detail,
-  group,
-  onClose,
-}: {
-  detail: SessionDetail;
-  group: GroupDetail;
-  onClose: () => void;
-}) {
-  const stacks = useStacks();
-  const reopen = useAction(stacks.Client.mutation("sessions", "reopen"));
-  if (detail.session.status === "live") {
-    return <Button label="Close session" size="lg" onPress={onClose} />;
-  }
-  if (!isAdmin(group)) return null;
-  return (
-    <View className="gap-2">
-      <Button
-        label="Reopen session"
-        pending={reopen.pending}
-        onPress={() => void reopen.run({ params: { sessionId: detail.session.id } })}
-      />
-      <Text className="text-sm text-muted">
-        Reopen to fix a mistake. Closed sessions can't be edited.
-      </Text>
-      {reopen.error ? <FormError>{reopen.error}</FormError> : null}
-    </View>
-  );
-}
-
-function EntryActionsSheet({
-  entry,
-  onClose,
-  onCorrect,
-}: {
-  entry: Entry;
-  onClose: () => void;
-  onCorrect: () => void;
-}) {
-  const stacks = useStacks();
-  const voidEntry = useAction(stacks.Client.mutation("ledger", "voidEntry"));
-  const [reason, setReason] = useState("");
-  const confirmVoid = async () => {
-    if (
-      await voidEntry.run({
-        params: { entryId: entry.id },
-        payload: { reason: reason.trim() || null },
-      })
-    )
-      onClose();
-  };
-  return (
-    <Sheet
-      open
-      onClose={onClose}
-      title="Fix this entry"
-      description="Voided entries stay in the history, crossed out, and stop counting."
-      footer={
-        <Button
-          label="Void entry"
-          variant="danger"
-          size="lg"
-          pending={voidEntry.pending}
-          onPress={() => void confirmVoid()}
-        />
-      }
-    >
-      <Button label="Correct the amount or who paid" size="lg" onPress={onCorrect} />
-      <TextField
-        label="Reason for voiding (optional)"
-        value={reason}
-        onChangeText={setReason}
-        maxLength={280}
-      />
-      {voidEntry.error ? <FormError>{voidEntry.error}</FormError> : null}
-    </Sheet>
-  );
-}
-
-/**
- * Closes the table, taking the cash-outs of anyone still playing on the way, and can open the
- * next table with the same people.
- */
-/** Marks the table high limit or not; anyone in the group can, even after it closes. */
-function HighLimitToggle({ detail }: { detail: SessionDetail }) {
-  const stacks = useStacks();
-  const set = useAction(stacks.Client.mutation("sessions", "setHighLimit"));
-  const on = detail.session.highLimit;
-  return (
-    <Pressable
-      accessibilityRole="switch"
-      accessibilityLabel="High-limit table"
-      accessibilityState={{ checked: on, disabled: set.pending }}
-      disabled={set.pending}
-      hitSlop={10}
-      onPress={() =>
-        void set.run({ params: { sessionId: detail.session.id }, payload: { highLimit: !on } })
-      }
-      className={cn(
-        "h-6 justify-center rounded-md px-2",
-        on ? "bg-ink" : "border border-fill-strong",
-      )}
-    >
-      <Text className={cn("type-label", on ? "text-ink-inverse" : "text-muted")}>High limit</Text>
-    </Pressable>
-  );
-}
-
-function CashOutField({
-  name,
-  value,
-  selected,
-  invalid,
-  onPress,
-}: {
-  name: string;
-  value: string;
-  selected: boolean;
-  invalid: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <View className="gap-1.5">
-      <Text className="px-1 type-footnote font-medium text-muted">{name}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={name}
-        accessibilityState={{ selected }}
-        accessibilityValue={{ text: value || "0 if they busted" }}
-        onPress={onPress}
-        className={cn(
-          "min-h-12 justify-center rounded-xl border bg-surface px-4 py-3",
-          selected ? "border-ink" : "border-transparent active:bg-fill",
-          invalid && "border-loss",
-        )}
-      >
-        <Text className={cn("tabular-nums type-body", value ? "text-ink" : "text-muted")}>
-          {value || "0 if they busted"}
-        </Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function CloseSheet({
-  detail,
-  playing,
-  currency,
-  onClose,
-}: {
-  detail: SessionDetail;
-  playing: ReadonlyArray<{ readonly id: PlayerId; readonly name: string }>;
-  currency: CurrencyCode;
-  onClose: () => void;
-}) {
-  const stacks = useStacks();
-  const go = useGo();
-  const close = useAction(stacks.Client.mutation("sessions", "close"), "session_close_confirmed");
-  const outbox = useOutbox();
-  const unsent = usePending(detail.session.id).length;
-  const decimal = decimalSeparator();
-  const [chips, setChips] = useState<ReadonlyMap<PlayerId, string>>(new Map());
-  const [focusedId, setFocusedId] = useState<PlayerId | null>(playing[0]?.id ?? null);
-  const [attempted, setAttempted] = useState(false);
-  const [closing, setClosing] = useState<"close" | "move" | null>(null);
-  const cashOuts = playing.map((player) => ({
-    player,
-    amount: readCashOut(chips.get(player.id) ?? "", currency),
-  }));
-  const missing = attempted && cashOuts.some(({ amount }) => amount === null);
-  const sendClose = async (
-    amounts: ReadonlyArray<{ player: { id: PlayerId }; amount: MinorUnits | null }>,
-  ) => {
-    // Anything still waiting to be sent goes first, so the close counts it.
-    await outbox.flush();
-    if (outbox.pending().some((p) => p.sessionId === detail.session.id)) return false;
-    // The last cash-outs travel with the close: one request for the whole table.
-    return close.run({
-      params: { sessionId: detail.session.id },
-      payload: {
-        cashOuts: amounts.map(({ player, amount }) => ({
-          id: EntryId.make(newId()),
-          playerId: player.id,
-          amount: amount!,
-        })),
-      },
-    });
-  };
-  const pressKey = (key: string) => {
-    if (focusedId === null || closing !== null) return;
-    setChips((all) =>
-      new Map(all).set(focusedId, applyAmountKey(all.get(focusedId) ?? "", key, decimal)),
-    );
-  };
-  const confirm = async (next: boolean) => {
-    if (cashOuts.some(({ amount }) => amount === null)) return setAttempted(true);
-    setClosing(next ? "move" : "close");
-    const closed = await sendClose(cashOuts).finally(() => setClosing(null));
-    if (!closed) return;
-    succeed();
-    onClose();
-    if (next) go.newSession(detail.session.tripId, detail.session.id);
-  };
-  return (
-    <Sheet
-      open
-      onClose={onClose}
-      title="Close this session?"
-      description="Results lock in and the session stops taking entries. An admin can reopen it."
-      footer={
-        <>
-          {missing ? (
-            <FormError>Enter what each of them cashed out, 0 if they busted.</FormError>
-          ) : null}
-          {close.error ? <FormError>{close.error}</FormError> : null}
-          <Button
-            label="Close session"
-            variant="primary"
-            size="lg"
-            disabled={closing !== null}
-            pending={closing === "close"}
-            onPress={() => void confirm(false)}
-          />
-
-          {playing.length > 0 ? (
-            <AmountKeypad
-              onKey={pressKey}
-              bottomLeft={minorUnitDigits(currency) > 0 ? decimal : null}
-            />
-          ) : null}
-        </>
-      }
-    >
-      {playing.length > 0 ? (
-        <View className="gap-3">
-          <Text className="text-sm text-ink">What did everyone still playing leave with?</Text>
-          {playing.map((player) => {
-            const value = chips.get(player.id) ?? "";
-            return (
-              <CashOutField
-                key={player.id}
-                name={player.name}
-                value={value}
-                selected={player.id === focusedId}
-                invalid={missing && readCashOut(value, currency) === null}
-                onPress={() => setFocusedId(player.id)}
-              />
-            );
-          })}
-        </View>
-      ) : null}
-      {unsent > 0 ? (
-        <FormError>
-          {unsent === 1 ? "1 entry hasn't" : `${unsent} entries haven't`} reached Color Up yet.
-          Close once they have, so nothing is left out.
-        </FormError>
-      ) : null}
-
-      <Button
-        label="Close and move tables"
-        accessibilityLabel="Close and start another session with the same players"
-        size="lg"
-        disabled={closing !== null}
-        pending={closing === "move"}
-        onPress={() => void confirm(true)}
-      />
-    </Sheet>
-  );
-}
-
-function AddPlayerSheet({
-  detail,
-  group,
-  onClose,
-}: {
-  detail: SessionDetail;
-  group: GroupDetail;
-  onClose: () => void;
-}) {
-  const stacks = useStacks();
-  const add = useAction(stacks.Client.mutation("sessions", "addPlayer"));
-  const [addingGuest, setAddingGuest] = useState(false);
-  const seated = new Set(detail.playerIds);
-  const available = group.players.filter(
-    (p) => !seated.has(p.id) && (p.role !== null || p.userId === null),
-  );
-  const seat = async (playerId: PlayerId) => {
-    if (await add.run({ params: { sessionId: detail.session.id }, payload: { playerId } }))
-      onClose();
-  };
-  return (
-    <Sheet open onClose={onClose} title="Add a player">
-      {available.length === 0 ? (
-        <Text className="text-sm text-muted">
-          Everyone in the group is already in this session.
-        </Text>
-      ) : (
-        <List>
-          {available.map((player) => (
-            <Row
-              key={player.id}
-              accessibilityHint="Adds them to this session"
-              onPress={() => void seat(player.id)}
-            >
-              <Text className="text-base text-ink">{player.displayName}</Text>
-            </Row>
-          ))}
-        </List>
-      )}
-      {add.error ? <FormError>{add.error}</FormError> : null}
-      <Button label="Not in the group? Add a guest" onPress={() => setAddingGuest(true)} />
-      <AddGuestSheet
-        detail={group}
-        open={addingGuest}
-        onClose={() => setAddingGuest(false)}
-        onAdded={(id) => void seat(id)}
-      />
-    </Sheet>
-  );
-}
-
-/** The table at a glance: who sat down, what went in and out. */
-function TicketStub({
-  players,
-  results,
-  currency,
-}: {
-  players: number;
-  results: ReadonlyArray<{ buyIn: number; cashOut: number; net: number }>;
-  currency: CurrencyCode;
-}) {
-  const total = (pick: (result: (typeof results)[number]) => number) =>
-    MinorUnits.make(results.reduce((sum, result) => sum + pick(result), 0));
-  const buyIn = total((r) => r.buyIn);
-  const cashOut = total((r) => r.cashOut);
-  // Imported sessions only have each player's net, so there's no money in or out to show.
-  const cells =
-    buyIn === 0 && cashOut === 0
-      ? [
-          {
-            label: "Players",
-            value: <Text className="type-number text-ink">{players}</Text>,
-          },
-          {
-            label: "Table net",
-            value: <Money amount={total((r) => r.net)} currency={currency} tone="result" />,
-          },
-        ]
-      : [
-          {
-            label: "Players",
-            value: <Text className="type-number text-ink">{players}</Text>,
-          },
-          { label: "In", value: <Money amount={buyIn} currency={currency} /> },
-          { label: "Out", value: <Money amount={cashOut} currency={currency} /> },
-        ];
-  return (
-    <View className="flex-row overflow-hidden rounded-[22px] bg-surface">
-      {cells.map((cell, index) => (
-        <View
-          key={cell.label}
-          accessible
-          className={cn("grow gap-0.5 px-4 py-3", index > 0 && "border-l border-line")}
-        >
-          <Text className="type-label text-muted">{cell.label}</Text>
-          {cell.value}
-        </View>
-      ))}
-    </View>
+                          {result ? (
+                            <Money amount={result.net} currency={currency} tone="result" />
+                          ) : null}
+                        </Row>
+                      );
+                    })}
+                </List>
+              </View>
+            ) : null}
+            {entries.length > 0 ? (
+              <View className="gap-2">
+                <SectionHeading>History</SectionHeading>
+                <List>
+                  {entries
+                    .toSorted(
+                      (a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds,
+                    )
+                    .map((entry) => (
+                      <Row key={entry.id}>
+                        <View className="flex-1 gap-1">
+                          <Text className="text-base text-ink">
+                            {names.get(entry.playerId) ?? "Player"} · {verbs[entry.kind]}
+                          </Text>
+                          <Text className="text-sm text-muted">
+                            {formatTime(entry.occurredAt)}
+                            {entry.counterpartyId
+                              ? ` · ${names.get(entry.counterpartyId) ?? "Player"}`
+                              : ""}
+                            {entry.voidedAt
+                              ? ` · Voided${entry.voidReason ? ` · ${entry.voidReason}` : ""}`
+                              : ""}
+                          </Text>
+                          {entry.note ? (
+                            <Text className="text-sm text-muted">{entry.note}</Text>
+                          ) : null}
+                        </View>
+                        <Money
+                          amount={entry.amount}
+                          currency={currency}
+                          className={entry.voidedAt ? "line-through text-muted" : undefined}
+                        />
+                      </Row>
+                    ))}
+                </List>
+              </View>
+            ) : null}
+          </Screen>
+        );
+      }}
+    </Loaded>
   );
 }

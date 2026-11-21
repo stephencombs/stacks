@@ -274,21 +274,6 @@ export function SettingsSkeleton() {
   );
 }
 
-/** A form screen loading: title, then fields at the height of real ones. */
-export function FormScreenSkeleton({ fields = 4 }: { fields?: number }) {
-  return (
-    <SkeletonScreen label="Loading">
-      <TitleSkeleton />
-      {keys(fields).map((key) => (
-        <View key={key} className="gap-1.5">
-          <SkeletonText size="sm" className="w-24" />
-          <Skeleton className="h-12 rounded-xl" />
-        </View>
-      ))}
-    </SkeletonScreen>
-  );
-}
-
 /** An invite or claim link loading: one card. */
 export function InviteScreenSkeleton() {
   return (

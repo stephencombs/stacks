@@ -22,6 +22,7 @@ import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts
 import { at, finish, openTable, seatNew, sitDown, start, uuid } from "../testing/recording.ts";
 import { TestApi } from "../testing/TestApi.ts";
 import * as LegacyMigration from "./LegacyMigration.ts";
+import { finishHistoricalSession, seedEntry, seedSession } from "../testing/legacySessions.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
@@ -358,40 +359,32 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
 
   it.effect("counts an older group session once after it's imported as a table in its trip", () =>
     Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
-      const { alex } = yield* users("alex");
-      const group = yield* groupWith(alex);
+      const { alex, bea } = yield* users("alex", "bea");
+      const group = yield* groupWith(alex, bea);
       const venue = yield* catalogVenue(alex);
       const sessionId = ids.session();
-      yield* alex.sessions.create({
-        params: { tripId: group.tripId },
-        payload: {
-          id: sessionId,
-          venueId: venue.id,
-          game: "blackjack",
-          playerIds: [group.myPlayerId],
-          notes: null,
-        },
+      yield* seedSession(group.tripId, {
+        id: sessionId,
+        venueId: venue.id,
+        game: "blackjack",
+        playerIds: [group.myPlayerId],
+        notes: null,
       });
       for (const [kind, amount] of [
         ["buy_in", 10000],
         ["cash_out", 15000],
       ] as const)
-        yield* alex.ledger.addEntry({
-          params: { sessionId },
-          payload: {
-            id: ids.entry(),
-            kind,
-            playerId: group.myPlayerId,
-            counterpartyId: null,
-            amount: usd(amount),
-            note: null,
-            replacesEntryId: null,
-          },
+        yield* seedEntry(sessionId, {
+          id: ids.entry(),
+          kind,
+          playerId: group.myPlayerId,
+          counterpartyId: null,
+          amount: usd(amount),
+          note: null,
+          replacesEntryId: null,
         });
-      yield* alex.sessions.close({ params: { sessionId }, payload: {} });
+      yield* finishHistoricalSession(sessionId);
       yield* LegacyMigration.importLegacy({ scope: [group.group.id], dryRun: false });
-      yield* sql`update tables set trip_id = ${group.tripId} where legacy_session_id = ${sessionId}`;
 
       const trip = yield* alex.trips.get({ params: { tripId: group.tripId } });
       expect([trip.sessions.length, trip.tables.length]).toEqual([1, 0]);
@@ -403,6 +396,22 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         (item) => item.kind !== "trip_started" && item.trip.id === group.tripId,
       );
       expect(feed).toHaveLength(1);
+
+      const stake = yield* alex.stakes.create({
+        params: { tripId: group.tripId },
+        payload: {
+          id: ids.stake(),
+          lenderId: group.myPlayerId,
+          borrowerId: group.players.find((player) => player.id !== group.myPlayerId)!.id,
+          amount: usd(1000),
+          lenderShare: 50,
+          note: null,
+        },
+      });
+      yield* alex.stakes.end({ params: { stakeId: stake.id }, payload: {} });
+      expect(yield* alex.stakes.reopen({ params: { stakeId: stake.id } })).toMatchObject({
+        endedAt: null,
+      });
     }),
   );
 });

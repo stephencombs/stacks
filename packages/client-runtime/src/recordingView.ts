@@ -91,7 +91,7 @@ export const visitTitle = (table: Pick<Table, "game" | "gameName" | "highLimit">
   `${tableGameLabel(table) ?? "Session"}${table.highLimit ? " · High limit" : ""}`;
 
 /** A table you record at without playing, by name: "Blackjack table". */
-export const tableTitle = (table: Table) => {
+export const tableTitle = (table: Pick<Table, "game" | "gameName" | "highLimit">) => {
   const name = tableGameLabel(table);
   return `${name ? `${name} table` : "Table"}${table.highLimit ? " · High limit" : ""}`;
 };

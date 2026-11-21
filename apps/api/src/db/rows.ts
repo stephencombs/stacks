@@ -155,6 +155,7 @@ export const RecordingIdentityRow = Schema.Struct({
 });
 
 export const TableRow = Schema.Struct({
+  legacySessionId: Schema.NullOr(SessionId),
   tripId: Schema.NullOr(TripId),
   id: TableId,
   starterPlayerId: Schema.NullOr(PlayerId),

@@ -5,6 +5,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import { catalogVenue, groupWith, ids, users } from "../testing/fixtures.ts";
 import { TestApi } from "../testing/TestApi.ts";
+import { seedSession } from "../testing/legacySessions.ts";
 
 it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
   it.effect("searches and reads only public venues without signing in", () =>
@@ -114,20 +115,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
       expect(mine.map((v) => v.id)).toEqual([home.id]);
       expect(yield* eve.venues.search({ query: { q: name, groupId: other.group.id } })).toEqual([]);
       expect(
-        yield* Effect.flip(
-          eve.sessions.create({
-            params: { tripId: other.tripId },
-            payload: {
-              id: ids.session(),
-              venueId: home.id,
-              game: "poker_cash",
-              playerIds: [other.myPlayerId],
-              notes: null,
-            },
-          }),
-        ),
-      ).toMatchObject({ reason: "venue_not_available" });
-      expect(
         yield* Effect.flip(eve.venues.search({ query: { q: name, groupId: group.group.id } })),
       ).toMatchObject({ _tag: "Forbidden" });
     }),
@@ -162,16 +149,13 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
         [first, "2026-01-01T20:00:00Z"],
         [second, "2026-02-01T20:00:00Z"],
       ] as const) {
-        yield* alex.sessions.create({
-          params: { tripId: group.tripId },
-          payload: {
-            id: ids.session(),
-            venueId: venue.id,
-            game: "roulette",
-            startedAt: DateTime.makeUnsafe(startedAt),
-            playerIds: [group.myPlayerId],
-            notes: null,
-          },
+        yield* seedSession(group.tripId, {
+          id: ids.session(),
+          venueId: venue.id,
+          game: "roulette",
+          startedAt: DateTime.makeUnsafe(startedAt),
+          playerIds: [group.myPlayerId],
+          notes: null,
         });
       }
       const recent = yield* alex.venues.recent({ params: { groupId: group.group.id } });

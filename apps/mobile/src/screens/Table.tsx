@@ -38,8 +38,11 @@ import {
 } from "../features/LiveTable";
 import { PersonalScreen } from "../features/Personal";
 import { SitDownSheet } from "../features/RecordingForms";
+import { useAccount } from "../lib/account";
 import { useRecordingState } from "../lib/recording";
+import { StacksProvider } from "../lib/stacks";
 import { BackButton, RecordingToast } from "./Play";
+import { ImportedSession } from "./Session";
 
 type Props = StaticScreenProps<{ tableId: string }>;
 
@@ -71,6 +74,7 @@ function Table({ tableId }: { tableId: TableId }) {
   const table = useRecordingTable(tableId);
   const server = useServerTable(tableId);
   const state = useRecordingState();
+  const account = useAccount();
   const navigation = useNavigation();
   const quick = useRecordingSubmit();
   const [open, setOpen] = useState<Open | null>(null);
@@ -80,7 +84,22 @@ function Table({ tableId }: { tableId: TableId }) {
     navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } }),
   );
   if (state === null) return <PersonalScreen session>{null}</PersonalScreen>;
-  if (!table) return <Missing />;
+  const signedIn = account.available && account.isSignedIn;
+  if (!table) {
+    if (server?.legacySessionId && signedIn) {
+      return (
+        <StacksProvider>
+          <ImportedSession
+            sessionId={server.legacySessionId}
+            table={server}
+            back={<BackButton />}
+          />
+        </StacksProvider>
+      );
+    }
+    if (signedIn && server === undefined) return <PersonalScreen session>{null}</PersonalScreen>;
+    return <Missing />;
+  }
   const view = liveTable(table, server);
   const close = () => setOpen(null);
   const toVisit = (visitId: VisitId) => navigation.dispatch(StackActions.push("Play", { visitId }));
