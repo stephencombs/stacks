@@ -31,11 +31,6 @@ const GENERATED = [
 export default defineConfig({
   test: {
     environment: "node",
-    environmentMatchGlobs: [
-      ["apps/mobile/**/*.test.tsx", "happy-dom"],
-      ["apps/mobile/index.test.tsx", "happy-dom"],
-      ["apps/mobile/src/lib/liveSessionAdapter.test.ts", "happy-dom"],
-    ],
     exclude: ["**/node_modules/**", "**/dist/**"],
     allowOnly: !process.env.CI,
   },

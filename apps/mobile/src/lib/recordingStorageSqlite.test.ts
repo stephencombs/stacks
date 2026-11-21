@@ -334,22 +334,22 @@ it.each(["start", "finish", "correct", "venue"] as const)(
     const before = store.getSnapshot();
     const state = before.state!;
 
-    const visitId = state.visits[0]!.id;
-
     const command = Match.value(operation).pipe(
       Match.when("start", () => store.prepare({ type: "start", buyIn: 20000 })),
-      Match.when("finish", () => store.prepare({ type: "finish", visitId, amount: 25000 })),
+      Match.when("finish", () =>
+        store.prepare({ type: "finish", visitId: state.visits[0]!.id, amount: 25000 }),
+      ),
       Match.when("venue", () =>
         store.prepare({
           type: "edit_visit",
-          visitId,
+          visitId: state.visits[0]!.id,
           table: { game: null, venueId: bellagio.id, highLimit: false },
         }),
       ),
       Match.orElse(() =>
         store.prepare({
           type: "correct",
-          visitId,
+          visitId: state.visits[0]!.id,
           entryId: state.entries[0]!.id,
           reason: "wrong amount",
           replacement: { amount: 18000 },

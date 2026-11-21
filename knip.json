@@ -8,8 +8,7 @@
       "entry": ["plugins/*.ts"],
       "ignoreDependencies": [
         "@expo-google-fonts/barlow-condensed",
-        "@expo-google-fonts/jetbrains-mono",
-        "happy-dom"
+        "@expo-google-fonts/jetbrains-mono"
       ]
     }
   }
