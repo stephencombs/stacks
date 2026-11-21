@@ -44,6 +44,10 @@
       "types": "./src/ids.ts",
       "import": "./src/ids.ts"
     },
+    "./liveSessionSurface": {
+      "types": "./src/liveSessionSurface.ts",
+      "import": "./src/liveSessionSurface.ts"
+    },
     "./liveTable": {
       "types": "./src/liveTable.ts",
       "import": "./src/liveTable.ts"

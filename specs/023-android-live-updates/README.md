@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-16
 priority: low
 tags:
@@ -9,7 +9,10 @@ depends_on:
   - "008"
 parent: "019"
 created_at: 2026-11-16T17:18:18.101034500Z
-updated_at: 2026-11-16T17:18:18.101034500Z
+updated_at: 2026-11-20T23:05:43.314468300Z
+transitions:
+  - status: in-progress
+    at: 2026-11-20T23:05:43.314468300Z
 ---
 
 # Android Live Updates
@@ -35,8 +38,8 @@ Page 003 · Live session: `AndLiveUpdate`, `AndStatusChip`, `AndShadeUpdate`, `A
   `setUsesChronometer`), and up to three actions: **+ $100**, **+ $200**, **Cash out**. In version
   one each action opens the app on the live session; **Cash out** opens the cash-out keypad
   (`AndLockCashOut`).
-- **Status-bar chip:** elapsed time through `setShortCriticalText` (the chip shows at most 7
-  characters in 96dp, so "1:28", not "1:28:10").
+- **Status-bar chip:** Android's chronometer keeps the elapsed time moving in other apps. A static
+  short critical label overrides that timer, so leave it unset.
 - **Finished:** the Live Update ends, because Google says past activities don't use one. Post an
   ordinary dismissible notification with the result, duration, in, out, hourly, and **See
   session** / **Back at the table** (`AndLockDone`).
@@ -53,14 +56,27 @@ Page 003 · Live session: `AndLiveUpdate`, `AndStatusChip`, `AndShadeUpdate`, `A
 
 ## Plan
 
-- [ ] Spike: promoted notifications from the Expo app
-- [ ] Post, update and end the Live Update with the session
-- [ ] Actions that open the app, Cash out onto the keypad
-- [ ] Finished notification
-- [ ] Permission prompt and the pre-16 fallback
+- [x] Spike: promoted notifications from the Expo app
+- [x] Post, update and end the Live Update with the session
+- [x] Actions that open the app, Cash out onto the keypad
+- [x] Finished notification
+- [x] Permission prompt and the pre-16 fallback
 
 ## Test
 
-- [ ] Each frame above matches on the emulator, light and dark (019's protocol), on an Android 16+
-      image
-- [ ] Ending, deleting or undoing a session removes or updates the notification
+- [x] Compare the lock-screen Live Update, shade, Cash out keypad and finished notification with
+      the light and dark frames on a Pixel 10 (Android 17)
+- [x] Capture the status chip with its elapsed time in both themes
+- [x] Ending, deleting or undoing a session removes or updates the notification
+- [x] Verify the ordinary notification fallback on Android 15
+
+Android supplies the notification layout and action styling. The finished notification starts
+collapsed and reveals the full breakdown and actions when expanded. On the Pixel 10, Cash out
+from the lock screen opened the keypad, an in-app rebuy updated the buy-in, undo restored the Live
+Update, and deleting the session cleared it. The status chip kept counting while Settings was
+open in both themes. Privacy mode hid the finished amounts without clearing the notification.
+On Android 15, the ordinary ongoing notification showed a running timer and opened the Cash
+out keypad. Finishing replaced it with the result notification.
+
+The recording bridge has automated coverage for replacing a live notification with the finished
+summary, hiding its amounts when privacy mode changes, and clearing it when the session is deleted.

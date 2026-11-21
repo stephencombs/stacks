@@ -30,6 +30,7 @@ import { appLinkPrefixes } from "./lib/config";
 import { markStartup, reportStartupError } from "./lib/diagnostics";
 import { useAppFonts } from "./lib/fonts";
 import { getInitialURL } from "./lib/initialUrl";
+import { LiveSessionBridge } from "./lib/liveSessionAdapter";
 import { oldAddress } from "./lib/oldAddresses";
 import { recordingStore } from "./lib/recording";
 import { ScopeProvider } from "./lib/scope";
@@ -375,6 +376,7 @@ export default function App() {
       }
     >
       <RecordingProvider store={recordingStore}>
+        {Platform.OS === "android" ? <LiveSessionBridge /> : null}
         <AccountProvider>
           <Root />
           <ConfirmDialogHost />
