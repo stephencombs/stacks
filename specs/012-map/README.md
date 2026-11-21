@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-14
 priority: medium
 tags:
@@ -9,7 +9,10 @@ depends_on:
   - "009"
 parent: "001"
 created_at: 2026-11-14T20:21:33.691109935Z
-updated_at: 2026-11-16T03:54:17.109455777Z
+updated_at: 2026-11-20T23:05:42.267867700Z
+transitions:
+  - status: in-progress
+    at: 2026-11-20T23:05:42.267867700Z
 ---
 
 # Map
@@ -30,12 +33,16 @@ The Map tab shows where you've played: venues as pins colored by result, a venue
 
 ## Plan
 
-- [ ] Shared pins, day paths and trip paths, with tests
-- [ ] Map tab on mobile with `expo-maps`
+- [x] Shared pins, day paths and trip paths, with tests
+- [x] Map tab on mobile with `expo-maps`
 
 ## Test
 
-- [ ] Pin colors match each venue's finished result
-- [ ] A day path visits venues in the order played
-- [ ] Sessions with no location are counted, not lost
-- [ ] Works signed out and offline after venues are cached
+- [x] Pin colors match each venue's finished result
+- [x] A day path visits venues in the order played
+- [x] Sessions with no location are counted, not lost
+- [x] The signed-out Map and its filters render from cached recordings in automated tests
+- [x] Verify cached pins and the venue sheet on a device with networking unavailable
+
+On the Pixel 10, the cached Wynn pin, venue sessions, day filter and missing-location count all
+remained available with airplane mode enabled, Wi-Fi off and the API port forward removed.

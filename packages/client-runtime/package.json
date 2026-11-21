@@ -48,6 +48,10 @@
       "types": "./src/liveTable.ts",
       "import": "./src/liveTable.ts"
     },
+    "./map": {
+      "types": "./src/map.ts",
+      "import": "./src/map.ts"
+    },
     "./motion": {
       "types": "./src/motion.ts",
       "import": "./src/motion.ts"
