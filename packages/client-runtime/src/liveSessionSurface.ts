@@ -75,12 +75,14 @@ const money = (
         trailingZeroDisplay: prefs.showCents ? "auto" : "stripIfInteger",
       });
 
+const MIN_HOURLY_MS = 60_000n;
+
 const hourlyRate = (result: MinorUnits, startedAt: DateTime.Utc, finishedAt: DateTime.Utc) => {
   const ms = BigInt(
     Math.max(0, DateTime.toEpochMillis(finishedAt) - DateTime.toEpochMillis(startedAt)),
   );
 
-  if (ms === 0n) return MinorUnits.make(0);
+  if (ms < MIN_HOURLY_MS) return null;
   const numerator = BigInt(result) * 3_600_000n;
   const magnitude = numerator < 0n ? -numerator : numerator;
   const rounded = (magnitude * 2n + ms) / (ms * 2n);
@@ -132,9 +134,15 @@ const finishedFromVisit: (
   const buyInText = money(item.totals.buyIn, prefs);
   const cashOutText = money(item.totals.cashOut, prefs);
   const hourly = hourlyRate(result, item.visit.startedAt, finishedAt);
-  const hourlyText = prefs.privacyMode ? HIDDEN : `${money(hourly, prefs, "exceptZero")}/hr`;
+
+  const hourlyText =
+    hourly === null ? "" : prefs.privacyMode ? HIDDEN : `${money(hourly, prefs, "exceptZero")}/hr`;
+
   const durationText = `${formatDuration(item.visit.startedAt, finishedAt)} played`;
   const path = `play/${item.visit.id}`;
+  const summaryParts = [`${buyInText} in`, `${cashOutText} out`];
+
+  if (hourlyText) summaryParts.push(hourlyText);
 
   return {
     kind: "finished",
@@ -149,9 +157,7 @@ const finishedFromVisit: (
     buyInText,
     cashOutText,
     hourlyText,
-    summaryLine: prefs.privacyMode
-      ? "Amounts hidden"
-      : `${buyInText} in · ${cashOutText} out · ${hourlyText}`,
+    summaryLine: prefs.privacyMode ? "Amounts hidden" : summaryParts.join(" · "),
     finishedAtMs: DateTime.toEpochMillis(finishedAt),
     privacyMode: prefs.privacyMode,
     deepLinks: {

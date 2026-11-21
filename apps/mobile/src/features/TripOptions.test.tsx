@@ -110,6 +110,7 @@ it("opens the Rename trip sheet from Trip options and saves the trimmed name", a
     ),
   }));
   vi.doMock("../components/ui/Sheet", () => ({
+    SheetHost: Container,
     Sheet: ({
       open,
       title,

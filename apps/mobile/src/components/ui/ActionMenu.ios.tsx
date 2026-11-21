@@ -11,8 +11,10 @@ import {
   labelStyle,
   tint,
 } from "@expo/ui/swift-ui/modifiers";
+import * as Predicate from "effect/Predicate";
 import { isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
 import { useCSSVariable, useUniwind } from "uniwind";
+
 import type { ActionMenuProps } from "./ActionMenu";
 import { symbols } from "./Icon.ios";
 
@@ -24,15 +26,16 @@ export function ActionMenu({
   felt = false,
 }: ActionMenuProps) {
   const { theme } = useUniwind();
-  const resolvedInk = useCSSVariable(felt ? "--color-felt-ink" : "--color-ink");
-  const ink = typeof resolvedInk === "string" ? resolvedInk : undefined;
+  const [resolvedInk, resolvedFeltInk] = useCSSVariable(["--color-ink", "--color-felt-ink"]);
+  const menuInk = Predicate.isString(resolvedInk) ? resolvedInk : undefined;
+  const triggerInk = felt && Predicate.isString(resolvedFeltInk) ? resolvedFeltInk : menuInk;
   const glass = isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
 
   return (
     <Host
       matchContents
       colorScheme={felt ? "dark" : theme === "dark" ? "dark" : "light"}
-      seedColor={ink}
+      seedColor={menuInk}
     >
       <Menu
         label={label}
@@ -41,7 +44,11 @@ export function ActionMenu({
           buttonStyle(glass ? "glass" : "bordered"),
           buttonBorderShape("circle"),
           labelStyle("iconOnly"),
-          ...(ink ? [foregroundStyle(ink), tint(ink)] : []),
+          ...(triggerInk
+            ? felt
+              ? [foregroundStyle(triggerInk)]
+              : [foregroundStyle(triggerInk), tint(triggerInk)]
+            : []),
           controlSize(fab ? "extraLarge" : "large"),
           frame(fab ? { minWidth: 56, minHeight: 56 } : { minWidth: 44, minHeight: 44 }),
           accessibilityLabel(label),
@@ -54,7 +61,10 @@ export function ActionMenu({
             label={action.label}
             systemImage={action.icon ? symbols[action.icon] : undefined}
             role={action.destructive ? "destructive" : "default"}
-            modifiers={[disable(action.disabled ?? false)]}
+            modifiers={[
+              disable(action.disabled ?? false),
+              ...(!action.destructive && menuInk ? [foregroundStyle(menuInk), tint(menuInk)] : []),
+            ]}
             onPress={action.onPress}
           />
         ))}

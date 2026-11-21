@@ -1,4 +1,13 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  use,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import {
   Keyboard,
   ScrollView,
@@ -11,10 +20,47 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen, ScreenStack, ScreenStackHeaderConfig } from "react-native-screens";
 import { FormSheet } from "react-native-screens/experimental";
-import { useCSSVariable } from "uniwind";
+import { useCSSVariable, useUniwind } from "uniwind";
 
+import { cn } from "./cn";
 import { keyboardOverlap, sheetBottomEdge } from "./keyboardInset";
+import {
+  InSheet,
+  SheetStoreContext,
+  useCreateSheetStore,
+  type SheetRegistration,
+  type SheetStore,
+} from "./sheetContext";
 
+type SheetProps = {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string | undefined;
+  footer?: ReactNode | undefined;
+  busy?: boolean;
+  back?: boolean;
+  children?: ReactNode | undefined;
+};
+
+let nextSheetId = 1;
+
+/** Mounts one shared native `FormSheet` host so swapping child sheets never closes and drops them. */
+export function SheetHost({ children }: { children?: ReactNode }) {
+  const store = useCreateSheetStore();
+
+  return (
+    <SheetStoreContext value={store}>
+      {children}
+      <SheetPortal store={store} />
+    </SheetStoreContext>
+  );
+}
+
+/**
+ * An iOS native modal presentation (`FormSheet`). Inside a `SheetHost`, sheets swap inside one
+ * persistent presenter; without a host (such as a header-launched sheet), it presents itself.
+ */
 export function Sheet({
   open,
   onClose,
@@ -22,31 +68,214 @@ export function Sheet({
   description,
   footer,
   busy = false,
-  back: _back = false,
+  back = false,
+  children,
+}: SheetProps) {
+  const store = use(SheetStoreContext);
+
+  if (store !== null) {
+    return (
+      <PortaledSheet
+        store={store}
+        open={open}
+        onClose={onClose}
+        title={title}
+        description={description}
+        footer={footer}
+        busy={busy}
+        back={back}
+      >
+        {children}
+      </PortaledSheet>
+    );
+  }
+
+  return (
+    <StandaloneSheet
+      open={open}
+      onClose={onClose}
+      title={title}
+      description={description}
+      footer={footer}
+      busy={busy}
+      back={back}
+    >
+      {children}
+    </StandaloneSheet>
+  );
+}
+
+function PortaledSheet({
+  store,
+  open,
+  onClose,
+  title,
+  description,
+  footer,
+  busy = false,
+  back = false,
+  children,
+}: SheetProps & { store: SheetStore }) {
+  const [id] = useState(() => nextSheetId++);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      store.release(id);
+
+      return;
+    }
+
+    store.claim({ id, title, description, footer, busy, back, onClose, children });
+  }, [store, id, open, title, description, footer, busy, back, onClose, children]);
+
+  useLayoutEffect(() => () => store.release(id), [store, id]);
+
+  return null;
+}
+
+function StandaloneSheet({
+  open,
+  onClose,
+  title,
+  description,
+  footer,
+  busy = false,
+  back = false,
+  children,
+}: SheetProps) {
+  const id = useId();
+  const [closing, setClosing] = useState(false);
+
+  const close = () => {
+    if (!busy) setClosing(true);
+  };
+
+  const dismissed = () => {
+    if (closing) {
+      setClosing(false);
+      onClose();
+    }
+  };
+
+  return (
+    <NativeFormSheet
+      isOpen={open && !closing}
+      slotKey={id}
+      title={title}
+      description={description}
+      footer={footer}
+      busy={busy}
+      back={back}
+      onHeaderPress={close}
+      onDismiss={dismissed}
+      onNativeDismiss={onClose}
+    >
+      {children}
+    </NativeFormSheet>
+  );
+}
+
+function SheetPortal({ store }: { store: SheetStore }) {
+  const slot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const [lastSlot, setLastSlot] = useState<SheetRegistration | null>(null);
+  const [nativeDismissing, setNativeDismissing] = useState(false);
+
+  if (slot !== null && slot !== lastSlot) setLastSlot(slot);
+
+  useEffect(() => {
+    if (!nativeDismissing) return;
+    let active = true;
+
+    void Promise.resolve().then(() => {
+      if (active) setNativeDismissing(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [nativeDismissing]);
+
+  const presented = slot ?? lastSlot;
+
+  if (!presented) return null;
+
+  return (
+    <NativeFormSheet
+      isOpen={slot !== null && !nativeDismissing}
+      slotKey={`portal-${presented.id}`}
+      title={presented.title}
+      description={presented.description}
+      footer={presented.footer}
+      busy={presented.busy}
+      back={presented.back}
+      onHeaderPress={() => {
+        if (slot && !slot.busy) slot.onClose();
+      }}
+      onDismiss={() => {
+        if (slot === null) setLastSlot(null);
+      }}
+      onNativeDismiss={() => {
+        if (!slot || slot.busy) return;
+        setNativeDismissing(true);
+        slot.onClose();
+      }}
+    >
+      {presented.children}
+    </NativeFormSheet>
+  );
+}
+
+function NativeFormSheet({
+  isOpen,
+  slotKey,
+  title,
+  description,
+  footer,
+  busy,
+  back,
+  onHeaderPress,
+  onDismiss,
+  onNativeDismiss,
   children,
 }: {
-  open: boolean;
-  onClose: () => void;
+  isOpen: boolean;
+  slotKey: string;
   title: string;
-  description?: string;
-  footer?: ReactNode;
-  busy?: boolean;
-  back?: boolean;
-  children?: ReactNode;
+  description?: string | undefined;
+  footer?: ReactNode | undefined;
+  busy: boolean;
+  back: boolean;
+  onHeaderPress: () => void;
+  onDismiss: () => void;
+  onNativeDismiss: () => void;
+  children?: ReactNode | undefined;
 }) {
-  const id = useId();
   const { height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const [canvas, ink] = useCSSVariable(["--color-canvas", "--color-ink"]).map(String);
-  const [closing, setClosing] = useState(false);
-  const [contentHeight, setContentHeight] = useState(0);
-  const [footerHeight, setFooterHeight] = useState(0);
+  const { theme } = useUniwind();
+
+  const [canvas, surface, ink] = useCSSVariable([
+    "--color-canvas",
+    "--color-surface",
+    "--color-ink",
+  ]).map(String);
+
+  const sheetBg = theme === "dark" ? surface! : canvas!;
+  const sheetBgClass = theme === "dark" ? "bg-surface" : "bg-canvas";
+  const [measured, setMeasured] = useState({ key: slotKey, content: 0, footer: 0 });
   const [keyboard, setKeyboard] = useState(0);
   const bottomEdge = useRef(screenHeight);
   const scroll = useRef<ScrollViewInstance>(null);
   const offset = useRef(0);
   const frame = useRef({ y: 0, height: 0 });
   const keyboardFrame = useRef<{ screenY: number; height: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (slotKey) offset.current = 0;
+  }, [slotKey]);
+
+  const contentHeight = measured.key === slotKey ? measured.content : 0;
+  const footerHeight = measured.key === slotKey ? measured.footer : 0;
 
   useEffect(() => {
     const shown = Keyboard.addListener("keyboardWillChangeFrame", (event) => {
@@ -74,17 +303,6 @@ export function Sheet({
         : 0.5
       : Math.min(0.9, Math.max(0.3, fittedHeight / screenHeight));
 
-  const close = () => {
-    if (!busy) setClosing(true);
-  };
-
-  const dismissed = () => {
-    if (closing) {
-      setClosing(false);
-      onClose();
-    }
-  };
-
   const revealFocusedField = () => {
     if (!keyboardFrame.current) return;
     TextInput.State.currentlyFocusedInput()?.measureInWindow((_x, y, _width, height) => {
@@ -101,80 +319,97 @@ export function Sheet({
 
   return (
     <FormSheet
-      isOpen={open && !closing}
+      isOpen={isOpen}
       detents={[detent, 1]}
       prefersGrabberVisible
       preventNativeDismiss={busy}
-      nativeContainerStyle={{ backgroundColor: canvas }}
-      onDismiss={dismissed}
-      onNativeDismiss={onClose}
+      nativeContainerStyle={{ backgroundColor: sheetBg }}
+      onDismiss={onDismiss}
+      onNativeDismiss={onNativeDismiss}
     >
-      <View collapsable={false} className="absolute inset-0 overflow-hidden bg-canvas">
-        <ScreenStack style={{ flex: 1, backgroundColor: canvas, overflow: "hidden" }}>
+      <View collapsable={false} className={cn("absolute inset-0 overflow-hidden", sheetBgClass)}>
+        <ScreenStack style={{ flex: 1, backgroundColor: sheetBg, overflow: "hidden" }}>
           <Screen
             activityState={2}
             enabled
             isNativeStack
-            screenId={`sheet-${id}`}
-            style={{ flex: 1, backgroundColor: canvas }}
+            screenId={`sheet-${slotKey}`}
+            style={{ flex: 1, backgroundColor: sheetBg }}
           >
-            <View
-              className="flex-1"
-              style={{ paddingBottom: Math.max(insets.bottom, keyboard) }}
-              onLayout={(event) => {
-                const target = event.target;
+            <InSheet value={true}>
+              <View
+                key={slotKey}
+                className="flex-1"
+                style={{ paddingBottom: Math.max(insets.bottom, keyboard) }}
+                onLayout={(event) => {
+                  const target = event.target;
 
-                if (typeof target !== "object" || target == null) return;
-                target.measureInWindow((_x, y, _width, height) => {
-                  bottomEdge.current = sheetBottomEdge(screenHeight, { y, height });
+                  if (typeof target !== "object" || target == null) return;
+                  target.measureInWindow((_x, y, _width, height) => {
+                    bottomEdge.current = sheetBottomEdge(screenHeight, { y, height });
 
-                  if (keyboardFrame.current) {
-                    setKeyboard(keyboardOverlap(bottomEdge.current, keyboardFrame.current));
-                  }
-                });
-              }}
-            >
-              <View className="flex-1 overflow-hidden">
-                <ScrollView
-                  ref={scroll}
-                  className="flex-1"
-                  contentInsetAdjustmentBehavior="automatic"
-                  keyboardShouldPersistTaps="handled"
-                  keyboardDismissMode="interactive"
-                  contentContainerClassName="gap-5 px-4 pt-4 pb-4"
-                  onContentSizeChange={(_width, height) => setContentHeight(height)}
-                  onScroll={(event) => {
-                    offset.current = event.nativeEvent.contentOffset.y;
-                  }}
-                  scrollEventThrottle={32}
-                  onLayout={(event) => {
-                    const target = event.target;
+                    if (keyboardFrame.current) {
+                      setKeyboard(keyboardOverlap(bottomEdge.current, keyboardFrame.current));
+                    }
+                  });
+                }}
+              >
+                <View className="flex-1 overflow-hidden">
+                  <ScrollView
+                    key={slotKey}
+                    ref={scroll}
+                    className="flex-1"
+                    contentInsetAdjustmentBehavior="automatic"
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="interactive"
+                    contentContainerClassName="gap-5 px-4 pt-4 pb-4"
+                    onContentSizeChange={(_width, height) =>
+                      setMeasured((prev) =>
+                        prev.key === slotKey
+                          ? { ...prev, content: height }
+                          : { key: slotKey, content: height, footer: 0 },
+                      )
+                    }
+                    onScroll={(event) => {
+                      offset.current = event.nativeEvent.contentOffset.y;
+                    }}
+                    scrollEventThrottle={32}
+                    onLayout={(event) => {
+                      const target = event.target;
 
-                    if (typeof target !== "object" || target == null) return;
-                    target.measureInWindow((_x, y, _width, height) => {
-                      frame.current = { y, height };
-                      revealFocusedField();
-                    });
-                  }}
-                >
-                  {description ? (
-                    <Text className="px-1 type-callout text-muted">{description}</Text>
-                  ) : null}
-                  {children}
-                </ScrollView>
-                {footer ? (
-                  <View
-                    className="gap-2 bg-canvas px-4 pt-2 pb-3"
-                    onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
+                      if (typeof target !== "object" || target == null) return;
+                      target.measureInWindow((_x, y, _width, height) => {
+                        frame.current = { y, height };
+                        revealFocusedField();
+                      });
+                    }}
                   >
-                    {footer}
-                  </View>
-                ) : null}
+                    {description ? (
+                      <Text className="px-1 type-callout text-muted">{description}</Text>
+                    ) : null}
+                    {children}
+                  </ScrollView>
+                  {footer ? (
+                    <View
+                      className={cn("gap-2 border-t border-line px-4 pt-2 pb-3", sheetBgClass)}
+                      onLayout={(event) => {
+                        const height = event.nativeEvent.layout.height;
+                        setMeasured((prev) =>
+                          prev.key === slotKey
+                            ? { ...prev, footer: height }
+                            : { key: slotKey, content: 0, footer: height },
+                        );
+                      }}
+                    >
+                      {footer}
+                    </View>
+                  ) : null}
+                </View>
               </View>
-            </View>
+            </InSheet>
             <ScreenStackHeaderConfig
-              backgroundColor="transparent"
-              translucent
+              backgroundColor={sheetBg}
+              translucent={false}
               color={ink}
               titleColor={ink}
               hideBackButton
@@ -182,16 +417,34 @@ export function Sheet({
               title={title}
               titleFontSize={17}
               titleFontWeight="600"
-              headerRightBarButtonItems={[
-                {
-                  type: "button",
-                  icon: { type: "sfSymbol", name: "xmark" },
-                  accessibilityLabel: `Close ${title}`,
-                  identifier: `sheet-close-${id}`,
-                  disabled: busy,
-                  onPress: close,
-                },
-              ]}
+              headerLeftBarButtonItems={
+                back
+                  ? [
+                      {
+                        type: "button",
+                        icon: { type: "sfSymbol", name: "chevron.backward" },
+                        accessibilityLabel: "Back",
+                        identifier: `sheet-back-${slotKey}`,
+                        disabled: busy,
+                        onPress: onHeaderPress,
+                      },
+                    ]
+                  : []
+              }
+              headerRightBarButtonItems={
+                back
+                  ? []
+                  : [
+                      {
+                        type: "button",
+                        icon: { type: "sfSymbol", name: "xmark" },
+                        accessibilityLabel: `Close ${title}`,
+                        identifier: `sheet-close-${slotKey}`,
+                        disabled: busy,
+                        onPress: onHeaderPress,
+                      },
+                    ]
+              }
             />
           </Screen>
         </ScreenStack>

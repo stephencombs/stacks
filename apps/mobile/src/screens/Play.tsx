@@ -40,7 +40,7 @@ import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
-import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 
 import { Money } from "../components/Money";
@@ -118,11 +118,11 @@ function Title({
       title: children,
       ...(Platform.OS === "ios"
         ? {
-            headerTitle,
+            headerTitle: context?.trim() ? headerTitle : undefined,
           }
         : null),
     });
-  }, [navigation, children, headerTitle]);
+  }, [navigation, children, context, headerTitle]);
 
   return (
     <View className="gap-1">
@@ -351,7 +351,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
   if (visit.visit.deletedAt !== undefined)
     return (
       <PersonalScreen
-        dock={
+        toast={
           canDelete && deletedHere ? (
             <RecordingToast>
               <Text
@@ -409,7 +409,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
     );
 
   const toast = saved ? (
-    <RecordingToast key={saved.entryId} felt={live}>
+    <RecordingToast key={saved.entryId} felt={live} onDismiss={() => setSaved(null)}>
       <Text
         className={cn(
           "min-w-0 flex-1 text-sm",
@@ -473,6 +473,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
     <PersonalScreen
       session
       felt={live}
+      toast={toast}
       dock={
         <>
           <LiveSessionsBar except={visitId} />
@@ -481,7 +482,6 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
               <Text className="text-sm text-ink">{notice}</Text>
             </View>
           ) : null}
-          {toast}
           {quick.error ? <FormError>{quick.error}</FormError> : null}
           {live ? (
             <>
@@ -536,27 +536,43 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
               <Text className="type-footnote text-muted">
                 Undo reopens this session. Returning starts a new one.
               </Text>
-              <View className={stacked ? "gap-2" : "flex-row gap-2"}>
-                <Button
-                  label="Undo cash-out"
-                  variant={Platform.OS === "android" ? "ghost" : "secondary"}
-                  size="lg"
-                  className={cn(
-                    !stacked && "flex-1",
-                    Platform.OS === "android" && "border border-line bg-transparent",
-                  )}
-                  onPress={() => setOpen({ type: "reopen" })}
-                />
-                {canReturn ? (
+              {Platform.OS === "android" ? (
+                <View className={stacked ? "gap-2" : "flex-row gap-2"}>
                   <Button
-                    label="Back at the table"
-                    variant="primary"
+                    label="Undo cash-out"
+                    variant="ghost"
                     size="lg"
-                    {...(stacked ? {} : { className: "flex-1" })}
-                    onPress={() => setOpen({ type: "return" })}
+                    className={cn(!stacked && "flex-1", "border border-line bg-transparent")}
+                    onPress={() => setOpen({ type: "reopen" })}
                   />
-                ) : null}
-              </View>
+                  {canReturn ? (
+                    <Button
+                      label="Back at the table"
+                      variant="primary"
+                      size="lg"
+                      className={stacked ? undefined : "flex-1"}
+                      onPress={() => setOpen({ type: "return" })}
+                    />
+                  ) : null}
+                </View>
+              ) : (
+                <View className="gap-2">
+                  {canReturn ? (
+                    <Button
+                      label="Back at the table"
+                      variant="primary"
+                      size="lg"
+                      onPress={() => setOpen({ type: "return" })}
+                    />
+                  ) : null}
+                  <Button
+                    label="Undo cash-out"
+                    variant="secondary"
+                    size="lg"
+                    onPress={() => setOpen({ type: "reopen" })}
+                  />
+                </View>
+              )}
             </>
           )}
         </>
@@ -683,7 +699,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           }}
         />
       ) : open?.type === "history" ? (
-        <Sheet open title={own ? "Your history" : `${name}'s history`} onClose={close}>
+        <Sheet open back title={own ? "Your history" : `${name}'s history`} onClose={close}>
           <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
         </Sheet>
       ) : null}
@@ -710,13 +726,23 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           onSaved={() => edited("Buy-in saved.")}
         />
       ) : open?.type === "start_time" ? (
-        <StartTimeSheet visit={visit} onClose={close} onSaved={() => edited("Start time saved.")} />
+        <StartTimeSheet
+          visit={visit}
+          back
+          onClose={close}
+          onSaved={() => edited("Start time saved.")}
+        />
       ) : open?.type === "game" ? (
-        <GameSheet visit={visit} onClose={close} onSaved={() => edited("Game saved.")} />
+        <GameSheet visit={visit} back onClose={close} onSaved={() => edited("Game saved.")} />
       ) : open?.type === "trip" ? (
-        <TableTripSheet table={visit.table} onClose={close} onSaved={() => edited("Trip saved.")} />
+        <TableTripSheet
+          table={visit.table}
+          back
+          onClose={close}
+          onSaved={() => edited("Trip saved.")}
+        />
       ) : open?.type === "venue" ? (
-        <VenueSheet visit={visit} onClose={close} onSaved={() => edited("Casino saved.")} />
+        <VenueSheet visit={visit} back onClose={close} onSaved={() => edited("Casino saved.")} />
       ) : open?.type === "reopen" ? (
         <ReopenSheet
           visit={visit}
@@ -774,16 +800,33 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
 export function RecordingToast({
   children,
   felt = false,
+  onDismiss,
 }: {
   children: ReactNode;
   felt?: boolean;
+  onDismiss?: () => void;
 }) {
   const [shown] = useState(() => new Animated.Value(0));
+  const dismiss = useRef(onDismiss);
+
+  useEffect(() => {
+    dismiss.current = onDismiss;
+  }, [onDismiss]);
+
   useEffect(() => {
     animate(shown, { toValue: 1, duration: duration.toastIn, easing: ease.enter });
 
     return () => shown.stopAnimation();
   }, [shown]);
+
+  const hasDismiss = Boolean(onDismiss);
+
+  useEffect(() => {
+    if (!hasDismiss) return;
+    const timer = setTimeout(() => dismiss.current?.(), 6000);
+
+    return () => clearTimeout(timer);
+  }, [hasDismiss]);
 
   return (
     <Animated.View
@@ -798,7 +841,10 @@ export function RecordingToast({
           "flex-row items-center",
           Platform.OS === "android"
             ? "gap-3 rounded-[4px] bg-[#1F2120] py-2 pr-2 pl-4 shadow-lg"
-            : cn("gap-2 rounded-xl py-2 pr-2 pl-4", felt ? "bg-black/80" : "bg-ink"),
+            : cn(
+                "gap-2 rounded-xl py-2 pr-2 pl-4 shadow-md",
+                felt ? "border border-felt-ink/20 bg-felt-deep" : "bg-ink",
+              ),
         )}
       >
         {children}

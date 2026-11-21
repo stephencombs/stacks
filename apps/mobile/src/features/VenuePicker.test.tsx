@@ -62,6 +62,7 @@ vi.mock("../components/ui/Field", () => ({
 }));
 
 vi.mock("../components/ui/Sheet", () => ({
+  SheetHost: Container,
   Sheet: ({ footer, children }: { footer?: ReactNode; children?: ReactNode }) => (
     <section>
       {children}
@@ -76,7 +77,11 @@ vi.mock("../components/ui/DateTimeField", () => ({ DateTimeField: () => null }))
 
 vi.mock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
 
-vi.mock("../components/ui/Surface", () => ({ List: Container, Row: Container }));
+vi.mock("../components/ui/Surface", () => ({
+  List: Container,
+  Row: Container,
+  Surface: Container,
+}));
 
 vi.mock("../components/Money", () => ({ Money: () => null }));
 
@@ -149,6 +154,50 @@ it("keeps an uncached existing casino distinct from Not listed, and clears it on
     store = makeRecordingStore(adapter());
     await store.ready;
     expect(store.getSnapshot().state!.tables[0]!.venueId).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    await store.close();
+    vi.unstubAllGlobals();
+  }
+});
+
+it("uses default casino copy when picking a default venue", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const { SessionVenuePicker } = await import("./VenuePicker");
+  const { RecordingProvider } = await import("@stacks/client-runtime/recordingReact");
+  let documentValue: RecordingStorageDocument = { revision: 0 };
+
+  const store = makeRecordingStore({
+    load: async () => documentValue,
+    commit: async (revision: number, payload: string) => {
+      documentValue = { revision: revision + 1, payload };
+
+      return documentValue.revision;
+    },
+    subscribe: () => () => {},
+    close: async () => {},
+  });
+
+  await store.ready;
+  const host = document.createElement("div");
+  const root = createRoot(host);
+
+  try {
+    await act(async () =>
+      root.render(
+        <RecordingProvider store={store}>
+          <SessionVenuePicker
+            context="default"
+            selectedId={null}
+            selected={null}
+            onSelect={() => {}}
+          />
+        </RecordingProvider>,
+      ),
+    );
+    expect(host.textContent).toContain("Not set");
+    expect(host.textContent).toContain("Start new sessions without a casino");
+    expect(host.textContent).not.toContain("Not listed");
   } finally {
     await act(async () => root.unmount());
     await store.close();

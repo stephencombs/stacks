@@ -37,7 +37,7 @@ export function screenFoot({ platform, bar, inset, footer, fab, live, footerGap 
     footerInset: (bar || Math.max(inset, 12)) + footerGap,
     fabBottom: base + floating + 16,
     above: footer !== null ? footer : bar || undefined,
-    clearance: android ? bar || inset : inset,
+    clearance: bar || inset,
   };
 }
 

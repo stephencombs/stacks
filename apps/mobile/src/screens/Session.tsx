@@ -85,7 +85,7 @@ export function ImportedSession({
 }: {
   sessionId: SessionId;
   table: TableView;
-  back: ReactNode;
+  back?: ReactNode;
 }) {
   return (
     <SessionData sessionId={sessionId}>

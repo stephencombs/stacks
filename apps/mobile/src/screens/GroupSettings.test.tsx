@@ -127,6 +127,7 @@ it("shows the Name row for owners and admins, hides it for members, and renames 
     ),
   }));
   vi.doMock("../components/ui/Sheet", () => ({
+    SheetHost: Container,
     Sheet: ({
       open,
       title,

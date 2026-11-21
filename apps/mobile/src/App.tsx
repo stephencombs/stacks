@@ -19,7 +19,6 @@ import { useCSSVariable, useUniwind } from "uniwind";
 
 import { Button } from "./components/ui/Button";
 import { ConfirmDialogHost } from "./components/ui/ConfirmDialogHost";
-import { HeaderTitle } from "./components/ui/HeaderTitle";
 import { TabBarHeight } from "./components/ui/tabBar";
 import { Landing } from "./features/Landing";
 import { PersonalYouButton, PlayBrand } from "./features/Personal";
@@ -54,9 +53,6 @@ import { StatsScreen } from "./screens/Stats";
 const headerOptions = {
   headerTransparent: Platform.OS === "ios",
   headerShadowVisible: false,
-  ...(Platform.OS === "ios"
-    ? { headerTitle: ({ children }: { children: string }) => <HeaderTitle title={children} /> }
-    : null),
   headerBackButtonDisplayMode: "minimal",
 } as const;
 
@@ -172,7 +168,11 @@ const RootStack = createNativeStackNavigator({
       linking: "sessions/:sessionId",
       layout: ({ children }) => <AccountGate>{children}</AccountGate>,
     },
-    Table: { screen: TableScreen, linking: "tables/:tableId", options: { headerShown: false } },
+    Table: {
+      screen: TableScreen,
+      linking: "tables/:tableId",
+      options: { title: Platform.OS === "android" ? "" : "Table" },
+    },
     SharedTable: {
       screen: SharedTableScreen,
       linking: "t/:token",
@@ -369,9 +369,9 @@ export default function App() {
       <RecordingProvider store={recordingStore}>
         <LiveSessionBridge />
         <AccountProvider>
+          <StatusBar style={theme === "light" ? "dark" : "light"} />
           <Root />
           <ConfirmDialogHost />
-          <StatusBar style={theme === "light" ? "dark" : "light"} />
         </AccountProvider>
       </RecordingProvider>
     </SafeAreaProvider>

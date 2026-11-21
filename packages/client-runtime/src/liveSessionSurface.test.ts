@@ -160,3 +160,49 @@ it("emits finished summary on cash-out and clears when deleted", async () => {
     await store.close();
   }
 });
+
+it("suppresses hourly rate for sub-minute finished sessions", async () => {
+  const store = await openStore();
+
+  try {
+    const start = DateTime.makeUnsafe("2026-11-13T21:12:00.000Z");
+    const end = DateTime.add(start, { seconds: 42 });
+
+    await store.execute(
+      store.prepare({ type: "start", buyIn: 20000, startedAt: start, game: "blackjack" }),
+    );
+    const visitId = store.getSnapshot().state!.visits[0]!.id;
+
+    await store.execute(store.prepare({ type: "finish", visitId, amount: 35000, finishedAt: end }));
+
+    const finished = reconcileLiveSessionSurface(
+      visitId,
+      store.getSnapshot().state,
+      { showCents: true, privacyMode: false },
+      appUrl,
+      utc,
+    );
+
+    expect(finished.kind).toBe("finished");
+
+    if (finished.kind !== "finished") throw new Error("expected finished");
+    expect(finished.hourlyText).toBe("");
+    expect(finished.summaryLine).toBe("$200.00 in · $350.00 out");
+
+    const hiddenFinished = reconcileLiveSessionSurface(
+      visitId,
+      store.getSnapshot().state,
+      { showCents: true, privacyMode: true },
+      appUrl,
+      utc,
+    );
+
+    expect(hiddenFinished.kind).toBe("finished");
+
+    if (hiddenFinished.kind !== "finished") throw new Error("expected finished");
+    expect(hiddenFinished.hourlyText).toBe("");
+    expect(hiddenFinished.summaryLine).toBe("Amounts hidden");
+  } finally {
+    await store.close();
+  }
+});

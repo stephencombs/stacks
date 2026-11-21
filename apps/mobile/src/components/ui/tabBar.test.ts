@@ -22,7 +22,7 @@ it("iOS's list scrolls under the glass tab bar and pads its end instead", () => 
   expect(foot.scrollStyle).toBeUndefined();
   expect(foot.endSpace).toBe(80 + 52 + 88);
   expect(foot.fabBottom).toBe(80 + 60 + 16);
-  expect(foot.clearance).toBe(24);
+  expect(foot.clearance).toBe(80);
 });
 
 it("a footer holds the foot of the screen, and the FAB and LiveBar stack above it", () => {
@@ -43,6 +43,7 @@ it("a screen off the tabs clears the gesture inset by at least 12, plus the foot
   );
   expect(screenFoot({ ...off, platform: "android" }).above).toBeUndefined();
   expect(screenFoot({ ...off, platform: "android" }).clearance).toBe(24);
+  expect(screenFoot({ ...off, platform: "ios" }).clearance).toBe(24);
 });
 
 it("at the end of a list, nothing floating covers the last row", () => {
