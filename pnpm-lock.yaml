@@ -27,7 +27,7 @@ overrides:
 
 packageExtensionsChecksum: sha256-MR3rI93rlYeDgLLq29V1ePkXOcpBRifwQ9KI2c2049s=
 
-pnpmfileChecksum: sha256-Y2DknmQuI+GXSDZjOMZTebkZSM2k50kwdsg77MsPWiE=
+pnpmfileChecksum: sha256-gODKZUUrlYdaQnPg8o/XY4p4aVFVIg7H+/Hso5v4RVI=
 
 patchedDependencies:
   '@effect/vitest@4.0.5':
