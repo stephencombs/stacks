@@ -8,6 +8,7 @@ import { FormError } from "./Field";
 import { cn } from "./cn";
 import { FloatingAction } from "./FloatingAction";
 import { PinnedFooter } from "./PinnedFooter";
+import { SheetHost } from "./Sheet";
 import { useScreenFoot } from "./tabBar";
 import { ToastHost, useToast, type Toast } from "./Toast";
 
@@ -51,41 +52,43 @@ export function Screen({
   const foot = useScreenFoot({ footer: !!footer, fab: !!fab, footerGap: 12 });
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-canvas"
-    >
-      {header}
-      <ToastHost {...(foot.above === undefined ? {} : { above: foot.above })}>
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          keyboardShouldPersistTaps="handled"
-          className="flex-1"
-          style={foot.scrollStyle}
-          contentContainerClassName={cn("gap-6 px-4 pt-4 pb-24", contentClassName)}
-        >
-          <Content>{children}</Content>
-          <View style={{ height: foot.endSpace }} />
-        </ScrollView>
-        {fab ? (
-          <FloatingAction right={16} bottom={foot.fabBottom}>
-            {fab}
-          </FloatingAction>
+    <SheetHost>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        className="flex-1 bg-canvas"
+      >
+        {header}
+        <ToastHost {...(foot.above === undefined ? {} : { above: foot.above })}>
+          <ScrollView
+            contentInsetAdjustmentBehavior="automatic"
+            keyboardShouldPersistTaps="handled"
+            className="flex-1"
+            style={foot.scrollStyle}
+            contentContainerClassName={cn("gap-6 px-4 pt-4 pb-24", contentClassName)}
+          >
+            <Content>{children}</Content>
+            <View style={{ height: foot.endSpace }} />
+          </ScrollView>
+          {fab ? (
+            <FloatingAction right={16} bottom={foot.fabBottom}>
+              {fab}
+            </FloatingAction>
+          ) : null}
+          {footer ? (
+            <PinnedFooter onLayout={foot.onFooterLayout} inset={foot.footerInset}>
+              <Content>{footer}</Content>
+            </PinnedFooter>
+          ) : null}
+        </ToastHost>
+        {live ? (
+          <LiveBar
+            onHeightChange={foot.onLiveBarHeight}
+            {...(shows ? { shows } : {})}
+            {...(foot.above === undefined ? {} : { bottom: foot.above })}
+          />
         ) : null}
-        {footer ? (
-          <PinnedFooter onLayout={foot.onFooterLayout} inset={foot.footerInset}>
-            <Content>{footer}</Content>
-          </PinnedFooter>
-        ) : null}
-      </ToastHost>
-      {live ? (
-        <LiveBar
-          onHeightChange={foot.onLiveBarHeight}
-          {...(shows ? { shows } : {})}
-          {...(foot.above === undefined ? {} : { bottom: foot.above })}
-        />
-      ) : null}
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SheetHost>
   );
 }
 

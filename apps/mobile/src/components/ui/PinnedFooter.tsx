@@ -30,7 +30,7 @@ export function PinnedFooter({
 
   return (
     <View
-      pointerEvents="box-none"
+      pointerEvents={filled ? "auto" : "box-none"}
       onLayout={onLayout}
       className={cn(
         "absolute inset-x-0 bottom-0",

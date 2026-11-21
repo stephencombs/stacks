@@ -29,8 +29,13 @@ const setupMapTest = async (store: Awaited<ReturnType<typeof openStore>>) => {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const navigate = vi.fn();
+  const setOptionsCalls: Array<{ readonly headerShown?: boolean }> = [];
+
   vi.doMock("@react-navigation/native", () => ({
-    useNavigation: () => ({ setOptions: vi.fn(), navigate }),
+    useNavigation: () => ({
+      setOptions: (options: { readonly headerShown?: boolean }) => setOptionsCalls.push(options),
+      navigate,
+    }),
   }));
 
   const Container = ({
@@ -96,6 +101,7 @@ const setupMapTest = async (store: Awaited<ReturnType<typeof openStore>>) => {
     ),
   }));
   vi.doMock("../components/ui/Sheet", () => ({
+    SheetHost: Container,
     Sheet: ({ open, children }: { open: boolean; children?: ReactNode }) =>
       open ? <section>{children}</section> : null,
   }));
@@ -122,15 +128,16 @@ const setupMapTest = async (store: Awaited<ReturnType<typeof openStore>>) => {
     ),
   );
 
-  return { element, root, navigate };
+  return { element, root, navigate, setOptionsCalls };
 };
 
 it("shows empty state before any finished sessions", async () => {
   const store = await openStore();
-  const { element, root } = await setupMapTest(store);
+  const { element, root, setOptionsCalls } = await setupMapTest(store);
 
   try {
     expect(element.textContent).toContain("No casinos on the map yet");
+    expect(setOptionsCalls).toEqual([{ headerShown: true }]);
   } finally {
     await act(async () => root.unmount());
     await store.close();
@@ -177,9 +184,10 @@ it("renders venue pins, unmapped count, day path filter, and venue sheet linking
     }),
   );
 
-  const { element, root, navigate } = await setupMapTest(store);
+  const { element, root, navigate, setOptionsCalls } = await setupMapTest(store);
 
   try {
+    expect(setOptionsCalls).toEqual([{ headerShown: false }]);
     expect(element.textContent).toContain("All casinos");
     expect(element.textContent).toContain("1 session has no saved location");
     expect(element.textContent).toContain("Wynn Las Vegas");

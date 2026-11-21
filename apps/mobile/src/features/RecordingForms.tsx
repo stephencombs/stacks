@@ -37,7 +37,7 @@ import {
 } from "@stacks/client-runtime/recordingView";
 import { decimalSeparator, formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
-import { useState, type ReactNode } from "react";
+import { use, useState, type ReactNode } from "react";
 import { Platform, Pressable, Text, TextInput, View } from "react-native";
 
 import { Money } from "../components/Money";
@@ -46,6 +46,7 @@ import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { DateTimeField } from "../components/ui/DateTimeField";
 import { Sheet } from "../components/ui/Sheet";
+import { InSheet } from "../components/ui/sheetContext";
 import { List, Row } from "../components/ui/Surface";
 import { Switch } from "../components/ui/Switch";
 import { cn } from "../components/ui/cn";
@@ -147,7 +148,13 @@ function KeypadAmount({
   );
 }
 
-function RecordingKeypad({ amount, tiled = false }: { amount: Amount; tiled?: boolean }) {
+function RecordingKeypad({
+  amount,
+  tiled = Platform.OS === "ios",
+}: {
+  amount: Amount;
+  tiled?: boolean;
+}) {
   if (tiled) {
     return (
       <View className="border-t border-line pt-2.5">
@@ -380,28 +387,47 @@ function GameFields({
   onHighLimit: (highLimit: boolean) => void;
 }) {
   const [choosing, setChoosing] = useState(false);
+  const inSheet = use(InSheet);
   const baseLabel = games.find((option) => option.value === game)!.label;
   const gameLabel = game === "other" && gameName.trim() ? gameName.trim() : baseLabel;
 
   return (
     <>
-      <View className="overflow-hidden rounded-xl bg-surface">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Game: ${gameLabel}. Change`}
-          accessibilityState={{ expanded: choosing }}
-          onPress={() => setChoosing((open) => !open)}
-          className={cn(
-            "min-h-12 flex-row items-center gap-3 px-4 active:bg-fill",
-            choosing && "bg-fill",
-          )}
-        >
-          <Text className="type-body text-ink">Game</Text>
-          <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
-            {gameLabel}
-          </Text>
-          <Icon name={choosing ? "chevron-down" : "chevron-right"} color="faint" size={16} />
-        </Pressable>
+      <View className={cn("overflow-hidden rounded-xl", inSheet ? "bg-raised" : "bg-surface")}>
+        {Platform.OS === "ios" ? (
+          <View className="min-h-12 flex-row items-center justify-between gap-3 px-4">
+            <Text className="type-body text-ink">Game</Text>
+            <Choice
+              inline
+              label="Game"
+              labelHidden
+              options={games}
+              value={game}
+              onChange={(next) => {
+                onGame(next);
+
+                if (next !== "other") onGameName?.("");
+              }}
+            />
+          </View>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Game: ${gameLabel}. Change`}
+            accessibilityState={{ expanded: choosing }}
+            onPress={() => setChoosing((open) => !open)}
+            className={cn(
+              "min-h-12 flex-row items-center gap-3 px-4 active:bg-fill",
+              choosing && "bg-fill",
+            )}
+          >
+            <Text className="type-body text-ink">Game</Text>
+            <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
+              {gameLabel}
+            </Text>
+            <Icon name={choosing ? "chevron-down" : "chevron-right"} color="faint" size={16} />
+          </Pressable>
+        )}
         <View className="min-h-12 flex-row items-center justify-between gap-3 border-t border-line px-4 py-2">
           <Text className="type-body text-ink">High limit</Text>
           <Switch accessibilityLabel="High limit" value={highLimit} onValueChange={onHighLimit} />
@@ -417,7 +443,7 @@ function GameFields({
           onChangeText={onGameName}
         />
       ) : null}
-      {choosing ? (
+      {Platform.OS !== "ios" && choosing ? (
         <Choice
           label="Game"
           labelHidden
@@ -444,6 +470,7 @@ function DetailsFields({
   onVenue?: (venue: CachedVenue | null) => void;
 }) {
   const [pickingVenue, setPickingVenue] = useState(false);
+  const inSheet = use(InSheet);
 
   return (
     <View className="gap-1.5">
@@ -451,7 +478,7 @@ function DetailsFields({
       <GameFields {...gameProps} />
       {onVenue ? (
         <>
-          <View className="overflow-hidden rounded-xl bg-surface">
+          <View className={cn("overflow-hidden rounded-xl", inSheet ? "bg-raised" : "bg-surface")}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Casino: ${venue?.name ?? "Not set"}. Change`}
@@ -474,16 +501,14 @@ function DetailsFields({
             </Pressable>
           </View>
           {pickingVenue ? (
-            <View className="rounded-xl bg-surface p-3">
-              <SessionVenuePicker
-                selectedId={venue?.id ?? null}
-                selected={venue ?? null}
-                onSelect={(next) => {
-                  onVenue(next);
-                  setPickingVenue(false);
-                }}
-              />
-            </View>
+            <SessionVenuePicker
+              selectedId={venue?.id ?? null}
+              selected={venue ?? null}
+              onSelect={(next) => {
+                onVenue(next);
+                setPickingVenue(false);
+              }}
+            />
           ) : null}
         </>
       ) : null}
@@ -519,6 +544,7 @@ export function StartSheet({
   onOpened?: (tableId: TableId) => void;
 }) {
   const save = useRecordingSubmit();
+  const inSheet = use(InSheet);
   const { home } = useRecordingHome();
   const prefs = usePreferences();
   const [tripId, setTripId] = useState(initialTripId);
@@ -585,7 +611,12 @@ export function StartSheet({
           Finish your live session before opening a table just to record for others.
         </Text>
       ) : onOpened ? (
-        <View className="min-h-12 flex-row items-center justify-between gap-3 rounded-xl bg-surface px-4 py-2">
+        <View
+          className={cn(
+            "min-h-12 flex-row items-center justify-between gap-3 rounded-xl px-4 py-2",
+            inSheet ? "bg-raised" : "bg-surface",
+          )}
+        >
           <Text className="flex-1 type-body text-ink">I'm not playing, just recording</Text>
           <Switch
             accessibilityLabel="I'm not playing, just recording"
@@ -619,6 +650,7 @@ export function PastSessionSheet({
   onAdded: (visitId: VisitId) => void;
 }) {
   const save = useRecordingSubmit();
+  const inSheet = use(InSheet);
   const prefs = usePreferences();
   const buyIn = useAmount("", 1);
   const cashOut = useAmount("", 0);
@@ -699,7 +731,12 @@ export function PastSessionSheet({
         <TypedAmount label="Total out" amount={cashOut} />
       </View>
       {Platform.OS === "android" && resultPreview !== null ? (
-        <View className="flex-row items-center justify-between rounded-xl bg-surface px-4 py-3">
+        <View
+          className={cn(
+            "flex-row items-center justify-between rounded-xl px-4 py-3",
+            inSheet ? "bg-raised" : "bg-surface",
+          )}
+        >
           <Text className="type-footnote font-medium text-muted">Your result</Text>
           <Money
             amount={MinorUnits.make(resultPreview)}
@@ -710,18 +747,16 @@ export function PastSessionSheet({
         </View>
       ) : null}
       {timeField("date", "Date")}
-      {Platform.OS === "android" ? (
-        <View className="flex-row gap-3">
-          <View className="flex-1">{timeField("start", "Started")}</View>
-          <View className="flex-1">{timeField("finish", "Finished")}</View>
-        </View>
-      ) : (
-        <>
-          {timeField("start", "Started")}
-          {timeField("finish", "Finished")}
-        </>
-      )}
-      <View className="flex-row items-center justify-between gap-3">
+      <View className="flex-row gap-3">
+        <View className="flex-1">{timeField("start", "Started")}</View>
+        <View className="flex-1">{timeField("finish", "Finished")}</View>
+      </View>
+      <View
+        className={cn(
+          "min-h-12 flex-row items-center justify-between gap-3 rounded-xl px-4 py-2",
+          inSheet ? "bg-raised" : "bg-surface",
+        )}
+      >
         <Text className="type-body text-ink">Finished the next day</Text>
         <Switch
           accessibilityLabel="Finished the next day"
@@ -779,12 +814,14 @@ function PaidField({ label, paid }: { label: string; paid: ReturnType<typeof use
 export function RebuySheet({
   visit,
   who,
+  back = false,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
   /** Whose rebuy, when it isn't yours: "Priya". */
   who?: string | undefined;
+  back?: boolean;
   onClose: () => void;
   onSaved: Saved;
 }) {
@@ -828,6 +865,7 @@ export function RebuySheet({
   return (
     <RecordingSheet
       keypad={<RecordingKeypad amount={amount} />}
+      back={back}
       title={who ? `${shortName(who)}'s rebuy` : "Rebuy"}
       submitLabel="Add rebuy"
       save={save}
@@ -922,6 +960,7 @@ export function CashOutSheet({
   visit,
   who,
   note,
+  back = false,
   onClose,
   onSaved,
 }: {
@@ -930,10 +969,12 @@ export function CashOutSheet({
   who?: string | undefined;
   /** What it does to the table: "Priya's visit ends. You and Dev keep playing." */
   note?: string | undefined;
+  back?: boolean;
   onClose: () => void;
   onSaved: Saved;
 }) {
   const save = useRecordingSubmit();
+  const inSheet = use(InSheet);
   const prefs = usePreferences();
   const amount = useAmount("", 0);
   const [now] = useState(() => DateTime.makeUnsafe(Date.now()));
@@ -945,8 +986,9 @@ export function CashOutSheet({
 
   return (
     <RecordingSheet
-      keypad={<RecordingKeypad amount={amount} tiled={Platform.OS === "ios"} />}
+      keypad={<RecordingKeypad amount={amount} />}
       keypadInFooter
+      back={back}
       title={who ? `Cash out ${shortName(who)}` : "Cash out"}
       description={note}
       submitLabel={who ? `End ${shortName(who)}'s visit` : "End session"}
@@ -979,7 +1021,7 @@ export function CashOutSheet({
         if (receipt?.command.type === "finish") onSaved(receipt.command.entryId, input);
       }}
     >
-      <View className="overflow-hidden rounded-xl bg-surface">
+      <View className={cn("overflow-hidden rounded-xl", inSheet ? "bg-raised" : "bg-surface")}>
         <View className="gap-1 px-4 py-3">
           <View className="flex-row items-center justify-between gap-3">
             <Text className="type-body text-ink">Cash-out</Text>
@@ -1120,7 +1162,7 @@ export function BuyInTotalSheet({
   return (
     <RecordingSheet
       keypad={<RecordingKeypad amount={amount} />}
-      back={Platform.OS === "android"}
+      back
       title="Edit buy-in"
       description={Platform.OS === "android" ? undefined : `Now ${currentShown} in.`}
       submitLabel={buyInTotalLabel(mode, amount.text)}
@@ -1183,10 +1225,12 @@ export function BuyInTotalSheet({
 /** When the visit started. It can move earlier, or later up to the first buy-in. */
 export function StartTimeSheet({
   visit,
+  back = false,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  back?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1215,6 +1259,7 @@ export function StartTimeSheet({
       title="Start time"
       description="When you sat down. It can't be after your first buy-in."
       submitLabel="Save start time"
+      back={back}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -1253,10 +1298,12 @@ export function StartTimeSheet({
 /** The table's game and whether it's high limit. */
 export function GameSheet({
   visit,
+  back = false,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  back?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1269,6 +1316,7 @@ export function GameSheet({
     <RecordingSheet
       title="Game"
       submitLabel="Save game"
+      back={back}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -1303,10 +1351,12 @@ export function GameSheet({
 /** The table's casino, picked from a search or from those saved on this device, or none. */
 export function VenueSheet({
   visit,
+  back = false,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
+  back?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1319,6 +1369,7 @@ export function VenueSheet({
     <RecordingSheet
       title="Casino"
       submitLabel="Save casino"
+      back={back}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -1468,10 +1519,12 @@ export function VoidSheet({
 
 export function ReopenSheet({
   visit,
+  back = false,
   onClose,
   onReopened,
 }: {
   visit: RecordingVisitView;
+  back?: boolean;
   onClose: () => void;
   onReopened: () => void;
 }) {
@@ -1493,6 +1546,7 @@ export function ReopenSheet({
       description="Only if you never stopped playing. The session goes back to live, and the finish stays in its history. If you left and came back, start a new session instead."
       submitLabel="Reopen session"
       cancelLabel="Keep finished"
+      back={back}
       save={save}
       onClose={onClose}
       onSubmit={() => void submit()}
@@ -1726,12 +1780,14 @@ export function SitDownSheet({
   tableId,
   player,
   returning = true,
+  back = false,
   onClose,
   onSeated,
 }: {
   tableId: TableId;
   player: PlayerIdentity;
   returning?: boolean;
+  back?: boolean;
   onClose: () => void;
   onSeated: (visitId: VisitId) => void;
 }) {
@@ -1749,6 +1805,7 @@ export function SitDownSheet({
             : `Your buy-in as ${player.displayName}.`
       }
       submitLabel={returning ? "Sit back down" : "Buy in"}
+      back={back}
       save={save}
       onClose={onClose}
       onSubmit={async () => {

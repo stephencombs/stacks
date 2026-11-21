@@ -186,8 +186,12 @@ export const sessionActivity = createLiveActivity(
             <HStack spacing={12} modifiers={[privacySensitive()]}>
               <Text modifiers={summaryStyle}>{content.buyInText} in</Text>
               <Text modifiers={summaryStyle}>{content.cashOutText} out</Text>
-              <Spacer />
-              <Text modifiers={summaryStyle}>{content.hourlyText}</Text>
+              {content.hourlyText ? (
+                <>
+                  <Spacer />
+                  <Text modifiers={summaryStyle}>{content.hourlyText}</Text>
+                </>
+              ) : null}
             </HStack>
             {action("See session", content.seeSessionUrl)}
           </VStack>

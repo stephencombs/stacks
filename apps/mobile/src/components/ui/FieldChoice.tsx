@@ -5,6 +5,7 @@ export type FieldChoiceProps<A extends string> = {
   onChange: (value: A) => void;
   labelHidden?: boolean;
   presentation?: "automatic" | "menu";
+  inline?: boolean;
 };
 
 export function FieldChoice<A extends string>(_props: FieldChoiceProps<A>) {

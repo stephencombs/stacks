@@ -20,6 +20,7 @@ import { PressableScale } from "../components/ui/PressableScale";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { FloatingAction } from "../components/ui/FloatingAction";
 import { PinnedFooter } from "../components/ui/PinnedFooter";
+import { SheetHost } from "../components/ui/Sheet";
 import { useScreenFoot } from "../components/ui/tabBar";
 import { cn } from "../components/ui/cn";
 import { useAccount } from "../lib/account";
@@ -38,6 +39,7 @@ import { YouSheet } from "./You";
 export function PersonalScreen({
   children,
   dock,
+  toast,
   fab,
   live = false,
   felt = false,
@@ -47,6 +49,7 @@ export function PersonalScreen({
 }: {
   children: ReactNode;
   dock?: ReactNode;
+  toast?: ReactNode;
   /** A floating action button, bottom right above the live bar: the screen's main way to add. */
   fab?: ReactNode;
   live?: boolean;
@@ -67,50 +70,65 @@ export function PersonalScreen({
   const clipped = session && Platform.OS === "android";
 
   return (
-    <View
-      className={felt ? "flex-1 bg-felt" : "flex-1 bg-canvas"}
-      style={clipped ? { paddingTop: insets.top } : undefined}
-    >
-      {header}
-      <FeltStatusBar felt={felt} />
-      <ScrollView
-        ref={scrollRef}
-        className="flex-1"
-        style={foot.scrollStyle}
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardShouldPersistTaps="handled"
-        contentContainerClassName={cn("gap-6 pt-4 pb-8", contentClassName)}
-        contentContainerStyle={{
-          ...sides,
-          flexGrow: 1,
-          ...(session ? { paddingTop: clipped ? 12 : insets.top + 12 } : null),
-        }}
+    <SheetHost>
+      <View
+        className={felt ? "flex-1 bg-felt" : "flex-1 bg-canvas"}
+        style={clipped ? { paddingTop: insets.top } : undefined}
       >
-        {children}
-        <View style={{ height: foot.endSpace }} />
-      </ScrollView>
-      {fab ? (
-        <FloatingAction right={sides.paddingRight} bottom={foot.fabBottom}>
-          {fab}
-        </FloatingAction>
-      ) : null}
-      {dock ? (
-        <PinnedFooter
-          felt={felt}
-          sides={sides}
-          onLayout={foot.onFooterLayout}
-          inset={foot.footerInset}
+        {header}
+        <FeltStatusBar felt={felt} />
+        <ScrollView
+          ref={scrollRef}
+          className="flex-1"
+          style={foot.scrollStyle}
+          contentInsetAdjustmentBehavior="automatic"
+          keyboardShouldPersistTaps="handled"
+          contentContainerClassName={cn("gap-6 pt-4 pb-8", contentClassName)}
+          contentContainerStyle={{
+            ...sides,
+            flexGrow: 1,
+            ...(session ? { paddingTop: clipped ? 12 : insets.top + 12 } : null),
+          }}
         >
-          {dock}
-        </PinnedFooter>
-      ) : null}
-      {live ? (
-        <PersonalLiveBar
-          onHeightChange={foot.onLiveBarHeight}
-          {...(foot.above === undefined ? {} : { bottom: foot.above })}
-        />
-      ) : null}
-    </View>
+          {children}
+          <View style={{ height: foot.endSpace }} />
+        </ScrollView>
+        {fab ? (
+          <FloatingAction right={sides.paddingRight} bottom={foot.fabBottom}>
+            {fab}
+          </FloatingAction>
+        ) : null}
+        {dock ? (
+          <PinnedFooter
+            felt={felt}
+            sides={sides}
+            onLayout={foot.onFooterLayout}
+            inset={foot.footerInset}
+          >
+            {dock}
+          </PinnedFooter>
+        ) : null}
+        {toast ? (
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: "absolute",
+              left: sides.paddingLeft,
+              right: sides.paddingRight,
+              bottom: (foot.above ?? Math.max(insets.bottom, 12)) + 8,
+            }}
+          >
+            {toast}
+          </View>
+        ) : null}
+        {live ? (
+          <PersonalLiveBar
+            onHeightChange={foot.onLiveBarHeight}
+            {...(foot.above === undefined ? {} : { bottom: foot.above })}
+          />
+        ) : null}
+      </View>
+    </SheetHost>
   );
 }
 

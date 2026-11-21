@@ -125,9 +125,33 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
         <SettingsRow
           icon={<Icon name="sessions" color="ink" size={16} />}
           title="Default game"
-          value={prefs.defaultGame ? gameNames[prefs.defaultGame] : "Not set"}
-          onPress={() => setPicking((current) => (current === "game" ? null : "game"))}
-          accessibilityHint="Changes the default game for new sessions"
+          value={
+            Platform.OS === "ios"
+              ? undefined
+              : prefs.defaultGame
+                ? gameNames[prefs.defaultGame]
+                : "Not set"
+          }
+          trailing={
+            Platform.OS === "ios" ? (
+              <Choice
+                inline
+                label="Default game"
+                labelHidden
+                options={defaultGameOptions}
+                value={prefs.defaultGame ?? "none"}
+                onChange={(next) => setDefaultGame(next === "none" ? null : next)}
+              />
+            ) : undefined
+          }
+          onPress={
+            Platform.OS === "ios"
+              ? undefined
+              : () => setPicking((current) => (current === "game" ? null : "game"))
+          }
+          accessibilityHint={
+            Platform.OS === "ios" ? undefined : "Changes the default game for new sessions"
+          }
         />
         <SettingsRow
           icon={<Icon name="map" color="ink" size={16} />}
@@ -152,16 +176,15 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
           />
         )),
         Match.when("venue", () => (
-          <View className="rounded-xl bg-surface p-3">
-            <SessionVenuePicker
-              selectedId={prefs.defaultVenue?.id ?? null}
-              selected={prefs.defaultVenue}
-              onSelect={(venue) => {
-                setDefaultVenue(venue);
-                setPicking(null);
-              }}
-            />
-          </View>
+          <SessionVenuePicker
+            context="default"
+            selectedId={prefs.defaultVenue?.id ?? null}
+            selected={prefs.defaultVenue}
+            onSelect={(venue) => {
+              setDefaultVenue(venue);
+              setPicking(null);
+            }}
+          />
         )),
         Match.orElse(() => null),
       )}

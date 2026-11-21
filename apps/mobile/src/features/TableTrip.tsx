@@ -78,10 +78,12 @@ function SignedInChoice({
 
 export function TableTripSheet({
   table,
+  back = false,
   onClose,
   onSaved,
 }: {
   table: Table;
+  back?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -92,6 +94,7 @@ export function TableTripSheet({
     <Sheet
       open
       title="Table's trip"
+      back={back}
       onClose={onClose}
       busy={save.pending}
       footer={

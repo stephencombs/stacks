@@ -452,6 +452,7 @@ function InviteSheet({ player, onClose }: { player: PlayerIdentity; onClose: () 
   return (
     <Sheet
       open
+      back
       busy={invite.pending}
       onClose={onClose}
       title={`Invite ${player.displayName}`}

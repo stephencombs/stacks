@@ -642,6 +642,36 @@ describe("live session readouts", () => {
     await store.close();
   });
 
+  it("suppresses hourly rate for sessions under one minute and computes it from 60 seconds", async () => {
+    const { store } = await open();
+    const start = at(9);
+
+    await save(store, {
+      type: "record_completed",
+      buyIn: 20000,
+      cashOut: 25000,
+      startedAt: start,
+      finishedAt: DateTime.add(start, { seconds: 30 }),
+    });
+
+    const shortId = state(store).visits[0]!.id;
+
+    expect(sessionReadout(recordingVisit(state(store), shortId)!, at(10)).hourly).toBeNull();
+
+    await save(store, {
+      type: "record_completed",
+      buyIn: 20000,
+      cashOut: 25000,
+      startedAt: start,
+      finishedAt: DateTime.add(start, { seconds: 60 }),
+    });
+
+    const minuteId = state(store).visits.find((visit) => visit.id !== shortId)!.id;
+
+    expect(sessionReadout(recordingVisit(state(store), minuteId)!, at(10)).hourly).toBe(300000);
+    await store.close();
+  });
+
   it("doesn't call a buy-in corrected when a rebuy was only undone", async () => {
     const { store } = await open();
     await save(store, { type: "start", buyIn: 20000, startedAt: at(9) });

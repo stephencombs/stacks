@@ -167,6 +167,7 @@ async function load(
   vi.doMock("../features/LiveBar", () => ({ PersonalLiveBar: () => null }));
   vi.doMock("../components/ui/tabBar", () => ({ useScreenFoot: () => ({ endSpace: 0 }) }));
   vi.doMock("../components/ui/Sheet", () => ({
+    SheetHost: Container,
     Sheet: ({
       title,
       footer,

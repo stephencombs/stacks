@@ -12,8 +12,8 @@ it("keeps the felt's colour for a filled footer and drops it for an empty one", 
   expect(pinnedFooterChrome({ filled: false, felt: true, surface: true })).toBe("");
 });
 
-it("iOS floats a filled footer without a surface", () => {
-  const chrome = pinnedFooterChrome({ filled: true, felt: false, surface: false });
-  expect(chrome).not.toContain("border-t");
-  expect(chrome).not.toContain("bg-canvas");
+it("draws a solid canvas band on the active path even when callers ask for clear chrome", () => {
+  expect(pinnedFooterChrome({ filled: true, felt: false, surface: false })).toBe(
+    "pt-3 border-t border-line bg-canvas",
+  );
 });

@@ -2,7 +2,7 @@
 export type ThemeChoice = "system" | "light" | "dark";
 
 export const themeChoices = [
-  { value: "system", label: "Match system" },
+  { value: "system", label: "System" },
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
 ] as const satisfies ReadonlyArray<{ value: ThemeChoice; label: string }>;
