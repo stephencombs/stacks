@@ -42,12 +42,25 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
   ]);
 
   vi.doMock("react-native", () => ({
+    Animated: {
+      Value: class {
+        setValue() {}
+        stopAnimation() {}
+      },
+      View: Container,
+    },
     Keyboard: { addListener: () => ({ remove: () => {} }) },
     ScrollView: Container,
     Text: Container,
     TextInput: { State: { currentlyFocusedInput: () => null } },
     View: Container,
     useWindowDimensions: () => ({ width: 390, height: 844 }),
+  }));
+  vi.doMock("./motion", () => ({
+    animate: () => {},
+    duration: { menuIn: 200 },
+    ease: { enter: () => 0 },
+    useReducedMotion: () => false,
   }));
   vi.doMock("react-native-safe-area-context", () => ({
     useSafeAreaInsets: () => ({ top: 44, right: 0, bottom: 34, left: 0 }),

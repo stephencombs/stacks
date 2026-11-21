@@ -9,6 +9,7 @@ import { Pressable, Text, View } from "react-native";
 import { Button } from "../components/ui/Button";
 import { TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
+import { Sheet } from "../components/ui/Sheet";
 import { Surface } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useDebounced } from "../lib/useDebounced";
@@ -72,6 +73,29 @@ function OptionRow({
 }
 
 type Near = { lat: number; lng: number };
+
+export function CasinoPickerSheet({
+  onClose,
+  onSelect,
+  ...picker
+}: Parameters<typeof SessionVenuePicker>[0] & { onClose: () => void }) {
+  return (
+    <Sheet
+      open
+      back
+      title={picker.context === "default" ? "Default casino" : "Casino"}
+      onClose={onClose}
+    >
+      <SessionVenuePicker
+        {...picker}
+        onSelect={(venue) => {
+          onSelect(venue);
+          onClose();
+        }}
+      />
+    </Sheet>
+  );
+}
 
 const here = () =>
   Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).then(

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  Animated,
   Keyboard,
   ScrollView,
   Text,
@@ -24,6 +25,7 @@ import { useCSSVariable, useUniwind } from "uniwind";
 
 import { cn } from "./cn";
 import { keyboardOverlap, sheetBottomEdge } from "./keyboardInset";
+import { animate, duration, ease, useReducedMotion } from "./motion";
 import {
   InSheet,
   SheetStoreContext,
@@ -177,10 +179,25 @@ function StandaloneSheet({
 
 function SheetPortal({ store }: { store: SheetStore }) {
   const slot = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  const [lastSlot, setLastSlot] = useState<SheetRegistration | null>(null);
+
+  const [presentation, setPresentation] = useState<{
+    slot: SheetRegistration;
+    direction: -1 | 0 | 1;
+  } | null>(null);
+
   const [nativeDismissing, setNativeDismissing] = useState(false);
 
-  if (slot !== null && slot !== lastSlot) setLastSlot(slot);
+  if (slot !== null && slot !== presentation?.slot) {
+    let direction: -1 | 0 | 1 = 0;
+
+    if (presentation) {
+      if (presentation.slot.id === slot.id) direction = presentation.direction;
+      else if (slot.back) direction = 1;
+      else if (presentation.slot.back) direction = -1;
+    }
+
+    setPresentation({ slot, direction });
+  }
 
   useEffect(() => {
     if (!nativeDismissing) return;
@@ -195,7 +212,7 @@ function SheetPortal({ store }: { store: SheetStore }) {
     };
   }, [nativeDismissing]);
 
-  const presented = slot ?? lastSlot;
+  const presented = presentation?.slot;
 
   if (!presented) return null;
 
@@ -212,7 +229,7 @@ function SheetPortal({ store }: { store: SheetStore }) {
         if (slot && !slot.busy) slot.onClose();
       }}
       onDismiss={() => {
-        if (slot === null) setLastSlot(null);
+        if (slot === null) setPresentation(null);
       }}
       onNativeDismiss={() => {
         if (!slot || slot.busy) return;
@@ -220,9 +237,29 @@ function SheetPortal({ store }: { store: SheetStore }) {
         slot.onClose();
       }}
     >
-      {presented.children}
+      {presentation.direction === 0 ? (
+        presented.children
+      ) : (
+        <SheetPage key={presented.id} direction={presentation.direction}>
+          {presented.children}
+        </SheetPage>
+      )}
     </NativeFormSheet>
   );
+}
+
+function SheetPage({ children, direction }: { children: ReactNode; direction: -1 | 1 }) {
+  const [translateX] = useState(() => new Animated.Value(direction * 28));
+  const reduced = useReducedMotion();
+
+  useLayoutEffect(() => {
+    if (reduced) translateX.setValue(0);
+    else animate(translateX, { toValue: 0, duration: duration.menuIn, easing: ease.enter });
+
+    return () => translateX.stopAnimation();
+  }, [reduced, translateX]);
+
+  return <Animated.View style={{ gap: 20, transform: [{ translateX }] }}>{children}</Animated.View>;
 }
 
 function NativeFormSheet({

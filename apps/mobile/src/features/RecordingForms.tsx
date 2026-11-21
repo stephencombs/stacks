@@ -55,7 +55,7 @@ import { useRecordingState } from "../lib/recording";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
 import { Chip } from "./Chip";
-import { SessionVenuePicker } from "./VenuePicker";
+import { CasinoPickerSheet, SessionVenuePicker } from "./VenuePicker";
 import { applyAmountKey } from "./amountKey";
 import { TripChoice } from "./TableTrip";
 
@@ -467,9 +467,8 @@ function DetailsFields({
   ...gameProps
 }: Parameters<typeof GameFields>[0] & {
   venue?: CachedVenue | null;
-  onVenue?: (venue: CachedVenue | null) => void;
+  onVenue?: () => void;
 }) {
-  const [pickingVenue, setPickingVenue] = useState(false);
   const inSheet = use(InSheet);
 
   return (
@@ -477,40 +476,20 @@ function DetailsFields({
       <Text className="px-1 type-footnote font-medium text-muted">Details (optional)</Text>
       <GameFields {...gameProps} />
       {onVenue ? (
-        <>
-          <View className={cn("overflow-hidden rounded-xl", inSheet ? "bg-raised" : "bg-surface")}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Casino: ${venue?.name ?? "Not set"}. Change`}
-              accessibilityState={{ expanded: pickingVenue }}
-              onPress={() => setPickingVenue((open) => !open)}
-              className={cn(
-                "min-h-12 flex-row items-center gap-3 px-4 active:bg-fill",
-                pickingVenue && "bg-fill",
-              )}
-            >
-              <Text className="type-body text-ink">Casino</Text>
-              <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
-                {venue?.name ?? "Not set"}
-              </Text>
-              <Icon
-                name={pickingVenue ? "chevron-down" : "chevron-right"}
-                color="faint"
-                size={16}
-              />
-            </Pressable>
-          </View>
-          {pickingVenue ? (
-            <SessionVenuePicker
-              selectedId={venue?.id ?? null}
-              selected={venue ?? null}
-              onSelect={(next) => {
-                onVenue(next);
-                setPickingVenue(false);
-              }}
-            />
-          ) : null}
-        </>
+        <View className={cn("overflow-hidden rounded-xl", inSheet ? "bg-raised" : "bg-surface")}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Casino: ${venue?.name ?? "Not set"}. Change`}
+            onPress={onVenue}
+            className="min-h-12 flex-row items-center gap-3 px-4 active:bg-fill"
+          >
+            <Text className="type-body text-ink">Casino</Text>
+            <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
+              {venue?.name ?? "Not set"}
+            </Text>
+            <Icon name="chevron-right" color="faint" size={16} />
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );
@@ -552,10 +531,21 @@ export function StartSheet({
   const [game, setGame] = useState<GameChoice>(() => prefs.defaultGame ?? "none");
   const [gameName, setGameName] = useState("");
   const [venue, setVenue] = useState<CachedVenue | null>(() => prefs.defaultVenue);
+  const [pickingVenue, setPickingVenue] = useState(false);
   const [highLimit, setHighLimit] = useState(false);
   const [recordingOnly, setRecordingOnly] = useState(false);
   const alreadyPlaying = Boolean(home?.active.length);
   const watching = recordingOnly && !alreadyPlaying;
+
+  if (pickingVenue)
+    return (
+      <CasinoPickerSheet
+        selectedId={venue?.id ?? null}
+        selected={venue}
+        onSelect={setVenue}
+        onClose={() => setPickingVenue(false)}
+      />
+    );
 
   return (
     <RecordingSheet
@@ -634,7 +624,7 @@ export function StartSheet({
         onGame={setGame}
         onGameName={setGameName}
         onHighLimit={setHighLimit}
-        onVenue={setVenue}
+        onVenue={() => setPickingVenue(true)}
       />
     </RecordingSheet>
   );
@@ -667,6 +657,7 @@ export function PastSessionSheet({
   const [game, setGame] = useState<GameChoice>(() => prefs.defaultGame ?? "none");
   const [gameName, setGameName] = useState("");
   const [venue, setVenue] = useState<CachedVenue | null>(() => prefs.defaultVenue);
+  const [pickingVenue, setPickingVenue] = useState(false);
   const [highLimit, setHighLimit] = useState(false);
   const inParsed = parseRecordingAmount(buyIn.text, 1);
   const outParsed = parseRecordingAmount(cashOut.text, 0);
@@ -693,6 +684,16 @@ export function PastSessionSheet({
       maximumDate={field === "date" ? now : undefined}
     />
   );
+
+  if (pickingVenue)
+    return (
+      <CasinoPickerSheet
+        selectedId={venue?.id ?? null}
+        selected={venue}
+        onSelect={setVenue}
+        onClose={() => setPickingVenue(false)}
+      />
+    );
 
   return (
     <RecordingSheet
@@ -772,7 +773,7 @@ export function PastSessionSheet({
         onGame={setGame}
         onGameName={setGameName}
         onHighLimit={setHighLimit}
-        onVenue={setVenue}
+        onVenue={() => setPickingVenue(true)}
       />
     </RecordingSheet>
   );

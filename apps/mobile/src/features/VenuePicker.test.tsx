@@ -48,8 +48,16 @@ vi.mock("@stacks/client-runtime/recordingReact", async (original) => ({
 }));
 
 vi.mock("../components/ui/Button", () => ({
-  Button: ({ label, onPress }: { label: string; onPress?: () => void }) => (
-    <button type="button" onClick={onPress}>
+  Button: ({
+    label,
+    onPress,
+    testID,
+  }: {
+    label: string;
+    onPress?: () => void;
+    testID?: string;
+  }) => (
+    <button type="button" onClick={onPress} data-testid={testID}>
       {label}
     </button>
   ),
@@ -63,8 +71,21 @@ vi.mock("../components/ui/Field", () => ({
 
 vi.mock("../components/ui/Sheet", () => ({
   SheetHost: Container,
-  Sheet: ({ footer, children }: { footer?: ReactNode; children?: ReactNode }) => (
-    <section>
+  Sheet: ({
+    title,
+    back,
+    onClose,
+    footer,
+    children,
+  }: {
+    title: string;
+    back?: boolean;
+    onClose: () => void;
+    footer?: ReactNode;
+    children?: ReactNode;
+  }) => (
+    <section aria-label={title}>
+      {back ? <button onClick={onClose}>Back</button> : null}
       {children}
       {footer}
     </section>
@@ -89,7 +110,13 @@ vi.mock("../lib/recording", () => ({ useRecordingState: () => null }));
 
 vi.mock("../lib/stacks", () => ({ useAction: () => null, useStacks: () => null }));
 
-vi.mock("./AmountKeypad", () => ({ AmountKeypad: () => null }));
+vi.mock("./AmountKeypad", () => ({
+  AmountKeypad: ({ onKey }: { onKey: (key: string) => void }) => (
+    <button type="button" aria-label="Enter 5" onClick={() => onKey("5")}>
+      5
+    </button>
+  ),
+}));
 
 vi.mock("./Chip", () => ({ Chip: () => null }));
 
@@ -161,9 +188,9 @@ it("keeps an uncached existing casino distinct from Not listed, and clears it on
   }
 });
 
-it("uses default casino copy when picking a default venue", async () => {
+it("opens a dedicated default casino sheet and closes after selection", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  const { SessionVenuePicker } = await import("./VenuePicker");
+  const { CasinoPickerSheet } = await import("./VenuePicker");
   const { RecordingProvider } = await import("@stacks/client-runtime/recordingReact");
   let documentValue: RecordingStorageDocument = { revision: 0 };
 
@@ -181,23 +208,79 @@ it("uses default casino copy when picking a default venue", async () => {
   await store.ready;
   const host = document.createElement("div");
   const root = createRoot(host);
+  const selected = vi.fn();
+  const closed = vi.fn();
 
   try {
     await act(async () =>
       root.render(
         <RecordingProvider store={store}>
-          <SessionVenuePicker
+          <CasinoPickerSheet
             context="default"
             selectedId={null}
             selected={null}
-            onSelect={() => {}}
+            onSelect={selected}
+            onClose={closed}
           />
         </RecordingProvider>,
       ),
     );
-    expect(host.textContent).toContain("Not set");
+    expect(host.querySelector('section[aria-label="Default casino"]')).not.toBeNull();
     expect(host.textContent).toContain("Start new sessions without a casino");
     expect(host.textContent).not.toContain("Not listed");
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('button[aria-label="Not set"]')!.click(),
+    );
+    expect(selected).toHaveBeenCalledWith(null);
+    expect(closed).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => root.unmount());
+    await store.close();
+    vi.unstubAllGlobals();
+  }
+});
+
+it("preserves the entered buy-in when backing out of the start session casino sheet", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const { StartSheet } = await import("./RecordingForms");
+  const { RecordingProvider } = await import("@stacks/client-runtime/recordingReact");
+  let documentValue: RecordingStorageDocument = { revision: 0 };
+
+  const store = makeRecordingStore({
+    load: async () => documentValue,
+    commit: async (revision, payload) => {
+      documentValue = { revision: revision + 1, payload };
+
+      return documentValue.revision;
+    },
+    subscribe: () => () => {},
+    close: async () => {},
+  });
+
+  await store.ready;
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  const started = vi.fn();
+
+  const click = (selector: string) =>
+    act(async () => host.querySelector<HTMLButtonElement>(selector)!.click());
+
+  try {
+    await act(async () =>
+      root.render(
+        <RecordingProvider store={store}>
+          <StartSheet onClose={() => {}} onStarted={started} />
+        </RecordingProvider>,
+      ),
+    );
+    await click('button[aria-label="Enter 5"]');
+    await click('button[aria-label="Casino: Not set. Change"]');
+    expect(host.querySelector('section[aria-label="Casino"]')).not.toBeNull();
+    expect(host.querySelector('section[aria-label="Start session"]')).toBeNull();
+    await click('section[aria-label="Casino"] button');
+    await click('section[aria-label="Start session"] [data-testid="sheet-submit"]');
+    expect(started).toHaveBeenCalledOnce();
+    expect(store.getSnapshot().state?.entries[0]?.amount).toBe(500);
   } finally {
     await act(async () => root.unmount());
     await store.close();
