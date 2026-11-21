@@ -22,6 +22,7 @@ const AccountContext = createContext<Account>({ available: false });
  */
 export function AccountProvider({ children }: { children: ReactNode }) {
   if (!clerkPublishableKey) return children;
+
   return (
     <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
       <ClerkAccount>{children}</ClerkAccount>
@@ -34,10 +35,12 @@ function ClerkAccount({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isLoaded) markStartup("auth_ready");
   }, [isLoaded]);
+
   const account = useMemo(
     () => ({ available: true as const, isLoaded, isSignedIn, userId }),
     [isLoaded, isSignedIn, userId],
   );
+
   return <AccountContext value={account}>{children}</AccountContext>;
 }
 

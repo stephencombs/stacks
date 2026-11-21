@@ -18,6 +18,7 @@ import {
   Authentication,
   CurrentUser,
   Recorder,
+  RecorderOf,
   RecordingAuthentication,
   StacksApi,
   Unauthorized,
@@ -33,11 +34,12 @@ import * as Api from "../http/Api.ts";
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/stacks_test";
 
-/** Tests sign in as `user_<name>`; the bearer token is the user ID. */
 const testUser = (credential: Redacted.Redacted) => {
   const userId = UserId.make(Redacted.value(credential));
+
   return { userId, displayName: userId.replace(/^user_/, ""), avatarUrl: null };
 };
+
 const layerTestAuthentication = Layer.mergeAll(
   Layer.succeed(Authentication, {
     bearer: (httpEffect, { credential }) =>
@@ -46,17 +48,17 @@ const layerTestAuthentication = Layer.mergeAll(
         : Effect.provideService(httpEffect, CurrentUser, testUser(credential)),
   }),
   Layer.succeed(RecordingAuthentication, {
-    // Without a bearer token, fail like Clerk does so the actor scheme gets its turn.
     bearer: (httpEffect, { credential }) =>
       Redacted.value(credential) === ""
         ? Effect.fail(new Unauthorized())
-        : Effect.provideService(httpEffect, Recorder, {
-            _tag: "Account",
-            user: testUser(credential),
-          }),
+        : Effect.provideService(
+            httpEffect,
+            Recorder,
+            RecorderOf.Account({ user: testUser(credential) }),
+          ),
     actor: (httpEffect, { credential }) =>
       Effect.flatMap(parseActor(credential), (actor) =>
-        Effect.provideService(httpEffect, Recorder, { _tag: "Actor", ...actor }),
+        Effect.provideService(httpEffect, Recorder, RecorderOf.Actor(actor)),
       ),
   }),
 );
@@ -71,14 +73,16 @@ const layerPlatform = Layer.mergeAll(
 const makeTestApi = Effect.gen(function* () {
   yield* PgMigrator.run({ loader: migrations });
   const database = yield* Effect.context<SqlClient.SqlClient>();
+
   const { handler, dispose } = HttpRouter.toWebHandler(
     Api.layer.pipe(Layer.provide([layerTestAuthentication, layerPlatform])),
   );
+
   yield* Effect.addFinalizer(() => Effect.promise(dispose));
+
   const fetch: typeof globalThis.fetch = (input, init) =>
     handler(new Request(input, init), database);
 
-  /** A typed API client signed in as the given user. */
   const as = (user: string) =>
     HttpApiClient.make(StacksApi, {
       baseUrl: "http://stacks.test",
@@ -87,7 +91,7 @@ const makeTestApi = Effect.gen(function* () {
       Effect.provide(FetchHttpClient.layer),
       Effect.provideService(FetchHttpClient.Fetch, fetch),
     );
-  /** A typed API client that sends `Authorization: Actor <id>.<secret>`, or nothing. */
+
   const asActor = (credential: { readonly actorId: string; readonly secret: string } | null) =>
     HttpApiClient.make(StacksApi, {
       baseUrl: "http://stacks.test",
@@ -104,6 +108,7 @@ const makeTestApi = Effect.gen(function* () {
       Effect.provide(FetchHttpClient.layer),
       Effect.provideService(FetchHttpClient.Fetch, fetch),
     );
+
   return { as, asActor };
 });
 

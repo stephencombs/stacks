@@ -1,7 +1,7 @@
-// @vitest-environment happy-dom
 import {
   CurrencyCode,
   GroupId,
+  MinorUnits,
   PlayerId,
   TripId,
   UserId,
@@ -20,6 +20,7 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
   const day = DateTime.makeUnsafe("2026-11-15T12:00:00Z");
   const groupId = GroupId.make(crypto.randomUUID());
   const tripId = TripId.make(crypto.randomUUID());
+
   let trip: TripDetail = {
     trip: {
       id: tripId,
@@ -35,6 +36,7 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
     balances: [],
     stakes: [],
   };
+
   let group: GroupDetail = {
     group: { id: groupId, name: "Crew", currency: CurrencyCode.make("USD"), createdAt: day },
     role: "owner",
@@ -114,11 +116,14 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
   const { SessionsScreen } = await import("./Sessions");
   const host = document.createElement("div");
   const root = createRoot(host);
+
   try {
     await act(async () => root.render(<SessionsScreen route={{ params: { tripId } }} />));
+
     const start = [...host.querySelectorAll("button")].find(
       (b) => b.textContent === "Start a session",
     );
+
     expect(start).toBeDefined();
     await act(async () => start!.click());
     expect(host.querySelector('[role="dialog"]')?.getAttribute("data-trip")).toBe(tripId);
@@ -132,7 +137,6 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
     );
     expect(navigate).toHaveBeenCalledWith("Play", { visitId });
     expect(host.querySelector('[role="dialog"]')).toBeNull();
-    // Recording without playing is offered from a trip too, and opens that table.
     await act(async () => start!.click());
     await act(async () =>
       [...host.querySelectorAll("button")].find((b) => b.textContent === "Record a table")!.click(),
@@ -140,11 +144,13 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
     expect(navigate).toHaveBeenCalledWith("Table", { tableId });
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     const usdGroup = group;
+
     for (const currency of ["EUR", "JPY"]) {
       group = { ...usdGroup, group: { ...usdGroup.group, currency: CurrencyCode.make(currency) } };
       await act(async () => root.render(<SessionsScreen route={{ params: { tripId } }} />));
       expect(host.textContent).not.toContain("Start a session");
     }
+
     group = usdGroup;
     trip = { ...trip, trip: { ...trip.trip, endedAt: day } };
     await act(async () => root.render(<SessionsScreen route={{ params: { tripId } }} />));
@@ -155,7 +161,7 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
       tables: [
         {
           table: {
-            id: crypto.randomUUID() as never,
+            id: TableId.make(crypto.randomUUID()),
             tripId,
             game: "poker_cash",
             venueId: null,
@@ -169,7 +175,7 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
           playerIds: [group.myPlayerId],
           playing: [group.myPlayerId],
           results: [],
-          inPlay: [{ playerId: group.myPlayerId, buyIn: 100_00 as never }],
+          inPlay: [{ playerId: group.myPlayerId, buyIn: MinorUnits.make(100_00) }],
           others: [],
           myVisitId: visitId,
         },

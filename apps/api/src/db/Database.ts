@@ -5,7 +5,7 @@ import * as String from "effect/String";
 /** Columns are snake_case in Postgres and camelCase in code. */
 export const layer = (url: Redacted.Redacted | string) =>
   PgClient.layer({
-    url: typeof url === "string" ? Redacted.make(url) : url,
+    url: Redacted.isRedacted(url) ? url : Redacted.make(url),
     transformResultNames: String.snakeToCamel,
     transformQueryNames: String.camelToSnake,
   });

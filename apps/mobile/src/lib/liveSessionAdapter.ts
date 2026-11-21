@@ -28,12 +28,15 @@ let androidPermissionAsked = false;
 
 const requestAndroidPermission = async () => {
   if (Platform.OS !== "android" || Number(Platform.Version) < 33) return true;
+
   if (androidPermissionAsked) return true;
   androidPermissionAsked = true;
+
   try {
     const result = await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
     );
+
     return result === PermissionsAndroid.RESULTS.GRANTED;
   } catch {
     return false;
@@ -42,6 +45,7 @@ const requestAndroidPermission = async () => {
 
 const surfaceSignature = (surface: LiveSessionSurface): string => {
   if (surface.kind === "idle") return "idle";
+
   if (surface.kind === "live") {
     return [
       "live",
@@ -53,6 +57,7 @@ const surfaceSignature = (surface: LiveSessionSurface): string => {
       surface.privacyMode,
     ].join("|");
   }
+
   return [
     "finished",
     surface.visitId,
@@ -83,8 +88,10 @@ export async function dispatchLiveSessionSurface(
       rebuy200Url: surface.deepLinks.rebuy200,
       cashOutUrl: surface.deepLinks.cashOut,
     });
+
     return;
   }
+
   if (surface.kind === "finished") {
     await drivers.showAndroidFinished({
       gameLabel: surface.gameLabel,
@@ -97,8 +104,10 @@ export async function dispatchLiveSessionSurface(
       seeSessionUrl: surface.deepLinks.seeSession,
       backAtTableUrl: surface.deepLinks.backAtTable,
     });
+
     return;
   }
+
   await drivers.clearAndroid();
 }
 
@@ -120,18 +129,22 @@ export function LiveSessionBridge() {
   const snapshot = useSyncExternalStore(recordingStore.subscribe, recordingStore.getSnapshot);
   const prefs = usePreferences();
   const themeChoice = useTheme();
+
   const colorScheme =
     Platform.OS === "ios" ? (themeChoice === "system" ? null : themeChoice) : null;
+
   const previous = useRef<LiveSessionSurface>({ kind: "idle" });
   const lastSignature = useRef<string | null>(null);
   const pending = useRef(Promise.resolve());
 
   useEffect(() => {
     if (!snapshot.state) return;
+
     const modePrefs: LiveSurfacePrefs = {
       showCents: prefs.showCents,
       privacyMode: prefs.privacyMode,
     };
+
     const surface = reconcileLiveSessionSurface(
       previous.current.kind === "idle" ? null : previous.current.visitId,
       snapshot.state,
@@ -139,14 +152,17 @@ export function LiveSessionBridge() {
       appUrl,
       DateTime.zoneMakeLocal(),
     );
+
     previous.current = surface;
     const sig = `${surfaceSignature(surface)}|${colorScheme ?? "system"}`;
+
     if (sig === lastSignature.current) return;
     lastSignature.current = sig;
     pending.current = pending.current
       .then(async () => {
         if (Platform.OS === "ios") {
           const { dispatchIosLiveSession } = await import("./iosLiveSession");
+
           if (lastSignature.current === sig) await dispatchIosLiveSession(surface, colorScheme);
         } else if (lastSignature.current === sig) {
           await dispatchLiveSessionSurface(surface, defaultDrivers);

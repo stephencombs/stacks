@@ -11,21 +11,26 @@ const utc = DateTime.zoneMakeOffset(0);
 
 const openStore = async () => {
   let documentState: RecordingStorageDocument = { revision: 0 };
+
   const store = makeRecordingStore({
     load: async () => documentState,
     commit: async (_revision, payload) => {
       documentState = { revision: documentState.revision + 1, payload };
+
       return documentState.revision;
     },
     subscribe: () => () => {},
     close: async () => {},
   });
+
   await store.ready;
+
   return store;
 };
 
 it("derives own live session surface while ignoring other players at a shared table", async () => {
   const store = await openStore();
+
   try {
     const start = DateTime.makeUnsafe("2026-11-13T21:12:00.000Z");
     await store.execute(
@@ -64,7 +69,9 @@ it("derives own live session surface while ignoring other players at a shared ta
       { showCents: true, privacyMode: false },
       appUrl,
     );
+
     expect(live.kind).toBe("live");
+
     if (live.kind !== "live") throw new Error("expected live");
     expect(live.visitId).toBe(visit.id);
     expect(live.gameLabel).toBe("Blackjack");
@@ -80,7 +87,9 @@ it("derives own live session surface while ignoring other players at a shared ta
       { showCents: true, privacyMode: true },
       appUrl,
     );
+
     expect(hidden.kind).toBe("live");
+
     if (hidden.kind !== "live") throw new Error("expected live");
     expect(hidden.buyInText).toBe("••••");
     expect(hidden.title).not.toContain("$300");
@@ -91,6 +100,7 @@ it("derives own live session surface while ignoring other players at a shared ta
 
 it("emits finished summary on cash-out and clears when deleted", async () => {
   const store = await openStore();
+
   try {
     const start = DateTime.makeUnsafe("2026-11-13T21:12:00.000Z");
     const end = DateTime.makeUnsafe("2026-11-13T23:00:00.000Z");
@@ -100,6 +110,7 @@ it("emits finished summary on cash-out and clears when deleted", async () => {
     const visitId = store.getSnapshot().state!.visits[0]!.id;
 
     await store.execute(store.prepare({ type: "finish", visitId, amount: 45000, finishedAt: end }));
+
     const finished = reconcileLiveSessionSurface(
       visitId,
       store.getSnapshot().state,
@@ -107,7 +118,9 @@ it("emits finished summary on cash-out and clears when deleted", async () => {
       appUrl,
       utc,
     );
+
     expect(finished.kind).toBe("finished");
+
     if (finished.kind !== "finished") throw new Error("expected finished");
     expect(finished.result).toBe(5000);
     expect(finished.resultText).toBe("+$50.00");
@@ -126,18 +139,22 @@ it("emits finished summary on cash-out and clears when deleted", async () => {
       appUrl,
       utc,
     );
+
     expect(hiddenFinished.kind).toBe("finished");
+
     if (hiddenFinished.kind !== "finished") throw new Error("expected finished");
     expect(hiddenFinished.resultText).toBe("••••");
     expect(hiddenFinished.summaryLine).toBe("Amounts hidden");
 
     await store.execute(store.prepare({ type: "delete_visit", visitId }));
+
     const deleted = reconcileLiveSessionSurface(
       visitId,
       store.getSnapshot().state,
       { showCents: false, privacyMode: false },
       appUrl,
     );
+
     expect(deleted.kind).toBe("idle");
   } finally {
     await store.close();

@@ -7,6 +7,7 @@ import { makeOutbox, type Pending, type SendEntry } from "./outbox.ts";
 const session = SessionId.make("0192e7a0-0000-7000-8000-000000000001");
 const alex = PlayerId.make("0192e7a0-0000-7000-8000-000000000002");
 let count = 0;
+
 const entry = (amount: number) => ({
   id: EntryId.make(`0192e7a0-0000-7000-8000-1${String(++count).padStart(11, "0")}`),
   kind: "buy_in" as const,
@@ -20,16 +21,21 @@ const entry = (amount: number) => ({
 
 const memory = (initial: string | null = null) => {
   let value = initial;
+
   return { load: () => value, save: (next: string) => void (value = next), read: () => value };
 };
+
 const offline: SendEntry = async () => ({ error: new Error("fetch failed") });
-/** A server that records what reached it and refuses nothing. */
+
 const server = () => {
   const received: Array<Pending> = [];
+
   const send: SendEntry = async (pending) => {
     received.push(pending);
+
     return { error: null };
   };
+
   return { received, send };
 };
 
@@ -56,18 +62,20 @@ describe("outbox", () => {
     await outbox.add(session, buyIn);
     expect(outbox.pending()).toEqual([]);
     expect(outbox.sent()).toEqual([{ sessionId: session, entry: buyIn, failed: null }]);
-    // Only for this launch: the server has it now, so nothing needs to survive a restart.
     expect(makeOutbox(memory(), send).sent()).toEqual([]);
   });
 
   it("sends in the order things happened and stops at the first network failure", async () => {
     let up = false;
     const sent: Array<number> = [];
+
     const outbox = makeOutbox(memory(), async ({ entry }) => {
       if (!up) return { error: new Error("timeout") };
       sent.push(entry.amount);
+
       return { error: null };
     });
+
     await outbox.add(session, entry(100));
     await outbox.add(session, entry(200));
     expect(sent).toEqual([]);
@@ -79,11 +87,13 @@ describe("outbox", () => {
   it("marks a refused entry failed with the reason, and keeps sending the rest", async () => {
     const closed = entry(100);
     const later = entry(200);
+
     const outbox = makeOutbox(memory(), async ({ entry }) =>
       entry.id === closed.id
         ? { error: new Conflict({ reason: "session_closed" }) }
         : { error: null },
     );
+
     await outbox.add(session, closed);
     await outbox.add(session, later);
     expect(outbox.pending()).toEqual([
@@ -98,10 +108,13 @@ describe("outbox", () => {
   it("retries a failed entry with the same id, or lets it go", async () => {
     let refuse = true;
     const ids: Array<string> = [];
+
     const outbox = makeOutbox(memory(), async ({ entry }) => {
       ids.push(entry.id);
+
       return { error: refuse ? new Conflict({ reason: "session_closed" }) : null };
     });
+
     const buyIn = entry(100);
     await outbox.add(session, buyIn);
     refuse = false;
@@ -118,6 +131,7 @@ describe("outbox", () => {
 
   it("retains confirmations beyond 200 entries for stale trip views", async () => {
     const outbox = makeOutbox(memory(), async () => ({ error: null }));
+
     for (let index = 0; index < 201; index++) await outbox.add(session, entry(1));
     expect(outbox.sent()).toHaveLength(201);
   });

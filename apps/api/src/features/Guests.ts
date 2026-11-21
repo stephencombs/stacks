@@ -25,6 +25,7 @@ const ClaimRow = Schema.Struct({
 const findClaim = Effect.fn("Guests.findClaim")(function* (code: string, lock = false) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
+
   const [claim] = yield* sql`
     select p.id as player_id, p.group_id, p.display_name, g.name as group_name,
       exists (
@@ -35,7 +36,9 @@ const findClaim = Effect.fn("Guests.findClaim")(function* (code: string, lock = 
     where p.claim_code = ${code.trim().toUpperCase()}
     ${lock ? sql`for update of p` : sql``}
   `.pipe(Effect.flatMap(Access.decodeRows(ClaimRow)));
+
   if (!claim) return yield* new NotFound({ resource: "claim" });
+
   return claim;
 });
 
@@ -46,18 +49,22 @@ export const add = Effect.fn("Guests.add")(function* (
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const member = yield* Access.membership(groupId);
+
   const [row] = yield* sql`
     insert into players (id, group_id, display_name, claim_code, created_by)
     values (${request.id}, ${groupId}, ${request.displayName}, ${Access.randomCode()}, ${userId})
     on conflict (id) do update set id = players.id
     returning group_id
   `.pipe(Effect.flatMap(Access.decodeRows(Schema.Struct({ groupId: GroupId }))));
+
   if (row!.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
+
   return yield* Views.groupDetail(member);
 });
 
 export const previewClaim = Effect.fn("Guests.previewClaim")(function* (code: string) {
   const claim = yield* findClaim(code);
+
   return {
     groupId: claim.groupId,
     groupName: claim.groupName,
@@ -77,10 +84,13 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   yield* Access.ensureUser();
+
   const groupId = yield* sql.withTransaction(
     Effect.gen(function* () {
       const guest = yield* findClaim(code, true);
+
       if (guest.alreadyMember) return yield* new Conflict({ reason: "claim_already_member" });
+
       const [own] = yield* sql`
         select p.id,
           exists (
@@ -97,7 +107,9 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
           ),
         ),
       );
+
       if (own?.hasHistory) return yield* new Conflict({ reason: "claim_has_history" });
+
       if (own) yield* sql`delete from players where id = ${own.id}`;
 
       yield* sql`
@@ -118,8 +130,10 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
         on conflict (group_id, user_id) do update set left_at = null
           where memberships.left_at is not null
       `;
+
       return guest.groupId;
     }),
   );
+
   return yield* Views.groupDetail(yield* Access.membership(groupId).pipe(Effect.orDie));
 });

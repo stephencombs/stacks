@@ -8,7 +8,6 @@ import { visitTitle, type RecordedVisit } from "./recordingView.ts";
 /** What Stats is filtered to. An omitted key means all; null picks sessions with it unset. */
 export type StatsFilters = PersonalStatsFilters;
 
-/** Up to this many sessions read better as a list of them than as a running line. */
 const FEW = 3;
 
 /** How many casinos show before "See all". */
@@ -40,13 +39,17 @@ export function statsTrips(
   const counts = new Map<TripId, number>();
   const ranges = new Map<TripId, { start: number; end: number }>();
   let total = 0;
+
   for (const session of sessions) {
     const matches =
       (filters.game === undefined || filters.game === session.game) &&
       (filters.venueId === undefined || filters.venueId === session.venueId);
+
     if (matches) total++;
     const id = session.tripId;
+
     if (id === null) continue;
+
     if (matches) counts.set(id, (counts.get(id) ?? 0) + 1);
     const start = DateTime.toEpochMillis(session.startedAt);
     const end = DateTime.toEpochMillis(session.endedAt);
@@ -56,6 +59,7 @@ export function statsTrips(
       end: Math.max(end, range?.end ?? end),
     });
   }
+
   for (const { id, startedAt, endedAt } of trips) {
     const start = DateTime.toEpochMillis(startedAt);
     ranges.set(id, {
@@ -66,20 +70,26 @@ export function statsTrips(
           : DateTime.toEpochMillis(endedAt),
     });
   }
+
   const rangeLabel = (start: number, end: number) => {
     const from = DateTime.setZone(DateTime.makeUnsafe(start), timeZone);
     const to = DateTime.setZone(DateTime.makeUnsafe(Math.max(start, end)), timeZone);
     const first = DateTime.toParts(from);
     const last = DateTime.toParts(to);
     const full = { month: "short", day: "numeric", year: "numeric" } as const;
+
     if (first.year !== last.year)
       return `${DateTime.format(from, full)} – ${DateTime.format(to, full)}`;
+
     if (first.month !== last.month)
       return `${DateTime.format(from, { month: "short", day: "numeric" })} – ${DateTime.format(to, full)}`;
+
     if (first.day !== last.day)
       return `${DateTime.format(from, { month: "short", day: "numeric" })}–${last.day}, ${last.year}`;
+
     return DateTime.format(from, full);
   };
+
   return {
     total,
     byId: new Map<string, StatsTrip>(
@@ -95,7 +105,6 @@ export type StatsTrips = ReturnType<typeof statsTrips>;
 
 export const gameName = (game: Game | null) => (game === null ? "No game set" : gameNames[game]);
 
-/** Each game's chip color, as the design tokens assign them. */
 const gameChips = {
   slots: "orange",
   blackjack: "black",
@@ -109,7 +118,7 @@ const gameChips = {
 
 export type GameChip = (typeof gameChips)[Game];
 
-export const gameChip = (game: Game | null): GameChip => (game === null ? "grey" : gameChips[game]);
+export const gameChip = (game: Game | null) => (game === null ? "grey" : gameChips[game]);
 
 /**
  * Each row's share of the sessions its breakdown covers. A session with no game, casino or seat
@@ -117,6 +126,7 @@ export const gameChip = (game: Game | null): GameChip => (game === null ? "grey"
  */
 export const sessionShare = (rows: ReadonlyArray<{ readonly sessionCount: number }>) => {
   const total = rows.reduce((sum, row) => sum + row.sessionCount, 0);
+
   return (row: { readonly sessionCount: number }) => (total === 0 ? 0 : row.sessionCount / total);
 };
 
@@ -125,7 +135,9 @@ export const formatHours = (hours: number) => {
   const minutes = Math.round(hours * 60);
   const whole = Math.floor(minutes / 60);
   const rest = minutes % 60;
+
   if (whole === 0) return `${minutes}m`;
+
   return rest === 0 ? `${whole}h` : `${whole}h ${String(rest).padStart(2, "0")}m`;
 };
 
@@ -168,22 +180,30 @@ const chip = <K extends StatsChip["key"], V>(
   all: string,
   values: ReadonlyArray<V>,
   describe: (value: V) => { value: string; label: string },
-): StatsChip => {
+) => {
   const cleared = { ...filters, [key]: undefined };
+
   const options = [
     { value: "", label: all, filters: cleared },
     ...values.map((value) => ({ ...describe(value), filters: { ...filters, [key]: value } })),
   ];
+
   const current = filters[key];
+
   if (current !== undefined) {
+    // SAFETY: a chip's key K is only written with values of V, so a present filter is one of them.
     const selected = describe(current as V);
+
     if (!options.some((option) => option.value === selected.value))
       options.push({ ...selected, filters });
   }
+
+  // SAFETY: a chip's key K is only written with values of V, so a present filter is one of them.
   const picked =
     current === undefined
       ? options[0]!
       : (options.find((option) => option.value === describe(current as V).value) ?? options[0]!);
+
   return {
     key,
     name,
@@ -199,10 +219,12 @@ const chip = <K extends StatsChip["key"], V>(
 export const noMatch = (filters: StatsFilters, casino: string, trip: string) => {
   const game =
     filters.game === undefined ? "" : filters.game === null ? "" : `${gameNames[filters.game]} `;
+
   const without = [
     filters.game === null ? "a game" : null,
     filters.venueId === null ? "a casino" : null,
   ].filter((part) => part !== null);
+
   return [
     `No finished ${game}sessions`,
     filters.venueId ? ` at ${casino}` : "",
@@ -241,6 +263,7 @@ export const filterChips = (
           value: id,
           label: names.tripName(id),
         }));
+
   const chips = [
     ...(filters.tripId === undefined
       ? [
@@ -271,6 +294,7 @@ export const filterChips = (
         ]
       : []),
   ];
+
   return {
     chips: [...chips.filter((c) => c.applied), ...chips.filter((c) => !c.applied)],
     filtered: chips.some((c) => c.applied),
@@ -298,21 +322,27 @@ export const personalStatsView = (
   const venues = new Map(
     visits.flatMap(({ venue }) => (venue ? [[venue.id, venue.name] as const] : [])),
   );
+
   const venueName = (id: VenueId | null) =>
     id === null ? "No casino set" : (venues.get(id) ?? "Casino");
+
   const tripName = (id: TripId) => tripNames.get(id) ?? "Group trip";
   const stats = personalStats(visits, timeZone, filters);
+
   const finished = visits.flatMap(({ visit, table, finalResult }) =>
     visit.deletedAt !== undefined || visit.finishedAt === null || finalResult === null
       ? []
       : [{ ...table, startedAt: visit.startedAt, endedAt: visit.finishedAt }],
   );
+
   const head = {
     ...filterChips(filters, stats.options, { venueName, tripName }),
     trips: statsTrips(finished, trips, filters, timeZone),
   };
+
   if (stats.options.years.length === 0) return { ...head, kind: "empty" as const };
   const { summary } = stats;
+
   if (summary.sessions === 0)
     return {
       ...head,
@@ -330,21 +360,26 @@ export const personalStatsView = (
       : filters.year === undefined
         ? "all time"
         : String(filters.year);
+
   const fullDay = (at: DateTime.DateTime) =>
     DateTime.format(DateTime.setZone(at, timeZone), {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
+
   const shortDay = (at: DateTime.DateTime) =>
     DateTime.format(DateTime.setZone(at, timeZone), { month: "short", day: "numeric" });
+
   const day = filters.year === undefined ? fullDay : shortDay;
   const yearOf = (at: DateTime.DateTime) => DateTime.toParts(DateTime.setZone(at, timeZone)).year;
+
   const running = stats.runningResult.map((point) => ({
     ...point,
     at: DateTime.toEpochMillis(point.finishedAt),
     day: fullDay(point.finishedAt),
   }));
+
   const from = running[0]!.finishedAt;
   const to = running.at(-1)!.finishedAt;
   const visit = new Map(visits.map((item) => [item.visit.id, item]));
@@ -393,10 +428,12 @@ export const personalStatsView = (
         ? null
         : running.toReversed().map((point) => {
             const item = visit.get(point.sessionId)!;
+
             const hours =
               (DateTime.toEpochMillis(point.finishedAt) -
                 DateTime.toEpochMillis(item.visit.startedAt)) /
               3_600_000;
+
             return {
               key: point.sessionId,
               title: visitTitle(item.table),
@@ -405,7 +442,6 @@ export const personalStatsView = (
               result: point.result,
             };
           }),
-    // A breakdown by the thing already filtered to would be a single row.
     byGame:
       filters.game !== undefined
         ? null

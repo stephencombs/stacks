@@ -3,8 +3,6 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  // An account's personal player is a players row outside any group. Its ID and actor come from
-  // the first device that synced, so that device's history needs no rewriting.
   yield* sql`alter table players alter column group_id drop not null`;
   yield* sql`alter table players add column recording_actor_id uuid unique`;
   yield* sql`
@@ -15,7 +13,6 @@ export default Effect.gen(function* () {
   `;
   yield* sql`create unique index players_one_personal on players (user_id) where group_id is null`;
 
-  // Until shared tables exist, a personal visit carries its own one-visit table.
   yield* sql`
     create table personal_visits (
       id uuid primary key,
@@ -51,7 +48,6 @@ export default Effect.gen(function* () {
     )
   `;
   yield* sql`create index personal_entries_visit on personal_entries (visit_id)`;
-  // The applied command log: the idempotency key, and each visit's history for the next command.
   yield* sql`
     create table personal_operations (
       id uuid primary key,

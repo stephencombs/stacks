@@ -16,6 +16,7 @@ export function pinnedFooterChrome({
   surface: boolean;
 }) {
   if (!filled) return "";
+
   return cn(
     "pt-3",
     felt

@@ -50,6 +50,7 @@ describe("mergeResults", () => {
         entry({ kind: "adjustment", playerId: BEA, amount: money(-5) }),
       ]),
     ]);
+
     expect(merged.get(ALEX)).toEqual({ buyIn: 100, cashOut: 250, adjustment: 0, net: 150 });
     expect(merged.get(BEA)).toEqual({ buyIn: 0, cashOut: 0, adjustment: -5, net: -5 });
     expect(mergeResults([]).size).toBe(0);
@@ -72,8 +73,10 @@ describe("resultsBy", () => {
     id: SessionId.make("0192e7a0-0000-7000-8000-0000000000b1"),
     game: "blackjack",
   };
+
   const craps = { id: SessionId.make("0192e7a0-0000-7000-8000-0000000000c1"), game: "craps" };
   const lastYear = { id: SessionId.make("0192e7a0-0000-7000-8000-0000000000c2"), game: "craps" };
+
   const entries = [
     { ...entry({ kind: "buy_in", playerId: ALEX, amount: money(10000) }), sessionId: blackjack.id },
     {
@@ -125,6 +128,7 @@ describe("sessionRuns", () => {
       expect(runs.wins).toBe(nets.filter((net) => net > 0).length);
       expect(runs.longestWinningRun).toBeLessThanOrEqual(runs.wins);
       expect(runs.current.length).toBeLessThanOrEqual(runs.sessions);
+
       if (runs.current.winning)
         expect(runs.longestWinningRun).toBeGreaterThanOrEqual(runs.current.length);
       const tail = nets.slice(nets.length - runs.current.length);

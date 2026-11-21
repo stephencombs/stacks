@@ -9,8 +9,11 @@ it("loads trip formatting and formats ranks without Intl.PluralRules", async () 
   vi.stubGlobal(
     "Intl",
     new Proxy(Intl, {
-      get(target, key, receiver) {
-        return key === "PluralRules" ? undefined : Reflect.get(target, key, receiver);
+      get(target, key) {
+        if (key === "PluralRules") return undefined;
+
+        // SAFETY: the proxy wraps Intl, so every other key is one of its members.
+        return target[key as keyof typeof target];
       },
     }),
   );

@@ -17,6 +17,7 @@ export function GlassSurface({
 }: GlassSurfaceProps) {
   const { theme } = useUniwind();
   const solid = useReduceTransparency();
+
   if (solid)
     return (
       <View
@@ -25,9 +26,10 @@ export function GlassSurface({
         {children}
       </View>
     );
-  // Liquid Glass needs iOS 26, and some of its betas lack the API.
+
   if (!isLiquidGlassAvailable() || !isGlassEffectAPIAvailable())
     return <View className={cn(glassFill, className)}>{children}</View>;
+
   return (
     <NativeGlass
       colorScheme={felt ? "dark" : theme === "light" ? "light" : "dark"}
@@ -40,7 +42,6 @@ export function GlassSurface({
   );
 }
 
-/** The native material ignores Reduce Transparency, so a solid card stands in for it. */
 function useReduceTransparency() {
   const [reduce, setReduce] = useState(false);
   useEffect(() => {
@@ -49,10 +50,12 @@ function useReduceTransparency() {
       if (live) setReduce(value);
     });
     const subscription = AccessibilityInfo.addEventListener("reduceTransparencyChanged", setReduce);
+
     return () => {
       live = false;
       subscription.remove();
     };
   }, []);
+
   return reduce;
 }

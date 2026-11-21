@@ -12,9 +12,11 @@ afterEach(() => {
 
 const field = (start: string) => {
   let amount = start;
+
   return {
     erase: () => {
       amount = amount.slice(0, -1);
+
       return amount.length === 0;
     },
     text: () => amount,
@@ -98,8 +100,10 @@ it("stops repeating when the key is released", () => {
 it("does not schedule a repeat when the amount is already empty", () => {
   vi.useFakeTimers();
   let calls = 0;
+
   const release = holdBackspace(() => {
     calls += 1;
+
     return true;
   });
 

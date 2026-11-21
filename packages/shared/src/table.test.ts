@@ -11,6 +11,7 @@ describe("buyInPresets", () => {
       entry({ kind: "buy_in", playerId: BEA, amount: money(20000) }),
       entry({ kind: "buy_in", playerId: ALEX, amount: money(10000) }),
     ];
+
     expect(buyInPresets(entries, ALEX)).toEqual([10000, 20000]);
     expect(buyInPresets(entries, BEA)).toEqual([20000, 40000]);
   });
@@ -32,6 +33,7 @@ describe("buyInPresets", () => {
       }),
       entry({ kind: "cash_out", playerId: ALEX, amount: money(30000) }),
     ];
+
     expect(buyInPresets(entries, ALEX)).toEqual([10000, 20000]);
   });
 });

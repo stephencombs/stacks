@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from "vite-plus/test";
 
 const files = vi.hoisted(() => new Map<string, string>());
+
 vi.mock("expo-file-system", () => ({
   Paths: { document: "documents" },
   File: class {
@@ -26,6 +27,7 @@ vi.mock("expo-file-system", () => ({
     }
   },
 }));
+
 vi.mock("react-native", () => ({ Platform: { OS: "ios" }, AppState: {} }));
 
 import { outboxStorage } from "./outbox";

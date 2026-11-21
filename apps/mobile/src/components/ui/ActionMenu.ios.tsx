@@ -27,6 +27,7 @@ export function ActionMenu({
   const resolvedInk = useCSSVariable(felt ? "--color-felt-ink" : "--color-ink");
   const ink = typeof resolvedInk === "string" ? resolvedInk : undefined;
   const glass = isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
+
   return (
     <Host
       matchContents

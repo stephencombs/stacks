@@ -3,9 +3,20 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import type { TripId } from "@stacks/contracts";
 
-import { catalogVenue, groupWith, ids, usd, users, type TestGroup } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
-import { finishHistoricalSession, seedEntry, seedSession } from "../testing/legacySessions.ts";
+import {
+  catalogVenue,
+  groupWith,
+  ids,
+  usd,
+  users,
+  type TestGroup,
+} from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
+import {
+  finishHistoricalSession,
+  seedEntry,
+  seedSession,
+} from "../testing/legacySessions.test-utils.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
@@ -26,19 +37,22 @@ const startSession = Effect.fn("test.startSession")(function* (
     notes: null,
     startedAt: day(1),
   });
+
   return id;
 });
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
+it.layer(TestApi.layer)("trips", (it) => {
   it.effect("hold their own sessions and their own ledger", () =>
     Effect.gen(function* () {
       const { alex, bea } = yield* users("alex", "bea");
       const group = yield* groupWith(alex, bea);
       const beaId = group.players.find((p) => p.id !== group.myPlayerId)!.id;
+
       const reno = yield* alex.trips.create({
         params: { groupId: group.group.id },
         payload: { id: ids.trip(), name: "Reno" },
       });
+
       const inVegas = yield* startSession(alex, group, group.tripId);
       const inReno = yield* startSession(alex, group, reno.id);
       yield* seedEntry(inReno, {
@@ -79,7 +93,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
       const [seated] = yield* alex.groups.list();
       expect(seated?.mySession).toMatchObject({ id: sessionId, tripId: group.tripId });
       expect(seated?.mySession?.venueName).toBeTruthy();
-      // Bea is in the group but not at the table.
       const [watching] = yield* bea.groups.list();
       expect(watching?.mySession).toBeNull();
       const trip = yield* alex.trips.get({ params: { tripId: group.tripId } });
@@ -112,15 +125,19 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
       const sessionId = yield* startSession(alex, group, group.tripId);
       const params = { tripId: group.tripId };
       yield* alex.trips.end({ params, payload: {} });
-      expect(yield* Effect.flip(alex.trips.end({ params, payload: {} }))).toMatchObject({
-        _tag: "Conflict",
-        reason: "trip_ended",
-      });
+      {
+        const received = yield* Effect.flip(alex.trips.end({ params, payload: {} }));
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "trip_ended" });
+      }
+
       yield* alex.trips.reopen({ params });
-      expect(yield* Effect.flip(alex.trips.reopen({ params }))).toMatchObject({
-        _tag: "Conflict",
-        reason: "trip_open",
-      });
+      {
+        const received = yield* Effect.flip(alex.trips.reopen({ params }));
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "trip_open" });
+      }
+
       expect((yield* alex.trips.get({ params })).sessions.map((s) => s.session.id)).toEqual([
         sessionId,
       ]);
@@ -131,23 +148,34 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
     Effect.gen(function* () {
       const { alex, bea, eve } = yield* users("alex", "bea", "eve");
       const group = yield* groupWith(alex, bea);
+
       const spare = yield* alex.trips.create({
         params: { groupId: group.group.id },
         payload: { id: ids.trip(), name: "Maybe Reno" },
       });
+
       yield* startSession(alex, group, group.tripId);
 
-      expect(yield* Effect.flip(eve.trips.get({ params: { tripId: spare.id } }))).toMatchObject({
-        _tag: "Forbidden",
-        reason: "not_a_member",
-      });
-      expect(yield* Effect.flip(bea.trips.delete({ params: { tripId: spare.id } }))).toMatchObject({
-        _tag: "Forbidden",
-        reason: "not_your_trip",
-      });
-      expect(
-        yield* Effect.flip(alex.trips.delete({ params: { tripId: group.tripId } })),
-      ).toMatchObject({ _tag: "Conflict", reason: "trip_not_empty" });
+      {
+        const received = yield* Effect.flip(eve.trips.get({ params: { tripId: spare.id } }));
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "not_a_member" });
+      }
+
+      {
+        const received = yield* Effect.flip(bea.trips.delete({ params: { tripId: spare.id } }));
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "not_your_trip" });
+      }
+
+      {
+        const received = yield* Effect.flip(
+          alex.trips.delete({ params: { tripId: group.tripId } }),
+        );
+
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "trip_not_empty" });
+      }
 
       yield* alex.trips.delete({ params: { tripId: spare.id } });
       const detail = yield* alex.groups.get({ params: { groupId: group.group.id } });
@@ -161,16 +189,20 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
       const group = yield* groupWith(alex, bea);
       const tripId = group.tripId;
 
-      expect(
-        yield* Effect.flip(
+      {
+        const received = yield* Effect.flip(
           eve.trips.rename({ params: { tripId }, payload: { name: "Reno weekend" } }),
-        ),
-      ).toMatchObject({ _tag: "Forbidden", reason: "not_a_member" });
+        );
+
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "not_a_member" });
+      }
 
       const renamed = yield* bea.trips.rename({
         params: { tripId },
         payload: { name: "Reno weekend" },
       });
+
       expect(renamed.name).toBe("Reno weekend");
 
       const detail = yield* alex.trips.get({ params: { tripId } });
@@ -191,8 +223,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("trips", (it) => {
         const attempt = yield* Effect.exit(
           alex.trips.rename({ params: { tripId }, payload: { name } }),
         );
+
         expect(attempt._tag).toBe("Failure");
       }
+
       expect((yield* alex.trips.get({ params: { tripId } })).trip.name).toBe(before);
       const longest = "x".repeat(60);
       expect(

@@ -1,4 +1,5 @@
 import {
+  Conflict,
   PlayerId,
   type ActorId,
   type PlayEntry,
@@ -30,9 +31,12 @@ import {
   type RecordingCommandResult,
   type RecordingHistory,
 } from "@stacks/contracts/recordingCommands";
+import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
+import * as Layer from "effect/Layer";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 
@@ -116,6 +120,7 @@ export interface RecordingTransport {
 /** Whether the server has the table, so it can be shared. */
 export const tableSynced = (state: RecordingState, tableId: TableId) => {
   const synced = new Set(state.sync?.synced);
+
   return state.receipts.some(
     ({ command }) =>
       (command.type === "start" ||
@@ -139,13 +144,10 @@ const newSecret = () =>
 
 const pendingActorKeys = new WeakMap<ActorKeyStorage, Map<ActorId, Promise<ActorCredential>>>();
 
-/** Share the first key load and save across requests so registration and sharing use the same key. */
-const actorCredential = (
-  keys: ActorKeyStorage,
-  actorId: ActorCredential["actorId"],
-): Promise<ActorCredential> => {
+const actorCredential = (keys: ActorKeyStorage, actorId: ActorCredential["actorId"]) => {
   const pending = pendingActorKeys.get(keys) ?? new Map<ActorId, Promise<ActorCredential>>();
   const existing = pending.get(actorId);
+
   if (existing) return existing;
 
   const credential = keys
@@ -154,11 +156,14 @@ const actorCredential = (
       if (saved?.actorId === actorId) return saved;
       const created = { actorId, secret: newSecret() };
       await keys.save(created);
+
       return created;
     })
     .finally(() => pending.delete(actorId));
+
   pending.set(actorId, credential);
   pendingActorKeys.set(keys, pending);
+
   return credential;
 };
 
@@ -189,16 +194,20 @@ export class RecordingSyncBlocked extends Error {
   }
 }
 
-/** The most commands one push carries; the contract caps a batch at 100. */
 const BATCH = 100;
 
 const commandText = (() => {
   const encode = Schema.encodeSync(Schema.toCodecJson(RecordingCommand));
+
   return (command: RecordingCommand) => JSON.stringify(encode(command));
 })();
 
-const rejectionOf = (command: RecordingCommand, error: unknown): RecordingRejection => {
+const rejectionOf: (
+  command: RecordingCommand,
+  error: typeof Schema.Unknown.Encoded,
+) => RecordingRejection = (command, error) => {
   if (!(error instanceof RecordingError)) throw error;
+
   return {
     command,
     reason:
@@ -207,10 +216,6 @@ const rejectionOf = (command: RecordingCommand, error: unknown): RecordingReject
   };
 };
 
-/**
- * Applies commands in order onto `state`, setting aside the ones the rules now refuse. Commands
- * the server already accepted (`onServer`) apply as it accepted them, whichever actor made them.
- */
 const replay = (
   state: RecordingState,
   commands: ReadonlyArray<RecordingCommand>,
@@ -218,6 +223,7 @@ const replay = (
 ) => {
   const failed: RecordingRejection[] = [];
   let current = state;
+
   for (const command of commands) {
     try {
       current = applyRecordingCommand(
@@ -229,11 +235,15 @@ const replay = (
       failed.push(rejectionOf(command, error));
     }
   }
+
   return { state: current, failed };
 };
 
 /** Adds a table this device joined, as the player it joined as. Joining again changes nothing. */
-export const addJoinedTable = (state: RecordingState, joined: JoinedTable): RecordingState => ({
+export const addJoinedTable: (state: RecordingState, joined: JoinedTable) => RecordingState = (
+  state,
+  joined,
+) => ({
   ...state,
   ownedPlayerIds: [...new Set([...(state.ownedPlayerIds ?? []), joined.player.id])],
   players: state.players.some((player) => player.id === joined.player.id)
@@ -252,6 +262,7 @@ export const addJoinedTable = (state: RecordingState, joined: JoinedTable): Reco
 /** Saved commands the server hasn't confirmed, oldest first. */
 export const pendingRecordingCommands = (state: RecordingState) => {
   const synced = new Set(state.sync?.synced);
+
   return state.receipts.map((receipt) => receipt.command).filter((c) => !synced.has(c.operationId));
 };
 
@@ -260,34 +271,33 @@ export const pendingRecordingCommands = (state: RecordingState) => {
  * commands first, then this device's pending ones. A device that never synced adopts the
  * account's identity, so its history joins the account's instead of becoming a second player.
  */
-export const mergeRecordingHistory = (
+export const mergeRecordingHistory: (
   state: RecordingState,
   userId: UserId | null,
   history: RecordingHistory,
-): RecordingState => {
-  // A device that synced as its actor has had that player claimed by the account by now.
+) => RecordingState = (state, userId, history) => {
   if (state.sync && state.sync.userId !== null && state.sync.userId !== userId)
     throw new RecordingSyncBlocked();
   const identity = history.identity;
+
   const adopt =
     identity !== null &&
     (identity.playerId !== state.self.id || identity.actorId !== state.actor.id);
+
   const accepted = new Set(state.sync?.synced);
-  // A device that synced as its own actor meets another identity here only once the account
-  // linked its player (never merged): that player is still the device's, now one of the account's.
-  // That's so when the server's history includes the device's player, and not merely because the
-  // identity differs; a device that never synced has nothing to link and is adopted instead.
+
   const reported =
     history.tables.some((table) => table.starterPlayerId === state.self.id) ||
     history.participants.some((item) => item.player.id === state.self.id) ||
     history.players.some((player) => player.id === state.self.id);
+
   const linked = adopt && state.sync?.userId === null && accepted.size > 0 && reported;
+
   if (adopt && accepted.size > 0 && !linked)
     throw new RecordingError("load", "This device already synced as a different player.");
   const actorId = identity?.actorId ?? state.actor.id;
   const playerId = identity?.playerId ?? state.self.id;
-  // Only what the server doesn't hold yet is signed as the account's actor. Only the device's own
-  // player, never synced, becomes the account's personal player; a table player keeps its ID.
+
   const own = (command: RecordingCommand) =>
     !adopt || accepted.has(command.operationId)
       ? command
@@ -296,14 +306,17 @@ export const mergeRecordingHistory = (
             ? { ...command, actorId, playerId }
             : { ...command, actorId },
         );
+
   const remote = new Map(history.commands.map((command) => [command.operationId, command]));
   const local = state.receipts.map((receipt) => own(receipt.command));
+
   const reused = local
     .filter((c) => remote.has(c.operationId))
     .filter((c) => commandText(remote.get(c.operationId)!) !== commandText(c))
     .map((command) => rejectionOf(command, new RecordingError("operation_reused", "")));
+
   const self = identity ? { ...state.self, id: identity.playerId } : state.self;
-  // Who joined which tables comes from the server, with the tables this device joined.
+
   const base: RecordingState = {
     ...state,
     self,
@@ -326,17 +339,21 @@ export const mergeRecordingHistory = (
     entries: [],
     receipts: [],
   };
+
   const synced = replay(
     base,
     history.commands,
     new Set(history.commands.map((command) => command.operationId)),
   );
+
   if (synced.failed.length > 0)
     throw new RecordingError("load", "The synced history doesn't follow the recording rules.");
+
   const merged = replay(
     synced.state,
     local.filter((c) => !remote.has(c.operationId)),
   );
+
   return {
     ...merged.state,
     sync: {
@@ -353,22 +370,20 @@ export const mergeRecordingHistory = (
 
 const ms = (time: DateTime.Utc) => DateTime.toEpochMillis(time);
 
-/**
- * Whether the account already has what a refused command recorded: this very operation, or the
- * same facts under another one (a restored backup, another device's copy). Then the refusal is
- * settled, and recording it again would count the money twice. An operation the server holds
- * with different content stays refused, as does anything whose facts differ in any way.
- */
 const settled = (
   command: RecordingCommand,
   remote: ReadonlyMap<string, RecordingCommand>,
   ledger: RecordingState,
 ) => {
   const held = remote.get(command.operationId);
+
   if (held) return commandText(held) === commandText(command);
+
   if (!isVisitCommand(command)) return false;
   const visit = ledger.visits.find((item) => item.id === command.visitId);
+
   if (!visit) return false;
+
   const entry = (
     id: string,
     kind: PlayEntry["kind"],
@@ -385,19 +400,22 @@ const settled = (
         ms(item.occurredAt) === ms(occurredAt) &&
         item.note === note,
     );
+
   const finishedAt = (at: DateTime.Utc) =>
     visit.finishedAt !== null && ms(visit.finishedAt) === ms(at);
-  // An edit since changed where the visit started and what its table is.
+
   const edited = ledger.receipts.some(
     (receipt) =>
       receipt.command.type === "edit_visit" &&
       receipt.command.visitId === visit.id &&
       receipt.command.operationId !== command.operationId,
   );
+
   switch (command.type) {
     case "start":
     case "record_completed": {
       const table = ledger.tables.find((item) => item.id === visit.tableId);
+
       return (
         table !== undefined &&
         table.id === command.tableId &&
@@ -413,6 +431,7 @@ const settled = (
             finishedAt(command.finishedAt)))
       );
     }
+
     case "join_table":
       return (
         visit.tableId === command.tableId &&
@@ -431,6 +450,7 @@ const settled = (
       const original = ledger.entries.find(
         (item) => item.id === command.entryId && item.visitId === visit.id,
       );
+
       return (
         original !== undefined &&
         original.voidedAt !== null &&
@@ -445,6 +465,7 @@ const settled = (
           ))
       );
     }
+
     case "delete_visit":
     case "restore_visit":
     case "reopen":
@@ -459,37 +480,47 @@ const settled = (
  * this device: another device changed the visit, so it leaves the ledger until the next pull
  * brings the server's version back.
  */
-export const applyPushResults = (
+export const applyPushResults: (
   state: RecordingState,
   results: ReadonlyArray<RecordingCommandResult>,
-): RecordingState => {
+) => RecordingState = (state, results) => {
   const sync = state.sync;
+
   if (!sync) throw new RecordingError("invalid", "Link an account before syncing.");
   const known = new Set(state.receipts.map((receipt) => receipt.command.operationId));
-  const accepted = results
-    .filter((result) => result.status === "accepted" && known.has(result.operationId))
-    .map((result) => result.operationId);
+
+  const accepted = results.flatMap((result) =>
+    result.status === "accepted" && known.has(result.operationId) ? [result.operationId] : [],
+  );
+
   const refused = new Map(
     results.flatMap((result) =>
       result.status === "rejected" ? [[result.operationId, result]] : [],
     ),
   );
+
   const synced = [...new Set([...sync.synced, ...accepted])];
+
   if (refused.size === 0) return { ...state, sync: { ...sync, synced } };
   const commands = state.receipts.map((receipt) => receipt.command);
+
   const rebuilt = replay(
     recordingBase(state),
     commands.filter((c) => !refused.has(c.operationId)),
     new Set(synced),
   );
+
   const rejected = commands.flatMap((command) => {
     const result = refused.get(command.operationId);
+
     return result?.status === "rejected"
       ? [{ command, reason: result.reason, message: result.message }]
       : [];
   });
+
   const onServer = new Set(synced);
   const dropped = new Set(rebuilt.failed.map((item) => item.command.operationId));
+
   return {
     ...rebuilt.state,
     sync: {
@@ -504,14 +535,25 @@ export const applyPushResults = (
   };
 };
 
-const optional = <K extends string, V>(key: K, value: V | null) =>
-  (value === null ? {} : { [key]: value }) as { [P in K]?: V };
+const optional = <K extends string, V>(key: K, value: V | null) => {
+  const fields: { [P in K]?: V } = {};
 
-/**
- * What the person recorded, to record again against the ledger as it is now. `ids` maps the
- * visit and entries of a start recorded again to their new IDs.
- */
-const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): RecordingInput => {
+  if (value !== null) fields[key] = value;
+
+  return fields;
+};
+
+const sameId = <A extends string>(id: A, replacements: ReadonlyMap<string, string>) => {
+  const next = replacements.get(id) ?? id;
+
+  // SAFETY: replacements stores an id minted for the same branded field as `id`.
+  return next as A;
+};
+
+const inputOf: (command: RecordingCommand, ids: ReadonlyMap<string, string>) => RecordingInput = (
+  command,
+  ids,
+) => {
   if (command.type === "open_table")
     return {
       type: "open_table",
@@ -520,24 +562,28 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
       ...optional("gameName", command.gameName ?? null),
       ...optional("venueId", command.venueId),
     };
+
   if (command.type === "delete_table")
     return {
       type: command.type,
-      tableId: (ids.get(command.tableId) ?? command.tableId) as typeof command.tableId,
+      tableId: sameId(command.tableId, ids),
     };
+
   if (command.type === "set_table_trip")
     return {
       type: command.type,
-      tableId: (ids.get(command.tableId) ?? command.tableId) as typeof command.tableId,
+      tableId: sameId(command.tableId, ids),
       tripId: command.tripId,
     };
+
   if (isTableCommand(command))
     return {
       type: command.type,
-      tableId: (ids.get(command.tableId) ?? command.tableId) as typeof command.tableId,
+      tableId: sameId(command.tableId, ids),
       playerId: command.playerId,
     };
-  const visitId = (ids.get(command.visitId) ?? command.visitId) as typeof command.visitId;
+  const visitId = sameId(command.visitId, ids);
+
   switch (command.type) {
     case "start":
     case "record_completed": {
@@ -549,6 +595,7 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
         ...optional("gameName", command.gameName ?? null),
         ...optional("venueId", command.venueId),
       };
+
       return command.type === "start"
         ? { type: "start", ...start }
         : {
@@ -559,10 +606,11 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
             finishedAt: command.finishedAt,
           };
     }
+
     case "join_table":
       return {
         type: "join_table",
-        tableId: (ids.get(command.tableId) ?? command.tableId) as typeof command.tableId,
+        tableId: sameId(command.tableId, ids),
         playerId: command.playerId,
         buyIn: command.buyIn,
         startedAt: command.startedAt,
@@ -591,7 +639,7 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
       return {
         type: "correct",
         visitId,
-        entryId: (ids.get(command.entryId) ?? command.entryId) as typeof command.entryId,
+        entryId: sameId(command.entryId, ids),
         reason: command.reason,
         replacement: command.replacement && {
           amount: command.replacement.amount,
@@ -618,7 +666,9 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
 const withoutRejection = (state: RecordingState, operationId: RecordingOperationId) => {
   const sync = state.sync;
   const rejection = sync?.rejected.find((item) => item.command.operationId === operationId);
+
   if (!sync || !rejection) throw new RecordingError("invalid", "That change is already resolved.");
+
   return {
     rejection,
     state: {
@@ -644,30 +694,37 @@ export const recordRejectedAgain = (state: RecordingState, operationId: Recordin
   const { rejection } = withoutRejection(state, operationId);
   const refused = rejection.command;
   const visits = new Set("visitId" in refused ? [refused.visitId] : []);
+
   const chain =
     refused.type === "start" || refused.type === "record_completed" || refused.type === "open_table"
       ? state.sync!.rejected.filter(({ command }) => {
           if (command.type === "join_table" && command.tableId === refused.tableId)
             visits.add(command.visitId);
+
           return (
             ("tableId" in command && command.tableId === refused.tableId) ||
             ("visitId" in command && visits.has(command.visitId))
           );
         })
       : [rejection];
+
   const ids = new Map<string, string>();
   let next = state;
+
   for (const item of chain) {
     next = withoutRejection(next, item.command.operationId).state;
     const command = prepareRecordingCommand(next, inputOf(item.command, ids));
+
     if ("visitId" in item.command && "visitId" in command)
       ids.set(item.command.visitId, command.visitId);
+
     if ("tableId" in item.command && "tableId" in command)
       ids.set(item.command.tableId, command.tableId);
     const before = createdEntryIds(item.command);
     createdEntryIds(command).forEach((id, index) => ids.set(before[index]!, id));
     next = applyRecordingCommand(next, command);
   }
+
   return next;
 };
 
@@ -692,18 +749,20 @@ export const makeRecordingSync = (
   userId: UserId | null,
   transport: RecordingTransport,
   keys: ActorKeyStorage,
-  /** Called each time the server accepted a push, so what the app shows from it can refetch. */
   onPushed: () => void = () => {},
 ) => {
   let status: RecordingSyncStatus = { phase: "idle", error: null, claim: null };
   const listeners = new Set<() => void>();
+
   const publish = (next: RecordingSyncStatus) => {
     status = next;
+
     for (const listener of listeners) listener();
   };
+
   const setStatus = (next: Omit<RecordingSyncStatus, "claim">) =>
     publish({ ...next, claim: status.claim });
-  // The account asked to link this device's own player to its own, instead of staying blocked.
+
   let linking = false;
   let pull = true;
   let signal: ((reason: "wake" | "change") => void) | null = null;
@@ -713,22 +772,22 @@ export const makeRecordingSync = (
 
   const active = (state: RecordingState | null) =>
     state !== null && (userId !== null || syncsAsDevice(state));
+
   const credential = (state: RecordingState) =>
     Effect.tryPromise({ try: () => actorCredential(keys, state.actor.id), catch: (e) => e });
+
   let prepared = false;
-  // Venues the server doesn't have, so later rounds don't ask again.
   const unknownVenues = new Set<VenueId>();
 
-  /**
-   * Caches the venues of tables that arrived from elsewhere: a joined table, or one another device
-   * started. A venue that can't be fetched now is tried again next round.
-   */
   const cacheVenues = Effect.gen(function* () {
     const state = store.getSnapshot().state;
+
     const missing = state?.sync
       ? missingVenueIds(state).filter((id) => !unknownVenues.has(id))
       : [];
+
     if (missing.length === 0) return;
+
     const found = yield* Effect.forEach(
       missing,
       (id) =>
@@ -737,27 +796,31 @@ export const makeRecordingSync = (
           Effect.catch((error) =>
             Effect.sync(() => {
               if (isNotFound(error)) unknownVenues.add(id);
+
               return null;
             }),
           ),
         ),
       { concurrency: 4 },
     );
+
     const venues = found.filter((venue) => venue !== null);
-    // Only a synced ledger may save without a receipt; tables from elsewhere come with sync.
     yield* transform((current) => (current.sync ? rememberVenues(current, venues) : current));
   });
 
   const round = Effect.gen(function* () {
     const loaded = store.getSnapshot().state;
+
     if (!active(loaded)) return setStatus({ phase: "idle", error: null });
     setStatus({ phase: "syncing", error: null });
     const actor = userId === null ? yield* credential(loaded!) : null;
+
     if (!prepared) {
       if (actor) yield* transport.registerActor(actor);
-      // The device synced as its actor before this sign-in: the account takes that player.
       else if (loaded!.sync?.userId === null) {
-        const request = { ...(yield* credential(loaded!)), ...(linking ? { link: true } : {}) };
+        const proof = yield* credential(loaded!);
+        const request = linking ? { ...proof, link: true } : proof;
+
         const result = yield* transport
           .claimActor(request)
           .pipe(
@@ -769,44 +832,52 @@ export const makeRecordingSync = (
                   : error,
             ),
           );
+
         linking = false;
+
         if (result.adopted || result.claimed.length > 0 || result.refused.length > 0)
           publish({ ...status, claim: result });
       }
+
       prepared = true;
     }
+
     for (;;) {
       if (pull) {
         const history = yield* transport.history(actor);
         yield* transform((state) => mergeRecordingHistory(state, userId, history));
         pull = false;
       }
+
       const state = store.getSnapshot().state;
+
       if (!state) return yield* Effect.fail(new RecordingError("load", "Recording isn't loaded."));
       const commands = pendingRecordingCommands(state).slice(0, BATCH);
+
       if (commands.length === 0) break;
+
       const response = yield* transport
         .push({ identity: { playerId: state.self.id, actorId: state.actor.id }, commands }, actor)
         .pipe(
           Effect.tapError((error) =>
             Effect.sync(() => {
-              // Another device established the account first: adopt it on the next try.
               if (isConflict(error, "recording_identity")) pull = true;
             }),
           ),
         );
+
       yield* transform((current) => applyPushResults(current, response.results));
       onPushed();
-      // A refusal can mean another device changed the visit: converge on the server's ledger.
+
       if (response.results.some((result) => result.status === "rejected")) pull = true;
     }
+
     setStatus({ phase: "idle", error: null });
   });
 
   const run = Effect.gen(function* () {
     const wakes = yield* Queue.sliding<"wake" | "change">(1);
     const hydration = yield* Queue.sliding<void>(1);
-    // Optional venue reads must never hold up money uploads.
     yield* Effect.forkScoped(
       Effect.forever(
         Queue.take(hydration).pipe(
@@ -816,44 +887,54 @@ export const makeRecordingSync = (
       ),
     );
     signal = (reason) => Queue.offerUnsafe(wakes, reason);
+
     const unsubscribe = store.subscribe(() => {
       const state = store.getSnapshot().state;
+
       if (state && active(state) && pendingRecordingCommands(state).length > 0) signal?.("change");
     });
+
     yield* Effect.addFinalizer(() => Effect.sync(unsubscribe));
     let attempt = 0;
+
     for (;;) {
       const failure = yield* round.pipe(
         Effect.as(null),
         Effect.catch((error) => Effect.succeed({ error })),
       );
+
       if (failure === null) {
         attempt = 0;
         yield* Queue.offer(hydration, undefined);
+
         if ((yield* Queue.take(wakes)) === "wake") pull = true;
         continue;
       }
+
       const { error } = failure;
+
       if (error instanceof RecordingSyncBlocked) {
         setStatus({ phase: "blocked", error });
         yield* Queue.take(wakes);
         pull = true;
         continue;
       }
+
       setStatus({ phase: "retrying", error });
       const delay = Duration.min(Duration.times(Duration.seconds(1), 2 ** attempt), MAX_DELAY);
       attempt += 1;
       const woke = yield* Effect.raceFirst(Effect.as(Effect.sleep(delay), null), Queue.take(wakes));
+
       if (woke === "wake") pull = true;
     }
   }).pipe(Effect.scoped, Effect.ensuring(Effect.sync(() => (signal = null))));
 
-  const online = async <A>(
-    call: (actor: ActorCredential | null) => Effect.Effect<A, unknown>,
-  ): Promise<A> => {
+  const online = async <A>(call: (actor: ActorCredential | null) => Effect.Effect<A, unknown>) => {
     const state = store.getSnapshot().state;
+
     if (!state) throw new RecordingError("load", "Recording isn't loaded.");
     const actor = userId === null ? await actorCredential(keys, state.actor.id) : null;
+
     return Effect.runPromise(call(actor));
   };
 
@@ -862,75 +943,57 @@ export const makeRecordingSync = (
     call: (tableId: TableId, actor: ActorCredential | null) => Effect.Effect<A, unknown>,
   ) => {
     const state = store.getSnapshot().state;
+
     if (!state || !tableSynced(state, tableId))
       throw new RecordingError("invalid", "This table hasn't synced yet. Try again once it has.");
     const actor = userId === null ? await actorCredential(keys, state.actor.id) : null;
+
     return Effect.runPromise(call(tableId, actor));
   };
 
   return {
     userId,
-    /** Runs until interrupted. Fork it while this account is signed in. */
     run,
-    /** The network or the app came back: pull and push now instead of after the backoff. */
     wake: () => signal?.("wake"),
     getStatus: () => status,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
+
       return () => void listeners.delete(listener);
     },
-    /** Puts away what signing in claimed, once it's been read. */
     dismissClaim: () => publish({ ...status, claim: null }),
-    /**
-     * Links this device's own player to the account's, after the account refused to take it as its
-     * personal player. They stay two players: nothing is merged, and the device keeps its history.
-     */
     link: () => {
       linking = true;
       signal?.("wake");
     },
-    /** Starts syncing a signed-out device's tables, so one can be shared. */
     enable: async () => {
       await store.transform((state) =>
         state.sync ? state : { ...state, sync: { userId: null, synced: [], rejected: [] } },
       );
       signal?.("wake");
     },
-    /** A new read-only link for a table this device started; any earlier link stops working. */
     share: (tableId: TableId) => sharing(tableId, transport.share),
-    /** Stops the table's link working. */
     unshare: (tableId: TableId) => sharing(tableId, transport.unshare),
-    /** Public venues matching `q`, or the nearest to `lat`/`lng`. Needs the network. */
     searchVenues: (query: typeof SearchPublicVenuesQuery.Type) =>
       Effect.runPromise(transport.searchVenues(query)),
-    /** The whole table as the server has it, for a table this device started or joined. */
     table: (tableId: TableId) => online((actor) => transport.table(tableId, actor)),
-    /** A single-use link that lets another device record as `playerId`. */
     invitePlayer: (playerId: PlayerId) =>
       online((actor) => transport.invitePlayer(playerId, actor)),
-    /** The open invite and the other devices recording as `playerId`. */
     playerAccess: (playerId: PlayerId) =>
       online((actor) => transport.playerAccess(playerId, actor)),
     revokeBinding: (playerId: PlayerId, actorId: ActorId) =>
       online((actor) => transport.revokeBinding(playerId, actorId, actor)),
     revokeInvite: (inviteId: PlayerInviteId) =>
       online((actor) => transport.revokeInvite(inviteId, actor)),
-    /**
-     * What the device's players and the people they've shared a table with owe each other, as
-     * the server has it.
-     */
-    /** Everything between this device's player and `playerId`, as the server has it. */
-    /**
-     * Records as the player a personal invite names, from now on. It needs the network once; the
-     * next pull brings that player's tables and play.
-     */
     redeem: async (token: string) => {
       await store.transform((state) =>
         state.sync ? state : { ...state, sync: { userId: null, synced: [], rejected: [] } },
       );
       const state = store.getSnapshot().state!;
       const actor = userId === null ? await actorCredential(keys, state.actor.id) : null;
+
       if (actor) await Effect.runPromise(transport.registerActor(actor));
+
       const player = await Effect.runPromise(
         transport.redeemInvite(
           token,
@@ -938,24 +1001,26 @@ export const makeRecordingSync = (
           actor,
         ),
       );
+
       pull = true;
       signal?.("wake");
+
       return player;
     },
-    /**
-     * Joins a shared table as a new player named `displayName`, which needs the network once.
-     * After that, the player's own play records on this device and syncs like any other.
-     */
     join: async (token: string, displayName: string) => {
       const name = displayName.trim();
+
       if (name === "") throw new RecordingError("invalid", "Enter your name.");
+
       if (name.length > 60) throw new RecordingError("invalid", "Keep your name to 60 characters.");
       await store.transform((state) =>
         state.sync ? state : { ...state, sync: { userId: null, synced: [], rejected: [] } },
       );
       const state = store.getSnapshot().state!;
       const actor = userId === null ? await actorCredential(keys, state.actor.id) : null;
+
       if (actor) await Effect.runPromise(transport.registerActor(actor));
+
       const joined = await Effect.runPromise(
         transport.join(
           token,
@@ -966,8 +1031,10 @@ export const makeRecordingSync = (
           actor,
         ),
       );
+
       await store.transform((current) => addJoinedTable(current, joined));
       signal?.("wake");
+
       return joined;
     },
     discard: (operationId: RecordingOperationId) =>
@@ -978,15 +1045,27 @@ export const makeRecordingSync = (
     },
   };
 };
+
 export type RecordingSync = ReturnType<typeof makeRecordingSync>;
 
-const isNotFound = (error: unknown) =>
-  typeof error === "object" && error !== null && "_tag" in error && error._tag === "NotFound";
+export class RecordingSyncService extends Context.Service<RecordingSyncService, RecordingSync>()(
+  "@stacks/client-runtime/RecordingSync",
+) {}
 
-const isConflict = (error: unknown, reason: "recording_identity" | "player_claimed") =>
-  typeof error === "object" &&
-  error !== null &&
-  "_tag" in error &&
-  error._tag === "Conflict" &&
-  "reason" in error &&
-  error.reason === reason;
+export const RecordingSyncLive = (
+  store: RecordingStore,
+  userId: UserId | null,
+  transport: RecordingTransport,
+  keys: ActorKeyStorage,
+  onPushed: () => void = () => {},
+) =>
+  Layer.sync(RecordingSyncService, () =>
+    makeRecordingSync(store, userId, transport, keys, onPushed),
+  );
+
+const isNotFound = (error: typeof Schema.Unknown.Encoded) => Predicate.isTagged(error, "NotFound");
+
+const isConflict = (
+  error: typeof Schema.Unknown.Encoded,
+  reason: "recording_identity" | "player_claimed",
+) => Schema.is(Conflict)(error) && error.reason === reason;

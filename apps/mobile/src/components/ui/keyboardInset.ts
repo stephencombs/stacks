@@ -10,6 +10,7 @@ export function sheetBottomEdge(
   frame: { readonly y: number; readonly height: number },
 ) {
   if (frame.y <= 1) return screenHeight;
+
   return Math.round(frame.y + frame.height);
 }
 
@@ -25,7 +26,8 @@ export function keyboardOverlap(
   keyboard: { readonly screenY: number; readonly height: number },
 ) {
   if (keyboard.height <= 0 || viewBottom <= 0) return 0;
-  // A missing origin still means a docked keyboard; its height is the overlap.
+
   if (keyboard.screenY <= 0) return Math.max(0, Math.round(keyboard.height));
+
   return Math.max(0, Math.round(Math.min(keyboard.height, viewBottom - keyboard.screenY)));
 }

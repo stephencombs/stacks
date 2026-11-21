@@ -11,6 +11,7 @@ import { MenuView } from "./MenuView";
 export function FilterChip<Value extends string>(props: FilterChipProps<Value>) {
   const { theme } = useUniwind();
   const label = props.options.find((option) => option.value === props.value)?.label ?? "";
+
   const menu = (face: ReactNode) => (
     <MenuView
       colorScheme={theme === "dark" ? "dark" : "light"}
@@ -22,6 +23,7 @@ export function FilterChip<Value extends string>(props: FilterChipProps<Value>) 
       }))}
       onPressAction={({ nativeEvent }) => {
         const option = props.options[Number(nativeEvent.event)];
+
         if (option) props.onChange(option.value);
       }}
       shouldOpenOnLongPress={false}
@@ -31,6 +33,7 @@ export function FilterChip<Value extends string>(props: FilterChipProps<Value>) 
       </View>
     </MenuView>
   );
+
   return Platform.OS === "android" ? (
     <AndroidFilterChip {...props} label={label}>
       {menu}

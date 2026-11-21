@@ -9,20 +9,25 @@ export const BACKSPACE_REPEAT_INTERVAL_MS = 100;
  * the amount is empty. `erase` removes one character and returns true when
  * nothing is left.
  */
-export function holdBackspace(erase: () => boolean): () => void {
+export function holdBackspace(erase: () => boolean) {
   if (erase()) return () => {};
 
   let stopped = false;
   let stopInterval = () => {};
+
   const delay = setTimeout(() => {
     if (stopped) return;
+
     if (erase()) {
       stopped = true;
+
       return;
     }
+
     const interval = setInterval(() => {
       if (erase()) stop();
     }, BACKSPACE_REPEAT_INTERVAL_MS);
+
     stopInterval = () => clearInterval(interval);
   }, BACKSPACE_REPEAT_DELAY_MS);
 

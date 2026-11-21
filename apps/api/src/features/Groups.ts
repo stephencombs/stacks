@@ -27,6 +27,7 @@ const ok = { ok: true } as const;
 export const list = Effect.fn("Groups.list")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
+
   const rows = yield* sql`
     select g.id, g.name, g.currency, g.created_at, m.group_id, m.role, p.id as player_id,
       (select count(*)::int from sessions s where s.group_id = g.id and s.status = 'live')
@@ -60,10 +61,12 @@ export const list = Effect.fn("Groups.list")(function* () {
       ),
     ),
   );
+
   if (rows.length === 0) return [];
 
   const groupIds = rows.map((row) => row.id);
   const seatedIds = rows.flatMap((row) => (row.mySessionId ? [row.mySessionId] : []));
+
   const [seated, groupTrips, liveTrips, entries, stakedRows] = yield* Effect.all(
     [
       seatedIds.length === 0
@@ -110,7 +113,6 @@ export const list = Effect.fn("Groups.list")(function* () {
         where group_id in ${sql.in(groupIds)}
           and voided_at is null and counterparty_id is not null
       `.pipe(Effect.flatMap(Access.decodeRows(EntryRow))),
-      // Stakes need each group's session results, so only groups with a live stake pay for them.
       sql`
         select distinct group_id from stakes
         where group_id in ${sql.in(groupIds)} and voided_at is null
@@ -118,12 +120,15 @@ export const list = Effect.fn("Groups.list")(function* () {
     ],
     { concurrency: "unbounded" },
   );
+
   const staked = new Set(stakedRows.map((row) => row.groupId));
+
   return yield* Effect.forEach(rows, (row) =>
     Effect.gen(function* () {
       const owed = staked.has(row.id)
         ? (yield* Views.groupBalances(row.id)).owed
         : balances(entries.filter((entry) => entry.groupId === row.id));
+
       return {
         group: { id: row.id, name: row.name, currency: row.currency, createdAt: row.createdAt },
         role: row.role,
@@ -153,6 +158,7 @@ export const create = Effect.fn("Groups.create")(function* (
         on conflict (id) do nothing
         returning id
       `;
+
       if (inserted.length === 0) return;
       yield* sql`
         insert into memberships (group_id, user_id, role) values (${request.id}, ${userId}, 'owner')
@@ -163,13 +169,14 @@ export const create = Effect.fn("Groups.create")(function* (
       `;
     }),
   );
-  // A retried create finds the group it already made; anyone else's ID is taken.
+
   const member = yield* Access.membership(request.id).pipe(
     Effect.catchTags({
       Forbidden: () => Effect.fail(new Conflict({ reason: "id_taken" })),
       NotFound: Effect.die,
     }),
   );
+
   return yield* Views.groupDetail(member);
 });
 
@@ -185,6 +192,7 @@ export const rename = Effect.fn("Groups.rename")(function* (
   const member = yield* Access.membership(groupId);
   yield* Access.requireAdmin(member);
   yield* sql`update groups set name = ${request.name} where id = ${groupId}`;
+
   return yield* Views.groupDetail(member);
 });
 
@@ -192,30 +200,36 @@ export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const member = yield* Access.membership(groupId);
+
   if (member.role === "owner") {
     const [others] = yield* sql`
       select count(*)::int as count from memberships
       where group_id = ${groupId} and user_id <> ${userId} and left_at is null
     `.pipe(Effect.flatMap(Access.decodeRows(Schema.Struct({ count: Schema.Int }))));
-    // The owner can't walk away from people still using the group.
+
     if (others!.count > 0) return yield* new Conflict({ reason: "last_owner" });
   }
+
   yield* sql`
     update memberships set left_at = now()
     where group_id = ${groupId} and user_id = ${userId} and left_at is null
   `;
+
   return ok;
 });
 
 const activeMember = Effect.fn("Groups.activeMember")(function* (groupId: GroupId, userId: UserId) {
   const sql = yield* SqlClient.SqlClient;
+
   const [target] = yield* sql`
     select m.group_id, m.role, p.id as player_id
     from memberships m
     join players p on p.group_id = m.group_id and p.user_id = m.user_id
     where m.group_id = ${groupId} and m.user_id = ${userId} and m.left_at is null
   `.pipe(Effect.flatMap(Access.decodeRows(MembershipRow)));
+
   if (!target) return yield* new NotFound({ resource: "player" });
+
   return target;
 });
 
@@ -226,17 +240,21 @@ export const removeMember = Effect.fn("Groups.removeMember")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
+
   if (targetUserId === userId) return yield* leave(groupId);
   const member = yield* Access.membership(groupId);
   yield* Access.requireAdmin(member);
   const target = yield* activeMember(groupId, targetUserId);
+
   if (target.role === "owner" || (target.role === "admin" && member.role !== "owner")) {
     return yield* new Forbidden({ reason: "owner_only" });
   }
+
   yield* sql`
     update memberships set left_at = now()
     where group_id = ${groupId} and user_id = ${targetUserId} and left_at is null
   `;
+
   return ok;
 });
 
@@ -248,11 +266,13 @@ export const setRole = Effect.fn("Groups.setRole")(function* (
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   yield* Access.requireOwner(yield* Access.membership(groupId));
+
   if (targetUserId === userId) return yield* new Conflict({ reason: "last_owner" });
   yield* activeMember(groupId, targetUserId);
   yield* sql`
     update memberships set role = ${request.role}
     where group_id = ${groupId} and user_id = ${targetUserId}
   `;
+
   return ok;
 });

@@ -10,10 +10,7 @@ export type Scope = { readonly item: GroupListItem; readonly trip: Trip | undefi
  * Your groups with a trip you just started in its group, until the list itself has caught up. Left
  * out, the remembered trip is one no group holds yet, and the scope lands on another group's.
  */
-export const withStartedTrip = (
-  groups: ReadonlyArray<GroupListItem>,
-  started: Trip | null,
-): ReadonlyArray<GroupListItem> =>
+export const withStartedTrip = (groups: ReadonlyArray<GroupListItem>, started: Trip | null) =>
   started === null || groups.some((item) => item.trips.some((trip) => trip.id === started.id))
     ? groups
     : groups.map((item) =>
@@ -29,11 +26,14 @@ export const resolveScope = (
   groups: ReadonlyArray<GroupListItem>,
   tripId: TripId | null,
   groupId: GroupId | null,
-): Scope | null => {
+) => {
   const holding = groups.find((item) => item.trips.some((trip) => trip.id === tripId));
   const picked = groups.find((item) => item.group.id === groupId);
+
   if (picked && picked !== holding) return { item: picked, trip: tripInScope(picked.trips, null) };
+
   if (holding) return { item: holding, trip: holding.trips.find((trip) => trip.id === tripId) };
+
   const going = groups
     .flatMap((item) =>
       item.trips.filter((trip) => trip.endedAt === null).map((trip) => ({ item, trip })),
@@ -41,8 +41,10 @@ export const resolveScope = (
     .toSorted(
       (a, b) => DateTime.toEpochMillis(b.trip.startedAt) - DateTime.toEpochMillis(a.trip.startedAt),
     )[0];
+
   if (going) return going;
   const item = groups.find((group) => group.trips.length > 0) ?? groups[0];
+
   return item ? { item, trip: item.trips[0] } : null;
 };
 

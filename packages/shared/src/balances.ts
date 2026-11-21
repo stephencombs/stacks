@@ -9,8 +9,9 @@ type BalanceEntry = Pick<Entry, "kind" | "playerId" | "counterpartyId" | "amount
  * Players who are square are left out, so an empty map means everyone is square.
  * Balances always sum to zero.
  */
-export const balances = (entries: Iterable<BalanceEntry>): ReadonlyMap<PlayerId, MinorUnits> => {
+export const balances = (entries: Iterable<BalanceEntry>) => {
   const totals = new Map<PlayerId, number>();
+
   const move = (from: PlayerId, to: PlayerId, amount: number) => {
     totals.set(from, (totals.get(from) ?? 0) - amount);
     totals.set(to, (totals.get(to) ?? 0) + amount);
@@ -18,13 +19,16 @@ export const balances = (entries: Iterable<BalanceEntry>): ReadonlyMap<PlayerId,
 
   for (const entry of entries) {
     if (entry.voidedAt !== null || entry.counterpartyId === null) continue;
+
     if (entry.kind === "buy_in") move(entry.playerId, entry.counterpartyId, entry.amount);
     else if (entry.kind === "cash_out") move(entry.counterpartyId, entry.playerId, entry.amount);
   }
 
   const result = new Map<PlayerId, MinorUnits>();
+
   for (const [playerId, total] of totals) {
     if (total !== 0) result.set(playerId, MinorUnits.make(total));
   }
+
   return result;
 };

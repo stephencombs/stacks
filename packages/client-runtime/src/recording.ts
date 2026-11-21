@@ -15,7 +15,9 @@ import {
   type TableDetails,
 } from "@stacks/contracts/recordingCommands";
 import { projectVisit } from "@stacks/shared/visits";
+import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
+import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import { newId } from "./ids.ts";
@@ -26,12 +28,12 @@ import {
   RecordingError,
   rememberVenues,
   CachedVenue,
-  type RecordingReceipt,
   type RecordingState,
 } from "./recordingState.ts";
 import { RecordingStorageConflict, type RecordingStorage } from "./recordingStorage.ts";
 
 export { CachedVenue, RecordingError } from "./recordingState.ts";
+
 export type { RecordingReceipt, RecordingState } from "./recordingState.ts";
 
 type StartInput = {
@@ -42,6 +44,7 @@ type StartInput = {
   readonly venueId?: VenueId;
   readonly highLimit?: boolean;
 };
+
 export type RecordingInput =
   | { readonly type: "set_table_trip"; readonly tableId: TableId; readonly tripId: TripId | null }
   | {
@@ -122,19 +125,19 @@ export type RecordingSnapshot = {
 };
 
 const commandCodec = Schema.toCodecJson(RecordingCommand);
+
 const commandText = (command: RecordingCommand) =>
   JSON.stringify(Schema.encodeSync(commandCodec)(command));
 
-export const prepareRecordingCommand = (
-  state: RecordingState,
-  input: RecordingInput,
-): RecordingCommand => {
+export const prepareRecordingCommand = (state: RecordingState, input: RecordingInput) => {
   const preparedAt = DateTime.makeUnsafe(Date.now());
+
   const common = {
     operationId: RecordingOperationId.make(newId()),
     actorId: state.actor.id,
     preparedAt,
   };
+
   if (input.type === "start" || input.type === "record_completed") {
     const start = {
       ...common,
@@ -145,56 +148,72 @@ export const prepareRecordingCommand = (
       buyIn: MinorUnits.make(input.buyIn),
       startedAt: input.startedAt ?? preparedAt,
       game: input.game ?? null,
-      ...(input.gameName === undefined ? {} : { gameName: input.gameName }),
       venueId: input.venueId ?? null,
       highLimit: input.highLimit ?? false,
     };
+
+    const named = input.gameName === undefined ? start : { ...start, gameName: input.gameName };
+
     return RecordingCommand.make(
       input.type === "start"
-        ? { type: "start", ...start }
+        ? { type: "start", ...named }
         : {
             type: "record_completed",
-            ...start,
+            ...named,
             cashOutId: EntryId.make(newId()),
             cashOut: MinorUnits.make(input.cashOut),
             finishedAt: input.finishedAt,
           },
     );
   }
+
   if (input.type === "join_table") {
     const saved = state.players.some((player) => player.id === input.playerId);
     const displayName = input.displayName?.trim() ?? "";
+
     if (!saved && displayName === "")
       throw new RecordingError("invalid", "Enter the player's name.");
+
     if (!saved && displayName.length > 60)
       throw new RecordingError("invalid", "Keep the name to 60 characters.");
     const playerId = input.playerId ?? PlayerId.make(newId());
-    return RecordingCommand.make({
+
+    const joined = {
       ...common,
-      type: "join_table",
+      type: "join_table" as const,
       tableId: input.tableId,
       visitId: VisitId.make(newId()),
       playerId,
       buyInId: EntryId.make(newId()),
       buyIn: MinorUnits.make(input.buyIn),
       startedAt: input.startedAt ?? preparedAt,
-      ...(saved ? {} : { newPlayer: { id: playerId, displayName } }),
       ...withCounterparty(input.counterpartyId),
-    });
+    };
+
+    return RecordingCommand.make(
+      saved ? joined : { ...joined, newPlayer: { id: playerId, displayName } },
+    );
   }
-  if (input.type === "open_table")
-    return RecordingCommand.make({
+
+  if (input.type === "open_table") {
+    const opened = {
       ...common,
-      type: "open_table",
+      type: "open_table" as const,
       tableId: TableId.make(newId()),
       playerId: state.self.id,
       game: input.game ?? null,
-      ...(input.gameName === undefined ? {} : { gameName: input.gameName }),
       venueId: input.venueId ?? null,
       highLimit: input.highLimit ?? false,
-    });
+    };
+
+    return RecordingCommand.make(
+      input.gameName === undefined ? opened : { ...opened, gameName: input.gameName },
+    );
+  }
+
   if (input.type === "set_table_trip" || input.type === "delete_table")
     return RecordingCommand.make({ ...common, ...input });
+
   if (input.type === "appoint_recorder" || input.type === "revoke_recorder")
     return RecordingCommand.make({
       ...common,
@@ -203,8 +222,10 @@ export const prepareRecordingCommand = (
       playerId: input.playerId,
     });
   const visit = state.visits.find((visit) => visit.id === input.visitId);
+
   if (!visit) throw new RecordingError("invalid", "Visit does not exist.");
   const existing = { ...common, visitId: visit.id, expectedRevision: visit.revision };
+
   switch (input.type) {
     case "add":
       return RecordingCommand.make({
@@ -230,7 +251,9 @@ export const prepareRecordingCommand = (
       const original = state.entries.find(
         (entry) => entry.id === input.entryId && entry.visitId === visit.id,
       );
+
       if (!original) throw new RecordingError("invalid", "Correction target does not exist.");
+
       return RecordingCommand.make({
         ...existing,
         type: "correct",
@@ -248,22 +271,26 @@ export const prepareRecordingCommand = (
               },
       });
     }
+
     case "delete_visit":
     case "restore_visit":
       return RecordingCommand.make({ ...existing, type: input.type });
     case "reopen":
       return RecordingCommand.make({ ...existing, type: "reopen", reason: input.reason });
-    case "edit_visit":
-      return RecordingCommand.make({
-        ...existing,
-        type: "edit_visit",
-        ...(input.startedAt === undefined ? {} : { startedAt: input.startedAt }),
-        ...(input.table === undefined ? {} : { table: input.table }),
-      });
+    case "edit_visit": {
+      const edited = { ...existing, type: "edit_visit" as const };
+
+      const timed =
+        input.startedAt === undefined ? edited : { ...edited, startedAt: input.startedAt };
+
+      return RecordingCommand.make(
+        input.table === undefined ? timed : { ...timed, table: input.table },
+      );
+    }
   }
 };
 
-const freezeState = (state: RecordingState): RecordingState => {
+const freezeState = (state: RecordingState) => {
   for (const records of [
     state.players,
     state.participants,
@@ -277,17 +304,22 @@ const freezeState = (state: RecordingState): RecordingState => {
     for (const record of records) Object.freeze(record);
     Object.freeze(records);
   }
+
   for (const receipt of state.receipts) {
     if (receipt.command.type === "correct" && receipt.command.replacement)
       Object.freeze(receipt.command.replacement);
+
     if (receipt.command.type === "join_table" && receipt.command.newPlayer)
       Object.freeze(receipt.command.newPlayer);
+
     if (receipt.command.type === "edit_visit" && receipt.command.table)
       Object.freeze(receipt.command.table);
     Object.freeze(receipt.command);
   }
+
   Object.freeze(state.self);
   Object.freeze(state.actor);
+
   return Object.freeze(state);
 };
 
@@ -301,35 +333,40 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
     error: null,
     failedCommand: null,
   });
+
   let closed = false;
   let loadFailed = false;
   let failedVenues: ReadonlyArray<CachedVenue> = [];
   let closePromise: Promise<void> | undefined;
   let queue: Promise<unknown> = Promise.resolve();
   const listeners = new Set<() => void>();
+
   const update = (values: Partial<RecordingSnapshot>) => {
     snapshot = Object.freeze({ ...snapshot, ...values });
+
     for (const listener of listeners) {
-      // Subscribers cannot change the outcome of an acknowledged durable transaction.
       try {
         listener();
-      } catch {
-        /* A view owns its subscriber errors. */
-      }
+      } catch {}
     }
   };
-  const serialize = <A>(operation: () => Promise<A>): Promise<A> => {
+
+  const serialize = <A>(operation: () => Promise<A>) => {
     if (closed) return Promise.reject(new RecordingError("closed", "Recording store is closed."));
     const result = queue.then(operation);
     queue = result.catch(() => undefined);
+
     return result;
   };
+
   const load = async () => {
     const document = await storage.load();
+
     if (document.payload === undefined) {
       if (snapshot.state !== null)
         throw new RecordingError("load", "Saved recording history disappeared.");
       const self = { id: PlayerId.make(newId()), displayName: "You" };
+
       const state: RecordingState = {
         version: 2,
         self,
@@ -343,6 +380,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         receipts: [],
         venues: [],
       };
+
       try {
         const revision = await storage.commit(0, encodeRecordingState(state));
         update({
@@ -354,6 +392,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
       } catch (error) {
         if (!(error instanceof RecordingStorageConflict)) throw error;
         const winner = await storage.load();
+
         if (winner.payload === undefined) throw error;
         update({
           state: freezeState(decodeRecordingState(winner.payload, winner.revision)),
@@ -365,8 +404,8 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
     } else {
       const state = freezeState(decodeRecordingState(document.payload, document.revision));
       const previous = snapshot.state;
-      // Another screen may have adopted the account's identity before anything synced.
       const adopted = state.sync !== undefined && (previous?.sync?.synced.length ?? 0) === 0;
+
       if (
         previous &&
         (((state.self.id !== previous.self.id || state.actor.id !== previous.actor.id) &&
@@ -382,6 +421,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
       });
     }
   };
+
   const refresh = () =>
     serialize(async () => {
       try {
@@ -393,37 +433,44 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         throw error;
       }
     });
+
   const unsubscribe = storage.subscribe((change) => {
     if (closed) return;
+
     if (change.type === "error") {
       loadFailed = true;
       update({ status: "load_failed", error: change.error });
     } else if (change.revision > snapshot.revision) void refresh().catch(() => undefined);
   });
+
   const ready = refresh();
-  /**
-   * Saves a command, and caches `venues` in the same write: a device that hasn't synced saves
-   * exactly one receipt per write, so a venue it picks can't be cached on its own.
-   */
+
   const execute = (prepared: RecordingCommand, venues: ReadonlyArray<CachedVenue> = []) => {
-    // Copy/validate now, so a caller cannot mutate queued or failed work.
     const command = Schema.decodeUnknownSync(commandCodec)(JSON.parse(commandText(prepared)), {
       onExcessProperty: "error",
     });
+
     Object.freeze(command);
+
     const cached = Object.freeze(
       venues.map((venue) => Object.freeze(Schema.decodeUnknownSync(CachedVenue)({ ...venue }))),
     );
+
     if (command.type === "correct" && command.replacement) Object.freeze(command.replacement);
+
     if (command.type === "edit_visit" && command.table) Object.freeze(command.table);
-    return serialize(async (): Promise<RecordingReceipt> => {
+
+    return serialize(async () => {
       try {
         const state = snapshot.state;
+
         if (state === null || loadFailed)
           throw new RecordingError("load", "Load recording history before saving.");
+
         const receipt = state.receipts.find(
           (receipt) => receipt.command.operationId === command.operationId,
         );
+
         if (receipt) {
           if (commandText(receipt.command) !== commandText(command))
             throw new RecordingError(
@@ -432,8 +479,10 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
             );
           failedVenues = [];
           update({ status: "saved", error: null, failedCommand: null });
+
           return receipt;
         }
+
         const committed = rememberVenues(applyRecordingCommand(state, command), cached);
         const saved = committed.receipts[committed.receipts.length - 1]!;
         const payload = encodeRecordingState(committed);
@@ -447,6 +496,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
           error: loadFailed ? snapshot.error : null,
           failedCommand: null,
         });
+
         return saved;
       } catch (error) {
         failedVenues = cached;
@@ -459,17 +509,21 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
       }
     });
   };
+
   return {
     ready,
     getSnapshot: () => snapshot,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
+
       return () => void listeners.delete(listener);
     },
     prepare: (input: RecordingInput) => {
       if (closed) throw new RecordingError("closed", "Recording store is closed.");
+
       if (snapshot.state === null || loadFailed)
         throw new RecordingError("load", "Load recording history before preparing a command.");
+
       return prepareRecordingCommand(snapshot.state, input);
     },
     execute,
@@ -478,35 +532,38 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         return Promise.reject(
           new RecordingError("invalid", "There is no failed command to retry."),
         );
+
       return execute(snapshot.failedCommand, failedVenues);
     },
     refresh,
-    /**
-     * Saves a whole-ledger change, such as sync bookkeeping, in turn with commands. `change` sees
-     * the latest saved state; returning it unchanged saves nothing.
-     */
     transform: (change: (state: RecordingState) => RecordingState) =>
       serialize(async () => {
         const state = snapshot.state;
+
         if (state === null || loadFailed)
           throw new RecordingError("load", "Load recording history before saving.");
         const next = change(state);
         const payload = encodeRecordingState(next);
+
         if (next === state || payload === encodeRecordingState(state)) return state;
         const revision = await storage.commit(snapshot.revision, payload);
         update({ state: freezeState(next), revision });
+
         return next;
       }),
     review: (visitId: VisitId) => {
       const state = snapshot.state;
       const visit = state?.visits.find((visit) => visit.id === visitId);
+
       if (!state || !visit) throw new RecordingError("invalid", "Visit does not exist.");
+
       return projectVisit(visit, state.entries);
     },
     close: () =>
       (closePromise ??= (() => {
         closed = true;
         unsubscribe();
+
         return queue.then(async () => {
           try {
             await storage.close();
@@ -518,4 +575,12 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
       })()),
   };
 };
+
 export type RecordingStore = ReturnType<typeof makeRecordingStore>;
+
+export class RecordingStoreService extends Context.Service<RecordingStoreService, RecordingStore>()(
+  "@stacks/client-runtime/RecordingStore",
+) {}
+
+export const RecordingStoreLive = (storage: RecordingStorage) =>
+  Layer.sync(RecordingStoreService, () => makeRecordingStore(storage));

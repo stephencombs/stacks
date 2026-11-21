@@ -35,7 +35,7 @@ export const groupChip = (
   applied: picked !== null,
   options: [
     { value: "", label: "Just me" },
-    ...groups.map((group) => ({ value: group.id as string, label: group.name })),
+    ...groups.map((group) => ({ value: group.id, label: group.name })),
   ],
 });
 
@@ -96,24 +96,31 @@ export const groupStatsView = (
   const currency = detail.group.currency;
   const names = playerNames(detail);
   const venues = new Map(stats.venues.map((venue) => [venue.id, venue]));
+
   const venueName = (id: VenueId | null) =>
     id === null ? "No casino set" : (venues.get(id)?.name ?? "Casino");
+
   const trips = new Map(detail.trips.map((trip) => [trip.id, trip.name]));
   const tripName = (id: TripId) => trips.get(id) ?? "Trip";
+
   const roster = detail.players
     .filter((player) => player.role !== null || player.claimCode !== null)
     .map((player) => player.id);
+
   const computed = groupStats(stats.plays, roster, timeZone, filters);
-  // The group's trips, newest first, whether or not they've finished anything yet.
+
   const options = {
     ...computed.options,
     tripIds: [...new Set([...computed.options.tripIds, ...detail.trips.map((trip) => trip.id)])],
   };
+
   const head = {
     ...filterChips(filters, options, { venueName, tripName }),
     trips: statsTrips(stats.plays, detail.trips, filters, timeZone),
   };
+
   if (stats.plays.length === 0) return { ...head, kind: "empty" as const };
+
   if (computed.plays.length === 0)
     return {
       ...head,
@@ -131,12 +138,14 @@ export const groupStatsView = (
       : filters.year === undefined
         ? "All time"
         : String(filters.year);
+
   const race = computed.plays.map((play) => ({
     session: { id: play.id, startedAt: play.startedAt },
     tripId: play.tripId,
     venue: play.venueId === null ? null : { id: play.venueId, name: venueName(play.venueId) },
     results: play.results,
   }));
+
   const nights =
     filters.tripId === undefined
       ? []
@@ -145,6 +154,7 @@ export const groupStatsView = (
           label: `Day ${night.number}`,
           ids: new Set(night.sessions.map((s) => s.session.id)),
         }));
+
   const marks =
     filters.tripId === undefined
       ? race.flatMap((session, index) =>
@@ -156,20 +166,27 @@ export const groupStatsView = (
           index: race.findIndex((s) => s.session.id === night.first),
           label: night.label,
         }));
+
   const biggest = Math.max(...computed.byGame.map((row) => Math.abs(row.result)));
   const meta = (sessions: number) => `${sessions} ${sessions === 1 ? "session" : "sessions"}`;
+
   const guests = new Set(
     detail.players.filter((player) => player.userId === null).map((p) => p.id),
   );
+
   const bests = new Map<PlayerId, { result: MinorUnits; line: string }>();
+
   for (const play of computed.plays) {
     for (const { playerId, net } of play.results) {
       const best = bests.get(playerId);
+
       if (best && best.result >= net) continue;
+
       const day = DateTime.format(DateTime.setZone(play.endedAt, timeZone), {
         month: "short",
         day: "numeric",
       });
+
       bests.set(playerId, {
         result: net,
         line: play.venueId === null ? day : `${venueName(play.venueId)} · ${day}`,

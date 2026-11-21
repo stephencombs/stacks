@@ -51,14 +51,18 @@ export function assignThemeItems(
 const withAndroidTheme: ConfigPlugin = (config) => {
   config = withAndroidColors(config, (config) => {
     config.modResults = assignColors(config.modResults, androidThemeColors.light);
+
     return config;
   });
   config = withAndroidColorsNight(config, (config) => {
     config.modResults = assignColors(config.modResults, androidThemeColors.night);
+
     return config;
   });
+
   return withAndroidStyles(config, (config) => {
     config.modResults = assignThemeItems(config.modResults);
+
     return config;
   });
 };

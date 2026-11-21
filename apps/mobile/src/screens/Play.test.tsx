@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { makeRecordingStore } from "@stacks/client-runtime/recording";
 import { recordingTable } from "@stacks/client-runtime/recordingView";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
@@ -10,15 +9,18 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   let documentState: RecordingStorageDocument = { revision: 0 };
+
   const store = makeRecordingStore({
     load: async () => documentState,
     commit: async (_revision, payload) => {
       documentState = { revision: documentState.revision + 1, payload };
+
       return documentState.revision;
     },
     subscribe: () => () => {},
     close: async () => {},
   });
+
   await store.ready;
   await store.execute(store.prepare({ type: "start", buyIn: 20000 }));
   const visit = store.getSnapshot().state!.visits[0]!;
@@ -31,15 +33,19 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   const navigation = { setOptions: vi.fn(), setParams, dispatch };
   vi.doMock("@react-navigation/native", () => ({
     useNavigation: () => navigation,
-    StackActions: { push: (screen: string, params: object) => ({ screen, params }) },
+    StackActions: {
+      push: (screen: string, params: { readonly visitId: string }) => ({ screen, params }),
+    },
   }));
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+
   class Value {
     interpolate() {
       return 0;
     }
     stopAnimation() {}
   }
+
   vi.doMock("react-native", () => ({
     Text: Container,
     View: Container,
@@ -65,6 +71,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     confirmAction: (_title: string, _message: string, _label: string, confirm: () => void) =>
       confirm(),
   }));
+
   const Button = ({
     label,
     accessibilityLabel,
@@ -74,6 +81,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     accessibilityLabel?: string;
     onPress?: () => void;
   }) => <button onClick={onPress}>{label ?? accessibilityLabel}</button>;
+
   vi.doMock("../components/ui/Button", () => ({ Button, IconButton: Button }));
   vi.doMock("../components/ui/ActionMenu", () => ({
     ActionMenu: ({ actions }: { actions: { label: string; onPress: () => void }[] }) =>
@@ -119,6 +127,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.doMock("../features/SharedTable", () => ({
     TableSection: ({ onOpen }: { onOpen: (id: typeof guest.id) => void }) => {
       const state = useSyncExternalStore(store.subscribe, store.getSnapshot).state!;
+
       return recordingTable(state, visit.tableId)
         ?.visits.filter((v) => !v.isSelf)
         .map((v) => (
@@ -134,13 +143,16 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   const { PlayScreen } = await import("./Play");
   const element = document.createElement("div");
   const root = createRoot(element);
+
   const click = async (label: string, within: ParentNode = element) => {
     const button = [...within.querySelectorAll("button")].find(
       (b) => b.textContent === label || b.getAttribute("aria-label")?.startsWith(label + ","),
     );
+
     expect(button, label).toBeDefined();
     await act(async () => button!.click());
   };
+
   try {
     await act(async () =>
       root.render(
@@ -156,7 +168,6 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     expect(element.textContent).not.toContain("View entry");
     await click("Dismiss");
     await click("Edit my session");
-    // Bea is at the table too, so this removes only your visit.
     await click("Delete my visit");
     expect(element.querySelector("footer")!.textContent).toContain("Session deletedUndoDismiss");
     await click("Bea");
@@ -166,7 +177,6 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     expect(store.getSnapshot().state!.visits[0]!.deletedAt).toBeUndefined();
     expect(element.querySelector("footer")!.textContent).not.toContain("Session deleted");
 
-    // Deep link ?action=cash_out opens CashOutSheet once on a live visit and clears action param.
     setParams.mockClear();
     await act(async () =>
       root.render(
@@ -178,7 +188,6 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     expect(element.textContent).toContain("Cash out sheet");
     expect(setParams).toHaveBeenCalledWith({ action: undefined });
 
-    // Once finished, ?action=cash_out no longer opens CashOutSheet.
     await store.execute(store.prepare({ type: "finish", visitId: visit.id, amount: 25000 }));
     setParams.mockClear();
     await act(async () =>

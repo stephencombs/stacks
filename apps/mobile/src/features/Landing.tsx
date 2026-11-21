@@ -26,12 +26,9 @@ import { SignInButton } from "./SignInButton";
 import { TripHero } from "./TripHero";
 
 const SHIFT_MS = 250;
-/** Phone-width column. Wider windows center it; the frame itself never grows into a page. */
+
 const FRAME = 440;
-/**
- * The sample trip card is a fixed block (figure, line, tiles). Show it only when the step
- * still has room for its title, so a short phone clips nothing and never scrolls.
- */
+
 const TRIP_MIN_PAGE = 530;
 
 const steps = [
@@ -70,8 +67,10 @@ const heightOf = (event: LayoutChangeEvent) => Math.round(event.nativeEvent.layo
 
 const pageOf = (event: ScrollEnd) => {
   const viewport = event.nativeEvent.layoutMeasurement.width;
+
   if (viewport <= 0) return null;
   const page = Math.round(event.nativeEvent.contentOffset.x / viewport);
+
   return Math.min(steps.length - 1, Math.max(0, page));
 };
 
@@ -152,21 +151,26 @@ export function Landing({
     shift(0);
     void Haptics.selectionAsync();
     const step = steps[indexRef.current];
+
     if (step)
       AccessibilityInfo.announceForAccessibility(
         `Step ${indexRef.current + 1} of ${steps.length}. ${step.title}`,
       );
   };
+
   const closeFromHardware = useEffectEvent(() => {
     closeAccount();
   });
 
   useEffect(() => {
     if (!account || Platform.OS !== "android") return;
+
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       closeFromHardware();
+
       return true;
     });
+
     return () => subscription.remove();
   }, [account]);
 
@@ -184,6 +188,7 @@ export function Landing({
     setIndex(next);
     void Haptics.selectionAsync();
     const step = steps[next];
+
     if (step)
       AccessibilityInfo.announceForAccessibility(
         `Step ${next + 1} of ${steps.length}. ${step.title}`,
@@ -205,6 +210,7 @@ export function Landing({
     const next = heightOf(event);
     setBodyHeight((height) => (height === next ? height : next));
   };
+
   const onPager = (event: LayoutChangeEvent) => {
     const next = heightOf(event);
     setPageHeight((height) => (height === next ? height : next));
@@ -282,12 +288,14 @@ export function Landing({
                         onMomentumScrollEnd={(event) => {
                           const fromFinger = dragging.current;
                           dragging.current = false;
+
                           if (!fromFinger) return;
                           commit(pageOf(event));
                         }}
                         onScrollEndDrag={(event) => {
                           if (!dragging.current) return;
                           const velocity = event.nativeEvent.velocity?.x ?? 0;
+
                           if (Math.abs(velocity) > 0.05) return;
                           dragging.current = false;
                           commit(pageOf(event));

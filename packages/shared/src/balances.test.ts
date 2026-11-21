@@ -9,6 +9,7 @@ describe("balances", () => {
     const result = balances([
       entry({ kind: "buy_in", playerId: ALEX, amount: money(10000), counterpartyId: BEA }),
     ]);
+
     expect(result).toEqual(
       new Map([
         [ALEX, -10000],
@@ -21,6 +22,7 @@ describe("balances", () => {
     const result = balances([
       entry({ kind: "cash_out", playerId: ALEX, amount: money(30000), counterpartyId: BEA }),
     ]);
+
     expect(result).toEqual(
       new Map([
         [ALEX, 30000],
@@ -42,6 +44,7 @@ describe("balances", () => {
         voidedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
       }),
     ]);
+
     expect(result.size).toBe(0);
   });
 

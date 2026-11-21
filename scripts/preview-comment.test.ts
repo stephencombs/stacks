@@ -34,19 +34,23 @@ it("updates the same comment when the URL changes", () => {
 
 it("does not write when the preview URL is unchanged", async () => {
   const calls: { input: string; method: string }[] = [];
+
   const fetch = async (input: string, init?: { method?: string }) => {
     calls.push({ input, method: init?.method ?? "GET" });
+
     return {
       ok: true,
       json: async () => [{ id: 7, body: commentBody(url) }],
     };
   };
+
   const plan = await publishPreviewComment({
     repository: "acme/stacks",
     pr: 35,
     token: "token",
     fetch,
   });
+
   expect(plan.action).toBe("skip");
   expect(calls.map((call) => call.method)).toEqual(["GET"]);
 });
@@ -59,5 +63,6 @@ it("updates the marked comment rather than a newer mention", () => {
     ],
     url,
   );
+
   expect(plan).toEqual({ action: "update", id: 3, body: commentBody(url) });
 });

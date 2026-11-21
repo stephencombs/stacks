@@ -16,6 +16,7 @@ export const BEA = PlayerId.make("0192e7a0-0000-7000-8000-000000000002");
 export const ACTOR = ActorId.make("0192e7a0-0000-7000-8000-000000000004");
 const AT = DateTime.makeUnsafe("2026-11-06T20:00:00Z");
 export const LATER = DateTime.makeUnsafe("2026-11-06T21:00:00Z");
+
 const table: Table = {
   id: TableId.make("0192e7a0-0000-7000-8000-0000000000a1"),
   tripId: null,
@@ -24,6 +25,7 @@ const table: Table = {
   highLimit: false,
   starterPlayerId: ALEX,
 };
+
 export const visit: Visit = {
   id: VisitId.make("0192e7a0-0000-7000-8000-0000000000b1"),
   tableId: table.id,
@@ -32,8 +34,10 @@ export const visit: Visit = {
   finishedAt: null,
   revision: 0,
 };
+
 export const entryId = (n: number) =>
   EntryId.make(`0192e7a0-0000-7000-8000-${n.toString(16).padStart(12, "0")}`);
+
 const audit = {
   createdBy: ACTOR,
   createdAt: AT,
@@ -42,7 +46,8 @@ const audit = {
   voidReason: null,
   replacesEntryId: null,
 };
-export const play = (fields: Partial<PlayEntry> = {}): PlayEntry => ({
+
+export const play: (fields?: Partial<PlayEntry>) => PlayEntry = (fields = {}) => ({
   id: entryId(1),
   visitId: visit.id,
   kind: "buy_in",

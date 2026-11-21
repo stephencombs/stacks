@@ -8,6 +8,7 @@ import {
 } from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import type { PlayerId, PlayerIdentity, TableId, VisitId } from "@stacks/contracts";
+import * as Match from "effect/Match";
 import { useState } from "react";
 import { Platform, Text, View } from "react-native";
 
@@ -23,7 +24,6 @@ import { shareLink } from "../lib/share";
 import { Chip } from "./Chip";
 import { AddPlayerSheet } from "./RecordingForms";
 
-/** How many played here, and whether the table has closed: it closes once nobody is playing. */
 const players = (count: number, closed: boolean) =>
   `${count === 1 ? "1 player" : `${count} players`}${closed ? " · Closed" : ""}`;
 
@@ -42,13 +42,18 @@ export function TableSection({
   const table = useRecordingTable(tableId);
   const account = useAccount();
   const [open, setOpen] = useState<"add" | "share" | "settings" | null>(null);
+
   if (!table) return null;
+
   if (table.role === "participant") return <JoinedTableSection tableId={tableId} onOpen={onOpen} />;
+
   const names = distinctPlayerNames(
     table.visits.map((item) => [item.player.id, item.isSelf ? "You" : item.player.displayName]),
   );
+
   const others = table.visits.some((item) => !item.isSelf);
   const signedOut = account.available && account.isLoaded && !account.isSignedIn;
+
   return (
     <View className="gap-2">
       <SectionHeading
@@ -111,21 +116,24 @@ export function TableSection({
           This table syncs from this device. Sign in to keep this table if you lose the device.
         </Text>
       ) : null}
-      {open === "add" ? (
-        <AddPlayerSheet
-          tableId={tableId}
-          saved={table.addable}
-          onClose={() => setOpen(null)}
-          onAdded={(next) => {
-            setOpen(null);
-            onOpen(next);
-          }}
-        />
-      ) : open === "share" ? (
-        <ShareSheet tableId={tableId} onClose={() => setOpen(null)} />
-      ) : open === "settings" ? (
-        <TableSettingsSheet tableId={tableId} onClose={() => setOpen(null)} />
-      ) : null}
+      {Match.value(open).pipe(
+        Match.when("add", () => (
+          <AddPlayerSheet
+            tableId={tableId}
+            saved={table.addable}
+            onClose={() => setOpen(null)}
+            onAdded={(next) => {
+              setOpen(null);
+              onOpen(next);
+            }}
+          />
+        )),
+        Match.when("share", () => <ShareSheet tableId={tableId} onClose={() => setOpen(null)} />),
+        Match.when("settings", () => (
+          <TableSettingsSheet tableId={tableId} onClose={() => setOpen(null)} />
+        )),
+        Match.orElse(() => null),
+      )}
     </View>
   );
 }
@@ -134,6 +142,7 @@ export function TableSection({
 export function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: () => void }) {
   const sharing = useTableSharing(tableId);
   const url = sharing.token ? appUrl(`t/${sharing.token}`) : null;
+
   return (
     <Sheet
       open
@@ -218,10 +227,6 @@ export function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: ()
   );
 }
 
-/**
- * A table this device joined. Its own visits are here; everyone else's come from the server, so
- * they show only online, and only to read: a participant records just their own play.
- */
 function JoinedTableSection({
   tableId,
   onOpen,
@@ -232,13 +237,16 @@ function JoinedTableSection({
   const table = useRecordingTable(tableId)!;
   const server = useServerTable(tableId);
   const names = new Map(server?.players.map((player) => [player.id, player.displayName]));
+
   const rows = [
     ...table.visits.map((item) => ({ ...item, name: "You", mine: true })),
     ...(server?.visits ?? [])
       .filter((item) => item.visit.playerId !== table.you.player.id)
       .map((item) => ({ ...item, name: names.get(item.visit.playerId) ?? "Player", mine: false })),
   ];
+
   const labels = distinctPlayerNames(rows.map((item) => [item.visit.playerId, item.name]));
+
   return (
     <View className="gap-2">
       <SectionHeading
@@ -307,23 +315,29 @@ export function TableSettingsSheet({
   const recording = useRecordingSubmit();
   const [inviting, setInviting] = useState<PlayerIdentity | null>(null);
   const [stopped, setStopped] = useState(false);
+
   const players = [
     ...new Map(
       table.visits.filter((item) => !item.isSelf).map((item) => [item.player.id, item.player]),
     ).values(),
   ];
+
   const playerLabels = distinctPlayerNames(
     players.map((player) => [player.id, player.displayName]),
   );
+
   const recorders = new Set(table.recorders.map((player) => player.id));
   const names = new Map(server?.players.map((player) => [player.id, player.displayName]));
+
   const toggle = (playerId: PlayerId) =>
     void recording.submit({
       type: recorders.has(playerId) ? "revoke_recorder" : "appoint_recorder",
       tableId,
       playerId,
     });
+
   if (inviting) return <InviteSheet player={inviting} onClose={() => setInviting(null)} />;
+
   return (
     <Sheet
       open
@@ -430,14 +444,11 @@ export function TableSettingsSheet({
   );
 }
 
-/**
- * A single-use link that lets one more device record as this player, and the devices that already
- * do.
- */
 function InviteSheet({ player, onClose }: { player: PlayerIdentity; onClose: () => void }) {
   const invite = usePlayerInvite(player.id);
   const url = invite.link ? appUrl(`invite/${invite.link.token}`) : null;
   const devices = invite.access?.devices ?? [];
+
   return (
     <Sheet
       open

@@ -75,28 +75,30 @@ const money = (
         trailingZeroDisplay: prefs.showCents ? "auto" : "stripIfInteger",
       });
 
-// Divide exact minor units by elapsed hours using integer math, rounding halves away from zero.
 const hourlyRate = (result: MinorUnits, startedAt: DateTime.Utc, finishedAt: DateTime.Utc) => {
   const ms = BigInt(
     Math.max(0, DateTime.toEpochMillis(finishedAt) - DateTime.toEpochMillis(startedAt)),
   );
+
   if (ms === 0n) return MinorUnits.make(0);
   const numerator = BigInt(result) * 3_600_000n;
   const magnitude = numerator < 0n ? -numerator : numerator;
   const rounded = (magnitude * 2n + ms) / (ms * 2n);
+
   return MinorUnits.make(Number(numerator < 0n ? -rounded : rounded));
 };
 
-const liveFromVisit = (
+const liveFromVisit: (
   item: RecordedVisit,
   prefs: LiveSurfacePrefs,
   appUrl: (path: string) => string,
-): LiveSessionSurfaceLive => {
+) => LiveSessionSurfaceLive = (item, prefs, appUrl) => {
   const gameLabel = visitTitle(item.table);
   const casino = venueLabel(item.venue);
   const buyInText = money(item.totals.buyIn, prefs);
   const startedAtMs = DateTime.toEpochMillis(item.visit.startedAt);
   const path = `play/${item.visit.id}`;
+
   return {
     kind: "live",
     visitId: item.visit.id,
@@ -116,12 +118,12 @@ const liveFromVisit = (
   };
 };
 
-const finishedFromVisit = (
+const finishedFromVisit: (
   item: RecordedVisit,
   prefs: LiveSurfacePrefs,
   appUrl: (path: string) => string,
   timeZone?: DateTime.TimeZone,
-): LiveSessionSurfaceFinished => {
+) => LiveSessionSurfaceFinished = (item, prefs, appUrl, timeZone) => {
   const finishedAt = item.visit.finishedAt!;
   const gameLabel = visitTitle(item.table);
   const casino = venueLabel(item.venue);
@@ -133,6 +135,7 @@ const finishedFromVisit = (
   const hourlyText = prefs.privacyMode ? HIDDEN : `${money(hourly, prefs, "exceptZero")}/hr`;
   const durationText = `${formatDuration(item.visit.startedAt, finishedAt)} played`;
   const path = `play/${item.visit.id}`;
+
   return {
     kind: "finished",
     visitId: item.visit.id,
@@ -162,13 +165,14 @@ const finishedFromVisit = (
  * Own active live session for lock screen / Dynamic Island / Android Live Update, reading only
  * this player's money.
  */
-export const liveSessionSurface = (
+export const liveSessionSurface: (
   state: RecordingState | null,
   prefs: LiveSurfacePrefs,
   appUrl: (path: string) => string,
-): LiveSessionSurface => {
+) => LiveSessionSurface = (state, prefs, appUrl) => {
   if (!state) return { kind: "idle" };
   const active = recordingHome(state).active[0];
+
   return active ? liveFromVisit(active, prefs, appUrl) : { kind: "idle" };
 };
 
@@ -176,20 +180,24 @@ export const liveSessionSurface = (
  * Keeps a tracked session's summary through cash-out and subsequent edits until the session is
  * deleted or a different active session takes over.
  */
-export const reconcileLiveSessionSurface = (
+export const reconcileLiveSessionSurface: (
   previousVisitId: VisitId | null,
   state: RecordingState | null,
   prefs: LiveSurfacePrefs,
   appUrl: (path: string) => string,
   timeZone?: DateTime.TimeZone,
-): LiveSessionSurface => {
+) => LiveSessionSurface = (previousVisitId, state, prefs, appUrl, timeZone) => {
   if (!state) return { kind: "idle" };
   const home = recordingHome(state);
   const active = home.active[0];
+
   if (active) return liveFromVisit(active, prefs, appUrl);
+
   if (previousVisitId !== null) {
     const finished = home.finished.find((item) => item.visit.id === previousVisitId);
+
     if (finished) return finishedFromVisit(finished, prefs, appUrl, timeZone);
   }
+
   return { kind: "idle" };
 };

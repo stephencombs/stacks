@@ -21,6 +21,7 @@ type Props = StaticScreenProps<{ groupId: string }>;
 export function GroupSettingsScreen({ route }: Props) {
   const stacks = useStacks();
   useLinkedScope(route.params);
+
   return (
     <Loaded
       query={stacks.group(GroupId.make(route.params.groupId))}
@@ -48,11 +49,14 @@ function SettingsView({ detail }: { detail: GroupDetail }) {
   const exportCsv = useAction(stacks.Client.mutation("groups", "exportCsv"));
   const [renaming, setRenaming] = useState(false);
   const leave = useAction(stacks.Client.mutation("groups", "leave"));
+
   const exportLedger = async () => {
     const csv = await exportCsv.run({ params: { groupId: detail.group.id } });
+
     if (csv == null) return;
     await shareCsv(csvFilename(detail.group.name), csv);
   };
+
   const leaveGroup = () =>
     confirmAction(
       `Leave ${detail.group.name}?`,
@@ -60,11 +64,14 @@ function SettingsView({ detail }: { detail: GroupDetail }) {
       "Leave group",
       async () => {
         const { error } = await leave.attempt({ params: { groupId: detail.group.id } });
+
         if (error !== null) return error;
         navigation.dispatch(afterLeavingGroup());
+
         return null;
       },
     );
+
   const sections: SettingsLayoutProps["sections"] = [
     ...(isAdmin(detail)
       ? [
@@ -108,6 +115,7 @@ function SettingsView({ detail }: { detail: GroupDetail }) {
 function RenameGroupSheet({ detail, onClose }: { detail: GroupDetail; onClose: () => void }) {
   const stacks = useStacks();
   const rename = useAction(stacks.Client.mutation("groups", "rename"));
+
   return (
     <NameSheet
       title="Rename group"

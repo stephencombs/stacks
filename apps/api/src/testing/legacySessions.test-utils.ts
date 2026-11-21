@@ -34,15 +34,19 @@ export const seedSession = Effect.fn("fixtures.seedSession")(function* (
         on conflict (id) do nothing
         returning group_id
       `;
+
       if (!row) return;
+
       const players = session.playerIds.map((playerId) => ({
         sessionId: session.id,
         groupId: row.groupId,
         playerId,
       }));
+
       if (players.length > 0) yield* sql`insert into session_players ${sql.insert(players)}`;
     }),
   );
+
   return session.id;
 });
 
@@ -74,15 +78,18 @@ export const seedEntry = Effect.fn("fixtures.seedEntry")(function* (
         on conflict (id) do nothing
         returning id
       `;
+
       if (!inserted) return;
       yield* sql`
         insert into session_players (session_id, group_id, player_id)
         select id, group_id, ${entry.playerId} from sessions where id = ${sessionId}
         on conflict do nothing
       `;
+
       if (entry.replacesEntryId) yield* voidHistoricalEntry(entry.replacesEntryId, "Corrected");
     }),
   );
+
   return entry;
 });
 
@@ -99,7 +106,9 @@ export const finishHistoricalSession = Effect.fn("fixtures.finishHistoricalSessi
         where id = ${sessionId} and status = 'live'
         returning ended_at
       `;
+
       if (!row) return;
+
       for (const cashOut of close.cashOuts ?? []) {
         yield* seedEntry(sessionId, {
           ...cashOut,

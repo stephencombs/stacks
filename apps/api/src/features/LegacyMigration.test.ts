@@ -20,27 +20,28 @@ import {
 import { balances } from "@stacks/shared/balances";
 import { playerResults } from "@stacks/shared/results";
 
-import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
+import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 import * as LegacyMigration from "./LegacyMigration.ts";
 import {
   finishHistoricalSession,
   seedEntry,
   seedSession,
   voidHistoricalEntry,
-} from "../testing/legacySessions.ts";
+} from "../testing/legacySessions.test-utils.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
 const scope = (groupId: GroupId) => [groupId] as const;
 const date = (value: Date) => DateTime.makeUnsafe(value);
 const optionalDate = (value: Date | null) => (value === null ? null : date(value));
+
 const sorted = <V>(map: ReadonlyMap<string, V>) =>
   [...map].toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
-/** Every result and balance the legacy ledger reports, by trip. */
 const legacyLedger = Effect.fn("test.legacyLedger")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
+
   const rows = yield* sql<{
     id: string;
     kind: "buy_in" | "cash_out" | "adjustment";
@@ -61,6 +62,7 @@ const legacyLedger = Effect.fn("test.legacyLedger")(function* (groupId: GroupId)
     from entries e join sessions s on s.id = e.session_id
     where e.group_id = ${groupId}
   `;
+
   const entries = rows.map((row) => ({
     ...row,
     playerId: PlayerId.make(row.playerId),
@@ -70,20 +72,23 @@ const legacyLedger = Effect.fn("test.legacyLedger")(function* (groupId: GroupId)
     createdAt: date(row.createdAt),
     voidedAt: optionalDate(row.voidedAt),
   }));
+
   const trips = new Set(entries.map((entry) => entry.trip));
+
   return {
     entries,
     results: sorted(playerResults(entries)),
-    balances: [...trips]
-      .toSorted()
-      .map((trip) => [trip, sorted(balances(entries.filter((e) => e.trip === trip)))] as const)
-      .filter(([, owed]) => owed.length > 0),
+    balances: [...trips].toSorted().flatMap((trip) => {
+      const owed = sorted(balances(entries.filter((entry) => entry.trip === trip)));
+
+      return owed.length > 0 ? [[trip, owed] as const] : [];
+    }),
   };
 });
 
-/** The same group's play as the import left it, read through the new model's types and math. */
 const importedLedger = Effect.fn("test.importedLedger")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
+
   const visitRows = yield* sql<{
     id: string;
     playerId: string;
@@ -96,6 +101,7 @@ const importedLedger = Effect.fn("test.importedLedger")(function* (groupId: Grou
     from personal_visits v join sessions s on s.id = v.legacy_session_id
     where s.group_id = ${groupId}
   `;
+
   const entryRows = yield* sql<{
     id: string;
     visitId: string;
@@ -116,6 +122,7 @@ const importedLedger = Effect.fn("test.importedLedger")(function* (groupId: Grou
     join sessions s on s.id = v.legacy_session_id
     where s.group_id = ${groupId}
   `;
+
   const audit = (row: (typeof entryRows)[number]) => ({
     id: EntryId.make(row.id),
     amount: MinorUnits.make(Number(row.amount)),
@@ -129,6 +136,7 @@ const importedLedger = Effect.fn("test.importedLedger")(function* (groupId: Grou
     voidReason: row.voidReason,
     replacesEntryId: row.replacesEntryId === null ? null : EntryId.make(row.replacesEntryId),
   });
+
   const entries = entryRows.map((row) =>
     PlayEntry.make({
       ...audit(row),
@@ -137,15 +145,19 @@ const importedLedger = Effect.fn("test.importedLedger")(function* (groupId: Grou
       counterpartyId: row.counterpartyId === null ? null : PlayerId.make(row.counterpartyId),
     }),
   );
+
   const ownerOf = new Map(visitRows.map((visit) => [visit.id, PlayerId.make(visit.playerId)]));
+
   const results = new Map<
     PlayerId,
     { buyIn: number; cashOut: number; adjustment: number; net: number }
   >();
+
   for (const entry of entries) {
     if (entry.voidedAt !== null) continue;
     const owner = ownerOf.get(entry.visitId)!;
     const result = results.get(owner) ?? { buyIn: 0, cashOut: 0, adjustment: 0, net: 0 };
+
     if (entry.kind === "buy_in") result.buyIn += entry.amount;
     else if (entry.kind === "cash_out") result.cashOut += entry.amount;
     else result.adjustment += entry.amount;
@@ -154,28 +166,32 @@ const importedLedger = Effect.fn("test.importedLedger")(function* (groupId: Grou
   }
 
   const trips = new Set(visitRows.map((row) => row.tripId));
-  const tripBalances = [...trips]
-    .toSorted()
-    .map((trip) => {
-      const inTrip = new Set(visitRows.filter((row) => row.tripId === trip).map((row) => row.id));
-      const nets = new Map<PlayerId, number>();
-      for (const entry of entries) {
-        if (
-          !inTrip.has(entry.visitId) ||
-          entry.voidedAt !== null ||
-          entry.counterpartyId === null ||
-          entry.amount === 0 ||
-          entry.kind === "adjustment"
-        )
-          continue;
-        const owner = ownerOf.get(entry.visitId)!;
-        const sign = entry.kind === "buy_in" ? 1 : -1;
-        nets.set(owner, (nets.get(owner) ?? 0) - sign * entry.amount);
-        nets.set(entry.counterpartyId, (nets.get(entry.counterpartyId) ?? 0) + sign * entry.amount);
-      }
-      return [trip, sorted(new Map([...nets].filter(([, net]) => net !== 0)))] as const;
-    })
-    .filter(([, owed]) => owed.length > 0);
+
+  const tripBalances = [...trips].toSorted().flatMap((trip) => {
+    const inTrip = new Set(visitRows.flatMap((row) => (row.tripId === trip ? [row.id] : [])));
+
+    const nets = new Map<PlayerId, number>();
+
+    for (const entry of entries) {
+      if (
+        !inTrip.has(entry.visitId) ||
+        entry.voidedAt !== null ||
+        entry.counterpartyId === null ||
+        entry.amount === 0 ||
+        entry.kind === "adjustment"
+      )
+        continue;
+      const owner = ownerOf.get(entry.visitId)!;
+      const sign = entry.kind === "buy_in" ? 1 : -1;
+      nets.set(owner, (nets.get(owner) ?? 0) - sign * entry.amount);
+      nets.set(entry.counterpartyId, (nets.get(entry.counterpartyId) ?? 0) + sign * entry.amount);
+    }
+
+    const owed = sorted(new Map([...nets].filter(([, net]) => net !== 0)));
+
+    return owed.length > 0 ? [[trip, owed] as const] : [];
+  });
+
   return {
     visits: visitRows,
     entries,
@@ -184,7 +200,6 @@ const importedLedger = Effect.fn("test.importedLedger")(function* (groupId: Grou
   };
 });
 
-/** What the new model must say about each legacy fact: same ID, amount, void and correction. */
 const facts = (
   rows: ReadonlyArray<{
     readonly id: string;
@@ -220,6 +235,7 @@ const expectFaithful = Effect.fn("test.expectFaithful")(function* (groupId: Grou
   expect(imported.results).toEqual(legacy.results);
   expect(imported.balances).toEqual(legacy.balances);
   expect(facts(imported.entries)).toEqual(facts(legacy.entries));
+
   return { legacy, imported };
 });
 
@@ -245,6 +261,7 @@ const startSession = Effect.fn("test.startSession")(function* (
     playerIds,
     notes: null,
   });
+
   return sessionId;
 });
 
@@ -273,10 +290,11 @@ const addGuest = Effect.fn("test.addGuest")(function* (
 ) {
   const id = ids.player();
   const group = yield* client.guests.add({ params: { groupId }, payload: { id, displayName } });
+
   return group.players.find((player) => player.id === id)!;
 });
 
-it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
+it.layer(TestApi.layer)("legacy migration", (it) => {
   it.effect("keeps IDs, money, corrections and claimed identities, and reruns as a no-op", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
@@ -302,10 +320,12 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       yield* finishHistoricalSession(sessionId);
 
       const before = yield* legacyLedger(group.group.id);
+
       const dry = yield* LegacyMigration.importLegacy({
         scope: scope(group.group.id),
         dryRun: true,
       });
+
       expect(dry).toEqual({
         dryRun: true,
         identities: 3,
@@ -313,15 +333,18 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
         visits: 4,
         entries: 10,
       });
+
       const [untouched] = yield* sql<{ count: string }>`
         select count(*) from personal_visits where legacy_session_id = ${sessionId}
       `;
+
       expect(Number(untouched!.count)).toBe(0);
 
       const applied = yield* LegacyMigration.importLegacy({
         scope: scope(group.group.id),
         dryRun: false,
       });
+
       expect(applied).toEqual({ ...dry, dryRun: false });
       expect((yield* expectFaithful(group.group.id)).legacy).toEqual(before);
       const params = { tableId: TableId.make(sessionId) };
@@ -337,34 +360,30 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       expect(yield* bea.sessions.get({ params: { sessionId } })).toMatchObject({
         importedTableId: sessionId,
       });
-      expect(yield* Effect.flip(eve.recording.table({ params }))).toMatchObject({
-        _tag: "NotFound",
-      });
+      expect((yield* Effect.flip(eve.recording.table({ params })))._tag).toBe("NotFound");
 
       const imported = yield* importedLedger(group.group.id);
-      // The correction chain survives with its IDs: the mistake stays voided and replaced.
       expect(imported.entries.find((e) => e.id === mistake.id)?.voidedAt).not.toBeNull();
       expect(imported.entries.find((e) => e.id === fixed.id)).toMatchObject({
         replacesEntryId: mistake.id,
         amount: 50000,
         counterpartyId: alexId,
       });
-      // One historical table per session, shared by each player's participation.
       expect(new Set(imported.visits.map((visit) => visit.tableId))).toEqual(new Set([sessionId]));
       expect(new Set(imported.visits.map((visit) => visit.playerId))).toEqual(
         new Set([alexId, beaId, claimedGus.id, otherGus.id]),
       );
-      // Two guests named Gus stay two players; only the claimed one links to an account.
+
       const links = yield* sql<{ id: string; userId: string | null; personal: string | null }>`
         select p.id, p.user_id,
           (select own.id from players own where own.user_id = p.user_id and own.group_id is null)
             as personal
         from players p where p.id in ${sql.in([claimedGus.id, otherGus.id])}
       `;
+
       const byId = new Map(links.map((link) => [link.id, link]));
       expect(byId.get(otherGus.id)).toMatchObject({ userId: null, personal: null });
       expect(byId.get(claimedGus.id)?.personal).not.toBeNull();
-      // Claiming doesn't copy history: the account's own recording stays empty.
       const history = yield* gus.recording.history();
       expect(history.identity?.playerId).toBe(byId.get(claimedGus.id)?.personal);
       expect(history.visits).toEqual([]);
@@ -373,14 +392,15 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
         yield* LegacyMigration.importLegacy({ scope: scope(group.group.id), dryRun: false }),
       ).toEqual(nothingNew);
 
-      // Later legacy writes come across on the next run, and only they do.
       yield* sql`update sessions set status = 'live', ended_at = null, closed_by = null where id = ${sessionId}`;
       yield* voidHistoricalEntry(fixed.id, "Again");
-      // An open session blocks the import until it closes again.
+
       const open = yield* Effect.flip(
         LegacyMigration.importLegacy({ scope: scope(group.group.id), dryRun: false }),
       );
-      expect(open).toMatchObject({ _tag: "LegacyBlocked", issues: [{ kind: "live_session" }] });
+
+      expect(open._tag).toBe("LegacyBlocked");
+      expect(open).toMatchObject({ issues: [{ kind: "live_session" }] });
       yield* finishHistoricalSession(sessionId, {
         endedAt: DateTime.makeUnsafe("2099-01-01T00:00:00Z"),
       });
@@ -396,11 +416,14 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       const sql = yield* SqlClient.SqlClient;
       const { alex, bea, cal } = yield* users("alex", "bea", "cal");
       const group = yield* groupWith(alex, bea, cal);
+
+      // SAFETY: groupWith creates the owner, then each invited member, and the group lists players by created_at.
       const [alexId, beaId, calId] = group.players.map((player) => player.id) as [
         PlayerId,
         PlayerId,
         PlayerId,
       ];
+
       const twin = yield* addGuest(alex, group.group.id, "member 1");
 
       const stake = (borrower: PlayerId, lender: PlayerId) =>
@@ -415,6 +438,7 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
             note: null,
           },
         });
+
       const backing = yield* stake(calId, alexId);
       const second = yield* stake(calId, beaId);
       const ended = yield* stake(beaId, alexId);
@@ -426,6 +450,7 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       const importedRows = sql`
         select count(*) from personal_visits where legacy_session_id = ${sessionId}
       `;
+
       const before = yield* importedRows;
       const report = yield* LegacyMigration.preflight(scope(group.group.id));
       expect(report.blocking.map((issue) => [issue.kind, issue.subjectId])).toEqual([
@@ -440,25 +465,24 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
           ["ambiguous_player", twin.id],
         ]),
       );
-      // A stake that covers its borrower's whole trip alone is not flagged.
       expect(flagged.filter(([, id]) => id === ended.id)).toHaveLength(1);
       expect(yield* importedRows).toEqual(before);
 
-      // A non-USD group is left out, live session and all; a broken correction blocks.
       const yen = ids.group();
       yield* alex.groups.create({
         payload: { id: yen, name: "Tokyo", currency: CurrencyCode.make("JPY"), displayName: "A" },
       });
+
       const tokyo = yield* alex.trips.create({
         params: { groupId: yen },
         payload: { id: ids.trip(), name: "Tokyo" },
       });
+
       const tokyoGroup = yield* alex.groups.get({ params: { groupId: yen } });
       const tokyoSession = yield* startSession(alex, tokyo.id, [tokyoGroup.myPlayerId]);
       yield* entry(tokyoSession, "buy_in", tokyoGroup.myPlayerId, 10000);
       const live = yield* entry(sessionId, "buy_in", alexId, 100);
       const broken = ids.entry();
-      // The API can't write this; old data may still hold it.
       yield* sql`
         insert into entries (id, group_id, session_id, kind, player_id, amount, occurred_at,
           created_by, replaces_entry_id)
@@ -473,9 +497,11 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       expect(blocked.excluded.map((issue) => [issue.kind, issue.subjectId])).toEqual([
         ["non_usd_group", yen],
       ]);
+
       const refused = yield* Effect.flip(
         LegacyMigration.importLegacy({ scope: [group.group.id, yen], dryRun: false }),
       );
+
       expect(refused._tag).toBe("LegacyBlocked");
       expect(yield* importedRows).toEqual(before);
     }),
@@ -491,11 +517,14 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
       yield* alex.groups.create({
         payload: { id: yen, name: "Tokyo", currency: CurrencyCode.make("JPY"), displayName: "A" },
       });
+
       const tokyo = yield* alex.trips.create({
         params: { groupId: yen },
         payload: { id: ids.trip(), name: "Tokyo" },
       });
+
       const tokyoGroup = yield* alex.groups.get({ params: { groupId: yen } });
+
       for (const [tripId, playerId] of [
         [usdGroup.tripId, usdGroup.myPlayerId],
         [otherUsd.tripId, otherUsd.myPlayerId],
@@ -521,17 +550,22 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
         visits: 2,
         entries: 4,
       });
+
       for (const groupId of [usdGroup.group.id, otherUsd.group.id]) yield* expectFaithful(groupId);
       expect(yield* Effect.forEach(groups, legacyLedger)).toEqual(before);
+
       const [left] = yield* sql<{ count: string }>`
         select count(*) from personal_visits v join sessions s on s.id = v.legacy_session_id
         where s.group_id = ${yen}
       `;
+
       expect(Number(left!.count)).toBe(0);
       const [tokyoRead] = (yield* alex.trips.get({ params: { tripId: tokyo.id } })).sessions;
+
       const { importedTableId } = yield* alex.sessions.get({
         params: { sessionId: tokyoRead!.session.id },
       });
+
       expect(importedTableId).toBeUndefined();
     }),
   );
@@ -554,17 +588,22 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
         const { alex, bea } = yield* users("alex", "bea");
         const group = yield* groupWith(alex, bea);
         const groupId = group.group.id;
+
         const guests = [
           yield* addGuest(alex, groupId, "Gus"),
           yield* addGuest(alex, groupId, "Gus"),
           yield* addGuest(alex, groupId, "Zed"),
         ];
+
         const players = [group.myPlayerId, group.players[1]!.id, ...guests.map((g) => g.id)];
+
         const second = yield* alex.trips.create({
           params: { groupId },
           payload: { id: ids.trip(), name: "Reno" },
         });
+
         const trips = [group.tripId, second.id];
+
         const sessions = [
           yield* startSession(alex, trips[0]!, [players[0]!]),
           yield* startSession(alex, trips[1]!, [players[1]!]),
@@ -577,7 +616,9 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
           const counterparty = op.kind === "adjustment" || op.counterparty === null ? null : other;
           const sessionId = sessions[op.trip]!;
           const added = yield* entry(sessionId, op.kind, player, amount, counterparty);
+
           if (op.correction === "void") yield* voidHistoricalEntry(added.id, null);
+
           if (op.correction === "replace")
             yield* entry(
               sessionId,
@@ -588,7 +629,7 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
               added.id,
             );
         }
-        // Close both sessions, cashing out anyone still in for nothing.
+
         for (const sessionId of sessions) {
           const playing = yield* sql<{ playerId: PlayerId }>`
             select distinct player_id from entries e
@@ -598,6 +639,7 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
                   and c.player_id = e.player_id and c.kind = 'cash_out' and c.voided_at is null
               )
           `;
+
           yield* finishHistoricalSession(sessionId, {
             cashOuts: playing.map(({ playerId }) => ({
               id: ids.entry(),
@@ -613,6 +655,6 @@ it.layer(TestApi.layer, { timeout: "60 seconds" })("legacy migration", (it) => {
           nothingNew,
         );
       }),
-    { timeout: 120_000, arbitrary: { runs: 8 } },
+    { arbitrary: { runs: 8 } },
   );
 });

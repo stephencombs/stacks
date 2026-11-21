@@ -10,6 +10,7 @@ const withIosFormSheet: ConfigPlugin = (config) =>
   withPodfile(config, (mod) => {
     // RNScreens only compiles its experimental FormSheet when CocoaPods sees this flag.
     mod.modResults.contents = enableIosFormSheet(mod.modResults.contents);
+
     return mod;
   });
 

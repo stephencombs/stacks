@@ -45,15 +45,16 @@ const withActor = (actor: ActorCredential) =>
  * Personal recording sync talks to the API outside the query cache: it owns its retries. Each
  * call proves the device actor when given one, and sends the account's session otherwise.
  */
-export const makeRecordingTransport = ({
+export const makeRecordingTransport: (options: StacksClientOptions) => RecordingTransport = ({
   baseUrl,
   getToken,
-}: StacksClientOptions): RecordingTransport => {
+}: StacksClientOptions) => {
   const client = (actor: ActorCredential | null) =>
     HttpApiClient.make(StacksApi, {
       baseUrl,
       transformClient: actor ? withActor(actor) : withToken(getToken),
     }).pipe(Effect.provide(FetchHttpClient.layer));
+
   return {
     history: (actor) => Effect.flatMap(client(actor), (api) => api.recording.history()),
     push: (payload, actor) =>
@@ -136,10 +137,10 @@ export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => 
   }) {}
 
   const keys = { reactivityKeys: LEDGER_KEYS };
+
   return {
     Client: StacksClient,
     groups: StacksClient.query("groups", "list", keys),
-    /** A page of activity from all your groups, newest first; pass `nextCursor` for older. */
     crewActivity: (cursor?: string) =>
       StacksClient.query("crew", "activity", {
         query: cursor === undefined ? {} : { cursor },
@@ -160,7 +161,6 @@ export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => 
       StacksClient.query("guests", "previewClaim", { params: { code }, ...keys }),
     recentVenues: (groupId: GroupId) =>
       StacksClient.query("venues", "recent", { params: { groupId }, ...keys }),
-    /** Catalog and home venues matching `q`, or the nearest to `near` when `q` is empty. */
     venueSearch: (
       groupId: GroupId,
       search: {
@@ -169,13 +169,21 @@ export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => 
       },
     ) =>
       StacksClient.query("venues", "search", {
-        query: {
-          groupId,
-          ...(search.q ? { q: search.q } : {}),
-          ...(search.near ? { lat: search.near.lat, lng: search.near.lng } : {}),
-        },
+        query: searchQuery(groupId, search),
       }),
   };
+};
+
+const searchQuery = (
+  groupId: GroupId,
+  search: {
+    readonly q: string;
+    readonly near?: { readonly lat: number; readonly lng: number };
+  },
+) => {
+  const query = search.q ? { groupId, q: search.q } : { groupId };
+
+  return search.near ? { ...query, lat: search.near.lat, lng: search.near.lng } : query;
 };
 
 export type Stacks = ReturnType<typeof makeStacksClient>;

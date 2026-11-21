@@ -21,6 +21,7 @@ import { HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
 
 const label = "text-sm";
 const shortDay = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+
 const lastDay = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
@@ -33,6 +34,7 @@ type Racer = { readonly playerId: PlayerId; readonly name: string; readonly chip
 type RaceSession = StatsSession & {
   readonly session: { readonly id: string; readonly startedAt: DateTime.Utc };
 };
+
 /** Where on the axis a stretch of sessions starts, such as a night or a trip. */
 type Mark = { readonly index: number; readonly label: string };
 
@@ -40,13 +42,14 @@ const measures = [
   { value: "money", label: "Money" },
   { value: "return", label: "% of buy-in" },
 ] as const;
+
 const HEIGHT = 168;
 const PAD = { x: 16, y: 14 };
 
 const MARKS = 22;
 const MARK_FONT = 11;
 const LETTER = 12;
-/** Clear of the card edge, so a rounded clip can't take the first character. */
+
 const INSET = 8;
 
 /**
@@ -77,13 +80,13 @@ export function Race<S extends RaceSession>({
 }) {
   const height = stats ? Math.max(128, players.length * 15 + 12) : HEIGHT;
   const last = sessions.length - 1;
-  // Unpinned, the race follows the latest session, including ones that arrive while it's open.
   const [pinned, setPinned] = useState<number | null>(null);
   const at = pinned === null ? last : Math.min(pinned, last);
   const setAt = (next: number) => setPinned(next >= last ? null : next);
   const [measure, setMeasure] = useState<RaceMeasure>("money");
   const prefs = usePreferences();
   const [width, setWidth] = useState(0);
+
   const [ink, muted, ring, ...chips] = useCSSVariable([
     "--color-ink",
     "--color-muted",
@@ -96,16 +99,19 @@ export function Race<S extends RaceSession>({
     players.map((p) => p.playerId),
     stats ? "money" : measure,
   ).map((line, i) => ({ ...line, ...players[i]! }));
+
   const chartNames = new Map(
     players.map(({ playerId, name }) => [
       playerId,
       stats && playerId === you ? "You" : name.trim().split(/\s+/)[0] || name,
     ]),
   );
+
   const labelSpace = Math.min(
     100,
     Math.max(30, ...[...chartNames.values()].map((name) => labelWidth(name, LETTER) + 24)),
   );
+
   const plot = lineScale(
     lines.map((l) => l.line),
     { width: Math.max(0, width - labelSpace), height },
@@ -117,28 +123,35 @@ export function Race<S extends RaceSession>({
           lines.length,
         ),
   );
+
   const standing = lines
     .map((l) => ({ ...l, now: l.values[at]! }))
     .toSorted((a, b) => (b.now ?? -Infinity) - (a.now ?? -Infinity));
+
   const [leader, second] = standing;
   const session = sessions[at]!;
-  // Yours draws last, on top of everyone else's.
+
   const drawn = lines.toSorted(
     (a, b) => Number(a.playerId === picked) - Number(b.playerId === picked),
   );
+
   const point = at + 1;
+
   const labels = spreadLabels(
     drawn.map(({ line }) => plot.y(line[point]!)),
     LETTER + 6,
     { min: LETTER, max: height - LETTER },
   );
+
   const axis = stats
     ? [
         { index: 0, label: shortDay.format(sessions[0]!.session.startedAt.epochMilliseconds) },
         { index: last, label: lastDay.format(sessions[last]!.session.startedAt.epochMilliseconds) },
       ]
     : marks;
+
   const edges = { min: INSET, max: Math.max(INSET, width - INSET) };
+
   const scrub = (locationX: number) =>
     setAt(
       Math.max(
@@ -149,21 +162,24 @@ export function Race<S extends RaceSession>({
         ),
       ),
     );
-  // Only a sideways drag scrubs; an up-or-down swipe that starts on the chart scrolls the page.
+
   const drag = PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) =>
       Math.abs(gesture.dx) > 6 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
     onPanResponderGrant: (event) => scrub(event.nativeEvent.locationX),
     onPanResponderMove: (event) => scrub(event.nativeEvent.locationX),
   });
+
   const lead =
     second && leader!.now !== second.now
       ? measure === "money"
         ? boardMoney(leader!.now! - second.now!, currency, false, prefs)
         : returnLabel(leader!.now)
       : null;
+
   const leadLabel =
     measure === "money" && prefs.privacyMode && lead !== null ? HIDDEN_AMOUNT_LABEL : lead;
+
   const headline = !second
     ? `${leader!.name} leads`
     : lead === null
@@ -248,6 +264,7 @@ export function Race<S extends RaceSession>({
                 labelWidth(mark.label, MARK_FONT),
                 edges,
               );
+
               return (
                 <SvgText
                   key={mark.index}
@@ -272,19 +289,24 @@ export function Race<S extends RaceSession>({
             )}
             {drawn.map(({ playerId, line, chip }, i) => {
               const yours = playerId === picked;
+
               const color =
                 stats && !prefs.privacyMode
                   ? (chips[(chip ?? 1) - 1] ?? muted)
                   : yours
                     ? ink
                     : muted;
+
               const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
               const now = { x: plot.x(point), y: plot.y(line[point]!) };
               const off = plot.clipped(line[point]!);
+
               const chartName =
                 chartNames.get(playerId)! + (off === 1 ? " ↑" : off === -1 ? " ↓" : "");
+
               const seatWidth = labelWidth(chartName, LETTER);
               const seat = placeLabel(now.x + 9 + seatWidth / 2, seatWidth, edges);
+
               return (
                 <G key={playerId}>
                   <Polyline

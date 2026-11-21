@@ -11,13 +11,16 @@ import { visitSummary } from "./visits.ts";
 let sequence = 100;
 const uuid = () => `0192e7a0-0000-7000-8000-${(sequence++).toString(16).padStart(12, "0")}`;
 const at = (minute: number) => DateTime.makeUnsafe(Date.UTC(2026, 10, 6, 22, minute));
+
 const common = () => ({
   operationId: RecordingOperationId.make(uuid()),
   actorId: ACTOR,
   preparedAt: at(30),
 });
-const initial = (): RecordingLedger => {
+
+const initial: () => RecordingLedger = () => {
   const self = PlayerIdentity.make({ id: visit.playerId, displayName: "Alex" });
+
   return {
     self,
     actor: { id: ACTOR, userId: null },
@@ -30,6 +33,7 @@ const initial = (): RecordingLedger => {
     receipts: [],
   };
 };
+
 const opened = (buyIn = 20000, finished = false) =>
   applyRecordingCommand(
     initial(),
@@ -54,6 +58,7 @@ const opened = (buyIn = 20000, finished = false) =>
         : { type: "start" }),
     }),
   );
+
 const change = (
   state: RecordingLedger,
   type: "delete_visit" | "restore_visit",
@@ -78,6 +83,7 @@ it.prop(
   ([amount, finished]) => {
     const before = opened(amount, finished);
     let state = before;
+
     for (let cycle = 0; cycle < 3; cycle++) {
       const deleted = change(state, "delete_visit");
       expect(deleted.entries.every((entry) => entry.voidedAt !== null)).toBe(true);
@@ -100,6 +106,7 @@ it.prop(
 
 it("touches only your visit and refuses starter and recorder authority over someone else's deletion", () => {
   const before = opened();
+
   const joined = {
     ...common(),
     type: "join_table",
@@ -112,15 +119,18 @@ it("touches only your visit and refuses starter and recorder authority over some
     startedAt: at(5),
     counterpartyId: visit.playerId,
   } satisfies RecordingCommand;
+
   const shared = applyRecordingCommand(before, joined);
   expect(() => change(shared, "delete_visit", joined.visitId)).toThrow("only your own");
   const deleted = change(shared, "delete_visit");
   expect(deleted.visits[1]).toEqual(shared.visits[1]);
   expect(deleted.entries[1]).toEqual(shared.entries[1]);
+
   const recorder = {
     ...shared,
     self: PlayerIdentity.make({ id: PlayerId.make(uuid()), displayName: "Recorder" }),
   };
+
   expect(() =>
     change(
       { ...recorder, recorders: [{ tableId: visit.tableId, playerId: recorder.self.id }] },
@@ -131,6 +141,7 @@ it("touches only your visit and refuses starter and recorder authority over some
 
 it("does not mistake a recorder's fetched participants for players it owns offline", () => {
   const before = opened();
+
   const seat = {
     ...common(),
     type: "join_table",
@@ -142,8 +153,10 @@ it("does not mistake a recorder's fetched participants for players it owns offli
     buyIn: MinorUnits.make(10000),
     startedAt: at(5),
   } satisfies RecordingCommand;
+
   const shared = applyRecordingCommand(before, seat);
   const self = PlayerIdentity.make({ id: PlayerId.make(uuid()), displayName: "Recorder" });
+
   const recorder = {
     ...shared,
     self,
@@ -153,8 +166,10 @@ it("does not mistake a recorder's fetched participants for players it owns offli
     ],
     recorders: [{ tableId: visit.tableId, playerId: self.id }],
   };
+
   expect(ownPlayers(recorder)).toEqual([self.id]);
   expect(() => change(recorder, "delete_visit", seat.visitId)).toThrow("only your own");
+
   const deleted = applyRecordingCommand(
     recorder,
     {
@@ -165,6 +180,7 @@ it("does not mistake a recorder's fetched participants for players it owns offli
     },
     null,
   );
+
   expect(() => change(deleted, "restore_visit", seat.visitId)).toThrow("only your own");
 });
 
@@ -206,6 +222,7 @@ it("refuses recording into a deleted visit and refuses imported history", () => 
 
 it("does not restore a live visit over another live return visit", () => {
   const deleted = change(opened(), "delete_visit");
+
   const returned = applyRecordingCommand(
     deleted,
     RecordingCommand.make({
@@ -219,6 +236,7 @@ it("does not restore a live visit over another live return visit", () => {
       startedAt: at(10),
     }),
   );
+
   expect(() => change(returned, "restore_visit")).toThrow("already playing");
   expect(returned.entries[0]!.voidedAt).not.toBeNull();
 });
@@ -249,10 +267,13 @@ it.prop(
       buyIn: MinorUnits.make(10000),
       startedAt: at(1),
     });
+
     const apply = (command: RecordingCommand) => {
       state = applyRecordingCommand(state, command);
     };
+
     const revision = () => state.visits[0]!.revision;
+
     for (const fact of facts) {
       const id = EntryId.make(uuid());
       apply({
@@ -267,6 +288,7 @@ it.prop(
         note: "Paid by Bea",
         counterpartyId: BEA,
       });
+
       if (fact.correct)
         apply({
           ...common(),
@@ -286,6 +308,7 @@ it.prop(
             : null,
         });
     }
+
     const cashOut = EntryId.make(uuid());
     apply({
       ...common(),
@@ -318,6 +341,7 @@ it.prop(
       expectedRevision: revision(),
       reason: "Still playing",
     });
+
     if (finishAgain)
       apply({
         ...common(),
@@ -329,6 +353,7 @@ it.prop(
         finishedAt: at(25),
       });
     const before = state;
+
     for (let cycle = 0; cycle < 2; cycle++) {
       state = change(state, "delete_visit");
       expect(
@@ -363,7 +388,9 @@ it("moves a whole table between trips and back to personal without changing play
       startedAt: at(30),
     }),
   );
+
   expect(before.visits).toHaveLength(2);
+
   const setTrip = (state: RecordingLedger, tripId: string | null) =>
     applyRecordingCommand(
       state,
@@ -374,6 +401,7 @@ it("moves a whole table between trips and back to personal without changing play
         tripId,
       }),
     );
+
   const first = uuid();
   const second = uuid();
   const attached = setTrip(before, first);
@@ -382,11 +410,13 @@ it("moves a whole table between trips and back to personal without changing play
   expect(moved.tables[0]!.tripId).toBe(second);
   const cleared = setTrip(moved, null);
   expect(cleared.tables[0]!.tripId).toBeNull();
+
   for (const state of [attached, moved, cleared]) {
     expect(state.visits).toEqual(before.visits);
     expect(state.entries).toEqual(before.entries);
     expect(visitSummary(state.visits[0]!, state.entries).finalResult).toBe(15000);
   }
+
   expect(() =>
     applyRecordingCommand(
       before,
@@ -411,6 +441,7 @@ it("opens a table without playing, records for the players added there, and dele
     venueId: null,
     highLimit: false,
   } satisfies RecordingCommand;
+
   expect(() => applyRecordingCommand(initial(), { ...open, playerId: BEA })).toThrow(
     "Start a table as yourself",
   );
@@ -427,7 +458,6 @@ it("opens a table without playing, records for the players added there, and dele
   ]);
   expect(empty.visits).toEqual([]);
   expect(() => applyRecordingCommand(empty, open)).toThrow("Start IDs are already used");
-  // A recorder's device gets the table with its history, then replays the opening.
   expect(applyRecordingCommand(empty, open, null).tables).toEqual(empty.tables);
 
   const seat = {
@@ -441,7 +471,9 @@ it("opens a table without playing, records for the players added there, and dele
     buyIn: MinorUnits.make(10000),
     startedAt: at(5),
   } satisfies RecordingCommand;
+
   const seated = applyRecordingCommand(empty, seat);
+
   const finished = applyRecordingCommand(
     seated,
     RecordingCommand.make({
@@ -454,6 +486,7 @@ it("opens a table without playing, records for the players added there, and dele
       finishedAt: at(20),
     }),
   );
+
   expect(visitSummary(finished.visits[0]!, finished.entries).finalResult).toBe(15000);
 
   const remove = (state: RecordingLedger, actorPlayers?: ReadonlyArray<PlayerId>) =>
@@ -462,11 +495,12 @@ it("opens a table without playing, records for the players added there, and dele
       RecordingCommand.make({ ...common(), type: "delete_table", tableId: visit.tableId }),
       actorPlayers,
     );
+
   expect(() => remove(finished)).toThrow("Someone has played at this table");
   expect(() => remove(empty, [BEA])).toThrow("Only the player who started this table");
   const deleted = remove(empty);
   expect(deleted.tables[0]!.deletedAt).toEqual(at(30));
-  // Deleting takes the table out of its trip, so the trip holds nothing of it.
+
   const inTrip = applyRecordingCommand(
     empty,
     Schema.decodeUnknownSync(RecordingCommand)({
@@ -476,6 +510,7 @@ it("opens a table without playing, records for the players added there, and dele
       tripId: uuid(),
     }),
   );
+
   expect(remove(inTrip).tables[0]!.tripId).toBeNull();
   expect(() => remove(deleted)).toThrow("This table was deleted");
   expect(() => applyRecordingCommand(deleted, seat)).toThrow("This table was deleted");
@@ -491,6 +526,7 @@ it("keeps a table someone played at, even after they deleted their visit, and re
     venueId: null,
     highLimit: false,
   } satisfies RecordingCommand;
+
   const sat = {
     ...common(),
     type: "join_table",
@@ -501,21 +537,24 @@ it("keeps a table someone played at, even after they deleted their visit, and re
     buyIn: MinorUnits.make(10000),
     startedAt: at(5),
   } satisfies RecordingCommand;
+
   const played = change(
     applyRecordingCommand(applyRecordingCommand(initial(), open), sat),
     "delete_visit",
   );
+
   expect(() =>
     applyRecordingCommand(
       played,
       RecordingCommand.make({ ...common(), type: "delete_table", tableId: visit.tableId }),
     ),
   ).toThrow("Someone has played at this table");
-  // However it came to be deleted, a deleted table takes no visit back.
+
   const gone = {
     ...played,
     tables: played.tables.map((table) => ({ ...table, deletedAt: at(40) })),
   };
+
   expect(() => change(gone, "restore_visit")).toThrow("This table was deleted");
 });
 
@@ -537,6 +576,7 @@ it("stores a trimmed custom game name only for Other and enforces the 60-charact
       highLimit: false,
     }),
   );
+
   expect(custom.tables[0]?.gameName).toBe("Pai Gow Tiles");
 
   const switched = applyRecordingCommand(
@@ -549,6 +589,7 @@ it("stores a trimmed custom game name only for Other and enforces the 60-charact
       table: { game: "blackjack", gameName: "Pai Gow Tiles", venueId: null, highLimit: false },
     }),
   );
+
   expect(switched.tables[0]?.gameName).toBeUndefined();
 
   expect(() =>

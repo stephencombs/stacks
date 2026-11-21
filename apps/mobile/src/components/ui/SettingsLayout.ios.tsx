@@ -19,6 +19,7 @@ import type { SettingsLayoutProps } from "./SettingsLayout";
 export function SettingsLayout({ groupName, currency, sections }: SettingsLayoutProps) {
   const header = useNativeHeaderActions();
   const { theme } = useUniwind();
+
   const [canvas, surface, ink, muted, loss] = useCSSVariable([
     "--color-canvas",
     "--color-surface",
@@ -26,6 +27,7 @@ export function SettingsLayout({ groupName, currency, sections }: SettingsLayout
     "--color-muted",
     "--color-loss",
   ]).map(String);
+
   const bar = use(TabBarHeight);
   const [liveBarHeight, setLiveBarHeight] = useState(0);
 

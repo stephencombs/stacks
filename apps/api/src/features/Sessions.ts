@@ -7,5 +7,6 @@ import * as Views from "./Views.ts";
 export const get = Effect.fn("Sessions.get")(function* (sessionId: SessionId) {
   const session = yield* Views.loadSession(sessionId);
   yield* Access.membership(session.groupId);
+
   return yield* Views.sessionDetail(sessionId);
 });

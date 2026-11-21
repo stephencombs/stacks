@@ -20,18 +20,21 @@ import * as Trips from "./Trips.ts";
 
 const load = Effect.fn("Stakes.load")(function* (stakeId: StakeId) {
   const sql = yield* SqlClient.SqlClient;
+
   const [stake] = yield* sql`select * from stakes where id = ${stakeId}`.pipe(
     Effect.flatMap(Access.decodeRows(StakeRow)),
   );
+
   if (!stake) return yield* new NotFound({ resource: "stake" });
+
   return stake;
 });
 
-/** The lender, the borrower, whoever added the stake or an admin can change it. */
 const loadToChange = Effect.fn("Stakes.loadToChange")(function* (stakeId: StakeId) {
   const stake = yield* load(stakeId);
   const member = yield* Access.membership(stake.groupId);
   const { userId } = yield* CurrentUser;
+
   if (
     member.role === "member" &&
     stake.createdBy !== userId &&
@@ -40,16 +43,19 @@ const loadToChange = Effect.fn("Stakes.loadToChange")(function* (stakeId: StakeI
   ) {
     return yield* new Forbidden({ reason: "not_your_stake" });
   }
+
   if (stake.voidedAt !== null) return yield* new Conflict({ reason: "stake_voided" });
+
   return stake;
 });
 
-/** Call inside a transaction, after locking the trip as Recording.loadLedger does. */
 const requireNoTables = Effect.fn("Stakes.requireNoTables")(function* (tripId: TripId) {
   const sql = yield* SqlClient.SqlClient;
+
   const tables = yield* sql`
     select 1 from tables where trip_id = ${tripId} and legacy_session_id is null limit 1
   `;
+
   if (tables.length > 0) return yield* new Conflict({ reason: "trip_has_tables" });
 });
 
@@ -58,17 +64,21 @@ export const create = Effect.fn("Stakes.create")(function* (
   request: typeof CreateStakeRequest.Type,
 ) {
   const sql = yield* SqlClient.SqlClient;
+
   return yield* sql.withTransaction(
     Effect.gen(function* () {
       const { userId } = yield* CurrentUser;
       yield* sql`select id from trips where id = ${tripId} for update`;
       const { groupId } = yield* Trips.load(tripId);
       yield* Access.membership(groupId);
+
       if (request.lenderId === request.borrowerId) {
         return yield* new InvalidRequest({ message: "Pick two different players." });
       }
+
       yield* Access.requirePlayersInGroup(groupId, [request.lenderId, request.borrowerId]);
       const existing = yield* sql`select id from stakes where id = ${request.id}`;
+
       if (existing.length === 0) yield* requireNoTables(tripId);
       const startedAt = request.startedAt ?? (yield* DateTime.now);
       yield* sql`
@@ -80,7 +90,9 @@ export const create = Effect.fn("Stakes.create")(function* (
         on conflict (id) do nothing
       `;
       const stored = yield* load(request.id);
+
       if (stored.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
+
       return stored;
     }),
   );
@@ -92,25 +104,32 @@ export const end = Effect.fn("Stakes.end")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   const stake = yield* loadToChange(stakeId);
+
   if (stake.endedAt !== null) return yield* new Conflict({ reason: "stake_ended" });
   const endedAt = request.endedAt ?? (yield* DateTime.now);
+
   if (DateTime.isLessThan(endedAt, stake.startedAt)) {
     return yield* new InvalidRequest({ message: "A stake can't end before it started." });
   }
+
   yield* sql`update stakes set ended_at = ${DateTime.toDateUtc(endedAt)} where id = ${stakeId}`;
+
   return yield* load(stakeId);
 });
 
 export const reopen = Effect.fn("Stakes.reopen")(function* (stakeId: StakeId) {
   const sql = yield* SqlClient.SqlClient;
+
   return yield* sql.withTransaction(
     Effect.gen(function* () {
       const { tripId } = yield* load(stakeId);
       yield* sql`select id from trips where id = ${tripId} for update`;
       const stake = yield* loadToChange(stakeId);
+
       if (stake.endedAt === null) return yield* new Conflict({ reason: "stake_open" });
       yield* requireNoTables(tripId);
       yield* sql`update stakes set ended_at = null where id = ${stakeId}`;
+
       return yield* load(stakeId);
     }),
   );
@@ -127,5 +146,6 @@ export const voidStake = Effect.fn("Stakes.void")(function* (
     update stakes set voided_at = now(), voided_by = ${userId}, void_reason = ${request.reason}
     where id = ${stakeId} and voided_at is null
   `;
+
   return yield* load(stakeId);
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
+import * as Match from "effect/Match";
 import { VenueId, type VisitId } from "@stacks/contracts";
 import { RecordingCommand } from "@stacks/contracts/recordingCommands";
 
@@ -21,31 +22,39 @@ import {
 
 const at = (hour: number) =>
   DateTime.makeUnsafe(`2026-11-06T${hour.toString().padStart(2, "0")}:00:00.000Z`);
+
 const memory = () => {
   let document: RecordingStorageDocument = { revision: 0 };
   let failure = false;
   let notificationFailure = false;
   let gate: Promise<void> | undefined;
   const listeners = new Set<(change: RecordingStorageChange) => void>();
-  const adapter = (): RecordingStorage => ({
+
+  const adapter: () => RecordingStorage = () => ({
     load: async () => document,
     commit: async (expected, payload) => {
       if (gate) await gate;
+
       if (failure) throw new Error("disk full");
+
       if (document.revision !== expected)
         throw new RecordingStorageConflict(expected, document.revision);
       document = { revision: expected + 1, payload };
+
       if (notificationFailure)
         for (const listener of listeners)
           listener({ type: "error", error: new RecordingStorageError("unavailable") });
+
       return document.revision;
     },
     subscribe: (listener) => {
       listeners.add(listener);
+
       return () => void listeners.delete(listener);
     },
     close: async () => undefined,
   });
+
   return {
     adapter,
     breakNotifications: () => {
@@ -68,13 +77,17 @@ const memory = () => {
     },
   };
 };
+
 const open = async (db: ReturnType<typeof memory>) => {
   const store = makeRecordingStore(db.adapter());
   await store.ready;
+
   return store;
 };
+
 const start = (store: RecordingStore) =>
   store.prepare({ type: "start", buyIn: 20000, startedAt: at(10) });
+
 const bellagio = {
   id: VenueId.make("0192e7a0-0000-7000-8000-0000000000b1"),
   name: "Bellagio",
@@ -85,11 +98,15 @@ const bellagio = {
   lat: 36.1126,
   lng: -115.1767,
 };
+
 const visitId = (store: RecordingStore) => store.getSnapshot().state!.visits[0]!.id;
+
 const save = (store: RecordingStore, input: Parameters<RecordingStore["prepare"]>[0]) =>
   store.execute(store.prepare(input));
+
 const reload = async (store: RecordingStore, db: ReturnType<typeof memory>) => {
   await store.close();
+
   return open(db);
 };
 
@@ -166,20 +183,27 @@ it.each(["start", "finish", "correct"] as const)(
   async (type) => {
     const db = memory();
     let store = await open(db);
+
     if (type !== "start") await store.execute(start(store));
     const id = store.getSnapshot().state!.visits[0]?.id;
-    const command =
-      type === "start"
-        ? start(store)
-        : type === "finish"
-          ? store.prepare({ type, visitId: id!, amount: 25000, finishedAt: at(13) })
-          : store.prepare({
-              type,
-              visitId: id!,
-              entryId: store.getSnapshot().state!.entries[0]!.id,
-              reason: "wrong buy-in",
-              replacement: { amount: 18000 },
-            });
+
+    const command = Match.value(type).pipe(
+      Match.when("start", () => start(store)),
+      Match.when("finish", () =>
+        store.prepare({ type: "finish", visitId: id!, amount: 25000, finishedAt: at(13) }),
+      ),
+      Match.when("correct", () =>
+        store.prepare({
+          type: "correct",
+          visitId: id!,
+          entryId: store.getSnapshot().state!.entries[0]!.id,
+          reason: "wrong buy-in",
+          replacement: { amount: 18000 },
+        }),
+      ),
+      Match.exhaustive,
+    );
+
     const before = db.document;
     const state = store.getSnapshot().state;
     db.fail();
@@ -253,19 +277,23 @@ describe("reopening a finished visit", () => {
     await store.execute(start(store));
     const id = visitId(store);
     await save(store, { type: "finish", visitId: id, amount, finishedAt: at(13) });
+
     return { store, id, cashOut: store.getSnapshot().state!.entries.at(-1)! };
   };
+
   const entry = (store: RecordingStore, id: string) =>
     store.getSnapshot().state!.entries.find((item) => item.id === id)!;
 
   it("voids the final cash-out so finishing again does not count it twice", async () => {
     const db = memory();
     let { store, id, cashOut } = await finished(db);
+
     const reopened = await save(store, {
       type: "reopen",
       visitId: id,
       reason: "finished accidentally",
     });
+
     expect(entry(store, cashOut.id)).toMatchObject({
       voidedAt: reopened.command.preparedAt,
       voidedBy: store.getSnapshot().state!.actor.id,
@@ -437,6 +465,7 @@ it("rejects operation ID reuse with different content even after reload", async 
   const db = memory();
   let store = await open(db);
   const command = start(store);
+
   if (command.type !== "start") throw new Error("expected start");
   await store.execute(command);
   store = await reload(store, db);
@@ -455,6 +484,7 @@ it("serializes saves and never shows financial success before the adapter commit
       release = resolve;
     }),
   );
+
   const saving = new Promise<void>((resolve) => {
     const unsubscribe = store.subscribe(() => {
       if (store.getSnapshot().status === "saving") {
@@ -463,6 +493,7 @@ it("serializes saves and never shows financial success before the adapter commit
       }
     });
   });
+
   const command = start(store);
   const first = store.execute(command);
   const duplicate = store.execute(command);
@@ -486,6 +517,7 @@ it("exposes CAS and stale financial conflicts without rebasing; refresh can reco
   const b = await open(db);
   const id = visitId(a);
   const finish = b.prepare({ type: "finish", visitId: id, amount: 25000, finishedAt: at(13) });
+
   const rebuy = a.prepare({
     type: "add",
     visitId: id,
@@ -493,6 +525,7 @@ it("exposes CAS and stale financial conflicts without rebasing; refresh can reco
     amount: 10000,
     occurredAt: at(11),
   });
+
   await a.execute(rebuy);
   await expect(b.execute(finish)).rejects.toBeInstanceOf(RecordingStorageConflict);
   await b.refresh();
@@ -508,6 +541,7 @@ it("observes another store's durable change through subscriptions", async () => 
   const db = memory();
   const a = await open(db);
   const b = await open(db);
+
   const changed = new Promise<void>((resolve) => {
     const unsubscribe = b.subscribe(() => {
       if (b.getSnapshot().revision === 2) {
@@ -516,6 +550,7 @@ it("observes another store's durable change through subscriptions", async () => 
       }
     });
   });
+
   await a.execute(start(a));
   db.notify();
   await changed;
@@ -572,18 +607,30 @@ describe("persisted document validation", () => {
     await store.execute(start(store));
     await store.close();
     const document = db.document;
+
     if (document.payload === undefined) throw new Error("missing test history");
     const value = JSON.parse(document.payload);
+
     if (damage === "version") value.version = 3;
+
     if (damage === "ownership") value.visits[0].playerId = value.actor.id;
+
     if (damage === "replacement") value.entries[0].replacesEntryId = value.actor.id;
+
     if (damage === "timestamp") value.entries[0].occurredAt = "2026-11-05T00:00:00.000Z";
+
     if (damage === "overflow") value.entries[0].amount = Number.MAX_SAFE_INTEGER + 1;
+
     if (damage === "duplicate") value.entries.push(value.entries[0]);
+
     if (damage === "receipt_amount") value.receipts[0].command.buyIn = 12345;
+
     if (damage === "receipt_revision") value.visits[0].revision = 8;
+
     if (damage === "missing_receipt") value.receipts = [];
+
     if (damage === "duplicate_venue") value.venues = [bellagio, bellagio];
+
     if (damage === "credentials") value.secret = "should not live in the financial document";
     db.document = {
       revision: document.revision,
@@ -641,6 +688,7 @@ it("retains a voided mistaken timestamp when finishing at the corrected time", a
   const store = await open(db);
   await store.execute(start(store));
   const id = visitId(store);
+
   const late = await save(store, {
     type: "add",
     visitId: id,
@@ -648,9 +696,11 @@ it("retains a voided mistaken timestamp when finishing at the corrected time", a
     amount: 1000,
     occurredAt: at(13),
   });
+
   await expect(
     save(store, { type: "finish", visitId: id, amount: 25000, finishedAt: at(12) }),
   ).rejects.toThrow("Fact outside visit times");
+
   if (late.command.type !== "add") throw new Error("expected add");
   await save(store, {
     type: "correct",
@@ -685,6 +735,7 @@ it("competing corrections leave exactly one replacement and a reviewable conflic
   const b = await open(db);
   const id = visitId(a);
   const entryId = a.getSnapshot().state!.entries[0]!.id;
+
   const second = b.prepare({
     type: "correct",
     visitId: id,
@@ -692,6 +743,7 @@ it("competing corrections leave exactly one replacement and a reviewable conflic
     reason: "second count",
     replacement: { amount: 17000 },
   });
+
   await save(a, {
     type: "correct",
     visitId: id,
@@ -729,6 +781,7 @@ describe("correcting one entry", () => {
       reason: "wrong amount",
       replacement: { amount: 7000 },
     });
+
     for (const current of [store, (store = await reload(store, db))]) {
       const { summary, entries } = current.review(id);
       expect(summary.totals.buyIn).toBe(27000);
@@ -736,6 +789,7 @@ describe("correcting one entry", () => {
       expect(entries.find((entry) => entry.id === second!.id)!.voidedAt).not.toBeNull();
       expect(entries.filter((entry) => entry.voidedAt === null)).toHaveLength(2);
     }
+
     await save(store, {
       type: "correct",
       visitId: id,
@@ -847,16 +901,17 @@ describe("the venue cache", () => {
     let store = await open(db);
     await store.execute(start(store));
     const id = visitId(store);
+
     const command = store.prepare({
       type: "edit_visit",
       visitId: id,
       table: { game: null, venueId: bellagio.id, highLimit: false },
     });
+
     const venue = { ...bellagio };
     const venues = [venue];
     db.fail();
     await expect(store.execute(command, venues)).rejects.toThrow("disk full");
-    // Failed work owns its payload even if the caller reuses the search results.
     venue.name = "Changed by caller";
     venues.length = 0;
     expect(store.getSnapshot().state!.venues).toEqual([]);
@@ -901,15 +956,15 @@ describe("the venue cache", () => {
     let store = await open(db);
     await store.execute(start(store));
     const id = visitId(store);
+
     const table = (venueId: VenueId | null) => ({
       type: "edit_visit" as const,
       visitId: id,
       table: { game: "blackjack" as const, venueId, highLimit: false },
     });
-    // A venue that came with a search keeps only what the device needs.
+
     const searched = { ...bellagio, verified: true, groupId: null };
     await store.execute(store.prepare(table(bellagio.id)), [searched]);
-    // Each save adds one receipt: the venue rides with the edit, so the ledger still loads.
     expect(db.document.revision).toBe(store.getSnapshot().state!.receipts.length + 1);
     store = await reload(store, db);
     expect(recordingVisit(store.getSnapshot().state!, id)).toMatchObject({
@@ -921,7 +976,6 @@ describe("the venue cache", () => {
     store = await reload(store, db);
     const cleared = recordingVisit(store.getSnapshot().state!, id)!;
     expect(cleared).toMatchObject({ table: { venueId: null, game: "blackjack" }, venue: null });
-    // The cache keeps it, so picking it again works offline.
     expect(store.getSnapshot().state!.venues).toEqual([bellagio]);
 
     await store.execute(store.prepare(table(bellagio.id)));
@@ -954,10 +1008,12 @@ describe("setting the buy-in total", () => {
   const setTotal = async (store: RecordingStore, id: VisitId, total: number) => {
     for (;;) {
       const next = nextBuyInChange(recordingVisit(store.getSnapshot().state!, id)!, total);
+
       if (next === null) return;
       await save(store, next);
     }
   };
+
   const buyIns = (store: RecordingStore, id: VisitId) =>
     recordingVisit(store.getSnapshot().state!, id)!.entries.filter(
       (entry) => entry.kind === "buy_in",
@@ -987,7 +1043,6 @@ describe("setting the buy-in total", () => {
     await setTotal(store, id, 15000);
     expect(store.review(id).summary.totals.buyIn).toBe(15000);
     const entries = buyIns(store, id);
-    // The $100 rebuy is voided, and the $200 start is replaced by $150.
     expect(entries.filter((entry) => entry.voidedAt !== null).map((entry) => entry.amount)).toEqual(
       expect.arrayContaining([10000, 20000]),
     );
@@ -1031,6 +1086,7 @@ it.each([false, true])(
       replacement: { amount: 36000 },
     });
     await save(store, { type: "reopen", visitId: id, reason: "Still playing" });
+
     if (finished)
       await save(store, { type: "finish", visitId: id, amount: 40000, finishedAt: at(13) });
     const before = store.review(id);
@@ -1062,6 +1118,7 @@ it.each(["marker", "audit", "revived entry"])(
     await save(store, { type: "delete_visit", visitId: visitId(store) });
     await store.close();
     const saved = JSON.parse(db.document.payload!);
+
     if (damage === "marker") delete saved.visits[0].deletedAt;
     else if (damage === "audit") saved.entries[0].voidReason = "Different reason";
     else {
@@ -1069,6 +1126,7 @@ it.each(["marker", "audit", "revived entry"])(
       saved.entries[0].voidedBy = null;
       saved.entries[0].voidReason = null;
     }
+
     db.document = { revision: db.document.revision, payload: JSON.stringify(saved) };
     store = makeRecordingStore(db.adapter());
     await expect(store.ready).rejects.toMatchObject({ reason: "load" });
@@ -1081,6 +1139,7 @@ describe("recording a table without playing", () => {
   const opened = async (db: ReturnType<typeof memory>) => {
     const store = await open(db);
     await save(store, { type: "open_table", game: "blackjack" });
+
     return { store, tableId: store.getSnapshot().state!.tables[0]!.id };
   };
 

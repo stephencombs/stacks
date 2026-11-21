@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import type { ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 
@@ -12,9 +13,16 @@ import { ToastHost, useToast, type Toast } from "./Toast";
 
 type Content = ReactNode | ((toast: (toast: Toast) => void) => ReactNode);
 
+function isToastContent(
+  children: Content,
+): children is (toast: (toast: Toast) => void) => ReactNode {
+  return Predicate.isFunction(children);
+}
+
 function Content({ children }: { children: Content }) {
   const toast = useToast();
-  return typeof children === "function" ? children(toast) : children;
+
+  return isToastContent(children) ? children(toast) : children;
 }
 
 /**
@@ -41,6 +49,7 @@ export function Screen({
   const footer = renderFooter;
   const header = useNativeHeaderActions();
   const foot = useScreenFoot({ footer: !!footer, fab: !!fab, footerGap: 12 });
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}

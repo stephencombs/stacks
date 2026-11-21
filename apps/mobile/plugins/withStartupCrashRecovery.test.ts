@@ -13,6 +13,7 @@ const app = `class AppDelegate: ExpoAppDelegate {
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }`;
+
 const scene = `internal import Expo
 @objc(SceneDelegate)
 class SceneDelegate: ExpoAppSceneDelegate {

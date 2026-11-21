@@ -12,6 +12,7 @@ const milestone = [
   play({ id: entryId(3), kind: "cash_out", amount: MinorUnits.make(10000) }),
   play({ id: entryId(4), kind: "cash_out", amount: MinorUnits.make(25000) }),
 ];
+
 const finished = { ...visit, finishedAt: LATER, revision: 1 };
 
 describe("visitSummary", () => {
@@ -19,6 +20,7 @@ describe("visitSummary", () => {
     for (let count = 1; count <= milestone.length; count++) {
       expect(visitSummary(visit, milestone.slice(0, count)).finalResult).toBeNull();
     }
+
     expect(visitSummary(visit, milestone).totals).toEqual({
       buyIn: 30000,
       cashOut: 35000,
@@ -36,6 +38,7 @@ describe("visitSummary", () => {
       play(),
       play({ id: entryId(2), kind: "cash_out", amount: MinorUnits.make(20000) }),
     ];
+
     expect(visitSummary(visit, entries).finalResult).toBeNull();
     expect(visitSummary(finished, entries).finalResult).toBe(0);
     entries.push(play({ id: entryId(3), kind: "cash_out", amount: MinorUnits.make(0) }));
@@ -45,15 +48,18 @@ describe("visitSummary", () => {
 
   it("retains correction chains while counting only live facts without reopening", () => {
     const original = { ...milestone[3]!, voidedAt: LATER, voidedBy: ACTOR, voidReason: "amount" };
+
     const replacement = play({
       id: entryId(5),
       kind: "cash_out",
       amount: MinorUnits.make(24000),
       replacesEntryId: original.id,
     });
+
     const entries = Object.freeze(
       [...milestone.slice(0, 3), original, replacement].map((entry) => Object.freeze(entry)),
     );
+
     const projection = projectVisit(finished, entries);
     expect(projection.summary.finalResult).toBe(4000);
     expect(projection.entries.map((entry) => entry.id)).toEqual(entries.map((entry) => entry.id));
@@ -71,16 +77,19 @@ describe("visitSummary", () => {
       id: VisitId.make("0192e7a0-0000-7000-8000-0000000000b2"),
       startedAt: LATER,
     };
+
     const friend = {
       ...visit,
       id: VisitId.make("0192e7a0-0000-7000-8000-0000000000b3"),
       playerId: BEA,
     };
+
     const entries = [
       ...milestone,
       play({ id: entryId(5), visitId: returning.id, amount: MinorUnits.make(100) }),
       play({ id: entryId(6), visitId: friend.id, amount: MinorUnits.make(200) }),
     ];
+
     expect(visitSummary(finished, entries).finalResult).toBe(5000);
     expect(visitSummary(returning, entries)).toMatchObject({
       totals: { buyIn: 100 },
@@ -122,6 +131,7 @@ describe("visitSummary", () => {
 
   it("accumulates signed adjustments exactly before checking totals", () => {
     const max = Number.MAX_SAFE_INTEGER;
+
     const entries = [max, 2, -max].map((amount, index) =>
       play({
         id: entryId(index + 1),
@@ -129,6 +139,7 @@ describe("visitSummary", () => {
         amount: MinorUnits.make(amount),
       }),
     );
+
     expect(visitSummary(finished, entries)).toMatchObject({
       totals: { adjustment: 2 },
       finalResult: 2,
@@ -158,10 +169,13 @@ describe("visitSummary", () => {
           voidedBy: voided ? ACTOR : null,
         }),
       );
+
       const summary = visitSummary(finished, entries);
+
       const expected = playerResults(
         entries.map((entry) => ({ ...entry, playerId: visit.playerId })),
       ).get(visit.playerId);
+
       expect(summary.finalResult).toBe(expected?.net ?? 0);
       expect(summary.totals).toEqual({
         buyIn: expected?.buyIn ?? 0,

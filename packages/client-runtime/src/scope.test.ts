@@ -4,6 +4,7 @@ import {
   MinorUnits,
   PlayerId,
   TripId,
+  SessionId,
   UserId,
   type GroupListItem,
   type Trip,
@@ -15,11 +16,19 @@ import { resolveScope, tripIsLive, withStartedTrip } from "./scope.ts";
 
 const day = (n: number) => DateTime.makeUnsafe(Date.UTC(2026, 9, n));
 const names = ["crew", "work", "fresh", "old", "vegas", "tahoe", "poker", "deleted", "user", "me"];
+
 const uuid = (name: string) =>
   `0192e7a0-0000-7000-8000-${String(names.indexOf(name) + 1).padStart(12, "0")}`;
+
 const tripId = (name: string) => TripId.make(uuid(name));
 const groupId = (name: string) => GroupId.make(uuid(name));
-const trip = (name: string, group: string, started: number, ended: number | null = null): Trip => ({
+
+const trip: (name: string, group: string, started: number, ended?: number | null) => Trip = (
+  name,
+  group,
+  started,
+  ended = null,
+) => ({
   id: tripId(name),
   groupId: groupId(group),
   name,
@@ -28,7 +37,8 @@ const trip = (name: string, group: string, started: number, ended: number | null
   createdBy: UserId.make(uuid("user")),
   createdAt: day(started),
 });
-const group = (name: string, trips: ReadonlyArray<Trip>): GroupListItem => ({
+
+const group: (name: string, trips: ReadonlyArray<Trip>) => GroupListItem = (name, trips) => ({
   group: { id: groupId(name), name, currency: CurrencyCode.make("USD"), createdAt: day(1) },
   role: "member",
   myPlayerId: PlayerId.make(uuid("me")),
@@ -95,23 +105,28 @@ it("calls a trip live when its id is in liveTripIds, mySession matches, or it's 
   const liveTableInOlder = { ...twoGoing, liveTripIds: [older.id] };
   expect(tripIsLive(liveTableInOlder, vegas)).toBe(false);
   expect(tripIsLive(liveTableInOlder, older)).toBe(true);
+
   const seated = {
     ...twoGoing,
-    mySession: { id: undefined as never, tripId: vegas.id, venueName: "Aria", startedAt: day(20) },
+    mySession: {
+      id: SessionId.make(uuid("me")),
+      tripId: vegas.id,
+      venueName: "Aria",
+      startedAt: day(20),
+    },
   };
+
   expect(tripIsLive(seated, vegas)).toBe(true);
 });
 
 it("puts a trip just started in its group before the groups list holds it", () => {
   const reno = trip("deleted", "fresh", 25);
-  // Remembered alone, a trip the list doesn't know falls back to another group's.
   expect(resolveScope([crew, work, fresh], reno.id, null)).toEqual({ item: crew, trip: vegas });
   const groups = withStartedTrip([crew, work, fresh], reno);
   expect(resolveScope(groups, reno.id, null)).toEqual({
     item: { ...fresh, trips: [reno] },
     trip: reno,
   });
-  // Once the list has it, there's nothing to add.
   const caught = [crew, work, group("fresh", [reno])];
   expect(withStartedTrip(caught, reno)).toEqual(caught);
   expect(withStartedTrip(caught, null)).toBe(caught);

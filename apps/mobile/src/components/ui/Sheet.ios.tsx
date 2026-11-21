@@ -53,10 +53,12 @@ export function Sheet({
       keyboardFrame.current = event.endCoordinates;
       setKeyboard(keyboardOverlap(bottomEdge.current, event.endCoordinates));
     });
+
     const hidden = Keyboard.addListener("keyboardWillHide", () => {
       keyboardFrame.current = null;
       setKeyboard(0);
     });
+
     return () => {
       shown.remove();
       hidden.remove();
@@ -64,26 +66,31 @@ export function Sheet({
   }, []);
 
   const fittedHeight = contentHeight + footerHeight + insets.bottom + 80;
+
   const detent =
     contentHeight === 0
       ? footer
         ? 0.65
         : 0.5
       : Math.min(0.9, Math.max(0.3, fittedHeight / screenHeight));
+
   const close = () => {
     if (!busy) setClosing(true);
   };
+
   const dismissed = () => {
     if (closing) {
       setClosing(false);
       onClose();
     }
   };
+
   const revealFocusedField = () => {
     if (!keyboardFrame.current) return;
     TextInput.State.currentlyFocusedInput()?.measureInWindow((_x, y, _width, height) => {
       const top = frame.current.y + 12;
       const bottom = frame.current.y + frame.current.height - 12;
+
       if (y < top) {
         scroll.current?.scrollTo({ y: Math.max(0, offset.current - (top - y)), animated: false });
       } else if (y + height > bottom) {
@@ -116,9 +123,11 @@ export function Sheet({
               style={{ paddingBottom: Math.max(insets.bottom, keyboard) }}
               onLayout={(event) => {
                 const target = event.target;
+
                 if (typeof target !== "object" || target == null) return;
                 target.measureInWindow((_x, y, _width, height) => {
                   bottomEdge.current = sheetBottomEdge(screenHeight, { y, height });
+
                   if (keyboardFrame.current) {
                     setKeyboard(keyboardOverlap(bottomEdge.current, keyboardFrame.current));
                   }
@@ -140,6 +149,7 @@ export function Sheet({
                   scrollEventThrottle={32}
                   onLayout={(event) => {
                     const target = event.target;
+
                     if (typeof target !== "object" || target == null) return;
                     target.measureInWindow((_x, y, _width, height) => {
                       frame.current = { y, height };

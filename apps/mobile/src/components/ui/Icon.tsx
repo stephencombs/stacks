@@ -70,6 +70,7 @@ const icons = {
 };
 
 export type IconName = keyof typeof icons;
+
 export type IconColor =
   | "ink"
   | "ink-inverse"
@@ -96,6 +97,7 @@ export function Icon({
 }) {
   const Glyph = icons[name];
   const tint = useCSSVariable(`--color-${color}`);
+
   return (
     <Glyph
       size={size}

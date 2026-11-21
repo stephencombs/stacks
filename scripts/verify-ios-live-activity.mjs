@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 
 const [buildId, mode] = process.argv.slice(2);
+
 if (
   !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(buildId ?? "") ||
   (mode && mode !== "--preflight")
@@ -28,7 +29,9 @@ function packageBin(file) {
   const bin = process.env.PATH?.split(delimiter)
     .map((directory) => resolve(directory, "..", file))
     .find(existsSync);
+
   assert.ok(bin, "Run this script via pnpm verify:ios-live-activity.");
+
   return bin;
 }
 
@@ -47,6 +50,7 @@ function run(bin, args, options = {}) {
 }
 
 const eas = (...args) => run(easBin, args);
+
 const activeSessions = () =>
   JSON.parse(
     eas(
@@ -63,28 +67,42 @@ const activeSessions = () =>
       "--non-interactive",
     ),
   ).sessions;
+
 const usage = () =>
   JSON.parse(eas("account:usage", account, "--json", "--non-interactive")).simulator.minutes;
+
 const localSession = () => (existsSync(dotenv) ? parseEnv(readFileSync(dotenv, "utf8")) : {});
 const sessionId = (session) => session?.id ?? session?.sessionId ?? session?.simulatorSessionId;
 
 const build = JSON.parse(eas("build:view", buildId, "--json"));
+
 assert.equal(build.status, "FINISHED");
+
 assert.equal(build.platform, "IOS");
+
 assert.equal(build.isForIosSimulator, true);
+
 assert.equal(build.appIdentifier, app);
+
 assert.equal(build.app?.ownerAccount?.name, account);
+
 assert.ok(new Date(build.expirationDate) > new Date(), "The build artifact has expired.");
+
 assert.equal(activeSessions().length, 0, "The Expo project already has an active session.");
+
 assert.ok(!localSession().EAS_SIMULATOR_SESSION_ID, "This checkout points to another session.");
+
 const before = usage();
+
 assert.ok(
   before.plan.limit - before.plan.used >= maxMinutes + startOverheadMinutes,
   "The remaining included minutes cannot cover this session's hard limit.",
 );
+
 console.log(`${before.plan.used.toFixed(2)} of ${before.plan.limit} included minutes used.`);
 
 if (mode === "--preflight") process.exit(0);
+
 mkdirSync(output);
 
 let id;
@@ -104,9 +122,11 @@ function fullSnapshot(timeout = "8000") {
 
 function press(label) {
   const tree = snapshot();
+
   const matching = tree
     .split(/\r?\n/)
     .filter((line) => line.includes(`"${label}"`) && /\[(button|popupbutton)\]/.test(line));
+
   assert.equal(matching.length, 1, `Expected one button named ${label}.\n${tree}`);
   device("press", matching[0].match(/@e\d+/)[0]);
 }
@@ -114,10 +134,12 @@ function press(label) {
 function pressTab(label) {
   const tree = snapshot();
   const lines = tree.split(/\r?\n/);
+
   const tab =
     lines.find((line) => line.includes(`"${label}"`) && /\[tab\]/i.test(line)) ??
     lines.findLast((line) => line.includes(`"${label}"`) && /\[button\]/i.test(line)) ??
     lines.find((line) => line.includes(`"${label}"`));
+
   assert.ok(tab, `Expected tab named ${label}.\n${tree}`);
   const ref = tab.match(/@e\d+/)?.[0];
   assert.ok(ref, `Expected ref on tab ${label}: ${tab}`);
@@ -126,12 +148,15 @@ function pressTab(label) {
 
 const control = (...args) => eas("simulator:control", ...args, "--id", id);
 const capture = (file) => device("screenshot", join(output, `${file}.png`));
+
 const captureControl = (file) =>
   control("screenshot.capture", "--output", join(output, `${file}.png`));
+
 const settle = (ms) => new Promise((done) => setTimeout(done, ms));
 
 function lock(file) {
   control("button", "lock");
+
   return captureControl(file);
 }
 
@@ -163,6 +188,7 @@ function cashOutFromLockScreen() {
   // A system notification beneath the activity moves the action row up on the iPhone 17 Pro.
   for (const y of ["0.71", "0.805"]) {
     control("tap", "0.79", y);
+
     try {
       const tree = device("snapshot", "-i", "--observe-only", "--timeout", "3500");
       assert.match(
@@ -170,16 +196,19 @@ function cashOutFromLockScreen() {
         /Close Cash out/,
         "The activity opened the app without the cash-out sheet.",
       );
+
       return;
     } catch (error) {
       if (!(error.stderr || error.stdout || "").includes("OBSERVATION_UNAVAILABLE")) throw error;
     }
   }
+
   throw new Error("Could not open the cash-out keypad from the Lock Screen.");
 }
 
 async function main() {
   let failure;
+
   try {
     const started = JSON.parse(
       run(
@@ -206,6 +235,7 @@ async function main() {
         { timeout: 8 * 60_000 },
       ),
     );
+
     const local = localSession();
     id = sessionId(started) ?? sessionId(activeSessions().find((session) => session.name === name));
     assert.ok(id, "Expo did not return the session ID.");
@@ -219,6 +249,7 @@ async function main() {
     console.log("Recording a signed-out session.");
     press("Start or add a session");
     press("Start session");
+
     for (const digit of "200") press(digit);
     press("Start session");
     press("+ $100");
@@ -245,6 +276,7 @@ async function main() {
     control("appearance.set", "dark");
     fullSnapshot();
     capture("cash-out-dark");
+
     for (const digit of "450") press(digit);
     const cashOut = fullSnapshot();
     assert.match(cashOut, /End session/);
@@ -298,6 +330,7 @@ async function main() {
   } finally {
     try {
       id ??= sessionId(activeSessions().find((session) => session.name === name));
+
       if (id) eas("simulator:stop", "--id", id, "--non-interactive");
       rmSync(dotenv, { force: true });
       const after = usage();

@@ -24,6 +24,7 @@ const checks = { ...all, preview: "false" };
 
 function jobs(paths: string[]) {
   const { typecheck_args: _typecheck, test_args: _test, ...flags } = output(plan(paths));
+
   return flags;
 }
 
@@ -142,6 +143,7 @@ describe("decide", () => {
     const boom = () => {
       throw new Error("missing");
     };
+
     expect(output(decide({ event: "schedule", base: "", diff: boom })).check).toBe("true");
     expect(output(decide({ event: "workflow_dispatch", base: "abc", diff: boom })).preview).toBe(
       "false",
@@ -158,6 +160,7 @@ describe("decide", () => {
         diff: () => ["apps/mobile/src/App.tsx"],
       }),
     );
+
     expect(result.api).toBe("false");
     expect(result.build).toBe("false");
   });
@@ -170,6 +173,7 @@ describe("dependents", () => {
       { name: "shared", deps: new Set(["contracts"]) },
       { name: "web", deps: new Set(["shared"]) },
     ];
+
     expect([...dependentsOf("contracts", packages)].sort()).toEqual(["contracts", "shared", "web"]);
     expect([...dependentsOf("web", packages)].sort()).toEqual(["web"]);
   });
@@ -177,38 +181,49 @@ describe("dependents", () => {
   it("matches the workspace dependency graph", () => {
     const packages: { name: string; dir: string; deps: Set<string> }[] = [];
     const repo = dirname(fileURLToPath(import.meta.url));
+
     for (const parent of ["apps", "packages"]) {
       for (const name of readdirSync(join(repo, "..", parent))) {
         const dir = join(repo, "..", parent, name);
         const manifest = join(dir, "package.json");
+
         if (!existsSync(manifest)) continue;
+
+        // SAFETY: these files are workspace package.json manifests with a string name and string dependency maps.
         const pkg = JSON.parse(readFileSync(manifest, "utf8")) as {
           name: string;
           dependencies?: Record<string, string>;
           devDependencies?: Record<string, string>;
           peerDependencies?: Record<string, string>;
         };
+
         const deps = new Set<string>();
+
         for (const field of ["dependencies", "devDependencies", "peerDependencies"] as const) {
           for (const [dep, version] of Object.entries(pkg[field] ?? {})) {
             if (version.startsWith("workspace:")) deps.add(dep);
           }
         }
+
         packages.push({ name: pkg.name, dir: `${parent}/${name}`, deps });
       }
     }
 
     for (const pkg of packages) {
       const result = output(plan([`${pkg.dir}/src/marker.ts`]));
+
       const listed =
         result.typecheck_args === "-r --cache"
           ? packages.map((item) => item.name)
           : [...result.typecheck_args.matchAll(/@[\w/-]+/g)].map((match) => match[0]);
+
       expect(listed, pkg.name).toContain(pkg.name);
+
       for (const other of packages) {
         if (other.deps.has(pkg.name))
           expect(listed, `${other.name} depends on ${pkg.name}`).toContain(other.name);
       }
+
       if (result.build === "true" || result.api === "true") expect(result.check).toBe("true");
     }
   });

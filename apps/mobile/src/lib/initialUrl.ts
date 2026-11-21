@@ -1,13 +1,15 @@
 export async function getInitialURL(
   lookup: () => Promise<string | null>,
   onTimeout: () => void,
-  onError: (error: unknown) => void,
+  onError: (error: Error) => void,
 ) {
   let timer: ReturnType<typeof setTimeout> | undefined;
+
   try {
     return await Promise.race([
-      lookup().catch((error: unknown) => {
-        onError(error);
+      lookup().catch((error) => {
+        onError(error instanceof Error ? error : new Error(String(error)));
+
         return null;
       }),
       new Promise<null>((resolve) => {
@@ -18,7 +20,8 @@ export async function getInitialURL(
       }),
     ]);
   } catch (error) {
-    onError(error);
+    onError(error instanceof Error ? error : new Error(String(error)));
+
     return null;
   } finally {
     clearTimeout(timer);

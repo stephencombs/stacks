@@ -72,12 +72,15 @@ export const sessionActivity = createLiveActivity(
 
     const { colors } = content;
     const dark = (content.colorScheme ?? environment.colorScheme) === "dark";
+
     const label = [
       font({ size: 15, weight: "semibold" }),
       foregroundStyle(colors.ink),
       lineLimit(1),
     ];
+
     const secondary = [font({ size: 13 }), foregroundStyle(colors.muted), lineLimit(1)];
+
     const chip = (size: number) => (
       <ZStack modifiers={[accessibilityHidden()]}>
         <Circle modifiers={[foregroundStyle(colors.chip), frame({ width: size, height: size })]} />
@@ -101,6 +104,7 @@ export const sessionActivity = createLiveActivity(
         />
       </ZStack>
     );
+
     const action = (title: string, url: string, primary = false) => (
       <Link destination={url} modifiers={[buttonStyle("plain")]}>
         <Text
@@ -127,11 +131,14 @@ export const sessionActivity = createLiveActivity(
         </Text>
       </Link>
     );
+
     const bannerModifiers = [
       padding({ all: 14 }),
       activityBackgroundTint(dark ? colors.darkCard : null),
     ];
+
     const subtitle = content.kind === "live" ? content.venueLabel : content.finishedTimeText;
+
     const identity = (
       <HStack spacing={10}>
         {chip(36)}
@@ -141,6 +148,7 @@ export const sessionActivity = createLiveActivity(
         </VStack>
       </HStack>
     );
+
     const amount = [
       font({ size: 27, weight: "bold" }),
       monospacedDigit(),
@@ -148,6 +156,7 @@ export const sessionActivity = createLiveActivity(
       lineLimit(1),
       minimumScaleFactor(0.7),
     ];
+
     if (content.kind === "finished") {
       const color =
         content.resultTone === "win"
@@ -155,12 +164,14 @@ export const sessionActivity = createLiveActivity(
           : content.resultTone === "loss"
             ? colors.loss
             : colors.ink;
+
       const summaryStyle = [
         font({ size: 14, weight: "medium" }),
         foregroundStyle(colors.ink),
         lineLimit(1),
         monospacedDigit(),
       ];
+
       return {
         banner: (
           <VStack alignment="leading" spacing={12} modifiers={bannerModifiers}>
@@ -185,11 +196,13 @@ export const sessionActivity = createLiveActivity(
     }
 
     const startedAt = new Date(content.startedAtMs);
+
     const timerStyle = [
       font({ size: 13, weight: "semibold" }),
       monospacedDigit(),
       foregroundStyle(colors.live),
     ];
+
     const details = (
       <HStack spacing={8}>
         {identity}
@@ -211,6 +224,7 @@ export const sessionActivity = createLiveActivity(
         </VStack>
       </HStack>
     );
+
     return {
       banner: (
         <VStack spacing={12} modifiers={bannerModifiers}>

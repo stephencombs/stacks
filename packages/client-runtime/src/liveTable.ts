@@ -34,7 +34,7 @@ export type LiveTable = {
 };
 
 const ms = DateTime.toEpochMillis;
-// Players added while the table was being set up sat down with it, not later.
+
 const LATER = 5 * 60_000;
 const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY);
 
@@ -42,17 +42,19 @@ const money = (amount: number) => formatMoney(MinorUnits.make(amount), RECORDING
  * The table as its live screen shows it. A device that records for everyone holds every visit; a
  * player who joined holds only their own, and sees the others from `server` while it's reachable.
  */
-export const liveTable = (
+export const liveTable: (
   table: RecordingTableView,
   server: TableView | null | undefined,
-): LiveTable => {
+) => LiveTable = (table, server) => {
   const everyone = table.role !== "participant";
   const names = new Map(server?.players.map((player) => [player.id, player.displayName]));
+
   const local = table.visits.map((item) => ({
     summary: item,
     name: item.isSelf ? "You" : item.player.displayName,
     isSelf: item.isSelf,
   }));
+
   const remote = everyone
     ? []
     : (server?.visits ?? [])
@@ -62,19 +64,24 @@ export const liveTable = (
           name: names.get(item.visit.playerId) ?? "Player",
           isSelf: false,
         }));
+
   const listed = [...local, ...remote];
   const named = distinctPlayerNames(listed.map((item) => [item.summary.visit.playerId, item.name]));
+
   const all = listed.map((item) => ({
     ...item,
     name: named.get(item.summary.visit.playerId)!,
   }));
+
   const first = all
     .map((item) => item.summary.visit.startedAt)
     .toSorted((a, b) => ms(a) - ms(b))[0];
+
   const seats = all
-    .map(({ summary, name, isSelf }): TableSeat => {
+    .map(({ summary, name, isSelf }) => {
       const { visit, totals, finalResult } = summary;
       const playing = visit.finishedAt === null;
+
       return {
         visitId: visit.id,
         playerId: visit.playerId,
@@ -96,9 +103,12 @@ export const liveTable = (
         Number(b.isSelf) - Number(a.isSelf) ||
         ms(started(all, a.visitId)) - ms(started(all, b.visitId)),
     );
+
   const live = seats.filter((seat) => seat.playing);
   let inPlay = 0n;
+
   for (const seat of live) inPlay += BigInt(seat.amount);
+
   return {
     seats,
     startedAt: first ?? null,
@@ -128,8 +138,10 @@ export const cashOutNote = (
   const seat = seats.find((item) => item.visitId === visitId)!;
   const whose = seat.isSelf ? "Your" : `${seat.name}'s`;
   const rest = seats.filter((item) => item.playing && item.visitId !== visitId);
+
   if (rest.length === 0) return `${whose} visit ends, and with it the table.`;
   const verb = rest.length === 1 && !rest[0]!.isSelf ? "keeps" : "keep";
+
   return `${whose} visit ends. ${list(rest.map((item) => item.name))} ${verb} playing.`;
 };
 
@@ -143,7 +155,7 @@ export type TableAction = "edit" | "add_player" | "share" | "settings" | "delete
 export const tableActions = (
   role: RecordingTableView["role"],
   table: { readonly playing: boolean; readonly closed: boolean; readonly empty: boolean },
-): ReadonlyArray<TableAction> => [
+) => [
   ...(table.playing ? (["edit"] as const) : []),
   ...(role !== "participant" && !table.closed ? (["add_player"] as const) : []),
   ...(role === "starter" && !table.closed ? (["share", "settings"] as const) : []),

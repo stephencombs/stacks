@@ -19,6 +19,7 @@ export function PressableScale({
   ...props
 }: Omit<PressableProps, "style"> & { style?: StyleProp<ViewStyle> }) {
   const [scale] = useState(() => new Animated.Value(1));
+
   return (
     <AnimatedPressable
       {...props}

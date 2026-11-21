@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
@@ -54,10 +55,13 @@ export function Sheet({
   const [progress] = useState(() => new Animated.Value(0));
   const [leaving, setLeaving] = useState(false);
   const [wasOpen, setWasOpen] = useState(open);
+
   if (open !== wasOpen) {
     setWasOpen(open);
+
     if (!open) setLeaving(true);
   }
+
   const [keyboard, setKeyboard] = useState(0);
   const sheetBottom = useRef(0);
   const keyboardFrame = useRef<{ screenY: number; height: number } | null>(null);
@@ -69,23 +73,29 @@ export function Sheet({
   useEffect(() => {
     const show = Platform.OS === "ios" ? "keyboardWillChangeFrame" : "keyboardDidShow";
     const hide = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
     const frameOf = (screenY: number, height: number) => {
       keyboardFrame.current = { screenY, height };
+
       const overlap = keyboardOverlap(
         sheetBottom.current || Dimensions.get("screen").height,
         keyboardFrame.current,
       );
+
       if (overlap > 0) revealAfterLayout.current = true;
       setKeyboard(overlap);
     };
+
     const shown = Keyboard.addListener(show, (event) => {
       frameOf(event.endCoordinates.screenY, event.endCoordinates.height);
     });
+
     const hidden = Keyboard.addListener(hide, () => {
       keyboardFrame.current = null;
       revealAfterLayout.current = false;
       setKeyboard(0);
     });
+
     return () => {
       shown.remove();
       hidden.remove();
@@ -119,6 +129,7 @@ export function Sheet({
           measureInWindow(event.target, (y, height) => {
             const edge = sheetBottomEdge(Dimensions.get("screen").height, { y, height });
             sheetBottom.current = edge;
+
             if (!keyboardFrame.current) return;
             setKeyboard(keyboardOverlap(edge, keyboardFrame.current));
           });
@@ -193,6 +204,7 @@ export function Sheet({
                 scrollFrame.current = { y: scrollFrame.current.y, height };
                 measureInWindow(event.target, (y, measured) => {
                   scrollFrame.current = { y, height: measured };
+
                   if (!revealAfterLayout.current) return;
                   revealAfterLayout.current = false;
                   revealFocusedField(
@@ -218,11 +230,21 @@ export function Sheet({
   );
 }
 
+function canMeasure(node: LayoutChangeEvent["target"]): node is LayoutChangeEvent["target"] & {
+  measureInWindow: (
+    callback: (x: number, y: number, width: number, height: number) => void,
+  ) => void;
+} {
+  return (
+    Predicate.hasProperty(node, "measureInWindow") && Predicate.isFunction(node.measureInWindow)
+  );
+}
+
 function measureInWindow(
   node: LayoutChangeEvent["target"],
   onFrame: (y: number, height: number) => void,
 ) {
-  if (typeof node !== "object" || node == null) return;
+  if (!canMeasure(node)) return;
   node.measureInWindow((_x, y, _width, height) => onFrame(y, height));
 }
 
@@ -236,6 +258,7 @@ function revealFocusedField(
   TextInput.State.currentlyFocusedInput()?.measureInWindow((_x, y, _width, height) => {
     const margin = 12;
     const viewBottom = frame.y + frame.height;
+
     if (y < frame.y + margin) {
       scroll.scrollTo({ y: Math.max(0, offsetY - (frame.y + margin - y)), animated });
     } else if (y + height > viewBottom - margin) {

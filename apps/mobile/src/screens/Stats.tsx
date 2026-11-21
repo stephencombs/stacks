@@ -66,15 +66,15 @@ export function StatsScreen({ route }: Props) {
   useLayoutEffect(() => {
     if (android) navigation.setOptions({ headerShown: false });
   }, [android, navigation]);
+
   const pick = {
-    ...(route.params?.groupId ? { groupId: GroupId.make(route.params.groupId) } : {}),
-    ...(route.params?.tripId ? { tripId: TripId.make(route.params.tripId) } : {}),
+    ...(route.params?.groupId ? { groupId: GroupId.make(route.params.groupId) } : null),
+    ...(route.params?.tripId ? { tripId: TripId.make(route.params.tripId) } : null),
   };
+
   const stats = (
     <YourGroups>
       {(groups) => (
-        // Each arrival with a group picked starts fresh, even when Stats is already open.
-        // Signed out there's no group to show, whatever the address still names.
         <StatsView
           key={`${pick.groupId}:${pick.tripId}`}
           pick={groups ? pick : justMe}
@@ -83,6 +83,7 @@ export function StatsScreen({ route }: Props) {
       )}
     </YourGroups>
   );
+
   return android ? stats : <PersonalScreen live>{stats}</PersonalScreen>;
 }
 
@@ -92,14 +93,15 @@ const justMe: Pick = {};
 const noGroups: ReadonlyArray<GroupListItem> = [];
 const remembered = new WeakSet<object>();
 
-/** Your groups when you're signed in, none before they load; null signed out. */
 function YourGroups({
   children,
 }: {
   children: (groups: ReadonlyArray<GroupListItem> | null) => ReactNode;
 }) {
   const account = useAccount();
+
   if (!account.available || !account.isSignedIn || !account.userId) return children(null);
+
   return (
     <StacksProvider>
       <SignedInGroups>{children}</SignedInGroups>
@@ -120,6 +122,7 @@ function SignedInGroups({
     copies.rememberGroups(result.value);
   }, [copies, result]);
   const groups = AsyncResult.getOrElse(result, () => noGroups);
+
   return children(groups);
 }
 
@@ -128,14 +131,16 @@ function StatsView({ pick, groups }: { pick: Pick; groups: ReadonlyArray<GroupLi
   const [picked, setPicked] = useState<Pick>(pick);
   const [filters, setFilters] = useState<StatsFilters>(pick.tripId ? { tripId: pick.tripId } : {});
   const rememberedTrip = picked.tripId && copies ? copies.groupOfTrip(picked.tripId) : null;
-  // A trip alone names its group once your groups have loaded, or from the phone's index offline.
+
   const groupId =
     picked.groupId ??
     groups.find((item) => item.trips.some((trip) => trip.id === picked.tripId))?.group.id ??
     rememberedTrip?.groupId ??
     null;
+
   const fallbackName =
     groupId === null ? null : (copies?.groupName(groupId) ?? rememberedTrip?.groupName ?? null);
+
   const chip =
     groups.length === 0 && groupId === null ? null : (
       <GroupChip
@@ -144,18 +149,21 @@ function StatsView({ pick, groups }: { pick: Pick; groups: ReadonlyArray<GroupLi
         fallbackName={fallbackName}
         onChange={(next) => {
           setPicked(next === null ? {} : { groupId: next });
-          // A trip stays picked only in the group it belongs to.
+
           const keep =
             next === null ||
             groups.some(
               (item) =>
                 item.group.id === next && item.trips.some((trip) => trip.id === filters.tripId),
             );
+
           if (!keep) setFilters({ ...filters, tripId: undefined });
         }}
       />
     );
+
   const group = groups.find((item) => item.group.id === groupId);
+
   return groupId === null ? (
     <JustMe
       names={tripNames(groups)}
@@ -194,17 +202,21 @@ function GroupChip({
   onChange: (groupId: GroupId | null) => void;
 }) {
   const list = groups.map((item) => ({ id: item.group.id, name: item.group.name }));
+
   const items =
     groupId !== null && !list.some((item) => item.id === groupId)
       ? [...list, { id: groupId, name: fallbackName ?? "Group" }]
       : list;
+
   const chip = groupChip(items, groupId);
+
   if (Platform.OS === "android")
     return (
       <AndroidGroupChip
         {...chip}
         options={chip.options.map((option) => {
           const group = groups.find((item) => item.group.id === option.value);
+
           return {
             ...option,
             icon: option.value === "" ? "person" : "group",
@@ -222,6 +234,7 @@ function GroupChip({
         onClear={() => onChange(null)}
       />
     );
+
   return (
     <FilterChip
       name={chip.name}
@@ -251,9 +264,11 @@ function JustMe({
   const [adding, setAdding] = useState(false);
   const [gameOpen, setGameOpen] = useState(false);
   const android = Platform.OS === "android";
+
   const liveTrips = new Set(
     home?.active.flatMap(({ table }) => (table.tripId ? [table.tripId] : [])),
   );
+
   const view = useMemo(
     () =>
       home
@@ -264,6 +279,7 @@ function JustMe({
         : null,
     [home, filters, names, trips],
   );
+
   const filterRow =
     view && view.kind !== "empty" ? (
       <Filters
@@ -278,6 +294,7 @@ function JustMe({
     ) : chip ? (
       <Filters lead={chip} chips={[]} filtered={false} onChange={onFilters} />
     ) : null;
+
   return (
     <StatsContent filters={filterRow}>
       {status === "load_failed" ? (
@@ -385,6 +402,7 @@ function Breakdown({
   const muted = String(useCSSVariable("--color-muted"));
   const trip = view.chips.find((chip) => chip.key === "tripId" && chip.applied);
   const range = trip && view.trips.byId.get(trip.value)?.range;
+
   const numbers = (
     <View className={android ? "mt-2 flex-row" : "mt-4 flex-row flex-wrap gap-y-4"}>
       <Figure label="Sessions" compact={android}>
@@ -407,6 +425,7 @@ function Breakdown({
       </Figure>
     </View>
   );
+
   const sessions = view.list ? (
     <View className="gap-2">
       <StatsHeading count={android ? `${view.list.length} finished` : String(view.list.length)}>
@@ -438,6 +457,7 @@ function Breakdown({
       </List>
     </View>
   ) : null;
+
   return (
     <>
       {android && range ? (
@@ -507,10 +527,10 @@ const HEIGHT = 64;
 const PAD = { x: 6, y: 6 };
 const CALLOUT = 196;
 
-/** The running result against time, from break-even. Dragging along it reads one session. */
 function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
   const android = Platform.OS === "android";
   const height = android ? 84 : HEIGHT;
+
   const [win, loss, winTint, lossTint, rule, surface, muted, fill] = useCSSVariable([
     "--color-win",
     "--color-loss",
@@ -521,6 +541,7 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
     "--color-muted",
     "--color-fill",
   ]).map(String);
+
   const prefs = usePreferences();
   const [width, setWidth] = useState(0);
   const [inspect, setInspect] = useState<number | null>(null);
@@ -531,6 +552,7 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
   const down = prefs.privacyMode ? muted : loss;
   const axis = android ? chart.androidAxis : chart;
   const calloutWidth = android ? Math.min(190, width) : CALLOUT;
+
   const drag = android
     ? PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
@@ -547,10 +569,12 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
         onResponderMove: (event: import("react-native").GestureResponderEvent) =>
           setInspect(plot.nearest(event.nativeEvent.locationX)),
       };
+
   const shown = inspect === null ? null : points[inspect]!;
   const dot = plot.points[inspect ?? last];
   const total = (shown ?? points[last]!).total;
   const step = (by: number) => setInspect(Math.min(last, Math.max(0, (inspect ?? last) + by)));
+
   const callout =
     dot && shown
       ? Math.min(
@@ -558,6 +582,7 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
           Math.max(0, width - calloutWidth),
         )
       : 0;
+
   return (
     <View className={android ? "mt-3 gap-1" : "mt-2 gap-1"}>
       <View className="flex-row items-center justify-between">

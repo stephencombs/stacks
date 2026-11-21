@@ -1,4 +1,6 @@
+import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
+import * as Layer from "effect/Layer";
 import {
   MinorUnits,
   TripId,
@@ -31,21 +33,24 @@ export type TripPlay =
       };
     });
 
+const sessionPlay: (summary: SessionSummary) => TripPlay = (summary) => ({
+  ...summary,
+  kind: "session",
+  live: summary.session.status === "live",
+});
+
+const tablePlay: (table: TripTable) => TripPlay = (table) => ({
+  ...table,
+  kind: "table",
+  live: table.endedAt === null,
+  session: { id: table.table.id, startedAt: table.startedAt, highLimit: table.table.highLimit },
+});
+
 /** A trip's sessions and tables together, oldest first. */
-export const tripPlays = (trip: Pick<TripDetail, "sessions" | "tables">): ReadonlyArray<TripPlay> =>
-  [
-    ...trip.sessions.map((summary): TripPlay => ({
-      ...summary,
-      kind: "session",
-      live: summary.session.status === "live",
-    })),
-    ...trip.tables.map((table): TripPlay => ({
-      ...table,
-      kind: "table",
-      live: table.endedAt === null,
-      session: { id: table.table.id, startedAt: table.startedAt, highLimit: table.table.highLimit },
-    })),
-  ].toSorted(
+export const tripPlays: (
+  trip: Pick<TripDetail, "sessions" | "tables">,
+) => ReadonlyArray<TripPlay> = (trip) =>
+  [...trip.sessions.map(sessionPlay), ...trip.tables.map(tablePlay)].toSorted(
     (a, b) =>
       DateTime.toEpochMillis(a.session.startedAt) - DateTime.toEpochMillis(b.session.startedAt),
   );
@@ -53,15 +58,14 @@ export const tripPlays = (trip: Pick<TripDetail, "sessions" | "tables">): Readon
 /** Every trip in the groups you're in, by name, for labeling tables that belong to one. */
 export const tripNames = (
   groups: ReadonlyArray<{ readonly trips: ReadonlyArray<Pick<Trip, "id" | "name">> }>,
-): ReadonlyMap<TripId, string> =>
-  new Map(groups.flatMap(({ trips }) => trips.map((trip) => [trip.id, trip.name] as const)));
+) => new Map(groups.flatMap(({ trips }) => trips.map((trip) => [trip.id, trip.name] as const)));
 
 /** What a trip has finished: what standings, nights and awards count. */
 export const closedPlays = (trip: Pick<TripDetail, "sessions" | "tables">) =>
   tripPlays(trip).filter((play) => !play.live);
 
 const HOUR = 3_600_000;
-/** A night runs until 6am, so the 2am session still counts as the night before. */
+
 const NIGHT_ENDS = 6;
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -72,6 +76,7 @@ const shortDate = new Intl.DateTimeFormat(undefined, { month: "short", day: "num
 export const localClock: TripClock = {
   night: (at) => {
     const date = new Date(DateTime.toEpochMillis(at) - NIGHT_ENDS * HOUR);
+
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   },
   hour: (at) => new Date(DateTime.toEpochMillis(at)).getHours(),
@@ -80,6 +85,7 @@ export const localClock: TripClock = {
 export const nightWeekday = (night: TripNight<TripSession>) => {
   const first = night.sessions[0]!;
   const date = new Date(DateTime.toEpochMillis(first.session.startedAt) - NIGHT_ENDS * HOUR);
+
   return weekday.format(date);
 };
 
@@ -90,6 +96,7 @@ export const nightLabel = (night: TripNight<TripSession>) =>
 /** "Oct 21 – Oct 25", or "Since Oct 21" while the trip is going. */
 export const tripDates = (trip: Trip) => {
   const from = shortDate.format(DateTime.toDateUtc(trip.startedAt));
+
   return trip.endedAt === null
     ? `Since ${from}`
     : `${from} – ${shortDate.format(DateTime.toDateUtc(trip.endedAt))}`;
@@ -103,6 +110,7 @@ export const boardMoney = (
   options: { readonly showCents?: boolean; readonly privacyMode?: boolean } = {},
 ) => {
   if (options.privacyMode) return "••••";
+
   return formatMoney(MinorUnits.make(amount), currency, {
     signDisplay: signed ? "exceptZero" : "auto",
     trailingZeroDisplay: options.showCents ? "auto" : "stripIfInteger",
@@ -112,6 +120,7 @@ export const boardMoney = (
 /** Chip colors go to players in the order they joined, 1 to 8, then around again. */
 export const chipOf = (detail: GroupDetail, playerId: PlayerId) => {
   const index = detail.players.findIndex((player) => player.id === playerId);
+
   return ((index === -1 ? 0 : index) % 8) + 1;
 };
 
@@ -123,8 +132,10 @@ export const streakLine = (streak: { readonly length: number; readonly winning: 
 export const ordinal = (n: number) => {
   const rank = Math.abs(n);
   const lastTwo = rank % 100;
+
   const suffix =
     lastTwo >= 11 && lastTwo <= 13 ? "th" : (["th", "st", "nd", "rd"][rank % 10] ?? "th");
+
   return `${n}${suffix}`;
 };
 
@@ -158,20 +169,32 @@ export type LastTripStorage = {
   readonly save: (tripId: string | null) => void;
 };
 
+export type LastTripStore = ReturnType<typeof makeLastTripStore>;
+
+export class LastTripStoreService extends Context.Service<LastTripStoreService, LastTripStore>()(
+  "@stacks/client-runtime/LastTripStore",
+) {}
+
+export const LastTripStoreLive = (storage: LastTripStorage) =>
+  Layer.sync(LastTripStoreService, () => makeLastTripStore(storage));
+
 export const makeLastTripStore = (storage: LastTripStorage) => {
   const listeners = new Set<() => void>();
   const initial = storage.load();
   let current = initial ? TripId.make(initial) : null;
+
   return {
     get: () => current,
     set: (next: TripId | null) => {
       if (next === current) return;
       current = next;
       storage.save(next);
+
       for (const listener of listeners) listener();
     },
     subscribe: (listener: () => void) => {
       listeners.add(listener);
+
       return () => {
         listeners.delete(listener);
       };
@@ -185,8 +208,10 @@ export const resolveEntry = (
 ) => {
   if (lastTripId !== null) {
     const exists = groups.some((item) => item.trips.some((trip) => trip.id === lastTripId));
+
     if (exists) return { kind: "trip" as const, tripId: lastTripId };
   }
+
   const going = groups
     .flatMap((item) =>
       item.trips
@@ -196,8 +221,11 @@ export const resolveEntry = (
     .toSorted(
       (a, b) => DateTime.toEpochMillis(b.trip.startedAt) - DateTime.toEpochMillis(a.trip.startedAt),
     );
+
   if (going.length === 1) return { kind: "trip" as const, tripId: going[0]!.trip.id };
+
   if (going.length > 1) return { kind: "choose" as const, trips: going };
+
   return { kind: "groups" as const };
 };
 
@@ -208,7 +236,7 @@ export const resolveEntry = (
 export const tripInScope = <T extends Pick<Trip, "id" | "endedAt">>(
   trips: ReadonlyArray<T>,
   current: TripId | null,
-): T | undefined =>
+) =>
   trips.find((trip) => trip.id === current) ??
   trips.find((trip) => trip.endedAt === null) ??
   trips[0];

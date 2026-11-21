@@ -9,13 +9,13 @@ import {
 } from "@stacks/contracts/recordingCommands";
 import { visitSummary } from "@stacks/shared/visits";
 
-import { usd, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
+import { usd, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 
 const uuid = () => crypto.randomUUID();
 const at = (minutes: number) => DateTime.makeUnsafe(Date.UTC(2026, 10, 7, 20, minutes));
 
-const device = (): RecordingIdentity => ({
+const device = () => ({
   playerId: PlayerId.make(uuid()),
   actorId: ActorId.make(uuid()),
 });
@@ -36,9 +36,12 @@ const start = (identity: RecordingIdentity, buyIn = 20000) => {
     venueId: null,
     highLimit: false,
   });
+
+  // SAFETY: the payload's type is the literal "start", so this is that member of RecordingCommand.
   return command as Extract<RecordingCommand, { type: "start" }>;
 };
 
+// SAFETY: the payload's type is the literal "add", so this is that member of RecordingCommand.
 const add = (
   identity: RecordingIdentity,
   visitId: VisitId,
@@ -78,18 +81,20 @@ const finish = (
     finishedAt: at(30),
   });
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
+it.layer(TestApi.layer)("recording", (it) => {
   it.effect("applies the first milestone and restores it from history", () =>
     Effect.gen(function* () {
       const { alex } = yield* users("alex");
       const identity = device();
       const opened = start(identity);
+
       const commands = [
         opened,
         add(identity, opened.visitId, 0, 10000),
         add(identity, opened.visitId, 1, 10000, "cash_out"),
         finish(identity, opened.visitId, 2, 25000),
       ];
+
       const pushed = yield* alex.recording.push({ payload: { identity, commands } });
       expect(pushed.results.map((result) => result.status)).toEqual([
         "accepted",
@@ -122,6 +127,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       const retried = yield* alex.recording.push({
         payload: { identity, commands: [opened, rebuy] },
       });
+
       expect(retried.results.every((result) => result.status === "accepted")).toBe(true);
       const history = yield* alex.recording.history();
       expect(history.entries).toHaveLength(2);
@@ -145,9 +151,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       const finished = finish(identity, opened.visitId, 0, 0);
       const late = add(identity, opened.visitId, 1, 10000);
       const missing = add(identity, VisitId.make(uuid()), 0, 10000);
+
       const { results } = yield* alex.recording.push({
         payload: { identity, commands: [opened, stale, finished, late, missing] },
       });
+
       expect(
         results.map((result) => (result.status === "rejected" ? result.reason : "ok")),
       ).toEqual(["ok", "conflict", "ok", "invalid", "invalid"]);
@@ -162,8 +170,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       ]);
       expect(history.entries).toHaveLength(2);
 
-      // A rejected operation left no trace, so its ID still works once it's valid.
       const fixed = RecordingCommand.make({ ...stale, expectedRevision: 2 });
+
       const reopened = RecordingCommand.make({
         type: "reopen",
         operationId: RecordingOperationId.make(uuid()),
@@ -173,9 +181,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
         expectedRevision: 1,
         reason: "Finished by mistake",
       });
+
       const retried = yield* alex.recording.push({
         payload: { identity, commands: [reopened, fixed] },
       });
+
       expect(retried.results.map((result) => result.status)).toEqual(["accepted", "accepted"]);
       const after = yield* alex.recording.history();
       const voided = after.entries.filter((entry) => entry.voidedAt !== null);
@@ -203,15 +213,17 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
         entries: [],
       });
 
-      // Bea can't borrow Alex's identity, and her own can't reach his visit or operations.
       const borrowed = yield* bea.recording
         .push({
           payload: { identity: alexDevice, commands: [add(alexDevice, opened.visitId, 0, 100)] },
         })
         .pipe(Effect.flip);
-      expect(borrowed).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
+
+      expect(borrowed._tag).toBe("Conflict");
+      expect(borrowed).toMatchObject({ reason: "recording_identity" });
 
       const beaDevice = device();
+
       const { results } = yield* bea.recording.push({
         payload: {
           identity: beaDevice,
@@ -222,6 +234,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
           ],
         },
       });
+
       expect(
         results.map((result) => (result.status === "rejected" ? result.reason : "ok")),
       ).toEqual(["forbidden", "operation_reused", "conflict"]);
@@ -236,10 +249,13 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       const first = device();
       yield* alex.recording.push({ payload: { identity: first, commands: [start(first)] } });
       const second = device();
+
       const refused = yield* alex.recording
         .push({ payload: { identity: second, commands: [start(second)] } })
         .pipe(Effect.flip);
-      expect(refused).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
+
+      expect(refused._tag).toBe("Conflict");
+      expect(refused).toMatchObject({ reason: "recording_identity" });
       expect((yield* alex.recording.history()).identity).toEqual(first);
     }),
   );
@@ -262,6 +278,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       yield* alex.recording.push({ payload: { identity, commands: [opened] } });
       const zeroBuyIn = add(identity, opened.visitId, 0, 0);
       const negativeCashOut = add(identity, opened.visitId, 0, -500, "cash_out");
+
       const negativeReplacement = RecordingCommand.make({
         type: "correct",
         operationId: RecordingOperationId.make(uuid()),
@@ -273,9 +290,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
         reason: "Typo",
         replacement: { id: EntryId.make(uuid()), amount: usd(-100), occurredAt: at(0), note: null },
       });
+
       const { results } = yield* alex.recording.push({
         payload: { identity, commands: [zeroBuyIn, negativeCashOut, negativeReplacement] },
       });
+
       expect(results.map((result) => result.status === "rejected" && result.reason)).toEqual([
         "invalid",
         "invalid",
@@ -291,6 +310,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       const identity = device();
       const first = start(identity);
       yield* alex.recording.push({ payload: { identity, commands: [start(identity)] } });
+
       const twins = Array.from({ length: 6 }, () =>
         RecordingCommand.make({
           ...start(identity),
@@ -298,14 +318,17 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
           tableId: first.tableId,
         }),
       );
+
       const responses = yield* Effect.forEach(
         twins,
         (command) => alex.recording.push({ payload: { identity, commands: [command] } }),
         { concurrency: "unbounded" },
       );
+
       const statuses = responses.map((response) => response.results[0]!.status);
       expect(statuses.filter((status) => status === "accepted")).toHaveLength(1);
       expect(statuses.filter((status) => status === "rejected")).toHaveLength(5);
+
       for (const response of responses)
         for (const result of response.results)
           if (result.status === "rejected")
@@ -323,16 +346,19 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
       const opened = start(identity);
       const rebuy = add(identity, opened.visitId, 0, 10000);
       yield* alex.recording.push({ payload: { identity, commands: [opened, rebuy] } });
-      // The same facts from a restored backup, under new operation IDs.
+
       const copy = (command: RecordingCommand) =>
         RecordingCommand.make({ ...command, operationId: RecordingOperationId.make(uuid()) });
+
       const later = add(identity, opened.visitId, 1, 500);
+
       const { results } = yield* alex.recording.push({
         payload: {
           identity,
           commands: [copy(opened), RecordingCommand.make({ ...later, entryId: rebuy.entryId })],
         },
       });
+
       expect(results).toMatchObject([
         { status: "rejected", reason: "conflict", message: "This session is already recorded." },
         {
@@ -348,11 +374,14 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
     Effect.gen(function* () {
       const { alex } = yield* users("alex");
       const identity = device();
+
+      // SAFETY: start() is a start command, and overriding game keeps that same member.
       const opened = RecordingCommand.make({
         ...start(identity),
         game: "other",
         gameName: "  Ultimate Texas Hold'em  ",
       }) as Extract<RecordingCommand, { type: "start" }>;
+
       const pushed = yield* alex.recording.push({ payload: { identity, commands: [opened] } });
       expect(pushed.results.map((result) => result.status)).toEqual(["accepted"]);
 
@@ -370,6 +399,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording", (it) => {
         expectedRevision: 0,
         table: { game: "other", gameName: "Mississippi Stud", venueId: null, highLimit: true },
       });
+
       const edited = yield* alex.recording.push({ payload: { identity, commands: [renamed] } });
       expect(edited.results.map((result) => result.status)).toEqual(["accepted"]);
 

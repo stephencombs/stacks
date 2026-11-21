@@ -15,6 +15,7 @@ export const OverpassResponse = Schema.Struct({
     }),
   ),
 });
+
 export type OverpassElement = (typeof OverpassResponse.Type)["elements"][number];
 
 export const OVERPASS_QUERY = `[out:json][timeout:300];nwr["amenity"="casino"]["name"];out center tags;`;
@@ -34,21 +35,27 @@ export interface CatalogVenue {
 const tag = (tags: Readonly<Record<string, string>>, ...keys: ReadonlyArray<string>) => {
   for (const key of keys) {
     const value = tags[key]?.trim();
+
     if (value) return value.slice(0, 80);
   }
+
   return null;
 };
 
 /** Maps one OSM casino to a catalog venue; unnamed places are skipped. */
-export const fromOsm = (element: OverpassElement): CatalogVenue | null => {
+export const fromOsm: (element: OverpassElement) => CatalogVenue | null = (element) => {
   const tags = element.tags ?? {};
   const name = tag(tags, "name:en", "name");
+
   if (!name) return null;
+
   const point =
     element.lat !== undefined && element.lon !== undefined
       ? { lat: element.lat, lon: element.lon }
       : (element.center ?? null);
+
   const country = tag(tags, "addr:country")?.toUpperCase() ?? null;
+
   return {
     name,
     kind: "casino",

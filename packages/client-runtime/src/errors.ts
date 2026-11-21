@@ -61,12 +61,17 @@ const isInvalid = Schema.is(InvalidRequest);
 const isUnauthorized = Schema.is(Unauthorized);
 
 /** A sentence to show a person for any failure the API or network can produce. */
-export const describeError = (error: unknown): string => {
+export const describeError = (error: typeof Schema.Unknown.Encoded) => {
   if (isConflict(error)) return conflictMessages[error.reason];
+
   if (isForbidden(error)) return forbiddenMessages[error.reason];
+
   if (isNotFound(error)) return "That doesn't exist anymore.";
+
   if (isInvalid(error)) return error.message;
+
   if (isUnauthorized(error)) return "Your sign-in expired. Sign in again.";
+
   return "Couldn't reach Color Up. Check your connection and try again.";
 };
 
@@ -74,5 +79,5 @@ export const describeError = (error: unknown): string => {
  * Whether trying again later could work. The API's own refusals won't change on a retry; anything
  * else (no signal, a timeout, an expired sign-in) might.
  */
-export const isRetryable = (error: unknown) =>
+export const isRetryable = (error: typeof Schema.Unknown.Encoded) =>
   !(isConflict(error) || isForbidden(error) || isNotFound(error) || isInvalid(error));

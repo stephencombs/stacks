@@ -1,4 +1,5 @@
 import * as Context from "effect/Context";
+import * as Data from "effect/Data";
 import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
 import * as HttpApiSecurity from "effect/http-api/HttpApiSecurity";
 
@@ -28,11 +29,16 @@ export class Authentication extends HttpApiMiddleware.Service<
  * `Authorization: Actor <actorId>.<secret>`. The service checks an actor's secret against the
  * database and answers 401 when it doesn't match.
  */
-export class Recorder extends Context.Service<
-  Recorder,
-  | { readonly _tag: "Account"; readonly user: CurrentUser["Service"] }
-  | { readonly _tag: "Actor"; readonly actorId: string; readonly secret: string }
->()("@stacks/contracts/Recorder") {}
+export type RecorderService = Data.TaggedEnum<{
+  Account: { readonly user: CurrentUser["Service"] };
+  Actor: { readonly actorId: string; readonly secret: string };
+}>;
+
+export const RecorderOf = Data.taggedEnum<RecorderService>();
+
+export class Recorder extends Context.Service<Recorder, RecorderService>()(
+  "@stacks/contracts/Recorder",
+) {}
 
 /** Accepts either an account's session or a device actor's credential. */
 export class RecordingAuthentication extends HttpApiMiddleware.Service<

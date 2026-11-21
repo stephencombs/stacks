@@ -2,20 +2,22 @@ import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import { CurrencyCode } from "@stacks/contracts";
 
-import { catalogVenue, groupWith, ids, owe, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
-import { seedSession } from "../testing/legacySessions.ts";
+import { catalogVenue, groupWith, ids, owe, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
+import { seedSession } from "../testing/legacySessions.test-utils.ts";
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
+it.layer(TestApi.layer)("groups", (it) => {
   it.effect("makes the creator the owner and treats a retried create as the same group", () =>
     Effect.gen(function* () {
       const { alex, bea } = yield* users("alex", "bea");
+
       const payload = {
         id: ids.group(),
         name: "Vegas crew",
         currency: CurrencyCode.make("USD"),
         displayName: "Alex",
       };
+
       const first = yield* alex.groups.create({ payload });
       const retry = yield* alex.groups.create({ payload });
 
@@ -24,10 +26,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
         expect.objectContaining({ id: first.myPlayerId, displayName: "Alex", role: "owner" }),
       ]);
       expect(retry.myPlayerId).toBe(first.myPlayerId);
-      expect(yield* Effect.flip(bea.groups.create({ payload }))).toMatchObject({
-        _tag: "Conflict",
-        reason: "id_taken",
-      });
+      {
+        const received = yield* Effect.flip(bea.groups.create({ payload }));
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "id_taken" });
+      }
     }),
   );
 
@@ -36,7 +39,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
       const { alex, eve } = yield* users("alex", "eve");
       const group = yield* groupWith(alex);
       const error = yield* Effect.flip(eve.groups.get({ params: { groupId: group.group.id } }));
-      expect(error).toMatchObject({ _tag: "Forbidden", reason: "not_a_member" });
+      expect(error._tag).toBe("Forbidden");
+      expect(error).toMatchObject({ reason: "not_a_member" });
       expect(yield* eve.groups.list()).toEqual([]);
     }),
   );
@@ -73,26 +77,41 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
       const groupId = group.group.id;
       const userOf = (index: number) => group.players[index]!.userId!;
 
-      expect(
-        yield* Effect.flip(
+      {
+        const received = yield* Effect.flip(
           bea.groups.setRole({
             params: { groupId, userId: userOf(2) },
             payload: { role: "admin" },
           }),
-        ),
-      ).toMatchObject({ _tag: "Forbidden", reason: "owner_only" });
+        );
+
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "owner_only" });
+      }
+
       yield* alex.groups.setRole({
         params: { groupId, userId: userOf(1) },
         payload: { role: "admin" },
       });
 
       yield* bea.groups.removeMember({ params: { groupId, userId: userOf(3) } });
-      expect(
-        yield* Effect.flip(cal.groups.removeMember({ params: { groupId, userId: userOf(1) } })),
-      ).toMatchObject({ _tag: "Forbidden", reason: "admins_only" });
-      expect(
-        yield* Effect.flip(bea.groups.removeMember({ params: { groupId, userId: userOf(0) } })),
-      ).toMatchObject({ _tag: "Forbidden", reason: "owner_only" });
+      {
+        const received = yield* Effect.flip(
+          cal.groups.removeMember({ params: { groupId, userId: userOf(1) } }),
+        );
+
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "admins_only" });
+      }
+
+      {
+        const received = yield* Effect.flip(
+          bea.groups.removeMember({ params: { groupId, userId: userOf(0) } }),
+        );
+
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "owner_only" });
+      }
 
       const after = yield* alex.groups.get({ params: { groupId } });
       expect(after.players.map((player) => player.role)).toEqual([
@@ -134,21 +153,29 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
         payload: { role: "admin" },
       });
 
-      expect(
-        yield* Effect.flip(
+      {
+        const received = yield* Effect.flip(
           eve.groups.rename({ params: { groupId }, payload: { name: "Reno crew" } }),
-        ),
-      ).toMatchObject({ _tag: "Forbidden", reason: "not_a_member" });
-      expect(
-        yield* Effect.flip(
+        );
+
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "not_a_member" });
+      }
+
+      {
+        const received = yield* Effect.flip(
           cal.groups.rename({ params: { groupId }, payload: { name: "Reno crew" } }),
-        ),
-      ).toMatchObject({ _tag: "Forbidden", reason: "admins_only" });
+        );
+
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "admins_only" });
+      }
 
       const byOwner = yield* alex.groups.rename({
         params: { groupId },
         payload: { name: "Reno crew" },
       });
+
       expect(byOwner.group.name).toBe("Reno crew");
       expect(byOwner.group.currency).toBe(group.group.currency);
 
@@ -156,6 +183,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
         params: { groupId },
         payload: { name: "Tahoe crew" },
       });
+
       expect(byAdmin.group.name).toBe("Tahoe crew");
       const [listed] = yield* cal.groups.list();
       expect(listed?.group.name).toBe("Tahoe crew");
@@ -172,8 +200,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("groups", (it) => {
         const attempt = yield* Effect.exit(
           alex.groups.rename({ params: { groupId }, payload: { name } }),
         );
+
         expect(attempt._tag).toBe("Failure");
       }
+
       expect((yield* alex.groups.get({ params: { groupId } })).group.name).toBe("Vegas crew");
       const longest = "x".repeat(80);
       expect(

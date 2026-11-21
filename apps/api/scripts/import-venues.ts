@@ -8,20 +8,25 @@ import { importVenues } from "../src/catalog/importVenues.ts";
 import { OVERPASS_QUERY, OverpassResponse, curatedOnline, fromOsm } from "../src/catalog/osm.ts";
 import * as Database from "../src/db/Database.ts";
 
-// Usage: node scripts/import-venues.ts [--file overpass.json]
-// Without --file, casinos are fetched from the Overpass API (OVERPASS_URL to use a mirror).
 const fileFlag = process.argv.indexOf("--file");
 const file = fileFlag === -1 ? undefined : process.argv[fileFlag + 1];
 const overpassUrl = process.env.OVERPASS_URL ?? "https://overpass-api.de/api/interpreter";
 const url = process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/stacks";
 
 const loadOverpass = Effect.tryPromise(async () => {
-  if (file) return JSON.parse(await NodeFS.readFile(file, "utf8")) as unknown;
+  if (file) {
+    // SAFETY: JSON.parse is typed any; OverpassResponse is decoded from this value below.
+    return JSON.parse(await NodeFS.readFile(file, "utf8")) as unknown;
+  }
+
   const response = await fetch(overpassUrl, {
     method: "POST",
     body: new URLSearchParams({ data: OVERPASS_QUERY }),
   });
+
   if (!response.ok) throw new Error(`Overpass answered ${response.status}`);
+
+  // SAFETY: Response.json() is typed any; OverpassResponse is decoded from this value below.
   return (await response.json()) as unknown;
 });
 

@@ -36,10 +36,13 @@ type NativeLiveSessionUpdates = {
   clear: () => Promise<void>;
 };
 
-const loadNative = (): NativeLiveSessionUpdates | null => {
+const loadNative = () => {
   if (typeof process !== "undefined" && process.env?.VITEST) return null;
+
   try {
+    // SAFETY: this specifier is the installed expo package, which exposes requireOptionalNativeModule.
     const expo = require("expo") as typeof import("expo");
+
     return expo.requireOptionalNativeModule<NativeLiveSessionUpdates>("LiveSessionUpdates");
   } catch {
     return null;

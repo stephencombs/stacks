@@ -1,5 +1,3 @@
-import type { ExpoConfig } from "expo/config";
-
 type AppVariant = "development" | "preview" | "production";
 
 const VARIANTS: Record<AppVariant, { name: string; scheme: string; id: string }> = {
@@ -12,15 +10,20 @@ const VARIANTS: Record<AppVariant, { name: string; scheme: string; id: string }>
   production: { name: "Color Up", scheme: "stacks", id: "com.stephencombs.colorup" },
 };
 
-const variant = (process.env.APP_VARIANT ?? "development") as AppVariant;
-const { name, scheme, id } = VARIANTS[variant] ?? VARIANTS.development;
+const requested = process.env.APP_VARIANT;
+
+const variant: AppVariant =
+  requested === "preview" || requested === "production" ? requested : "development";
+
+const { name, scheme, id } = VARIANTS[variant];
 
 const displayFont =
   "./node_modules/@expo-google-fonts/barlow-condensed/700Bold/BarlowCondensed_700Bold.ttf";
+
 const monoFont =
   "./node_modules/@expo-google-fonts/jetbrains-mono/500Medium/JetBrainsMono_500Medium.ttf";
 
-export default (): ExpoConfig => ({
+export default () => ({
   name,
   slug: "stacks",
   scheme,
@@ -31,12 +34,10 @@ export default (): ExpoConfig => ({
   ios: {
     bundleIdentifier: id,
     supportsTablet: true,
-    // Only HTTPS and Apple's own crypto, which is exempt; saves the export-compliance prompt on every upload.
     config: { usesNonExemptEncryption: false },
   },
   android: {
     package: id,
-    // Google's map on Android needs a key in the build; without one the route shows as a list.
     config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_API_KEY } },
   },
   plugins: [

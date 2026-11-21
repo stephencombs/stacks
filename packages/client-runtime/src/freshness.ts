@@ -1,12 +1,6 @@
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 
 /**
- * Query freshness, the way TanStack Query does it: data stays cached for a while after nothing
- * shows it, a page that comes back shows what it had at once, and data older than `STALE_MS` is
- * fetched again in the background while the old copy stays on screen.
- */
-
-/**
  * How long anything in the atom registry is kept once nothing on screen reads it. It's the
  * registry's default rather than a per-query setting because a query is built on atoms of its own
  * (the request, the client runtime); left at the 400ms default those are torn down between pages
@@ -44,6 +38,7 @@ const syncListeners = new Set<() => void>();
 export const ledgerChanged = () => {
   changedAt = Date.now();
 };
+
 export const lastLedgerChange = () => changedAt;
 
 /**
@@ -53,10 +48,14 @@ export const lastLedgerChange = () => changedAt;
 export const ledgerSynced = () => {
   ledgerChanged();
   ledgerSyncs += 1;
+
   for (const listener of syncListeners) listener();
 };
+
 export const subscribeLedgerSynced = (listener: () => void) => {
   syncListeners.add(listener);
+
   return () => void syncListeners.delete(listener);
 };
+
 export const ledgerSyncCount = () => ledgerSyncs;

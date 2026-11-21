@@ -3,16 +3,17 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 
-import { catalogVenue, groupWith, ids, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
-import { seedSession } from "../testing/legacySessions.ts";
+import { catalogVenue, groupWith, ids, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
+import { seedSession } from "../testing/legacySessions.test-utils.ts";
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
+it.layer(TestApi.layer)("venues", (it) => {
   it.effect("searches and reads only public venues without signing in", () =>
     Effect.gen(function* () {
       const { owner } = yield* users("owner");
       const group = yield* groupWith(owner);
       const venue = yield* catalogVenue(owner);
+
       const home = yield* owner.venues.create({
         payload: {
           id: ids.venue(),
@@ -24,6 +25,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
           groupId: group.group.id,
         },
       });
+
       const anonymous = yield* (yield* TestApi).asActor(null);
       const found = yield* anonymous.publicVenues.search({ query: { q: venue.name } });
       expect(found).toEqual([venue]);
@@ -34,17 +36,30 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
         }),
       ).toEqual([venue]);
       expect(yield* anonymous.publicVenues.get({ params: { venueId: venue.id } })).toEqual(venue);
+
       for (const venueId of [home.id, ids.venue()]) {
-        expect(
-          yield* anonymous.publicVenues.get({ params: { venueId } }).pipe(Effect.flip),
-        ).toMatchObject({ _tag: "NotFound", resource: "venue" });
+        {
+          const received = yield* anonymous.publicVenues
+            .get({ params: { venueId } })
+            .pipe(Effect.flip);
+
+          expect(received._tag).toBe("NotFound");
+          expect(received).toMatchObject({ resource: "venue" });
+        }
       }
+
+      {
+        const received = yield* owner.publicVenues
+          .get({ params: { venueId: home.id } })
+          .pipe(Effect.flip);
+
+        expect(received._tag).toBe("NotFound");
+        expect(received).toMatchObject({ resource: "venue" });
+      }
+
       expect(
-        yield* owner.publicVenues.get({ params: { venueId: home.id } }).pipe(Effect.flip),
-      ).toMatchObject({ _tag: "NotFound", resource: "venue" });
-      expect(
-        yield* anonymous.venues.search({ query: { q: venue.name } }).pipe(Effect.flip),
-      ).toMatchObject({ _tag: "Unauthorized" });
+        (yield* anonymous.venues.search({ query: { q: venue.name } }).pipe(Effect.flip))._tag,
+      ).toBe("Unauthorized");
     }),
   );
 
@@ -53,6 +68,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
       const { owner } = yield* users("owner");
       const group = yield* groupWith(owner);
       const venue = yield* catalogVenue(owner);
+
       const home = yield* owner.venues.create({
         payload: {
           id: ids.venue(),
@@ -64,6 +80,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
           groupId: group.group.id,
         },
       });
+
       const near = { lat: 40 + Math.random(), lng: -115 + Math.random() };
       const sql = yield* SqlClient.SqlClient;
       yield* sql`
@@ -99,6 +116,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
       const group = yield* groupWith(alex);
       const other = yield* groupWith(eve);
       const name = `Garage ${crypto.randomUUID().slice(0, 6)}`;
+
       const home = yield* alex.venues.create({
         payload: {
           id: ids.venue(),
@@ -115,14 +133,16 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
       expect(mine.map((v) => v.id)).toEqual([home.id]);
       expect(yield* eve.venues.search({ query: { q: name, groupId: other.group.id } })).toEqual([]);
       expect(
-        yield* Effect.flip(eve.venues.search({ query: { q: name, groupId: group.group.id } })),
-      ).toMatchObject({ _tag: "Forbidden" });
+        (yield* Effect.flip(eve.venues.search({ query: { q: name, groupId: group.group.id } })))
+          ._tag,
+      ).toBe("Forbidden");
     }),
   );
 
   it.effect("needs a group for a home venue", () =>
     Effect.gen(function* () {
       const { alex } = yield* users("alex");
+
       const error = yield* Effect.flip(
         alex.venues.create({
           payload: {
@@ -136,7 +156,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
           },
         }),
       );
-      expect(error).toMatchObject({ _tag: "InvalidRequest" });
+
+      expect(error._tag).toBe("InvalidRequest");
     }),
   );
 
@@ -145,6 +166,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
       const { alex } = yield* users("alex");
       const group = yield* groupWith(alex);
       const [first, second] = [yield* catalogVenue(alex), yield* catalogVenue(alex)];
+
       for (const [venue, startedAt] of [
         [first, "2026-01-01T20:00:00Z"],
         [second, "2026-02-01T20:00:00Z"],
@@ -158,6 +180,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("venues", (it) => {
           notes: null,
         });
       }
+
       const recent = yield* alex.venues.recent({ params: { groupId: group.group.id } });
       expect(recent.map((v) => v.id)).toEqual([second.id, first.id]);
     }),

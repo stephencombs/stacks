@@ -6,7 +6,9 @@ import {
   PlayerId,
   TripId,
   UserId,
+  type Trip,
   VenueId,
+  VisitId,
   type GroupListItem,
 } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
@@ -50,16 +52,19 @@ const at = (hour: number) =>
 const memory = () => {
   let document: RecordingStorageDocument = { revision: 0 };
   let failure: Error | null = null;
+
   const storage: RecordingStorage = {
     load: async () => document,
     commit: async (expected, payload) => {
       if (failure) throw failure;
       document = { revision: expected + 1, payload };
+
       return document.revision;
     },
     subscribe: () => () => undefined,
     close: async () => undefined,
   };
+
   return {
     storage,
     fail: (error: Error | null) => {
@@ -72,8 +77,10 @@ const open = async () => {
   const db = memory();
   const store = makeRecordingStore(db.storage);
   await store.ready;
+
   return { db, store };
 };
+
 const save = (store: RecordingStore, input: RecordingInput) => store.execute(store.prepare(input));
 const state = (store: RecordingStore) => store.getSnapshot().state!;
 
@@ -168,7 +175,7 @@ describe("recordingVisit", () => {
     expect(view.replacedBy.get(original.id)).toBe(replacement.id);
     expect(view.totals.buyIn).toBe(10000);
     expect(view.presets).toEqual([10000, 20000]);
-    expect(recordingVisit(state(store), replacement.id as never)).toBeNull();
+    expect(recordingVisit(state(store), VisitId.make(replacement.id))).toBeNull();
   });
 });
 
@@ -183,6 +190,7 @@ describe("venueChoices", () => {
     lat: null,
     lng: null,
   });
+
   const bellagio = venue(1, "Bellagio", "Las Vegas");
   const aria = venue(2, "Aria", "Las Vegas");
   const borgata = venue(3, "Borgata", "Atlantic City");
@@ -252,7 +260,9 @@ describe("parsePastSessionTimes", () => {
       { date: "2026-11-06", start: "21:30", finish: "01:15", finishNextDay: true },
       now,
     );
+
     expect(result.error).toBeNull();
+
     if (result.error !== null) return;
     expect(DateTime.toEpochMillis(result.startedAt)).toBe(new Date(2026, 10, 6, 21, 30).getTime());
     expect(DateTime.toEpochMillis(result.finishedAt)).toBe(new Date(2026, 10, 7, 1, 15).getTime());
@@ -351,11 +361,15 @@ describe("openDeviceRecordingStore", () => {
     const db = memory();
     const opened: string[] = [];
     let attempts = 0;
+
     const store = openDeviceRecordingStore(async (namespace) => {
       opened.push(namespace);
+
       if (attempts++ === 0) throw new RecordingStorageError("unavailable");
+
       return db.storage;
     });
+
     await expect(store.ready).rejects.toThrow();
     expect(store.getSnapshot().status).toBe("load_failed");
     await store.refresh();
@@ -468,6 +482,7 @@ describe("recordingPeriods by year", () => {
 
   it("adds up to the same visits and totals as its months", async () => {
     const { store } = await open();
+
     for (const [day, cashOut] of [
       ["2025-02-14", 0],
       ["2025-11-02", 30000],
@@ -485,15 +500,19 @@ describe("recordingPeriods by year", () => {
     expect(months.map((month) => month.period)).toEqual(["2026-01", "2025-11", "2025-02"]);
     const years = recordingPeriods(home, "year");
     expect(years.map((year) => year.period)).toEqual(["2026", "2025"]);
+
     for (const year of years) {
       const inYear = months.filter((month) => month.period.startsWith(`${year.period}-`));
+
       const sum = (pick: (month: (typeof months)[number]) => number) =>
         inYear.reduce((total, month) => total + pick(month), 0);
+
       expect(year.result).toBe(sum((month) => month.result));
       expect(year.finished).toBe(sum((month) => month.finished));
       expect(year.minutes).toBe(sum((month) => month.minutes));
       expect(year.visits).toHaveLength(sum((month) => month.visits.length));
     }
+
     await store.close();
   });
 });
@@ -502,6 +521,7 @@ it.each(["delete_visit", "restore_visit"] as const)("names a refused %s change",
   const { store } = await open();
   await save(store, { type: "start", buyIn: 20000 });
   const visitId = state(store).visits[0]!.id;
+
   if (type === "restore_visit") await save(store, { type: "delete_visit", visitId });
   const command = store.prepare({ type, visitId });
   expect(
@@ -515,6 +535,7 @@ it.each(["delete_visit", "restore_visit"] as const)("names a refused %s change",
 describe("editing when a session started", () => {
   const local = (day: number, hour: number, minute = 0, second = 0) =>
     DateTime.makeUnsafe(new Date(2026, 10, day, hour, minute, second));
+
   const initial = local(6, 21, 30, 12);
   const first = local(6, 22, 0);
 
@@ -600,9 +621,11 @@ describe("live session readouts", () => {
       finishedAt: at(9),
     });
     const id = state(store).visits[0]!.id;
+
     const original = recordingVisit(state(store), id)!.entries.find(
       (entry) => entry.kind === "buy_in",
     )!;
+
     await save(store, {
       type: "correct",
       visitId: id,
@@ -687,15 +710,16 @@ describe("live session readouts", () => {
       await save(store, { type: "finish", visitId: id, amount: 35000, finishedAt: at(12) });
 
       const lines = historyLines(view());
-      // Every row counts, the finish included, so a header can say how many there are.
       expect(lines.map((line) => (line.type === "event" ? "finished" : line.entry.amount))).toEqual(
         ["finished", 35000, 10000, 25000, 30000, 20000],
       );
+
       const names = lines.flatMap((line) =>
         line.type === "entry"
           ? [`${line.entry.amount}:${historyEntryName(view(), line.entry)}`]
           : [],
       );
+
       expect(names).toEqual([
         "35000:Final cash-out",
         "10000:Rebuy",
@@ -728,7 +752,8 @@ describe("live session readouts", () => {
 
 it("offers only live trips in the recording currency, including when a mismatched trip was selected", () => {
   const groupId = GroupId.make(crypto.randomUUID());
-  const trip = (name: string, endedAt: DateTime.Utc | null = null) => ({
+
+  const trip: (name: string, endedAt?: DateTime.Utc | null) => Trip = (name, endedAt = null) => ({
     id: TripId.make(crypto.randomUUID()),
     groupId,
     name,
@@ -737,11 +762,16 @@ it("offers only live trips in the recording currency, including when a mismatche
     createdBy: UserId.make("owner"),
     createdAt: at(9),
   });
+
   const live = trip("Vegas");
   const ended = trip("Reno", at(10));
   const euro = trip("Paris");
   const yen = trip("Tokyo");
-  const group = (currency: string, trips: GroupListItem["trips"]): GroupListItem => ({
+
+  const group: (currency: string, trips: GroupListItem["trips"]) => GroupListItem = (
+    currency,
+    trips,
+  ) => ({
     group: { id: groupId, name: "Crew", currency: CurrencyCode.make(currency), createdAt: at(9) },
     role: "owner",
     myPlayerId: PlayerId.make(crypto.randomUUID()),
@@ -752,11 +782,14 @@ it("offers only live trips in the recording currency, including when a mismatche
     mySession: null,
     trips,
   });
+
   const groups = [group("USD", [live, ended]), group("EUR", [euro]), group("JPY", [yen])];
+
   const expected = [
     { key: "", label: "Personal · no trip" },
     { key: live.id, label: "Crew · Vegas" },
   ];
+
   expect(tableTripOptions(groups, null)).toEqual(expected);
   expect(tableTripOptions(groups, euro.id)).toEqual(expected);
   expect(tableTripOptions(groups, yen.id)).toEqual(expected);

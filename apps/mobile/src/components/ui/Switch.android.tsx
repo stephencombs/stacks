@@ -16,6 +16,7 @@ export function Switch({ value, onValueChange, disabled, accessibilityLabel }: S
     "--color-fill",
     "--color-faint",
   ]);
+
   return (
     <Host matchContents>
       <ComposeSwitch

@@ -16,6 +16,7 @@ export async function dispatchIosLiveSession(
 ): Promise<void> {
   const instances = sessionActivity.getInstances();
   const previous = tracked;
+
   const current =
     surface.kind === "idle" || surface.visitId !== previous?.visitId
       ? undefined
@@ -24,8 +25,10 @@ export async function dispatchIosLiveSession(
   for (const instance of instances) {
     if (instance !== current) await instance.end("immediate");
   }
+
   if (surface.kind === "idle") {
     tracked = undefined;
+
     return;
   }
 
@@ -50,10 +53,12 @@ export async function dispatchIosLiveSession(
       seeSessionUrl: surface.deepLinks.seeSession,
     });
     tracked = undefined;
+
     return;
   }
 
   const openUrl = surface.deepLinks.open;
+
   const content: SessionActivityContent = {
     kind: "live",
     gameLabel: surface.gameLabel,
@@ -65,6 +70,7 @@ export async function dispatchIosLiveSession(
     openUrl,
     cashOutUrl: surface.deepLinks.cashOut,
   };
+
   if (current) {
     await current.update(content);
   } else {

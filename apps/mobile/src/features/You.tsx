@@ -5,6 +5,7 @@ import { gameNames } from "@stacks/client-runtime/format";
 import { useRecordingHome, useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { Game } from "@stacks/contracts";
+import * as Match from "effect/Match";
 import { useState, type ReactNode } from "react";
 import { Platform, Text, View } from "react-native";
 
@@ -46,6 +47,7 @@ export function YouButton() {
   const { user } = useUser();
   const [open, setOpen] = useState(false);
   const name = user?.firstName ?? user?.fullName ?? "You";
+
   return (
     <>
       <PressableScale
@@ -80,6 +82,7 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
   const theme = useTheme();
   const prefs = usePreferences();
   const [picking, setPicking] = useState<"game" | "venue" | null>(null);
+
   const [exportState, setExportState] = useState<{ pending: boolean; error: string | null }>({
     pending: false,
     error: null,
@@ -91,6 +94,7 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
   const exportSessions = async () => {
     if (exportState.pending || finished.length === 0) return;
     setExportState({ pending: true, error: null });
+
     try {
       const csv = exportPersonalSessionsCsv(finished);
       await shareCsv(personalCsvFilename(), csv);
@@ -134,29 +138,33 @@ export function YouSheet({ name = "You", onClose }: { name?: string; onClose: ()
         />
       </SettingsGroup>
 
-      {picking === "game" ? (
-        <Choice
-          label="Default game"
-          labelHidden
-          options={defaultGameOptions}
-          value={prefs.defaultGame ?? "none"}
-          onChange={(next) => {
-            setDefaultGame(next === "none" ? null : next);
-            setPicking(null);
-          }}
-        />
-      ) : picking === "venue" ? (
-        <View className="rounded-xl bg-surface p-3">
-          <SessionVenuePicker
-            selectedId={prefs.defaultVenue?.id ?? null}
-            selected={prefs.defaultVenue}
-            onSelect={(venue) => {
-              setDefaultVenue(venue);
+      {Match.value(picking).pipe(
+        Match.when("game", () => (
+          <Choice
+            label="Default game"
+            labelHidden
+            options={defaultGameOptions}
+            value={prefs.defaultGame ?? "none"}
+            onChange={(next) => {
+              setDefaultGame(next === "none" ? null : next);
               setPicking(null);
             }}
           />
-        </View>
-      ) : null}
+        )),
+        Match.when("venue", () => (
+          <View className="rounded-xl bg-surface p-3">
+            <SessionVenuePicker
+              selectedId={prefs.defaultVenue?.id ?? null}
+              selected={prefs.defaultVenue}
+              onSelect={(venue) => {
+                setDefaultVenue(venue);
+                setPicking(null);
+              }}
+            />
+          </View>
+        )),
+        Match.orElse(() => null),
+      )}
 
       <SettingsGroup title="Display">
         <SettingsRow
@@ -222,6 +230,7 @@ function SignedInCard({ fallbackName }: { fallbackName: string }) {
   const { user } = useUser();
   const displayName = user?.fullName ?? fallbackName;
   const email = user?.primaryEmailAddress?.emailAddress;
+
   return (
     <Card className="flex-row items-center gap-3 p-4">
       <Chip chip={Platform.OS === "android" ? 5 : 1} name={displayName} size={46} />
@@ -241,6 +250,7 @@ function SignedInCard({ fallbackName }: { fallbackName: string }) {
 
 function SignOutFooter() {
   const { signOut } = useClerk();
+
   return <Button label="Sign out" variant="danger" onPress={() => void signOut()} />;
 }
 
@@ -250,10 +260,13 @@ function Note({ children }: { children: ReactNode }) {
 
 function AccountActions() {
   const account = useAccount();
+
   if (!account.available)
     return <Note>Sign-in isn't set up in this copy of Color Up. Recording works without it.</Note>;
+
   if (!account.isLoaded)
     return <Note>Sign-in hasn't loaded yet. Recording on this device works without it.</Note>;
+
   return (
     <View className="gap-3">
       <Note>An account opens groups and trips with friends.</Note>

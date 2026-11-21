@@ -15,6 +15,7 @@ type Variant =
   | "danger"
   | "felt"
   | "feltPrimary";
+
 type Size = "sm" | "md" | "lg" | "xl" | "fab";
 
 const surfaces: Record<Variant, string> = {
@@ -27,6 +28,7 @@ const surfaces: Record<Variant, string> = {
   felt: "bg-white/15 active:bg-white/25",
   feltPrimary: "bg-felt-ink active:opacity-90",
 };
+
 const spinners: Record<Variant, string> = {
   primary: "accent-ink-inverse",
   tint: "accent-ink",
@@ -37,6 +39,7 @@ const spinners: Record<Variant, string> = {
   felt: "accent-felt-ink",
   feltPrimary: "accent-felt-deep",
 };
+
 const labels: Record<Variant, string> = {
   primary: "text-ink-inverse",
   tint: "text-ink",
@@ -47,7 +50,7 @@ const labels: Record<Variant, string> = {
   felt: "text-felt-ink",
   feltPrimary: "text-[#14472B]",
 };
-// Minimum heights, so larger accessibility text sizes grow the button instead of clipping it.
+
 const sizes: Record<Size, string> = {
   sm: "min-h-11 px-4 py-2 rounded-full",
   md: "min-h-11 px-5 py-2.5 rounded-full",
@@ -55,6 +58,7 @@ const sizes: Record<Size, string> = {
   xl: "min-h-14 px-6 py-4 rounded-full",
   fab: "min-h-14 rounded-2xl px-4 py-3",
 };
+
 const text: Record<Size, string> = {
   sm: "type-callout",
   md: "type-callout",
@@ -92,6 +96,7 @@ export function Button({
   className?: string;
 }) {
   const inactive = disabled || pending;
+
   return (
     <PressableScale
       accessibilityRole="button"
@@ -121,7 +126,6 @@ export function Button({
           disabled && !pending ? "text-muted" : labels[variant],
           text[size],
         )}
-        // At large text a label wraps to two lines on Android rather than hide the action's name.
         numberOfLines={Platform.OS === "android" ? 2 : 1}
       >
         {label}

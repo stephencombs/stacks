@@ -5,7 +5,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 
 vi.mock("expo-crypto", () => ({ getRandomValues: crypto.getRandomValues.bind(crypto) }));
 
-/** What Node has and Hermes on iOS doesn't, so code the phone can't run fails here too. */
 const missing = [
   [Intl.NumberFormat.prototype, "formatToParts"],
   [Array.prototype, "toSorted"],
@@ -14,12 +13,13 @@ const missing = [
   [globalThis, "Iterator"],
 ] as const;
 
-/** Takes those away until the returned function puts them back. */
 const hermesLike = () => {
   const saved = missing.map(
     ([owner, key]) => [owner, key, Object.getOwnPropertyDescriptor(owner, key)] as const,
   );
+
   for (const [owner, key] of missing) Reflect.deleteProperty(owner, key);
+
   return () => {
     for (const [owner, key, descriptor] of saved)
       if (descriptor) Object.defineProperty(owner, key, descriptor);
@@ -28,12 +28,13 @@ const hermesLike = () => {
 };
 
 let restore = () => {};
+
 beforeEach(async () => {
   vi.resetModules();
   restore = hermesLike();
-  // The app's own polyfills put back what it relies on, before any other module loads.
   await import("./polyfills");
 });
+
 afterEach(() => restore());
 
 it("takes away what Hermes lacks", () => {
@@ -48,18 +49,22 @@ it("records, reviews and formats a solo session without them", async () => {
   const { recordingHome, recordingPeriods } = await import("@stacks/client-runtime/recordingView");
   const { decimalSeparator, formatMoney, parseMoney } = await import("@stacks/shared/money");
   let document: RecordingStorageDocument = { revision: 0 };
+
   const store = makeRecordingStore({
     load: async () => document,
     commit: async (revision, payload) => {
       document = { revision: revision + 1, payload };
+
       return document.revision;
     },
     subscribe: () => () => {},
     close: async () => {},
   });
+
   await store.ready;
   const start = store.prepare({ type: "start", buyIn: 20000 });
   await store.execute(start);
+
   if (!("visitId" in start)) throw new Error("Expected a visit");
   await store.execute(
     store.prepare({ type: "add", visitId: start.visitId, kind: "buy_in", amount: 10000 }),

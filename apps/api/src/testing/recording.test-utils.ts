@@ -9,11 +9,12 @@ import {
   type TableDetails,
 } from "@stacks/contracts/recordingCommands";
 
-import { usd } from "./fixtures.ts";
-import { TestApi } from "./TestApi.ts";
+import { usd } from "./fixtures.test-utils.ts";
+import { TestApi } from "./TestApi.test-utils.ts";
 
 export const uuid = () => crypto.randomUUID();
 export const at = (minutes: number) => DateTime.makeUnsafe(Date.UTC(2026, 10, 7, 20, minutes));
+
 const secret = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) =>
     byte.toString(16).padStart(2, "0"),
@@ -30,14 +31,17 @@ const recorder = (identity: RecordingIdentity, client: Client) => {
           results.map((result) => (result.status === "rejected" ? result.reason : result.status)),
         ),
       );
+
   const join = (token: string, player = { id: PlayerId.make(uuid()), displayName: "Bea" }) =>
     client.recording.join({ params: { token }, payload: { identity, player } });
+
   const redeem = (token: string) =>
     client.recording.redeemInvite({ params: { token }, payload: { identity } });
+
   return { identity, client, push, join, redeem };
 };
 
-const newIdentity = (): RecordingIdentity => ({
+const newIdentity = () => ({
   playerId: PlayerId.make(uuid()),
   actorId: ActorId.make(uuid()),
 });
@@ -48,6 +52,7 @@ export const device = Effect.fn("test.device")(function* () {
   const identity = newIdentity();
   const credential = { actorId: identity.actorId, secret: secret() };
   yield* (yield* api.asActor(null)).publicRecording.registerActor({ payload: credential });
+
   return { ...recorder(identity, yield* api.asActor(credential)), credential };
 });
 
@@ -61,12 +66,14 @@ export const signedIn = Effect.fn("test.signedIn")(function* (
   identity: RecordingIdentity = newIdentity(),
 ) {
   const api = yield* TestApi;
+
   return recorder(identity, yield* api.as(handle));
 });
 
 /** A signed-in account, recording as its account actor. */
 export const account = Effect.fn("test.account")(function* (name: string) {
   const api = yield* TestApi;
+
   return recorder(newIdentity(), yield* api.as(`${name}_${uuid().slice(0, 8)}`));
 });
 
@@ -76,6 +83,7 @@ const common = (identity: RecordingIdentity, minutes = 0) => ({
   preparedAt: at(minutes),
 });
 
+// SAFETY: the payload's type is the literal "start", so this is that member of RecordingCommand.
 export const start = (identity: RecordingIdentity) =>
   RecordingCommand.make({
     type: "start",
@@ -92,8 +100,9 @@ export const start = (identity: RecordingIdentity) =>
   }) as Extract<RecordingCommand, { type: "start" }>;
 
 /** A table its starter records at without playing. */
-export const openTable = (identity: RecordingIdentity) =>
-  RecordingCommand.make({
+export const openTable = (identity: RecordingIdentity) => {
+  // SAFETY: the payload's type is the literal "open_table", so this is that member of RecordingCommand.
+  return RecordingCommand.make({
     type: "open_table",
     ...common(identity),
     tableId: TableId.make(uuid()),
@@ -102,10 +111,12 @@ export const openTable = (identity: RecordingIdentity) =>
     venueId: null,
     highLimit: false,
   }) as Extract<RecordingCommand, { type: "open_table" }>;
+};
 
 export const deleteTable = (identity: RecordingIdentity, tableId: TableId) =>
   RecordingCommand.make({ type: "delete_table", ...common(identity, 2), tableId });
 
+// SAFETY: the payload's type is the literal "join_table", so this is that member of RecordingCommand.
 export const sitDown = (
   identity: RecordingIdentity,
   tableId: TableId,
@@ -126,12 +137,15 @@ export const sitDown = (
 /** The starter seats a player they name at their table. */
 export const seatNew = (identity: RecordingIdentity, tableId: TableId, displayName: string) => {
   const id = PlayerId.make(uuid());
+
+  // SAFETY: sitDown is a join_table command, and newPlayer stays on that same member.
   return RecordingCommand.make({
     ...sitDown(identity, tableId, id),
     newPlayer: { id, displayName },
   }) as Extract<RecordingCommand, { type: "join_table" }>;
 };
 
+// SAFETY: the payload's type is the literal "add", so this is that member of RecordingCommand.
 export const rebuy = (identity: RecordingIdentity, visitId: VisitId, expectedRevision = 0) =>
   RecordingCommand.make({
     type: "add",
@@ -178,14 +192,16 @@ export const edit = (
   visitId: VisitId,
   expectedRevision: number,
   change: { startedAt?: DateTime.Utc; table?: TableDetails },
-) =>
-  RecordingCommand.make({
+) => {
+  // SAFETY: the payload's type is the literal "edit_visit", so this is that member of RecordingCommand.
+  return RecordingCommand.make({
     type: "edit_visit",
     ...common(identity, 40),
     visitId,
     expectedRevision,
     ...change,
   }) as Extract<RecordingCommand, { type: "edit_visit" }>;
+};
 
 export const recorderCommand = (
   type: "appoint_recorder" | "revoke_recorder",
@@ -200,5 +216,6 @@ export const sharedTable = Effect.fn("test.sharedTable")(function* () {
   const opened = start(starter.identity);
   expect(yield* starter.push(opened)).toEqual(["accepted"]);
   const { token } = yield* starter.client.recording.share({ params: { tableId: opened.tableId } });
+
   return { starter, opened, token };
 });

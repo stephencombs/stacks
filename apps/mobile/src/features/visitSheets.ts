@@ -20,7 +20,6 @@ export type OpenSheet =
   | { readonly type: "action"; readonly action: Exclude<TableAction, "edit" | "delete_table"> }
   | { readonly type: "seat"; readonly seat: TableSeat };
 
-/** What each field of Edit opens, so closing or saving one lands back in Edit. */
 const editChildren: ReadonlySet<OpenSheet["type"]> = new Set([
   "buy_in",
   "start_time",
@@ -31,5 +30,5 @@ const editChildren: ReadonlySet<OpenSheet["type"]> = new Set([
 ]);
 
 /** The sheet to show once the open one closes or saves: Edit for its fields, else none. */
-export const afterClosing = (open: OpenSheet | null): OpenSheet | null =>
+export const afterClosing: (open: OpenSheet | null) => OpenSheet | null = (open) =>
   open && editChildren.has(open.type) ? { type: "edit" } : null;

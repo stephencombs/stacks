@@ -15,6 +15,7 @@ async function render(options: { os: string; focused: boolean; felt: boolean }) 
   const element = document.createElement("div");
   const root = createRoot(element);
   await act(async () => root.render(<FeltStatusBar felt={options.felt} />));
+
   return element.querySelector("i")?.getAttribute("data-status") ?? null;
 }
 

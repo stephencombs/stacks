@@ -6,16 +6,21 @@ import { join } from "node:path";
 import { previewUrl, publishPreviewComment } from "./preview-comment.mjs";
 
 const number = process.argv[3];
+
 if (!/^[1-9]\d*$/.test(number ?? "")) throw new Error("Expected a PR number");
+
 const name = `pr-${number}`;
 const project = process.env.NEON_PROJECT_ID;
 const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+
 if (!project || !account || !process.env.NEON_PREVIEW_PARENT_ID)
   throw new Error("Missing preview project or Cloudflare account");
+
 const scratch = mkdtempSync(join(tmpdir(), "colorup-preview-"));
 
 async function api(provider, path, method = "GET", body) {
   const neon = provider === "neon";
+
   const response = await fetch(
     `${neon ? "https://console.neon.tech/api/v2" : "https://api.cloudflare.com/client/v4"}${path}`,
     {
@@ -24,16 +29,21 @@ async function api(provider, path, method = "GET", body) {
         Authorization: `Bearer ${neon ? process.env.NEON_API_KEY : process.env.CLOUDFLARE_API_TOKEN}`,
         "Content-Type": "application/json",
       },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(body === undefined ? null : { body: JSON.stringify(body) }),
     },
   );
+
   if (!response.ok) throw new Error(`${provider} ${method} failed (${response.status})`);
+
   if (response.status === 204) return;
   const result = await response.json();
+
   return neon ? result : result.result;
 }
+
 const run = (args, env = {}) =>
   execFileSync("pnpm", args, { stdio: "inherit", env: { ...process.env, ...env } });
+
 const cfPath = `/accounts/${account}/hyperdrive/configs`;
 const neonPath = `/projects/${project}`;
 
@@ -42,12 +52,16 @@ try {
   let branch = branches.find((value) => value.name === name);
   const configs = await api("cloudflare", cfPath);
   let hyperdrive = configs.find((value) => value.name === `colorup-${name}`);
+
   if (process.argv[2] === "delete") {
     const previewsPath = `/accounts/${account}/workers/workers/colorup/previews`;
     const previews = await api("cloudflare", `${previewsPath}?name=${name}&per_page=100`);
     const preview = previews.find((value) => value.name === name);
+
     if (preview) await api("cloudflare", `${previewsPath}/${preview.id}`, "DELETE");
+
     if (hyperdrive) await api("cloudflare", `${cfPath}/${hyperdrive.id}`, "DELETE");
+
     if (branch) await api("neon", `${neonPath}/branches/${branch.id}`, "DELETE");
     console.log(`Removed ${name}`);
   } else if (process.argv[2] === "deploy") {
@@ -61,6 +75,7 @@ try {
         ],
       }));
     }
+
     const database = await api(
       "neon",
       `${neonPath}/connection_uri?${new URLSearchParams({
@@ -69,9 +84,12 @@ try {
         role_name: "neondb_owner",
       })}`,
     );
+
     const uri = database.uri;
+
     if (process.env.GITHUB_ACTIONS) console.log(`::add-mask::${uri}`);
     run(["--filter", "@stacks/api", "db:migrate"], { DATABASE_URL: uri });
+
     if (!hyperdrive) {
       const connection = new URL(uri);
       hyperdrive = await api("cloudflare", cfPath, "POST", {
@@ -87,6 +105,7 @@ try {
         caching: { disabled: true },
       });
     }
+
     const config = {
       name: "colorup",
       main: join(process.cwd(), "apps/api/src/worker.ts"),
@@ -96,8 +115,10 @@ try {
         hyperdrive: [{ binding: "HYPERDRIVE", id: hyperdrive.id }],
       },
     };
+
     const configPath = join(scratch, "wrangler.json");
     const secretsPath = join(scratch, "secrets.json");
+
     if (!process.env.CLERK_SECRET_KEY && !process.env.CLERK_JWT_KEY)
       throw new Error("Missing Clerk verification key");
     writeFileSync(configPath, JSON.stringify(config));
@@ -128,10 +149,13 @@ try {
     ]);
     const url = previewUrl(number);
     const health = await fetch(`${url}/api/health`);
+
     if (!health.ok) throw new Error(`Preview health check failed (${health.status})`);
     console.log(`Preview: ${url}`);
+
     if (process.env.GITHUB_STEP_SUMMARY)
       appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Preview ${url}\n`);
+
     if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY)
       await publishPreviewComment({
         repository: process.env.GITHUB_REPOSITORY,

@@ -7,7 +7,6 @@ import * as Effect from "effect/Effect";
 import * as Database from "../src/db/Database.ts";
 import { migrations } from "../src/db/migrations/index.ts";
 
-// `--test` targets the integration test database.
 const url = process.argv.includes("--test")
   ? (process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/stacks_test")
   : (process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/stacks");

@@ -27,13 +27,20 @@ import {
 
 const day = (n: number) => DateTime.makeUnsafe(Date.UTC(2026, 9, n));
 const ids = ["crew", "work", "vegas", "tahoe", "poker", "user", "me", "ana", "ben", "s1", "t1"];
+
 const uuid = (name: string) =>
   `0192e7a0-0000-7000-8000-${String(ids.indexOf(name) + 1).padStart(12, "0")}`;
+
 const me = PlayerId.make(uuid("me"));
 const ana = PlayerId.make(uuid("ana"));
 const ben = PlayerId.make(uuid("ben"));
 
-const trip = (name: string, group: string, started: number, ended: number | null = null): Trip => ({
+const trip: (name: string, group: string, started: number, ended?: number | null) => Trip = (
+  name,
+  group,
+  started,
+  ended = null,
+) => ({
   id: TripId.make(uuid(name)),
   groupId: GroupId.make(uuid(group)),
   name,
@@ -42,11 +49,12 @@ const trip = (name: string, group: string, started: number, ended: number | null
   createdBy: UserId.make(uuid("user")),
   createdAt: day(started),
 });
-const group = (
+
+const group: (
   name: string,
   trips: ReadonlyArray<Trip>,
-  extra: Partial<GroupListItem> = {},
-): GroupListItem => ({
+  extra?: Partial<GroupListItem>,
+) => GroupListItem = (name, trips, extra = {}) => ({
   group: {
     id: GroupId.make(uuid(name)),
     name,
@@ -82,11 +90,13 @@ it("pins a trip with someone playing over a newer quiet one", () => {
 
 it("pins the older open trip with a live table over a newer quiet open trip in the same group", () => {
   const openTahoe = trip("tahoe", "crew", 2);
+
   const crew = group("crew", [vegas, openTahoe], {
     liveSessionCount: 1,
     liveTripIds: [openTahoe.id],
     currentTripId: vegas.id,
   });
+
   expect(pinnedTrip([crew])).toEqual({ item: crew, trip: openTahoe });
   expect(groupHappening(crew)).toEqual({ kind: "live", trip: openTahoe });
 });
@@ -100,8 +110,10 @@ const activityGroup = {
   name: "crew",
   currency: CurrencyCode.make("USD"),
 };
+
 const activityTrip = { id: vegas.id, name: vegas.name };
-const sessionLive = (players: ReadonlyArray<PlayerId>): CrewActivityItem => ({
+
+const sessionLive: (players: ReadonlyArray<PlayerId>) => CrewActivityItem = (players) => ({
   kind: "session_live",
   group: activityGroup,
   trip: activityTrip,
@@ -121,11 +133,12 @@ const sessionLive = (players: ReadonlyArray<PlayerId>): CrewActivityItem => ({
   players: players.map((playerId) => ({ playerId, displayName: playerId })),
   startedAt: day(20),
 });
-const tableItem = (
+
+const tableItem: (
   kind: "table_live" | "table_finished",
   players: ReadonlyArray<PlayerId | null>,
-  myVisitId: VisitId | null = null,
-): CrewActivityItem => {
+  myVisitId?: VisitId | null,
+) => CrewActivityItem = (kind, players, myVisitId = null) => {
   const base = {
     group: activityGroup,
     trip: activityTrip,
@@ -134,6 +147,7 @@ const tableItem = (
     game: null,
     myVisitId,
   };
+
   return kind === "table_live"
     ? {
         ...base,

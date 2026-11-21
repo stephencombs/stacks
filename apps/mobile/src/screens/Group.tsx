@@ -23,6 +23,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 export function GroupScreen({ route }: Props) {
   const stacks = useStacks();
   usePlaceAddress(route.params, "groupId");
+
   return (
     <Screen
       live={Platform.OS !== "android"}
@@ -47,6 +48,7 @@ function GroupHub({ detail }: { detail: GroupDetail }) {
   const members = people.length - guests;
   const android = Platform.OS === "android";
   const headerRight = useCallback(() => <GroupActions groupId={groupId} />, [groupId]);
+
   return (
     <>
       <View className="gap-3">
@@ -94,6 +96,7 @@ function GroupHub({ detail }: { detail: GroupDetail }) {
 
 function GroupActions({ groupId }: { groupId: GroupId }) {
   const go = useGo();
+
   return (
     <View className="flex-row items-center gap-2">
       <Button label="Stats" size="sm" onPress={() => go.stats({ groupId })} />

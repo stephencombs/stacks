@@ -1,6 +1,7 @@
 import { Host } from "@expo/ui";
 import { Picker, Text } from "@expo/ui/swift-ui";
 import { accessibilityLabel, frame, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
+import * as Predicate from "effect/Predicate";
 import { Text as NativeText, View, useWindowDimensions } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 
@@ -18,10 +19,12 @@ export function FieldChoice<A extends string>({
   const { theme } = useUniwind();
   const tint = useCSSVariable("--color-ink");
   const segmentWidth = (width - 64) / Math.max(1, options.length);
+
   const segmented =
     presentation !== "menu" &&
     options.length <= 3 &&
     options.every((option) => option.label.length * 8 * fontScale + 32 <= segmentWidth);
+
   return (
     <View className="gap-1.5">
       {labelHidden ? null : (
@@ -30,7 +33,7 @@ export function FieldChoice<A extends string>({
       <Host
         style={{ height: Math.max(48, 44 * fontScale) }}
         colorScheme={theme === "dark" ? "dark" : "light"}
-        seedColor={typeof tint === "string" ? tint : undefined}
+        seedColor={Predicate.isString(tint) ? tint : undefined}
       >
         <Picker
           selection={value}

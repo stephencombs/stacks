@@ -11,7 +11,7 @@
     "build": "expo export --platform ios --platform android --output-dir dist",
     "eas:dev": "eas build --profile development",
     "eas:preview": "eas build --profile preview",
-    "test": "vp test run --config ../../vite.config.ts --dir . --passWithNoTests",
+    "test": "vp test run --config ./vitest.config.ts --dir . --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "ios:device": "expo run:ios --device"
   },

@@ -18,21 +18,20 @@ export function useGo() {
   const navigation = useNavigation();
   const { setTrip, setGroup } = useScope();
   const crew = (params: CrewParams) => navigation.navigate("Tabs", { screen: "CrewTab", params });
+
   return {
     groups: () => crew({ screen: "Groups", initial: false }),
     session: (sessionId: SessionId) => navigation.navigate("Session", { sessionId }),
-    /** Puts a trip in scope and opens its sessions. */
     trip: (tripId: TripId) => {
       setTrip(tripId);
       crew({ screen: "Sessions", params: { tripId }, initial: false });
     },
-    /** Puts a group in scope and opens it. */
     group: (groupId: GroupId, { replace = false } = {}) => {
       setGroup(groupId);
+
       if (replace) navigation.dispatch(StackActions.replace("Group", { groupId }));
       else crew({ screen: "Group", params: { groupId }, initial: false });
     },
-    /** Stats, with a group (and trip) picked. */
     stats: (pick: StatsPick) =>
       navigation.navigate("Tabs", {
         screen: "StatsTab",

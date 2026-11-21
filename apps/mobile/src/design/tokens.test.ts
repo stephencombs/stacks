@@ -3,24 +3,26 @@ import { describe, expect, it } from "vite-plus/test";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const css = read("../../global.css");
+
 const tokens: {
   color: { tokens: ReadonlyArray<{ name: string; value: { light: string; dark: string } }> };
 } = JSON.parse(read("../../../../docs/design/tokens.json"));
 
-/** The `--color-*` declarations in a piece of CSS. */
 const colors = (css: string) =>
   Object.fromEntries(
     [...css.matchAll(/(--color-[a-z0-9-]+):\s*(oklch\([^)]*\))/g)].map((m) => [m[1]!, m[2]!]),
   );
 
-/** The text from `start` to the brace that closes the block opening there. */
 const block = (css: string, start: string) => {
   const open = css.indexOf("{", css.indexOf(start));
   let depth = 0;
+
   for (let i = open; i < css.length; i++) {
     if (css[i] === "{") depth++;
+
     if (css[i] === "}" && --depth === 0) return css.slice(open, i);
   }
+
   throw new Error(`No block at ${start}`);
 };
 
@@ -29,25 +31,43 @@ const themes = {
   dark: colors(block(css, "@variant dark")),
 };
 
-// The code kept its Tailwind names where they mean the same as a token.
-const cssName: Record<string, string> = {
+const cssName = {
   ground: "canvas",
   card: "surface",
   "card-raised": "raised",
   hairline: "line",
   "live-text": "live",
+} as const;
+
+const variable = (token: string) => {
+  switch (token) {
+    case "ground":
+    case "card":
+    case "card-raised":
+    case "hairline":
+    case "live-text":
+      return `--color-${cssName[token]}`;
+    default:
+      return `--color-${token}`;
+  }
 };
-const variable = (token: string) => `--color-${cssName[token] ?? token}`;
-// Player chips are a player's identity, numbered by the server, and aren't design tokens.
+
 const playerChip = /^--color-chip-(\d(-ink)?|edge)$/;
 
 const linearRgb = (color: string) => {
-  const [l, c, h] = color.match(/[\d.]+/g)!.map(Number) as [number, number, number];
+  const channels = color.match(/[\d.]+/g);
+
+  if (channels === null || channels.length < 3)
+    throw new Error(`expected an OKLCH color: ${color}`);
+  const l = Number(channels[0]);
+  const c = Number(channels[1]);
+  const h = Number(channels[2]);
   const a = c * Math.cos((h * Math.PI) / 180);
   const b = c * Math.sin((h * Math.PI) / 180);
   const x = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
   const y = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3;
   const z = (l - 0.0894841775 * a - 1.291485548 * b) ** 3;
+
   return [
     4.0767416621 * x - 3.3077115913 * y + 0.2309699292 * z,
     -1.2684380046 * x + 2.6097574011 * y - 0.3413193965 * z,
@@ -57,27 +77,28 @@ const linearRgb = (color: string) => {
 
 const encode = (v: number) => {
   const c = Math.min(1, Math.max(0, v));
+
   return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
 };
 
-/** An `oklch()` color as 8-bit sRGB channels and its alpha. */
 const rgba = (color: string) => [
   ...linearRgb(color).map((v) => 255 * encode(v)),
   Number(color.match(/\/\s*([\d.]+)/)?.[1] ?? 1),
 ];
 
-/** A tokens.json color, `#rrggbb` or `rgba(r, g, b, a)`, the same way. */
 const parse = (color: string) =>
   color.startsWith("#")
     ? [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)).concat(1)
     : color.match(/[\d.]+/g)!.map(Number);
 
+const clampChannel = (channel: number) => Math.min(1, Math.max(0, channel));
+
 const luminance = (color: string) => {
-  const [r, g, b] = linearRgb(color).map((v) => Math.min(1, Math.max(0, v))) as [
-    number,
-    number,
-    number,
-  ];
+  const [x, y, z] = linearRgb(color);
+  const r = clampChannel(x);
+  const g = clampChannel(y);
+  const b = clampChannel(z);
+
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
@@ -97,11 +118,12 @@ describe.each(Object.entries(themes))("the %s palette", (name, theme) => {
     (token, value) => {
       const css = theme[variable(token)];
       expect(css, variable(token)).toBeDefined();
-      const expected = parse(value[name as keyof typeof value]);
-      // Within one step of 255 per channel, and the same alpha.
+      const expected = parse(name === "dark" ? value.dark : value.light);
+
       const off = rgba(css!).map(
         (channel, i) => Math.abs(channel - expected[i]!) / (i < 3 ? 1 : 0.001),
       );
+
       expect(Math.max(...off)).toBeLessThanOrEqual(1);
     },
   );
@@ -134,21 +156,22 @@ describe.each(Object.entries(themes))("the %s palette", (name, theme) => {
     const outside = Object.entries(theme)
       .filter(([, color]) => linearRgb(color).some((v) => v < -0.001 || v > 1.001))
       .map(([name]) => name);
+
     expect(outside).toEqual([]);
   });
 });
 
-// Tailwind drops a class it doesn't know without a word, so a type role a screen names has to be
-// one global.css defines.
 it("defines every type role the screens use", () => {
   const defined = new Set([...css.matchAll(/@utility (type-[a-z0-9-]+)/g)].map((m) => m[1]));
   const src = new URL("..", import.meta.url);
+
   const used = new Set(
     readdirSync(src, { recursive: true, encoding: "utf8" })
       .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
       .flatMap((file) => [...read(`../${file}`).matchAll(/(?<![\w-])type-[a-z][a-z0-9-]*/g)])
       .map((m) => m[0]),
   );
+
   expect(used.size).toBeGreaterThan(0);
   expect([...used].filter((role) => !defined.has(role))).toEqual([]);
 });

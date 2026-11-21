@@ -3,10 +3,6 @@ import { readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Which CI jobs a diff can affect. An unrecognized path runs every check.
-// A preview deploys only when the API changes.
-// The mobile bundle workflow keeps its own path filter.
-
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const API = "@stacks/api";
 
@@ -26,13 +22,11 @@ const SKIP_EXACT = new Set([
   ".gitignore",
   ".mcp.json",
   ".github/dependabot.yml",
-  // Mobile filters its own paths. TestFlight runs only from a manual dispatch.
   ".github/workflows/mobile.yml",
   ".github/workflows/testflight.yml",
   "docker-compose.yml",
 ]);
 
-// Repo-wide config. A change here can affect every package.
 const TOOLING = new Set([
   ".node-version",
   ".pnpmfile.cjs",
@@ -60,31 +54,39 @@ function blank(value) {
 function load() {
   if (workspaces) return workspaces;
   const found = [];
+
   for (const parent of ["apps", "packages"]) {
     for (const name of readdirSync(join(root, parent))) {
       const dir = `${parent}/${name}`;
       let pkg;
+
       try {
         pkg = JSON.parse(readFileSync(join(root, dir, "package.json"), "utf8"));
       } catch (error) {
         if (error && error.code === "ENOENT") continue;
         throw error;
       }
+
       const deps = new Set();
+
       for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
         for (const [dep, version] of Object.entries(pkg[field] ?? {})) {
           if (String(version).startsWith("workspace:")) deps.add(dep);
         }
       }
+
       found.push({ dir, name: pkg.name, deps });
     }
   }
+
   workspaces = found;
+
   return found;
 }
 
 export function dependentsOf(name, packages) {
   const dependers = new Map();
+
   for (const pkg of packages) {
     for (const dep of pkg.deps) {
       const list = dependers.get(dep) ?? [];
@@ -92,23 +94,27 @@ export function dependentsOf(name, packages) {
       dependers.set(dep, list);
     }
   }
+
   const seen = new Set([name]);
   const stack = [name];
+
   while (stack.length > 0) {
     const current = stack.pop();
+
     for (const depender of dependers.get(current) ?? []) {
       if (seen.has(depender)) continue;
       seen.add(depender);
       stack.push(depender);
     }
   }
+
   return seen;
 }
 
 function everything() {
   const jobs = blank(true);
-  // A preview spends a Neon branch, so a lockfile or an unknown file does not deploy one.
   jobs.preview = false;
+
   return {
     all: true,
     packages: new Set(load().map((pkg) => pkg.name)),
@@ -118,7 +124,9 @@ function everything() {
 
 function jobsOnly(partial) {
   const jobs = blank(false);
+
   for (const [name, value] of Object.entries(partial)) jobs[name] = value;
+
   return { all: false, packages: new Set(), jobs };
 }
 
@@ -126,11 +134,13 @@ function affected(name) {
   const packages = dependentsOf(name, load());
   const jobs = blank(false);
   jobs.check = true;
+
   if (packages.has(API)) {
     jobs.api = true;
     jobs.build = true;
     jobs.preview = true;
   }
+
   return { all: false, packages, jobs };
 }
 
@@ -139,12 +149,15 @@ function fullCheck() {
   jobs.check = true;
   jobs.api = true;
   jobs.build = true;
+
   return { all: false, packages: new Set(load().map((pkg) => pkg.name)), jobs };
 }
 
 function skipped(path) {
   if (path.endsWith(".md")) return true;
+
   if (SKIP_EXACT.has(path)) return true;
+
   return SKIP_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
@@ -154,30 +167,39 @@ function tooling(path) {
 
 function special(path) {
   if (path === ".github/workflows/ci.yml") return fullCheck();
+
   if (path === ".github/workflows/preview.yml" || path.startsWith("scripts/preview"))
     return jobsOnly({ check: true });
+
   if (path === "scripts/ci-changes.mjs" || path === "scripts/ci-changes.test.ts")
     return jobsOnly({ check: true });
+
   return null;
 }
 
 function packageFor(path) {
   let match;
+
   for (const pkg of load()) {
     if (path === pkg.dir || path.startsWith(`${pkg.dir}/`)) {
       if (!match || pkg.dir.length > match.dir.length) match = pkg;
     }
   }
+
   return match;
 }
 
 function classify(path) {
   if (skipped(path)) return jobsOnly({});
+
   if (tooling(path)) return everything();
   const known = special(path);
+
   if (known) return known;
   const pkg = packageFor(path);
+
   if (pkg) return affected(pkg.name);
+
   return everything();
 }
 
@@ -185,28 +207,38 @@ export function plan(paths) {
   const jobs = blank(false);
   const packages = new Set();
   let all = false;
+
   for (const raw of paths) {
     const path = raw.trim();
+
     if (path === "") continue;
     const part = classify(path);
+
     if (part.all) all = true;
+
     for (const name of JOB_NAMES) if (part.jobs[name]) jobs[name] = true;
+
     for (const name of part.packages) packages.add(name);
   }
+
   if (all) {
     for (const pkg of load()) packages.add(pkg.name);
   }
+
   return { all, jobs, packages };
 }
 
 export function decide({ event, base, diff }) {
   if (event === "schedule" || event === "workflow_dispatch") return everything();
+
   if (!base || /^0+$/.test(base)) return everything();
+
   try {
     return plan(diff());
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     console.error("Could not diff the changeset; running every check.");
+
     return everything();
   }
 }
@@ -219,12 +251,14 @@ function samePackages(names) {
   const all = load()
     .map((pkg) => pkg.name)
     .sort();
+
   return names.length === all.length && names.every((name, index) => name === all[index]);
 }
 
 export function output(result) {
   const names = [...result.packages].sort();
   const tested = names.filter((name) => name !== API);
+
   return {
     check: result.jobs.check ? "true" : "false",
     api: result.jobs.api ? "true" : "false",
@@ -232,7 +266,6 @@ export function output(result) {
     preview: result.jobs.preview ? "true" : "false",
     typecheck_args:
       names.length === 0 ? "" : samePackages(names) ? "-r --cache" : `--cache ${filters(names)}`,
-    // API tests need Postgres, so they stay on their own job.
     test_args: filters(tested),
   };
 }
@@ -254,9 +287,11 @@ function main() {
         }).split("\n"),
     }),
   );
+
   console.error(text.trim().replaceAll("\n", " "));
   process.stdout.write(text);
 }
 
 const entry = process.argv[1];
+
 if (entry && realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url))) main();

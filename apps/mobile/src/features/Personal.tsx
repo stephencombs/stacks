@@ -58,13 +58,14 @@ export function PersonalScreen({
   const header = useNativeHeaderActions(true);
   const insets = useSafeAreaInsets();
   const foot = useScreenFoot({ footer: !!dock, fab: !!fab });
+
   const sides = {
     paddingLeft: Math.max(16, insets.left),
     paddingRight: Math.max(16, insets.right),
   };
-  // A session hides the native header and draws its own top. On Android the list stops at the
-  // status bar instead of scrolling under it.
+
   const clipped = session && Platform.OS === "android";
+
   return (
     <View
       className={felt ? "flex-1 bg-felt" : "flex-1 bg-canvas"}
@@ -82,7 +83,7 @@ export function PersonalScreen({
         contentContainerStyle={{
           ...sides,
           flexGrow: 1,
-          ...(session ? { paddingTop: clipped ? 12 : insets.top + 12 } : {}),
+          ...(session ? { paddingTop: clipped ? 12 : insets.top + 12 } : null),
         }}
       >
         {children}
@@ -134,6 +135,7 @@ export function SaveStatus({
   felt?: boolean;
 }) {
   const sync = useRecordingSync(visitId);
+
   if (
     status !== "saved" ||
     (sync.rejected.length === 0 && sync.error === null && sync.claim.length === 0 && !sync.canLink)
@@ -141,6 +143,7 @@ export function SaveStatus({
     return (
       <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} felt={felt} />
     );
+
   return (
     <View className="gap-2">
       <SaveLine status={status} error={error} onRetry={onRetry} sync={sync.line} felt={felt} />
@@ -248,8 +251,7 @@ function SaveLine({
     );
   const busy = status === "loading" || status === "saving" || sync.kind === "syncing";
   const failed = status === "save_failed";
-  // Saved and in step needs no line; the You sheet says where your sessions are kept. On the
-  // felt of Android the room stays, so a rebuy's "Syncing…" doesn't push the table down.
+
   if (!busy && !failed && (sync.kind === "device" || sync.kind === "synced"))
     return felt && Platform.OS === "android" ? (
       <View
@@ -260,6 +262,7 @@ function SaveLine({
         <Text className="text-sm opacity-0">Syncing…</Text>
       </View>
     ) : null;
+
   const text =
     status === "loading"
       ? "Opening…"
@@ -268,6 +271,7 @@ function SaveLine({
         : failed
           ? "Last change not saved"
           : sync.text;
+
   return (
     <View accessibilityLiveRegion="polite" className="min-h-5 flex-row items-center gap-1.5">
       {busy ? (
@@ -295,6 +299,7 @@ function SaveLine({
 export function PersonalYouButton() {
   const [open, setOpen] = useState(false);
   const account = useAccount();
+
   return (
     <>
       <PressableScale
@@ -322,12 +327,13 @@ export function PersonalYouButton() {
   );
 }
 
-/** Your chip, once signed in. Only rendered under Clerk, which useUser needs. */
 function SignedInChip() {
   const { user } = useUser();
+
   if (Platform.OS === "android") {
     return <Chip chip={5} name={user?.fullName ?? user?.firstName ?? "You"} size={32} ring />;
   }
+
   return <Chip chip={1} name={user?.firstName ?? user?.fullName ?? "You"} size={32} />;
 }
 

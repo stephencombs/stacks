@@ -4,6 +4,7 @@ import { finishedSessions, type StatsFilters } from "@stacks/client-runtime/stat
 import { ordinal } from "@stacks/client-runtime/trip";
 import type { CurrencyCode, GroupId, PlayerId, TripId } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
+import * as Match from "effect/Match";
 import { useState, type ReactNode } from "react";
 import { Platform, Text, View } from "react-native";
 
@@ -32,6 +33,7 @@ import {
 const provenance = "Only sessions recorded in this group.\nDevice-only play stays in Just me.";
 
 type Shown = Extract<View_, { kind: "stats" }>;
+
 type Standing = Shown["standings"][number];
 
 /**
@@ -61,6 +63,7 @@ export function GroupStatsView({
   const go = useGo();
   const android = Platform.OS === "android";
   const prefs = usePreferences();
+
   const justMe = (
     <Button
       label="Just me"
@@ -70,7 +73,9 @@ export function GroupStatsView({
       onPress={onJustMe}
     />
   );
+
   const groupChip = <Filters lead={chip} chips={[]} filtered={false} onChange={onFilters} />;
+
   if (state.kind === "loading")
     return (
       <StatsContent filters={android ? groupChip : undefined}>
@@ -85,6 +90,7 @@ export function GroupStatsView({
         </View>
       </StatsContent>
     );
+
   if (state.kind === "refused" || state.kind === "unavailable")
     return (
       <StatsContent filters={groupChip}>
@@ -125,6 +131,7 @@ export function GroupStatsView({
   const view = groupStatsView(stats, detail, filters, prefs);
   const activeTrip = currentTripId ?? detail.trips.find((trip) => trip.endedAt === null)?.id;
   const tripRange = filters.tripId && view.trips.byId.get(filters.tripId)?.range;
+
   return (
     <StatsContent
       filters={
@@ -151,50 +158,54 @@ export function GroupStatsView({
       {android && tripRange ? (
         <Text className="px-1 type-footnote text-muted">{tripRange} · Whole trip</Text>
       ) : null}
-      {view.kind === "empty" ? (
-        android ? (
-          <AndroidStatsEmpty
-            icon="group"
-            title="No finished sessions yet"
-            body={`When someone finishes a session in ${name}, everyone’s results will appear here.`}
-            button="Start a group session"
-            onPress={() => (activeTrip ? go.trip(activeTrip) : go.group(groupId))}
-            note="Only play recorded in this group counts here."
-          />
-        ) : (
-          <EmptyState centered title="No finished sessions yet" action={justMe}>
-            {`${name}'s stats count the finished sessions in its trips.`}
-          </EmptyState>
-        )
-      ) : view.kind === "no_match" ? (
-        android ? (
-          <AndroidStatsEmpty
-            icon="search"
-            title="No matching sessions"
-            body={view.sentence.replace(/^No finished /, "No ")}
-            button="Clear filters"
-            onPress={() => onFilters({})}
-            note="Your group stays selected."
-          />
-        ) : (
-          <EmptyState
-            centered
-            title="No matching sessions"
-            action={
-              <Button
-                label="Reset all filters"
-                variant="primary"
-                size="lg"
-                className="mt-2 self-stretch"
-                onPress={() => onFilters({})}
-              />
-            }
-          >
-            {view.sentence}
-          </EmptyState>
-        )
-      ) : (
-        <ShownStats view={view} me={detail.myPlayerId} groupName={name} onFilter={onFilters} />
+      {Match.value(view).pipe(
+        Match.when({ kind: "empty" }, () =>
+          android ? (
+            <AndroidStatsEmpty
+              icon="group"
+              title="No finished sessions yet"
+              body={`When someone finishes a session in ${name}, everyone’s results will appear here.`}
+              button="Start a group session"
+              onPress={() => (activeTrip ? go.trip(activeTrip) : go.group(groupId))}
+              note="Only play recorded in this group counts here."
+            />
+          ) : (
+            <EmptyState centered title="No finished sessions yet" action={justMe}>
+              {`${name}'s stats count the finished sessions in its trips.`}
+            </EmptyState>
+          ),
+        ),
+        Match.when({ kind: "no_match" }, (filtered) =>
+          android ? (
+            <AndroidStatsEmpty
+              icon="search"
+              title="No matching sessions"
+              body={filtered.sentence.replace(/^No finished /, "No ")}
+              button="Clear filters"
+              onPress={() => onFilters({})}
+              note="Your group stays selected."
+            />
+          ) : (
+            <EmptyState
+              centered
+              title="No matching sessions"
+              action={
+                <Button
+                  label="Reset all filters"
+                  variant="primary"
+                  size="lg"
+                  className="mt-2 self-stretch"
+                  onPress={() => onFilters({})}
+                />
+              }
+            >
+              {filtered.sentence}
+            </EmptyState>
+          ),
+        ),
+        Match.orElse((shown) => (
+          <ShownStats view={shown} me={detail.myPlayerId} groupName={name} onFilter={onFilters} />
+        )),
       )}
     </StatsContent>
   );
@@ -202,15 +213,18 @@ export function GroupStatsView({
 
 function OfflineBanner({ fetchedAt }: { fetchedAt: DateTime.Utc }) {
   const local = DateTime.setZone(fetchedAt, DateTime.zoneMakeLocal());
+
   const date = DateTime.format(local, {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+
   const time = DateTime.format(local, {
     hour: "numeric",
     minute: "2-digit",
   });
+
   return (
     <View
       className="flex-row items-center gap-3 rounded-2xl bg-fill p-3.5"
@@ -241,6 +255,7 @@ function ShownStats({
   const selected = view.standings.find((row) => row.playerId === open);
   const racers = view.standings.filter((row) => row.rank !== null);
   const leader = racers.some((row) => row.playerId === me) ? me : racers[0]?.playerId;
+
   return (
     <>
       <Standings view={view} onOpen={(row) => setOpen(row.playerId)} />
@@ -309,10 +324,10 @@ function ShownStats({
   );
 }
 
-/** Everyone ranked by result, you marked, the group's result under them. */
 function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => void }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
+
   return (
     <View className="gap-2">
       <StatsHeading count={android ? finishedSessions(view.sessions) : view.title}>
@@ -321,6 +336,7 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
       <List>
         {view.standings.map((row) => {
           const count = row.sheet.sessions;
+
           const meta = android
             ? [
                 row.guest ? "Guest" : null,
@@ -329,6 +345,7 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
                 .filter(Boolean)
                 .join(" · ")
             : row.meta;
+
           return (
             <Row
               key={row.playerId}
@@ -407,7 +424,6 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
   );
 }
 
-/** One member's numbers over what's shown. */
 function StatSheet({
   row,
   groupName,
@@ -425,6 +441,7 @@ function StatSheet({
 }) {
   const { sheet } = row;
   const android = Platform.OS === "android";
+
   const numbers = (
     <View className="flex-row flex-wrap gap-y-4">
       <Figure label="Sessions">
@@ -449,9 +466,11 @@ function StatSheet({
       </Figure>
     </View>
   );
+
   const result = (
     <Money amount={sheet.result} currency={currency} tone="result" fit className="type-hero" />
   );
+
   return (
     <Sheet
       open

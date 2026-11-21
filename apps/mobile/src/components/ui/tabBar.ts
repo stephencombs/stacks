@@ -25,25 +25,18 @@ type FootInput = {
 /** The arithmetic behind `useScreenFoot`, apart from the state, for tests. */
 export function screenFoot({ platform, bar, inset, footer, fab, live, footerGap }: FootInput) {
   const android = platform === "android";
-  // On Android the LiveBar floats 8 above whatever it sits on; on iOS the list pads by its height.
   const floating = live > 0 ? live + 8 : 0;
-  // What sits at the foot of the screen: a footer, else the tab bar. The LiveBar, toasts and the
-  // FAB stack above it.
   const base = footer ?? bar;
+
   const listEnd =
     footer !== null ? footer + (android ? floating : live) : android ? floating : bar + live;
+
   return {
-    /** Android's tab bar is opaque, so a list stops above it; iOS's is glass the list scrolls under. */
     scrollStyle: footer === null && android && bar > 0 ? { marginBottom: bar } : undefined,
-    /** Height of the empty space a list leaves after its last row. */
     endSpace: listEnd + (fab ? FAB_ROOM : 0),
-    /** Space below a footer's buttons. */
     footerInset: (bar || Math.max(inset, 12)) + footerGap,
-    /** Where the FAB's bottom edge sits. */
     fabBottom: base + floating + 16,
-    /** Where the LiveBar and toasts sit above, or undefined to sit on the screen's own edge. */
     above: footer !== null ? footer : bar || undefined,
-    /** What a pinned block with no footer or list, like the signed-out intro, pads its foot by. */
     clearance: android ? bar || inset : inset,
   };
 }
@@ -63,6 +56,7 @@ export function useScreenFoot({
   const { bottom } = useSafeAreaInsets();
   const [footerHeight, setFooterHeight] = useState(0);
   const [live, setLive] = useState(0);
+
   return {
     ...screenFoot({
       platform: Platform.OS,

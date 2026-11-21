@@ -10,8 +10,6 @@ export const ease = {
   press: Easing.bezier(...easing.press),
 };
 
-// The one reduced-motion switch. Every animation goes through `animate`, which jumps to the end
-// while Reduce Motion is on. The setting is read once, on first use, and followed after that.
 let reduced = false;
 let watching = false;
 const listeners = new Set<() => void>();
@@ -19,10 +17,13 @@ const listeners = new Set<() => void>();
 function watch() {
   if (watching) return;
   watching = true;
+
   const apply = (value: boolean) => {
     reduced = value;
+
     for (const listener of listeners) listener();
   };
+
   void AccessibilityInfo.isReduceMotionEnabled().then(apply);
   AccessibilityInfo.addEventListener("reduceMotionChanged", apply);
 }
@@ -30,6 +31,7 @@ function watch() {
 function subscribe(listener: () => void) {
   watch();
   listeners.add(listener);
+
   return () => {
     listeners.delete(listener);
   };
@@ -41,6 +43,7 @@ export const useReducedMotion = () => useSyncExternalStore(subscribe, () => redu
 /** The same, read at the moment, for a sequence that plays outside render. */
 export const isReducedMotion = () => {
   watch();
+
   return reduced;
 };
 
@@ -60,11 +63,14 @@ export function animate(
 ) {
   watch();
   value.stopAnimation();
+
   if (reduced) {
     value.setValue(config.toValue);
     done?.(true);
+
     return;
   }
+
   Animated.timing(value, { ...config, useNativeDriver: true }).start(({ finished }) =>
     done?.(finished),
   );

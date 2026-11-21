@@ -11,7 +11,6 @@ import {
   UserId,
   VenueId,
   type SessionSummary,
-  type TripTable,
 } from "@stacks/contracts";
 
 import {
@@ -31,6 +30,7 @@ import {
 } from "./trip.ts";
 
 const usd = CurrencyCode.make("USD");
+
 const local = (day: number, hour: number) =>
   DateTime.makeUnsafe(new Date(2026, 9, day, hour).getTime());
 
@@ -51,6 +51,7 @@ it("shows board money signed, without cents when there are none", () => {
 
 it("lists a trip's sessions and tables together, oldest first, and says which are live", () => {
   const alex = PlayerId.make("0192e7a0-0000-7000-8000-0000000000a1");
+
   const venue = {
     id: VenueId.make("0192e7a0-0000-7000-8000-000000000002"),
     name: "Circa",
@@ -63,7 +64,9 @@ it("lists a trip's sessions and tables together, oldest first, and says which ar
     verified: true,
     groupId: null,
   };
+
   const result = { playerId: alex, buyIn: 100, cashOut: 300, adjustment: 0, net: 200 };
+
   const money = (r: typeof result) => ({
     ...r,
     buyIn: MinorUnits.make(r.buyIn),
@@ -71,22 +74,32 @@ it("lists a trip's sessions and tables together, oldest first, and says which ar
     adjustment: MinorUnits.make(r.adjustment),
     net: MinorUnits.make(r.net),
   });
-  const session = {
+
+  const session: SessionSummary = {
     session: {
       id: SessionId.make("0192e7a0-0000-7000-8000-000000000011"),
+      groupId: GroupId.make("0192e7a0-0000-7000-8000-000000000010"),
+      tripId: TripId.make("0192e7a0-0000-7000-8000-000000000012"),
+      venueId: venue.id,
+      game: "craps",
       status: "closed",
       startedAt: local(24, 20),
+      endedAt: local(24, 23),
+      notes: null,
+      tableSeats: null,
+      highLimit: false,
     },
     venue,
     playerIds: [alex],
     playing: [],
     results: [money(result)],
-  } as unknown as SessionSummary;
-  const table = (n: number, hour: number, live: boolean): TripTable => ({
+  };
+
+  const table = (n: number, hour: number, live: boolean) => ({
     table: {
       id: TableId.make(`0192e7a0-0000-7000-8000-00000000002${n}`),
       tripId: null,
-      game: "craps",
+      game: "craps" as const,
       venueId: null,
       highLimit: true,
       starterPlayerId: alex,
@@ -102,10 +115,12 @@ it("lists a trip's sessions and tables together, oldest first, and says which ar
     others: [],
     myVisitId: null,
   });
+
   const plays = tripPlays({
     sessions: [session],
     tables: [table(1, 22, true), table(2, 18, false)],
   });
+
   expect(plays.map((play) => [play.kind, play.session.id, play.live])).toEqual([
     ["table", "0192e7a0-0000-7000-8000-000000000022", false],
     ["session", "0192e7a0-0000-7000-8000-000000000011", false],
@@ -120,10 +135,12 @@ it("lists a trip's sessions and tables together, oldest first, and says which ar
 
 it("names every trip in the groups you're in", () => {
   const trip = (id: string, name: string) => ({ id: TripId.make(id), name });
+
   const names = tripNames([
     { trips: [trip("0192e7a0-0000-7000-8000-0000000000f1", "Vegas")] },
     { trips: [trip("0192e7a0-0000-7000-8000-0000000000f2", "Reno")] },
   ]);
+
   expect([...names.values()]).toEqual(["Vegas", "Reno"]);
 });
 
@@ -138,12 +155,14 @@ it("puts runs and records into words", () => {
 
 it("resolves app entry from the last-viewed trip and going trips across groups", () => {
   const user = UserId.make("user_1");
+
   const makeGroup = (id: string, name: string) => ({
     id: GroupId.make(id),
     name,
     currency: usd,
     createdAt: local(1, 12),
   });
+
   const makeTrip = (
     id: string,
     groupId: GroupId,
@@ -162,6 +181,7 @@ it("resolves app entry from the last-viewed trip and going trips across groups",
 
   const vegasGroup = makeGroup("0192e7a0-0000-7000-8000-000000000010", "Vegas crew");
   const homeGroup = makeGroup("0192e7a0-0000-7000-8000-000000000011", "Home game");
+
   const pastTrip = makeTrip(
     "0192e7a0-0000-7000-8000-000000000020",
     vegasGroup.id,
@@ -169,6 +189,7 @@ it("resolves app entry from the last-viewed trip and going trips across groups",
     10,
     true,
   );
+
   const vegasTrip = makeTrip(
     "0192e7a0-0000-7000-8000-000000000021",
     vegasGroup.id,
@@ -176,6 +197,7 @@ it("resolves app entry from the last-viewed trip and going trips across groups",
     20,
     false,
   );
+
   const homeTrip = makeTrip(
     "0192e7a0-0000-7000-8000-000000000022",
     homeGroup.id,
@@ -183,6 +205,7 @@ it("resolves app entry from the last-viewed trip and going trips across groups",
     22,
     false,
   );
+
   const missingTripId = TripId.make("0192e7a0-0000-7000-8000-000000000099");
 
   expect(resolveEntry([], null)).toEqual({ kind: "groups" });
@@ -199,6 +222,7 @@ it("resolves app entry from the last-viewed trip and going trips across groups",
     { group: vegasGroup, trips: [vegasTrip, pastTrip] },
     { group: homeGroup, trips: [homeTrip] },
   ];
+
   expect(resolveEntry(multiple, null)).toEqual({
     kind: "choose",
     trips: [
@@ -224,12 +248,14 @@ it("resolves app entry from the last-viewed trip and going trips across groups",
 it("persists and notifies on last-viewed trip changes", () => {
   let saved: string | null = "0192e7a0-0000-7000-8000-000000000021";
   let notifications = 0;
+
   const store = makeLastTripStore({
     load: () => saved,
     save: (next) => {
       saved = next;
     },
   });
+
   const unsubscribe = store.subscribe(() => {
     notifications += 1;
   });
@@ -276,6 +302,7 @@ it("says how far a trip climbed from its low, and how often it won", () => {
     low: -12500,
     best: null,
   };
+
   expect(tripLines(trip, usd)).toEqual({ climb: "Up $400 from your low", winRate: "67%" });
   expect(tripLines({ ...trip, low: 0 }, usd).climb).toBeNull();
   expect(tripLines({ ...trip, net: -12500 }, usd).climb).toBeNull();
@@ -291,6 +318,7 @@ it("puts the trip already in scope first, then the newest still going, then the 
     id: TripId.make(`0192e7a0-0000-7000-8000-00000000003${n}`),
     endedAt: ended ? local(n, 12) : null,
   });
+
   const [ended, going, older] = [trip(3, true), trip(2, false), trip(1, true)];
   const trips = [ended, going, older];
 

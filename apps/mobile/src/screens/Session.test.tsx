@@ -1,5 +1,4 @@
-// @vitest-environment happy-dom
-import { SessionId, TableId, type SessionDetail, type GroupDetail } from "@stacks/contracts";
+import { SessionId, TableId } from "@stacks/contracts";
 import { useEffect, act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
@@ -14,6 +13,7 @@ it("opens an imported table from its old link and shows unimported sessions read
   const dispatch = vi.fn();
   const navigation = { dispatch };
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+
   const details = {
     session: { id: sessionId, game: "blackjack", startedAt: day, endedAt: day, highLimit: false },
     venue: { name: "Tokyo table" },
@@ -21,10 +21,13 @@ it("opens an imported table from its old link and shows unimported sessions read
     entries: [],
     seatings: [],
   };
+
   vi.doMock("@react-navigation/native", () => ({
     useFocusEffect: useEffect,
     useNavigation: () => navigation,
-    StackActions: { replace: (name: string, params: object) => ({ name, params }) },
+    StackActions: {
+      replace: (name: string, params: { readonly tableId: TableId }) => ({ name, params }),
+    },
   }));
   vi.doMock("react-native", () => ({ View: Container, Text: Container, Platform: { OS: "ios" } }));
   vi.doMock("../components/Money", () => ({ Money: Container }));
@@ -44,21 +47,25 @@ it("opens an imported table from its old link and shows unimported sessions read
       children,
     }: {
       query: "session" | "group";
-      children: (data: SessionDetail | GroupDetail) => ReactNode;
+      children: (
+        data:
+          | (typeof details & { importedTableId?: TableId })
+          | { players: readonly []; group: { currency: "JPY" } },
+      ) => ReactNode;
     }) =>
       children(
         query === "session"
-          ? ({
-              ...details,
-              ...(imported ? { importedTableId: tableId } : {}),
-            } as unknown as SessionDetail)
-          : ({ players: [], group: { currency: "JPY" } } as unknown as GroupDetail),
+          ? imported
+            ? { ...details, importedTableId: tableId }
+            : details
+          : { players: [], group: { currency: "JPY" } },
       ),
   }));
 
   const { SessionScreen } = await import("./Session");
   const host = document.createElement("div");
   const root = createRoot(host);
+
   try {
     await act(async () => root.render(<SessionScreen route={{ params: { sessionId } }} />));
     expect(dispatch).toHaveBeenCalledExactlyOnceWith({ name: "Table", params: { tableId } });

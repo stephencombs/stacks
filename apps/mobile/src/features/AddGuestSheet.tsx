@@ -27,6 +27,7 @@ export function AddGuestSheet({
     if (!name.trim()) return setNameError("Enter their name.");
     setNameError(null);
     const id = PlayerId.make(newId());
+
     if (
       await add.run({
         params: { groupId: detail.group.id },

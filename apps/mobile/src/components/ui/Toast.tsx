@@ -18,7 +18,6 @@ const VISIBLE_MS = 6000;
 
 /** `above` keeps toasts clear of something pinned to the bottom, such as a tab bar. */
 export function ToastHost({ children, above }: { children: ReactNode; above?: number }) {
-  // Mounted with the app, so the Reduce Motion setting is known before anything animates.
   useReducedMotion();
   const [current, setCurrent] = useState<(Toast & { readonly id: number }) | null>(null);
   const nextId = useRef(0);
@@ -51,6 +50,7 @@ function ToastView({
   const insets = useSafeAreaInsets();
   const [shown] = useState(() => new Animated.Value(0));
   const closing = useRef(false);
+
   const [close] = useState(() => () => {
     if (closing.current) return;
     closing.current = true;
@@ -62,6 +62,7 @@ function ToastView({
   useEffect(() => {
     animate(shown, { toValue: 1, duration: duration.toastIn, easing: ease.enter });
     const hide = setTimeout(close, VISIBLE_MS);
+
     return () => clearTimeout(hide);
   }, [shown, close]);
 

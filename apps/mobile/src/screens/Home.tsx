@@ -26,7 +26,6 @@ import { PastSessionSheet, StartSheet } from "../features/RecordingForms";
 import { chipColor } from "../features/chipColor";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 
-/** How many finished sessions Play lists before See all. */
 const RECENT = 5;
 
 /** This month's result and your latest finished sessions; the LiveBar shows what's live. */
@@ -36,11 +35,14 @@ export function HomeScreen() {
   const [sheet, setSheet] = useState<"start" | "past" | null>(null);
   const open = (visitId: VisitId) => navigation.navigate("Play", { visitId });
   const showHistory = () => navigation.navigate("History");
+
   const opened = (visitId: VisitId) => {
     setSheet(null);
     open(visitId);
   };
+
   const empty = home !== null && home.active.length === 0 && home.finished.length === 0;
+
   return (
     <PersonalScreen
       live
@@ -123,13 +125,13 @@ export function HomeScreen() {
   );
 }
 
-/** The month you're in: its result from finished sessions, hours and how many you played. */
 function MonthHero({ home }: { home: RecordingHome }) {
   const today = localDateText();
   const key = today.slice(0, 7);
   const month = recordingPeriods(home, "month").find((item) => item.period === key);
   const count = month?.finished ?? 0;
   const android = Platform.OS === "android";
+
   return (
     <View className="gap-1 rounded-[22px] bg-surface p-4">
       <Text accessibilityRole="header" className="type-title text-ink">
@@ -168,22 +170,28 @@ function FinishedRow({ item, onPress }: { item: RecordedVisit; onPress: () => vo
   const prefs = usePreferences();
   const title = visitTitle(item.table);
   const finished = item.visit.finishedAt!;
+
   const when =
     localDateText(DateTime.toDateUtc(finished)) === localDateText()
       ? formatTime(item.visit.startedAt)
       : formatDay(finished);
+
   const duration = formatDuration(item.visit.startedAt, finished);
   const meta = [item.venue?.name, when, duration].filter(Boolean).join(" · ");
+
   const buyInLabel = formatDisplayMoney(item.totals.buyIn, RECORDING_CURRENCY, prefs, {
     forAccessibility: true,
   });
+
   const cashOutLabel = formatDisplayMoney(item.totals.cashOut, RECORDING_CURRENCY, prefs, {
     forAccessibility: true,
   });
+
   const resultLabel = formatDisplayMoney(item.finalResult!, RECORDING_CURRENCY, prefs, {
     signDisplay: "exceptZero",
     forAccessibility: true,
   });
+
   return (
     <Row
       onPress={onPress}

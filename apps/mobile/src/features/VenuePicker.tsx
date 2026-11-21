@@ -73,7 +73,7 @@ type Near = { lat: number; lng: number };
 
 const here = () =>
   Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).then(
-    (position): Near => ({ lat: position.coords.latitude, lng: position.coords.longitude }),
+    (position) => ({ lat: position.coords.latitude, lng: position.coords.longitude }),
     () => null,
   );
 
@@ -101,18 +101,20 @@ export function SessionVenuePicker({
     setLocating("busy");
     const permission = await Location.requestForegroundPermissionsAsync();
     const position = permission.granted ? await here() : null;
+
     if (!position) return setLocating("failed");
     setNear(position);
     setLocating("idle");
   };
 
-  // Someone who has already let Color Up see where they are gets nearby casinos first, unasked.
   useEffect(() => {
     let current = true;
     void Location.getForegroundPermissionsAsync().then(async (permission) => {
       const position = permission.granted ? await here() : null;
+
       if (current && position) setNear(position);
     });
+
     return () => {
       current = false;
     };
@@ -122,6 +124,7 @@ export function SessionVenuePicker({
     selected && !search.venues.some((venue) => venue.id === selected.id)
       ? [selected, ...search.venues]
       : search.venues;
+
   const status =
     search.status === "offline"
       ? "Searching needs a connection. These are the casinos saved on this device."
@@ -134,12 +137,14 @@ export function SessionVenuePicker({
           : search.status === "saved" && search.venues.length === 0
             ? "Search for where you're playing."
             : null;
+
   const heading =
     search.status === "found" && search.venues.length > 0 && !q
       ? "Near you"
       : search.status === "saved" && search.venues.length > 0
         ? "On this device"
         : null;
+
   return (
     <View className="gap-3">
       <TextField

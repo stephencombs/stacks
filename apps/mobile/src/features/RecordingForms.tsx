@@ -62,12 +62,14 @@ const money = (amount: number, showCents = false) =>
   formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY, {
     trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
   });
+
 const decimal = decimalSeparator();
 
 /** An amount's text and its error, which shows from the first submit and follows what's typed. */
 function useAmount(initial: string, minimum: 0 | 1) {
   const [text, setText] = useState(initial);
   const [checked, setChecked] = useState(false);
+
   return {
     text,
     error: checked ? parseRecordingAmount(text, minimum).error : null,
@@ -78,6 +80,7 @@ function useAmount(initial: string, minimum: 0 | 1) {
     read: () => {
       setChecked(true);
       const parsed = parseRecordingAmount(text, minimum);
+
       return parsed.error === null ? parsed.amount : null;
     },
   };
@@ -101,6 +104,7 @@ function KeypadAmount({
   hint?: ReactNode;
 }) {
   const parsed = parseRecordingAmount(amount.text, 0);
+
   return (
     <View className="gap-2">
       <View
@@ -151,6 +155,7 @@ function RecordingKeypad({ amount, tiled = false }: { amount: Amount; tiled?: bo
       </View>
     );
   }
+
   return (
     <GlassSurface radius={22} className="rounded-2xl p-2">
       <AmountKeypad onKey={amount.press} bottomLeft={decimal} />
@@ -192,6 +197,7 @@ function TypedAmount({ label, amount }: { label: string; amount: Amount }) {
         ) : null}
       </View>
     );
+
   return (
     <TextField
       label={label}
@@ -239,16 +245,19 @@ function ReasonField({
 function useReason(missing: string) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+
   return {
     text,
     error,
     set: (value: string) => {
       setText(value);
+
       if (error && value.trim()) setError(null);
     },
     read: () => {
       const why = text.trim();
       setError(why ? null : missing);
+
       return why || null;
     },
   };
@@ -349,6 +358,7 @@ function RecordingSheet({
 }
 
 type GameChoice = Game | "none";
+
 const games: ReadonlyArray<{ value: GameChoice; label: string }> = [
   { value: "none", label: "Not set" },
   ...Game.literals.map((game) => ({ value: game, label: gameNames[game] })),
@@ -372,6 +382,7 @@ function GameFields({
   const [choosing, setChoosing] = useState(false);
   const baseLabel = games.find((option) => option.value === game)!.label;
   const gameLabel = game === "other" && gameName.trim() ? gameName.trim() : baseLabel;
+
   return (
     <>
       <View className="overflow-hidden rounded-xl bg-surface">
@@ -414,6 +425,7 @@ function GameFields({
           value={game}
           onChange={(next) => {
             onGame(next);
+
             if (next !== "other") onGameName?.("");
             setChoosing(false);
           }}
@@ -432,6 +444,7 @@ function DetailsFields({
   onVenue?: (venue: CachedVenue | null) => void;
 }) {
   const [pickingVenue, setPickingVenue] = useState(false);
+
   return (
     <View className="gap-1.5">
       <Text className="px-1 type-footnote font-medium text-muted">Details (optional)</Text>
@@ -517,6 +530,7 @@ export function StartSheet({
   const [recordingOnly, setRecordingOnly] = useState(false);
   const alreadyPlaying = Boolean(home?.active.length);
   const watching = recordingOnly && !alreadyPlaying;
+
   return (
     <RecordingSheet
       title={watching ? "Record a table" : "Start session"}
@@ -530,18 +544,25 @@ export function StartSheet({
       onClose={onClose}
       onSubmit={async () => {
         const venues = venue ? [venue] : [];
+
         if (watching) {
           const receipt = await save.submit(
             { type: "open_table", ...details(game, highLimit, venue, gameName) },
             venues,
           );
+
           if (tripId && receipt && "tableId" in receipt.command)
             await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
+
           if (receipt && "tableId" in receipt.command) onOpened?.(receipt.command.tableId);
+
           return;
         }
+
         const amount = buyIn.read();
+
         if (amount === null) return;
+
         const receipt = await save.submit(
           {
             type: "start",
@@ -550,9 +571,11 @@ export function StartSheet({
           },
           venues,
         );
+
         if (tripId && receipt && "tableId" in receipt.command)
           await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
         const visitId = receipt && startedVisit(receipt);
+
         if (visitId) onStarted(visitId);
       }}
     >
@@ -600,12 +623,14 @@ export function PastSessionSheet({
   const buyIn = useAmount("", 1);
   const cashOut = useAmount("", 0);
   const [now] = useState(() => new Date());
+
   const [times, setTimes] = useState<Times & { readonly finishNextDay: boolean }>(() => ({
     date: localDateText(now),
     start: "",
     finish: "",
     finishNextDay: false,
   }));
+
   const [timeErrors, setTimeErrors] = useState<Partial<Record<keyof Times, string>>>({});
   const [game, setGame] = useState<GameChoice>(() => prefs.defaultGame ?? "none");
   const [gameName, setGameName] = useState("");
@@ -613,15 +638,19 @@ export function PastSessionSheet({
   const [highLimit, setHighLimit] = useState(false);
   const inParsed = parseRecordingAmount(buyIn.text, 1);
   const outParsed = parseRecordingAmount(cashOut.text, 0);
+
   const resultPreview =
     inParsed.error === null && outParsed.error === null ? outParsed.amount - inParsed.amount : null;
+
   const updateTimes = (next: typeof times) => {
     setTimes(next);
+
     if (Object.keys(timeErrors).length > 0) {
       const parsed = parsePastSessionTimes(next);
       setTimeErrors(parsed.error === null ? {} : parsed.errors);
     }
   };
+
   const timeField = (field: keyof Times, label: string) => (
     <DateTimeField
       label={label}
@@ -632,6 +661,7 @@ export function PastSessionSheet({
       maximumDate={field === "date" ? now : undefined}
     />
   );
+
   return (
     <RecordingSheet
       title="Add past session"
@@ -644,7 +674,9 @@ export function PastSessionSheet({
         const totalOut = cashOut.read();
         const parsed = parsePastSessionTimes(times);
         setTimeErrors(parsed.error === null ? {} : parsed.errors);
+
         if (totalIn === null || totalOut === null || parsed.error !== null) return;
+
         const receipt = await save.submit(
           {
             type: "record_completed",
@@ -656,7 +688,9 @@ export function PastSessionSheet({
           },
           venue ? [venue] : [],
         );
+
         const visitId = receipt && startedVisit(receipt);
+
         if (visitId) onAdded(visitId);
       }}
     >
@@ -722,6 +756,7 @@ function usePaidBy(visit: RecordingVisitView) {
   const [value, setValue] = useState<"own" | PlayerId>("own");
   const own = visit.visit.playerId === state?.self.id ? "Me" : "Their own money";
   const names = tellApart(people.map((person) => person.displayName));
+
   return {
     people,
     value,
@@ -737,6 +772,7 @@ function usePaidBy(visit: RecordingVisitView) {
 
 function PaidField({ label, paid }: { label: string; paid: ReturnType<typeof usePaidBy> }) {
   if (paid.people.length === 0) return null;
+
   return <Choice label={label} options={paid.options} value={paid.value} onChange={paid.set} />;
 }
 
@@ -758,6 +794,7 @@ export function RebuySheet({
   const paid = usePaidBy(visit);
   const preview = buyInTotalPreview(visit.totals.buyIn, amount.text, "add");
   const added = parseRecordingAmount(amount.text, 1);
+
   const hint =
     preview === null ? undefined : (
       <>
@@ -787,6 +824,7 @@ export function RebuySheet({
         ) : null}
       </>
     );
+
   return (
     <RecordingSheet
       keypad={<RecordingKeypad amount={amount} />}
@@ -796,7 +834,9 @@ export function RebuySheet({
       onClose={onClose}
       onSubmit={async () => {
         const value = amount.read();
+
         if (value === null) return;
+
         const input = {
           type: "add",
           visitId: visit.visit.id,
@@ -804,7 +844,9 @@ export function RebuySheet({
           amount: value,
           ...paid.input(),
         } as const;
+
         const receipt = await save.submit(input);
+
         if (receipt?.command.type === "add") onSaved(receipt.command.entryId, input);
       }}
     >
@@ -843,6 +885,7 @@ export function RebuySheet({
 function useClock(initial: DateTime.Utc) {
   const [text, setText] = useState(() => localTimeText(initial));
   const [error, setError] = useState<string | null>(null);
+
   return {
     text,
     error,
@@ -857,6 +900,7 @@ function useClock(initial: DateTime.Utc) {
     ) => {
       const value = text === localTimeText(initial) ? initial : parseTimeNear(text, latest.at);
       const ms = value && DateTime.toEpochMillis(value);
+
       const problem =
         ms === null
           ? "Enter a time like 21:30."
@@ -865,7 +909,9 @@ function useClock(initial: DateTime.Utc) {
             : earliest !== null && ms < DateTime.toEpochMillis(earliest.at)
               ? earliest.error
               : null;
+
       setError(problem);
+
       return problem === null ? value : null;
     },
   };
@@ -896,6 +942,7 @@ export function CashOutSheet({
   const previous = visit.totals.cashOut;
   const parsedCashOut = parseRecordingAmount(amount.text, 0);
   const resultPreview = cashOutResultPreview(visit, amount.text);
+
   return (
     <RecordingSheet
       keypad={<RecordingKeypad amount={amount} tiled={Platform.OS === "ios"} />}
@@ -911,11 +958,14 @@ export function CashOutSheet({
       onClose={onClose}
       onSubmit={async () => {
         const value = amount.read();
+
         const finishedAt = clock.read(
           { at: DateTime.makeUnsafe(Date.now()), error: "The session can't finish in the future." },
           { at: visit.visit.startedAt, error: "The session can't finish before it started." },
         );
+
         if (value === null || finishedAt === null) return;
+
         const input = {
           type: "finish",
           visitId: visit.visit.id,
@@ -923,7 +973,9 @@ export function CashOutSheet({
           finishedAt,
           ...paid.input(),
         } as const;
+
         const receipt = await save.submit(input);
+
         if (receipt?.command.type === "finish") onSaved(receipt.command.entryId, input);
       }}
     >
@@ -1046,6 +1098,7 @@ export function BuyInTotalSheet({
   const current = visit.totals.buyIn;
   const currentShown = formatDisplayMoney(current, RECORDING_CURRENCY, prefs);
   const total = buyInTotalPreview(current, amount.text, mode);
+
   const preview =
     total === null ? (
       amount.text ? (
@@ -1063,6 +1116,7 @@ export function BuyInTotalSheet({
         />
       </>
     );
+
   return (
     <RecordingSheet
       keypad={<RecordingKeypad amount={amount} />}
@@ -1074,7 +1128,9 @@ export function BuyInTotalSheet({
       onClose={onClose}
       onSubmit={async () => {
         const value = amount.read();
+
         if (value === null || total === null) return;
+
         if (await save.set(total)) onSaved();
       }}
     >
@@ -1140,6 +1196,7 @@ export function StartTimeSheet({
   const [date, setDate] = useState(() => localDateText(new Date(DateTime.toEpochMillis(initial))));
   const [time, setTime] = useState(() => localTimeText(initial));
   const [problem, setProblem] = useState<{ field: "date" | "time"; error: string } | null>(null);
+
   const first = visit.entries.reduce(
     (earliest, entry) =>
       DateTime.toEpochMillis(entry.occurredAt) < DateTime.toEpochMillis(earliest)
@@ -1147,10 +1204,12 @@ export function StartTimeSheet({
         : earliest,
     visit.visit.finishedAt ?? now,
   );
+
   const change = (set: (value: string) => void) => (value: string) => {
     set(value);
     setProblem(null);
   };
+
   return (
     <RecordingSheet
       title="Start time"
@@ -1160,12 +1219,15 @@ export function StartTimeSheet({
       onClose={onClose}
       onSubmit={async () => {
         const parsed = parseStartedAt({ date, time }, initial, first);
+
         if (parsed.error !== null) return setProblem(parsed);
+
         const receipt = await save.submit({
           type: "edit_visit",
           visitId: visit.visit.id,
           startedAt: parsed.startedAt,
         });
+
         if (receipt) onSaved();
       }}
     >
@@ -1202,6 +1264,7 @@ export function GameSheet({
   const [game, setGame] = useState<GameChoice>(visit.table.game ?? "none");
   const [gameName, setGameName] = useState(visit.table.gameName ?? "");
   const [highLimit, setHighLimit] = useState(visit.table.highLimit);
+
   return (
     <RecordingSheet
       title="Game"
@@ -1219,6 +1282,7 @@ export function GameSheet({
             highLimit,
           },
         });
+
         if (receipt) onSaved();
       }}
     >
@@ -1250,6 +1314,7 @@ export function VenueSheet({
   // A venue another device set that this one hasn't fetched yet stays until something is picked.
   const [picked, setPicked] = useState<{ venue: CachedVenue | null } | null>(null);
   const selected = picked ? picked.venue : visit.venue;
+
   return (
     <RecordingSheet
       title="Casino"
@@ -1258,6 +1323,7 @@ export function VenueSheet({
       onClose={onClose}
       onSubmit={async () => {
         if (!picked) return onSaved();
+
         const receipt = await save.submit(
           {
             type: "edit_visit",
@@ -1271,6 +1337,7 @@ export function VenueSheet({
           },
           picked.venue ? [picked.venue] : [],
         );
+
         if (receipt) onSaved();
       }}
     >
@@ -1299,10 +1366,13 @@ export function CorrectSheet({
   const save = useRecordingSubmit();
   const amount = useAmount(amountInputText(entry.amount), entry.kind === "buy_in" ? 1 : 0);
   const reason = useReason("Say what was wrong with it.");
+
   const submit = async () => {
     const value = amount.read();
     const why = reason.read();
+
     if (value === null || why === null) return;
+
     const input = {
       type: "correct",
       visitId: visit.visit.id,
@@ -1310,10 +1380,13 @@ export function CorrectSheet({
       reason: why,
       replacement: { amount: value },
     } as const;
+
     const receipt = await save.submit(input);
+
     if (receipt?.command.type === "correct" && receipt.command.replacement)
       onSaved(receipt.command.replacement.id, input);
   };
+
   return (
     <RecordingSheet
       title={`Correct ${kindName(entry)}`}
@@ -1354,9 +1427,12 @@ export function VoidSheet({
   const save = useRecordingSubmit();
   const prefs = usePreferences();
   const reason = useReason("Say why it's being voided.");
+
   const submit = async () => {
     const why = reason.read();
+
     if (why === null) return;
+
     const receipt = await save.submit({
       type: "correct",
       visitId: visit.visit.id,
@@ -1364,8 +1440,10 @@ export function VoidSheet({
       reason: why,
       replacement: null,
     });
+
     if (receipt) onVoided();
   };
+
   return (
     <RecordingSheet
       title="Void this entry?"
@@ -1399,12 +1477,16 @@ export function ReopenSheet({
 }) {
   const save = useRecordingSubmit();
   const reason = useReason("Say what happened.");
+
   const submit = async () => {
     const why = reason.read();
+
     if (why === null) return;
     const receipt = await save.submit({ type: "reopen", visitId: visit.visit.id, reason: why });
+
     if (receipt) onReopened();
   };
+
   return (
     <RecordingSheet
       title="Fix an accidental finish?"
@@ -1461,22 +1543,29 @@ export function AddPlayerSheet({
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
   const savedNames = tellApart(saved.map((player) => player.displayName));
+
   const chosen =
     Platform.OS === "android" || choice === NEW_PLAYER
       ? name.trim()
       : (saved.find((player) => player.id === choice)?.displayName ?? "");
+
   const typed = parseRecordingAmount(amount.text, 1);
+
   const submitSaved = async (playerId: PlayerId, label: string) => {
     const value = amount.read();
+
     if (value === null) return;
+
     const receipt = await save.submit({
       type: "join_table",
       tableId,
       playerId,
       buyIn: value,
     });
+
     if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId, label);
   };
+
   return (
     <RecordingSheet
       title="Add player"
@@ -1497,12 +1586,15 @@ export function AddPlayerSheet({
         const trimmed = name.trim();
         setNameError(isNew && trimmed === "" ? "Enter the player's name." : null);
         const value = amount.read();
+
         if (value === null || (isNew && trimmed === "")) return;
+
         const receipt = await save.submit(
           isNew
             ? { type: "join_table", tableId, displayName: trimmed, buyIn: value }
             : { type: "join_table", tableId, playerId: choice as PlayerId, buyIn: value },
         );
+
         if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId, chosen);
       }}
     >
@@ -1525,6 +1617,7 @@ export function AddPlayerSheet({
                 placeholderTextColorClassName="accent-muted"
                 onChangeText={(next) => {
                   setName(next);
+
                   if (nameError && next.trim()) setNameError(null);
                 }}
                 className="py-1 type-body text-ink"
@@ -1575,6 +1668,7 @@ export function AddPlayerSheet({
               <List>
                 {saved.map((player, index) => {
                   const label = savedNames[index]!;
+
                   return (
                     <Row key={player.id}>
                       <Chip chip={(index % 8) + 1} name={label} size={36} ring />
@@ -1643,6 +1737,7 @@ export function SitDownSheet({
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 1);
+
   return (
     <RecordingSheet
       title={returning ? "Back at the table" : "Buy in"}
@@ -1658,13 +1753,16 @@ export function SitDownSheet({
       onClose={onClose}
       onSubmit={async () => {
         const value = amount.read();
+
         if (value === null) return;
+
         const receipt = await save.submit({
           type: "join_table",
           tableId,
           playerId: player.id,
           buyIn: value,
         });
+
         if (receipt?.command.type === "join_table") onSeated(receipt.command.visitId);
       }}
     >
@@ -1688,12 +1786,16 @@ export function JoinSheet({
 }) {
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+
   const submit = async () => {
     const trimmed = name.trim();
     setNameError(trimmed === "" ? "Enter your name." : null);
+
     if (trimmed === "") return;
+
     if (await join.join(trimmed)) onJoined();
   };
+
   return (
     <Sheet
       open

@@ -1,6 +1,7 @@
 import { Host } from "@expo/ui";
 import { Picker, Text } from "@expo/ui/swift-ui";
 import { accessibilityLabel, frame, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
+import * as Predicate from "effect/Predicate";
 import { useWindowDimensions } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 
@@ -16,11 +17,12 @@ export function SegmentedControl<A extends string>({
   const { fontScale } = useWindowDimensions();
   const { theme } = useUniwind();
   const tint = useCSSVariable("--color-ink");
+
   return (
     <Host
       style={{ height: Math.max(48, 44 * fontScale) }}
       colorScheme={theme === "dark" ? "dark" : "light"}
-      seedColor={typeof tint === "string" ? tint : undefined}
+      seedColor={Predicate.isString(tint) ? tint : undefined}
     >
       <Picker
         selection={value}

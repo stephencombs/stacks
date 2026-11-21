@@ -21,6 +21,7 @@ const closedReasons = {
 } as const;
 
 const inviteTitle = Platform.OS === "android" ? <PageTitle inContent>Invite</PageTitle> : null;
+
 const inviteSkeleton = (
   <>
     {inviteTitle}
@@ -28,7 +29,6 @@ const inviteSkeleton = (
   </>
 );
 
-/** A link that doesn't resolve, said the way the personal invite's page says it. */
 const invalidInvite = (message: string) => (
   <>
     {inviteTitle}
@@ -48,11 +48,13 @@ function InviteCard({
   children: ReactNode;
 }) {
   const android = Platform.OS === "android";
+
   const heading = (
     <PageTitle inContent={android} context={context}>
       {title}
     </PageTitle>
   );
+
   return (
     <>
       {android ? heading : null}
@@ -66,6 +68,7 @@ function InviteCard({
 
 export function JoinScreen({ route }: Props) {
   const stacks = useStacks();
+
   return (
     <Screen>
       <Loaded
@@ -86,8 +89,10 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
   const accept = useAction(stacks.Client.mutation("invites", "accept"));
   const [name, setName] = useState(user?.firstName ?? "");
   const [nameError, setNameError] = useState<string | null>(null);
+
   const openDetail = (detail: GroupDetail) => {
     const trip = detail.trips.find((item) => item.endedAt === null);
+
     if (trip) go.trip(trip.id);
     else go.group(detail.group.id);
   };
@@ -96,6 +101,7 @@ function JoinView({ code, preview }: { code: string; preview: InvitePreview }) {
     if (!name.trim()) return setNameError("Enter the name your friends know you by.");
     setNameError(null);
     const joined = await accept.run({ params: { code }, payload: { displayName: name.trim() } });
+
     if (joined) openDetail(joined);
   };
 
@@ -146,14 +152,18 @@ export function ClaimScreen({ route }: Props) {
   const stacks = useStacks();
   const go = useGo();
   const claim = useAction(stacks.Client.mutation("guests", "claim"));
+
   const confirm = async () => {
     const claimed = await claim.run({ params: { code: route.params.code } });
+
     if (claimed) {
       const trip = claimed.trips.find((item) => item.endedAt === null);
+
       if (trip) go.trip(trip.id);
       else go.group(claimed.group.id);
     }
   };
+
   return (
     <Screen>
       <Loaded

@@ -9,6 +9,7 @@ const PLAYERS = [
   PlayerId.make("0192e7a0-0000-7000-8000-000000000004"),
   PlayerId.make("0192e7a0-0000-7000-8000-000000000005"),
 ] as const;
+
 export const [ALEX, BEA, CAL, DEE] = PLAYERS;
 
 const VOIDED_AT = DateTime.makeUnsafe("2026-10-01T00:00:00Z");
@@ -49,6 +50,7 @@ export const toEntries = (ledger: typeof RandomLedger.Type) =>
         : counterpartyOffset === null
           ? null
           : PLAYERS[(player + counterpartyOffset) % 5]!;
+
     return entry({
       kind,
       playerId: PLAYERS[player]!,

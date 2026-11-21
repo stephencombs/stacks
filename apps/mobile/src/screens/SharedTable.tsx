@@ -38,10 +38,12 @@ export function SharedTableScreen({ route }: Props) {
     void Effect.runPromiseExit(fetchSharedTable({ baseUrl: apiUrl }, token)).then((exit) => {
       if (current) setView(Exit.isSuccess(exit) ? exit.value : null);
     });
+
     return () => {
       current = false;
     };
   }, [token]);
+
   return (
     <PersonalScreen>
       {Platform.OS === "android" && view == null ? (
@@ -77,13 +79,16 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
   const navigation = useNavigation();
   const [open, setOpen] = useState<"join" | "sit" | null>(null);
   const you = local?.you.player ?? null;
+
   const names = distinctPlayerNames(
     view.players.map((player) => [player.id, player.id === you?.id ? "You" : player.displayName]),
   );
+
   const visits = view.visits;
   const first = visits[0]?.visit;
   const live = visits.some((item) => item.finalResult === null);
   const played = local?.visits.some((item) => item.isSelf) ?? false;
+
   const openVisit = (visitId: VisitId) =>
     navigation.dispatch(StackActions.replace("Play", { visitId }));
 

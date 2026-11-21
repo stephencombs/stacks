@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
+  CurrencyCode,
   GroupId,
   MinorUnits,
   PlayerId,
@@ -16,17 +17,19 @@ import * as DateTime from "effect/DateTime";
 import { groupChip, groupStatsView } from "./groupStats.ts";
 
 const zone = DateTime.zoneMakeNamedUnsafe("UTC");
+
 const clock: TripClock = {
   night: (at) => new Date(DateTime.toEpochMillis(at) - 6 * 3_600_000).toISOString().slice(0, 10),
   hour: (at) => new Date(DateTime.toEpochMillis(at)).getUTCHours(),
 };
+
 const id = (n: number) => `0192e7a0-0000-7000-8000-${String(n).padStart(12, "0")}`;
-const [alex, bea, cal, dee] = [1, 2, 3, 4].map((n) => PlayerId.make(id(n))) as [
-  PlayerId,
-  PlayerId,
-  PlayerId,
-  PlayerId,
-];
+
+const alex = PlayerId.make(id(1));
+const bea = PlayerId.make(id(2));
+const cal = PlayerId.make(id(3));
+const dee = PlayerId.make(id(4));
+
 const groupId = GroupId.make(id(10));
 const vegas = TripId.make(id(20));
 const reno = TripId.make(id(21));
@@ -40,6 +43,7 @@ const player = (playerId: PlayerId, displayName: string, role: "owner" | "member
   role,
   claimCode: null,
 });
+
 const trip = (tripId: TripId, name: string) => ({
   id: tripId,
   groupId,
@@ -49,11 +53,16 @@ const trip = (tripId: TripId, name: string) => ({
   createdBy: UserId.make("user_Alex"),
   createdAt: at("2026-10-01T00:00:00Z"),
 });
-const detail = {
-  group: { name: "Thursday crew", currency: "USD" },
+
+const detail: GroupDetail = {
+  group: {
+    id: groupId,
+    name: "Thursday crew",
+    currency: CurrencyCode.make("USD"),
+    createdAt: at("2026-10-01T00:00:00Z"),
+  },
   role: "owner",
   myPlayerId: alex,
-  // Dee left the group; Cal is in it but hasn't played.
   players: [
     player(alex, "Alex", "owner"),
     player(bea, "Bea", "member"),
@@ -61,19 +70,17 @@ const detail = {
     player(dee, "Dee", null),
   ],
   trips: [trip(reno, "Reno"), trip(vegas, "Vegas")],
-} as unknown as GroupDetail;
+};
 
 let count = 0;
-const play = (
-  tripId: TripId,
-  startedAt: string,
-  results: ReadonlyArray<[PlayerId, number]>,
-): GroupStats["plays"][number] => {
+
+const play = (tripId: TripId, startedAt: string, results: ReadonlyArray<[PlayerId, number]>) => {
   const start = at(startedAt);
+
   return {
     id: TableId.make(id(100 + ++count)),
     tripId,
-    game: "blackjack",
+    game: "blackjack" as const,
     venueId: wynn,
     startedAt: start,
     endedAt: DateTime.makeUnsafe(DateTime.toEpochMillis(start) + 90 * 60_000),
@@ -85,6 +92,7 @@ const play = (
     })),
   };
 };
+
 const stats: GroupStats = {
   plays: [
     play(vegas, "2026-10-02T20:00:00Z", [
@@ -118,6 +126,7 @@ describe("groupStatsView", () => {
   it("leads with standings: ties share a rank, you're marked, and a member who hasn't played sits last", () => {
     const view = groupStatsView(stats, detail, {}, { timeZone: zone, clock });
     expect(view.kind).toBe("stats");
+
     if (view.kind !== "stats") return;
     expect(view.standings.map((row) => [row.name, row.rank, row.you, row.result])).toEqual([
       ["Alex", 1, true, 20000],
@@ -135,28 +144,27 @@ describe("groupStatsView", () => {
       winRateLine: "1 of 2",
     });
     expect(view.standings[3]!.meta).toBe("No sessions");
-    // Awards belong to one trip.
     expect(view.awards).toBeNull();
     expect(view.race.marks.map((mark) => mark.label)).toEqual(["Vegas", "Reno"]);
   });
 
   it("hands out a trip's awards and marks its nights once a trip is picked", () => {
     const view = groupStatsView(stats, detail, { tripId: vegas }, { timeZone: zone, clock });
+
     if (view.kind !== "stats") throw new Error(view.kind);
     expect(view.title).toBe("Vegas");
     expect(view.awards?.map((award) => [award.title, award.name, award.line])).toEqual([
       ["Biggest hit", "Alex", "+$300 at Wynn"],
       ["Comeback kid", "Bea", "Climbed $100 from their low"],
-      // Alex already holds an award, but nobody else sat down late.
       ["Night owl", "Alex", "Sat down at 3:00 AM"],
     ]);
-    // The 3am table counts toward the night before.
     expect(view.race.marks.map((mark) => mark.label)).toEqual(["Day 1"]);
     expect(view.chips.map((chip) => chip.label)).toEqual(["Vegas", "All games", "All casinos"]);
   });
 
   it("supplies a trip's date range and each player's best session in scope", () => {
     const view = groupStatsView(stats, detail, { tripId: vegas }, { timeZone: zone, clock });
+
     if (view.kind !== "stats") throw new Error(view.kind);
     expect(view.trips.total).toBe(3);
     expect(view.trips.byId.get(vegas)).toEqual({ sessions: 2, range: "Oct 1–3, 2026" });
@@ -174,12 +182,14 @@ describe("groupStatsView", () => {
       { tripId: vegas },
       { timeZone: zone, clock, showCents: true },
     );
+
     const hidden = groupStatsView(
       stats,
       detail,
       { tripId: vegas },
       { timeZone: zone, clock, privacyMode: true },
     );
+
     if (visible.kind !== "stats" || hidden.kind !== "stats") throw new Error("Missing group stats");
     expect(visible.awards?.[0]?.line).toBe("+$300.00 at Wynn");
     expect(hidden.awards?.[0]?.line).not.toContain("300");
@@ -188,12 +198,14 @@ describe("groupStatsView", () => {
 
   it("leaves the place off a biggest hit at a table with no casino set", () => {
     const [first] = stats.plays;
+
     const view = groupStatsView(
       { ...stats, plays: [{ ...first!, venueId: null }] },
       detail,
       { tripId: vegas },
       { timeZone: zone, clock },
     );
+
     if (view.kind !== "stats") throw new Error(view.kind);
     expect(view.awards?.[0]?.line).toBe("+$300");
   });

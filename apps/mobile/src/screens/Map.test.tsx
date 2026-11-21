@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { makeRecordingStore, type CachedVenue } from "@stacks/client-runtime/recording";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
 import { VenueId } from "@stacks/contracts";
@@ -9,16 +8,20 @@ import { expect, it, vi } from "vite-plus/test";
 
 const openStore = async () => {
   let documentState: RecordingStorageDocument = { revision: 0 };
+
   const store = makeRecordingStore({
     load: async () => documentState,
     commit: async (_revision, payload) => {
       documentState = { revision: documentState.revision + 1, payload };
+
       return documentState.revision;
     },
     subscribe: () => () => {},
     close: async () => {},
   });
+
   await store.ready;
+
   return store;
 };
 
@@ -29,6 +32,7 @@ const setupMapTest = async (store: Awaited<ReturnType<typeof openStore>>) => {
   vi.doMock("@react-navigation/native", () => ({
     useNavigation: () => ({ setOptions: vi.fn(), navigate }),
   }));
+
   const Container = ({
     children,
     accessibilityLabel,
@@ -48,6 +52,7 @@ const setupMapTest = async (store: Awaited<ReturnType<typeof openStore>>) => {
     ) : (
       <div>{children}</div>
     );
+
   vi.doMock("react-native", () => ({
     Text: Container,
     View: Container,
@@ -116,12 +121,14 @@ const setupMapTest = async (store: Awaited<ReturnType<typeof openStore>>) => {
       </RecordingProvider>,
     ),
   );
+
   return { element, root, navigate };
 };
 
 it("shows empty state before any finished sessions", async () => {
   const store = await openStore();
   const { element, root } = await setupMapTest(store);
+
   try {
     expect(element.textContent).toContain("No casinos on the map yet");
   } finally {
@@ -134,6 +141,7 @@ it("shows empty state before any finished sessions", async () => {
 
 it("renders venue pins, unmapped count, day path filter, and venue sheet linking to Play offline", async () => {
   const store = await openStore();
+
   const wynn: CachedVenue = {
     id: VenueId.make("0192e7a0-0000-7000-8000-000000000001"),
     name: "Wynn Las Vegas",
@@ -144,6 +152,7 @@ it("renders venue pins, unmapped count, day path filter, and venue sheet linking
     lat: 36.1265,
     lng: -115.1656,
   };
+
   await store.execute(
     store.prepare({
       type: "record_completed",
@@ -169,6 +178,7 @@ it("renders venue pins, unmapped count, day path filter, and venue sheet linking
   );
 
   const { element, root, navigate } = await setupMapTest(store);
+
   try {
     expect(element.textContent).toContain("All casinos");
     expect(element.textContent).toContain("1 session has no saved location");
@@ -177,6 +187,7 @@ it("renders venue pins, unmapped count, day path filter, and venue sheet linking
     const pinButton = [...element.querySelectorAll("button")].find((b) =>
       b.getAttribute("aria-label")?.startsWith("Wynn Las Vegas"),
     );
+
     expect(pinButton).toBeDefined();
     await act(async () => pinButton!.click());
     expect(element.textContent).toContain("Las Vegas, NV · 1 session · 2h 10m");
@@ -185,6 +196,7 @@ it("renders venue pins, unmapped count, day path filter, and venue sheet linking
     const sessionRow = [...element.querySelectorAll("button")].find((b) =>
       b.getAttribute("aria-label")?.startsWith("Craps,"),
     );
+
     expect(sessionRow).toBeDefined();
     await act(async () => sessionRow!.click());
     expect(navigate).toHaveBeenCalledWith("Play", { visitId: wynnVisitId });
@@ -192,6 +204,7 @@ it("renders venue pins, unmapped count, day path filter, and venue sheet linking
     const filter = element.querySelector<HTMLButtonElement>(
       'button[aria-label="Map filter: All casinos"]',
     )!;
+
     await act(async () => filter.click());
     expect(element.textContent).not.toContain("Las Vegas, NV · 1 session · 2h 10m");
     const [, day] = element.querySelectorAll<HTMLButtonElement>("section button");

@@ -12,18 +12,19 @@ export const LIVE_UPDATE_PERMISSIONS = [
   "android.permission.POST_PROMOTED_NOTIFICATIONS",
 ] as const;
 
-export function addLiveUpdatePermissions(
-  manifest: AndroidConfig.Manifest.AndroidManifest,
-): AndroidConfig.Manifest.AndroidManifest {
+export function addLiveUpdatePermissions(manifest: AndroidConfig.Manifest.AndroidManifest) {
   const existing = manifest.manifest["uses-permission"] ?? [];
   const names = new Set(existing.map((item) => item.$?.["android:name"]));
   const next = [...existing];
+
   for (const permission of LIVE_UPDATE_PERMISSIONS) {
     if (!names.has(permission)) {
       next.push({ $: { "android:name": permission } });
     }
   }
+
   manifest.manifest["uses-permission"] = next;
+
   return manifest;
 }
 
@@ -34,8 +35,10 @@ export function addLiveUpdatePermissions(
 const withAndroidLiveUpdates: ConfigPlugin = (config) => {
   config = withAndroidManifest(config, (config) => {
     config.modResults = addLiveUpdatePermissions(config.modResults);
+
     return config;
   });
+
   return withDangerousMod(config, [
     "android",
     (config) => {
@@ -43,6 +46,7 @@ const withAndroidLiveUpdates: ConfigPlugin = (config) => {
       const drawable = join(config.modRequest.platformProjectRoot, "app/src/main/res/drawable");
       mkdirSync(drawable, { recursive: true });
       copyFileSync(source, join(drawable, "ic_stat_color_up.xml"));
+
       return config;
     },
   ]);

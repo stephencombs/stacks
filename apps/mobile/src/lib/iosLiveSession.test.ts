@@ -6,15 +6,18 @@ import { expect, it, vi } from "vite-plus/test";
 
 const { factory, activity } = vi.hoisted(() => {
   const activity = { getId: () => "activity", update: vi.fn(), end: vi.fn() };
+
   return { factory: { getInstances: vi.fn(), start: vi.fn(() => activity) }, activity };
 });
 
 vi.mock("expo-widgets", () => ({ after: (date: Date) => ({ after: date }) }));
+
 vi.mock("./sessionActivity", () => ({ sessionActivity: factory, sessionActivityColors: {} }));
 
 import { dispatchIosLiveSession } from "./iosLiveSession";
 
 const open = "stacks-dev://play/session";
+
 const live = {
   kind: "live",
   visitId: "session",

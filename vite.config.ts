@@ -13,12 +13,19 @@ const GENERATED = [
   "apps/mobile/android/**",
   "apps/mobile/.expo/**",
   "apps/mobile/uniwind-types.d.ts",
-  // Git can check out this symlink as plain text on Windows. Format its target instead.
   ".mcp.json",
-  // Agent skills are vendored and replaced as a whole when they update.
-  ".agents/skills/**",
-  ".claude/skills/**",
-  ".codex/skills/**",
+  ".agent/**",
+  ".agents/**",
+  ".claude/**",
+  ".codex/**",
+  ".continue/**",
+  ".cursor/**",
+  ".gemini/**",
+  ".opencode/**",
+  ".pi/**",
+  ".roo/**",
+  ".windsurf/**",
+  "tools/oxlint/anti-slop/**",
 ];
 
 export default defineConfig({
@@ -26,8 +33,6 @@ export default defineConfig({
     environment: "node",
     exclude: ["**/node_modules/**", "**/dist/**"],
     allowOnly: !process.env.CI,
-    // Flaky tests are fixed, not retried.
-    retry: 0,
   },
   staged: {
     "*": "vp fmt --no-error-on-unmatched-pattern",
@@ -39,6 +44,103 @@ export default defineConfig({
   lint: {
     ignorePatterns: GENERATED,
     plugins: ["eslint", "oxc", "react", "unicorn", "typescript"],
+    jsPlugins: [
+      { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
+      { name: "anti-slop-effect", specifier: "./tools/oxlint/anti-slop/effect/index.ts" },
+      { name: "landmines-testing", specifier: "@interfere/landmines/testing" },
+      { name: "landmines-style", specifier: "@interfere/landmines/style" },
+      { name: "landmines-structure", specifier: "@interfere/landmines/structure" },
+      { name: "landmines-types", specifier: "@interfere/landmines/types" },
+    ],
+    overrides: [
+      {
+        files: ["apps/mobile/plugins/withIosFormSheet.ts"],
+        rules: {
+          "landmines-style/no-comments": "off",
+          "landmines-types/no-explicit-return-types": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/components/ui/ActionMenu.ios.tsx"],
+        rules: {
+          "anti-slop/no-runtime-typeof": "off",
+          "anti-slop/no-shape-in-symbol-names": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/components/ui/DateTimeField.ios.tsx"],
+        rules: {
+          "anti-slop/no-runtime-typeof": "off",
+          "anti-slop/no-shape-in-symbol-names": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/components/ui/Sheet.ios.tsx"],
+        rules: {
+          "anti-slop/no-runtime-typeof": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/features/FeltStatusBar.test.tsx"],
+        rules: {
+          "landmines-style/no-comments": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/features/RecordingForms.tsx"],
+        rules: {
+          "anti-slop/no-conditional-empty-object-spread": "off",
+          "anti-slop/no-unknown-returns": "off",
+          "anti-slop/require-safety-comment-for-type-assertion": "off",
+          "landmines-style/no-comments": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/lib/iosLiveSession.test.ts"],
+        rules: {
+          "anti-slop/require-safety-comment-for-type-assertion": "off",
+          "landmines-testing/no-test-doubles": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/lib/iosLiveSession.ts"],
+        rules: {
+          "landmines-types/no-explicit-return-types": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/lib/liveSessionAdapter.test.ts"],
+        rules: {
+          "anti-slop/require-safety-comment-for-type-assertion": "off",
+          "landmines-style/no-comments": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/lib/liveSessionAdapter.ts"],
+        rules: {
+          "landmines-types/no-explicit-return-types": "off",
+        },
+      },
+      {
+        files: ["apps/mobile/src/lib/sessionActivity.tsx"],
+        rules: {
+          "anti-slop-effect/prefer-effect-match": "off",
+          "anti-slop/no-shape-in-symbol-names": "off",
+        },
+      },
+      {
+        files: ["packages/shared/src/money.ts"],
+        rules: {
+          "anti-slop/require-readable-spacing": "off",
+        },
+      },
+      {
+        files: ["scripts/verify-ios-live-activity.mjs"],
+        rules: {
+          "landmines-style/no-comments": "off",
+        },
+      },
+    ],
     categories: {
       correctness: "warn",
       suspicious: "warn",
@@ -46,11 +148,43 @@ export default defineConfig({
     },
     rules: {
       "oxc/no-accumulating-spread": "error",
+      "anti-slop/no-array-filter-map": "error",
+      "anti-slop/no-reduce-accumulator-copy": "error",
+      "anti-slop/no-chained-type-assertions": "error",
+      "anti-slop/no-conditional-empty-object-spread": "error",
+      "anti-slop/no-known-value-widening": "error",
+      "anti-slop/no-module-mocking": "error",
+      "anti-slop/no-object-parameters": "error",
+      "anti-slop/no-reflect-apply": "error",
+      "anti-slop/no-reflect-get": "error",
+      "anti-slop/no-runtime-typeof": "error",
+      "anti-slop/no-shape-in-symbol-names": "error",
+      "anti-slop/no-unknown-parameters": "error",
+      "anti-slop/no-unknown-returns": "error",
+      "anti-slop/no-unknown-type-aliases": "error",
+      "anti-slop/no-unsafe-dictionary-type": "error",
+      "anti-slop/no-widen-then-assert": "error",
+      "anti-slop/require-readable-spacing": "error",
+      "anti-slop/require-safety-comment-for-type-assertion": "error",
+      "anti-slop-effect/no-manual-effect-error-tag": "error",
+      "anti-slop-effect/no-manual-tag-comparison": "error",
+      "anti-slop-effect/no-manual-tagged-construction": "error",
+      "anti-slop-effect/no-service-constructor-imports": "error",
+      "anti-slop-effect/prefer-effect-match": "error",
+      "landmines-testing/no-fixed-sleep": "error",
+      "landmines-testing/no-flake-masking": "error",
+      "landmines-testing/no-test-doubles": "error",
+      "landmines-testing/no-unsignaled-poll": "error",
+      "landmines-testing/strict-msw": "error",
+      "landmines-style/no-comments": ["error", { allow: ["WARNING", "SAFETY"] }],
+      "landmines-structure/colocated-tests": "error",
+      "landmines-structure/package-exports": "error",
+      "landmines-structure/test-file-names": "error",
+      "landmines-types/no-explicit-return-types": "error",
       "react/exhaustive-effect-dependencies": "error",
       "react/set-state-in-effect": "error",
       "react/no-array-index-key": "error",
       "react/no-unstable-nested-components": "error",
-      // expo-status-bar takes a string `style`.
       "react/style-prop-object": ["warn", { allow: ["StatusBar"] }],
       "react-in-jsx-scope": "off",
       "react-hooks/exhaustive-deps": "off",

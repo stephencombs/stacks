@@ -24,7 +24,7 @@ export function ActionMenu({
       actions={actions.map((action, index) => ({
         id: String(index),
         title: action.label,
-        ...(action.icon && menuIcons[action.icon] ? { image: menuIcons[action.icon] } : {}),
+        ...(action.icon && menuIcons[action.icon] ? { image: menuIcons[action.icon] } : null),
         attributes: { destructive: action.destructive, disabled: disabled || action.disabled },
       }))}
       onPressAction={({ nativeEvent }) => actions[Number(nativeEvent.event)]?.onPress()}

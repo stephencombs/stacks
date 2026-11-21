@@ -21,13 +21,12 @@ import { venueColumns } from "./Views.ts";
 
 const PAGE_SIZE = 50;
 
-// A cursor is the last item's time in microseconds, Postgres's precision, and its id. Milliseconds
-// would skip or repeat items that share one.
 const CURSOR = /^(\d{1,18})\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 const parseCursor = (cursor: string | undefined) => {
   if (cursor === undefined) return Effect.succeed(null);
   const match = CURSOR.exec(cursor);
+
   return match
     ? Effect.succeed({ at: match[1]!, id: match[2]! })
     : Effect.fail(new InvalidRequest({ message: "That page of activity no longer exists." }));
@@ -44,6 +43,7 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const after = yield* parseCursor(query.cursor);
+
   const rows = yield* sql`
     with mine as (
       select m.group_id from memberships m
@@ -79,13 +79,17 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
   const page = rows.slice(0, PAGE_SIZE);
   const last = page.at(-1);
   const nextCursor = rows.length > PAGE_SIZE && last ? `${last.atKey}.${last.id}` : null;
+
   if (page.length === 0) return { items: [], nextCursor } satisfies CrewActivityPage;
 
   const tripIds = page.filter((row) => row.source === "trip").map((row) => TripId.make(row.id));
+
   const sessionIds = page
     .filter((row) => row.source === "session")
     .map((row) => SessionId.make(row.id));
+
   const tableIds = page.filter((row) => row.source === "table").map((row) => TableId.make(row.id));
+
   const [sessions, tables] = yield* Effect.all(
     [
       sessionIds.length === 0
@@ -97,9 +101,11 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
     ],
     { concurrency: "unbounded" },
   );
+
   const allTripIds = Array.from(
     new Set([...tripIds, ...sessions.map((s) => s.tripId), ...tables.map((t) => t.table.tripId!)]),
   );
+
   const memberIds = Array.from(new Set(tables.flatMap((t) => t.playerIds)));
   const closedIds = sessions.filter((s) => s.status === "closed").map((s) => s.id);
   const venueIds = Array.from(new Set(sessions.map((s) => s.venueId)));
@@ -156,22 +162,27 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
   const venueById = new Map(venues.map((venue) => [venue.id, venue]));
   const tableById = new Map(tables.map((table) => [table.table.id, table]));
   const memberName = new Map(members.map((member) => [member.id, member.displayName]));
+
   const refs = (tripId: TripId) => {
     const trip = tripById.get(tripId)!;
     const group = groupById.get(trip.groupId)!;
+
     return {
       group: { id: group.id, name: group.name, currency: group.currency },
       trip: { id: trip.id, name: trip.name },
     };
   };
 
-  const items = page.map((row): CrewActivityItem => {
+  const items: ReadonlyArray<CrewActivityItem> = page.map((row) => {
     if (row.source === "trip") {
       const tripId = TripId.make(row.id);
+
       return { kind: "trip_started", ...refs(tripId), startedAt: tripById.get(tripId)!.startedAt };
     }
+
     if (row.source === "table") {
       const table = tableById.get(TableId.make(row.id))!;
+
       const shared = {
         ...refs(table.table.tripId!),
         tableId: table.table.id,
@@ -179,6 +190,7 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
         game: table.table.game,
         myVisitId: table.myVisitId,
       };
+
       const players = [
         ...table.playerIds.map((playerId) => ({
           playerId,
@@ -188,6 +200,7 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
         })),
         ...table.others.map(({ displayName, net }) => ({ playerId: null, displayName, net })),
       ];
+
       return table.endedAt === null
         ? {
             kind: "table_live",
@@ -197,19 +210,25 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
           }
         : { kind: "table_finished", ...shared, players, endedAt: table.endedAt };
     }
+
     const session = sessionById.get(SessionId.make(row.id))!;
+
     const players = seats
       .filter((seat) => seat.sessionId === session.id)
       .map(({ playerId, displayName }) => ({ playerId, displayName }));
+
     const shared = {
       ...refs(session.tripId),
       sessionId: session.id,
       venue: venueById.get(session.venueId)!,
     };
+
     if (session.endedAt === null) {
       return { kind: "session_live", ...shared, players, startedAt: session.startedAt };
     }
+
     const results = playerResults(entries.filter((entry) => entry.sessionId === session.id));
+
     return {
       kind: "session_finished",
       ...shared,
@@ -220,5 +239,6 @@ export const activity = Effect.fn("Crew.activity")(function* (query: { readonly 
       endedAt: session.endedAt,
     };
   });
+
   return { items, nextCursor } satisfies CrewActivityPage;
 });

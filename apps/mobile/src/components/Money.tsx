@@ -30,9 +30,11 @@ export function Money({
 }) {
   const prefs = usePreferences();
   const hidden = prefs.privacyMode;
+
   const formatted = formatDisplayMoney(amount, currency, prefs, {
     signDisplay: tone === "result" ? "exceptZero" : "auto",
   });
+
   return (
     <Text
       testID={testID}

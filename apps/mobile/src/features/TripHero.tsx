@@ -33,14 +33,18 @@ export function TripHero({
   const tone = mine.net > 0 ? "win" : mine.net < 0 ? "loss" : "ink";
   const [color, ring] = useCSSVariable([`--color-${tone}`, "--color-fill-strong"]).map(String);
   const [width, setWidth] = useState(0);
+
   if (mine.played === 0) return null;
   const standings = tripStandings(closed, localClock);
   const rank = standings.find((s) => s.playerId === me)?.rank;
   const lines = tripLines(mine, currency);
+
   const onLayout = (event: LayoutChangeEvent) => {
     const next = Math.round(event.nativeEvent.layout.width);
+
     if (next !== width) setWidth(next);
   };
+
   const plot = lineScale([mine.line], { width, height: HEIGHT }, { x: 16, y: 10 });
   const points = plot.points(mine.line);
   const end = { x: plot.x(mine.line.length - 1), y: plot.y(mine.line.at(-1)!) };

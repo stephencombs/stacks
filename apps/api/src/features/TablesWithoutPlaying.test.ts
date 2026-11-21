@@ -14,10 +14,10 @@ import {
   seatNew,
   sitDown,
   uuid,
-} from "../testing/recording.ts";
-import { TestApi } from "../testing/TestApi.ts";
+} from "../testing/recording.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without playing", (it) => {
+it.layer(TestApi.layer)("tables recorded without playing", (it) => {
   it.effect("records, shares and finishes a table its starter never plays at", () =>
     Effect.gen(function* () {
       const starter = yield* device();
@@ -28,23 +28,25 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without play
         "accepted",
         "accepted",
       ]);
+
       const { token } = yield* starter.client.recording.share({
         params: { tableId: opened.tableId },
       });
+
       const dev = yield* device();
       const { player } = yield* dev.join(token, { id: PlayerId.make(uuid()), displayName: "Dev" });
       const sat = sitDown(dev.identity, opened.tableId, player.id);
       expect(yield* dev.push(sat)).toEqual(["accepted"]);
-      // A joiner records only their own play.
       expect(yield* dev.push(rebuy(dev.identity, priya.visitId, 1))).toEqual(["forbidden"]);
       expect(yield* dev.push(deleteTable(dev.identity, opened.tableId))).toEqual(["forbidden"]);
 
-      // Cashing Priya out leaves the table open for Dev, until Dev cashes out too.
       expect(yield* starter.push(finish(starter.identity, priya.visitId, 1))).toEqual(["accepted"]);
       let view = yield* starter.client.recording.table({ params: { tableId: opened.tableId } });
       expect(view.viewerRole).toBe("starter");
+
       const playing = (id: string) =>
         view.visits.find((item) => item.visit.id === id)?.visit.finishedAt === null;
+
       expect([playing(priya.visitId), playing(sat.visitId)]).toEqual([false, true]);
       expect(yield* starter.push(finish(starter.identity, sat.visitId))).toEqual(["accepted"]);
       view = yield* starter.client.recording.table({ params: { tableId: opened.tableId } });
@@ -53,7 +55,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without play
         false,
       );
 
-      // Someone played here, so it stays.
       expect(yield* starter.push(deleteTable(starter.identity, opened.tableId))).toEqual([
         "invalid",
       ]);
@@ -75,10 +76,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without play
       const starter = yield* device();
       const opened = openTable(starter.identity);
       expect(yield* starter.push(opened)).toEqual(["accepted"]);
-      // An empty table can be shared and joined before anyone buys in.
+
       const { token } = yield* starter.client.recording.share({
         params: { tableId: opened.tableId },
       });
+
       const rae = yield* account("rae");
       const { player } = yield* rae.join(token, { id: PlayerId.make(uuid()), displayName: "Rae" });
       expect(
@@ -94,10 +96,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without play
       expect(view.viewerRole).toBe("recorder");
       expect(view.visits.map((item) => item.visit.playerId)).toEqual([sam.playerId]);
       expect(
-        yield* rae.client.recording
+        (yield* rae.client.recording
           .share({ params: { tableId: opened.tableId } })
-          .pipe(Effect.flip),
-      ).toMatchObject({ _tag: "Forbidden" });
+          .pipe(Effect.flip))._tag,
+      ).toBe("Forbidden");
       expect(yield* rae.push(deleteTable(rae.identity, opened.tableId))).toEqual(["forbidden"]);
       const history = yield* rae.client.recording.history();
       expect(history.commands.map((command) => command.type)).toEqual([
@@ -115,6 +117,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without play
       const opened = openTable(starter.identity);
       const sat = sitDown(starter.identity, opened.tableId, starter.identity.playerId);
       expect(yield* starter.push(opened, sat)).toEqual(["accepted", "accepted"]);
+
       const removed = RecordingCommand.make({
         type: "delete_visit",
         operationId: RecordingOperationId.make(uuid()),
@@ -123,6 +126,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without play
         visitId: sat.visitId,
         expectedRevision: 0,
       });
+
       expect(yield* starter.push(removed)).toEqual(["accepted"]);
       expect(yield* starter.push(deleteTable(starter.identity, opened.tableId))).toEqual([
         "invalid",
@@ -135,9 +139,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without play
       const starter = yield* device();
       const opened = openTable(starter.identity);
       expect(yield* starter.push(opened)).toEqual(["accepted"]);
+
       const { token } = yield* starter.client.recording.share({
         params: { tableId: opened.tableId },
       });
+
       const other = yield* device();
       expect(yield* other.push(deleteTable(other.identity, opened.tableId))).toEqual(["forbidden"]);
       expect(yield* starter.push(deleteTable(starter.identity, opened.tableId))).toEqual([
@@ -150,11 +156,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("tables recorded without play
         "invalid",
       ]);
       expect(
-        yield* starter.client.recording
+        (yield* starter.client.recording
           .table({ params: { tableId: opened.tableId } })
-          .pipe(Effect.flip),
-      ).toMatchObject({ _tag: "NotFound" });
-      expect(yield* other.join(token).pipe(Effect.flip)).toMatchObject({ _tag: "NotFound" });
+          .pipe(Effect.flip))._tag,
+      ).toBe("NotFound");
+      expect((yield* other.join(token).pipe(Effect.flip))._tag).toBe("NotFound");
       const history = yield* starter.client.recording.history();
       expect(history.tables.find((table) => table.id === opened.tableId)?.deletedAt).toBeDefined();
     }),

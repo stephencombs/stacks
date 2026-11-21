@@ -20,15 +20,11 @@ import {
 import { resolveScope, withStartedTrip, type Scope } from "@stacks/client-runtime/scope";
 import { Loaded, useLastTrip, useStacks } from "./stacks";
 
-/**
- * A group picked without a trip, such as one that has none yet. It holds only until the
- * remembered trip changes, so opening any trip or session takes the scope back.
- */
 type Picked = { readonly groupId: GroupId; readonly whileTrip: TripId | null };
 
 const PickedContext = createContext<Picked | null>(null);
 const SetPickedContext = createContext<(picked: Picked | null) => void>(() => {});
-/** The trip just started, until the groups list holds it. */
+
 const StartedContext = createContext<readonly [Trip | null, Dispatch<SetStateAction<Trip | null>>]>(
   [null, () => {}],
 );
@@ -37,6 +33,7 @@ export function ScopeProvider({ children }: { children: ReactNode }) {
   const [picked, setPicked] = useState<Picked | null>(null);
   const [started, setStarted] = useState<Trip | null>(null);
   const startedValue = useMemo(() => [started, setStarted] as const, [started]);
+
   return (
     <SetPickedContext value={setPicked}>
       <StartedContext value={startedValue}>
@@ -60,9 +57,9 @@ export function useScope() {
   const [started, setStarted] = use(StartedContext);
   const loaded = AsyncResult.getOrElse(groups, () => null);
   const list = loaded && withStartedTrip(loaded, started);
+
   return {
     scope: list ? resolveScope(list, lastTripId, groupId) : undefined,
-    /** A trip you just made, in scope before your groups list knows about it. */
     startTrip: (trip: Trip) => {
       setStarted(trip);
       setPicked(null);
@@ -72,15 +69,14 @@ export function useScope() {
       setPicked(null);
       setLastTripId(tripId);
     },
-    /** Keeps the trip if it's already in this group; otherwise its live or newest one. */
     setGroup: (id: GroupId) => {
       const trip = tripInScope(list?.find((item) => item.group.id === id)?.trips ?? [], lastTripId);
+
       if (trip) {
         setPicked(null);
         setLastTripId(trip.id);
       } else setPicked({ groupId: id, whileTrip: lastTripId });
     },
-    /** After the trip in scope is deleted: its group's next trip, or the group alone. */
     forgetTrip: (id: GroupId, tripId: TripId) => {
       setStarted((pending) => (pending?.id === tripId ? null : pending));
       setPicked({ groupId: id, whileTrip: null });
@@ -99,13 +95,13 @@ export function useLinkedScope(
   const { scope, setTrip, setGroup } = useScope();
   const tripId = link?.tripId;
   const groupId = link?.groupId;
+
   const apply = useEffectEvent((trip: string | undefined, group: string | undefined) => {
-    // An address that names what's already shown is the place following the scope, not a link.
-    // While a new trip waits for the groups list, that's the stand-in, which mustn't stick.
     if (trip) {
       if (trip !== scope?.trip?.id) setTrip(TripId.make(trip));
     } else if (group && group !== scope?.item.group.id) setGroup(GroupId.make(group));
   });
+
   useLayoutEffect(() => apply(tripId, groupId), [tripId, groupId]);
 }
 
@@ -125,10 +121,9 @@ export function usePlaceAddress(
   const named = link?.[key];
   const last = useRef(id);
   useEffect(() => {
-    // A link that arrives names a scope that isn't applied yet, so only a change of scope, or
-    // an address with nothing in it, moves the address.
     const moved = last.current !== undefined && last.current !== id;
     last.current = id;
+
     if (id === undefined || id === named || (named !== undefined && !moved)) return;
     navigation.dispatch(CommonActions.setParams({ [key]: id }));
   }, [id, named, key, navigation]);
@@ -146,6 +141,7 @@ export function ScopeLoaded({
 }) {
   const stacks = useStacks();
   const { scope } = useScope();
+
   return (
     <Loaded query={stacks.groups} skeleton={skeleton} renderError={renderError}>
       {() => (scope ? children(scope) : null)}

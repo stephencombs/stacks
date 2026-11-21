@@ -46,13 +46,17 @@ describe("formatMoney", () => {
 
   it("drops zero cents where Intl ignores trailingZeroDisplay, as Hermes on iOS does", () => {
     const NumberFormat = Intl.NumberFormat;
+
     class WithoutTrailingZeroDisplay extends NumberFormat {
       constructor(locale?: string | Array<string>, options: Intl.NumberFormatOptions = {}) {
         const { trailingZeroDisplay: _ignored, ...rest } = options;
         super(locale, rest);
       }
     }
+
+    // SAFETY: the subclass keeps NumberFormat's construct signature and only drops one option.
     Intl.NumberFormat = WithoutTrailingZeroDisplay as typeof Intl.NumberFormat;
+
     try {
       expect(formatMoney(money(10000), USD, { locale: "en-US" })).toBe("$100");
       expect(formatMoney(money(5050), USD, { locale: "en-US" })).toBe("$50.50");
@@ -63,13 +67,17 @@ describe("formatMoney", () => {
 
   it("shows a plus sign where Intl ignores signDisplay, as Hermes on iOS does", () => {
     const NumberFormat = Intl.NumberFormat;
+
     class WithoutSignDisplay extends NumberFormat {
       constructor(locale?: string | Array<string>, options: Intl.NumberFormatOptions = {}) {
         const { signDisplay: _ignored, ...rest } = options;
         super(locale, rest);
       }
     }
+
+    // SAFETY: the subclass keeps the construct signature and only drops signDisplay.
     Intl.NumberFormat = WithoutSignDisplay as typeof Intl.NumberFormat;
+
     try {
       expect(formatMoney(money(15000), USD, { locale: "en-US", signDisplay: "exceptZero" })).toBe(
         "+$150",
@@ -127,6 +135,7 @@ describe("parseMoney", () => {
     const formatToParts = Intl.NumberFormat.prototype.formatToParts;
     // @ts-expect-error Hermes on Apple platforms doesn't define it.
     delete Intl.NumberFormat.prototype.formatToParts;
+
     try {
       expect(parseMoney("1,234.50", USD, { locale: "en-US" })).toEqual(Option.some(123450));
       expect(parseMoney("1.234,50 €", EUR, { locale: "de-DE" })).toEqual(Option.some(123450));

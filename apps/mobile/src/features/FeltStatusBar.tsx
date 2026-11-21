@@ -7,5 +7,6 @@ import { StatusBar } from "expo-status-bar";
  */
 export function FeltStatusBar({ felt }: { felt: boolean }) {
   const focused = useIsFocused();
+
   return felt && focused ? <StatusBar style="light" /> : null;
 }

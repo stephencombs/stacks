@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import {
   CurrencyCode,
   GroupId,
@@ -23,6 +22,7 @@ it("opens the Rename trip sheet from Trip options and saves the trimmed name", a
   const day = DateTime.makeUnsafe("2026-11-15T12:00:00Z");
   const groupId = GroupId.make(crypto.randomUUID());
   const tripId = TripId.make(crypto.randomUUID());
+
   const trip: TripDetail = {
     trip: {
       id: tripId,
@@ -38,6 +38,7 @@ it("opens the Rename trip sheet from Trip options and saves the trimmed name", a
     balances: [],
     stakes: [],
   };
+
   const group: GroupDetail = {
     group: { id: groupId, name: "Vegas crew", currency: CurrencyCode.make("USD"), createdAt: day },
     role: "member",
@@ -131,21 +132,26 @@ it("opens the Rename trip sheet from Trip options and saves the trimmed name", a
   const { TripOptionsButton } = await import("./TripOptions");
   const host = document.createElement("div");
   const root = createRoot(host);
+
   try {
     await act(async () => root.render(<TripOptionsButton trip={trip} group={group} />));
+
     const renameAction = [...host.querySelectorAll("button")].find(
       (b) => b.textContent === "Rename",
     );
+
     expect(renameAction).toBeDefined();
     await act(async () => renameAction!.click());
     expect(host.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe("Rename trip");
 
     const input = host.querySelector("input")!;
+
     const setInput = (next: string) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
       setter.call(input, next);
       input.dispatchEvent(new Event("input", { bubbles: true }));
     };
+
     await act(async () => setInput(""));
     const save = [...host.querySelectorAll("button")].find((b) => b.textContent === "Save")!;
     await act(async () => save.click());

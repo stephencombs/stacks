@@ -32,6 +32,7 @@ export function DateTimeField({
   const { theme } = useUniwind();
   const resolvedInk = useCSSVariable("--color-ink");
   const ink = typeof resolvedInk === "string" ? resolvedInk : undefined;
+
   const triggerModifiers = compact
     ? [
         buttonStyle("bordered"),
@@ -41,6 +42,7 @@ export function DateTimeField({
         accessibilityLabel(`${label}, ${fieldDisplay(value, kind)}`),
       ]
     : [frame({ minHeight: 44 }), accessibilityLabel(`${label}, ${fieldDisplay(value, kind)}`)];
+
   return (
     <View className="gap-1.5">
       {compact ? null : <Text className="px-1 type-footnote font-medium text-muted">{label}</Text>}

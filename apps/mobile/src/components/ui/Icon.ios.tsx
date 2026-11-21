@@ -58,6 +58,7 @@ export function Icon({
   filled?: boolean;
 }) {
   const tint = useCSSVariable(`--color-${color}`);
+
   return (
     <SymbolView
       name={(filled ? filledSymbols[name] : undefined) ?? symbols[name]}

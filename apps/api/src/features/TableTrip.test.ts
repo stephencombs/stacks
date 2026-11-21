@@ -8,18 +8,21 @@ import {
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
-import { groupWith, ids, usd, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
+import { groupWith, ids, usd, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 
-const identity = (): RecordingIdentity => ({
+const identity = () => ({
   playerId: PlayerId.make(crypto.randomUUID()),
   actorId: ActorId.make(crypto.randomUUID()),
 });
+
 const common = (who: RecordingIdentity) => ({
   operationId: RecordingOperationId.make(crypto.randomUUID()),
   actorId: who.actorId,
   preparedAt: DateTime.makeUnsafe("2026-11-15T12:00:00Z"),
 });
+
+// SAFETY: the payload's type is the literal "start", so this is that member of RecordingCommand.
 const start = (who: RecordingIdentity) =>
   RecordingCommand.make({
     ...common(who),
@@ -34,41 +37,48 @@ const start = (who: RecordingIdentity) =>
     venueId: null,
     highLimit: false,
   }) as Extract<RecordingCommand, { type: "start" }>;
+
 const choose = (
   who: RecordingIdentity,
   tableId: TableId,
   tripId: ReturnType<typeof ids.trip> | null,
 ) => RecordingCommand.make({ ...common(who), type: "set_table_trip", tableId, tripId });
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
+it.layer(TestApi.layer)("a table's trip", (it) => {
   it.effect("leaves the trip free once a table in it is deleted unplayed", () =>
     Effect.gen(function* () {
       const { alex, bea } = yield* users("alex", "bea");
       const { tripId } = yield* groupWith(alex, bea);
       const who = identity();
+
+      const tableId = TableId.make(crypto.randomUUID());
+
       const opened = RecordingCommand.make({
         ...common(who),
         type: "open_table",
-        tableId: TableId.make(crypto.randomUUID()),
+        tableId,
         playerId: who.playerId,
         game: null,
         venueId: null,
         highLimit: false,
       });
-      const tableId = (opened as Extract<RecordingCommand, { type: "open_table" }>).tableId;
+
       yield* alex.recording.push({
         payload: { identity: who, commands: [opened, choose(who, tableId, tripId)] },
       });
-      expect(yield* Effect.flip(alex.trips.delete({ params: { tripId } }))).toMatchObject({
-        _tag: "Conflict",
-        reason: "trip_not_empty",
-      });
+      {
+        const received = yield* Effect.flip(alex.trips.delete({ params: { tripId } }));
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "trip_not_empty" });
+      }
+
       const { results } = yield* alex.recording.push({
         payload: {
           identity: who,
           commands: [RecordingCommand.make({ ...common(who), type: "delete_table", tableId })],
         },
       });
+
       expect(results.map((result) => result.status)).toEqual(["accepted"]);
       const history = yield* alex.recording.history();
       expect(history.tables.find((table) => table.id === tableId)?.tripId).toBeNull();
@@ -93,27 +103,28 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
       const params = { tableId: opened.tableId };
       expect((yield* bea.recording.table({ params })).table.tripId).toBe(first.tripId);
       expect((yield* bea.recording.table({ params })).entries).toHaveLength(1);
-      expect(yield* Effect.flip(eve.recording.table({ params }))).toMatchObject({
-        _tag: "NotFound",
-      });
+      expect((yield* Effect.flip(eve.recording.table({ params })))._tag).toBe("NotFound");
       expect(
-        yield* Effect.flip(bea.recording.table({ params: { tableId: privateTable.tableId } })),
-      ).toMatchObject({ _tag: "NotFound" });
-      expect(
-        yield* Effect.flip(alex.trips.delete({ params: { tripId: first.tripId } })),
-      ).toMatchObject({ _tag: "Conflict", reason: "trip_not_empty" });
+        (yield* Effect.flip(bea.recording.table({ params: { tableId: privateTable.tableId } })))
+          ._tag,
+      ).toBe("NotFound");
+      {
+        const received = yield* Effect.flip(
+          alex.trips.delete({ params: { tripId: first.tripId } }),
+        );
+
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "trip_not_empty" });
+      }
+
       const before = yield* alex.recording.history();
       yield* alex.recording.push({
         payload: { identity: who, commands: [choose(who, opened.tableId, second.tripId)] },
       });
-      expect(yield* Effect.flip(bea.recording.table({ params }))).toMatchObject({
-        _tag: "NotFound",
-      });
+      expect((yield* Effect.flip(bea.recording.table({ params })))._tag).toBe("NotFound");
       expect((yield* cal.recording.table({ params })).table.tripId).toBe(second.tripId);
       yield* cal.groups.leave({ params: { groupId: second.group.id } });
-      expect(yield* Effect.flip(cal.recording.table({ params }))).toMatchObject({
-        _tag: "NotFound",
-      });
+      expect((yield* Effect.flip(cal.recording.table({ params })))._tag).toBe("NotFound");
       yield* alex.recording.push({
         payload: { identity: who, commands: [choose(who, opened.tableId, null)] },
       });
@@ -135,6 +146,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
         const opened = start(who);
         yield* alex.recording.push({ payload: { identity: who, commands: [opened] } });
         yield* alex.trips.end({ params: { tripId: group.tripId }, payload: {} });
+
         const refused = yield* alex.recording.push({
           payload: {
             identity: who,
@@ -145,12 +157,14 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
             ],
           },
         });
+
         expect(refused.results.map((result) => result.status)).toEqual([
           "rejected",
           "rejected",
           "rejected",
         ]);
         yield* alex.trips.reopen({ params: { tripId: group.tripId } });
+
         const stake = yield* alex.stakes.create({
           params: { tripId: group.tripId },
           payload: {
@@ -162,6 +176,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
             note: null,
           },
         });
+
         expect(
           (yield* alex.recording.push({
             payload: { identity: who, commands: [choose(who, opened.tableId, group.tripId)] },
@@ -185,6 +200,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
       const who = identity();
       const opened = start(who);
       yield* alex.recording.push({ payload: { identity: who, commands: [opened] } });
+
       for (const currency of ["EUR", "JPY"]) {
         const groupId = ids.group();
         yield* alex.groups.create({
@@ -195,22 +211,26 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
             displayName: "Alex",
           },
         });
+
         const trip = yield* alex.trips.create({
           params: { groupId },
           payload: { id: ids.trip(), name: "Away" },
         });
+
         const response = yield* alex.recording.push({
           payload: {
             identity: who,
             commands: [choose(who, opened.tableId, trip.id)],
           },
         });
+
         expect(response.results[0]).toMatchObject({
           status: "rejected",
           reason: "invalid",
           message: expect.stringContaining("USD"),
         });
       }
+
       const history = yield* alex.recording.history();
       expect(history.tables[0]!.tripId).toBeNull();
       expect(history.entries).toHaveLength(1);
@@ -223,6 +243,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
       Effect.gen(function* () {
         const { alex, bea } = yield* users("alex", "bea");
         const group = yield* groupWith(alex, bea);
+
         const request = {
           id: ids.stake(),
           lenderId: group.myPlayerId,
@@ -231,28 +252,39 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
           lenderShare: 50,
           note: null,
         };
+
         const stake = yield* alex.stakes.create({
           params: { tripId: group.tripId },
           payload: request,
         });
+
         yield* alex.stakes.end({ params: { stakeId: stake.id }, payload: {} });
         const who = identity();
         const opened = start(who);
         yield* alex.recording.push({
           payload: { identity: who, commands: [opened, choose(who, opened.tableId, group.tripId)] },
         });
-        expect(
-          yield* Effect.flip(
+        {
+          const received = yield* Effect.flip(
             alex.stakes.create({
               params: { tripId: group.tripId },
               payload: { ...request, id: ids.stake() },
             }),
-          ),
-        ).toMatchObject({ _tag: "Conflict", reason: "trip_has_tables" });
-        expect(
-          yield* Effect.flip(alex.stakes.reopen({ params: { stakeId: stake.id } })),
-        ).toMatchObject({ _tag: "Conflict", reason: "trip_has_tables" });
-        // Retrying an existing creation does not open the ended stake.
+          );
+
+          expect(received._tag).toBe("Conflict");
+          expect(received).toMatchObject({ reason: "trip_has_tables" });
+        }
+
+        {
+          const received = yield* Effect.flip(
+            alex.stakes.reopen({ params: { stakeId: stake.id } }),
+          );
+
+          expect(received._tag).toBe("Conflict");
+          expect(received).toMatchObject({ reason: "trip_has_tables" });
+        }
+
         expect(
           (yield* alex.stakes.create({ params: { tripId: group.tripId }, payload: request }))
             .endedAt,
@@ -276,6 +308,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
       for (const operation of ["create", "reopen"] as const) {
         const { alex, bea } = yield* users("alex", "bea");
         const group = yield* groupWith(alex, bea);
+
         const request = {
           id: ids.stake(),
           lenderId: group.myPlayerId,
@@ -284,13 +317,16 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
           lenderShare: 50,
           note: null,
         };
+
         if (operation === "reopen") {
           yield* alex.stakes.create({ params: { tripId: group.tripId }, payload: request });
           yield* alex.stakes.end({ params: { stakeId: request.id }, payload: {} });
         }
+
         const who = identity();
         const opened = start(who);
         yield* alex.recording.push({ payload: { identity: who, commands: [opened] } });
+
         const [attached, staked] = yield* Effect.all(
           [
             alex.recording
@@ -305,7 +341,9 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
               Effect.match({
                 onSuccess: () => true,
                 onFailure: (error) => {
-                  expect(error).toMatchObject({ _tag: "Conflict", reason: "trip_has_tables" });
+                  expect(error._tag).toBe("Conflict");
+                  expect(error).toMatchObject({ reason: "trip_has_tables" });
+
                   return false;
                 },
               }),
@@ -313,6 +351,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
           ],
           { concurrency: "unbounded" },
         );
+
         expect(Number(attached) + Number(staked)).toBe(1);
       }
     }),
@@ -336,6 +375,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("a table's trip", (it) => {
       });
       const joined = yield* bea.recording.history();
       const playerId = joined.participants[0]!.player.id;
+
       for (const appointed of [false, true]) {
         if (appointed)
           yield* alex.recording.push({

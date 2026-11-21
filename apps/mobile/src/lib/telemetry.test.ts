@@ -2,6 +2,7 @@ import type PostHog from "posthog-react-native";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 type Options = NonNullable<ConstructorParameters<typeof PostHog>[1]>;
+
 const sdk = vi.hoisted(() => ({
   configurations: new Array<Options>(),
   capture: vi.fn(),

@@ -16,7 +16,6 @@ import * as Trips from "../features/Trips.ts";
 import * as Stats from "../features/Stats.ts";
 import * as Venues from "../features/Venues.ts";
 
-/** Database failures are server faults, so they surface as 500s instead of typed errors. */
 const serve = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.catchTags({ SqlError: Effect.die }));
 

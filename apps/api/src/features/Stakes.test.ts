@@ -3,15 +3,21 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import { StakeId, type PlayerId } from "@stacks/contracts";
 
-import { catalogVenue, groupWith, ids, usd, users, type TestGroup } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
-import { seedEntry, seedSession } from "../testing/legacySessions.ts";
+import {
+  catalogVenue,
+  groupWith,
+  ids,
+  usd,
+  users,
+  type TestGroup,
+} from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
+import { seedEntry, seedSession } from "../testing/legacySessions.test-utils.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
 const day = (n: number) => DateTime.makeUnsafe(`2026-10-${20 + n}T20:00:00Z`);
 
-/** A session on `day` where `playerId` wins (or loses) `net`. */
 const play = Effect.fn("test.play")(function* (
   client: Client,
   group: TestGroup,
@@ -54,7 +60,7 @@ const back = (client: Client, group: TestGroup, lender: PlayerId, borrower: Play
     },
   });
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
+it.layer(TestApi.layer)("stakes", (it) => {
   it.effect("pays the backer their stake plus half the winnings, through balances", () =>
     Effect.gen(function* () {
       const { alex, bea } = yield* users("alex", "bea");
@@ -94,6 +100,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
       const lender = group.myPlayerId;
       const borrower = group.players.find((p) => p.id !== lender)!.id;
       const stake = yield* back(alex, group, lender, borrower);
+
       const owed = () =>
         alex.trips
           .get({ params: { tripId: group.tripId } })
@@ -103,31 +110,42 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
       yield* bea.stakes.end({ params: { stakeId: stake.id }, payload: { endedAt: day(3) } });
       yield* play(alex, group, borrower, 99900, 4);
       expect(yield* owed()).toMatchObject({ result: -30000, owed: 70000 });
-      expect(
-        yield* Effect.flip(bea.stakes.end({ params: { stakeId: stake.id }, payload: {} })),
-      ).toMatchObject({ _tag: "Conflict", reason: "stake_ended" });
+      {
+        const received = yield* Effect.flip(
+          bea.stakes.end({ params: { stakeId: stake.id }, payload: {} }),
+        );
+
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "stake_ended" });
+      }
 
       yield* bea.stakes.reopen({ params: { stakeId: stake.id } });
       expect(yield* owed()).toMatchObject({ result: 69900, owed: 134950 });
-      expect(
-        yield* Effect.flip(bea.stakes.reopen({ params: { stakeId: stake.id } })),
-      ).toMatchObject({ _tag: "Conflict", reason: "stake_open" });
+      {
+        const received = yield* Effect.flip(bea.stakes.reopen({ params: { stakeId: stake.id } }));
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "stake_open" });
+      }
 
       const voided = yield* alex.stakes.void({
         params: { stakeId: stake.id },
         payload: { reason: "Wrong amount" },
       });
+
       expect(voided.voidReason).toBe("Wrong amount");
       const detail = yield* alex.trips.get({ params: { tripId: group.tripId } });
       expect(detail.balances).toEqual([]);
       expect(detail.stakes).toEqual([
         { stake: expect.objectContaining({ voidReason: "Wrong amount" }), result: 0, owed: 0 },
       ]);
-      expect(
-        yield* Effect.flip(
+      {
+        const received = yield* Effect.flip(
           alex.stakes.void({ params: { stakeId: stake.id }, payload: { reason: null } }),
-        ),
-      ).toMatchObject({ _tag: "Conflict", reason: "stake_voided" });
+        );
+
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "stake_voided" });
+      }
     }),
   );
 
@@ -139,17 +157,27 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("stakes", (it) => {
       const [borrower, bystander] = group.players.filter((p) => p.id !== lender).map((p) => p.id);
       const stake = yield* back(bea, group, lender, borrower!);
 
-      expect(
-        yield* Effect.flip(
+      {
+        const received = yield* Effect.flip(
           cal.stakes.void({ params: { stakeId: stake.id }, payload: { reason: null } }),
-        ),
-      ).toMatchObject({ _tag: "Forbidden", reason: "not_your_stake" });
-      expect(
-        yield* Effect.flip(eve.stakes.end({ params: { stakeId: stake.id }, payload: {} })),
-      ).toMatchObject({ _tag: "Forbidden", reason: "not_a_member" });
-      expect(yield* Effect.flip(back(cal, group, bystander!, bystander!))).toMatchObject({
-        _tag: "InvalidRequest",
-      });
+        );
+
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "not_your_stake" });
+      }
+
+      {
+        const received = yield* Effect.flip(
+          eve.stakes.end({ params: { stakeId: stake.id }, payload: {} }),
+        );
+
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "not_a_member" });
+      }
+
+      expect((yield* Effect.flip(back(cal, group, bystander!, bystander!)))._tag).toBe(
+        "InvalidRequest",
+      );
       yield* bea.stakes.end({ params: { stakeId: stake.id }, payload: { endedAt: day(2) } });
       yield* alex.stakes.reopen({ params: { stakeId: stake.id } });
     }),

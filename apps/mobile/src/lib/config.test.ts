@@ -1,7 +1,9 @@
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 vi.mock("expo-constants", () => ({ default: { expoConfig: {} } }));
+
 vi.mock("expo-linking", () => ({ createURL: (path = "") => `stacks://${path}` }));
+
 import Constants from "expo-constants";
 
 afterEach(() => {

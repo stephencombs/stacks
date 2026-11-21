@@ -1,24 +1,39 @@
+import * as Match from "effect/Match";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const driver = vi.hoisted(() => ({
-  directory: "",
-  failOpen: false,
-  failRead: false,
-  failAfterWrite: false,
-  beforeCommit: undefined as (() => Promise<void>) | undefined,
-  connections: new Set<{ closeAsync(): Promise<void> }>(),
-  scopes: [] as string[],
-}));
+interface SqliteDriver {
+  directory: string;
+  failOpen: boolean;
+  failRead: boolean;
+  failAfterWrite: boolean;
+  beforeCommit: (() => Promise<void>) | undefined;
+  connections: Set<{ closeAsync(): Promise<void> }>;
+  scopes: string[];
+}
 
-// Real SQLite executes all SQL and rollback; only Expo's native bridge is substituted.
+const driver = vi.hoisted(() => {
+  const state: SqliteDriver = {
+    directory: "",
+    failOpen: false,
+    failRead: false,
+    failAfterWrite: false,
+    beforeCommit: undefined,
+    connections: new Set<{ closeAsync(): Promise<void> }>(),
+    scopes: [],
+  };
+
+  return state;
+});
+
 vi.mock("expo-sqlite", () => ({
   openDatabaseAsync: async (name: string) => {
     if (driver.failOpen) throw new Error("cannot open");
     const path = join(driver.directory, name);
+
     const queries = (db: DatabaseSync, scope: string) => ({
       async execAsync(sql: string) {
         driver.scopes.push(scope);
@@ -26,23 +41,30 @@ vi.mock("expo-sqlite", () => ({
       },
       async getFirstAsync(sql: string, ...params: SQLInputValue[]) {
         driver.scopes.push(scope);
+
         if (driver.failRead) throw new Error("read failed");
+
         return db.prepare(sql).get(...params) ?? null;
       },
       async runAsync(sql: string, ...params: SQLInputValue[]) {
         driver.scopes.push(scope);
         const result = db.prepare(sql).run(...params);
+
         if (driver.failAfterWrite) throw new Error("write interrupted");
+
         return result;
       },
     });
+
     const db = new DatabaseSync(path);
+
     const api = {
       ...queries(db, "connection"),
       async withExclusiveTransactionAsync(
         task: (transaction: ReturnType<typeof queries>) => Promise<void>,
       ) {
         const transactionDb = new DatabaseSync(path);
+
         try {
           transactionDb.exec("BEGIN");
           await task(queries(transactionDb, "transaction"));
@@ -60,7 +82,9 @@ vi.mock("expo-sqlite", () => ({
         driver.connections.delete(api);
       },
     };
+
     driver.connections.add(api);
+
     return api;
   },
 }));
@@ -78,6 +102,7 @@ beforeEach(() => {
   driver.beforeCommit = undefined;
   driver.scopes = [];
 });
+
 afterEach(async () => {
   for (const connection of driver.connections) await connection.closeAsync();
   rmSync(driver.directory, { recursive: true, force: true });
@@ -126,10 +151,13 @@ it("acknowledges and notifies only after COMMIT; close drains accepted operation
     entered.resolve();
     await release.promise;
   };
+
   let acknowledged = false;
+
   const commit = storage.commit(0, "durable").then(() => {
     acknowledged = true;
   });
+
   await entered.promise;
   expect(acknowledged).toBe(false);
   expect(events).toEqual([]);
@@ -164,6 +192,7 @@ it("rolls back a failed transaction completion", async () => {
   driver.beforeCommit = async () => {
     throw new Error("commit failed");
   };
+
   await expect(storage.commit(1, "lost")).rejects.toMatchObject({ reason: "write" });
   expect(await storage.load()).toEqual({ revision: 1, payload: "saved" });
   await storage.close();
@@ -241,8 +270,10 @@ it("runs private recording through real SQLite across reopen and a rolled-back f
   const open = async () => {
     const store = makeRecordingStore(await openRecordingStorage("runtime"));
     await store.ready;
+
     return store;
   };
+
   let store = await open();
   const identity = store.getSnapshot().state!.self;
   await store.execute(store.prepare({ type: "start", buyIn: 20000 }));
@@ -279,6 +310,7 @@ it("runs private recording through real SQLite across reopen and a rolled-back f
 const openStore = async () => {
   const store = makeRecordingStore(await openRecordingStorage("runtime"));
   await store.ready;
+
   return store;
 };
 
@@ -297,27 +329,34 @@ it.each(["start", "finish", "correct", "venue"] as const)(
   "%s rolls back an interrupted SQLite write and retries the identical command",
   async (operation) => {
     let store = await openStore();
+
     if (operation !== "start") await store.execute(store.prepare({ type: "start", buyIn: 20000 }));
     const before = store.getSnapshot();
     const state = before.state!;
-    const command =
-      operation === "start"
-        ? store.prepare({ type: "start", buyIn: 20000 })
-        : operation === "finish"
-          ? store.prepare({ type: "finish", visitId: state.visits[0]!.id, amount: 25000 })
-          : operation === "venue"
-            ? store.prepare({
-                type: "edit_visit",
-                visitId: state.visits[0]!.id,
-                table: { game: null, venueId: bellagio.id, highLimit: false },
-              })
-            : store.prepare({
-                type: "correct",
-                visitId: state.visits[0]!.id,
-                entryId: state.entries[0]!.id,
-                reason: "wrong amount",
-                replacement: { amount: 18000 },
-              });
+
+    const command = Match.value(operation).pipe(
+      Match.when("start", () => store.prepare({ type: "start", buyIn: 20000 })),
+      Match.when("finish", () =>
+        store.prepare({ type: "finish", visitId: state.visits[0]!.id, amount: 25000 }),
+      ),
+      Match.when("venue", () =>
+        store.prepare({
+          type: "edit_visit",
+          visitId: state.visits[0]!.id,
+          table: { game: null, venueId: bellagio.id, highLimit: false },
+        }),
+      ),
+      Match.orElse(() =>
+        store.prepare({
+          type: "correct",
+          visitId: state.visits[0]!.id,
+          entryId: state.entries[0]!.id,
+          reason: "wrong amount",
+          replacement: { amount: 18000 },
+        }),
+      ),
+    );
+
     driver.failAfterWrite = true;
     await expect(
       store.execute(command, operation === "venue" ? [bellagio] : []),
@@ -330,7 +369,6 @@ it.each(["start", "finish", "correct", "venue"] as const)(
       failedCommand: { operationId: command.operationId },
     });
 
-    // Retry runs the same operation, with the venue it was given, not a new one.
     const receipt = await store.retry();
     expect(receipt.command.operationId).toBe(command.operationId);
     expect(store.getSnapshot()).toMatchObject({ status: "saved", failedCommand: null });
@@ -342,10 +380,12 @@ it.each(["start", "finish", "correct", "venue"] as const)(
     expect(
       saved.receipts.filter((r) => r.command.operationId === command.operationId),
     ).toHaveLength(1);
+
     if (operation === "venue") {
       expect(saved.venues).toMatchObject([{ id: bellagio.id, name: "Bellagio" }]);
       expect(saved.tables[0]!.venueId).toBe(bellagio.id);
     }
+
     await store.close();
   },
 );

@@ -2,17 +2,18 @@ import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import { RecordingCommand } from "@stacks/contracts/recordingCommands";
 
-import { catalogVenue, groupWith, ids, usd } from "../testing/fixtures.ts";
-import { account, at, device, edit, start } from "../testing/recording.ts";
-import { TestApi } from "../testing/TestApi.ts";
+import { catalogVenue, groupWith, ids, usd } from "../testing/fixtures.test-utils.ts";
+import { account, at, device, edit, start } from "../testing/recording.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("recording venues", (it) => {
+it.layer(TestApi.layer)("recording venues", (it) => {
   for (const type of ["start", "record_completed"] as const) {
     it.effect(`${type} refuses private and missing venues, even for a home venue's owner`, () =>
       Effect.gen(function* () {
         const owner = yield* account("owner");
         const group = yield* groupWith(owner.client);
         const venue = yield* catalogVenue(owner.client);
+
         const home = yield* owner.client.venues.create({
           payload: {
             id: ids.venue(),
@@ -24,6 +25,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording venues", (it) => {
             groupId: group.group.id,
           },
         });
+
         for (const recorder of [owner, yield* device()]) {
           const opened =
             type === "start"
@@ -35,6 +37,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording venues", (it) => {
                   cashOut: usd(12000),
                   finishedAt: at(20),
                 };
+
           for (const venueId of [home.id, ids.venue()]) {
             const { results } = yield* recorder.client.recording.push({
               payload: {
@@ -42,6 +45,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording venues", (it) => {
                 commands: [RecordingCommand.make({ ...opened, venueId })],
               },
             });
+
             expect(results).toEqual([
               {
                 operationId: opened.operationId,
@@ -52,6 +56,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording venues", (it) => {
             ]);
             expect((yield* recorder.client.recording.history()).tables).toEqual([]);
           }
+
           expect(
             yield* recorder.push(RecordingCommand.make({ ...opened, venueId: venue.id })),
           ).toEqual(["accepted"]);
@@ -70,6 +75,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording venues", (it) => {
         const owner = yield* account("owner");
         const group = yield* groupWith(owner.client);
         const venue = yield* catalogVenue(owner.client);
+
         const home = yield* owner.client.venues.create({
           payload: {
             id: ids.venue(),
@@ -81,12 +87,15 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording venues", (it) => {
             groupId: group.group.id,
           },
         });
+
         for (const recorder of [owner, yield* device()]) {
           const opened = start(recorder.identity);
           expect(yield* recorder.push(opened)).toEqual(["accepted"]);
+
           const change = edit(recorder.identity, opened.visitId, 0, {
             table: { game: "roulette", venueId: home.id, highLimit: true },
           });
+
           for (const venueId of [home.id, ids.venue()]) {
             const { results } = yield* recorder.client.recording.push({
               payload: {
@@ -99,6 +108,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording venues", (it) => {
                 ],
               },
             });
+
             expect(results).toEqual([
               {
                 operationId: change.operationId,
@@ -116,6 +126,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("recording venues", (it) => {
               opened.operationId,
             ]);
           }
+
           expect(
             yield* recorder.push(
               RecordingCommand.make({

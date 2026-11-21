@@ -4,7 +4,6 @@ import * as SqlClient from "effect/sql/SqlClient";
 /** Drops settlements, repayments, payment handles and loss limits along with their data. */
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  // The append-only trigger refuses deletes; settlements go with the feature.
   yield* sql`alter table entries disable trigger entries_append_only`;
   yield* sql`delete from entries where kind = 'settlement'`;
   yield* sql`alter table entries enable trigger entries_append_only`;

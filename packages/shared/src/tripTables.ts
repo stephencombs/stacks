@@ -6,6 +6,7 @@ import { playerResults, type PlayerResult } from "./results.ts";
 export type TableVisit = Pick<Visit, "id" | "playerId" | "startedAt" | "finishedAt"> & {
   readonly deletedAt?: DateTime.Utc | null | undefined;
 };
+
 export type TableEntry = Pick<PlayEntry, "visitId" | "kind" | "amount" | "voidedAt">;
 
 export interface GroupTable {
@@ -38,15 +39,16 @@ const ZERO: PlayerResult = { buyIn: none, cashOut: none, adjustment: none, net: 
 
 const millis = DateTime.toEpochMillis;
 
-/** The length of the union of the given intervals. */
 const covered = (intervals: ReadonlyArray<readonly [number, number]>) => {
   let total = 0;
   let end = -Infinity;
+
   for (const [from, to] of intervals.toSorted((a, b) => a[0] - b[0])) {
     if (to <= end) continue;
     total += to - Math.max(from, end);
     end = to;
   }
+
   return total;
 };
 
@@ -59,25 +61,30 @@ export const groupTable = (
   visits: Iterable<TableVisit>,
   entries: Iterable<TableEntry>,
   memberOf: (visit: TableVisit) => PlayerId | null,
-): GroupTable | null => {
+) => {
   const shown = Array.from(visits)
     .filter((visit) => (visit.deletedAt ?? null) === null)
     .toSorted(
       (a, b) =>
         millis(a.startedAt) - millis(b.startedAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
     );
+
   if (shown.length === 0) return null;
 
   const byVisit = new Map(
     shown.map((visit) => {
       const member = memberOf(visit);
+
       return [visit.id, { visit, member, owner: member ?? visit.playerId }] as const;
     }),
   );
+
   const counted = Array.from(entries).flatMap((entry) => {
     const at = byVisit.get(entry.visitId);
+
     return at && entry.voidedAt === null ? [{ ...entry, ...at }] : [];
   });
+
   const settled = (members: boolean) =>
     playerResults(
       counted.flatMap((entry) =>
@@ -86,29 +93,37 @@ export const groupTable = (
           : [],
       ),
     );
+
   const memberResults = settled(true);
   const otherResults = settled(false);
 
   const seated = new Set<PlayerId>();
   const inPlay = new Map<PlayerId, number>();
   const others = new Map<PlayerId, boolean>();
+
   for (const { visit, member } of byVisit.values()) {
     const open = visit.finishedAt === null;
+
     if (member === null) others.set(visit.playerId, (others.get(visit.playerId) ?? false) || open);
     else {
       seated.add(member);
+
       if (open) inPlay.set(member, inPlay.get(member) ?? 0);
     }
   }
+
   for (const entry of counted)
     if (entry.member !== null && entry.visit.finishedAt === null && entry.kind === "buy_in")
       inPlay.set(entry.member, (inPlay.get(entry.member) ?? 0) + entry.amount);
 
   const span = (visit: TableVisit) =>
     visit.finishedAt === null ? [] : [[millis(visit.startedAt), millis(visit.finishedAt)] as const];
+
   const finished = shown.flatMap(span);
+
   const minutes = (intervals: ReadonlyArray<readonly [number, number]>) =>
     Math.round(covered(intervals) / 60_000);
+
   const memberMilliseconds = Array.from(seated, (playerId) => ({
     playerId,
     milliseconds: covered(
@@ -117,6 +132,7 @@ export const groupTable = (
       ),
     ),
   }));
+
   return {
     startedAt: shown[0]!.startedAt,
     endedAt:
@@ -132,6 +148,7 @@ export const groupTable = (
     seated: Array.from(seated),
     results: Array.from(seated).flatMap((playerId) => {
       const result = memberResults.get(playerId);
+
       return result ? [{ playerId, ...result }] : [];
     }),
     inPlay: Array.from(inPlay, ([playerId, buyIn]) => ({

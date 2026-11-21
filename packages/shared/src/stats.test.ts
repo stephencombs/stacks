@@ -16,10 +16,11 @@ import {
 
 const palazzo = { id: "palazzo", name: "The Palazzo" };
 const wynn = { id: "wynn", name: "Wynn" };
+
 const session = (
   venue: StatsSession["venue"],
   results: ReadonlyArray<[PlayerId, number, number?]>,
-): StatsSession => ({
+) => ({
   venue,
   results: results.map(([playerId, net, buyIn]) => ({ playerId, net, buyIn: buyIn ?? 0 })),
 });
@@ -31,6 +32,7 @@ describe("runningTotals", () => {
       session(wynn, [[BEA, 50]]),
       session(wynn, [[ALEX, -40]]),
     ];
+
     expect(runningTotals(sessions, ALEX)).toEqual([100, 100, 60]);
   });
 });
@@ -42,6 +44,7 @@ describe("runningReturns", () => {
       session(wynn, [[BEA, -600000, 2000000]]),
       session(wynn, [[ALEX, -2500, 50000]]),
     ];
+
     expect(runningReturns(sessions, ALEX)).toEqual([0.55, 0.55, 0.25]);
     expect(runningReturns(sessions, BEA)).toEqual([null, -0.3, -0.3]);
   });
@@ -64,6 +67,7 @@ describe("runningReturns", () => {
       const sessions = plays.map(({ buyIn, cashOut }) =>
         session(palazzo, [[ALEX, cashOut - buyIn, buyIn]]),
       );
+
       for (const value of runningReturns(sessions, ALEX))
         if (value !== null) expect(value).toBeGreaterThanOrEqual(-1);
     },
@@ -76,6 +80,7 @@ describe("raceLines", () => {
       session(palazzo, [[ALEX, 27500, 50000]]),
       session(wynn, [[BEA, -6000, 20000]]),
     ];
+
     expect(raceLines(sessions, [ALEX, BEA], "money").map((l) => l.line)).toEqual([
       [0, 27500, 27500],
       [0, 0, -6000],
@@ -94,6 +99,7 @@ const otherCasino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c2");
 const missingCasino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c3");
 const vegasTrip = TripId.make("0192e7a0-0000-7000-8000-0000000000d1");
 const renoTrip = TripId.make("0192e7a0-0000-7000-8000-0000000000d2");
+
 const personalSession = (
   id: number,
   result: number,
@@ -133,6 +139,7 @@ describe("personalStats", () => {
       ],
       zone,
     );
+
     expect(stats.summary).toEqual({
       result: 60,
       sessions: 3,
@@ -159,9 +166,9 @@ describe("personalStats", () => {
       personalSession(4, 900),
       personalSession(5, 400, { tripId: renoTrip, finishedAt: null }),
     ];
+
     const stats = personalStats(sessions, zone, { tripId: vegasTrip, year: 2026 });
     expect(stats.summary).toMatchObject({ result: 150, sessions: 2 });
-    // Most recently played first.
     expect(personalStats(sessions, zone).options.tripIds).toEqual([renoTrip, vegasTrip]);
   });
 
@@ -207,6 +214,7 @@ describe("personalStats", () => {
         finishedAt: "2027-01-01T08:00:00Z",
       }),
     ];
+
     expect(personalStats(sessions, zone, { year: 2026 }).summary.result).toBe(50);
     expect(personalStats(sessions, zone, { year: 2025 }).summary.result).toBe(10);
     expect(personalStats(sessions, zone).options.years).toEqual([2027, 2026, 2025]);
@@ -226,11 +234,13 @@ describe("personalStats", () => {
       }),
       personalSession(5, 500, { game: null, venueId: null }),
     ];
+
     const filtered = personalStats(sessions, zone, {
       year: 2026,
       game: "blackjack",
       venueId: casino,
     });
+
     expect(filtered.summary.result).toBe(100);
     expect(personalStats(sessions, zone, { game: null, venueId: null }).summary.result).toBe(500);
     expect(
@@ -251,6 +261,7 @@ describe("personalStats", () => {
       personalSession(2, 0),
       personalSession(1, 100),
     ]);
+
     const stats = personalStats(sessions, zone);
     expect(stats.runningResult).toEqual([
       {
@@ -286,6 +297,7 @@ describe("personalStats", () => {
       ],
       zone,
     );
+
     expect(stats.byGame).toEqual([
       { game: "blackjack", result: 100, sessions: 2, hours: 2 },
       { game: "roulette", result: 100, sessions: 1, hours: 1 },
@@ -305,6 +317,7 @@ describe("personalStats", () => {
         startedAt: "2026-11-06T20:00:00Z",
         finishedAt: "2026-11-06T20:00:18Z",
       });
+
     const single = personalStats([short(1, 1)], zone);
     expect(single.summary.hours).toBe(0.01);
     expect(single.summary.hourlyResult).toBe(200);
@@ -313,10 +326,12 @@ describe("personalStats", () => {
     expect(summed.byGame[0]!.hours).toBe(0.01);
     expect(summed.byCasino[0]!.hours).toBe(0.01);
     expect(summed.summary.hourlyResult).toBe(200);
+
     const tiny = personalStats(
       [personalSession(1, 1, { finishedAt: "2026-11-06T20:00:00.001Z" })],
       zone,
     );
+
     expect(tiny.summary.hours).toBe(0);
     expect(tiny.summary.hourlyResult).toBe(3_600_000);
   });
@@ -333,6 +348,7 @@ describe("personalStats", () => {
           .summary.hourlyResult,
       ).toBe(expected);
     }
+
     const instant = personalSession(1, 10, { finishedAt: "2026-11-06T20:00:00Z" });
     expect(personalStats([instant], zone).summary).toEqual({
       result: 10,
@@ -353,6 +369,7 @@ describe("personalStats", () => {
       ],
       zone,
     );
+
     expect(stats.summary.hours).toBe(2);
     expect(stats.summary.hourlyResult).toBe(100);
   });
@@ -374,6 +391,7 @@ describe("personalStats", () => {
     expect(() =>
       personalStats([personalSession(1, max, { finishedAt: "2026-11-06T20:30:00Z" })], zone),
     ).toThrow(RangeError);
+
     for (const fields of [{ game: "slots" as const }, { venueId: otherCasino }]) {
       expect(() =>
         personalStats(
@@ -402,6 +420,7 @@ describe("personalStats", () => {
     ([records]) => {
       const sessions = records.map((record, index) => {
         const finish = DateTime.makeUnsafe(`${record.year}-06-01T12:00:00Z`);
+
         return personalSession(
           index + 1,
           playerResults(toEntries(record.ledger)).get(ALEX)?.net ?? 0,
@@ -416,6 +435,7 @@ describe("personalStats", () => {
           },
         );
       });
+
       for (const [year, tripId] of [
         ...[undefined, 2024, 2025, 2026, 2030].map((year) => [year, undefined] as const),
         [2025, vegasTrip] as const,
@@ -432,10 +452,12 @@ describe("personalStats", () => {
                 (game === undefined || session.table.game === game) &&
                 (venueId === undefined || session.table.venueId === venueId),
             );
+
             const sum = expected.reduce(
               (total, session) => total + BigInt(session.finalResult!),
               0n,
             );
+
             const stats = personalStats(sessions, zone, { year, game, venueId, tripId });
             expect(stats.summary.result).toBe(Number(sum));
             expect(stats.summary.sessions).toBe(expected.length);
@@ -443,10 +465,12 @@ describe("personalStats", () => {
               wins: expected.filter((session) => session.finalResult! > 0).length,
               sessions: expected.length,
             });
+
             for (const rows of [stats.byGame, stats.byCasino]) {
               expect(rows.reduce((total, row) => total + BigInt(row.result), 0n)).toBe(sum);
               expect(rows.reduce((total, row) => total + row.sessions, 0)).toBe(expected.length);
             }
+
             expect(stats.runningResult.at(-1)?.total ?? 0).toBe(Number(sum));
           }
         }
