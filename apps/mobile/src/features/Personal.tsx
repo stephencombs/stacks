@@ -67,13 +67,11 @@ export function PersonalScreen({
     paddingRight: Math.max(16, insets.right),
   };
 
-  const clipped = session && Platform.OS === "android";
-
   return (
     <SheetHost>
       <View
         className={felt ? "flex-1 bg-felt" : "flex-1 bg-canvas"}
-        style={clipped ? { paddingTop: insets.top } : undefined}
+        style={session ? { paddingTop: insets.top } : undefined}
       >
         {header}
         <FeltStatusBar felt={felt} />
@@ -81,13 +79,13 @@ export function PersonalScreen({
           ref={scrollRef}
           className="flex-1"
           style={foot.scrollStyle}
-          contentInsetAdjustmentBehavior="automatic"
+          contentInsetAdjustmentBehavior={session && Platform.OS === "ios" ? "never" : "automatic"}
           keyboardShouldPersistTaps="handled"
           contentContainerClassName={cn("gap-6 pt-4 pb-8", contentClassName)}
           contentContainerStyle={{
             ...sides,
             flexGrow: 1,
-            ...(session ? { paddingTop: clipped ? 12 : insets.top + 12 } : null),
+            ...(session ? { paddingTop: 12 } : null),
           }}
         >
           {children}
