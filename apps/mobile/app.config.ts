@@ -72,6 +72,7 @@ export default (): ExpoConfig => ({
     "./plugins/withStartupCrashRecovery",
     "./plugins/withAndroidTabIcons",
     "./plugins/withAndroidTheme",
+    "./plugins/withAndroidLiveUpdates",
   ],
   extra: {
     appVariant: variant,

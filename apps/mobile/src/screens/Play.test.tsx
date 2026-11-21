@@ -27,7 +27,8 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   );
   const guest = store.getSnapshot().state!.visits[1]!;
   const dispatch = vi.fn();
-  const navigation = { setOptions: vi.fn(), dispatch };
+  const setParams = vi.fn();
+  const navigation = { setOptions: vi.fn(), setParams, dispatch };
   vi.doMock("@react-navigation/native", () => ({
     useNavigation: () => navigation,
     StackActions: { push: (screen: string, params: object) => ({ screen, params }) },
@@ -102,7 +103,9 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     ),
     SaveStatus: () => null,
   }));
-  vi.doMock("../features/RecordingForms", () => ({}));
+  vi.doMock("../features/RecordingForms", () => ({
+    CashOutSheet: () => <div>Cash out sheet</div>,
+  }));
   vi.doMock("../features/TableTrip", () => ({
     TableTripSheet: () => null,
     TableTripButton: () => null,
@@ -160,6 +163,34 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     await click("Undo");
     expect(store.getSnapshot().state!.visits[0]!.deletedAt).toBeUndefined();
     expect(element.querySelector("footer")!.textContent).not.toContain("Session deleted");
+
+    // Deep link ?action=cash_out opens CashOutSheet once on a live visit and clears action param.
+    setParams.mockClear();
+    await act(async () =>
+      root.render(
+        <RecordingProvider store={store}>
+          <PlayScreen route={{ params: { visitId: visit.id, action: "cash_out" } }} />
+        </RecordingProvider>,
+      ),
+    );
+    expect(element.textContent).toContain("Cash out sheet");
+    expect(setParams).toHaveBeenCalledWith({ action: undefined });
+
+    // Once finished, ?action=cash_out no longer opens CashOutSheet.
+    await store.execute(store.prepare({ type: "finish", visitId: visit.id, amount: 25000 }));
+    setParams.mockClear();
+    await act(async () =>
+      root.render(
+        <RecordingProvider store={store}>
+          <PlayScreen
+            key="finished"
+            route={{ params: { visitId: visit.id, action: "cash_out" } }}
+          />
+        </RecordingProvider>,
+      ),
+    );
+    expect(element.textContent).not.toContain("Cash out sheet");
+    expect(setParams).toHaveBeenCalledWith({ action: undefined });
   } finally {
     await act(async () => root.unmount());
     await store.close();

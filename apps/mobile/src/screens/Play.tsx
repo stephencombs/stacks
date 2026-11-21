@@ -83,12 +83,12 @@ import {
   type TableRecorded,
 } from "../features/LiveTable";
 
-type Props = StaticScreenProps<{ visitId: string }>;
+type Props = StaticScreenProps<{ visitId: string; action?: string }>;
 
 /** One session of your own play, saved on this device. */
 export function PlayScreen({ route }: Props) {
   const id = Option.getOrNull(VisitId.makeOption(route.params.visitId));
-  return id ? <Visit visitId={id} /> : <Missing />;
+  return id ? <Visit visitId={id} action={route.params.action} /> : <Missing />;
 }
 
 function Title({
@@ -158,7 +158,7 @@ const money = (amount: number, showCents = false) =>
     trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
   });
 
-function Visit({ visitId }: { visitId: VisitId }) {
+function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
   const { visit, status, error, retryLoad } = useRecordingVisit(visitId);
   const prefs = usePreferences();
   const navigation = useNavigation();
@@ -180,6 +180,21 @@ function Visit({ visitId }: { visitId: VisitId }) {
   // Two side-by-side actions don't fit at large text on Android, so they stack.
   const { fontScale } = useWindowDimensions();
   const stacked = Platform.OS === "android" && fontScale > 1.2;
+  const loadedLive = visit !== null && visit !== undefined && visit.visit.finishedAt === null;
+  const loadedActive = loadedLive && visit.visit.deletedAt === undefined;
+  const [handledAction, setHandledAction] = useState<string | null>(null);
+  if (action !== "cash_out" && handledAction !== null) {
+    setHandledAction(null);
+  } else if (action === "cash_out" && visit !== undefined && handledAction !== action) {
+    setHandledAction(action);
+    if (loadedActive) setOpen((current) => current ?? { type: "cash_out" });
+  }
+  useEffect(() => {
+    if (action !== "cash_out" || visit === undefined) return;
+    (navigation as { setParams?: (params: { action?: undefined }) => void }).setParams?.({
+      action: undefined,
+    });
+  }, [action, navigation, visit]);
   if (visit === null) return <Missing />;
   if (visit === undefined)
     return (
