@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-14
 priority: medium
 tags:
@@ -10,7 +10,10 @@ depends_on:
   - "015"
 parent: "001"
 created_at: 2026-11-14T20:21:34.790856353Z
-updated_at: 2026-11-16T03:54:17.491230885Z
+updated_at: 2026-11-21T03:29:21.747177300Z
+transitions:
+  - status: in-progress
+    at: 2026-11-21T03:29:21.747177300Z
 ---
 
 # Retire the older group sessions
@@ -29,7 +32,7 @@ With group play recorded from Play (specs 013, 015), the older group sessions (`
 
 ## Plan
 
-- [ ] Preflight report on the seeded database and a production copy
+- [x] Preflight report on the seeded database and a production copy — Nov 16 production-copy preflight found 16 open USD legacy sessions blocking write-freeze and cutover until closed via the legacy recorder; 3 windowed and 2 overlapping stakes stay legacy
 - [ ] Import with tests that compare every group's results before and after
 - [ ] Freeze, cut over, retire screens and endpoints; redirect `/sessions/:id`
 

@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-16
 priority: high
 tags:
@@ -7,10 +7,13 @@ tags:
   - android
   - design
 created_at: 2026-11-16T17:18:15.495532200Z
-updated_at: 2026-11-21T00:25:38.871405200Z
+updated_at: 2026-11-21T03:29:21.172306700Z
+completed_at: 2026-11-21T03:29:21.172306700Z
 transitions:
   - status: in-progress
     at: 2026-11-21T00:25:38.871405200Z
+  - status: complete
+    at: 2026-11-21T03:29:21.172306700Z
 ---
 
 # Android matches its design frames
@@ -66,11 +69,11 @@ child uses to prove it.
 - [x] Publish light and dark references for every indexed Android frame on `design-frames`
 - [x] 024 shared parts ([PR #109](https://github.com/stephencombs/stacks/pull/109))
 - [x] 020 shell, Play and Crew ([PR #114](https://github.com/stephencombs/stacks/pull/114))
-- [ ] 021 live table and sheets
-- [ ] 022 Stats
+- [x] 021 live table and sheets ([PR #119](https://github.com/stephencombs/stacks/pull/119))
+- [x] 022 Stats ([PR #120](https://github.com/stephencombs/stacks/pull/120))
 - [x] 023 Live Updates ([PR #117](https://github.com/stephencombs/stacks/pull/117))
 
 ## Test
 
-- [ ] Every `And*` frame in `docs/design/frames.md` has a matching emulator screenshot, light and
-      dark, in a merged child PR, with any remaining difference explained
+- [x] Every `And*` frame in `docs/design/frames.md` has a matching emulator screenshot, light and
+      dark, in a merged child PR, with any remaining difference explained (verified on Pixel 10 across 024, 020, 021, 022, and 023; signed-in-only Stats states in 022 are covered by component/runtime tests, and iOS verification remains deferred)
