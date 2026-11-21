@@ -9,7 +9,6 @@ import {
   type VisitId,
 } from "@stacks/contracts";
 import { formatDay, gameNames, shortName, tellApart } from "@stacks/client-runtime/format";
-import type { JoinedTable } from "@stacks/contracts/recordingCommands";
 import type {
   CachedVenue,
   RecordingInput,
@@ -66,6 +65,7 @@ const money = (amount: number, showCents = false) =>
 
 const decimal = decimalSeparator();
 
+/** An amount's text and its error, which shows from the first submit and follows what's typed. */
 function useAmount(initial: string, minimum: 0 | 1) {
   const [text, setText] = useState(initial);
   const [checked, setChecked] = useState(false);
@@ -74,7 +74,9 @@ function useAmount(initial: string, minimum: 0 | 1) {
     text,
     error: checked ? parseRecordingAmount(text, minimum).error : null,
     set: setText,
+    // A held delete repeats from the keypad's first render, so each key applies to the latest text.
     press: (key: string) => setText((current) => applyAmountKey(current, key, decimal)),
+    /** The amount, or null after showing why it can't be saved. */
     read: () => {
       setChecked(true);
       const parsed = parseRecordingAmount(text, minimum);
@@ -86,6 +88,10 @@ function useAmount(initial: string, minimum: 0 | 1) {
 
 type Amount = ReturnType<typeof useAmount>;
 
+/**
+ * An amount typed on the table keypad. It never raises the system keyboard, so the sheet's action
+ * stays in sight.
+ */
 function KeypadAmount({
   label,
   amount,
@@ -141,7 +147,15 @@ function KeypadAmount({
   );
 }
 
-function RecordingKeypad({ amount }: { amount: Amount }) {
+function RecordingKeypad({ amount, tiled = false }: { amount: Amount; tiled?: boolean }) {
+  if (tiled) {
+    return (
+      <View className="border-t border-line pt-2.5">
+        <AmountKeypad onKey={amount.press} bottomLeft={decimal} tiled />
+      </View>
+    );
+  }
+
   return (
     <GlassSurface radius={22} className="rounded-2xl p-2">
       <AmountKeypad onKey={amount.press} bottomLeft={decimal} />
@@ -149,6 +163,7 @@ function RecordingKeypad({ amount }: { amount: Amount }) {
   );
 }
 
+/** An amount typed with the system keyboard, for a form with several fields. */
 function TypedAmount({ label, amount }: { label: string; amount: Amount }) {
   if (Platform.OS === "android")
     return (
@@ -226,6 +241,7 @@ function ReasonField({
   );
 }
 
+/** A required reason: says what's missing on submit, and clears once something's typed. */
 function useReason(missing: string) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -247,6 +263,10 @@ function useReason(missing: string) {
   };
 }
 
+/**
+ * A recording form in a sheet. It closes only once the device has saved, and while saving it
+ * can't be dismissed. A failed save keeps everything entered, and submitting again retries it.
+ */
 function RecordingSheet({
   title,
   description,
@@ -256,6 +276,7 @@ function RecordingSheet({
   secondaryAction,
   back = false,
   keypad,
+  keypadInFooter = Platform.OS === "android",
   save,
   onSubmit,
   onClose,
@@ -269,6 +290,7 @@ function RecordingSheet({
   secondaryAction?: { readonly label: string; readonly onPress: () => void };
   back?: boolean;
   keypad?: ReactNode;
+  keypadInFooter?: boolean;
   save: { readonly pending: boolean; readonly error: string | null };
   onSubmit: () => void;
   onClose: () => void;
@@ -287,14 +309,16 @@ function RecordingSheet({
           {save.error ? (
             <FormError>{save.error} What you entered is still here. Try again.</FormError>
           ) : null}
-          {Platform.OS === "android" && secondaryAction ? (
+          {secondaryAction ? (
             <View className="flex-row gap-2">
               <Button
                 label={secondaryAction.label}
-                variant="ghost"
+                variant={Platform.OS === "android" ? "ghost" : "secondary"}
                 size="lg"
                 disabled={save.pending}
-                className="flex-1 border border-line bg-transparent"
+                className={
+                  Platform.OS === "android" ? "flex-1 border border-line bg-transparent" : "px-5"
+                }
                 onPress={secondaryAction.onPress}
               />
               <Button
@@ -314,6 +338,7 @@ function RecordingSheet({
               variant={submitVariant}
               size="lg"
               haptic
+              // A sheet's title and submit often say the same as the button that opened it.
               testID="sheet-submit"
               pending={save.pending}
               onPress={onSubmit}
@@ -322,12 +347,12 @@ function RecordingSheet({
           {cancelLabel ? (
             <Button label={cancelLabel} size="lg" disabled={save.pending} onPress={onClose} />
           ) : null}
-          {Platform.OS === "android" ? keypad : null}
+          {keypadInFooter ? keypad : null}
         </>
       }
     >
       {children}
-      {Platform.OS === "android" ? null : keypad}
+      {keypadInFooter ? null : keypad}
     </Sheet>
   );
 }
@@ -472,9 +497,9 @@ const details = (
   venue: CachedVenue | null = null,
   gameName = "",
 ) => ({
-  ...(game === "none" ? null : { game }),
-  ...(game === "other" && gameName.trim() ? { gameName: gameName.trim() } : null),
-  ...(venue ? { venueId: venue.id } : null),
+  ...(game === "none" ? {} : { game }),
+  ...(game === "other" && gameName.trim() ? { gameName: gameName.trim() } : {}),
+  ...(venue ? { venueId: venue.id } : {}),
   highLimit,
 });
 
@@ -720,6 +745,10 @@ export function PastSessionSheet({
 
 type Saved = (entryId: PlayEntry["id"], input: RecordingInput) => void;
 
+/**
+ * Whose money paid for a buy-in, or who took a cash-out: the player's own by default, or someone
+ * else at the table, who then owes or is owed it.
+ */
 function usePaidBy(visit: RecordingVisitView) {
   const state = useRecordingState();
   const view = useServerTable(visit.visit.tableId);
@@ -736,6 +765,7 @@ function usePaidBy(visit: RecordingVisitView) {
       { value: "own" as const, label: own },
       ...people.map((person, index) => ({ value: person.id, label: names[index]! })),
     ],
+    /** Spread into an add or finish input. */
     input: () => (value === "own" ? {} : { counterpartyId: value }),
   };
 }
@@ -848,6 +878,10 @@ export function RebuySheet({
   );
 }
 
+/**
+ * A time field for when something happened, between `earliest` and `latest`. Left as it opened,
+ * it keeps `initial` to the second, so finishing in the minute a session started still follows it.
+ */
 function useClock(initial: DateTime.Utc) {
   const [text, setText] = useState(() => localTimeText(initial));
   const [error, setError] = useState<string | null>(null);
@@ -859,6 +893,7 @@ function useClock(initial: DateTime.Utc) {
       setText(next);
       setError(null);
     },
+    /** The moment, or null after showing why it can't be saved. */
     read: (
       latest: { readonly at: DateTime.Utc; readonly error: string },
       earliest: { readonly at: DateTime.Utc; readonly error: string } | null,
@@ -880,18 +915,6 @@ function useClock(initial: DateTime.Utc) {
       return problem === null ? value : null;
     },
   };
-}
-
-function ClockField({ label, clock }: { label: string; clock: ReturnType<typeof useClock> }) {
-  return (
-    <DateTimeField
-      label={label}
-      kind="time"
-      value={clock.text}
-      onChange={clock.set}
-      error={clock.error}
-    />
-  );
 }
 
 /** Cashing out finishes the visit: what they left with, and when. */
@@ -922,22 +945,15 @@ export function CashOutSheet({
 
   return (
     <RecordingSheet
-      keypad={<RecordingKeypad amount={amount} />}
+      keypad={<RecordingKeypad amount={amount} tiled={Platform.OS === "ios"} />}
+      keypadInFooter
       title={who ? `Cash out ${shortName(who)}` : "Cash out"}
-      description={
-        Platform.OS === "android"
-          ? note
-          : (note ?? "This finishes the session and works out its result.")
-      }
+      description={note}
       submitLabel={who ? `End ${shortName(who)}'s visit` : "End session"}
-      secondaryAction={
-        Platform.OS === "android"
-          ? {
-              label: `${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`,
-              onPress: () => amount.set(amountInputText(0)),
-            }
-          : undefined
-      }
+      secondaryAction={{
+        label: `${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`,
+        onPress: () => amount.set(amountInputText(0)),
+      }}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -963,132 +979,92 @@ export function CashOutSheet({
         if (receipt?.command.type === "finish") onSaved(receipt.command.entryId, input);
       }}
     >
-      {Platform.OS === "android" ? (
-        <View className="overflow-hidden rounded-xl bg-surface">
-          <View className="gap-1 px-4 py-3">
-            <View className="flex-row items-center justify-between gap-3">
-              <Text className="type-body text-ink">Cash-out</Text>
-              {parsedCashOut.error === null ? (
-                <Money
-                  amount={parsedCashOut.amount}
-                  currency={RECORDING_CURRENCY}
-                  className="text-[28px] leading-[34px] font-bold tabular-nums"
-                />
-              ) : (
-                <Text
-                  className={cn(
-                    "text-[28px] leading-[34px] font-bold tabular-nums",
-                    amount.text ? "text-ink" : "text-faint",
-                  )}
-                >
-                  {amount.text || money(0, prefs.showCents)}
-                </Text>
-              )}
-            </View>
-            {amount.error ? (
-              <Text className="type-footnote text-loss">{amount.error}</Text>
-            ) : previous > 0 ? (
-              <Text className="type-footnote text-muted">
-                Earlier cash-outs total{" "}
-                <Money
-                  amount={previous}
-                  currency={RECORDING_CURRENCY}
-                  className="type-footnote text-muted"
-                />
-                .
+      <View className="overflow-hidden rounded-xl bg-surface">
+        <View className="gap-1 px-4 py-3">
+          <View className="flex-row items-center justify-between gap-3">
+            <Text className="type-body text-ink">Cash-out</Text>
+            {parsedCashOut.error === null ? (
+              <Money
+                amount={parsedCashOut.amount}
+                currency={RECORDING_CURRENCY}
+                className="text-[28px] leading-[34px] font-bold tabular-nums"
+              />
+            ) : (
+              <Text
+                className={cn(
+                  "text-[28px] leading-[34px] font-bold tabular-nums",
+                  amount.text ? "text-ink" : "text-faint",
+                )}
+              >
+                {amount.text || money(0, prefs.showCents)}
               </Text>
-            ) : null}
+            )}
           </View>
-          <View className="gap-1 border-t border-line px-4 py-2.5">
-            <View className="flex-row items-center justify-between gap-3">
-              <Text className="type-body text-ink">Finished</Text>
-              <View className="flex-row items-center gap-2">
+          {amount.error ? (
+            <Text className="type-footnote text-loss">{amount.error}</Text>
+          ) : previous > 0 ? (
+            <Text className="type-footnote text-muted">
+              Earlier cash-outs total{" "}
+              <Money
+                amount={previous}
+                currency={RECORDING_CURRENCY}
+                className="type-footnote text-muted"
+              />
+              .
+            </Text>
+          ) : null}
+        </View>
+        <View className="gap-1 border-t border-line px-4 py-2.5">
+          <View className="flex-row items-center justify-between gap-3">
+            <Text className="type-body text-ink">Finished</Text>
+            <View className="flex-row items-center gap-2">
+              {Platform.OS === "android" ? (
                 <View className="flex-row items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5">
                   <Icon name="calendar" color="muted" size={14} />
                   <Text className="type-footnote font-medium text-muted">{formatDay(now)}</Text>
                 </View>
-                <DateTimeField
-                  compact
-                  label="Finished at"
-                  kind="time"
-                  value={clock.text}
-                  onChange={clock.set}
-                />
-              </View>
-            </View>
-            {clock.error ? <Text className="type-footnote text-loss">{clock.error}</Text> : null}
-          </View>
-          <View className="flex-row items-center justify-between gap-3 border-t border-line px-4 py-3">
-            <View className="min-w-0 flex-1">
-              <Text numberOfLines={1} className="type-footnote text-muted">
-                {who ? `${who}'s result` : "Your result"}
-              </Text>
-              <Text className="type-footnote text-muted">
-                {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
-              </Text>
-            </View>
-            {resultPreview === null ? (
-              <Text className="text-muted">—</Text>
-            ) : (
-              <Money
-                amount={MinorUnits.make(resultPreview)}
-                currency={RECORDING_CURRENCY}
-                tone="result"
-                className="type-title"
+              ) : (
+                <View className="rounded-[10px] bg-fill px-3 py-1.5">
+                  <Text className="type-callout font-medium text-ink">
+                    {DateTime.toDateUtc(now).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </Text>
+                </View>
+              )}
+              <DateTimeField
+                compact
+                label="Finished at"
+                kind="time"
+                value={clock.text}
+                onChange={clock.set}
               />
-            )}
+            </View>
           </View>
+          {clock.error ? <Text className="type-footnote text-loss">{clock.error}</Text> : null}
         </View>
-      ) : (
-        <>
-          <KeypadAmount
-            keypad={false}
-            label="Amount"
-            amount={amount}
-            hint={
-              previous > 0 ? (
-                <>
-                  Earlier cash-outs total{" "}
-                  <Money
-                    amount={previous}
-                    currency={RECORDING_CURRENCY}
-                    className="type-footnote text-muted"
-                  />
-                  .
-                </>
-              ) : undefined
-            }
-          />
-          <View className="items-center">
-            <Button
-              label={`${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`}
-              size="sm"
-              onPress={() => amount.set(amountInputText(0))}
+        <View className="flex-row items-center justify-between gap-3 border-t border-line px-4 py-3">
+          <View className="min-w-0 flex-1">
+            <Text numberOfLines={1} className="type-footnote text-muted">
+              {who ? `${who}'s result` : "Your result"}
+            </Text>
+            <Text className="type-footnote text-muted">
+              {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
+            </Text>
+          </View>
+          {resultPreview === null ? (
+            <Text className="text-muted">—</Text>
+          ) : (
+            <Money
+              amount={MinorUnits.make(resultPreview)}
+              currency={RECORDING_CURRENCY}
+              tone="result"
+              className="type-title"
             />
-          </View>
-          <ClockField label="Finished at" clock={clock} />
-          <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
-            <View className="min-w-0 flex-1">
-              <Text numberOfLines={1} className="type-footnote text-muted">
-                {who ? `${who}'s result` : "Your result"}
-              </Text>
-              <Text className="type-footnote text-muted">
-                {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
-              </Text>
-            </View>
-            {resultPreview === null ? (
-              <Text className="text-muted">—</Text>
-            ) : (
-              <Money
-                amount={MinorUnits.make(resultPreview)}
-                currency={RECORDING_CURRENCY}
-                tone="result"
-                className="type-title"
-              />
-            )}
-          </View>
-        </>
-      )}
+          )}
+        </View>
+      </View>
       <PaidField label="Paid to" paid={paid} />
     </RecordingSheet>
   );
@@ -1335,6 +1311,7 @@ export function VenueSheet({
   onSaved: () => void;
 }) {
   const save = useRecordingSubmit();
+  // A venue another device set that this one hasn't fetched yet stays until something is picked.
   const [picked, setPicked] = useState<{ venue: CachedVenue | null } | null>(null);
   const selected = picked ? picked.venue : visit.venue;
 
@@ -1562,7 +1539,7 @@ export function AddPlayerSheet({
   const save = useRecordingSubmit();
   const prefs = usePreferences();
   const amount = useAmount("", 1);
-  const [choice, setChoice] = useState<PlayerId | typeof NEW_PLAYER>(NEW_PLAYER);
+  const [choice, setChoice] = useState<string>(NEW_PLAYER);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
   const savedNames = tellApart(saved.map((player) => player.displayName));
@@ -1615,7 +1592,7 @@ export function AddPlayerSheet({
         const receipt = await save.submit(
           isNew
             ? { type: "join_table", tableId, displayName: trimmed, buyIn: value }
-            : { type: "join_table", tableId, playerId: choice, buyIn: value },
+            : { type: "join_table", tableId, playerId: choice as PlayerId, buyIn: value },
         );
 
         if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId, chosen);
@@ -1803,11 +1780,7 @@ export function JoinSheet({
   onClose,
   onJoined,
 }: {
-  join: {
-    pending: boolean;
-    error: string | null;
-    join: (name: string) => Promise<JoinedTable | null>;
-  };
+  join: { pending: boolean; error: string | null; join: (name: string) => Promise<unknown> };
   onClose: () => void;
   onJoined: () => void;
 }) {

@@ -175,7 +175,13 @@ export function IconButton({
         className,
       )}
     >
-      {plain || felt ? icon : <ControlSurface>{icon}</ControlSurface>}
+      {plain ? (
+        icon
+      ) : felt && Platform.OS === "android" ? (
+        icon
+      ) : (
+        <ControlSurface felt={felt}>{icon}</ControlSurface>
+      )}
     </PressableScale>
   );
 }

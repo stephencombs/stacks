@@ -367,7 +367,7 @@ export default function App() {
       }
     >
       <RecordingProvider store={recordingStore}>
-        {Platform.OS === "android" ? <LiveSessionBridge /> : null}
+        <LiveSessionBridge />
         <AccountProvider>
           <Root />
           <ConfirmDialogHost />

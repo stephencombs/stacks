@@ -2,8 +2,10 @@ import * as Match from "effect/Match";
 import { useEffect, useRef } from "react";
 import * as Haptics from "expo-haptics";
 import { Platform, Pressable, Text, View } from "react-native";
+import { useUniwind } from "uniwind";
 
 import { Icon } from "../components/ui/Icon";
+import { cn } from "../components/ui/cn";
 import { holdBackspace } from "./holdBackspace";
 
 const digitRows = [
@@ -18,11 +20,14 @@ const DELETE_PRESS_SETTLE_MS = 300;
 export function AmountKeypad({
   onKey,
   bottomLeft,
+  tiled = false,
 }: {
   onKey: (key: string) => void;
   /** A decimal mark, `"sign"` for ±, or nothing. */
   bottomLeft: string | null;
+  tiled?: boolean;
 }) {
+  const { theme } = useUniwind();
   const releaseRepeat = useRef<(() => void) | null>(null);
   const deletePress = useRef(0);
   const deletedOnPressIn = useRef(false);
@@ -81,11 +86,14 @@ export function AmountKeypad({
   };
 
   return (
-    <View className="w-full">
+    <View className={cn("w-full", tiled && "gap-1.5")}>
       {[...digitRows, [bottomLeft, "0", "back"]].map((row) => (
         <View
           key={row[1]}
-          className={Platform.OS === "android" ? "h-12 flex-row" : "h-16 flex-row"}
+          className={cn(
+            "flex-row",
+            tiled ? "h-[50px] gap-1.5" : Platform.OS === "android" ? "h-12" : "h-16",
+          )}
         >
           {row.map((key) =>
             key === null ? (
@@ -103,12 +111,22 @@ export function AmountKeypad({
                 onPressIn={key === "back" ? pressDelete : undefined}
                 onPressOut={key === "back" ? releaseDelete : undefined}
                 onPress={key === "back" ? activateDelete : () => tap(key)}
-                className="min-w-0 flex-1 items-center justify-center rounded-full active:bg-fill-strong"
+                className={cn(
+                  "min-w-0 flex-1 items-center justify-center active:bg-fill-strong",
+                  tiled
+                    ? cn("rounded-[10px]", theme === "dark" ? "bg-fill" : "bg-surface")
+                    : "rounded-full",
+                )}
               >
                 {key === "back" ? (
                   <Icon name="delete" color="ink" size={24} />
                 ) : (
-                  <Text className="text-3xl font-medium text-ink">
+                  <Text
+                    className={cn(
+                      "text-ink",
+                      tiled ? "text-[26px] font-normal" : "text-3xl font-medium",
+                    )}
+                  >
                     {key === "sign" ? "±" : key}
                   </Text>
                 )}

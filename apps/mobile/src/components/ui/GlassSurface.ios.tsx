@@ -13,13 +13,18 @@ export function GlassSurface({
   className,
   radius = 999,
   interactive = false,
+  felt = false,
 }: GlassSurfaceProps) {
   const { theme } = useUniwind();
   const solid = useReduceTransparency();
 
   if (solid)
     return (
-      <View className={cn("border border-line bg-surface shadow-lg", className)}>{children}</View>
+      <View
+        className={cn(felt ? "bg-black/25" : "border border-line bg-surface shadow-lg", className)}
+      >
+        {children}
+      </View>
     );
 
   if (!isLiquidGlassAvailable() || !isGlassEffectAPIAvailable())
@@ -27,7 +32,7 @@ export function GlassSurface({
 
   return (
     <NativeGlass
-      colorScheme={theme === "light" ? "light" : "dark"}
+      colorScheme={felt ? "dark" : theme === "light" ? "light" : "dark"}
       isInteractive={interactive}
       className={className}
       style={{ borderRadius: radius }}

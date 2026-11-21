@@ -12,6 +12,7 @@
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
     "test": "vp test run scripts && vp run -r test",
+    "verify:ios-live-activity": "npm exec --yes --package=eas-cli@27.11.0 --package=agent-device@0.21.41 -- node scripts/verify-ios-live-activity.mjs",
     "knip": "knip",
     "leanspec": "leanspec",
     "prepare": "vp config --hooks --no-agent",

@@ -15,6 +15,7 @@ import {
 import { appUrl } from "./config";
 import { usePreferences } from "./preferences";
 import { recordingStore } from "./recording";
+import { useTheme } from "./theme";
 
 export type LiveSurfaceDrivers = {
   readonly requestAndroidPermission: () => Promise<boolean>;
@@ -42,7 +43,7 @@ const requestAndroidPermission = async () => {
   }
 };
 
-const surfaceSignature = (surface: LiveSessionSurface) => {
+const surfaceSignature = (surface: LiveSessionSurface): string => {
   if (surface.kind === "idle") return "idle";
 
   if (surface.kind === "live") {
@@ -73,7 +74,7 @@ const surfaceSignature = (surface: LiveSessionSurface) => {
 export async function dispatchLiveSessionSurface(
   surface: LiveSessionSurface,
   drivers: LiveSurfaceDrivers,
-) {
+): Promise<void> {
   if (surface.kind === "live") {
     await drivers.requestAndroidPermission();
     await drivers.showAndroidLive({
@@ -123,10 +124,15 @@ const defaultDrivers: LiveSurfaceDrivers = {
   },
 };
 
-/** Synchronizes the active recording session with the Android notification. */
+/** Synchronizes the recording session with the system's live surface. */
 export function LiveSessionBridge() {
   const snapshot = useSyncExternalStore(recordingStore.subscribe, recordingStore.getSnapshot);
   const prefs = usePreferences();
+  const themeChoice = useTheme();
+
+  const colorScheme =
+    Platform.OS === "ios" ? (themeChoice === "system" ? null : themeChoice) : null;
+
   const previous = useRef<LiveSessionSurface>({ kind: "idle" });
   const lastSignature = useRef<string | null>(null);
   const pending = useRef(Promise.resolve());
@@ -148,19 +154,24 @@ export function LiveSessionBridge() {
     );
 
     previous.current = surface;
-    const sig = surfaceSignature(surface);
+    const sig = `${surfaceSignature(surface)}|${colorScheme ?? "system"}`;
 
     if (sig === lastSignature.current) return;
     lastSignature.current = sig;
     pending.current = pending.current
-      .then(() => {
-        if (lastSignature.current === sig)
-          return dispatchLiveSessionSurface(surface, defaultDrivers);
+      .then(async () => {
+        if (Platform.OS === "ios") {
+          const { dispatchIosLiveSession } = await import("./iosLiveSession");
+
+          if (lastSignature.current === sig) await dispatchIosLiveSession(surface, colorScheme);
+        } else if (lastSignature.current === sig) {
+          await dispatchLiveSessionSurface(surface, defaultDrivers);
+        }
       })
       .catch(() => {
         if (lastSignature.current === sig) lastSignature.current = null;
       });
-  }, [snapshot.state, prefs.showCents, prefs.privacyMode]);
+  }, [snapshot.state, prefs.showCents, prefs.privacyMode, colorScheme]);
 
   return null;
 }

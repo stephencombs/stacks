@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { reconcileLiveSessionSurface } from "@stacks/client-runtime/liveSessionSurface";
 import { makeRecordingStore } from "@stacks/client-runtime/recording";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
@@ -6,25 +7,13 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
 
-interface LiveBridge {
-  store: ReturnType<typeof makeRecordingStore> | undefined;
-  privacyMode: boolean;
-  showLive: () => Promise<void>;
-  showFinished: (payload: { resultText: string }) => Promise<void>;
-  clear: () => Promise<void>;
-}
-
-const bridge = vi.hoisted(() => {
-  const state: LiveBridge = {
-    store: undefined,
-    privacyMode: false,
-    showLive: vi.fn(async () => {}),
-    showFinished: vi.fn(async () => {}),
-    clear: vi.fn(async () => {}),
-  };
-
-  return state;
-});
+const bridge = vi.hoisted(() => ({
+  store: undefined as ReturnType<typeof makeRecordingStore> | undefined,
+  privacyMode: false,
+  showLive: vi.fn(async () => {}),
+  showFinished: vi.fn<(payload: { resultText: string }) => Promise<void>>(async () => {}),
+  clear: vi.fn(async () => {}),
+}));
 
 vi.stubGlobal("__DEV__", false);
 
@@ -48,6 +37,8 @@ vi.mock("./config", () => ({
 vi.mock("./preferences", () => ({
   usePreferences: () => ({ showCents: false, privacyMode: bridge.privacyMode }),
 }));
+
+vi.mock("./theme", () => ({ useTheme: () => "system" }));
 
 vi.mock("./recording", () => ({
   recordingStore: {

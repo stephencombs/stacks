@@ -49,7 +49,13 @@ export const formatMoney = (
     format.maximumFractionDigits = 0;
   }
 
-  return new Intl.NumberFormat(options.locale, format).format(toDecimalString(amount, digits));
+  const formatted = new Intl.NumberFormat(options.locale, format).format(
+    toDecimalString(amount, digits),
+  );
+  const needsPlus =
+    (signDisplay === "always" && amount >= 0) || (signDisplay === "exceptZero" && amount > 0);
+
+  return needsPlus && !formatted.includes("+") ? `+${formatted}` : formatted;
 };
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");

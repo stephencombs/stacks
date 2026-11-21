@@ -1,4 +1,3 @@
-import * as Predicate from "effect/Predicate";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   Keyboard,
@@ -7,7 +6,6 @@ import {
   TextInput,
   View,
   useWindowDimensions,
-  type LayoutChangeEvent,
   type ScrollViewInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,16 +14,6 @@ import { FormSheet } from "react-native-screens/experimental";
 import { useCSSVariable } from "uniwind";
 
 import { keyboardOverlap, sheetBottomEdge } from "./keyboardInset";
-
-function canMeasure(node: LayoutChangeEvent["target"]): node is LayoutChangeEvent["target"] & {
-  measureInWindow: (
-    callback: (x: number, y: number, width: number, height: number) => void,
-  ) => void;
-} {
-  return (
-    Predicate.hasProperty(node, "measureInWindow") && Predicate.isFunction(node.measureInWindow)
-  );
-}
 
 export function Sheet({
   open,
@@ -77,10 +65,14 @@ export function Sheet({
     };
   }, []);
 
-  const fittedHeight = contentHeight + insets.bottom + 64;
+  const fittedHeight = contentHeight + footerHeight + insets.bottom + 80;
 
   const detent =
-    contentHeight === 0 ? 0.5 : Math.min(0.9, Math.max(0.3, fittedHeight / screenHeight));
+    contentHeight === 0
+      ? footer
+        ? 0.65
+        : 0.5
+      : Math.min(0.9, Math.max(0.3, fittedHeight / screenHeight));
 
   const close = () => {
     if (!busy) setClosing(true);
@@ -97,7 +89,7 @@ export function Sheet({
     if (!keyboardFrame.current) return;
     TextInput.State.currentlyFocusedInput()?.measureInWindow((_x, y, _width, height) => {
       const top = frame.current.y + 12;
-      const bottom = frame.current.y + frame.current.height - footerHeight - 12;
+      const bottom = frame.current.y + frame.current.height - 12;
 
       if (y < top) {
         scroll.current?.scrollTo({ y: Math.max(0, offset.current - (top - y)), animated: false });
@@ -132,7 +124,7 @@ export function Sheet({
               onLayout={(event) => {
                 const target = event.target;
 
-                if (!canMeasure(target)) return;
+                if (typeof target !== "object" || target == null) return;
                 target.measureInWindow((_x, y, _width, height) => {
                   bottomEdge.current = sheetBottomEdge(screenHeight, { y, height });
 
@@ -149,8 +141,7 @@ export function Sheet({
                   contentInsetAdjustmentBehavior="automatic"
                   keyboardShouldPersistTaps="handled"
                   keyboardDismissMode="interactive"
-                  contentContainerClassName="gap-5 px-4 pt-4"
-                  contentContainerStyle={{ paddingBottom: footerHeight + 24 }}
+                  contentContainerClassName="gap-5 px-4 pt-4 pb-4"
                   onContentSizeChange={(_width, height) => setContentHeight(height)}
                   onScroll={(event) => {
                     offset.current = event.nativeEvent.contentOffset.y;
@@ -159,7 +150,7 @@ export function Sheet({
                   onLayout={(event) => {
                     const target = event.target;
 
-                    if (!canMeasure(target)) return;
+                    if (typeof target !== "object" || target == null) return;
                     target.measureInWindow((_x, y, _width, height) => {
                       frame.current = { y, height };
                       revealFocusedField();
@@ -173,7 +164,7 @@ export function Sheet({
                 </ScrollView>
                 {footer ? (
                   <View
-                    className="absolute right-0 bottom-0 left-0 gap-2 px-4 pt-2 pb-3"
+                    className="gap-2 bg-canvas px-4 pt-2 pb-3"
                     onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
                   >
                     {footer}
