@@ -68,6 +68,6 @@ tags:
     id: "visit-result"
     text: "\\+\\$150"
 
-- tapOn: "Back to your play"
+- tapOn: "Back to (your play|Play)"
 - assertNotVisible: "Back to your session.*"
 - assertVisible: ".*Session, in \\$300, out \\$450, result \\+\\$150"

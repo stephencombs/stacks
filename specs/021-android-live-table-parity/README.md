@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-16
 priority: high
 tags:
@@ -8,13 +8,15 @@ tags:
   - design
 parent: "019"
 created_at: 2026-11-16T17:18:16.781260900Z
-updated_at: 2026-11-21T00:25:39.356552800Z
+updated_at: 2026-11-21T03:14:46.513639Z
 completed_at: 2026-11-20T21:50:11.841254200Z
 transitions:
   - status: complete
     at: 2026-11-20T21:50:11.841254200Z
   - status: in-progress
     at: 2026-11-21T00:25:39.356552800Z
+  - status: complete
+    at: 2026-11-21T03:14:46.513639Z
 ---
 
 # Android live table and its sheets match the frames
@@ -108,4 +110,4 @@ What the audit found against these frames, beyond the Design above:
 ## Test
 
 - [x] Each frame above matches on the emulator, light and dark (019's protocol)
-- [ ] `solo-recording.yaml` and `shared-table.yaml` pass on Android
+- [x] `solo-recording.yaml` and `shared-table.yaml` pass on Android
