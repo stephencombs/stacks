@@ -1,6 +1,5 @@
 import { useIsFocused } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
-import { Platform } from "react-native";
 
 /**
  * Light icons on the dark green of a live session, in either theme. A screen pushed over the felt
@@ -8,5 +7,5 @@ import { Platform } from "react-native";
  */
 export function FeltStatusBar({ felt }: { felt: boolean }) {
   const focused = useIsFocused();
-  return felt && focused && Platform.OS === "android" ? <StatusBar style="light" /> : null;
+  return felt && focused ? <StatusBar style="light" /> : null;
 }

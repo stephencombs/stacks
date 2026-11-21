@@ -1,5 +1,5 @@
 ---
-status: planned
+status: complete
 created: 2026-11-14
 priority: high
 tags:
@@ -10,7 +10,11 @@ depends_on:
   - "002"
 parent: "001"
 created_at: 2026-11-14T20:15:30.022549421Z
-updated_at: 2026-11-15T02:56:24.748322334Z
+updated_at: 2026-11-21T08:08:00.775952200Z
+completed_at: 2026-11-21T08:08:00.775952200Z
+transitions:
+  - status: complete
+    at: 2026-11-21T08:08:00.775952200Z
 ---
 
 # Color Up design system: tokens, light and dark, glass and motion
@@ -51,7 +55,7 @@ Second PR, glass, motion and docs:
 - [x] Web and mobile token values match `docs/design/tokens.json` for both themes (a test reads both CSS files)
 - [x] Text and money colors pass 4.5:1 on ground and card in both themes
 - [x] Reduced motion turns off every animation
-- [ ] Screenshots of each tab in light and dark on web, iOS and Android
+- [x] Screenshots of each tab in light and dark on web, iOS and Android
 
 ## Notes
 

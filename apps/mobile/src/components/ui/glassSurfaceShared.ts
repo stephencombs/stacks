@@ -8,6 +8,8 @@ export type GlassSurfaceProps = {
   radius?: number;
   /** Lets iOS glass answer a touch, for a surface that is itself a control. */
   interactive?: boolean;
+  /** Uses dark-scheme glass over green felt so controls stay legible in light mode. */
+  felt?: boolean;
 };
 
 /** Glass without the native material: the glass token's translucent fill, an edge and the float shadow. */

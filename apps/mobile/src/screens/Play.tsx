@@ -384,11 +384,15 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       </PersonalScreen>
     );
   const toast = saved ? (
-    <RecordingToast key={saved.entryId}>
+    <RecordingToast key={saved.entryId} felt={live}>
       <Text
         className={cn(
           "min-w-0 flex-1 text-sm",
-          Platform.OS === "android" ? "text-[#F9FAFB]" : "text-ink-inverse",
+          Platform.OS === "android"
+            ? "text-[#F9FAFB]"
+            : live
+              ? "text-felt-ink"
+              : "text-ink-inverse",
         )}
       >
         {saved.text}
@@ -406,6 +410,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
         ) : (
           <Button
             label="Undo"
+            variant={live ? "felt" : "secondary"}
             pending={quick.pending}
             size="sm"
             onPress={() => void undo(saved.entryId, saved.visitId)}
@@ -413,7 +418,12 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
         )
       ) : saved.visitId && saved.visitId !== visitId ? (
         Platform.OS === "android" ? null : (
-          <Button label="Dismiss" size="sm" onPress={() => setSaved(null)} />
+          <Button
+            label="Dismiss"
+            variant={live ? "felt" : "secondary"}
+            size="sm"
+            onPress={() => setSaved(null)}
+          />
         )
       ) : Platform.OS === "android" ? (
         <Pressable
@@ -426,6 +436,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       ) : (
         <Button
           label="View entry"
+          variant={live ? "felt" : "secondary"}
           size="sm"
           onPress={() => setOpen({ type: "inspect", entryId: saved.entryId })}
         />
@@ -467,7 +478,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
                     <Button
                       key={preset}
                       label={`+ ${money(preset, prefs.showCents)}`}
-                      variant={Platform.OS === "android" ? "felt" : "secondary"}
+                      variant="felt"
                       size="lg"
                       haptic
                       disabled={quick.pending}
@@ -477,7 +488,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
                   ))}
                   <Button
                     label="Other"
-                    variant={Platform.OS === "android" ? "felt" : "secondary"}
+                    variant="felt"
                     size="lg"
                     disabled={quick.pending}
                     className="min-w-0 flex-1"
@@ -487,7 +498,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
               </View>
               <Button
                 label="Cash out"
-                variant={Platform.OS === "android" ? "feltPrimary" : "primary"}
+                variant="feltPrimary"
                 size="lg"
                 haptic
                 disabled={quick.pending}
@@ -734,7 +745,13 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
   );
 }
 
-export function RecordingToast({ children }: { children: ReactNode }) {
+export function RecordingToast({
+  children,
+  felt = false,
+}: {
+  children: ReactNode;
+  felt?: boolean;
+}) {
   const [shown] = useState(() => new Animated.Value(0));
   useEffect(() => {
     animate(shown, { toValue: 1, duration: duration.toastIn, easing: ease.enter });
@@ -753,7 +770,7 @@ export function RecordingToast({ children }: { children: ReactNode }) {
           "flex-row items-center",
           Platform.OS === "android"
             ? "gap-3 rounded-[4px] bg-[#1F2120] py-2 pr-2 pl-4 shadow-lg"
-            : "gap-2 rounded-xl bg-ink py-2 pr-2 pl-4",
+            : cn("gap-2 rounded-xl py-2 pr-2 pl-4", felt ? "bg-black/80" : "bg-ink"),
         )}
       >
         {children}
@@ -1055,10 +1072,11 @@ export function BackButton({ label, felt = false }: { label?: string; felt?: boo
     );
   return (
     <IconButton
+      felt={felt}
       accessibilityLabel="Back to your play"
       icon={
         <View className="rotate-180">
-          <Icon name="arrow-right" color="ink" />
+          <Icon name="chevron-right" color={felt ? "felt-ink" : "ink"} size={20} />
         </View>
       }
       onPress={goBack}

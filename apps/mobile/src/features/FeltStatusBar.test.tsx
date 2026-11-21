@@ -20,11 +20,13 @@ async function render(options: { os: string; focused: boolean; felt: boolean }) 
 
 it("draws light status-bar icons on the felt, but only while the felt is the screen you see", async () => {
   expect(await render({ os: "android", focused: true, felt: true })).toBe("light");
+  expect(await render({ os: "ios", focused: true, felt: true })).toBe("light");
   // A screen pushed over the felt leaves it mounted; its icons must follow the theme again.
   expect(await render({ os: "android", focused: false, felt: true })).toBeNull();
+  expect(await render({ os: "ios", focused: false, felt: true })).toBeNull();
 });
 
-it("leaves the bar alone off the felt and off Android", async () => {
+it("leaves the bar alone off the felt", async () => {
   expect(await render({ os: "android", focused: true, felt: false })).toBeNull();
-  expect(await render({ os: "ios", focused: true, felt: true })).toBeNull();
+  expect(await render({ os: "ios", focused: true, felt: false })).toBeNull();
 });

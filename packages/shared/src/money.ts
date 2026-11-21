@@ -36,12 +36,16 @@ export const formatMoney = (
   // Zero has no sign to show. Hermes on Android prints "+$0" for exceptZero, so don't ask it to.
   const signDisplay =
     amount === 0 && options.signDisplay === "exceptZero" ? "auto" : options.signDisplay;
-  return new Intl.NumberFormat(options.locale, {
+  const formatted = new Intl.NumberFormat(options.locale, {
     style: "currency",
     currency,
     signDisplay: signDisplay ?? "auto",
     ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
   }).format(toDecimalString(amount, digits));
+  // Hermes on iOS ignores signDisplay on Intl.NumberFormat, dropping "+" on positive results.
+  const needsPlus =
+    (signDisplay === "always" && amount >= 0) || (signDisplay === "exceptZero" && amount > 0);
+  return needsPlus && !formatted.includes("+") ? `+${formatted}` : formatted;
 };
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");

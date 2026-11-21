@@ -93,7 +93,7 @@ async function load({
     lastTripStorage: () => ({ load: () => null, save: () => {} }),
     statsCopyStorage: () => ({ load: () => null, save: () => {} }),
   }));
-  vi.doMock("./lib/theme", () => ({}));
+  vi.doMock("./lib/theme", () => ({ useTheme: () => "system" }));
   vi.doMock("./lib/actorKeys", () => ({ actorKeys: {} }));
   vi.doMock("./lib/fonts", () => ({ useAppFonts: () => {} }));
   // Real recording hooks over a store whose storage never opens, as on a slow first launch.

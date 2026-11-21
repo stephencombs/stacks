@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-13
 priority: high
 tags:
@@ -8,10 +8,13 @@ tags:
   - mobile
   - api
 created_at: 2026-11-13T03:32:31.830953888Z
-updated_at: 2026-11-14T20:21:29.848396571Z
+updated_at: 2026-11-21T08:08:01.257776200Z
+completed_at: 2026-11-21T08:08:01.257776200Z
 transitions:
   - status: in-progress
     at: 2026-11-13T04:25:05.274586219Z
+  - status: complete
+    at: 2026-11-21T08:08:01.257776200Z
 ---
 
 # Navigation rethink: Play, Stats, Map, Crew
@@ -58,5 +61,5 @@ Personal play is what people do most, yet it sat outside the app's tabs, and the
 
 ## Test
 
-- [ ] Every child spec is complete
-- [ ] Screenshots of each tab and the live session on web (preview server), iOS and Android, light and dark
+- [x] Every child spec is complete
+- [x] Screenshots of each tab and the live session on web (preview server), iOS and Android, light and dark

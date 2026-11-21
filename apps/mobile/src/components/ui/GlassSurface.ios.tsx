@@ -13,19 +13,24 @@ export function GlassSurface({
   className,
   radius = 999,
   interactive = false,
+  felt = false,
 }: GlassSurfaceProps) {
   const { theme } = useUniwind();
   const solid = useReduceTransparency();
   if (solid)
     return (
-      <View className={cn("border border-line bg-surface shadow-lg", className)}>{children}</View>
+      <View
+        className={cn(felt ? "bg-black/25" : "border border-line bg-surface shadow-lg", className)}
+      >
+        {children}
+      </View>
     );
   // Liquid Glass needs iOS 26, and some of its betas lack the API.
   if (!isLiquidGlassAvailable() || !isGlassEffectAPIAvailable())
     return <View className={cn(glassFill, className)}>{children}</View>;
   return (
     <NativeGlass
-      colorScheme={theme === "light" ? "light" : "dark"}
+      colorScheme={felt ? "dark" : theme === "light" ? "light" : "dark"}
       isInteractive={interactive}
       className={className}
       style={{ borderRadius: radius }}
