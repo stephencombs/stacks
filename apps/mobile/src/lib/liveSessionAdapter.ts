@@ -27,20 +27,24 @@ let androidPermissionAsked = false;
 
 const requestAndroidPermission = async () => {
   if (Platform.OS !== "android" || Number(Platform.Version) < 33) return true;
+
   if (androidPermissionAsked) return true;
   androidPermissionAsked = true;
+
   try {
     const result = await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
     );
+
     return result === PermissionsAndroid.RESULTS.GRANTED;
   } catch {
     return false;
   }
 };
 
-const surfaceSignature = (surface: LiveSessionSurface): string => {
+const surfaceSignature = (surface: LiveSessionSurface) => {
   if (surface.kind === "idle") return "idle";
+
   if (surface.kind === "live") {
     return [
       "live",
@@ -52,6 +56,7 @@ const surfaceSignature = (surface: LiveSessionSurface): string => {
       surface.privacyMode,
     ].join("|");
   }
+
   return [
     "finished",
     surface.visitId,
@@ -68,7 +73,7 @@ const surfaceSignature = (surface: LiveSessionSurface): string => {
 export async function dispatchLiveSessionSurface(
   surface: LiveSessionSurface,
   drivers: LiveSurfaceDrivers,
-): Promise<void> {
+) {
   if (surface.kind === "live") {
     await drivers.requestAndroidPermission();
     await drivers.showAndroidLive({
@@ -82,8 +87,10 @@ export async function dispatchLiveSessionSurface(
       rebuy200Url: surface.deepLinks.rebuy200,
       cashOutUrl: surface.deepLinks.cashOut,
     });
+
     return;
   }
+
   if (surface.kind === "finished") {
     await drivers.showAndroidFinished({
       gameLabel: surface.gameLabel,
@@ -96,8 +103,10 @@ export async function dispatchLiveSessionSurface(
       seeSessionUrl: surface.deepLinks.seeSession,
       backAtTableUrl: surface.deepLinks.backAtTable,
     });
+
     return;
   }
+
   await drivers.clearAndroid();
 }
 
@@ -124,10 +133,12 @@ export function LiveSessionBridge() {
 
   useEffect(() => {
     if (!snapshot.state) return;
+
     const modePrefs: LiveSurfacePrefs = {
       showCents: prefs.showCents,
       privacyMode: prefs.privacyMode,
     };
+
     const surface = reconcileLiveSessionSurface(
       previous.current.kind === "idle" ? null : previous.current.visitId,
       snapshot.state,
@@ -135,8 +146,10 @@ export function LiveSessionBridge() {
       appUrl,
       DateTime.zoneMakeLocal(),
     );
+
     previous.current = surface;
     const sig = surfaceSignature(surface);
+
     if (sig === lastSignature.current) return;
     lastSignature.current = sig;
     pending.current = pending.current

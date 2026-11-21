@@ -12,6 +12,7 @@ import {
   type MapVenuePin,
 } from "@stacks/shared/map";
 import * as DateTime from "effect/DateTime";
+import * as Match from "effect/Match";
 
 import { formatDay, formatDuration, formatTime } from "./format.ts";
 import { visitTitle, venuePlace, type RecordedVisit, type RecordingHome } from "./recordingView.ts";
@@ -77,7 +78,8 @@ export type PersonalMapView =
 
 const casinoCountLabel = (count: number) => `${count} ${count === 1 ? "casino" : "casinos"}`;
 const sessionCountLabel = (count: number) => `${count} ${count === 1 ? "session" : "sessions"}`;
-const outcomeOf = (amount: number): MapOutcome =>
+
+const outcomeOf: (amount: number) => MapOutcome = (amount) =>
   amount > 0 ? "win" : amount < 0 ? "loss" : "even";
 
 const dayWeekday = (date: DateTime.Utc, timeZone: DateTime.TimeZone) =>
@@ -93,25 +95,29 @@ const noLocationText = (count: number) =>
  * Pure presentation model for the Map tab over this device's finished sessions and cached venue
  * coordinates, working signed out and offline.
  */
-export function personalMapView(
+export const personalMapView: (
   home: Pick<RecordingHome, "finished">,
   tripNames: ReadonlyMap<string, string>,
   timeZone: DateTime.TimeZone,
-  filter: MapFilter = { kind: "all" },
-): PersonalMapView {
+  filter?: MapFilter,
+) => PersonalMapView = (home, tripNames, timeZone, filter = { kind: "all" }) => {
   const finished = home.finished;
+
   if (finished.length === 0) return { kind: "empty" };
 
   const allPins = mapPins(finished);
   const days = mapDays(finished, timeZone);
 
   const weekdayCounts = new Map<string, number>();
+
   for (const day of days) {
     const wd = dayWeekday(day.date, timeZone);
     weekdayCounts.set(wd, (weekdayCounts.get(wd) ?? 0) + 1);
   }
+
   const labelForDay = (day: (typeof days)[number]) => {
     const wd = dayWeekday(day.date, timeZone);
+
     return (weekdayCounts.get(wd) ?? 0) > 1 ? `${wd}, ${dayShortDate(day.date, timeZone)}` : wd;
   };
 
@@ -129,6 +135,7 @@ export function personalMapView(
     ...tripIds.map((tripId, index) => {
       const trip = mapTripPath(finished, tripId);
       const name = tripNames.get(tripId) ?? `Trip ${index + 1}`;
+
       return {
         key: `trip:${tripId}`,
         filter: { kind: "trip" as const, tripId },
@@ -139,6 +146,7 @@ export function personalMapView(
     ...days.map((day) => {
       const wd = dayWeekday(day.date, timeZone);
       const dateText = dayShortDate(day.date, timeZone);
+
       return {
         key: `day:${day.key}`,
         filter: { kind: "day" as const, dayKey: day.key },
@@ -148,12 +156,16 @@ export function personalMapView(
     }),
   ];
 
-  const scopedVisits =
-    filter.kind === "all"
-      ? finished
-      : filter.kind === "day"
-        ? finished.filter((item) => mapDayKey(item.visit.startedAt, timeZone) === filter.dayKey)
-        : finished.filter((item) => item.table.tripId === filter.tripId);
+  const scopedVisits = Match.value(filter).pipe(
+    Match.when({ kind: "all" }, () => finished),
+    Match.when({ kind: "day" }, (day) =>
+      finished.filter((item) => mapDayKey(item.visit.startedAt, timeZone) === day.dayKey),
+    ),
+    Match.when({ kind: "trip" }, (trip) =>
+      finished.filter((item) => item.table.tripId === trip.tripId),
+    ),
+    Match.exhaustive,
+  );
 
   const scopedPins = mapPins(scopedVisits);
 
@@ -173,6 +185,7 @@ export function personalMapView(
     stops = summary.stops;
     path = summary.path;
     unmappedCount = summary.unmappedCount;
+
     if (summary.sessionCount > 0 && summary.startedAt && summary.finishedAt) {
       summaryCard = {
         title: `${label} · ${summary.venueCount > 0 ? casinoCountLabel(summary.venueCount) : sessionCountLabel(summary.sessionCount)}`,
@@ -188,6 +201,7 @@ export function personalMapView(
     stops = summary.stops;
     path = summary.path;
     unmappedCount = summary.unmappedCount;
+
     if (summary.sessionCount > 0 && summary.startedAt && summary.finishedAt) {
       summaryCard = {
         title: `${tripLabel} · ${summary.venueCount > 0 ? casinoCountLabel(summary.venueCount) : sessionCountLabel(summary.sessionCount)}`,
@@ -201,13 +215,15 @@ export function personalMapView(
   const cameraPoints =
     stops.length > 0 ? stops : scopedPins.pins.length > 0 ? scopedPins.pins : allPins.pins;
 
-  const venueSheet = (venueId: VenueId): MapVenueSheetView | null => {
+  const venueSheet = (venueId: VenueId) => {
     const pin =
       scopedPins.pins.find((item) => item.venue.id === venueId) ??
       allPins.pins.find((item) => item.venue.id === venueId);
+
     if (!pin) return null;
     const place = venuePlace(pin.venue);
     const hours = formatHours(pin.hours);
+
     return {
       venueId: pin.venue.id,
       name: pin.venue.name,
@@ -219,6 +235,7 @@ export function personalMapView(
       outcome: pin.outcome,
       visits: pin.visits.map((item) => {
         const trip = item.table.tripId ? tripNames.get(item.table.tripId) : undefined;
+
         return {
           visitId: item.visit.id,
           title: visitTitle(item.table),
@@ -252,4 +269,4 @@ export function personalMapView(
     unmappedCount,
     venueSheet,
   };
-}
+};

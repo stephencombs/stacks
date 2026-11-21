@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   MinorUnits,
+  PlayerId,
   PlayerIdentity,
-  type PlayerId,
   type TableView,
   type VisitId,
 } from "@stacks/contracts";
@@ -22,23 +22,30 @@ const at = (hour: number, minute = 0) => DateTime.makeUnsafe(Date.UTC(2026, 10, 
 
 const open = async () => {
   let document: RecordingStorageDocument = { revision: 0 };
+
   const store = makeRecordingStore({
     load: async () => document,
     commit: async (expected, payload) => {
       document = { revision: expected + 1, payload };
+
       return document.revision;
     },
     subscribe: () => () => undefined,
     close: async () => undefined,
   });
+
   await store.ready;
+
   return store;
 };
+
 const save = async (store: RecordingStore, input: RecordingInput) => {
   const command = store.prepare(input);
   await store.execute(command);
+
   return command;
 };
+
 const state = (store: RecordingStore) => store.getSnapshot().state!;
 const visitOf = (command: RecordingCommand) => ("visitId" in command ? command.visitId : null)!;
 
@@ -47,6 +54,7 @@ describe("liveTable", () => {
     const store = await open();
     const mine = await save(store, { type: "start", buyIn: 20000, startedAt: at(21) });
     const tableId = state(store).tables[0]!.id;
+
     const priya = await save(store, {
       type: "join_table",
       tableId,
@@ -54,6 +62,7 @@ describe("liveTable", () => {
       buyIn: 30000,
       startedAt: at(21),
     });
+
     const jonah = await save(store, {
       type: "join_table",
       tableId,
@@ -61,6 +70,7 @@ describe("liveTable", () => {
       buyIn: 20000,
       startedAt: at(21, 3),
     });
+
     const dev = await save(store, {
       type: "join_table",
       tableId,
@@ -68,6 +78,7 @@ describe("liveTable", () => {
       buyIn: 10000,
       startedAt: at(22, 5),
     });
+
     await save(store, {
       type: "finish",
       visitId: visitOf(priya),
@@ -90,7 +101,6 @@ describe("liveTable", () => {
     expect(table).toMatchObject({ startedAt: at(21), inPlay: 50000, playing: 3, closed: false });
     expect(table.seats[0]!.visitId).toBe(visitOf(mine));
 
-    // Cashing out another player leaves the table open until the last player.
     expect(cashOutNote(table.seats, visitOf(dev))).toBe(
       "Dev's visit ends. You and Jonah keep playing.",
     );
@@ -111,17 +121,19 @@ describe("liveTable", () => {
     const starter = await save(store, { type: "start", buyIn: 20000, startedAt: at(21) });
     const tableId = state(store).tables[0]!.id;
     const local = recordingTable(state(store), tableId)!;
-    // The same device seen as a joiner: its own visit is local, the starter's comes from the server.
+
     const bea = PlayerIdentity.make({
-      id: "0192e7a0-0000-7000-8000-00000000be00" as PlayerId,
+      id: PlayerId.make("0192e7a0-0000-7000-8000-00000000be00"),
       displayName: "Bea",
     });
+
     const joined = {
       ...local,
       role: "participant" as const,
       you: { player: bea, playing: null },
       visits: [],
     };
+
     const server: TableView = {
       table: local.table,
       players: [state(store).self, bea],
@@ -132,6 +144,7 @@ describe("liveTable", () => {
       appointable: [],
       shared: false,
     };
+
     const table = liveTable(joined, server);
     expect(table.seats.map((seat) => [seat.name, seat.recordable])).toEqual([
       [state(store).self.displayName, false],
@@ -141,12 +154,16 @@ describe("liveTable", () => {
   });
 
   it("words a cash-out for the last player and for a crowd", () => {
+    // SAFETY: cashOutNote only compares visit ids, so these fixture labels never need to be UUIDs.
+    const visit = (name: string) => name as VisitId;
+
     const seat = (name: string, playing = true, isSelf = false) => ({
-      visitId: name as VisitId,
+      visitId: visit(name),
       name: isSelf ? "You" : name,
       isSelf,
       playing,
     });
+
     const seats = [
       seat("You", true, true),
       seat("Priya"),
@@ -154,13 +171,14 @@ describe("liveTable", () => {
       seat("Jonah"),
       seat("Sam", false),
     ];
-    expect(cashOutNote(seats, "Priya" as VisitId)).toBe(
+
+    expect(cashOutNote(seats, visit("Priya"))).toBe(
       "Priya's visit ends. You, Dev and Jonah keep playing.",
     );
-    expect(cashOutNote([seat("Priya"), seat("Dev")], "Priya" as VisitId)).toBe(
+    expect(cashOutNote([seat("Priya"), seat("Dev")], visit("Priya"))).toBe(
       "Priya's visit ends. Dev keeps playing.",
     );
-    expect(cashOutNote([seat("Priya"), seat("Sam", false)], "Priya" as VisitId)).toBe(
+    expect(cashOutNote([seat("Priya"), seat("Sam", false)], visit("Priya"))).toBe(
       "Priya's visit ends, and with it the table.",
     );
   });
@@ -170,6 +188,7 @@ it("tells two players with the same name apart", async () => {
   const store = await open();
   await save(store, { type: "open_table" });
   const tableId = state(store).tables[0]!.id;
+
   for (const buyIn of [20000, 10000])
     await save(store, {
       type: "join_table",

@@ -4,12 +4,6 @@ import { View } from "react-native";
 import { cn } from "../components/ui/cn";
 import { Skeleton } from "../components/ui/Surface";
 
-/*
- * Each screen's loading state is drawn at the size of the screen it stands in for: the same title,
- * cards, rows and gaps, so nothing moves when the real screen arrives. Text sits in a line box the
- * height of the text it replaces, with a shorter bar inside, the way a line of type looks.
- */
-
 const lines = {
   sm: ["h-5", "h-3"],
   base: ["h-6", "h-3.5"],
@@ -18,7 +12,6 @@ const lines = {
   figure: ["h-16", "h-12"],
 } as const;
 
-/** A line of text that hasn't loaded, `className` setting its width. */
 function SkeletonText({
   size = "base",
   className,
@@ -27,6 +20,7 @@ function SkeletonText({
   className?: string;
 }) {
   const [box, bar] = lines[size];
+
   return (
     <View className={cn("justify-center", box, className)}>
       <Skeleton className={cn("w-full", bar)} />
@@ -37,7 +31,6 @@ function SkeletonText({
 const titleWidths = ["w-32", "w-44", "w-28", "w-40"];
 const keys = (count: number) => Array.from({ length: count }, (_, i) => `placeholder-${i}`);
 
-/** A screen loading, announced once to screen readers. */
 function SkeletonScreen({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View accessible accessibilityLabel={label} accessibilityRole="progressbar" className="gap-6">
@@ -86,7 +79,6 @@ export function RowsSkeleton({
   );
 }
 
-/** A section heading and its content. `action` is a heading with a button, which stands taller. */
 function SectionSkeleton({ action = false, children }: { action?: boolean; children: ReactNode }) {
   return (
     <View className="gap-2">
@@ -98,7 +90,6 @@ function SectionSkeleton({ action = false, children }: { action?: boolean; child
   );
 }
 
-/** A hero card: label, figure, comparison, then the trip card's 96px chart and three tiles. */
 function HeroSkeleton() {
   return (
     <View className="overflow-hidden rounded-xl bg-surface">
@@ -233,7 +224,6 @@ export function InviteLinkSkeleton() {
   );
 }
 
-/** A group's members, each with their chip and role. */
 function MembersSkeleton() {
   return (
     <View className="overflow-hidden rounded-xl bg-surface">

@@ -12,10 +12,12 @@ export const counterpartiesAt = (
   tableId: TableId,
   playerId: PlayerId,
   view: TableView | null = null,
-): ReadonlyArray<PlayerIdentity> => {
+) => {
   const known = new Map<PlayerId, PlayerIdentity>();
+
   for (const player of [...(state?.players ?? []), ...(view?.players ?? [])])
     known.set(player.id, player);
+
   const ids = new Set<PlayerId>([
     ...(state?.tables.filter((table) => table.id === tableId).map((t) => t.starterPlayerId) ?? []),
     ...(state?.visits.filter((visit) => visit.tableId === tableId).map((v) => v.playerId) ?? []),
@@ -23,11 +25,15 @@ export const counterpartiesAt = (
       []),
     ...(view?.table.id === tableId ? view.players.map((player) => player.id) : []),
   ]);
+
   ids.delete(playerId);
+
   return [...ids]
     .flatMap((id) => {
       const player = known.get(id);
+
       if (!player) return [];
+
       return [id === state?.self.id ? { ...player, displayName: "You" } : player];
     })
     .toSorted((a, b) => a.displayName.localeCompare(b.displayName));

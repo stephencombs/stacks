@@ -1,21 +1,23 @@
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
-import { catalogVenue, groupWith, ids, owe, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
-import { seedSession } from "../testing/legacySessions.ts";
+import { catalogVenue, groupWith, ids, owe, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
+import { seedSession } from "../testing/legacySessions.test-utils.ts";
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
+it.layer(TestApi.layer)("guests", (it) => {
   it.effect("hands a guest's history to whoever claims it", () =>
     Effect.gen(function* () {
       const { alex, gus } = yield* users("alex", "gus");
       const group = yield* groupWith(alex);
       const groupId = group.group.id;
       const guestId = ids.player();
+
       const withGuest = yield* alex.guests.add({
         params: { groupId },
         payload: { id: guestId, displayName: "Gus" },
       });
+
       const guest = withGuest.players.find((player) => player.id === guestId)!;
       expect(guest).toMatchObject({ userId: null, role: null });
 
@@ -31,10 +33,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
       const trip = yield* gus.trips.get({ params: { tripId: group.tripId } });
       expect(trip.balances).toContainEqual({ playerId: guestId, amount: -4000 });
       expect(
-        yield* Effect.flip(gus.guests.previewClaim({ params: { code: guest.claimCode! } })),
-      ).toMatchObject({
-        _tag: "NotFound",
-      });
+        (yield* Effect.flip(gus.guests.previewClaim({ params: { code: guest.claimCode! } })))._tag,
+      ).toBe("NotFound");
     }),
   );
 
@@ -44,15 +44,18 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
       const group = yield* groupWith(alex, gus);
       const groupId = group.group.id;
       const guestId = ids.player();
+
       const withGuest = yield* alex.guests.add({
         params: { groupId },
         payload: { id: guestId, displayName: "Jonah" },
       });
+
       const code = withGuest.players.find((player) => player.id === guestId)!.claimCode!;
 
       expect(yield* zed.guests.previewClaim({ params: { code } })).toMatchObject({
         alreadyMember: false,
       });
+
       for (const member of [alex, gus]) {
         expect(yield* member.guests.previewClaim({ params: { code } })).toMatchObject({
           alreadyMember: true,
@@ -82,10 +85,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
       const group = yield* groupWith(alex, gus);
       const groupId = group.group.id;
       const guestId = ids.player();
+
       const withGuest = yield* alex.guests.add({
         params: { groupId },
         payload: { id: guestId, displayName: "Gus" },
       });
+
       const code = withGuest.players.find((player) => player.id === guestId)!.claimCode!;
       yield* gus.groups.leave({ params: { groupId } });
 
@@ -109,10 +114,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("guests", (it) => {
         notes: null,
       });
       const guestId = ids.player();
+
       const withGuest = yield* alex.guests.add({
         params: { groupId },
         payload: { id: guestId, displayName: "Gus" },
       });
+
       const code = withGuest.players.find((player) => player.id === guestId)!.claimCode!;
       yield* gus.groups.leave({ params: { groupId } });
 

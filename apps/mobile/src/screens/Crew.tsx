@@ -5,6 +5,9 @@ import {
   GroupId,
   MinorUnits,
   type CrewActivityItem,
+  type SessionId,
+  type TripId,
+  type VisitId,
   type GroupDetail,
   type GroupListItem,
   type PlayerId,
@@ -30,6 +33,7 @@ import { useRecordingClock } from "@stacks/client-runtime/recordingReact";
 import { chipOf, closedPlays, localClock, tripDates, tripPlays } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import type * as DateTime from "effect/DateTime";
+import * as Match from "effect/Match";
 import { useState, type ReactNode } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -61,6 +65,7 @@ import { Loaded, TripLoaded, useAction, useStacks } from "../lib/stacks";
 export function CrewScreen() {
   const stacks = useStacks();
   const [sheet, setSheet] = useState<"groups" | "create" | null>(null);
+
   return (
     <Screen
       live={Platform.OS !== "android"}
@@ -114,6 +119,7 @@ export function CrewScreen() {
 
 export function CrewGroupsButton() {
   const go = useGo();
+
   return <Button label="Groups" size="sm" onPress={go.groups} />;
 }
 
@@ -124,6 +130,7 @@ export function GroupsScreen() {
   const insets = useSafeAreaInsets();
   const [creating, setCreating] = useState(false);
   const select = (groupId: GroupId) => go.group(groupId, { replace: true });
+
   return (
     <Screen
       live={false}
@@ -180,6 +187,7 @@ function CrewSkeleton() {
 
 function Feed({ groups }: { groups: ReadonlyArray<GroupListItem> }) {
   const pinned = pinnedTrip(groups);
+
   return (
     <>
       {pinned ? (
@@ -198,16 +206,17 @@ function Feed({ groups }: { groups: ReadonlyArray<GroupListItem> }) {
   );
 }
 
-/** The trip going now: who's at a table, and the top of its standings. */
 function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const go = useGo();
   const names = playerNames(group);
   const android = Platform.OS === "android";
   const name = (id: PlayerId) => (id === group.myPlayerId ? "You" : (names.get(id) ?? "Someone"));
   const playing = livePlayerIds(tripPlays(trip));
+
   const top = tripStandings(closedPlays(trip), localClock)
     .toSorted((a, b) => a.rank - b.rank)
     .slice(0, 3);
+
   return (
     <Surface>
       <Pressable
@@ -308,7 +317,6 @@ function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   );
 }
 
-/** One page of activity; older pages load under it, one at a time. */
 function ActivityPage({
   groups,
   cursor,
@@ -318,13 +326,16 @@ function ActivityPage({
 }) {
   const stacks = useStacks();
   const [older, setOlder] = useState(false);
+
   return (
     <Loaded query={stacks.crewActivity(cursor)} skeleton={<RowsSkeleton rows={cursor ? 2 : 4} />}>
       {(page) => {
         const items = crewFeed(page.items, groups);
+
         const activity = items.map((item) => (
           <ActivityRow key={activityKey(item)} item={item} me={myPlayer(groups, item)} />
         ));
+
         return (
           <View className="gap-3">
             {items.length > 0 ? (
@@ -350,9 +361,41 @@ function ActivityPage({
   );
 }
 
-/** Your player in the item's group, so your own result reads "You". */
 const myPlayer = (groups: ReadonlyArray<GroupListItem>, item: CrewActivityItem) =>
   groups.find((group) => group.group.id === item.group.id)?.myPlayerId;
+
+function isSessionTarget<
+  T extends { readonly kind: string; readonly sessionId?: SessionId | undefined },
+>(item: T): item is T & { readonly sessionId: SessionId } {
+  return item.kind === "session" && item.sessionId !== undefined;
+}
+
+function isVisitTarget<T extends { readonly kind: string; readonly visitId?: VisitId | undefined }>(
+  item: T,
+): item is T & { readonly visitId: VisitId } {
+  return item.kind === "visit" && item.visitId !== undefined;
+}
+
+function isTripTarget<T extends { readonly kind: string; readonly tripId?: TripId | undefined }>(
+  item: T,
+): item is T & { readonly tripId: TripId } {
+  return item.kind === "trip" && item.tripId !== undefined;
+}
+
+function isLiveHappening<
+  T extends { readonly kind: string; readonly trip?: { readonly name: string } | undefined },
+>(item: T): item is T & { readonly kind: "live" } {
+  return item.kind === "live";
+}
+
+function isStartedHappening<
+  T extends {
+    readonly kind: string;
+    readonly trip?: { readonly name: string; readonly startedAt: DateTime.Utc } | undefined;
+  },
+>(item: T): item is T & { readonly trip: NonNullable<T["trip"]> } {
+  return item.kind === "started" && item.trip !== undefined;
+}
 
 const activityKey = (item: CrewActivityItem) => {
   switch (item.kind) {
@@ -367,25 +410,29 @@ const activityKey = (item: CrewActivityItem) => {
   }
 };
 
-/** A row of the feed: who's playing where, how a table went, or a trip starting. */
 function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | undefined }) {
   const { privacyMode } = usePreferences();
   const go = useGo();
   const navigation = useNavigation();
   const target = activityTarget(item);
+
   const open = () =>
-    target.kind === "session"
-      ? go.session(target.sessionId)
-      : target.kind === "visit"
-        ? navigation.navigate("Play", { visitId: target.visitId })
-        : go.trip(target.tripId);
+    Match.value(target).pipe(
+      Match.when(isSessionTarget, (row) => go.session(row.sessionId)),
+      Match.when(isVisitTarget, (row) => navigation.navigate("Play", { visitId: row.visitId })),
+      Match.when(isTripTarget, (row) => go.trip(row.tripId)),
+      Match.orElse(() => undefined),
+    );
+
   const hint = target.kind === "trip" ? "Opens the trip" : "Opens the session";
   const android = Platform.OS === "android";
   const finished = item.kind === "session_finished" || item.kind === "table_finished";
+
   const firstPlayer =
     item.kind === "trip_started" || (finished && item.players.length > 1)
       ? undefined
       : item.players[0];
+
   const row = (title: string, meta: string, trailing?: ReactNode, results?: ReactNode) => {
     const contents = (
       <Row
@@ -415,11 +462,14 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
         {android ? null : <Icon name="chevron-right" color="faint" />}
       </Row>
     );
+
     return android ? <List>{contents}</List> : contents;
   };
+
   if (item.kind === "trip_started") {
     if (!android)
       return row(`${item.trip.name} started`, `${item.group.name} · ${formatDay(item.startedAt)}`);
+
     return row(
       item.group.name,
       formatDay(item.startedAt),
@@ -427,14 +477,18 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
       <Text className="type-callout text-ink">Started {item.trip.name}</Text>,
     );
   }
+
   const venue = item.venue?.name ?? "a table";
+
   const game =
     item.kind === "table_live" || item.kind === "table_finished"
       ? item.game && gameNames[item.game]
       : null;
+
   if (item.kind === "session_live" || item.kind === "table_live") {
     if (android) {
       const players = nameList(item.players.map((player) => player.displayName));
+
       return row(
         players || venue,
         `Now · ${item.trip.name}`,
@@ -446,16 +500,20 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
         </Text>,
       );
     }
+
     return row(
       `${nameList(item.players.map((player) => player.displayName))} at ${venue}`,
       [game, item.trip.name, `since ${formatTime(item.startedAt)}`].filter(Boolean).join(" · "),
       <Tag tone="live">Live</Tag>,
     );
   }
+
   const results = item.players.toSorted((a, b) => b.net - a.net);
+
   if (android && results.length === 1 && firstPlayer) {
     const player = results[0]!;
     const name = player.playerId === me ? "You" : player.displayName;
+
     return row(
       name,
       `${formatDay(item.endedAt)} · ${item.trip.name}`,
@@ -479,13 +537,17 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
       </Text>,
     );
   }
+
   const seenGuests = new Map<string, number>();
+
   const playerKey = (playerId: (typeof results)[number]["playerId"], displayName: string) => {
     if (playerId) return playerId;
     const n = (seenGuests.get(displayName) ?? 0) + 1;
     seenGuests.set(displayName, n);
+
     return `guest-${displayName}-${n}`;
   };
+
   return row(
     venue,
     [game, item.trip.name, `${formatDay(item.endedAt)}, ${formatTime(item.endedAt)}`]
@@ -511,6 +573,7 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
 
 function ActivityLiveDuration({ startedAt }: { startedAt: DateTime.Utc }) {
   const now = useRecordingClock();
+
   return <Text className="font-semibold text-live">live {formatDuration(startedAt, now)}</Text>;
 }
 
@@ -522,13 +585,17 @@ function ActivityChip({
   player: { playerId: PlayerId | null; displayName: string };
 }) {
   const stacks = useStacks();
+
   const neutral = (
     <View className="size-8 items-center justify-center rounded-full bg-fill">
       <Icon name="person" color="muted" size={18} />
     </View>
   );
+
   const { playerId, displayName } = player;
+
   if (!playerId) return neutral;
+
   return (
     <Loaded query={stacks.group(groupId)} skeleton={neutral} renderError={() => neutral}>
       {(detail) => <Chip chip={chipOf(detail, playerId)} name={displayName} size={32} ring />}
@@ -538,10 +605,6 @@ function ActivityChip({
 
 const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "MXN", "JPY"] as const;
 
-/**
- * Your groups, with who's in each and what it has going, and a new one. No amounts: debts come
- * later. One sheet for both, so starting a group never stacks a sheet on a sheet.
- */
 function GroupsSheet({
   groups,
   mode,
@@ -554,7 +617,9 @@ function GroupsSheet({
   onClose: () => void;
 }) {
   const go = useGo();
+
   if (mode === "create") return <CreateGroupSheet onClose={onClose} />;
+
   return (
     <Sheet
       open={mode === "groups"}
@@ -599,15 +664,17 @@ function GroupRows({
 function GroupRow({ item }: { item: GroupListItem }) {
   const stacks = useStacks();
   const happening = groupHappening(item);
+
   if (Platform.OS === "android") {
-    const status =
-      happening.kind === "live"
-        ? happening.trip
-          ? `${happening.trip.name} is live`
-          : "Live now"
-        : happening.kind === "started"
-          ? `${happening.trip.name} started ${formatDay(happening.trip.startedAt)}`
-          : "No trips yet";
+    const status = Match.value(happening).pipe(
+      Match.when(isLiveHappening, (live) => (live.trip ? `${live.trip.name} is live` : "Live now")),
+      Match.when(
+        isStartedHappening,
+        (started) => `${started.trip.name} started ${formatDay(started.trip.startedAt)}`,
+      ),
+      Match.orElse(() => "No trips yet"),
+    );
+
     return (
       <Loaded
         query={stacks.group(item.group.id)}
@@ -618,6 +685,7 @@ function GroupRow({ item }: { item: GroupListItem }) {
           const people = detail.players.filter(
             (player) => player.role !== null || player.claimCode !== null,
           );
+
           return (
             <>
               <View className="flex-row">
@@ -642,14 +710,18 @@ function GroupRow({ item }: { item: GroupListItem }) {
       </Loaded>
     );
   }
-  const line =
-    happening.kind === "live"
-      ? happening.trip
-        ? `Live now · ${happening.trip.name}`
-        : "Live now"
-      : happening.kind === "started"
-        ? `${happening.trip.name} · started ${formatDay(happening.trip.startedAt)}`
-        : "No trips yet";
+
+  const line = Match.value(happening).pipe(
+    Match.when(isLiveHappening, (live) =>
+      live.trip ? `Live now · ${live.trip.name}` : "Live now",
+    ),
+    Match.when(
+      isStartedHappening,
+      (started) => `${started.trip.name} · started ${formatDay(started.trip.startedAt)}`,
+    ),
+    Match.orElse(() => "No trips yet"),
+  );
+
   return (
     <View className="flex-1 gap-0.5">
       <View className="flex-row items-center gap-2">
@@ -706,6 +778,7 @@ function CreateGroupSheet({
   const submit = async () => {
     if (!name.trim()) return setNameError("Give the group a name.");
     setNameError(null);
+
     const detail = await create.run({
       payload: {
         id: GroupId.make(newId()),
@@ -714,6 +787,7 @@ function CreateGroupSheet({
         displayName: displayName.trim() || "Me",
       },
     });
+
     if (detail) {
       onClose();
       (onCreated ?? go.group)(detail.group.id);

@@ -11,12 +11,14 @@ import {
 } from "@stacks/contracts";
 import { isTableCommand, RecordingCommand } from "@stacks/contracts/recordingCommands";
 import * as DateTime from "effect/DateTime";
+import * as Match from "effect/Match";
 import * as Schema from "effect/Schema";
 
 export const RecordingReceipt = Schema.Struct({
   command: RecordingCommand,
   revision: Schema.Int.check(Schema.isGreaterThan(1)),
 });
+
 export type RecordingReceipt = typeof RecordingReceipt.Type;
 
 /** A player at a table: who joined it through its link or an invite, or who records for it. */
@@ -72,7 +74,7 @@ export const authorize = (
   (actorPlayers.includes(playerId) && at(participants, table.id, playerId));
 
 /** The players a device records as: its own, and the ones it joined other tables as. */
-export const ownPlayers = (state: RecordingLedger): ReadonlyArray<PlayerId> => [
+export const ownPlayers = (state: RecordingLedger) => [
   ...new Set([state.self.id, ...(state.ownedPlayerIds ?? [])]),
 ];
 
@@ -91,8 +93,9 @@ const requireValid: (condition: unknown, message: string) => asserts condition =
 ) => {
   if (!condition) throw new RecordingError("invalid", message);
 };
+
 const ms = DateTime.toEpochMillis;
-// The live cash-out that last finished the visit, following corrections to its replacement.
+
 export const finalCashOut = (current: EntryId | null, command: RecordingCommand) => {
   switch (command.type) {
     case "record_completed":
@@ -107,8 +110,9 @@ export const finalCashOut = (current: EntryId | null, command: RecordingCommand)
       return current;
   }
 };
+
 /** The entries a command creates, in a stable order. */
-export const createdEntryIds = (command: RecordingCommand): ReadonlyArray<EntryId> =>
+export const createdEntryIds = (command: RecordingCommand) =>
   command.type === "start" || command.type === "join_table"
     ? [command.buyInId]
     : command.type === "record_completed"
@@ -123,28 +127,29 @@ export const createdEntryIds = (command: RecordingCommand): ReadonlyArray<EntryI
 export const visitLiveEntryIds = (receipts: ReadonlyArray<RecordingReceipt>, visitId: VisitId) => {
   const live = new Set<EntryId>();
   let final: EntryId | null = null;
+
   for (const { command } of receipts) {
     if (!("visitId" in command) || command.visitId !== visitId) continue;
+
     for (const id of createdEntryIds(command)) live.add(id);
+
     if (command.type === "correct") live.delete(command.entryId);
+
     if (command.type === "reopen" && final !== null) live.delete(final);
     final = finalCashOut(final, command);
   }
+
   return live;
 };
 
-/**
- * Applies one command. `actorPlayers` are the players bound to the command's actor: on a device,
- * its own players; on the server, what the database binds to the authenticated actor. `null`
- * applies a command the server already accepted, from whichever actor made it: a device can't
- * know another actor's players, and the server checked them.
- */
 /** Custom name only applies when the game is `"other"`, trimmed to at most 60 characters. */
 export const normalizeGameName = (game: Table["game"], gameName: string | null | undefined) => {
   if (game !== "other" || gameName === null || gameName === undefined) return null;
   const trimmed = gameName.trim();
+
   if (trimmed === "") return null;
   requireValid(trimmed.length <= 60, "Keep the game name to 60 characters.");
+
   return trimmed;
 };
 
@@ -152,11 +157,12 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
   state: S,
   command: RecordingCommand,
   actorPlayers: ReadonlyArray<PlayerId> | null = ownPlayers(state),
-): S => {
+) => {
   requireValid(
     actorPlayers === null || command.actorId === state.actor.id,
     "Command has a foreign local actor.",
   );
+
   const forbid = (table: Pick<Table, "id" | "starterPlayerId">, playerId: PlayerId) => {
     if (
       actorPlayers !== null &&
@@ -164,24 +170,26 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     )
       throw new RecordingError("forbidden", "You can record only your own play at this table.");
   };
+
   const receipts = [...state.receipts, { command, revision: state.receipts.length + 2 }];
+
   if (isTableCommand(command)) {
     const table = state.tables.find((table) => table.id === command.tableId);
     requireValid(table, "Table does not exist.");
-    // Only the server knows who has an account and every way a player came to the table.
+
     if (actorPlayers !== null && !actorPlayers.includes(table.starterPlayerId))
       throw new RecordingError("forbidden", "Only the player who started this table can do that.");
     requireValid(table.deletedAt === undefined, "This table was deleted.");
+
     if (command.type === "delete_table") {
-      // A visit deleted since still means someone played here.
       requireValid(
         !state.visits.some((item) => item.tableId === table.id),
         "Someone has played at this table, so it can't be deleted.",
       );
+
       return {
         ...state,
         tables: state.tables.map((item) =>
-          // Out of its trip too, so the trip keeps nothing of a table nobody played at.
           item.id === table.id
             ? Table.make({ ...table, tripId: null, deletedAt: command.preparedAt })
             : item,
@@ -189,6 +197,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         receipts,
       };
     }
+
     if (command.type === "set_table_trip")
       return {
         ...state,
@@ -204,6 +213,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         ? "This player already records for the table."
         : "This player doesn't record for the table.",
     );
+
     return {
       ...state,
       recorders:
@@ -215,39 +225,56 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       receipts,
     };
   }
+
   if (command.type === "open_table") {
     if (actorPlayers !== null && command.playerId !== state.self.id)
       throw new RecordingError("forbidden", "Start a table as yourself.");
-    // A table someone else opened came with the history, for a device that records there.
+
     const known =
       actorPlayers === null && state.tables.some((table) => table.id === command.tableId);
+
     requireValid(
       known || !state.tables.some((table) => table.id === command.tableId),
       "Start IDs are already used.",
     );
+
     if (known) return { ...state, receipts };
     const gameName = normalizeGameName(command.game, command.gameName);
+
     return {
       ...state,
       tables: [
         ...state.tables,
-        Table.make({
-          id: command.tableId,
-          tripId: null,
-          game: command.game,
-          ...(gameName === null ? {} : { gameName }),
-          venueId: command.venueId,
-          highLimit: command.highLimit,
-          starterPlayerId: command.playerId,
-        }),
+        Table.make(
+          gameName === null
+            ? {
+                id: command.tableId,
+                tripId: null,
+                game: command.game,
+                venueId: command.venueId,
+                highLimit: command.highLimit,
+                starterPlayerId: command.playerId,
+              }
+            : {
+                id: command.tableId,
+                tripId: null,
+                game: command.game,
+                gameName,
+                venueId: command.venueId,
+                highLimit: command.highLimit,
+                starterPlayerId: command.playerId,
+              },
+        ),
       ],
       receipts,
     };
   }
+
   const tables = [...state.tables];
   const players = [...state.players];
   let visits = [...state.visits];
   let entries = [...state.entries];
+
   const append = (
     id: EntryId,
     visitId: Visit["id"],
@@ -266,12 +293,16 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       "Leave Paid by and Paid to empty for the player's own money.",
     );
     requireValid(
-      kind === "buy_in" ? amount > 0 : kind === "cash_out" ? amount >= 0 : amount !== 0,
-      kind === "buy_in"
-        ? "A buy-in must be more than zero."
-        : kind === "cash_out"
-          ? "A cash-out can't be negative."
-          : "An adjustment can't be zero.",
+      Match.value(kind).pipe(
+        Match.when("buy_in", () => amount > 0),
+        Match.when("cash_out", () => amount >= 0),
+        Match.orElse(() => amount !== 0),
+      ),
+      Match.value(kind).pipe(
+        Match.when("buy_in", () => "A buy-in must be more than zero."),
+        Match.when("cash_out", () => "A cash-out can't be negative."),
+        Match.orElse(() => "An adjustment can't be zero."),
+      ),
     );
     entries.push(
       PlayEntry.make({
@@ -292,6 +323,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       }),
     );
   };
+
   const openAt = (tableId: Table["id"], playerId: PlayerId) =>
     visits.some(
       (visit) =>
@@ -300,6 +332,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         visit.finishedAt === null &&
         visit.deletedAt === undefined,
     );
+
   if (
     command.type === "start" ||
     command.type === "record_completed" ||
@@ -310,9 +343,10 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       requireValid(table, "Table does not exist.");
       forbid(table, command.playerId);
       requireValid(table.deletedAt === undefined, "This table was deleted.");
-      // A player the server already holds came with the history, as someone at the table.
+
       const known =
         actorPlayers === null && players.some((player) => player.id === command.playerId);
+
       if (command.newPlayer && !known) {
         requireValid(
           command.newPlayer.id === command.playerId &&
@@ -321,6 +355,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         );
         players.push(PlayerIdentity.make(command.newPlayer));
       }
+
       requireValid(
         players.some((player) => player.id === command.playerId),
         "Add the player before recording their play.",
@@ -336,28 +371,40 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     } else {
       if (actorPlayers !== null && command.playerId !== state.self.id)
         throw new RecordingError("forbidden", "Start a table as yourself.");
-      // A table someone else started came with the history; its start only adds their visit.
       const known = actorPlayers === null && tables.some((table) => table.id === command.tableId);
       requireValid(
         !visits.some((visit) => visit.id === command.visitId) &&
           (known || !tables.some((table) => table.id === command.tableId)),
         "Start IDs are already used.",
       );
+
       if (!known) {
         const gameName = normalizeGameName(command.game, command.gameName);
         tables.push(
-          Table.make({
-            id: command.tableId,
-            tripId: null,
-            game: command.game,
-            ...(gameName === null ? {} : { gameName }),
-            venueId: command.venueId,
-            highLimit: command.highLimit,
-            starterPlayerId: command.playerId,
-          }),
+          Table.make(
+            gameName === null
+              ? {
+                  id: command.tableId,
+                  tripId: null,
+                  game: command.game,
+                  venueId: command.venueId,
+                  highLimit: command.highLimit,
+                  starterPlayerId: command.playerId,
+                }
+              : {
+                  id: command.tableId,
+                  tripId: null,
+                  game: command.game,
+                  gameName,
+                  venueId: command.venueId,
+                  highLimit: command.highLimit,
+                  starterPlayerId: command.playerId,
+                },
+          ),
         );
       }
     }
+
     visits.push(
       Visit.make({
         id: command.visitId,
@@ -378,6 +425,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       null,
       command.type === "join_table" ? (command.counterpartyId ?? null) : null,
     );
+
     if (command.type === "record_completed")
       append(command.cashOutId, command.visitId, "cash_out", command.cashOut, command.finishedAt);
   } else {
@@ -385,6 +433,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     requireValid(visit, "Visit does not exist.");
     const table = tables.find((table) => table.id === visit.tableId);
     requireValid(table, "Table does not exist.");
+
     if (command.type === "delete_visit" || command.type === "restore_visit") {
       if (actorPlayers !== null && !actorPlayers.includes(visit.playerId))
         throw new RecordingError("forbidden", "You can delete or restore only your own sessions.");
@@ -399,6 +448,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         "Imported history is read-only.",
       );
     } else forbid(table, visit.playerId);
+
     if (visit.revision !== command.expectedRevision)
       throw new RecordingError(
         "conflict",
@@ -416,6 +466,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     let deletedAt = visit.deletedAt;
     let finishedAt = visit.finishedAt;
     let startedAt = visit.startedAt;
+
     if (command.type === "delete_visit") {
       deletedAt = command.preparedAt;
       entries = entries.map((entry) =>
@@ -446,6 +497,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         command.startedAt !== undefined || command.table !== undefined,
         "Change the start time, game or venue.",
       );
+
       if (command.startedAt !== undefined) {
         const start = command.startedAt;
         requireValid(
@@ -458,6 +510,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         );
         startedAt = start;
       }
+
       if (command.table !== undefined) {
         if (
           actorPlayers !== null &&
@@ -476,19 +529,22 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         const gameName = normalizeGameName(command.table.game, command.table.gameName);
         const { gameName: _previousGameName, ...rest } = table;
         const index = tables.findIndex((item) => item.id === table.id);
-        tables[index] = Table.make({
+
+        const next = {
           ...rest,
           game: command.table.game,
           venueId: command.table.venueId,
           highLimit: command.table.highLimit,
-          ...(gameName === null ? {} : { gameName }),
-        });
+        };
+
+        tables[index] = Table.make(gameName === null ? next : { ...next, gameName });
       }
     } else if (command.type === "add" || command.type === "finish") {
       requireValid(
         visit.finishedAt === null,
         "This visit has finished. Start a new visit when returning.",
       );
+
       if (command.type === "add")
         append(
           command.entryId,
@@ -520,6 +576,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         "This player is playing at this table again. Correct that visit instead.",
       );
       finishedAt = null;
+
       const final = state.receipts.reduce<EntryId | null>(
         (current, receipt) =>
           "visitId" in receipt.command && receipt.command.visitId === visit.id
@@ -527,6 +584,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
             : current,
         null,
       );
+
       entries = entries.map((entry) =>
         entry.id === final
           ? PlayEntry.make({
@@ -557,6 +615,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
             })
           : entry,
       );
+
       if (command.replacement !== null) {
         const replacement = command.replacement;
         append(
@@ -571,16 +630,21 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         );
       }
     }
+
     const { deletedAt: _deletedAt, ...restored } = visit;
-    const updated = Visit.make({
+
+    const revised = {
       ...restored,
       startedAt,
       finishedAt,
       revision: visit.revision + 1,
-      ...(deletedAt === undefined ? {} : { deletedAt }),
-    });
+    };
+
+    const updated = Visit.make(deletedAt === undefined ? revised : { ...revised, deletedAt });
+
     visits = visits.map((item) => (item.id === visit.id ? updated : item));
   }
+
   return {
     ...state,
     players,

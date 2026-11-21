@@ -8,5 +8,6 @@ import { Platform } from "react-native";
  */
 export function FeltStatusBar({ felt }: { felt: boolean }) {
   const focused = useIsFocused();
+
   return felt && focused && Platform.OS === "android" ? <StatusBar style="light" /> : null;
 }

@@ -50,7 +50,6 @@ export default Effect.gen(function* () {
     )
   `;
 
-  // Ledger rows point at players, never users, so a guest's history survives being claimed.
   yield* sql`
     create table players (
       id uuid primary key,
@@ -133,7 +132,6 @@ export default Effect.gen(function* () {
   `;
 
   yield* sql`create type entry_kind as enum ('buy_in', 'cash_out', 'adjustment', 'settlement')`;
-  // The composite keys keep every player and session on an entry inside the entry's group.
   yield* sql`
     create table entries (
       id uuid primary key,
@@ -168,7 +166,6 @@ export default Effect.gen(function* () {
   yield* sql`create index entries_group on entries (group_id, occurred_at)`;
   yield* sql`create index entries_session on entries (session_id) where session_id is not null`;
 
-  // Entries are never edited: an update may only void a live entry, and nothing is deleted.
   yield* sql`
     create function entries_append_only() returns trigger language plpgsql as $$
     begin

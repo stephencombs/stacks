@@ -17,13 +17,13 @@ export interface PlayerResult {
 }
 
 /** Each player's result across the given entries. Voided entries don't count. */
-export const playerResults = (
-  entries: Iterable<ResultEntry>,
-): ReadonlyMap<PlayerId, PlayerResult> => {
+export const playerResults = (entries: Iterable<ResultEntry>) => {
   const totals = new Map<PlayerId, { buyIn: number; cashOut: number; adjustment: number }>();
+
   for (const entry of entries) {
     if (entry.voidedAt !== null) continue;
     const player = totals.get(entry.playerId) ?? { buyIn: 0, cashOut: 0, adjustment: 0 };
+
     if (entry.kind === "buy_in") player.buyIn += entry.amount;
     else if (entry.kind === "cash_out") player.cashOut += entry.amount;
     else player.adjustment += entry.amount;
@@ -31,6 +31,7 @@ export const playerResults = (
   }
 
   const results = new Map<PlayerId, PlayerResult>();
+
   for (const [playerId, { buyIn, cashOut, adjustment }] of totals) {
     results.set(playerId, {
       buyIn: MinorUnits.make(buyIn),
@@ -39,14 +40,14 @@ export const playerResults = (
       net: MinorUnits.make(cashOut + adjustment - buyIn),
     });
   }
+
   return results;
 };
 
 /** Each player's results added up across several ledgers, such as sessions and tables. */
-export const mergeResults = (
-  parts: Iterable<ReadonlyMap<PlayerId, PlayerResult>>,
-): ReadonlyMap<PlayerId, PlayerResult> => {
+export const mergeResults = (parts: Iterable<ReadonlyMap<PlayerId, PlayerResult>>) => {
   const totals = new Map<PlayerId, { buyIn: number; cashOut: number; adjustment: number }>();
+
   for (const part of parts)
     for (const [playerId, result] of part) {
       const player = totals.get(playerId) ?? { buyIn: 0, cashOut: 0, adjustment: 0 };
@@ -55,6 +56,7 @@ export const mergeResults = (
       player.adjustment += result.adjustment;
       totals.set(playerId, player);
     }
+
   return new Map(
     Array.from(totals, ([playerId, { buyIn, cashOut, adjustment }]) => [
       playerId,
@@ -76,13 +78,16 @@ export const resultsBy = <S extends Pick<Session, "id">, K>(
   sessions: Iterable<S>,
   entries: Iterable<ResultEntry & Pick<Entry, "sessionId">>,
   key: (session: S) => K,
-): ReadonlyMap<K, ReadonlyMap<PlayerId, PlayerResult>> => {
+) => {
   const keyBySession = new Map<SessionId, { readonly key: K }>();
+
   for (const session of sessions) keyBySession.set(session.id, { key: key(session) });
 
   const grouped = new Map<K, Array<ResultEntry>>();
+
   for (const entry of entries) {
     const session = entry.sessionId === null ? undefined : keyBySession.get(entry.sessionId);
+
     if (!session) continue;
     const group = grouped.get(session.key) ?? [];
     group.push(entry);
@@ -102,15 +107,17 @@ export interface SessionRuns {
 }
 
 /** Wins and streaks over one player's session results, oldest first. */
-export const sessionRuns = (nets: Iterable<number>): SessionRuns => {
+export const sessionRuns = (nets: Iterable<number>) => {
   let sessions = 0;
   let wins = 0;
   let longestWinningRun = 0;
   let winning = 0;
   let length = 0;
   let sign = 0;
+
   for (const net of nets) {
     sessions += 1;
+
     if (net > 0) wins += 1;
     winning = net > 0 ? winning + 1 : 0;
     longestWinningRun = Math.max(longestWinningRun, winning);
@@ -118,5 +125,6 @@ export const sessionRuns = (nets: Iterable<number>): SessionRuns => {
     length = next === 0 ? 0 : next === sign ? length + 1 : 1;
     sign = next;
   }
+
   return { sessions, wins, longestWinningRun, current: { length, winning: sign > 0 } };
 };

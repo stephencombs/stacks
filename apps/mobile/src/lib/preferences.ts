@@ -5,9 +5,11 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { useSyncExternalStore } from "react";
 
-const loadSecureStore = (): typeof import("expo-secure-store") | null => {
+const loadSecureStore = () => {
   if (typeof process !== "undefined" && process.env?.VITEST) return null;
+
   try {
+    // SAFETY: this specifier is the installed expo-secure-store module; tests return before requiring it.
     return require("expo-secure-store") as typeof import("expo-secure-store");
   } catch {
     return null;
@@ -63,13 +65,13 @@ const VenueJson = Schema.toCodecJson(CachedVenue);
 const decodeVenue = Schema.decodeUnknownOption(VenueJson);
 const encodeVenue = Schema.encodeSync(VenueJson);
 
-const VALID_GAMES = new Set<string>(Game.literals);
+const isGame = (raw: string): raw is Game => Game.literals.some((game) => game === raw);
 
-const parseGame = (raw: string | null): Game | null =>
-  raw !== null && VALID_GAMES.has(raw) ? (raw as Game) : null;
+const parseGame = (raw: string | null) => (raw !== null && isGame(raw) ? raw : null);
 
-const parseVenue = (raw: string | null): CachedVenue | null => {
+const parseVenue = (raw: string | null) => {
   if (!raw) return null;
+
   try {
     return Option.getOrNull(decodeVenue(JSON.parse(raw)));
   } catch {
@@ -85,10 +87,11 @@ export const formatDisplayMoney = (
     readonly signDisplay?: "auto" | "always" | "exceptZero";
     readonly forAccessibility?: boolean;
   } = {},
-): string => {
+) => {
   if (prefs.privacyMode) {
     return options.forAccessibility ? HIDDEN_AMOUNT_LABEL : HIDDEN_AMOUNT;
   }
+
   return formatMoney(amount, currency, {
     signDisplay: options.signDisplay ?? "auto",
     trailingZeroDisplay: prefs.showCents ? "auto" : "stripIfInteger",
@@ -97,6 +100,7 @@ export const formatDisplayMoney = (
 
 export const createPreferencesStore = (storage: PreferencesStorage) => {
   const listeners = new Set<() => void>();
+
   let current: DevicePreferences = {
     showCents: storage.getItem(KEYS.showCents) === "true",
     privacyMode: storage.getItem(KEYS.privacyMode) === "true",
@@ -112,8 +116,10 @@ export const createPreferencesStore = (storage: PreferencesStorage) => {
     if (value === null) {
       if (storage.deleteItem) void Promise.resolve(storage.deleteItem(key)).catch(() => undefined);
       else storage.setItem(key, "");
+
       return;
     }
+
     storage.setItem(key, value);
   };
 
@@ -121,6 +127,7 @@ export const createPreferencesStore = (storage: PreferencesStorage) => {
     get: () => current,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
+
       return () => {
         listeners.delete(listener);
       };
@@ -159,8 +166,8 @@ const store = createPreferencesStore(secureStorage);
 export const setShowCents = (showCents: boolean) => store.setShowCents(showCents);
 export const setPrivacyMode = (privacyMode: boolean) => store.setPrivacyMode(privacyMode);
 export const setDefaultGame = (defaultGame: Game | null) => store.setDefaultGame(defaultGame);
+
 export const setDefaultVenue = (defaultVenue: CachedVenue | null) =>
   store.setDefaultVenue(defaultVenue);
 
-export const usePreferences = (): DevicePreferences =>
-  useSyncExternalStore(store.subscribe, store.get);
+export const usePreferences = () => useSyncExternalStore(store.subscribe, store.get);

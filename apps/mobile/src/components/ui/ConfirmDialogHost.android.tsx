@@ -20,8 +20,10 @@ const trashIcon = require("../../../assets/menu-icons/delete.xml");
 export function ConfirmDialogHost() {
   const asking = useConfirmation();
   const loss = String(useCSSVariable("--color-loss"));
+
   if (!asking) return null;
   const { confirmation, pending, error } = asking;
+
   return (
     <Host style={{ position: "absolute", width: 0, height: 0 }}>
       <AlertDialog onDismissRequest={pending ? () => {} : dismissConfirmation}>

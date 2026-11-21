@@ -50,13 +50,16 @@ describe("barTrack", () => {
     ([values, compress]) => {
       const track = barTrack(values, { compress });
       const sorted = values.map(Math.abs).toSorted((a, b) => a - b);
+
       for (let i = 1; i < sorted.length; i++)
         expect(track.extent(sorted[i]!) + 1e-12).toBeGreaterThanOrEqual(
           track.extent(sorted[i - 1]!),
         );
+
       for (const value of values) {
         const end =
           value >= 0 ? track.zero + track.extent(value) : track.zero - track.extent(value);
+
         expect(end).toBeGreaterThanOrEqual(-1e-9);
         expect(end).toBeLessThanOrEqual(1 + 1e-9);
       }
@@ -97,6 +100,7 @@ describe("lineScale", () => {
       { x: 0, y: 0 },
       [0, 1],
     );
+
     expect(plot.y(275)).toBe(0);
     expect(plot.zero).toBe(100);
     expect(plot.y(-6000)).toBe(100);
@@ -113,6 +117,7 @@ describe("lineScale", () => {
       { x: 0, y: 0 },
       [0],
     );
+
     expect(plot.clipped(-200)).toBe(0);
     expect(plot.y(-200)).toBe(100);
   });
@@ -127,6 +132,7 @@ describe("lineScale", () => {
     ],
     ([series, focused]) => {
       const plot = lineScale(series, size, { x: 4, y: 4 }, focused ? [0] : undefined);
+
       for (const values of series)
         values.forEach((value, i) => {
           expect(plot.x(i)).toBeGreaterThanOrEqual(4);
@@ -134,6 +140,7 @@ describe("lineScale", () => {
           expect(plot.y(value)).toBeGreaterThanOrEqual(4 - 1e-9);
           expect(plot.y(value)).toBeLessThanOrEqual(96 + 1e-9);
         });
+
       if (!focused)
         for (const values of series)
           for (const value of values) expect(plot.clipped(value)).toBe(0);
@@ -157,6 +164,7 @@ describe("spreadLabels", () => {
     const sorted = out.toSorted((a, b) => a - b);
     expect(sorted[0]).toBe(0);
     expect(sorted.at(-1)).toBe(20);
+
     for (let k = 1; k < sorted.length; k++) expect(sorted[k]! - sorted[k - 1]!).toBeCloseTo(20 / 3);
   });
 
@@ -170,10 +178,12 @@ describe("spreadLabels", () => {
     ([ys]) => {
       const out = spreadLabels(ys, 12, { min: 0, max: 200 });
       const pairs = ys.map((y, i) => [y, out[i]!] as const).toSorted((a, b) => a[1] - b[1]);
+
       for (let k = 1; k < pairs.length; k++) {
         expect(pairs[k]![1] - pairs[k - 1]![1]).toBeGreaterThanOrEqual(12 - 1e-9);
         expect(pairs[k]![0]).toBeGreaterThanOrEqual(pairs[k - 1]![0]);
       }
+
       for (const y of out) {
         expect(y).toBeGreaterThanOrEqual(0);
         expect(y).toBeLessThanOrEqual(200);
@@ -214,6 +224,7 @@ describe("runningLine", () => {
       size,
       pad,
     );
+
     expect(plot.points.map((p) => p.x)).toEqual([4, 29, 104]);
     expect(plot.points[1]!.y).toBe(4);
     expect(plot.points[0]!.y).toBe(54);
@@ -232,6 +243,7 @@ describe("runningLine", () => {
       size,
       pad,
     );
+
     expect(plot.nearest(-50)).toBe(0);
     expect(plot.nearest(20)).toBe(1);
     expect(plot.nearest(70)).toBe(2);
@@ -265,6 +277,7 @@ describe("runningLine", () => {
     ([points]) => {
       const sorted = points.toSorted((a, b) => a.at - b.at);
       const plot = runningLine(sorted, size, pad);
+
       for (const { x, y } of [...plot.points, { x: 4, y: plot.zero }]) {
         expect(x).toBeGreaterThanOrEqual(4 - 1e-9);
         expect(x).toBeLessThanOrEqual(104 + 1e-9);

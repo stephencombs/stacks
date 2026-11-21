@@ -6,11 +6,10 @@ import { GroupId } from "@stacks/contracts";
 
 import * as Access from "./Access.ts";
 
-/** Problems that stop the import: data the new model can't hold, or that may still change. */
 const blocking = ["live_session", "broken_correction", "invalid_audit", "unsafe_amount"] as const;
-/** Groups the import leaves on the legacy ledger until it supports their currency. */
+
 const excluded = ["non_usd_group"] as const;
-/** Facts the import keeps as they are, flagged for the people involved. */
+
 const reconcile = ["windowed_stake", "overlapping_stake", "ambiguous_player"] as const;
 
 export const LegacyIssue = Schema.Struct({
@@ -20,6 +19,7 @@ export const LegacyIssue = Schema.Struct({
   subjectId: Schema.String,
   detail: Schema.String,
 });
+
 export type LegacyIssue = typeof LegacyIssue.Type;
 
 /** Every group when null. */
@@ -31,7 +31,6 @@ export class LegacyBlocked extends Data.TaggedError("LegacyBlocked")<{
 
 interface ImportReport {
   readonly dryRun: boolean;
-  /** Rows inserted or brought up to date; all zero when a rerun finds nothing new. */
   readonly identities: number;
   readonly tables: number;
   readonly visits: number;
@@ -42,22 +41,22 @@ class DryRun extends Data.TaggedError("DryRun")<{ readonly report: ImportReport 
 
 const MAX_SAFE = "9007199254740991";
 
-/** Only USD groups move; the rest stay on the legacy ledger. */
 const migrating = (sql: SqlClient.SqlClient, scope: LegacyScope) => (column: string) =>
   sql`${sql.literal(column)} in (
     select id from groups
     where currency = 'USD' and ${scope ? sql.in("id", scope) : sql.literal("true")}
   )`;
 
-// A UUIDv8 from the session and player, so every run names a participation the same way.
 const participationId = (session: string, player: string) => {
   const hash = `md5('legacy-visit:' || ${session} || ':' || ${player})`;
+
   return `(substr(${hash}, 1, 12) || '8' || substr(${hash}, 14, 3) || '8' || substr(${hash}, 18))::uuid`;
 };
 
 const findIssues = Effect.fn("LegacyMigration.findIssues")(function* (scope: LegacyScope) {
   const sql = yield* SqlClient.SqlClient;
   const within = migrating(sql, scope);
+
   return yield* sql`
     select 'non_usd_group' as kind, g.id as group_id, g.id::text as subject_id,
       'Records money in ' || g.currency || '; it stays on the legacy ledger.' as detail
@@ -137,10 +136,9 @@ const findIssues = Effect.fn("LegacyMigration.findIssues")(function* (scope: Leg
   `.pipe(Effect.flatMap(Access.decodeRows(LegacyIssue)));
 });
 
-const isBlocking = (issue: LegacyIssue) =>
-  (blocking as ReadonlyArray<LegacyIssue["kind"]>).includes(issue.kind);
-const isExcluded = (issue: LegacyIssue) =>
-  (excluded as ReadonlyArray<LegacyIssue["kind"]>).includes(issue.kind);
+const isBlocking = (issue: LegacyIssue) => blocking.some((kind) => kind === issue.kind);
+
+const isExcluded = (issue: LegacyIssue) => excluded.some((kind) => kind === issue.kind);
 
 /**
  * Read-only report of legacy histories to fix or decide before the cutover. The transaction is
@@ -148,12 +146,15 @@ const isExcluded = (issue: LegacyIssue) =>
  */
 export const preflight = Effect.fn("LegacyMigration.preflight")(function* (scope: LegacyScope) {
   const sql = yield* SqlClient.SqlClient;
+
   const issues = yield* sql.withTransaction(
     Effect.gen(function* () {
       yield* sql`set transaction isolation level repeatable read, read only`;
+
       return yield* findIssues(scope);
     }),
   );
+
   return {
     blocking: issues.filter(isBlocking),
     excluded: issues.filter(isExcluded),
@@ -172,13 +173,13 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
 }) {
   const sql = yield* SqlClient.SqlClient;
   const within = migrating(sql, options.scope);
+
   const work = Effect.gen(function* () {
     yield* sql`set transaction isolation level repeatable read`;
     const blockers = (yield* findIssues(options.scope)).filter(isBlocking);
+
     if (blockers.length > 0) return yield* new LegacyBlocked({ issues: blockers });
 
-    // Each account in legacy play gets its one personal player, linked by user. Claimed group
-    // players keep their own IDs and history; guests are never matched up by name.
     const identities = yield* sql`
       insert into players (id, group_id, display_name, user_id, created_by, recording_actor_id)
       select gen_random_uuid(), null, u.display_name, u.id, u.id, gen_random_uuid()
@@ -196,6 +197,7 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       on conflict do nothing
       returning id, recording_actor_id
     `;
+
     for (const identity of identities)
       yield* sql`
         with actor as (
@@ -210,7 +212,7 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       union
       select session_id, player_id from entries where session_id is not null
     )`);
-    // The session's table has no starter, so nobody records at it again.
+
     const tables = yield* sql`
       insert into tables (id, starter_player_id, game, venue_id, high_limit, legacy_session_id, trip_id)
       select s.id, null, s.game, s.venue_id, s.high_limit, s.id, s.trip_id
@@ -223,6 +225,7 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
           (excluded.game, excluded.venue_id, excluded.high_limit, excluded.trip_id)
       returning id
     `;
+
     const visits = yield* sql`
       insert into personal_visits (id, player_id, table_id, started_at, finished_at, revision,
         legacy_session_id)
@@ -240,6 +243,7 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       sql.literal(
         `left join players ${alias} on ${alias}.user_id = ${user} and ${alias}.recording_actor_id is not null`,
       );
+
     const entries = yield* sql`
       insert into personal_entries (id, visit_id, kind, amount, occurred_at, note, created_by,
         created_at, voided_at, voided_by, void_reason, replaces_entry_id, counterparty_id)
@@ -266,9 +270,12 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       visits: visits.length,
       entries: entries.length,
     };
+
     if (options.dryRun) return yield* new DryRun({ report });
+
     return report;
   });
+
   return yield* sql
     .withTransaction(work)
     .pipe(Effect.catchTag("DryRun", ({ report }) => Effect.succeed(report)));

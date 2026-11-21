@@ -13,8 +13,8 @@ import {
   VenueId,
 } from "@stacks/contracts";
 
-import { TestApi } from "./TestApi.ts";
-import { seedEntry, seedSession } from "./legacySessions.ts";
+import { TestApi } from "./TestApi.test-utils.ts";
+import { seedEntry, seedSession } from "./legacySessions.test-utils.ts";
 
 export const ids = {
   group: () => GroupId.make(crypto.randomUUID()),
@@ -38,6 +38,8 @@ export const users = <const Names extends ReadonlyArray<string>>(...names: Names
     const api = yield* TestApi;
     const run = crypto.randomUUID().slice(0, 8);
     const clients = yield* Effect.forEach(names, (name) => api.as(`${name}_${run}`));
+
+    // SAFETY: forEach returns one client per name, in order, so each name key is that caller.
     return Object.fromEntries(names.map((name, i) => [name, clients[i]!])) as {
       readonly [K in Names[number]]: (typeof clients)[number];
     };
@@ -62,20 +64,24 @@ export const groupWith = Effect.fn("fixtures.groupWith")(function* (
       displayName: "Owner",
     },
   });
+
   const invite = yield* owner.invites.create({
     params: { groupId },
     payload: { id: ids.invite(), maxUses: null },
   });
+
   for (const [index, member] of others.entries()) {
     yield* member.invites.accept({
       params: { code: invite.code },
       payload: { displayName: `Member ${index + 1}` },
     });
   }
+
   const trip = yield* owner.trips.create({
     params: { groupId },
     payload: { id: ids.trip(), name: "Vegas" },
   });
+
   return { ...(yield* owner.groups.get({ params: { groupId } })), tripId: trip.id };
 });
 

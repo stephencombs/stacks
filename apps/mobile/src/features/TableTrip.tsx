@@ -13,7 +13,9 @@ import { Loaded, StacksProvider, useStacks } from "../lib/stacks";
 
 export function TableTripButton({ attached, onOpen }: { attached: boolean; onOpen: () => void }) {
   const account = useAccount();
+
   if (!attached && (!account.available || !account.isSignedIn)) return null;
+
   return <Button label="Table's trip" variant="ghost" onPress={onOpen} />;
 }
 
@@ -22,7 +24,9 @@ export function TripChoice(props: {
   onChange: (value: TripId | null) => void;
 }) {
   const account = useAccount();
+
   if (!account.available || !account.isSignedIn) return null;
+
   return (
     <StacksProvider>
       <SignedInChoice {...props} />
@@ -38,6 +42,7 @@ function SignedInChoice({
   onChange: (value: TripId | null) => void;
 }) {
   const stacks = useStacks();
+
   return (
     <Loaded
       query={stacks.groups}
@@ -82,6 +87,7 @@ export function TableTripSheet({
 }) {
   const [tripId, setTripId] = useState(table.tripId);
   const save = useRecordingSubmit();
+
   return (
     <Sheet
       open

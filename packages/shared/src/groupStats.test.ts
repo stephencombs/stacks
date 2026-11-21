@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { TripId, VenueId, type Game, type PlayerId } from "@stacks/contracts";
+import { TableId, TripId, VenueId, type Game, type PlayerId } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
@@ -8,16 +8,19 @@ import { groupAwards, groupStats, type GroupPlay } from "./stats.ts";
 import { tripStandings, type TripClock } from "./trips.ts";
 
 const zone = DateTime.zoneMakeNamedUnsafe("UTC");
+
 const clock: TripClock = {
   night: (at) => new Date(DateTime.toEpochMillis(at) - 6 * 3_600_000).toISOString().slice(0, 10),
   hour: (at) => new Date(DateTime.toEpochMillis(at)).getUTCHours(),
 };
+
 const vegas = TripId.make("0192e7a0-0000-7000-8000-000000000301");
 const reno = TripId.make("0192e7a0-0000-7000-8000-000000000302");
 const wynn = VenueId.make("0192e7a0-0000-7000-8000-000000000401");
 const bellagio = VenueId.make("0192e7a0-0000-7000-8000-000000000402");
 
 let count = 0;
+
 const play = (
   results: ReadonlyArray<[PlayerId, number, number?]>,
   fields: {
@@ -27,11 +30,13 @@ const play = (
     game?: Game | null;
     venueId?: VenueId | null;
   } = {},
-): GroupPlay => {
+) => {
   const startedAt = DateTime.makeUnsafe(fields.at ?? "2026-10-21T20:00:00Z");
+
   const endedAt = DateTime.makeUnsafe(
     fields.endedAt ?? DateTime.toEpochMillis(startedAt) + 3_600_000,
   );
+
   return {
     id: `play-${++count}`,
     tripId: fields.tripId ?? vegas,
@@ -62,9 +67,9 @@ describe("groupStats", () => {
       [DEE, CAL, BEA, ALEX],
       zone,
     );
+
     expect(stats.standings.map((s) => [s.playerId, s.rank, s.result])).toEqual([
       [ALEX, 1, 500],
-      // Nothing breaks a tie: the roster's order keeps them in place.
       [CAL, 2, 200],
       [BEA, 2, 200],
       [DEE, 4, -100],
@@ -79,6 +84,7 @@ describe("groupStats", () => {
       zone,
       { tripId: vegas },
     );
+
     expect(stats.standings.map((s) => [s.playerId, s.rank, s.result, s.sessions])).toEqual([
       [ALEX, 1, -300, 1],
       [BEA, null, 0, 0],
@@ -104,6 +110,7 @@ describe("groupStats", () => {
       [ALEX],
       zone,
     );
+
     expect(stats.standings[0]).toEqual({
       playerId: ALEX,
       rank: 1,
@@ -120,17 +127,19 @@ describe("groupStats", () => {
       at: "2025-12-31T22:00:00Z",
       endedAt: "2026-01-01T02:00:00Z",
     });
+
     const subMinuteA: GroupPlay = {
       ...play([]),
       results: [{ playerId: ALEX, net: 1000, buyIn: 0, milliseconds: 29 * 60_000 + 40_000 }],
     };
+
     const subMinuteB: GroupPlay = {
       ...play([]),
       results: [{ playerId: ALEX, net: 1000, buyIn: 0, milliseconds: 29 * 60_000 + 40_000 }],
     };
+
     expect(groupStats([crossYear], [ALEX], zone).options.years).toEqual([2026]);
     const summed = groupStats([subMinuteA, subMinuteB], [ALEX], zone).standings[0]!;
-    // 59m20s = 0.99h (not 58m = 0.97h if each play were rounded to minutes first).
     expect(summed.hours).toBe(0.99);
     expect(summed.hourlyResult).toBe(2022);
   });
@@ -143,8 +152,10 @@ describe("groupStats", () => {
       play([[ALEX, 800]], { tripId: reno, at: "2025-03-01T20:00:00Z" }),
       play([[ALEX, 1600]], { game: null, venueId: null }),
     ];
+
     const result = (filters: Parameters<typeof groupStats>[3]) =>
       groupStats(plays, [ALEX], zone, filters).result;
+
     expect(result({})).toBe(3100);
     expect(result({ tripId: vegas })).toBe(2300);
     expect(result({ tripId: reno, year: 2026 })).toBe(800);
@@ -177,6 +188,7 @@ describe("groupStats", () => {
       [ALEX, BEA, CAL],
       zone,
     );
+
     expect(stats.byGame).toEqual([
       { game: "blackjack", sessions: 1, result: 300 },
       { game: "craps", sessions: 1, result: 50 },
@@ -209,6 +221,7 @@ describe("groupStats", () => {
       ),
     }),
   );
+
   const Filters = Schema.Struct({
     trip: Schema.Int.check(Schema.isBetween({ minimum: -1, maximum: 1 })),
     game: Schema.Int.check(Schema.isBetween({ minimum: -1, maximum: 2 })),
@@ -224,8 +237,10 @@ describe("groupStats", () => {
       const games = ["blackjack", "craps", null] as const;
       const venues = [wynn, bellagio, null] as const;
       const trips = [vegas, reno];
+
       const plays = raw.map((p, index) => {
         const startedAt = DateTime.makeUnsafe(Date.UTC(2025, 0, 1 + p.day, 20));
+
         return {
           id: `p${index}`,
           tripId: trips[p.trip]!,
@@ -233,7 +248,6 @@ describe("groupStats", () => {
           venueId: venues[p.venue]!,
           startedAt,
           endedAt: DateTime.makeUnsafe(DateTime.toEpochMillis(startedAt) + 45 * 60_000),
-          // One result per player at a table.
           results: [...new Map(p.results.map((r) => [r.player, r.net]))].map(([player, net]) => ({
             playerId: people[player]!,
             net,
@@ -242,12 +256,15 @@ describe("groupStats", () => {
           })),
         };
       });
-      const filters = {
-        ...(f.trip === -1 ? {} : { tripId: trips[f.trip]! }),
-        ...(f.game === -1 ? {} : { game: games[f.game]! }),
-        ...(f.venue === -1 ? {} : { venueId: venues[f.venue]! }),
-        ...(f.year === -1 ? {} : { year: 2025 + f.year }),
-      };
+
+      const filters = Object.assign(
+        {},
+        f.trip === -1 ? {} : { tripId: trips[f.trip]! },
+        f.game === -1 ? {} : { game: games[f.game]! },
+        f.venue === -1 ? {} : { venueId: venues[f.venue]! },
+        f.year === -1 ? {} : { year: 2025 + f.year },
+      );
+
       const roster = [CAL, ALEX];
       const stats = groupStats(plays, roster, zone, filters);
 
@@ -260,7 +277,9 @@ describe("groupStats", () => {
           (filters.game === undefined || p.game === filters.game) &&
           (filters.venueId === undefined || p.venueId === filters.venueId),
       );
+
       const expected = new Map<PlayerId, number>();
+
       for (const p of inScope)
         for (const r of p.results)
           expected.set(r.playerId, (expected.get(r.playerId) ?? 0) + r.net);
@@ -269,17 +288,18 @@ describe("groupStats", () => {
       expect(new Map(ranked.map((s) => [s.playerId, s.result]))).toEqual(expected);
       expect(stats.result).toBe([...expected.values()].reduce((a, b) => a + b, 0));
       expect(stats.plays).toHaveLength(inScope.length);
-      // Everyone on the roster appears once; the unranked sit last at zero.
+
       for (const id of roster)
         expect(stats.standings.filter((s) => s.playerId === id)).toHaveLength(1);
       const firstUnranked = stats.standings.findIndex((s) => s.rank === null);
+
       if (firstUnranked !== -1)
         for (const s of stats.standings.slice(firstUnranked)) {
           expect(s.rank).toBeNull();
           expect(s.result).toBe(0);
           expect(s.sessions).toBe(0);
         }
-      // Each rank is one more than the number of members strictly ahead.
+
       for (const s of ranked)
         expect(s.rank).toBe(1 + ranked.filter((other) => other.result > s.result).length);
       expect(stats.byGame.reduce((sum, row) => sum + row.result, 0)).toBe(stats.result);
@@ -302,10 +322,14 @@ it.prop(
   ],
   ([tables]) => {
     const people = [ALEX, BEA, CAL, DEE];
+
     const plays = tables.map((rows, index) => {
       const startedAt = DateTime.makeUnsafe(Date.UTC(2026, 9, 21, 18 + (index % 6), index));
+
       return {
-        id: `t${index}`,
+        id: TableId.make(
+          `0192e7a0-0000-7000-8000-${(index + 1).toString(16).padStart(12, "0").slice(-12)}`,
+        ),
         tripId: vegas,
         game: null,
         venueId: null,
@@ -319,15 +343,18 @@ it.prop(
         })),
       };
     });
+
     const ours = groupStats(plays, [], zone, { tripId: vegas }).standings;
+
     const trip = tripStandings(
       plays.map((play) => ({
-        session: { id: play.id as never, startedAt: play.startedAt },
+        session: { id: play.id, startedAt: play.startedAt },
         venue: null,
         results: play.results.map((r) => ({ ...r, net: money(r.net), buyIn: money(r.buyIn) })),
       })),
       clock,
     );
+
     const byPlayer = (
       rows: ReadonlyArray<{
         playerId: PlayerId;
@@ -336,6 +363,7 @@ it.prop(
         result?: number;
       }>,
     ) => new Map(rows.map((row) => [row.playerId, [row.rank, row.net ?? row.result]]));
+
     expect(byPlayer(ours)).toEqual(byPlayer(trip));
   },
 );
@@ -365,6 +393,7 @@ describe("groupAwards", () => {
         { at: "2026-10-21T22:00:00Z", venueId: null },
       ),
     ];
+
     expect(groupAwards(plays, clock).map((a) => [a.key, a.playerId, a.value])).toEqual([
       ["biggest_hit", ALEX, 5000],
       ["heater", BEA, 2],
@@ -390,9 +419,9 @@ describe("groupAwards", () => {
       ),
       play([[ALEX, 3000]], { at: "2026-10-22T04:00:00Z" }),
     ];
+
     const awards = new Map(groupAwards(plays, clock).map((a) => [a.key, a]));
     expect(awards.get("comeback")).toMatchObject({ playerId: ALEX, value: 3000 });
-    // Alex sat down latest, at 4am, but already holds awards, so the next owl gets it.
     expect(awards.get("night_owl")).toMatchObject({ playerId: BEA, value: 3 });
     expect([...awards.keys()]).not.toContain("whale");
   });

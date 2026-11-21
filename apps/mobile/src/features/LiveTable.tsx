@@ -56,6 +56,7 @@ const money = (amount: number, showCents = false) =>
 /** The LIVE pill, timing the table from its first visit. With nobody there yet, it has no time. */
 export function LiveClock({ since }: { since: DateTime.Utc | null }) {
   const now = useRecordingClock();
+
   if (Platform.OS === "android")
     return (
       <View className="min-h-10 flex-row items-center gap-2 rounded-full bg-black/15 px-4">
@@ -68,6 +69,7 @@ export function LiveClock({ since }: { since: DateTime.Utc | null }) {
         ) : null}
       </View>
     );
+
   return (
     <GlassSurface radius={22} className="min-h-11 flex-row items-center gap-2 rounded-full px-4">
       <View className="size-2 rounded-full bg-live" />
@@ -113,11 +115,14 @@ export function TableSeats({
 }) {
   const prefs = usePreferences();
   const androidFelt = Platform.OS === "android" && felt;
+
   const seats =
     androidFelt && current ? table.seats.filter((seat) => seat.visitId !== current) : table.seats;
+
   if (seats.length === 0) return null;
   const soft = felt ? "text-felt-soft" : "text-muted";
   const ink = felt ? "text-felt-ink" : "text-ink";
+
   return (
     <View className="gap-2">
       {androidFelt ? null : (
@@ -140,14 +145,17 @@ export function TableSeats({
       >
         {seats.map((seat, index) => {
           const self = seat.isSelf && seat.visitId !== current;
+
           const press = self
             ? () => onSelf(seat.visitId)
             : seat.recordable
               ? () => onSeat(seat)
               : undefined;
+
           const status = prefs.privacyMode
             ? seat.status.replace(/\$[0-9,.]+/, HIDDEN_AMOUNT)
             : seat.status;
+
           const body = (
             <>
               {Platform.OS === "android" ? (
@@ -171,6 +179,7 @@ export function TableSeats({
               ) : null}
             </>
           );
+
           const row = cn(
             "min-h-16 flex-row items-center gap-3 py-3",
             androidFelt ? "px-3" : "px-4",
@@ -178,6 +187,7 @@ export function TableSeats({
               (felt ? "border-t border-felt-ink/15" : "border-t border-line"),
             !seat.playing && "opacity-60",
           );
+
           return press ? (
             <Pressable
               key={seat.visitId}
@@ -207,6 +217,7 @@ const actionLabels: Record<TableAction, string> = {
   settings: "Table settings",
   delete_table: "Delete table",
 };
+
 const actionIcons: Record<TableAction, IconName> = {
   edit: "edit",
   add_player: "add-person",
@@ -230,8 +241,11 @@ export function ActionSlot({
 }) {
   const label = (action: TableAction) =>
     action === "edit" && who ? `Edit ${who}'s session` : actionLabels[action];
+
   const [only] = actions;
+
   if (!only) return <View className="size-11" />;
+
   if (actions.length === 1)
     return (
       <IconButton
@@ -242,6 +256,7 @@ export function ActionSlot({
         onPress={() => onAction(only)}
       />
     );
+
   return (
     <ActionMenu
       label="Table actions"
@@ -270,6 +285,7 @@ export function TableActionSheet({
   onAdded: (name: string) => void;
 }) {
   const tableId = table.table.id;
+
   switch (action) {
     case "add_player":
       return (
@@ -290,6 +306,7 @@ export function TableActionSheet({
 /** Asks, then deletes a table nobody has played at. */
 export function useDeleteTable(tableId: TableId, onDeleted: () => void) {
   const save = useRecordingSubmit();
+
   return {
     error: save.error,
     confirm: () =>
@@ -331,10 +348,14 @@ export function SeatSheet({
   const prefs = usePreferences();
   const quick = useRecordingSubmit();
   const [step, setStep] = useState<SeatStep>("menu");
+
   if (!visit) return null;
+
   const shown = (amount: number) =>
     formatDisplayMoney(MinorUnits.make(amount), RECORDING_CURRENCY, prefs);
+
   const back = () => setStep("menu");
+
   if (step === "rebuy")
     return (
       <RebuySheet
@@ -351,6 +372,7 @@ export function SeatSheet({
         }
       />
     );
+
   if (step === "cash_out")
     return (
       <CashOutSheet
@@ -367,6 +389,7 @@ export function SeatSheet({
         }
       />
     );
+
   if (step === "reopen")
     return (
       <ReopenSheet
@@ -377,6 +400,7 @@ export function SeatSheet({
         }
       />
     );
+
   if (step === "return")
     return (
       <SitDownSheet
@@ -386,6 +410,7 @@ export function SeatSheet({
         onSeated={(next) => onSeated(next, seat.name)}
       />
     );
+
   const rebuy = async (amount: number) => {
     const receipt = await quick.submit({
       type: "add",
@@ -393,6 +418,7 @@ export function SeatSheet({
       kind: "buy_in",
       amount,
     });
+
     if (receipt?.command.type === "add")
       onRecorded({
         visitId: seat.visitId,
@@ -401,9 +427,11 @@ export function SeatSheet({
         text: `Rebuy of ${shown(amount)} for ${seat.name} recorded.`,
       });
   };
+
   const playingAgain = table.seats.some(
     (item) => item.playerId === seat.playerId && item.playing && item.visitId !== seat.visitId,
   );
+
   return (
     <Sheet
       open

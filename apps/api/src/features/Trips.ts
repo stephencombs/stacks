@@ -21,10 +21,13 @@ import * as Views from "./Views.ts";
 
 export const load = Effect.fn("Trips.load")(function* (tripId: TripId) {
   const sql = yield* SqlClient.SqlClient;
+
   const [trip] = yield* sql`select * from trips where id = ${tripId}`.pipe(
     Effect.flatMap(Access.decodeRows(TripRow)),
   );
+
   if (!trip) return yield* new NotFound({ resource: "trip" });
+
   return trip;
 });
 
@@ -42,13 +45,16 @@ export const create = Effect.fn("Trips.create")(function* (
     on conflict (id) do nothing
   `;
   const stored = yield* load(request.id);
+
   if (stored.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
+
   return stored;
 });
 
 export const get = Effect.fn("Trips.get")(function* (tripId: TripId) {
   const trip = yield* load(tripId);
   yield* Access.membership(trip.groupId);
+
   return yield* Views.tripDetail(trip, yield* TripTables.load({ tripIds: [trip.id] }));
 });
 
@@ -60,6 +66,7 @@ export const rename = Effect.fn("Trips.rename")(function* (
   const trip = yield* load(tripId);
   yield* Access.membership(trip.groupId);
   yield* sql`update trips set name = ${request.name} where id = ${tripId}`;
+
   return yield* load(tripId);
 });
 
@@ -71,12 +78,16 @@ export const end = Effect.fn("Trips.end")(function* (
   const sql = yield* SqlClient.SqlClient;
   const trip = yield* load(tripId);
   yield* Access.membership(trip.groupId);
+
   if (trip.endedAt !== null) return yield* new Conflict({ reason: "trip_ended" });
   const endedAt = request.endedAt ?? (yield* DateTime.now);
+
   if (DateTime.isLessThan(endedAt, trip.startedAt)) {
     return yield* new InvalidRequest({ message: "A trip can't end before it started." });
   }
+
   yield* sql`update trips set ended_at = ${DateTime.toDateUtc(endedAt)} where id = ${tripId}`;
+
   return yield* load(tripId);
 });
 
@@ -84,8 +95,10 @@ export const reopen = Effect.fn("Trips.reopen")(function* (tripId: TripId) {
   const sql = yield* SqlClient.SqlClient;
   const trip = yield* load(tripId);
   yield* Access.membership(trip.groupId);
+
   if (trip.endedAt === null) return yield* new Conflict({ reason: "trip_open" });
   yield* sql`update trips set ended_at = null where id = ${tripId}`;
+
   return yield* load(tripId);
 });
 
@@ -95,16 +108,20 @@ export const remove = Effect.fn("Trips.remove")(function* (tripId: TripId) {
   const { userId } = yield* CurrentUser;
   const trip = yield* load(tripId);
   const member = yield* Access.membership(trip.groupId);
+
   if (member.role === "member" && trip.createdBy !== userId) {
     return yield* new Forbidden({ reason: "not_your_trip" });
   }
+
   const used = yield* sql`
     select 1 from sessions where trip_id = ${tripId}
     union all select 1 from stakes where trip_id = ${tripId}
     union all select 1 from tables where trip_id = ${tripId}
     limit 1
   `;
+
   if (used.length > 0) return yield* new Conflict({ reason: "trip_not_empty" });
   yield* sql`delete from trips where id = ${tripId}`;
+
   return trip;
 });

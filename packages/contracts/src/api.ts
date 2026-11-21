@@ -59,10 +59,12 @@ export const HealthResponse = Schema.Struct({
   status: Schema.Literal("ok"),
   service: Schema.Literal("stacks-api"),
 });
+
 export type HealthResponse = typeof HealthResponse.Type;
 
 const Name = (maxLength: number) =>
   Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(maxLength));
+
 const Note = Schema.String.check(Schema.isMaxLength(280));
 
 export const CreateGroupRequest = Schema.Struct({
@@ -186,6 +188,7 @@ export const EndTripRequest = Schema.Struct({ endedAt: Schema.optionalKey(Schema
 const groupParams = Schema.Struct({ groupId: GroupId });
 const sessionParams = Schema.Struct({ sessionId: SessionId });
 const Ok = Schema.Struct({ ok: Schema.Literal(true) });
+
 const CsvText = Schema.String.pipe(
   HttpApiSchema.asText({ contentType: "text/csv; charset=utf-8" }),
 );
@@ -261,7 +264,6 @@ const GroupsGroup = HttpApiGroup.make("groups")
 
 export const CrewActivityQuery = Schema.Struct({ cursor: Schema.optionalKey(Schema.String) });
 
-/** Activity across every group the caller is in, for the Crew tab. */
 const CrewGroup = HttpApiGroup.make("crew")
   .add(
     HttpApiEndpoint.get("activity", "/crew/activity", {
@@ -557,7 +559,6 @@ const TripsGroup = HttpApiGroup.make("trips")
 const tableParams = Schema.Struct({ tableId: TableId });
 const playerParams = Schema.Struct({ playerId: PlayerId });
 
-/** An account's session or a device actor's credential. Tables it isn't at are 404s. */
 const RecordingGroup = HttpApiGroup.make("recording")
   .add(
     HttpApiEndpoint.get("history", "/recording", {
@@ -651,7 +652,6 @@ const RecordingGroup = HttpApiGroup.make("recording")
   )
   .middleware(RecordingAuthentication);
 
-/** Device actors register themselves, and share links are read without signing in. */
 const PublicRecordingGroup = HttpApiGroup.make("publicRecording")
   .add(
     HttpApiEndpoint.post("registerActor", "/actors", {
@@ -675,7 +675,6 @@ const PublicRecordingGroup = HttpApiGroup.make("publicRecording")
     }),
   );
 
-/** Signing in on a device that already synced as its actor keeps that player as the account's. */
 const ClaimGroup = HttpApiGroup.make("claim")
   .add(
     HttpApiEndpoint.post("claimActor", "/recording/claim", {

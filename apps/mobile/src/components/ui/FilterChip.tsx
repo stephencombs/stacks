@@ -38,6 +38,7 @@ export function ChipFace({ label, applied }: { label: string; applied: boolean }
 export function FilterChip<Value extends string>(props: FilterChipProps<Value>) {
   const [open, setOpen] = useState(false);
   const label = props.options.find((option) => option.value === props.value)?.label ?? "";
+
   return (
     <ChipShell {...props}>
       <Pressable

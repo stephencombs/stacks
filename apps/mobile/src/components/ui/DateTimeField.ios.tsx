@@ -1,6 +1,7 @@
 import { Host } from "@expo/ui";
 import { Button, DatePicker, Popover, VStack } from "@expo/ui/swift-ui";
 import { accessibilityLabel, datePickerStyle, frame, padding } from "@expo/ui/swift-ui/modifiers";
+import * as Predicate from "effect/Predicate";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -21,13 +22,14 @@ export function DateTimeField({
   const [draft, setDraft] = useState(() => fieldDate(value, kind) ?? new Date());
   const { theme } = useUniwind();
   const tint = useCSSVariable("--color-ink");
+
   return (
     <View className="gap-1.5">
       <Text className="px-1 type-footnote font-medium text-muted">{label}</Text>
       <Host
         style={{ height: 48 }}
         colorScheme={theme === "dark" ? "dark" : "light"}
-        seedColor={typeof tint === "string" ? tint : undefined}
+        seedColor={Predicate.isString(tint) ? tint : undefined}
       >
         <Popover isPresented={open} onIsPresentedChange={setOpen}>
           <Popover.Trigger>

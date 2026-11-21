@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vite-plus/test";
 
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
+
 vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 
 const { screenFoot } = await import("./tabBar");
@@ -46,11 +47,11 @@ it("a screen off the tabs clears the gesture inset by at least 12, plus the foot
 
 it("at the end of a list, nothing floating covers the last row", () => {
   const FAB = 56;
+
   for (const platform of ["android", "ios"]) {
     for (const footer of [null, 96]) {
       for (const live of [0, 52, 76]) {
         const foot = screenFoot({ ...base, platform, footer, fab: true, live });
-        // Where the list's bottom edge sits above the screen's: Android's list stops at the tab bar.
         const listBottom = footer === null && platform === "android" ? base.bar : 0;
         const fabTop = foot.fabBottom + FAB - listBottom;
         const liveTop = (foot.above ?? 0) + 8 + live - listBottom;

@@ -12,6 +12,7 @@ export function BrandMark({ size, chip = false }: { size: number; chip?: boolean
     "--color-felt",
     "--color-felt-ink",
   ]).map(String);
+
   if (chip) {
     return (
       <Svg width={size} height={size} viewBox="0 0 64 64" accessibilityElementsHidden>
@@ -31,6 +32,7 @@ export function BrandMark({ size, chip = false }: { size: number; chip?: boolean
       </Svg>
     );
   }
+
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64" accessibilityElementsHidden>
       <Rect x={8} y={10} width={48} height={44} rx={8} fill="none" stroke={ink} strokeWidth={5} />

@@ -5,7 +5,6 @@ import { Icon } from "./Icon";
 import { cn } from "./cn";
 import { FieldChoice } from "./FieldChoice";
 
-/** A caption over a group of rows, in the iOS grouped-list style. */
 function FieldLabel({ id, children }: { id?: string; children: ReactNode }) {
   return (
     <Text nativeID={id} className="px-1 type-footnote font-medium text-muted">
@@ -33,6 +32,7 @@ export function TextField({
   inputClassName?: string;
 }) {
   const id = useId();
+
   return (
     <View className={cn("gap-1.5", className)}>
       <FieldLabel id={id}>{label}</FieldLabel>

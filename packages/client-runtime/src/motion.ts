@@ -1,5 +1,3 @@
-/** Color Up's shared motion timings. */
-
 /** Cubic-bezier control points. Enter on `enter`, leave on `exit`, and press down on `press`. */
 export const easing = {
   enter: [0.32, 0.72, 0, 1],

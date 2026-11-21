@@ -50,38 +50,38 @@ const startOf = (s: TripSession) => DateTime.toEpochMillis(s.session.startedAt);
 
 const netsOf = (sessions: ReadonlyArray<TripSession>) => {
   const nets = new Map<PlayerId, number>();
+
   for (const s of sessions)
     for (const r of s.results) nets.set(r.playerId, (nets.get(r.playerId) ?? 0) + r.net);
+
   return nets;
 };
 
-/**
- * Highest net first. Equal nets share a rank (1, 2, 2, 4) and keep the order players first
- * appeared in, as group stats rank them.
- */
 const ranked = (nets: ReadonlyMap<PlayerId, number>) => {
   const order = Array.from(nets)
     .map(([playerId, net], index) => ({ playerId, net, index }))
     .sort((a, b) => b.net - a.net || a.index - b.index);
+
   return new Map(
     order.map(({ playerId, net }) => [playerId, 1 + order.filter((o) => o.net > net).length]),
   );
 };
 
 /** The trip's sessions oldest first, grouped into nights. */
-export const tripNights = <S extends TripSession>(
-  sessions: ReadonlyArray<S>,
-  clock: TripClock,
-): ReadonlyArray<TripNight<S>> => {
+export const tripNights = <S extends TripSession>(sessions: ReadonlyArray<S>, clock: TripClock) => {
   const nights: Array<{ key: string; sessions: Array<S> }> = [];
+
   for (const s of sessions.toSorted((a, b) => startOf(a) - startOf(b))) {
     const key = clock.night(s.session.startedAt);
     const last = nights.at(-1);
+
     if (last?.key === key) last.sessions.push(s);
     else nights.push({ key, sessions: [s] });
   }
+
   return nights.map((night, index) => {
     const [top] = Array.from(netsOf(night.sessions)).sort((a, b) => b[1] - a[1]);
+
     return {
       key: night.key,
       number: index + 1,
@@ -92,20 +92,19 @@ export const tripNights = <S extends TripSession>(
 };
 
 /** Everyone who played, ranked by trip net, with how far they moved since tonight began. */
-export const tripStandings = (
-  sessions: ReadonlyArray<TripSession>,
-  clock: TripClock,
-): ReadonlyArray<TripStanding> => {
+export const tripStandings = (sessions: ReadonlyArray<TripSession>, clock: TripClock) => {
   const ordered = sessions.toSorted((a, b) => startOf(a) - startOf(b));
   const nights = tripNights(ordered, clock);
   const tonight = nights.at(-1)?.sessions.length ?? 0;
   const before = ranked(netsOf(ordered.slice(0, ordered.length - tonight)));
   const nets = netsOf(ordered);
   const now = ranked(nets);
+
   return Array.from(now, ([playerId, rank]) => {
     const mine = ordered.flatMap((s) => s.results.filter((r) => r.playerId === playerId));
     const runs = sessionRuns(mine.map((r) => r.net));
     const was = before.get(playerId);
+
     return {
       playerId,
       net: nets.get(playerId)!,
@@ -133,16 +132,19 @@ export interface PlayerTrip<S> {
 export const playerTrip = <S extends TripSession>(
   sessions: ReadonlyArray<S>,
   playerId: PlayerId,
-): PlayerTrip<S> => {
+) => {
   const mine = sessions
     .toSorted((a, b) => startOf(a) - startOf(b))
     .flatMap((session) =>
       session.results
         .filter((result) => result.playerId === playerId)
-        .map((result) => ({ session, net: result.net as number })),
+        .map((result) => ({ session, net: result.net })),
     );
+
   const line = [0];
+
   for (const { net } of mine) line.push(line.at(-1)! + net);
+
   return {
     net: line.at(-1)!,
     line,
@@ -181,11 +183,13 @@ export interface TonightRow {
 }
 
 /** What each player still at a live table has bought in for there. */
-export const inPlay = (live: ReadonlyArray<LiveTable>): ReadonlyMap<PlayerId, number> => {
+export const inPlay = (live: ReadonlyArray<LiveTable>) => {
   const amounts = new Map<PlayerId, number>();
+
   for (const table of live)
     for (const r of table.inPlay ?? table.results.filter((r) => table.playing.includes(r.playerId)))
       amounts.set(r.playerId, (amounts.get(r.playerId) ?? 0) + r.buyIn);
+
   return amounts;
 };
 
@@ -195,8 +199,9 @@ export const tonightBoard = (
   live: ReadonlyArray<LiveTable>,
   clock: TripClock,
   now: DateTime.Utc,
-): ReadonlyArray<TonightRow> => {
+) => {
   const tonight = clock.night(now);
+
   const finished = [
     ...closed
       .filter((s) => clock.night(s.session.startedAt) === tonight)
@@ -208,10 +213,13 @@ export const tonightBoard = (
         : table.results.filter((r) => !table.playing.includes(r.playerId)),
     ),
   ];
+
   const nets = new Map<PlayerId, number>();
+
   for (const r of finished) nets.set(r.playerId, (nets.get(r.playerId) ?? 0) + r.net);
   const playing = inPlay(live);
   const players = new Set([...nets.keys(), ...playing.keys()]);
+
   return Array.from(players, (playerId) => ({
     playerId,
     net: nets.get(playerId) ?? null,
@@ -256,10 +264,11 @@ export const tripDays = (
   sessions: ReadonlyArray<TripSession>,
   clock: TripClock,
   players: ReadonlyArray<PlayerId>,
-): ReadonlyArray<TripDay> =>
+) =>
   tripNights(sessions, clock).map((night) => {
     const rows = players.map((playerId) => {
       const mine = night.sessions.flatMap((s) => s.results.filter((r) => r.playerId === playerId));
+
       return {
         playerId,
         net: mine.length === 0 ? null : mine.reduce((sum, r) => sum + r.net, 0),
@@ -268,6 +277,7 @@ export const tripDays = (
         even: mine.filter((r) => r.net === 0).length,
       };
     });
+
     return {
       key: night.key,
       number: night.number,
@@ -295,9 +305,11 @@ export interface RouteStop<V> {
  */
 export const tripRoute = <S extends TripSession>(sessions: ReadonlyArray<S>) => {
   type Venue = NonNullable<S["venue"]>;
+
   const stops = new Map<VenueId, { venue: Venue; number: number; visits: number; net: number }>();
   const path: Array<Venue> = [];
   const placed = sessions.filter((s): s is S & { readonly venue: Venue } => s.venue !== null);
+
   for (const s of placed.toSorted((a, b) => startOf(a) - startOf(b))) {
     const stop = stops.get(s.venue.id) ?? {
       venue: s.venue,
@@ -305,10 +317,15 @@ export const tripRoute = <S extends TripSession>(sessions: ReadonlyArray<S>) => 
       visits: 0,
       net: 0,
     };
+
     stop.visits += 1;
     stop.net += s.results.reduce((sum, r) => sum + r.net, 0);
     stops.set(s.venue.id, stop);
+
     if (path.at(-1)?.id !== s.venue.id) path.push(s.venue);
   }
-  return { stops: [...stops.values()] as ReadonlyArray<RouteStop<Venue>>, path };
+
+  const listed: ReadonlyArray<RouteStop<Venue>> = [...stops.values()];
+
+  return { stops: listed, path };
 };

@@ -8,9 +8,6 @@ import * as SqlClient from "effect/sql/SqlClient";
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
-  // Every actor, in one namespace, so an ID can't be both an account's and a device's. A device
-  // actor proves itself with a secret, whose hash the server keeps; an account actor has none and
-  // is reached only through the account's session. Actor IDs are public (they sign entries).
   yield* sql`
     create table recording_actors (
       id uuid primary key,
@@ -25,8 +22,6 @@ export default Effect.gen(function* () {
     insert into recording_actors (id, kind)
     select recording_actor_id, 'account' from players where recording_actor_id is not null
   `;
-  // A personal player's actor must be an account actor. Deferred, so a player and its actor can
-  // be created in either order inside one transaction.
   yield* sql`
     alter table players
       add column recording_actor_kind text
@@ -35,7 +30,6 @@ export default Effect.gen(function* () {
         foreign key (recording_actor_id, recording_actor_kind)
         references recording_actors (id, kind) deferrable initially deferred
   `;
-  // Who an actor records as.
   yield* sql`
     create table player_actors (
       player_id uuid not null references players (id),
@@ -49,7 +43,6 @@ export default Effect.gen(function* () {
     select id, recording_actor_id from players where recording_actor_id is not null
   `;
 
-  // A table player belongs to no group or account: someone added them at a table by name.
   yield* sql`alter table players add column created_by_actor uuid`;
   yield* sql`alter table players alter column created_by drop not null`;
   yield* sql`alter table players drop constraint players_personal`;
@@ -62,8 +55,6 @@ export default Effect.gen(function* () {
     )
   `;
 
-  // Game, venue and high limit describe the table, so they move from the visit to it. A legacy
-  // session's table has no starter: its participations stay read-only.
   yield* sql`
     create table tables (
       id uuid primary key,
@@ -94,13 +85,11 @@ export default Effect.gen(function* () {
   `;
   yield* sql`drop index personal_visits_native_table`;
   yield* sql`create index personal_visits_table on personal_visits (table_id)`;
-  // A player who leaves and comes back has a new visit; only one of them can be open.
   yield* sql`
     create unique index personal_visits_one_open on personal_visits (table_id, player_id)
     where finished_at is null
   `;
 
-  // Each operation is kept per table and per actor. Starts name their player now.
   yield* sql`alter table personal_operations add column table_id uuid references tables (id)`;
   yield* sql`alter table personal_operations add column actor_id uuid`;
   yield* sql`
@@ -112,11 +101,11 @@ export default Effect.gen(function* () {
     from personal_visits v, players p
     where v.id = o.visit_id and p.id = o.player_id
   `;
-  // An operation is written with its visit in one transaction, so none should lack one. Stop with
-  // the rows named rather than guess a table for them.
+
   const orphans = yield* sql<{ id: string }>`
     select id from personal_operations where table_id is null or actor_id is null order by seq
   `;
+
   if (orphans.length > 0)
     return yield* Effect.die(
       new Error(

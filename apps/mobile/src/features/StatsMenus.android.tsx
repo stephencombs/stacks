@@ -23,8 +23,10 @@ type MenuOption = {
 };
 
 function MenuIcon({ name, color }: { name: keyof typeof paths; color: string }) {
+  // SAFETY: this specifier is the installed Jetpack Compose module on Android.
   const { RNHostView } =
     require("@expo/ui/jetpack-compose") as typeof import("@expo/ui/jetpack-compose");
+
   return (
     <RNHostView matchContents>
       <Svg width={22} height={22} viewBox="0 0 24 24" importantForAccessibility="no">
@@ -49,6 +51,7 @@ export function StatsMenu({
   options: ReadonlyArray<MenuOption>;
   menuState?: { readonly open: boolean; readonly setOpen: (open: boolean) => void };
 }) {
+  // SAFETY: this specifier is the installed Jetpack Compose module on Android.
   const {
     Column,
     DropdownMenu,
@@ -56,20 +59,28 @@ export function StatsMenu({
     RNHostView,
     Text: ComposeText,
   } = require("@expo/ui/jetpack-compose") as typeof import("@expo/ui/jetpack-compose");
+
+  // SAFETY: this specifier is the installed Compose modifiers module on Android.
   const { background, width } =
     require("@expo/ui/jetpack-compose/modifiers") as typeof import("@expo/ui/jetpack-compose/modifiers");
+
+  // SAFETY: this relative specifier is this app's Compose host module.
   const { ComposeHost } =
     require("../components/ui/ComposeHost.android") as typeof import("../components/ui/ComposeHost.android");
+
   const [open, setOpen] = useState(false);
   const expanded = menuState?.open ?? open;
   const setExpanded = menuState?.setOpen ?? setOpen;
+
   const [ink, muted, surface, fill] = useCSSVariable([
     "--color-ink",
     "--color-muted",
     "--color-surface",
     "--color-fill",
   ]).map(String);
+
   const label = options.find((option) => option.value === props.value)?.label ?? "";
+
   return (
     <AndroidFilterChip {...props} label={label}>
       {(face) => (
@@ -96,6 +107,7 @@ export function StatsMenu({
             <DropdownMenu.Items>
               {options.map((option) => {
                 const selected = option.value === props.value;
+
                 return (
                   <DropdownMenuItem
                     key={option.value}
@@ -167,10 +179,14 @@ export function StatsChipTrigger({
 }
 
 export function StatsRadio({ selected }: { selected: boolean }) {
+  // SAFETY: this specifier is the installed Jetpack Compose module on Android.
   const { RadioButton } =
     require("@expo/ui/jetpack-compose") as typeof import("@expo/ui/jetpack-compose");
+
+  // SAFETY: this relative specifier is this app's Compose host module.
   const { ComposeHost } =
     require("../components/ui/ComposeHost.android") as typeof import("../components/ui/ComposeHost.android");
+
   return (
     <View importantForAccessibility="no-hide-descendants" pointerEvents="none">
       <ComposeHost matchContents>

@@ -1,6 +1,8 @@
-import { GroupDetail, GroupId, GroupStats, TripId, type GroupListItem } from "@stacks/contracts";
+import { GroupDetail, GroupId, GroupStats, TripId } from "@stacks/contracts";
 import * as Cause from "effect/Cause";
+import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Schema from "effect/Schema";
@@ -19,13 +21,16 @@ const StatsCopy = Schema.Struct({
   detail: GroupDetail,
   stats: GroupStats,
 });
+
 export type StatsCopy = typeof StatsCopy.Type;
 
 const Json = Schema.toCodecJson(StatsCopy);
 const decode = Schema.decodeUnknownOption(Json);
 const encode = Schema.encodeSync(Json);
 
+// SAFETY: the trip index lives in the group-id slot under a reserved key that is not a group.
 const TRIP_INDEX = "_trips" as GroupId;
+
 const TripIndex = Schema.Array(
   Schema.Struct({
     tripId: TripId,
@@ -33,6 +38,7 @@ const TripIndex = Schema.Array(
     groupName: Schema.String,
   }),
 );
+
 const IndexJson = Schema.toCodecJson(TripIndex);
 const decodeIndex = Schema.decodeUnknownOption(IndexJson);
 const encodeIndex = Schema.encodeSync(IndexJson);
@@ -41,52 +47,60 @@ export const makeStatsCopies = (storage: StatsCopyStorage) => {
   const readIndex = () => {
     try {
       const kept = storage.load(TRIP_INDEX);
+
       return kept === null ? [] : (Option.getOrNull(decodeIndex(JSON.parse(kept))) ?? []);
     } catch {
       return [];
     }
   };
+
   const writeIndex = (entries: typeof TripIndex.Type) => {
     try {
       storage.save(TRIP_INDEX, entries.length === 0 ? null : JSON.stringify(encodeIndex(entries)));
-    } catch {
-      // A full or missing store only costs the offline trip lookup.
-    }
+    } catch {}
   };
-  const load = (groupId: GroupId): StatsCopy | null => {
+
+  const load = (groupId: GroupId) => {
     try {
       const kept = storage.load(groupId);
+
       return kept === null ? null : Option.getOrNull(decode(JSON.parse(kept)));
     } catch {
       return null;
     }
   };
+
   return {
     load,
     save: (groupId: GroupId, copy: StatsCopy) => {
       try {
         storage.save(groupId, JSON.stringify(encode(copy)));
-      } catch {
-        // A full or missing store only costs the offline copy.
-      }
+      } catch {}
+
       const rest = readIndex().filter((entry) => entry.groupId !== groupId);
+
       const own = copy.detail.trips.map((trip) => ({
         tripId: trip.id,
         groupId,
         groupName: copy.detail.group.name,
       }));
+
       writeIndex([...rest, ...own]);
     },
     forget: (groupId: GroupId) => {
       try {
         storage.save(groupId, null);
-      } catch {
-        // Nothing was kept.
-      }
+      } catch {}
+
       const next = readIndex().filter((entry) => entry.groupId !== groupId);
       writeIndex(next);
     },
-    rememberGroups: (groups: ReadonlyArray<Pick<GroupListItem, "group" | "trips">>) => {
+    rememberGroups: (
+      groups: ReadonlyArray<{
+        readonly group: { readonly id: GroupId; readonly name: string };
+        readonly trips: ReadonlyArray<{ readonly id: TripId }>;
+      }>,
+    ) => {
       writeIndex(
         groups.flatMap((item) =>
           item.trips.map((trip) => ({
@@ -97,19 +111,26 @@ export const makeStatsCopies = (storage: StatsCopyStorage) => {
         ),
       );
     },
-    groupOfTrip: (
-      tripId: TripId,
-    ): { readonly groupId: GroupId; readonly groupName: string } | null => {
+    groupOfTrip: (tripId: TripId) => {
       const match = readIndex().find((entry) => entry.tripId === tripId);
+
       return match ? { groupId: match.groupId, groupName: match.groupName } : null;
     },
-    groupName: (groupId: GroupId): string | null =>
+    groupName: (groupId: GroupId) =>
       readIndex().find((entry) => entry.groupId === groupId)?.groupName ??
       load(groupId)?.detail.group.name ??
       null,
   };
 };
+
 export type StatsCopies = ReturnType<typeof makeStatsCopies>;
+
+export class StatsCopiesService extends Context.Service<StatsCopiesService, StatsCopies>()(
+  "@stacks/client-runtime/StatsCopies",
+) {}
+
+export const StatsCopiesLive = (storage: StatsCopyStorage) =>
+  Layer.sync(StatsCopiesService, () => makeStatsCopies(storage));
 
 /**
  * What a group's stats screen shows, from its two queries and the copy kept on the device: the
@@ -126,17 +147,19 @@ export const statsState = <E1, E2>(
     ...(AsyncResult.isFailure(detail) ? [Cause.squash(detail.cause)] : []),
     ...(AsyncResult.isFailure(stats) ? [Cause.squash(stats.cause)] : []),
   ];
+
   for (const error of errors) {
     if (!isRetryable(error)) return { kind: "refused" as const, message: describeError(error) };
   }
+
   if (AsyncResult.isSuccess(detail) && AsyncResult.isSuccess(stats))
     return {
       kind: "live" as const,
       detail: detail.value,
       stats: stats.value,
-      // When both came back, for the copy kept on the device.
       fetchedAt: Math.min(detail.timestamp, stats.timestamp),
     };
+
   if (errors.length > 0) {
     const kept = <A, E>(result: AsyncResult.AsyncResult<A, E>) =>
       AsyncResult.isSuccess(result)
@@ -147,8 +170,10 @@ export const statsState = <E1, E2>(
               timestamp: previous.timestamp,
             }))
           : Option.none();
+
     const keptDetail = kept(detail);
     const keptStats = kept(stats);
+
     if (Option.isSome(keptDetail) && Option.isSome(keptStats))
       return {
         kind: "saved" as const,
@@ -161,8 +186,10 @@ export const statsState = <E1, E2>(
         },
       };
     const saved = copy();
+
     return saved ? { kind: "saved" as const, copy: saved } : { kind: "unavailable" as const };
   }
+
   return { kind: "loading" as const };
 };
 

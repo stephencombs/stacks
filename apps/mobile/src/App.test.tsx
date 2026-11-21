@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { makeOutbox } from "@stacks/client-runtime/outbox";
 import { EntryId, MinorUnits, PlayerId, SessionId } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
@@ -7,23 +6,31 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 type Auth = { isLoaded: boolean; isSignedIn?: boolean; userId?: string | null };
+
 type Metrics = {
   frame: { x: number; y: number; width: number; height: number };
   insets: { top: number; right: number; bottom: number; left: number };
 } | null;
+
+type StackScreen = ComponentType<{ children?: ReactNode }> | { config: StackConfig };
+
+interface RenderedApp {
+  root: ReturnType<typeof createRoot> | null;
+  element: ReactNode;
+}
+
 type StackConfig = {
   initialRouteName?: string;
   layout?: ComponentType<{
     state: { index: number; routes: { name: string }[] };
     children?: ReactNode;
   }>;
-  screens: Record<string, { screen: unknown; linking?: unknown }>;
+  screens: Record<string, { screen: StackScreen; linking?: unknown }>;
 };
 
 const SIGNED_OUT = { isLoaded: true, isSignedIn: false, userId: null };
 const SIGNED_IN = { isLoaded: true, isSignedIn: true, userId: "user-1" };
 
-/** The app with its native edges stubbed: Clerk, navigation, storage and the screens themselves. */
 async function load({
   key = "test",
   auth: initialAuth = SIGNED_OUT,
@@ -32,24 +39,28 @@ async function load({
   let auth = initialAuth;
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+
   const Container = ({ children }: { children?: ReactNode }) =>
     createElement("div", null, children);
+
   const window = { width: 440, height: 956, scale: 3, fontScale: 1 };
   vi.doMock("react-native", () => ({
     View: Container,
     Text: Container,
     Dimensions: { get: () => window },
     useWindowDimensions: () => window,
-    StyleSheet: { create: (styles: object) => styles },
+    StyleSheet: { create: <Styles,>(styles: Styles) => styles },
     AppState: { addEventListener: () => ({ remove: () => {} }) },
     Platform: { OS: "ios" },
   }));
   vi.doMock("react-native-safe-area-context/lib/module/NativeSafeAreaProvider", () => ({
     NativeSafeAreaProvider: Container,
   }));
+
   const { SafeAreaProvider, useSafeAreaInsets } = await vi.importActual<
     typeof import("react-native-safe-area-context")
   >("react-native-safe-area-context/lib/module/SafeAreaContext");
+
   vi.doMock("react-native-safe-area-context", () => ({
     SafeAreaProvider,
     initialWindowMetrics: metrics,
@@ -61,7 +72,6 @@ async function load({
     getClerkInstance: () => ({ session: { getToken: async () => "token" } }),
   }));
   vi.doMock("@clerk/expo/token-cache", () => ({ tokenCache: {} }));
-  // These tests watch the group outbox's requests; personal recording sync has its own tests.
   vi.doMock("@stacks/client-runtime/recordingReact", async () => ({
     ...(await vi.importActual<typeof import("@stacks/client-runtime/recordingReact")>(
       "@stacks/client-runtime/recordingReact",
@@ -81,7 +91,6 @@ async function load({
     notificationAsync: vi.fn(),
     NotificationFeedbackType: { Error: "error" },
   }));
-  // Use the test DOM's storage so the outbox survives a remount.
   vi.doMock("./lib/outbox", () => ({
     outboxStorage: (userId: string) => ({
       load: () => localStorage.getItem(`stacks-outbox-${userId}`),
@@ -96,17 +105,18 @@ async function load({
   vi.doMock("./lib/theme", () => ({}));
   vi.doMock("./lib/actorKeys", () => ({ actorKeys: {} }));
   vi.doMock("./lib/fonts", () => ({ useAppFonts: () => {} }));
-  // Real recording hooks over a store whose storage never opens, as on a slow first launch.
   vi.doMock("./lib/recording", async () => {
     const { openDeviceRecordingStore } = await vi.importActual<
       typeof import("@stacks/client-runtime/recordingReact")
     >("@stacks/client-runtime/recordingReact");
+
     return { recordingStore: openDeviceRecordingStore(() => new Promise(() => {})) };
   });
   vi.doMock("./screens/Home", async () => {
     const { useRecordingHome } = await vi.importActual<
       typeof import("@stacks/client-runtime/recordingReact")
     >("@stacks/client-runtime/recordingReact");
+
     return {
       HomeScreen: () => createElement("main", null, `Your play: ${useRecordingHome().status}`),
     };
@@ -122,30 +132,41 @@ async function load({
   }));
   const stacks: StackConfig[] = [];
   const dispatch = vi.fn();
+
   type NavigationProps = {
     linking: { config: { initialRouteName: string }; getInitialURL: () => Promise<string | null> };
     onReady: () => void;
   };
-  const navigation = vi.fn((_props: NavigationProps) => null as ReactNode);
+
+  const navigation = vi.fn<(props: NavigationProps) => ReactNode>(() => null);
   let navigationMounts = 0;
   vi.doMock("@react-navigation/native", () => ({
     DarkTheme: { colors: {}, fonts: {} },
     DefaultTheme: { colors: {}, fonts: {} },
-    CommonActions: { navigate: (payload: object) => ({ type: "NAVIGATE", payload }) },
+    CommonActions: {
+      navigate: (payload: {
+        readonly name: string;
+        readonly params: { readonly screen: string; readonly params: { readonly screen: string } };
+      }) => ({ type: "NAVIGATE", payload }),
+    },
     useNavigation: () => ({ dispatch }),
-    // Draws the root stack's first screen under the real providers, as the native stack would.
     createStaticNavigation: ({ config }: { config: StackConfig }) =>
       function Navigation(props: NavigationProps) {
         navigation(props);
         useEffect(() => void navigationMounts++, []);
         const { top, right, bottom, left } = useSafeAreaInsets();
-        // Nested navigators open on their own first screens, down to a component.
-        const open = (stack: StackConfig): ComponentType => {
-          const screen = stack.screens[stack.initialRouteName ?? Object.keys(stack.screens)[0]!]!
-            .screen as ComponentType | { config: StackConfig };
-          return "config" in screen ? open(screen.config) : screen;
+
+        const open = (stack: StackConfig) => {
+          const screen =
+            stack.screens[stack.initialRouteName ?? Object.keys(stack.screens)[0]!]?.screen;
+
+          if (screen && "config" in screen) return open(screen.config);
+
+          return screen ?? Container;
         };
+
         const first = open(config);
+
         return createElement(
           "div",
           { "data-insets": [top, right, bottom, left].join(",") },
@@ -156,12 +177,14 @@ async function load({
   vi.doMock("@react-navigation/native-stack", () => ({
     createNativeStackNavigator: (config: StackConfig) => {
       stacks.push(config);
+
       return { config };
     },
   }));
   vi.doMock("./features/PlaceTabs", () => ({
     createPlaceTabs: (config: StackConfig) => {
       stacks.push(config);
+
       return { config };
     },
     placeTab: vi.fn(),
@@ -176,6 +199,7 @@ async function load({
     Landing: ({ invited }: { invited: boolean }) =>
       createElement("section", null, invited ? "Sign in to join" : "Sign in"),
   }));
+
   for (const [module, names] of Object.entries({
     "./components/ui/Field": ["FormError"],
     "./components/ui/Icon": ["Icon"],
@@ -203,27 +227,30 @@ async function load({
   const { default: App } = await import("./App");
   const { AccountProvider } = await import("./lib/account");
   const { SignedInProvider } = await import("./lib/stacks");
-  const view = { root: null as ReturnType<typeof createRoot> | null, element: null as ReactNode };
+  const view: RenderedApp = { root: null, element: null };
+
   const render = async (element: ReactNode) => {
     const host = document.createElement("div");
     const root = createRoot(host);
     await act(async () => root.render(element));
     roots.push(root);
     Object.assign(view, { root, element });
+
     return host;
   };
-  /** Sign-in changing under the last render, as Clerk finishing or signing someone in would. */
+
   const authChanges = (next: Auth) =>
     act(async () => {
       auth = next;
       view.root!.render(view.element);
     });
+
   const stack = (screen: string) => stacks.find((config) => screen in config.screens)!;
   const root = stack("Tabs");
   const tabs = stack("PlayTab");
   const crew = stack("Crew");
   const invites = stack("Join");
-  /** Crew's gate, or with `route` an invitation's, inside the app's sign-in. */
+
   const gate = (route?: "Join" | "Claim") =>
     render(
       createElement(
@@ -240,6 +267,7 @@ async function load({
         ),
       ),
     );
+
   return {
     App,
     render,
@@ -258,6 +286,7 @@ async function load({
 }
 
 const roots: ReturnType<typeof createRoot>[] = [];
+
 afterEach(() => {
   for (const root of roots.splice(0)) act(() => root.unmount());
   vi.useRealTimers();
@@ -265,9 +294,9 @@ afterEach(() => {
   localStorage.clear();
 });
 
-/** A buy-in logged on a group session with no signal, still waiting in user-1's outbox. */
 function queueBuyIn() {
   const sessionId = SessionId.make("0192e7a0-0000-7000-8000-000000000001");
+
   const outbox = makeOutbox(
     {
       load: () => localStorage.getItem("stacks-outbox-user-1"),
@@ -275,6 +304,7 @@ function queueBuyIn() {
     },
     async () => ({ error: new Error("fetch failed") }),
   );
+
   void outbox.add(sessionId, {
     id: EntryId.make("0192e7a0-0000-7000-8000-000000000003"),
     kind: "buy_in",
@@ -285,17 +315,19 @@ function queueBuyIn() {
     note: null,
     replacesEntryId: null,
   });
+
   return `/api/sessions/${sessionId}/entries`;
 }
 
-/** No signal: every request fails, and each attempt is announced as it happens. */
 function offline() {
   const sent: string[] = [];
   let announce = () => {};
+
   const attempt = () =>
     new Promise<void>((resolve) => {
       announce = resolve;
     });
+
   let next = attempt();
   vi.stubGlobal(
     "fetch",
@@ -306,6 +338,7 @@ function offline() {
       throw new TypeError("Network request failed");
     }),
   );
+
   return { sent, attempted: () => next };
 }
 
@@ -317,7 +350,6 @@ it.each([
 ])("opens on your play $label", async ({ key, auth }) => {
   const app = await load({ key, auth });
   const host = await app.render(createElement(app.App));
-  // Recording reaches its store whatever sign-in is doing; nothing waits on an account.
   expect(host.textContent).toBe("Your play: loading");
   expect(host.querySelector("[data-clerk]") !== null).toBe(key !== "");
 
@@ -350,7 +382,6 @@ it("keeps every address: your play in the first tab, groups in Crew, invites abo
   expect(stack("Map").screens.Map!.linking).toBe("map");
   expect(tabs.screens.CrewTab!.screen).toEqual({ config: crew });
   expect(crew.screens.Crew!.linking).toBe("crew");
-  // Your groups' old address still opens; old Board and Stats links go to Stats.
   expect(crew.screens.Groups!.linking).toBe("groups");
   expect(Object.keys(crew.screens)).not.toContain("Board");
   expect(invites.screens.Join!.linking).toBe("join/:code");
@@ -424,7 +455,6 @@ it("keeps your play and its navigation in place when sign-in finishes", async ()
   await app.authChanges(SIGNED_IN);
   expect(host.querySelector("main")).toBe(page);
   expect(app.navigationMounts()).toBe(1);
-  // Nothing was waiting to send, so being signed in on your play asks nothing of the API.
   expect(network.sent).toEqual([]);
 });
 

@@ -35,7 +35,6 @@ type Placement = {
   onHeightChange?: (height: number) => void;
 };
 
-/** Somewhere live to go back to: a session you're playing, or a table you record at. */
 type LivePlace = {
   readonly key: string;
   readonly title: string;
@@ -45,13 +44,10 @@ type LivePlace = {
   readonly to: { readonly visitId: VisitId } | { readonly tableId: TableId };
 };
 
-/**
- * Your own live sessions, newest first, then the tables you record for everyone at without
- * playing, leaving out the one on screen (a visit's or a table's ID).
- */
 function useLiveSessions(except?: string) {
   const { home } = useRecordingHome();
   const prefs = usePreferences();
+
   const places: ReadonlyArray<LivePlace> = [
     ...(home?.active ?? []).map((item) => ({
       key: item.visit.id,
@@ -77,6 +73,7 @@ function useLiveSessions(except?: string) {
       to: { tableId: item.table.id },
     })),
   ];
+
   return places.filter((item) => item.key !== except);
 }
 
@@ -86,6 +83,7 @@ function useLiveSessions(except?: string) {
  */
 export function LiveBar({ shows, ...placement }: Placement & { shows?: ShowsTable }) {
   const live = useLiveSessions().length > 0;
+
   return live ? (
     <Pinned {...placement}>
       <LiveSessionsBar />
@@ -102,6 +100,7 @@ export function PersonalLiveBar(placement: Placement) {
   useEffect(() => {
     if (!live) onHeightChange?.(0);
   }, [live, onHeightChange]);
+
   return live ? (
     <Pinned {...placement}>
       <LiveSessionsBar />
@@ -118,14 +117,18 @@ export function LiveSessionsBar({ except }: { except?: string }) {
   const live = useLiveSessions(except);
   const [picking, setPicking] = useState(false);
   const [newest, ...rest] = live;
+
   if (!newest) return null;
+
   const open = (place: LivePlace) =>
     navigation.dispatch(
       "visitId" in place.to
         ? StackActions.push("Play", { visitId: place.to.visitId })
         : StackActions.push("Table", { tableId: place.to.tableId }),
     );
+
   const { title, game, startedAt, detail } = newest;
+
   if (rest.length === 0)
     return (
       <Bar
@@ -138,6 +141,7 @@ export function LiveSessionsBar({ except }: { except?: string }) {
         onPress={() => open(newest)}
       />
     );
+
   return (
     <>
       <Bar
@@ -173,15 +177,19 @@ function Seat({ shows, ...placement }: Placement & { shows?: ShowsTable | undefi
   const go = useGo();
   const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
   const seat = groups.flatMap((item) => (item.mySession ? [item.mySession] : []))[0];
+
   const visible =
     seat &&
     !(shows && ("session" in shows ? shows.session === seat.id : shows.trip === seat.tripId));
+
   const { onHeightChange } = placement;
   useEffect(() => {
     if (!visible) onHeightChange?.(0);
   }, [visible, onHeightChange]);
+
   if (!visible) return null;
   const since = formatTime(seat.startedAt);
+
   return (
     <Pinned {...placement}>
       <Bar
@@ -198,6 +206,7 @@ function Seat({ shows, ...placement }: Placement & { shows?: ShowsTable | undefi
 
 function Pinned({ bottom, onHeightChange, children }: Placement & { children: ReactNode }) {
   const insets = useSafeAreaInsets();
+
   return (
     <View
       pointerEvents="box-none"
@@ -269,6 +278,7 @@ function Bar({
 
 function Elapsed({ since }: { since: DateTime.Utc }) {
   const now = useRecordingClock();
+
   return (
     <Text
       className={cn("type-title text-ink tabular-nums", Platform.OS === "ios" && "font-semibold")}

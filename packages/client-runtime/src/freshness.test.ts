@@ -4,6 +4,7 @@ import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { DEDUPE_MS, STALE_MS, shouldRevalidate } from "./freshness.ts";
 
 const at = 1_000_000;
+
 const loaded = (age: number, waiting = false) =>
   AsyncResult.success("trip", { timestamp: at - age, waiting });
 

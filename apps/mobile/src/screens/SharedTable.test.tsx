@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { Conflict, MinorUnits, PlayerId, TableId, VisitId } from "@stacks/contracts";
 import type { TableView } from "@stacks/contracts/recordingCommands";
 import { makeRecordingStore } from "@stacks/client-runtime/recording";
@@ -14,15 +13,18 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 
   let documentState: RecordingStorageDocument = { revision: 0 };
+
   const store = makeRecordingStore({
     load: async () => documentState,
     commit: async (_revision, payload) => {
       documentState = { revision: documentState.revision + 1, payload };
+
       return documentState.revision;
     },
     subscribe: () => () => {},
     close: async () => {},
   });
+
   await store.ready;
 
   const tableId = TableId.make(crypto.randomUUID());
@@ -69,6 +71,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
   const navigate = vi.fn();
   const dispatch = vi.fn();
   let failSharedLoad = false;
+
   const joinMock = vi.fn(async (displayName: string) => {
     const joined = {
       table: {
@@ -77,6 +80,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
       },
       player: { id: samId, displayName },
     };
+
     await store.transform((current) => ({
       ...current,
       ownedPlayerIds: [...new Set([...(current.ownedPlayerIds ?? []), joined.player.id])],
@@ -87,10 +91,12 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
       ],
       tables: [...current.tables, joined.table],
     }));
+
     return joined;
   });
 
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+
   const Button = ({
     label,
     onPress,
@@ -108,7 +114,10 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
   vi.doMock("@react-navigation/native", () => ({
     useNavigation: () => ({ navigate, dispatch }),
     StackActions: {
-      replace: (screen: string, params: object) => ({ type: "REPLACE", screen, params }),
+      replace: (
+        screen: string,
+        params: { readonly visitId?: string; readonly tableId?: string },
+      ) => ({ type: "REPLACE", screen, params }),
     },
   }));
   vi.doMock("react-native", () => ({
@@ -131,6 +140,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
     const actual = await vi.importActual<typeof import("@stacks/client-runtime/recordingReact")>(
       "@stacks/client-runtime/recordingReact",
     );
+
     return {
       ...actual,
       useJoinTable: () => ({ pending: false, error: null, join: joinMock }),
@@ -246,12 +256,10 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
     await clickButton("Join this table");
     expect(element.querySelector('section[aria-label="Join this table"]')).not.toBeNull();
 
-    // Empty name validation stays in JoinSheet.
     await clickButton("Join as a new player");
     expect(element.textContent).toContain("Enter your name.");
     expect(joinMock).not.toHaveBeenCalled();
 
-    // Entering a name joins the table and transitions straight into SitDownSheet (returning=false).
     const input = element.querySelector<HTMLInputElement>('input[aria-label="Your name"]');
     expect(input).not.toBeNull();
     await act(async () => {
@@ -315,6 +323,7 @@ it("redeems a player invite to Home and shows Conflict errors clearly", async ()
   let mode: "ok" | "conflict" = "ok";
 
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+
   const Button = ({ label, onPress }: { label: string; onPress?: () => void }) => (
     <button onClick={onPress}>{label}</button>
   );
@@ -371,9 +380,11 @@ it("redeems a player invite to Home and shows Conflict errors clearly", async ()
     expect(element.textContent).toContain(
       "Alex invited you to record your own play at their table.",
     );
+
     const redeemButton = [...element.querySelectorAll("button")].find(
       (b) => b.textContent === "I'm Pat",
     );
+
     expect(redeemButton).toBeDefined();
     await act(async () => {
       redeemButton!.click();

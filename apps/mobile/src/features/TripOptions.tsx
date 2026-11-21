@@ -32,10 +32,12 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
   useEffect(() => {
     if (android && error) Alert.alert("Trip update failed", error);
   }, [android, error]);
+
   const canDelete =
     trip.sessions.length === 0 &&
     trip.tables.length === 0 &&
     (isAdmin(group) || trip.trip.createdBy === userId);
+
   const actions = [
     {
       label: "Rename",
@@ -78,6 +80,7 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
         ]
       : []),
   ];
+
   return (
     <View className="gap-2">
       <ActionMenu label="Trip options" disabled={pending} actions={actions} vertical />
@@ -90,6 +93,7 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
 function RenameTripSheet({ trip, onClose }: { trip: TripDetail; onClose: () => void }) {
   const stacks = useStacks();
   const rename = useAction(stacks.Client.mutation("trips", "rename"));
+
   return (
     <NameSheet
       title="Rename trip"
@@ -119,6 +123,7 @@ export function ReopenTrip({
 }) {
   const stacks = useStacks();
   const reopen = useAction(stacks.Client.mutation("trips", "reopen"));
+
   return (
     <View className="gap-2">
       <Button

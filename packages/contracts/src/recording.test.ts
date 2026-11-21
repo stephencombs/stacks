@@ -13,6 +13,7 @@ const VISIT = "0192e7a0-0000-7000-8000-0000000000b1";
 const ACTOR = "0192e7a0-0000-7000-8000-0000000000c1";
 const AT = "2026-11-06T20:00:00.000Z";
 const LATER = "2026-11-06T21:00:00.000Z";
+
 const audit = {
   createdBy: ACTOR,
   createdAt: AT,
@@ -21,6 +22,7 @@ const audit = {
   voidReason: null,
   replacesEntryId: null,
 };
+
 const entry = {
   id: "0192e7a0-0000-7000-8000-0000000000e1",
   visitId: VISIT,
@@ -32,6 +34,7 @@ const entry = {
   note: null,
   ...audit,
 };
+
 const visit = {
   id: VISIT,
   tableId: TABLE,
@@ -40,9 +43,10 @@ const visit = {
   finishedAt: null,
   revision: 0,
 };
+
 const accepts = <S extends Schema.Top & { readonly DecodingServices: never }>(
   schema: S,
-  value: unknown,
+  value: typeof Schema.Unknown.Encoded,
 ) => Exit.isSuccess(Schema.decodeUnknownExit(Schema.toCodecJson(schema))(value));
 
 describe("native recording contracts", () => {
@@ -61,6 +65,7 @@ describe("native recording contracts", () => {
 
   it("accepts existing UUID versions for each distinct native ID", () => {
     const uuid = "550e8400-e29b-41d4-a716-446655440000";
+
     for (const id of [ActorId, TableId, VisitId]) expect(accepts(id, uuid)).toBe(true);
   });
 
@@ -82,6 +87,7 @@ describe("native recording contracts", () => {
     expect(accepts(Visit, { ...visit, finishedAt: LATER, revision: 1 })).toBe(true);
     expect(accepts(Visit, { ...visit, finishedAt: undefined })).toBe(false);
     expect(accepts(Visit, { ...visit, finishedAt: "2026-11-05T20:00:00.000Z" })).toBe(false);
+
     for (const revision of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
       expect(accepts(Visit, { ...visit, revision })).toBe(false);
     }
@@ -92,6 +98,7 @@ describe("native recording contracts", () => {
     expect(accepts(PlayEntry, { ...entry, kind: "cash_out", amount: 0 })).toBe(true);
     expect(accepts(PlayEntry, { ...entry, kind: "adjustment", amount: -100 })).toBe(true);
     expect(accepts(PlayEntry, { ...entry, kind: "adjustment", amount: 100 })).toBe(true);
+
     for (const fields of [
       { amount: 0 },
       { amount: -1 },
@@ -120,6 +127,7 @@ describe("native recording contracts", () => {
 
   it("retains audit and replacement links with consistent void fields", () => {
     expect(accepts(PlayEntry, { ...entry, voidedAt: LATER, voidedBy: ACTOR })).toBe(true);
+
     for (const fields of [
       { voidedAt: LATER },
       { voidedBy: ACTOR },
@@ -137,6 +145,7 @@ describe("native recording contracts", () => {
       totals: { buyIn: 20000, cashOut: 20000, adjustment: 0 },
       finalResult: null,
     };
+
     expect(accepts(VisitSummary, summary)).toBe(true);
     expect(accepts(VisitSummary, { ...summary, finalResult: 0 })).toBe(false);
     expect(

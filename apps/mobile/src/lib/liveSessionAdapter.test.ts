@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { reconcileLiveSessionSurface } from "@stacks/client-runtime/liveSessionSurface";
 import { makeRecordingStore } from "@stacks/client-runtime/recording";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
@@ -7,18 +6,32 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
 
-const bridge = vi.hoisted(() => ({
-  store: undefined as ReturnType<typeof makeRecordingStore> | undefined,
-  privacyMode: false,
-  showLive: vi.fn(async () => {}),
-  showFinished: vi.fn<(payload: { resultText: string }) => Promise<void>>(async () => {}),
-  clear: vi.fn(async () => {}),
-}));
+interface LiveBridge {
+  store: ReturnType<typeof makeRecordingStore> | undefined;
+  privacyMode: boolean;
+  showLive: () => Promise<void>;
+  showFinished: (payload: { resultText: string }) => Promise<void>;
+  clear: () => Promise<void>;
+}
+
+const bridge = vi.hoisted(() => {
+  const state: LiveBridge = {
+    store: undefined,
+    privacyMode: false,
+    showLive: vi.fn(async () => {}),
+    showFinished: vi.fn(async () => {}),
+    clear: vi.fn(async () => {}),
+  };
+
+  return state;
+});
 
 vi.stubGlobal("__DEV__", false);
+
 vi.mock("../../modules/live-session-updates/src", () => ({
   liveSessionUpdates: bridge,
 }));
+
 vi.mock("react-native", () => ({
   PermissionsAndroid: {
     PERMISSIONS: { POST_NOTIFICATIONS: "android.permission.POST_NOTIFICATIONS" },
@@ -27,12 +40,15 @@ vi.mock("react-native", () => ({
   },
   Platform: { OS: "android", Version: 37 },
 }));
+
 vi.mock("./config", () => ({
   appUrl: (path: string) => `stacks-dev://${path}`,
 }));
+
 vi.mock("./preferences", () => ({
   usePreferences: () => ({ showCents: false, privacyMode: bridge.privacyMode }),
 }));
+
 vi.mock("./recording", () => ({
   recordingStore: {
     subscribe: (listener: () => void) => bridge.store!.subscribe(listener),
@@ -48,16 +64,20 @@ import {
 
 const openStore = async () => {
   let documentState: RecordingStorageDocument = { revision: 0 };
+
   const store = makeRecordingStore({
     load: async () => documentState,
     commit: async (_revision, payload) => {
       documentState = { revision: documentState.revision + 1, payload };
+
       return documentState.revision;
     },
     subscribe: () => () => {},
     close: async () => {},
   });
+
   await store.ready;
+
   return store;
 };
 
@@ -68,6 +88,7 @@ it("keeps the finished notification in sync with privacy and clears it on deleti
   const store = await openStore();
   bridge.store = store;
   const root = createRoot(document.createElement("div"));
+
   try {
     await store.execute(
       store.prepare({
@@ -114,6 +135,7 @@ it("keeps the finished notification in sync with privacy and clears it on deleti
 
 it("dispatches live, finished, and cleared transitions on Android", async () => {
   const store = await openStore();
+
   try {
     const start = DateTime.makeUnsafe("2026-11-13T21:12:00.000Z");
     await store.execute(store.prepare({ type: "start", buyIn: 20000, startedAt: start }));
@@ -132,6 +154,7 @@ it("dispatches live, finished, and cleared transitions on Android", async () => 
       { showCents: false, privacyMode: false },
       appUrl,
     );
+
     await dispatchLiveSessionSurface(live, androidDrivers);
     expect(androidDrivers.requestAndroidPermission).toHaveBeenCalledTimes(1);
     expect(androidDrivers.showAndroidLive).toHaveBeenCalledWith(
@@ -153,12 +176,14 @@ it("dispatches live, finished, and cleared transitions on Android", async () => 
         finishedAt: DateTime.makeUnsafe("2026-11-13T22:12:00.000Z"),
       }),
     );
+
     const finished = reconcileLiveSessionSurface(
       visitId,
       store.getSnapshot().state,
       { showCents: false, privacyMode: false },
       appUrl,
     );
+
     await dispatchLiveSessionSurface(finished, androidDrivers);
     expect(androidDrivers.showAndroidFinished).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -173,6 +198,7 @@ it("dispatches live, finished, and cleared transitions on Android", async () => 
       { showCents: false, privacyMode: false },
       appUrl,
     );
+
     await dispatchLiveSessionSurface(idle, androidDrivers);
     expect(androidDrivers.clearAndroid).toHaveBeenCalledTimes(1);
   } finally {

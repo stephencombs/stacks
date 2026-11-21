@@ -44,6 +44,6 @@ export const captureStartup = (stage: StartupStage, elapsedMs: number, environme
   });
 };
 
-export const captureCaughtError = (error: unknown, stage: StartupStage, environment: string) => {
+export const captureCaughtError = (error: Error, stage: StartupStage, environment: string) => {
   posthog?.captureException(error, { startup_stage: stage, startup_environment: environment });
 };

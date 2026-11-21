@@ -25,10 +25,8 @@ import {
   VenueKind,
 } from "@stacks/contracts";
 
-/** Postgres returns `timestamptz` as a Date. */
 const Timestamp = Schema.DateTimeUtcFromDate;
 
-/** Postgres returns `bigint` as a JS bigint; `MinorUnits` rejects anything past 2^53. */
 const Amount = Schema.BigInt.pipe(
   Schema.decodeTo(
     MinorUnits,

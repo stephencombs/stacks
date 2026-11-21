@@ -35,6 +35,7 @@ type Props = StaticScreenProps<{ tripId?: string } | undefined>;
  */
 export function SessionsScreen({ route }: Props) {
   usePlaceAddress(route.params, "tripId");
+
   return (
     <ScopeLoaded
       renderError={screenError}
@@ -77,6 +78,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
   const nights = tripNights(closed, localClock).toReversed();
   const going = trip.trip.endedAt === null;
   const canStart = going && group.group.currency === RECORDING_CURRENCY;
+
   const startButton = (
     <Button
       label="Start a session"
@@ -86,7 +88,9 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
       onPress={() => setStarting(true)}
     />
   );
+
   const headerRight = useCallback(() => <TripActions trip={trip} group={group} />, [trip, group]);
+
   return (
     <Screen
       shows={{ trip: trip.trip.id }}
@@ -135,6 +139,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
         const played = night.sessions.flatMap((s) =>
           s.results.filter((r) => r.playerId === group.myPlayerId),
         );
+
         return (
           <View key={night.key} className="gap-2">
             <SectionHeading
@@ -194,6 +199,7 @@ function SessionsView({ trip, group }: { trip: TripDetail; group: GroupDetail })
 
 function TripActions({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const go = useGo();
+
   return (
     <View className="flex-row items-center gap-2">
       <Button
@@ -218,6 +224,7 @@ function TripSummary({
   const mine = playerTrip(closed, group.myPlayerId);
   const standings = tripStandings(closed, localClock);
   const rank = standings.find((standing) => standing.playerId === group.myPlayerId)?.rank;
+
   return (
     <View className="flex-row flex-wrap justify-between gap-x-3 gap-y-2">
       <TripStat label="You">

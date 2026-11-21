@@ -1,8 +1,8 @@
 import { Host } from "@expo/ui";
 import { Button, Menu } from "@expo/ui/swift-ui";
+import * as swiftModifiers from "@expo/ui/swift-ui/modifiers";
 import {
   accessibilityLabel,
-  buttonBorderShape,
   buttonStyle,
   controlSize,
   disabled as disable,
@@ -21,7 +21,7 @@ export function ActionMenu({ label, actions, disabled = false, fab = false }: Ac
         modifiers={[
           buttonStyle("bordered"),
           labelStyle("iconOnly"),
-          ...(fab ? [buttonBorderShape("circle"), controlSize("extraLarge")] : []),
+          ...(fab ? [swiftModifiers.buttonBorderShape("circle"), controlSize("extraLarge")] : []),
           frame(fab ? { minWidth: 56, minHeight: 56 } : { minWidth: 44, minHeight: 44 }),
           accessibilityLabel(label),
           disable(disabled),

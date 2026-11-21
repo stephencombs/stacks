@@ -11,6 +11,7 @@ export const actorKeys: ActorKeyStorage = {
   load: async () => {
     const saved = await SecureStore.getItemAsync(KEY);
     const credential = saved === null ? null : decode(saved);
+
     return credential?._tag === "Some" ? credential.value : null;
   },
   save: (credential) => SecureStore.setItemAsync(KEY, JSON.stringify(credential)),

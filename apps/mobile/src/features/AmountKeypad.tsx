@@ -1,3 +1,4 @@
+import * as Match from "effect/Match";
 import { useEffect, useRef } from "react";
 import * as Haptics from "expo-haptics";
 import { Platform, Pressable, Text, View } from "react-native";
@@ -11,8 +12,6 @@ const digitRows = [
   ["7", "8", "9"],
 ] as const;
 
-// A click can follow pointer-up as its own event. Remember the press-in delete
-// until that click arrives, so a tap doesn't remove a second character.
 const DELETE_PRESS_SETTLE_MS = 300;
 
 /** The keypad used at the table: digits, an optional decimal or sign, and delete. */
@@ -32,6 +31,7 @@ export function AmountKeypad({
   useEffect(
     () => () => {
       releaseRepeat.current?.();
+
       if (settleDelete.current !== null) clearTimeout(settleDelete.current);
     },
     [],
@@ -42,9 +42,9 @@ export function AmountKeypad({
     deletedOnPressIn.current = true;
     void Haptics.selectionAsync();
     releaseRepeat.current?.();
-    // Empty is a no-op in the parent, which applies each delete to the latest amount.
     releaseRepeat.current = holdBackspace(() => {
       onKey("back");
+
       return false;
     });
   };
@@ -52,21 +52,25 @@ export function AmountKeypad({
   const releaseDelete = () => {
     releaseRepeat.current?.();
     releaseRepeat.current = null;
+
     if (settleDelete.current !== null) clearTimeout(settleDelete.current);
     const seen = deletePress.current;
     settleDelete.current = setTimeout(() => {
       settleDelete.current = null;
+
       if (deletePress.current === seen) deletedOnPressIn.current = false;
     }, DELETE_PRESS_SETTLE_MS);
   };
 
-  // VoiceOver and keyboard activation fire onPress without a press-in.
   const activateDelete = () => {
     deletePress.current += 1;
+
     if (deletedOnPressIn.current) {
       deletedOnPressIn.current = false;
+
       return;
     }
+
     void Haptics.selectionAsync();
     onKey("back");
   };
@@ -90,10 +94,11 @@ export function AmountKeypad({
               <Pressable
                 key={key}
                 accessibilityRole="button"
-                accessibilityLabel={
-                  key === "back" ? "Delete" : key === "sign" ? "Plus or minus" : key
-                }
-                // The sheet scrolls; a stolen press would stop a held delete.
+                accessibilityLabel={Match.value(key).pipe(
+                  Match.when("back", () => "Delete"),
+                  Match.when("sign", () => "Plus or minus"),
+                  Match.orElse((label) => label),
+                )}
                 cancelable={key === "back" ? false : undefined}
                 onPressIn={key === "back" ? pressDelete : undefined}
                 onPressOut={key === "back" ? releaseDelete : undefined}

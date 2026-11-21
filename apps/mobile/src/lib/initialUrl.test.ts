@@ -38,6 +38,7 @@ it("consumes a late rejection after the deadline", async () => {
   vi.useFakeTimers();
   let reject!: (error: Error) => void;
   const failed = vi.fn();
+
   const result = getInitialURL(
     () =>
       new Promise<string | null>((_resolve, fail) => {
@@ -46,6 +47,7 @@ it("consumes a late rejection after the deadline", async () => {
     vi.fn(),
     failed,
   );
+
   await vi.advanceTimersByTimeAsync(1_500);
   await expect(result).resolves.toBeNull();
   reject(new Error("Late native failure"));

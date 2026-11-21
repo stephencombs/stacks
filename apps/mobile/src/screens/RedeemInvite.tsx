@@ -5,6 +5,8 @@ import { useRedeemInvite } from "@stacks/client-runtime/recordingReact";
 import type { PlayerInvitePreview } from "@stacks/contracts/recordingCommands";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import { useEffect, useState } from "react";
 import { Platform, Text } from "react-native";
 
@@ -20,29 +22,35 @@ type Props = StaticScreenProps<{ token: string }>;
 export function RedeemInviteScreen({ route }: Props) {
   const { token } = route.params;
   const navigation = useNavigation();
+
   const [preview, setPreview] = useState<
     { ok: PlayerInvitePreview } | { error: string } | undefined
   >(undefined);
+
   const redeem = useRedeemInvite(token);
   useEffect(() => {
     let current = true;
     void Effect.runPromiseExit(fetchInvitePreview({ baseUrl: apiUrl }, token)).then((exit) => {
       if (!current) return;
+
       if (Exit.isSuccess(exit)) return setPreview({ ok: exit.value });
-      const failure = Exit.findErrorOption(exit);
+      const failure = Option.getOrNull(Exit.findErrorOption(exit));
       setPreview({
         error:
-          failure._tag === "Some" && failure.value._tag === "Conflict"
-            ? describeError(failure.value)
+          failure !== null && Predicate.isTagged(failure, "Conflict")
+            ? describeError(failure)
             : "This invite doesn't work. Ask whoever sent it for a new one.",
       });
     });
+
     return () => {
       current = false;
     };
   }, [token]);
+
   const openHome = () =>
     navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } });
+
   return (
     <PersonalScreen>
       {Platform.OS === "android" ? <PageTitle inContent>Invite</PageTitle> : null}

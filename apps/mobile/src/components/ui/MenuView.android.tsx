@@ -1,4 +1,5 @@
 import type { MenuComponentProps } from "@expo/ui/community/menu";
+import * as Predicate from "effect/Predicate";
 import {
   DropdownMenu,
   DropdownMenuItem,
@@ -12,8 +13,6 @@ import { useCSSVariable } from "uniwind";
 
 import { ComposeHost as Host } from "./ComposeHost.android";
 
-// Clipped popups drop the status bar offset, so edge-to-edge menus near the bottom detach from
-// their anchor.
 const popup = { clippingEnabled: false };
 
 /**
@@ -31,6 +30,7 @@ export function MenuView({
 }: MenuComponentProps) {
   const [expanded, setExpanded] = useState(false);
   const [loss, ink] = useCSSVariable(["--color-loss", "--color-ink"]).map(String);
+
   return (
     <View style={style} testID={testID}>
       <Host matchContents>
@@ -57,7 +57,8 @@ export function MenuView({
               .filter((action) => !action.attributes?.hidden)
               .map((action) => {
                 const leading =
-                  action.image && typeof action.image !== "string" ? action.image : undefined;
+                  action.image && !Predicate.isString(action.image) ? action.image : undefined;
+
                 return (
                   <DropdownMenuItem
                     key={action.id ?? action.title}

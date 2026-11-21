@@ -13,7 +13,6 @@ export default Effect.gen(function* () {
   yield* sql`alter table entries add column trip_id uuid`;
   yield* sql`alter table stakes add column trip_id uuid`;
 
-  // Each row goes to the latest-starting trip whose dates hold it, if any.
   yield* sql`
     update sessions s set trip_id = (
       select t.id from trips t
@@ -30,9 +29,7 @@ export default Effect.gen(function* () {
       order by t.started_at desc limit 1
     )
   `;
-  // Entries are append-only; this one backfill writes past the guard.
   yield* sql`alter table entries disable trigger entries_append_only`;
-  // People pay up after a trip ends, so a payment squares up the latest trip that began before it.
   yield* sql`
     update entries e set trip_id = (
       select t.id from trips t

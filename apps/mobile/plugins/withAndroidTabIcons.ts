@@ -13,8 +13,10 @@ const withAndroidTabIcons: ConfigPlugin = (config) =>
       const source = join(config.modRequest.projectRoot, "assets", "tab-icons");
       const drawable = join(config.modRequest.platformProjectRoot, "app/src/main/res/drawable");
       mkdirSync(drawable, { recursive: true });
+
       for (const file of readdirSync(source))
         copyFileSync(join(source, file), join(drawable, file));
+
       return config;
     },
   ]);

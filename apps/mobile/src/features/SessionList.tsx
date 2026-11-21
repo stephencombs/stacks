@@ -35,11 +35,13 @@ function TableSummarySheet({
   onClose: () => void;
 }) {
   const names = playerNames(detail);
+
   const when = play.live
     ? `Since ${formatTime(play.startedAt)}`
     : play.endedAt
       ? `${formatDay(play.startedAt)} · ${formatTime(play.startedAt)} – ${formatTime(play.endedAt)} (${formatDuration(play.startedAt, play.endedAt)})`
       : `${formatDay(play.startedAt)} · ${formatTime(play.startedAt)}`;
+
   const description = [
     play.table.game ? gameNames[play.table.game] : "No game set",
     play.table.highLimit ? "High limit" : null,
@@ -47,10 +49,13 @@ function TableSummarySheet({
   ]
     .filter(Boolean)
     .join(" · ");
+
   const seenGuests = new Map<string, number>();
+
   const guestKey = (name: string) => {
     const n = (seenGuests.get(name) ?? 0) + 1;
     seenGuests.set(name, n);
+
     return `guest-${name}-${n}`;
   };
 
@@ -63,9 +68,11 @@ function TableSummarySheet({
           {play.playerIds.map((playerId) => {
             const name =
               playerId === detail.myPlayerId ? "You" : (names.get(playerId) ?? "Someone");
+
             const isPlaying = play.playing.includes(playerId);
             const open = play.inPlay.find((item) => item.playerId === playerId);
             const result = play.results.find((item) => item.playerId === playerId);
+
             return (
               <Row key={playerId}>
                 <Chip chip={chipOf(detail, playerId)} name={name} size={28} />
@@ -154,19 +161,24 @@ export function SessionList({
           const venue = venueLabel(play.venue);
           const game = play.kind === "session" ? play.session.game : play.table.game;
           const gameName = game ? gameNames[game] : "No game set";
+
           const playerCount =
             play.kind === "table" ? play.playerIds.length + play.others.length : results.length;
+
           const visitId = play.kind === "table" ? play.myVisitId : null;
+
           const open =
             play.kind === "session"
               ? () => go.session(play.session.id)
               : visitId
                 ? () => navigation.navigate("Play", { visitId })
                 : () => setSelected(play);
+
           const accessibilityHint =
             play.kind === "table" && !visitId ? "Opens the table summary" : "Opens the session";
+
           const mine = results.find((result) => result.playerId === detail.myPlayerId);
-          // Who's still at a live table, members first.
+
           const who = live
             ? nameList([
                 ...play.playing.map((id) =>
@@ -177,6 +189,7 @@ export function SessionList({
                   : []),
               ])
             : "";
+
           return (
             <Row key={session.id} accessibilityHint={accessibilityHint} onPress={open}>
               {android ? (
@@ -202,7 +215,7 @@ export function SessionList({
                     : `${who ? `${who} · ` : ""}${gameName} · ${live ? "since " : ""}${formatTime(session.startedAt)}`}
                 </Text>
               </View>
-              {/* A live table's result is only its finished visits; it isn't settled yet. */}
+              {}
               {android && live ? (
                 <TripLiveDuration startedAt={session.startedAt} />
               ) : mine && !(live && play.kind === "table") ? (
@@ -228,6 +241,7 @@ export function SessionList({
 function TripLiveDuration({ startedAt }: { startedAt: DateTime.Utc }) {
   const now = useRecordingClock();
   const duration = formatDuration(startedAt, now);
+
   return (
     <Text
       accessibilityLabel={`Live for ${duration}`}

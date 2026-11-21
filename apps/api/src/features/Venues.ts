@@ -24,6 +24,7 @@ const searchVisible = Effect.fn("Venues.searchVisible")(function* (
   const sql = yield* SqlClient.SqlClient;
   const text = query.q?.trim();
   const pattern = text ? `%${escapeLike(text)}%` : null;
+
   const near =
     query.lat !== undefined && query.lng !== undefined ? { lat: query.lat, lng: query.lng } : null;
 
@@ -48,6 +49,7 @@ const searchVisible = Effect.fn("Venues.searchVisible")(function* (
  */
 export const search = Effect.fn("Venues.search")(function* (query: typeof SearchVenuesQuery.Type) {
   if (query.groupId) yield* Access.membership(query.groupId);
+
   return yield* searchVisible(query, query.groupId);
 });
 
@@ -60,6 +62,7 @@ export const searchPublic = Effect.fn("Venues.searchPublic")(function* (
 export const recent = Effect.fn("Venues.recent")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   yield* Access.membership(groupId);
+
   return yield* sql`
     select ${venueColumns(sql)} from venues v
     join (
@@ -76,11 +79,14 @@ const findVisible = Effect.fn("Venues.findVisible")(function* (
   groupId: GroupId | null,
 ) {
   const sql = yield* SqlClient.SqlClient;
+
   const [venue] = yield* sql`
     select ${venueColumns(sql)} from venues v
     where v.id = ${venueId} and (v.group_id is null or v.group_id = ${groupId})
   `.pipe(Effect.flatMap(Access.decodeRows(VenueRow)));
+
   if (!venue) return yield* new NotFound({ resource: "venue" });
+
   return venue;
 });
 
@@ -97,10 +103,13 @@ export const create = Effect.fn("Venues.create")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
+
   if (request.kind === "home" && request.groupId === null) {
     return yield* new InvalidRequest({ message: "A home venue belongs to one group." });
   }
+
   const groupId = request.kind === "home" ? request.groupId : null;
+
   if (groupId) yield* Access.membership(groupId);
   yield* Access.ensureUser();
   yield* sql`
@@ -109,5 +118,6 @@ export const create = Effect.fn("Venues.create")(function* (
       ${request.country}, 'user', ${groupId}, ${userId})
     on conflict (id) do nothing
   `;
+
   return yield* findVisible(request.id, groupId);
 });

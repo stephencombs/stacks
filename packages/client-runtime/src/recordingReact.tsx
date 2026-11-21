@@ -1,5 +1,9 @@
 import * as DateTime from "effect/DateTime";
 import {
+  Conflict,
+  Forbidden,
+  NotFound,
+  Unauthorized,
   UserId,
   type ActorId,
   type PlayerId,
@@ -8,13 +12,13 @@ import {
   type VisitId,
 } from "@stacks/contracts";
 import type {
-  JoinedTable,
   PlayerAccess,
   PlayerInviteLink,
   RecordingCommand,
   RecordingOperationId,
   TableView,
 } from "@stacks/contracts/recordingCommands";
+import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import {
@@ -30,18 +34,19 @@ import {
 
 import { describeError } from "./errors.ts";
 import {
-  makeRecordingStore,
   RecordingError,
+  RecordingStoreLive,
+  RecordingStoreService,
   type CachedVenue,
   type RecordingInput,
-  type RecordingReceipt,
   type RecordingStore,
 } from "./recording.ts";
 import { ledgerSynced } from "./freshness.ts";
 import type { RecordingStorage, RecordingStorageChange } from "./recordingStorage.ts";
 import {
-  makeRecordingSync,
   RecordingSyncBlocked,
+  RecordingSyncLive,
+  RecordingSyncService,
   syncsAsDevice,
   tableSynced,
   type ActorKeyStorage,
@@ -61,32 +66,32 @@ import {
   venueChoices,
 } from "./recordingView.ts";
 
-/**
- * Hands the store an adapter at once and opens the platform's storage on first use, so the store
- * exists synchronously and a failed open becomes its visible load failure, retried by `refresh`.
- */
-const deferStorage = (open: () => Promise<RecordingStorage>): RecordingStorage => {
+const deferStorage = (open: () => Promise<RecordingStorage>) => {
   let opening: Promise<RecordingStorage> | undefined;
   let detach: (() => void) | undefined;
   const listeners = new Set<(change: RecordingStorageChange) => void>();
+
   const opened = () =>
     (opening ??= open().then(
       (storage) => {
         detach = storage.subscribe((change) => {
           for (const listener of listeners) listener(change);
         });
+
         return storage;
       },
-      (error: unknown) => {
+      (error) => {
         opening = undefined;
         throw error;
       },
     ));
-  return {
+
+  const deferred: RecordingStorage = {
     load: async () => (await opened()).load(),
     commit: async (expected, payload) => (await opened()).commit(expected, payload),
     subscribe: (listener) => {
       listeners.add(listener);
+
       return () => void listeners.delete(listener);
     },
     close: async () => {
@@ -95,6 +100,8 @@ const deferStorage = (open: () => Promise<RecordingStorage>): RecordingStorage =
       await storage?.close();
     },
   };
+
+  return deferred;
 };
 
 /**
@@ -103,10 +110,17 @@ const deferStorage = (open: () => Promise<RecordingStorage>): RecordingStorage =
  */
 export const openDeviceRecordingStore = (
   open: (namespace: string) => Promise<RecordingStorage>,
-): RecordingStore => {
-  const store = makeRecordingStore(deferStorage(() => open(PRIVATE_RECORDING_NAMESPACE)));
-  // The snapshot reports a failed load; nothing awaits `ready` itself.
+) => {
+  const store = Effect.runSync(
+    Effect.gen(function* () {
+      return yield* RecordingStoreService;
+    }).pipe(
+      Effect.provide(RecordingStoreLive(deferStorage(() => open(PRIVATE_RECORDING_NAMESPACE)))),
+    ),
+  );
+
   store.ready.catch(() => undefined);
+
   return store;
 };
 
@@ -117,17 +131,16 @@ export const openDeviceRecordingStore = (
  */
 export const makeRecordingSubmission = (store: RecordingStore) => {
   let retained: { readonly key: string; readonly command: RecordingCommand } | null = null;
-  /** `venues` are cached in the same save, for a venue the input names. */
-  return async (
-    input: RecordingInput,
-    venues: ReadonlyArray<CachedVenue> = [],
-  ): Promise<RecordingReceipt> => {
+
+  return async (input: RecordingInput, venues: ReadonlyArray<CachedVenue> = []) => {
     const key = JSON.stringify(input);
     const command = retained?.key === key ? retained.command : store.prepare(input);
     retained = { key, command };
+
     try {
       const receipt = await store.execute(command, venues);
       retained = null;
+
       return receipt;
     } catch (error) {
       if (!canRetryRecording(error)) retained = null;
@@ -150,17 +163,18 @@ export function RecordingProvider({
 
 const useRecordingStore = () => {
   const store = use(RecordingContext);
+
   if (!store) throw new Error("Recording hooks need a RecordingProvider above them");
+
   return store;
 };
 
-/** Load and save state for the whole device ledger, worded for a status line. */
 const useSnapshot = () => {
   const store = useRecordingStore();
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+
   return {
     status: snapshot.status,
-    /** A sentence for a failed load or the last failed save; null otherwise. */
     error:
       snapshot.status === "load_failed" || snapshot.status === "save_failed"
         ? describeRecordingError(snapshot.error)
@@ -174,16 +188,19 @@ const useSnapshot = () => {
 export const useRecordingHome = () => {
   const { state, ...snapshot } = useSnapshot();
   const home = useMemo(() => (state ? recordingHome(state) : null), [state]);
+
   return { ...snapshot, home };
 };
 
 /** One visit's review. `visit` is undefined while loading and null when there's no such visit. */
 export const useRecordingVisit = (visitId: VisitId) => {
   const { state, ...snapshot } = useSnapshot();
+
   const visit = useMemo(
     () => (state ? recordingVisit(state, visitId) : undefined),
     [state, visitId],
   );
+
   return { ...snapshot, visit };
 };
 
@@ -210,27 +227,40 @@ export function RecordingSyncRoot({
   children: ReactNode;
 }) {
   const store = useRecordingStore();
+
   const hold = (id: string | null) => ({
     userId: id,
-    sync: makeRecordingSync(
-      store,
-      id === null ? null : UserId.make(id),
-      connect(),
-      keys,
-      ledgerSynced,
+    sync: Effect.runSync(
+      Effect.gen(function* () {
+        return yield* RecordingSyncService;
+      }).pipe(
+        Effect.provide(
+          RecordingSyncLive(
+            store,
+            id === null ? null : UserId.make(id),
+            connect(),
+            keys,
+            ledgerSynced,
+          ),
+        ),
+      ),
     ),
   });
+
   const [held, setHeld] = useState(() => hold(userId));
+
   if (held.userId !== userId) setHeld(hold(userId));
   const sync = held.sync;
   useEffect(() => {
     const fiber = Effect.runFork(sync.run);
     const stopWaking = wake(sync.wake);
+
     return () => {
       stopWaking();
       Effect.runFork(Fiber.interrupt(fiber));
     };
   }, [sync, wake]);
+
   return <RecordingSyncContext value={sync}>{children}</RecordingSyncContext>;
 }
 
@@ -246,34 +276,38 @@ export const useRecordingSync = (visitId?: VisitId) => {
   const sync = use(RecordingSyncContext);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const status = useSyncExternalStore(sync?.subscribe ?? noSubscription, sync?.getStatus ?? idle);
-  // Signed out, solo play never leaves the device, so there's nothing to report.
+
   const deviceOnly =
     sync?.userId === null && snapshot.state !== null && !syncsAsDevice(snapshot.state);
+
   const view = useMemo(
     () => recordingSyncView(snapshot.state, deviceOnly ? null : status, visitId),
     [snapshot.state, status, visitId, deviceOnly],
   );
+
   const [error, setError] = useState<string | null>(null);
+
   const resolve =
     (action: "recordAgain" | "discard") => async (operationId: RecordingOperationId) => {
       if (!sync) return;
       setError(null);
+
       try {
         await sync[action](operationId);
       } catch (cause) {
         setError(describeRecordingError(cause));
       }
     };
+
   const claim = useMemo(() => claimLines(status?.claim ?? null), [status?.claim]);
+
   return {
     ...view,
     error,
     recordAgain: resolve("recordAgain"),
     discard: resolve("discard"),
-    /** What signing in claimed from this device, or was refused, until dismissed. */
     claim,
     dismissClaim: () => sync?.dismissClaim(),
-    /** Whether this device's player can be linked to the account's, which keeps them separate. */
     canLink:
       status?.phase === "blocked" &&
       status.error instanceof RecordingSyncBlocked &&
@@ -290,25 +324,31 @@ export const useRecordingSubmit = () => {
   const store = useRecordingStore();
   const [submission] = useState(() => makeRecordingSubmission(store));
   const busy = useRef(false);
+
   const [state, setState] = useState<{ pending: boolean; error: string | null }>({
     pending: false,
     error: null,
   });
+
   const submit = async (input: RecordingInput, venues?: ReadonlyArray<CachedVenue>) => {
     if (busy.current) return null;
     busy.current = true;
     setState({ pending: true, error: null });
+
     try {
       const receipt = await submission(input, venues);
       setState({ pending: false, error: null });
+
       return receipt;
     } catch (error) {
       setState({ pending: false, error: describeRecordingError(error) });
+
       return null;
     } finally {
       busy.current = false;
     }
   };
+
   return { ...state, submit, clearError: () => setState((s) => ({ ...s, error: null })) };
 };
 
@@ -320,32 +360,41 @@ export const useBuyInTotal = (visitId: VisitId) => {
   const store = useRecordingStore();
   const [submission] = useState(() => makeRecordingSubmission(store));
   const busy = useRef(false);
+
   const [state, setState] = useState<{ pending: boolean; error: string | null }>({
     pending: false,
     error: null,
   });
+
   const set = async (total: number) => {
     if (busy.current) return false;
     busy.current = true;
     setState({ pending: true, error: null });
+
     try {
       for (;;) {
         const ledger = store.getSnapshot().state;
         const visit = ledger ? recordingVisit(ledger, visitId) : null;
+
         if (!visit) throw new RecordingError("invalid", "Visit does not exist.");
         const next = nextBuyInChange(visit, total);
+
         if (next === null) break;
         await submission(next);
       }
+
       setState({ pending: false, error: null });
+
       return true;
     } catch (error) {
       setState({ pending: false, error: describeRecordingError(error) });
+
       return false;
     } finally {
       busy.current = false;
     }
   };
+
   return { ...state, set, clearError: () => setState((s) => ({ ...s, error: null })) };
 };
 
@@ -366,10 +415,12 @@ export const useVenueSearch = (
   const lng = near?.lng ?? null;
   const searching = text !== "" || lat !== null;
   const key = JSON.stringify([text, lat, lng, attempt]);
+
   const [answer, setAnswer] = useState<{
     key: string;
     venues: ReadonlyArray<Venue> | null;
   } | null>(null);
+
   useEffect(() => {
     if (!searching || !sync) return;
     let current = true;
@@ -377,22 +428,25 @@ export const useVenueSearch = (
       (venues) => current && setAnswer({ key, venues }),
       () => current && setAnswer({ key, venues: null }),
     );
+
     return () => {
       current = false;
     };
   }, [sync, key, searching, text, lat, lng]);
-  // Without sync (no network layer at all) a search can't be asked.
   const found = !sync ? null : answer?.key === key ? answer.venues : undefined;
+
   const choices = useMemo(
     () => venueChoices(state?.venues ?? [], text, searching, found),
     [state?.venues, text, searching, found],
   );
+
   return { ...choices, retry: () => setAttempt((n) => n + 1) };
 };
 
 /** A table and everyone recorded at it. `table` is undefined while loading, null if missing. */
 export const useRecordingTable = (tableId: TableId | null) => {
   const { state } = useSnapshot();
+
   return useMemo(
     () => (state && tableId ? recordingTable(state, tableId) : undefined),
     [state, tableId],
@@ -407,68 +461,83 @@ export const useTableSharing = (tableId: TableId) => {
   const store = useRecordingStore();
   const sync = use(RecordingSyncContext);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+
   const [state, setState] = useState<{
     token: string | null;
     pending: boolean;
     error: string | null;
   }>({ token: null, pending: false, error: null });
+
   const ready = snapshot.state !== null && tableSynced(snapshot.state, tableId);
+
   const run = async (action: () => Promise<string | null>) => {
     if (!sync) return;
     setState((s) => ({ ...s, pending: true, error: null }));
+
     try {
       const token = await action();
       setState({ token, pending: false, error: null });
     } catch (error) {
       const message =
         error instanceof RecordingError ? describeRecordingError(error) : describeError(error);
+
       setState((s) => ({ ...s, pending: false, error: message }));
     }
   };
+
   return {
     ...state,
     ready,
-    /** Starts syncing this device's tables; sharing needs the table on the server. */
     prepare: () => sync?.enable(),
     share: () => run(async () => (await sync!.share(tableId)).token),
     revoke: () =>
       run(async () => {
         await sync!.unshare(tableId);
+
         return null;
       }),
   };
 };
+
 /**
  * Joins a shared table through its link as a new player named as typed. It needs the network
  * once; `join` resolves with the table, or null with `error` set.
  */
 export const useJoinTable = (token: string) => {
   const sync = use(RecordingSyncContext);
+
   const [state, setState] = useState<{ pending: boolean; error: string | null }>({
     pending: false,
     error: null,
   });
-  const join = async (displayName: string): Promise<JoinedTable | null> => {
+
+  const join = async (displayName: string) => {
     if (!sync) return null;
     setState({ pending: true, error: null });
+
     try {
       const joined = await sync.join(token, displayName);
       setState({ pending: false, error: null });
+
       return joined;
     } catch (error) {
       setState({ pending: false, error: describeJoinError(error) });
+
       return null;
     }
   };
+
   return { ...state, join };
 };
 
-const describeJoinError = (error: unknown) => {
+const describeJoinError = (error: typeof Schema.Unknown.Encoded) => {
   if (error instanceof RecordingError) return describeRecordingError(error);
-  const tag = typeof error === "object" && error !== null && "_tag" in error ? error._tag : null;
-  if (tag === "NotFound")
+
+  if (Schema.is(NotFound)(error))
     return "This link doesn't work anymore. Ask whoever shared it for the current one.";
-  if (tag === "Conflict" || tag === "Unauthorized") return describeError(error);
+
+  if (Schema.is(Conflict)(error) || Schema.is(Unauthorized)(error)) return describeError(error);
+
   return "Joining needs a connection. Try again once you're online.";
 };
 
@@ -480,10 +549,12 @@ export const useServerTable = (tableId: TableId | null) => {
   const store = useRecordingStore();
   const sync = use(RecordingSyncContext);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+
   const enabled =
     snapshot.state !== null &&
     sync !== null &&
     (sync.userId !== null || syncsAsDevice(snapshot.state));
+
   const [view, setView] = useState<{ id: TableId; view: TableView | null } | null>(null);
   useEffect(() => {
     if (!enabled || !sync || !tableId) return;
@@ -492,38 +563,46 @@ export const useServerTable = (tableId: TableId | null) => {
       (next) => current && setView({ id: tableId, view: next }),
       () => current && setView({ id: tableId, view: null }),
     );
+
     return () => {
       current = false;
     };
   }, [enabled, sync, tableId]);
+
   return enabled && view?.id === tableId ? view.view : undefined;
 };
+
 /**
  * Hands a player to another device: a single-use invite link (a new one cancels the last), and
  * the devices already recording as them, each of which can be stopped. Needs the network.
  */
 export const usePlayerInvite = (playerId: PlayerId) => {
   const sync = use(RecordingSyncContext);
+
   const [state, setState] = useState<{
     link: PlayerInviteLink | null;
     access: PlayerAccess | null;
     pending: boolean;
     error: string | null;
   }>({ link: null, access: null, pending: false, error: null });
+
   useEffect(() => {
     if (!sync) return;
     let current = true;
     sync.playerAccess(playerId).then(
       (access) => current && setState((s) => ({ ...s, access })),
-      (error: unknown) => current && setState((s) => ({ ...s, error: describeInviteError(error) })),
+      (error) => current && setState((s) => ({ ...s, error: describeInviteError(error) })),
     );
+
     return () => {
       current = false;
     };
   }, [sync, playerId]);
+
   const run = async (action: () => Promise<PlayerInviteLink | null>) => {
     if (!sync) return;
     setState((s) => ({ ...s, pending: true, error: null }));
+
     try {
       const link = await action();
       const access = await sync.playerAccess(playerId);
@@ -532,19 +611,22 @@ export const usePlayerInvite = (playerId: PlayerId) => {
       setState((s) => ({ ...s, pending: false, error: describeInviteError(error) }));
     }
   };
+
   return {
     ...state,
     issue: () => run(() => sync!.invitePlayer(playerId)),
-    /** Cancels the open link, if there is one. */
     cancel: () =>
       run(async () => {
         const open = state.link?.id ?? state.access?.invite?.id;
+
         if (open) await sync!.revokeInvite(open);
+
         return null;
       }),
     stopDevice: (actorId: ActorId) =>
       run(async () => {
         await sync!.revokeBinding(playerId, actorId);
+
         return state.link;
       }),
   };
@@ -556,31 +638,40 @@ export const usePlayerInvite = (playerId: PlayerId) => {
  */
 export const useRedeemInvite = (token: string) => {
   const sync = use(RecordingSyncContext);
+
   const [state, setState] = useState<{ pending: boolean; error: string | null }>({
     pending: false,
     error: null,
   });
+
   const redeem = async () => {
     if (!sync) return null;
     setState({ pending: true, error: null });
+
     try {
       const player = await sync.redeem(token);
       setState({ pending: false, error: null });
+
       return player;
     } catch (error) {
       setState({ pending: false, error: describeInviteError(error) });
+
       return null;
     }
   };
+
   return { ...state, redeem };
 };
 
-const describeInviteError = (error: unknown) => {
+const describeInviteError = (error: typeof Schema.Unknown.Encoded) => {
   if (error instanceof RecordingError) return describeRecordingError(error);
-  const tag = typeof error === "object" && error !== null && "_tag" in error ? error._tag : null;
-  if (tag === "NotFound") return "This invite doesn't work. Ask whoever sent it for a new one.";
-  if (tag === "Conflict" || tag === "Forbidden" || tag === "Unauthorized")
+
+  if (Schema.is(NotFound)(error))
+    return "This invite doesn't work. Ask whoever sent it for a new one.";
+
+  if (Schema.is(Conflict)(error) || Schema.is(Forbidden)(error) || Schema.is(Unauthorized)(error))
     return describeError(error);
+
   return "This needs a connection. Try again once you're online.";
 };
 
@@ -590,7 +681,9 @@ export function useRecordingClock() {
   const [now, setNow] = useState(() => DateTime.nowUnsafe());
   useEffect(() => {
     const timer = setInterval(() => setNow(DateTime.nowUnsafe()), 1000);
+
     return () => clearInterval(timer);
   }, []);
+
   return now;
 }

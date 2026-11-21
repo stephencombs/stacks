@@ -12,6 +12,7 @@ it("distinguishes a missing document from damaged saved history", () => {
     revision: 1,
     payload: "opaque",
   });
+
   for (const value of [
     null,
     {},
@@ -30,6 +31,7 @@ it("accepts opaque strings but refuses invalid CAS revisions or namespaces", () 
   expect(() => validateRecordingNamespace("")).toThrow(RecordingStorageError);
   expect(() => validateRecordingNamespace("principal:a")).not.toThrow();
   expect(() => validateRecordingCommit(0, "not JSON")).not.toThrow();
+
   for (const revision of [-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER]) {
     expect(() => validateRecordingCommit(revision, "payload")).toThrow(RecordingStorageError);
   }

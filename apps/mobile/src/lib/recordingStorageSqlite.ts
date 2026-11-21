@@ -11,13 +11,17 @@ import {
 
 const listeners = new Map<string, Set<(change: RecordingStorageChange) => void>>();
 
-export const openSQLiteRecordingStorage = async (namespace: string): Promise<RecordingStorage> => {
+export const openSQLiteRecordingStorage: (namespace: string) => Promise<RecordingStorage> = async (
+  namespace,
+) => {
   validateRecordingNamespace(namespace);
+
   const database = await openDatabaseAsync("color-up-recording.db", {
     useNewConnection: true,
-  }).catch((error: unknown) => {
+  }).catch((error) => {
     throw new RecordingStorageError("open", error);
   });
+
   try {
     await database.execAsync(`
       CREATE TABLE IF NOT EXISTS recording_documents (
@@ -32,6 +36,7 @@ export const openSQLiteRecordingStorage = async (namespace: string): Promise<Rec
     } catch (closeError) {
       throw new RecordingStorageError("open", new AggregateError([error, closeError]));
     }
+
     throw new RecordingStorageError("open", error);
   }
 
@@ -39,26 +44,32 @@ export const openSQLiteRecordingStorage = async (namespace: string): Promise<Rec
   let closed = false;
   let closing: Promise<void> | undefined;
   let pending = Promise.resolve();
+
   const assertOpen = () => {
     if (closed) throw new RecordingStorageError("closed");
   };
-  const run = <T>(operation: "read" | "write", task: () => Promise<T>): Promise<T> => {
+
+  const run = <T>(operation: "read" | "write", task: () => Promise<T>) => {
     try {
       assertOpen();
     } catch (error) {
       return Promise.reject(error);
     }
-    const result = pending.then(task).catch((error: unknown) => {
+
+    const result = pending.then(task).catch((error) => {
       if (error instanceof RecordingStorageConflict || error instanceof RecordingStorageError)
         throw error;
       throw new RecordingStorageError(operation, error);
     });
+
     pending = result.then(
       () => {},
       () => {},
     );
+
     return result;
   };
+
   const notify = (revision: number) => {
     for (const listener of listeners.get(namespace) ?? []) {
       queueMicrotask(() => {
@@ -74,21 +85,24 @@ export const openSQLiteRecordingStorage = async (namespace: string): Promise<Rec
           "SELECT revision, payload FROM recording_documents WHERE namespace = ?",
           namespace,
         );
+
         return decodeRecordingStorageDocument(row === null ? undefined : row);
       }),
     commit(expectedRevision, payload) {
       return run("write", async () => {
         validateRecordingCommit(expectedRevision, payload);
-        // SDK 58 creates a separate connection. All CAS queries must use txn, never database.
         await database.withExclusiveTransactionAsync(async (txn) => {
           const row = await txn.getFirstAsync<unknown>(
             "SELECT revision, payload FROM recording_documents WHERE namespace = ?",
             namespace,
           );
+
           const document = decodeRecordingStorageDocument(row === null ? undefined : row);
+
           if (document.revision !== expectedRevision) {
             throw new RecordingStorageConflict(expectedRevision, document.revision);
           }
+
           await txn.runAsync(
             `INSERT INTO recording_documents(namespace, revision, payload) VALUES (?, ?, ?)
              ON CONFLICT(namespace) DO UPDATE SET revision = excluded.revision, payload = excluded.payload`,
@@ -98,23 +112,27 @@ export const openSQLiteRecordingStorage = async (namespace: string): Promise<Rec
           );
         });
         notify(expectedRevision + 1);
+
         return expectedRevision + 1;
       });
     },
     subscribe(listener) {
       assertOpen();
-      // The wrapper keeps subscriptions independent even when the same callback is reused.
       const subscription = (change: RecordingStorageChange) => listener(change);
       ownListeners.add(subscription);
       let shared = listeners.get(namespace);
+
       if (!shared) {
         shared = new Set();
         listeners.set(namespace, shared);
       }
+
       shared.add(subscription);
+
       return () => {
         if (!ownListeners.delete(subscription)) return;
         shared.delete(subscription);
+
         if (shared.size === 0) listeners.delete(namespace);
       };
     },
@@ -122,8 +140,10 @@ export const openSQLiteRecordingStorage = async (namespace: string): Promise<Rec
       if (closing) return closing;
       closed = true;
       const shared = listeners.get(namespace);
+
       for (const listener of ownListeners) shared?.delete(listener);
       ownListeners.clear();
+
       if (shared?.size === 0) listeners.delete(namespace);
       closing = pending.then(async () => {
         try {
@@ -132,6 +152,7 @@ export const openSQLiteRecordingStorage = async (namespace: string): Promise<Rec
           throw new RecordingStorageError("close", error);
         }
       });
+
       return closing;
     },
   };

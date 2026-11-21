@@ -25,6 +25,7 @@ export const membership = Effect.fn("Access.membership")(function* (groupId: Gro
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const groups = yield* sql`select 1 from groups where id = ${groupId}`;
+
   if (groups.length === 0) return yield* new NotFound({ resource: "group" });
 
   const [row] = yield* sql`
@@ -33,7 +34,9 @@ export const membership = Effect.fn("Access.membership")(function* (groupId: Gro
     join players p on p.group_id = m.group_id and p.user_id = m.user_id
     where m.group_id = ${groupId} and m.user_id = ${userId} and m.left_at is null
   `.pipe(Effect.flatMap(decodeRows(MembershipRow)));
+
   if (!row) return yield* new Forbidden({ reason: "not_a_member" });
+
   return row;
 });
 
@@ -62,6 +65,7 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 /** A short code people can read aloud or type: no 0/O or 1/I. */
 export const randomCode = (length = 10) => {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
+
   return Array.from(bytes, (byte) => CODE_ALPHABET[byte % CODE_ALPHABET.length]).join("");
 };
 
@@ -72,9 +76,12 @@ export const requirePlayersInGroup = Effect.fn("Access.requirePlayersInGroup")(f
 ) {
   const sql = yield* SqlClient.SqlClient;
   const unique = Array.from(new Set(playerIds));
+
   if (unique.length === 0) return;
+
   const found = yield* sql`
     select id from players where group_id = ${groupId} and id in ${sql.in(unique)}
   `;
+
   if (found.length !== unique.length) return yield* new Conflict({ reason: "player_not_in_group" });
 });

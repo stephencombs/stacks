@@ -18,11 +18,15 @@ export function confirmAction(
     if (error === null) return;
     Alert.alert("Something went wrong", error);
   };
+
   const confirmed = () => void Promise.resolve(onConfirm()).then((error) => failed(error ?? null));
+
   if (Platform.OS === "android") {
     requestConfirmation({ title, message, label, onConfirm, ...options });
+
     return;
   }
+
   Alert.alert(title, message, [
     { text: options?.dismissLabel ?? "Cancel", style: "cancel" },
     { text: label, style: "destructive", onPress: confirmed },

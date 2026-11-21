@@ -34,9 +34,27 @@ import {
   shouldRevalidate,
   subscribeLedgerSynced,
 } from "./freshness.ts";
-import { makeOutbox, type Outbox, type OutboxStorage, type Pending } from "./outbox.ts";
-import { makeStatsCopies, statsState, type StatsCopyStorage } from "./statsCopy.ts";
-import { makeLastTripStore, type LastTripStorage } from "./trip.ts";
+import {
+  OutboxLive,
+  OutboxService,
+  type Outbox,
+  type OutboxStorage,
+  type Pending,
+  type SendEntry,
+} from "./outbox.ts";
+import {
+  StatsCopiesLive,
+  StatsCopiesService,
+  statsState,
+  type StatsCopies,
+  type StatsCopyStorage,
+} from "./statsCopy.ts";
+import {
+  LastTripStoreLive,
+  LastTripStoreService,
+  type LastTripStorage,
+  type LastTripStore,
+} from "./trip.ts";
 import type { TestEvent } from "./telemetry.ts";
 
 export const TelemetryContext = createContext<(event: TestEvent) => void>(() => {});
@@ -46,7 +64,9 @@ export const StacksContext = createContext<Stacks | null>(null);
 
 export const useStacks = () => {
   const stacks = use(StacksContext);
+
   if (!stacks) throw new Error("useStacks needs a StacksContext provider above it");
+
   return stacks;
 };
 
@@ -57,27 +77,33 @@ export const useStacks = () => {
 export function useAction<Arg, A, E>(mutation: Atom.AtomResultFn<Arg, A, E>, event?: TestEvent) {
   const capture = use(TelemetryContext);
   const run = useAtomSet(mutation, { mode: "promiseExit" });
+
   const [state, setState] = useState<{ pending: boolean; error: string | null }>({
     pending: false,
     error: null,
   });
-  /** Like `run`, but hands back the failure sentence too, for callers that show it elsewhere. */
+
   const attempt = async (arg: Omit<Arg, "reactivityKeys">) => {
     setState({ pending: true, error: null });
+    // SAFETY: arg is the mutation without reactivityKeys, and LEDGER_KEYS is the key list Arg requires.
     const exit = await run({ ...arg, reactivityKeys: LEDGER_KEYS } as Arg);
     const error = Exit.isFailure(exit) ? describeError(Cause.squash(exit.cause)) : null;
+
     if (Exit.isSuccess(exit)) ledgerChanged();
+
     if (Exit.isSuccess(exit) && event) {
       try {
         capture(event);
-      } catch {
-        // Telemetry must not change the result of a ledger action.
-      }
+      } catch {}
     }
+
     setState({ pending: false, error });
+
     return { value: Exit.isSuccess(exit) ? exit.value : null, error };
   };
+
   const execute = async (arg: Omit<Arg, "reactivityKeys">) => (await attempt(arg)).value;
+
   return {
     run: execute,
     attempt,
@@ -86,7 +112,6 @@ export function useAction<Arg, A, E>(mutation: Atom.AtomResultFn<Arg, A, E>, eve
   };
 }
 
-/** How often entries waiting for signal try again while the app is open. */
 const RETRY_MS = 15_000;
 
 /**
@@ -109,37 +134,52 @@ export const makeSignedIn = ({
 }) => {
   const registry = AtomRegistry.make({ scheduleTask, defaultIdleTTL: CACHE_MS });
   const addEntry = stacks.Client.mutation("ledger", "addEntry");
-  return {
-    stacks,
-    registry,
-    lastTrip: makeLastTripStore(lastTrip),
-    statsCopies: makeStatsCopies(statsCopies),
-    outbox: makeOutbox(outbox, async ({ sessionId, entry }) => {
-      const release = registry.mount(addEntry);
-      try {
-        registry.set(addEntry, {
-          params: { sessionId },
-          payload: entry,
-          reactivityKeys: LEDGER_KEYS,
-        });
-        const exit = await Effect.runPromiseExit(
-          AtomRegistry.getResult(registry, addEntry, { suspendOnWaiting: true }),
-        );
-        if (Exit.isSuccess(exit)) {
-          ledgerChanged();
-          try {
-            capture("entry_confirmed");
-          } catch {
-            // A confirmed entry must not be retried because telemetry failed.
-          }
-        }
-        return { error: Exit.isFailure(exit) ? Cause.squash(exit.cause) : null };
-      } finally {
-        release();
+
+  const send: SendEntry = async ({ sessionId, entry }) => {
+    const release = registry.mount(addEntry);
+
+    try {
+      registry.set(addEntry, {
+        params: { sessionId },
+        payload: entry,
+        reactivityKeys: LEDGER_KEYS,
+      });
+
+      const exit = await Effect.runPromiseExit(
+        AtomRegistry.getResult(registry, addEntry, { suspendOnWaiting: true }),
+      );
+
+      if (Exit.isSuccess(exit)) {
+        ledgerChanged();
+
+        try {
+          capture("entry_confirmed");
+        } catch {}
       }
-    }),
+
+      return { error: Exit.isFailure(exit) ? Cause.squash(exit.cause) : null };
+    } finally {
+      release();
+    }
   };
+
+  return Effect.runSync(
+    Effect.gen(function* () {
+      return {
+        stacks,
+        registry,
+        lastTrip: yield* LastTripStoreService,
+        statsCopies: yield* StatsCopiesService,
+        outbox: yield* OutboxService,
+      };
+    }).pipe(
+      Effect.provide(LastTripStoreLive(lastTrip)),
+      Effect.provide(StatsCopiesLive(statsCopies)),
+      Effect.provide(OutboxLive(outbox, send)),
+    ),
+  );
 };
+
 type SignedIn = ReturnType<typeof makeSignedIn>;
 
 const SignedInContext = createContext<SignedIn | null>(null);
@@ -165,7 +205,9 @@ export function SignedInRoot({
 }) {
   const hold = (id: string | null) => ({ userId: id, signedIn: id ? make(id) : null });
   const [held, setHeld] = useState(() => hold(userId));
+
   if (held.userId !== userId) setHeld(hold(userId));
+
   return (
     <SignedInContext value={held.signedIn}>
       {held.signedIn ? (
@@ -176,7 +218,6 @@ export function SignedInRoot({
   );
 }
 
-/** Sends what's waiting now, whenever `wake` says, and every little while until it's through. */
 function KeepSending({
   signedIn: { outbox, registry },
   wake,
@@ -188,28 +229,33 @@ function KeepSending({
   const waiting = pending.some((p) => p.failed === null);
   useEffect(() => {
     void outbox.flush();
+
     return wake(() => void outbox.flush());
   }, [outbox, wake]);
   useEffect(() => {
     if (!waiting) return;
     const timer = setInterval(() => void outbox.flush(), RETRY_MS);
+
     return () => clearInterval(timer);
   }, [outbox, waiting]);
-  // Dropped a moment after this user leaves; strict mode's remount comes back before then.
   const leaving = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
     clearTimeout(leaving.current);
+
     return () => {
       leaving.current = setTimeout(() => registry.dispose(), 500);
     };
   }, [registry]);
+
   return null;
 }
 
 /** The signed-in user's client, cache, last trip and outbox, for the screens of their account. */
 export function SignedInScope({ children }: { children: ReactNode }) {
   const signedIn = use(SignedInContext);
+
   if (!signedIn) throw new Error("SignedInScope needs someone signed in above it");
+
   return (
     <StacksContext value={signedIn.stacks}>
       <RegistryContext value={signedIn.registry}>
@@ -230,7 +276,9 @@ const OutboxContext = createContext<Outbox | null>(null);
 
 export const useOutbox = () => {
   const outbox = use(OutboxContext);
+
   if (!outbox) throw new Error("useOutbox needs a SignedInScope above it");
+
   return outbox;
 };
 
@@ -238,6 +286,7 @@ export const useOutbox = () => {
 export const usePending = (sessionId: SessionId) => {
   const outbox = useOutbox();
   const pending = useSyncExternalStore(outbox.subscribe, outbox.pending);
+
   return pending.filter((p) => p.sessionId === sessionId);
 };
 
@@ -245,6 +294,7 @@ export const useAllOutboxEntries = () => {
   const outbox = useOutbox();
   const pending = useSyncExternalStore(outbox.subscribe, outbox.pending);
   const sent = useSyncExternalStore(outbox.subscribe, outbox.sent);
+
   return { pending, sent };
 };
 
@@ -260,22 +310,21 @@ export const useUnsaved = (
   const pending = usePending(sessionId);
   const sent = useSyncExternalStore(outbox.subscribe, outbox.sent);
   const known = new Set(saved.map((entry) => entry.id));
+
   return {
-    /** Waiting to be sent, or refused. */
     pending: pending.filter((p) => !known.has(p.entry.id)),
-    /** Confirmed, and still to show up in what the screen has. */
     sent: sent.filter((p) => p.sessionId === sessionId && !known.has(p.entry.id)),
   };
 };
-
-type LastTripStore = ReturnType<typeof makeLastTripStore>;
 
 const LastTripContext = createContext<LastTripStore | null>(null);
 
 export const useLastTrip = () => {
   const store = use(LastTripContext);
+
   if (!store) throw new Error("useLastTrip needs a SignedInScope above it");
   const lastTripId = useSyncExternalStore(store.subscribe, store.get);
+
   return { lastTripId, setLastTripId: store.set };
 };
 
@@ -286,7 +335,7 @@ export const useRememberTrip = (tripId: TripId) => {
   }, [store, tripId]);
 };
 
-const StatsCopiesContext = createContext<ReturnType<typeof makeStatsCopies> | null>(null);
+const StatsCopiesContext = createContext<StatsCopies | null>(null);
 
 /** The signed-in user's cached group stats copies, or null while nobody is signed in. */
 export const useStatsCopies = () => use(StatsCopiesContext);
@@ -299,6 +348,7 @@ export const useStatsCopies = () => use(StatsCopiesContext);
 export function useGroupStats(groupId: GroupId, onWake: (revalidate: () => void) => () => void) {
   const stacks = useStacks();
   const copies = use(StatsCopiesContext);
+
   if (!copies) throw new Error("useGroupStats needs a SignedInScope above it");
   const detailQuery = stacks.group(groupId);
   const statsQuery = stacks.stats(groupId);
@@ -307,6 +357,7 @@ export function useGroupStats(groupId: GroupId, onWake: (revalidate: () => void)
   useRevalidate(detailQuery, detail, onWake);
   useRevalidate(statsQuery, stats, onWake);
   const state = statsState(detail, stats, () => copies.load(groupId));
+
   const keep = useEffectEvent((id: GroupId, kind: typeof state.kind, fetchedAt: number | null) => {
     if (kind === "live" && fetchedAt !== null && state.kind === "live")
       copies.save(id, {
@@ -314,15 +365,18 @@ export function useGroupStats(groupId: GroupId, onWake: (revalidate: () => void)
         detail: state.detail,
         stats: state.stats,
       });
+
     if (kind === "refused") copies.forget(id);
   });
+
   const fetchedAt = state.kind === "live" ? state.fetchedAt : null;
   useEffect(() => keep(groupId, state.kind, fetchedAt), [groupId, state.kind, fetchedAt]);
+
   return state;
 }
 
-/** When each query last refetched in the background, so screens sharing one ask only once. */
 const lastRevalidated = new WeakMap<object, number>();
+
 /**
  * Keeps a shown query fresh without ever blanking it: when the screen mounts, and whenever
  * `onWake` reports the app coming back (focus, reconnect, foreground), stale data refetches in the
@@ -334,17 +388,20 @@ export function useRevalidate<A, E>(
   onWake: (revalidate: () => void) => () => void,
 ) {
   const refresh = useAtomRefresh(query);
+
   const revalidate = useEffectEvent(() => {
     const now = Date.now();
+
     if (!shouldRevalidate(result, now, lastRevalidated.get(query), lastLedgerChange())) return;
     lastRevalidated.set(query, now);
     refresh();
   });
+
   useEffect(() => {
     revalidate();
+
     return onWake(() => revalidate());
   }, [onWake]);
-  // Changes that reached the server by sync didn't refetch anything; do it now, not on next mount.
   const syncs = useSyncExternalStore(subscribeLedgerSynced, ledgerSyncCount);
   const first = useRef(syncs);
   useEffect(() => {

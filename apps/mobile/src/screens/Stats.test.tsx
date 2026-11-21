@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { makeRecordingStore } from "@stacks/client-runtime/recording";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
 import { recordingHome } from "@stacks/client-runtime/recordingView";
@@ -20,7 +19,6 @@ import { afterEach, expect, it, vi } from "vite-plus/test";
 
 type Account = { available: true; isLoaded: true; isSignedIn: boolean; userId: string | null };
 
-/** Stats with its edges stubbed. The group view reads the signed-in client, as the real one does. */
 async function load(
   account: Account,
   {
@@ -35,6 +33,7 @@ async function load(
 ) {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+
   const Container = ({
     children,
     className,
@@ -48,6 +47,7 @@ async function load(
       {children}
     </div>
   );
+
   const Touch = ({
     children,
     label,
@@ -73,6 +73,7 @@ async function load(
       {children ?? label}
     </button>
   );
+
   vi.doMock("react-native", () => ({
     Platform: { OS: platform },
     View: Container,
@@ -143,12 +144,15 @@ async function load(
   vi.doMock("../lib/go", () => ({ useGo: () => ({ trip: vi.fn(), group: vi.fn() }) }));
   vi.doMock("../features/GroupStats", async () => {
     if (groupState) return vi.importActual("../features/GroupStats");
+
     const { useStacks } = await vi.importActual<typeof import("@stacks/client-runtime/react")>(
       "@stacks/client-runtime/react",
     );
+
     return {
       GroupStatsView: () => {
         useStacks();
+
         return <span>Group stats</span>;
       },
     };
@@ -196,6 +200,7 @@ async function load(
       const [localOpen, setLocalOpen] = useState(false);
       const open = menuState?.open ?? localOpen;
       const setOpen = menuState?.setOpen ?? setLocalOpen;
+
       return (
         <>
           <Touch
@@ -229,9 +234,12 @@ async function load(
     const { StacksContext, useStacks } = await vi.importActual<
       typeof import("@stacks/client-runtime/react")
     >("@stacks/client-runtime/react");
+
     const stacks = { groups: (await import("effect/reactivity/Atom")).make([]) };
+
     return {
       StacksProvider: ({ children }: { children: ReactNode }) => (
+        // SAFETY: this screen only reads stacks.groups; the other Stacks fields stay unused in this test.
         <StacksContext value={stacks as never}>{children}</StacksContext>
       ),
       useStacks,
@@ -243,6 +251,7 @@ async function load(
   const element = document.createElement("div");
   const errors: unknown[] = [];
   const root = createRoot(element, { onUncaughtError: (error) => errors.push(error) });
+
   return { StatsScreen, element, errors, navigation, root };
 }
 
@@ -252,7 +261,7 @@ afterEach(() => {
 });
 
 const groupId = "5f0e2c0e-6f43-4a44-9d0a-4f8f4bb0a001";
-const route = { params: { groupId } } as never;
+const route = { params: { groupId } };
 
 it("opens on a group's stats when signed in with that group picked", async () => {
   const { StatsScreen, element, errors, root } = await load({
@@ -261,6 +270,7 @@ it("opens on a group's stats when signed in with that group picked", async () =>
     isSignedIn: true,
     userId: "user-1",
   });
+
   await act(async () => root.render(<StatsScreen route={route} />));
   expect(errors).toEqual([]);
   expect(element.textContent).toBe("Group stats");
@@ -274,6 +284,7 @@ it("falls back to Just me when signed out, even with a group picked in the addre
     isSignedIn: false,
     userId: null,
   });
+
   await act(async () => root.render(<StatsScreen route={route} />));
   expect(errors).toEqual([]);
   expect(element.textContent).toContain("Loading your play");
@@ -293,15 +304,18 @@ const casinoId = VenueId.make("0192e7a0-0000-7000-8000-0000000000e2");
 
 async function withFinishedSessions() {
   let saved: RecordingStorageDocument = { revision: 0 };
+
   const store = makeRecordingStore({
     load: async () => saved,
     commit: async (revision, payload) => {
       saved = { revision: revision + 1, payload };
+
       return saved.revision;
     },
     subscribe: () => () => undefined,
     close: async () => undefined,
   });
+
   await store.ready;
   await store.transform((current) => ({
     ...current,
@@ -319,13 +333,14 @@ async function withFinishedSessions() {
     ],
   }));
   const start = DateTime.makeUnsafe("2025-03-01T18:00:00.000Z");
+
   for (let day = 0; day < 5; day++) {
     const startedAt = DateTime.add(start, { days: day });
     await store.execute(
       store.prepare({
         type: "record_completed",
         game: day === 4 ? "baccarat" : "blackjack",
-        ...(day < 4 ? { venueId: casinoId } : {}),
+        ...(day < 4 ? { venueId: casinoId } : null),
         buyIn: 10000,
         cashOut: 13000,
         startedAt,
@@ -333,7 +348,9 @@ async function withFinishedSessions() {
       }),
     );
   }
+
   const home = recordingHome(store.getSnapshot().state!);
+
   return {
     ...home,
     finished: home.finished.map((item) => ({ ...item, table: { ...item.table, tripId: vegas } })),
@@ -344,7 +361,9 @@ function button(parent: ParentNode, text: string) {
   const found = [...parent.querySelectorAll("button")].find((item) =>
     item.textContent?.includes(text),
   );
+
   if (!found) throw new Error(`Missing button: ${text}`);
+
   return found;
 }
 
@@ -352,6 +371,7 @@ it("keeps You beside the Android filters and fills the bar on scroll", async () 
   const { StatsScreen, element, errors, navigation, root } = await load(signedOut, {
     platform: "android",
   });
+
   await act(async () => root.render(<StatsScreen route={route} />));
   expect(errors).toEqual([]);
   expect(navigation.setOptions).toHaveBeenCalledWith({ headerShown: false });
@@ -370,6 +390,7 @@ it("confirms an Android trip only when the radio sheet's action is pressed", asy
     platform: "android",
     home: await withFinishedSessions(),
   });
+
   await act(async () => root.render(<StatsScreen route={route} />));
   expect(errors).toEqual([]);
   await act(async () => button(element, "All trips").click());
@@ -389,6 +410,7 @@ it("opens and dismisses the personal running-result reading", async () => {
     platform: "android",
     home: await withFinishedSessions(),
   });
+
   await act(async () => root.render(<StatsScreen route={route} />));
   expect(errors).toEqual([]);
   await act(async () => button(element, "Drag to inspect").click());
@@ -403,6 +425,7 @@ it("opens the game menu from no match and keeps the casino when choosing another
     platform: "android",
     home: await withFinishedSessions(),
   });
+
   await act(async () => root.render(<StatsScreen route={route} />));
   expect(errors).toEqual([]);
   await act(async () => button(element, "Casino").click());
@@ -420,6 +443,7 @@ it("shows saved group stats and opens a member's result sheet", async () => {
   const startedAt = DateTime.makeUnsafe("2026-11-12T20:00:00.000Z");
   const endedAt = DateTime.add(startedAt, { hours: 3 });
   const you = PlayerId.make("0192e7a0-0000-7000-8000-0000000000f1");
+
   const { StatsScreen, element, errors, root } = await load(
     { ...signedOut, isSignedIn: true, userId: "user-1" },
     {
@@ -473,6 +497,7 @@ it("shows saved group stats and opens a member's result sheet", async () => {
       },
     },
   );
+
   await act(async () => root.render(<StatsScreen route={route} />));
   expect(errors).toEqual([]);
   expect(element.textContent).toContain("Offline · Showing saved stats");

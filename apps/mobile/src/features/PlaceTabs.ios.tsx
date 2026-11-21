@@ -17,5 +17,6 @@ export const placeTab = (
 
 export function useTabBarHeight() {
   const insets = useSafeAreaInsets();
+
   return 49 + insets.bottom;
 }

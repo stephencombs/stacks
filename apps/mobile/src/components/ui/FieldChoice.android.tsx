@@ -1,10 +1,10 @@
+import * as Compose from "@expo/ui/jetpack-compose";
 import {
   DropdownMenuItem,
   ExposedDropdownMenu,
   ExposedDropdownMenuBox,
   Icon,
   SegmentedButton,
-  Shape,
   SingleChoiceSegmentedButtonRow,
   Text,
   TextField,
@@ -24,7 +24,8 @@ import type { FieldChoiceProps } from "./FieldChoice";
 import { fitsSegments } from "./segmentFit";
 
 const arrow = require("../../../assets/field-icons/arrow_drop_down.xml");
-const fieldShape = Shape.RoundedCorner({
+
+const fieldOutline = Compose.Shape.RoundedCorner({
   cornerRadii: { topStart: 16, topEnd: 16, bottomStart: 16, bottomEnd: 16 },
 });
 
@@ -37,6 +38,7 @@ export function FieldChoice<A extends string>({
   presentation = "automatic",
 }: FieldChoiceProps<A>) {
   const { width, fontScale } = useWindowDimensions();
+
   const segmented =
     presentation !== "menu" &&
     fitsSegments(
@@ -44,6 +46,7 @@ export function FieldChoice<A extends string>({
       width - 64,
       fontScale,
     );
+
   return (
     <View className="gap-1.5">
       {labelHidden ? null : (
@@ -73,7 +76,6 @@ export function FieldChoice<A extends string>({
   );
 }
 
-/** Material's exposed dropdown: a full-width field with a trailing arrow that opens on one tap. */
 function Dropdown<A extends string>({
   label,
   options,
@@ -86,13 +88,14 @@ function Dropdown<A extends string>({
   useEffect(() => {
     text.set(shown);
   }, [text, shown]);
+
   return (
     <ExposedDropdownMenuBox expanded={expanded} onExpandedChange={setExpanded}>
       <TextField
         value={text}
         readOnly
         singleLine
-        shape={fieldShape}
+        {...{ ["shape"]: fieldOutline }}
         modifiers={[
           fillMaxWidth(),
           menuAnchor("primaryNotEditable"),

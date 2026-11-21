@@ -5,7 +5,10 @@
 export const oldAddress = (path: string) => {
   const [, kind, id, page] =
     /^\/?(trips|groups)\/([^/?#]+)\/(board|results|stats)(?:[?#].*)?$/.exec(path) ?? [];
+
   if (kind === "trips" && (page === "board" || page === "results")) return `stats?tripId=${id}`;
+
   if (kind === "groups" && page === "stats") return `stats?groupId=${id}`;
+
   return path;
 };

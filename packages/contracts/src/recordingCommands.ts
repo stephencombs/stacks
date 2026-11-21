@@ -19,6 +19,7 @@ import { PlayEntry, Table, Visit, VisitSummary } from "./recording.ts";
 export const RecordingOperationId = Schema.String.check(Schema.isUUID()).pipe(
   Schema.brand("RecordingOperationId"),
 );
+
 export type RecordingOperationId = typeof RecordingOperationId.Type;
 
 const common = {
@@ -26,11 +27,13 @@ const common = {
   actorId: ActorId,
   preparedAt: Schema.DateTimeUtc,
 };
+
 const existing = {
   ...common,
   visitId: VisitId,
   expectedRevision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 };
+
 const visit = {
   ...common,
   tableId: TableId,
@@ -40,6 +43,7 @@ const visit = {
   buyIn: MinorUnits.check(Schema.isGreaterThan(0)),
   startedAt: Schema.DateTimeUtc,
 };
+
 const start = {
   ...visit,
   game: Schema.NullOr(Game),
@@ -47,12 +51,11 @@ const start = {
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
 };
+
 const recorder = { ...common, tableId: TableId, playerId: PlayerId };
-/**
- * Whose money paid for a buy-in, or who took a cash-out: another player at the same table. Absent
- * for the player's own money, so commands recorded before counterparties keep their encoding.
- */
+
 const counterparty = { counterpartyId: Schema.optionalKey(PlayerId) };
+
 export const RecordingReplacement = Schema.Struct({
   id: EntryId,
   amount: MinorUnits,
@@ -60,6 +63,7 @@ export const RecordingReplacement = Schema.Struct({
   note: Schema.NullOr(Schema.String),
   ...counterparty,
 });
+
 export type RecordingReplacement = typeof RecordingReplacement.Type;
 
 export const TableDetails = Schema.Struct({
@@ -68,12 +72,11 @@ export const TableDetails = Schema.Struct({
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
 });
+
 export type TableDetails = typeof TableDetails.Type;
 
-// The actor is checked against the push's credential; the rules decide what it may record.
 export const RecordingCommand = Schema.Union([
   Schema.Struct({ type: Schema.Literal("start"), ...start }),
-  // A table its starter records at without playing: everyone's visits there are join_table.
   Schema.Struct({
     type: Schema.Literal("open_table"),
     ...common,
@@ -91,7 +94,6 @@ export const RecordingCommand = Schema.Union([
     cashOut: MinorUnits.check(Schema.isGreaterThanOrEqualTo(0)),
     finishedAt: Schema.DateTimeUtc,
   }),
-  // A visit at a table that already exists, for a saved player or a new one.
   Schema.Struct({
     type: Schema.Literal("join_table"),
     ...visit,
@@ -131,16 +133,12 @@ export const RecordingCommand = Schema.Union([
   Schema.Struct({ type: Schema.Literal("delete_visit"), ...existing }),
   Schema.Struct({ type: Schema.Literal("restore_visit"), ...existing }),
   Schema.Struct({ type: Schema.Literal("reopen"), ...existing, reason: Schema.NonEmptyString }),
-  // Changes when a visit started, or its table's game, venue and high-limit, after the fact.
-  // Only whoever records for everyone at the table changes the table.
   Schema.Struct({
     type: Schema.Literal("edit_visit"),
     ...existing,
     startedAt: Schema.optionalKey(Schema.DateTimeUtc),
     table: Schema.optionalKey(TableDetails),
   }),
-  // The starter lets a player at the table record for everyone, or stops them. These belong to
-  // the table, not a visit, and are ordered with its play.
   Schema.Struct({
     type: Schema.Literal("set_table_trip"),
     ...common,
@@ -149,26 +147,31 @@ export const RecordingCommand = Schema.Union([
   }),
   Schema.Struct({ type: Schema.Literal("appoint_recorder"), ...recorder }),
   Schema.Struct({ type: Schema.Literal("revoke_recorder"), ...recorder }),
-  // Removes a table nobody has played at, such as one opened by mistake.
   Schema.Struct({ type: Schema.Literal("delete_table"), ...common, tableId: TableId }),
 ]);
+
 export type RecordingCommand = typeof RecordingCommand.Type;
+
 /** Commands about a table that already exists, never one of its visits. */
 export type TableCommand = Extract<
   RecordingCommand,
   { type: "appoint_recorder" | "revoke_recorder" | "set_table_trip" | "delete_table" }
 >;
+
 export type VisitCommand = Exclude<RecordingCommand, TableCommand | { type: "open_table" }>;
+
 export const isTableCommand = (command: RecordingCommand): command is TableCommand =>
   command.type === "appoint_recorder" ||
   command.type === "revoke_recorder" ||
   command.type === "set_table_trip" ||
   command.type === "delete_table";
+
 export const isVisitCommand = (command: RecordingCommand): command is VisitCommand =>
   !isTableCommand(command) && command.type !== "open_table";
 
 /** The player and actor a device records as. An account's are the same on every device. */
 export const RecordingIdentity = Schema.Struct({ playerId: PlayerId, actorId: ActorId });
+
 export type RecordingIdentity = typeof RecordingIdentity.Type;
 
 export const RecordingRejectionReason = Schema.Literals([
@@ -177,12 +180,14 @@ export const RecordingRejectionReason = Schema.Literals([
   "operation_reused",
   "forbidden",
 ]);
+
 export type RecordingRejectionReason = typeof RecordingRejectionReason.Type;
 
 export const PushRecordingRequest = Schema.Struct({
   identity: RecordingIdentity,
   commands: Schema.Array(RecordingCommand).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
 });
+
 export type PushRecordingRequest = typeof PushRecordingRequest.Type;
 
 export const RecordingCommandResult = Schema.Union([
@@ -194,11 +199,13 @@ export const RecordingCommandResult = Schema.Union([
     message: Schema.String,
   }),
 ]);
+
 export type RecordingCommandResult = typeof RecordingCommandResult.Type;
 
 export const PushRecordingResponse = Schema.Struct({
   results: Schema.Array(RecordingCommandResult),
 });
+
 export type PushRecordingResponse = typeof PushRecordingResponse.Type;
 
 /** A device actor's credential. The server keeps only a hash of the secret. */
@@ -206,6 +213,7 @@ export const ActorCredential = Schema.Struct({
   actorId: ActorId,
   secret: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
 });
+
 export type ActorCredential = typeof ActorCredential.Type;
 
 /**
@@ -217,6 +225,7 @@ export const ClaimActorRequest = Schema.Struct({
   ...ActorCredential.fields,
   link: Schema.optionalKey(Schema.Boolean),
 });
+
 export type ClaimActorRequest = typeof ClaimActorRequest.Type;
 
 /**
@@ -229,10 +238,12 @@ export const ClaimResult = Schema.Struct({
   claimed: Schema.Array(PlayerIdentity),
   refused: Schema.Array(PlayerIdentity),
 });
+
 export type ClaimResult = typeof ClaimResult.Type;
 
 /** A player who joined a table through its link. */
 export const TableParticipant = Schema.Struct({ tableId: TableId, player: PlayerIdentity });
+
 export type TableParticipant = typeof TableParticipant.Type;
 
 /**
@@ -251,6 +262,7 @@ export const RecordingHistory = Schema.Struct({
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
 });
+
 export type RecordingHistory = typeof RecordingHistory.Type;
 
 /**
@@ -272,9 +284,11 @@ export const TableView = Schema.Struct({
   appointable: Schema.Array(PlayerId),
   shared: Schema.Boolean,
 });
+
 export type TableView = typeof TableView.Type;
 
 export const ShareLink = Schema.Struct({ token: Schema.String });
+
 export type ShareLink = typeof ShareLink.Type;
 
 /**
@@ -288,13 +302,16 @@ export const JoinTableRequest = Schema.Struct({
     displayName: Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(60)),
   }),
 });
+
 export type JoinTableRequest = typeof JoinTableRequest.Type;
 
 export const JoinedTable = Schema.Struct({ table: Table, player: PlayerIdentity });
+
 export type JoinedTable = typeof JoinedTable.Type;
 
 /** A personal invite's link. Only its hash is kept; issuing another revokes this one. */
 export const PlayerInviteLink = Schema.Struct({ id: PlayerInviteId, token: Schema.String });
+
 export type PlayerInviteLink = typeof PlayerInviteLink.Type;
 
 /** What an invite link shows before it's used: whose play it records, and who sent it. */
@@ -302,10 +319,12 @@ export const PlayerInvitePreview = Schema.Struct({
   player: PlayerIdentity,
   invitedBy: Schema.String,
 });
+
 export type PlayerInvitePreview = typeof PlayerInvitePreview.Type;
 
 /** Redeems a personal invite as the recorder's own actor. `identity` is as in a push. */
 export const RedeemInviteRequest = Schema.Struct({ identity: RecordingIdentity });
+
 export type RedeemInviteRequest = typeof RedeemInviteRequest.Type;
 
 /**
@@ -319,4 +338,5 @@ export const PlayerAccess = Schema.Struct({
     Schema.Struct({ actorId: ActorId, boundVia: Schema.Literals(["join", "invite"]) }),
   ),
 });
+
 export type PlayerAccess = typeof PlayerAccess.Type;

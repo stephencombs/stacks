@@ -20,12 +20,14 @@ export const importVenues = Effect.fn("Catalog.importVenues")(function* (
   const unique = Array.from(new Map(venues.map((v) => [`${v.source}:${v.sourceRef}`, v])).values());
   let inserted = 0;
   let updated = 0;
+
   for (let start = 0; start < unique.length; start += BATCH_SIZE) {
     const batch = unique.slice(start, start + BATCH_SIZE).map((venue) => ({
       id: crypto.randomUUID(),
       ...venue,
       verifiedAt,
     }));
+
     const rows = yield* sql`
       insert into venues ${sql.insert(batch)}
       on conflict (source, source_ref) do update set
@@ -33,10 +35,12 @@ export const importVenues = Effect.fn("Catalog.importVenues")(function* (
         country = excluded.country, lat = excluded.lat, lng = excluded.lng
       returning (xmax = 0) as inserted
     `.pipe(Effect.flatMap(decodeRows(Schema.Struct({ inserted: Schema.Boolean }))));
+
     for (const row of rows) {
       if (row.inserted) inserted++;
       else updated++;
     }
   }
+
   return { inserted, updated };
 });

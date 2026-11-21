@@ -8,6 +8,7 @@ import {
   NotFound,
   TableId,
   TripId,
+  VisitId,
   UserId,
   VenueId,
   type PlayerIdentity,
@@ -58,21 +59,25 @@ import {
 import { claimLines, recordingHome, recordingSyncView, recordingTable } from "./recordingView.ts";
 
 const alex = UserId.make("user_alex");
+
 const at = (hour: number) =>
   DateTime.makeUnsafe(`2026-11-06T${hour.toString().padStart(2, "0")}:00:00.000Z`);
 
 const memory = () => {
   let document: RecordingStorageDocument = { revision: 0 };
+
   const adapter: RecordingStorage = {
     load: async () => document,
     commit: async (expected, payload) => {
       if (document.revision !== expected) throw new Error("conflict");
       document = { revision: expected + 1, payload };
+
       return document.revision;
     },
     subscribe: () => () => undefined,
     close: async () => undefined,
   };
+
   return {
     adapter,
     get document() {
@@ -84,18 +89,23 @@ const memory = () => {
 const open = async (db = memory()) => {
   const store = makeRecordingStore(db.adapter);
   await store.ready;
+
   return store;
 };
+
 const save = (store: RecordingStore, input: Parameters<RecordingStore["prepare"]>[0]) =>
   store.execute(store.prepare(input));
+
 const state = (store: RecordingStore) => store.getSnapshot().state!;
 
-/** The API's rules in memory: one account, applying each command once. */
 const server = () => {
   let ledger: RecordingLedger | null = null;
   const applied = new Map<string, string>();
   const refuse = new Set<string>();
-  const push = (request: PushRecordingRequest) => {
+
+  const push: (request: PushRecordingRequest) => ReadonlyArray<RecordingCommandResult> = (
+    request,
+  ) => {
     ledger ??= {
       self: { id: request.identity.playerId, displayName: "You" },
       actor: { id: request.identity.actorId, userId: alex },
@@ -107,9 +117,12 @@ const server = () => {
       entries: [],
       receipts: [],
     };
+
     if (ledger.self.id !== request.identity.playerId) throw new Error("identity conflict");
-    return request.commands.map((command): RecordingCommandResult => {
+
+    return request.commands.map((command) => {
       const text = JSON.stringify(command);
+
       if (applied.has(command.operationId))
         return applied.get(command.operationId) === text
           ? { operationId: command.operationId, status: "accepted" }
@@ -119,6 +132,7 @@ const server = () => {
               reason: "operation_reused",
               message: "reused",
             };
+
       if (refuse.has(command.operationId))
         return {
           operationId: command.operationId,
@@ -126,12 +140,15 @@ const server = () => {
           reason: "conflict",
           message: "Visit changed. Review it before preparing another command.",
         };
+
       try {
         ledger = applyRecordingCommand(ledger!, command);
         applied.set(command.operationId, text);
+
         return { operationId: command.operationId, status: "accepted" };
       } catch (error) {
         if (!(error instanceof RecordingError) || error.reason === "operation_reused") throw error;
+
         return {
           operationId: command.operationId,
           status: "rejected",
@@ -142,7 +159,8 @@ const server = () => {
       }
     });
   };
-  const history = (): RecordingHistory =>
+
+  const history: () => RecordingHistory = () =>
     ledger
       ? {
           identity: { playerId: ledger.self.id, actorId: ledger.actor.id },
@@ -162,6 +180,7 @@ const server = () => {
           visits: [],
           entries: [],
         };
+
   return {
     push,
     history,
@@ -171,7 +190,8 @@ const server = () => {
 };
 
 const unused = () => Effect.die("not used by this test");
-const transportFor = (remote: ReturnType<typeof server>): RecordingTransport => ({
+
+const transportFor: (remote: ReturnType<typeof server>) => RecordingTransport = (remote) => ({
   history: () => Effect.sync(remote.history),
   push: (request) => Effect.sync(() => ({ results: remote.push(request) })),
   registerActor: () => Effect.void,
@@ -189,16 +209,15 @@ const transportFor = (remote: ReturnType<typeof server>): RecordingTransport => 
   venue: unused,
 });
 
-/** An actor key store in memory. */
-const memoryKeys = (): ActorKeyStorage => {
+const memoryKeys: () => ActorKeyStorage = () => {
   let saved: ActorCredential | null = null;
+
   return {
     load: async () => saved,
     save: async (credential) => void (saved = credential),
   };
 };
 
-/** What another device recorded under `identity`, as the server returns it. */
 const otherDevice = (identity: RecordingIdentity) => {
   let ledger: RecordingState = {
     version: 2,
@@ -213,20 +232,25 @@ const otherDevice = (identity: RecordingIdentity) => {
     receipts: [],
     venues: [],
   };
+
   const record = (input: Parameters<typeof prepareRecordingCommand>[1]) => {
     const command = prepareRecordingCommand(ledger, input);
     ledger = applyRecordingCommand(ledger, command);
+
     return command;
   };
+
   return { record, commands: () => ledger.receipts.map((receipt) => receipt.command) };
 };
 
 const pushAll = async (store: RecordingStore, remote: ReturnType<typeof server>) => {
   const current = state(store);
+
   const results = remote.push({
     identity: { playerId: current.self.id, actorId: current.actor.id },
     commands: pendingRecordingCommands(current),
   });
+
   await store.transform((s) => applyPushResults(s, results));
 };
 
@@ -250,7 +274,6 @@ describe("merging", () => {
       actorId: state(store).actor.id,
     });
 
-    // A rebuy after sync is pending until it's pushed; all of it reloads from storage.
     await save(store, { type: "add", visitId, kind: "buy_in", amount: 5000, occurredAt: at(12) });
     const reloaded = decodeRecordingState(db.document.payload!, db.document.revision);
     expect(pendingRecordingCommands(reloaded).map((c) => c.type)).toEqual(["add"]);
@@ -262,6 +285,7 @@ describe("merging", () => {
       playerId: PlayerId.make(crypto.randomUUID()),
       actorId: ActorId.make(crypto.randomUUID()),
     };
+
     const first = otherDevice(identity);
     first.record({
       type: "record_completed",
@@ -303,23 +327,23 @@ describe("merging", () => {
     await save(store, { type: "add", visitId, kind: "buy_in", amount: 5000, occurredAt: at(11) });
     const [pending] = pendingRecordingCommands(state(store));
 
-    // The account has its own player; the device's was linked to it, so the server returns both.
     const account = {
       playerId: PlayerId.make(crypto.randomUUID()),
       actorId: ActorId.make(crypto.randomUUID()),
     };
+
     const history: RecordingHistory = {
       ...remote.history(),
       identity: account,
       ownedPlayerIds: [device.self.id, account.playerId],
       participants: [{ tableId: device.tables[0]!.id, player: device.self }],
     };
+
     await store.transform((s) => mergeRecordingHistory(s, alex, history));
 
     const merged = state(store);
     expect(merged.self.id).toBe(account.playerId);
     expect(merged.actor.id).toBe(account.actorId);
-    // What the device already synced stays as the device signed it, so it still matches the server.
     const bought = merged.entries.filter((entry) => entry.visitId === visitId);
     expect(bought.map((entry) => entry.createdBy)).toEqual([device.actor.id, account.actorId]);
     expect(merged.visits[0]).toMatchObject({ id: visitId, playerId: device.self.id });
@@ -335,11 +359,12 @@ describe("merging", () => {
     await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
     const remote = server();
     await pushAll(store, remote);
+
     const account = {
       playerId: PlayerId.make(crypto.randomUUID()),
       actorId: ActorId.make(crypto.randomUUID()),
     };
-    // The account's history holds none of the device's player: nothing was linked.
+
     const history: RecordingHistory = {
       identity: account,
       commands: [],
@@ -349,6 +374,7 @@ describe("merging", () => {
       visits: [],
       entries: [],
     };
+
     await expect(
       store.transform((s) => mergeRecordingHistory(s, alex, history)),
     ).rejects.toBeInstanceOf(RecordingError);
@@ -360,13 +386,14 @@ describe("merging", () => {
     await store.transform((s) => ({ ...s, sync: { userId: null, synced: [], rejected: [] } }));
     await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
     const device = state(store);
+
     const account = {
       playerId: PlayerId.make(crypto.randomUUID()),
       actorId: ActorId.make(crypto.randomUUID()),
     };
+
     const history: RecordingHistory = { ...server().history(), identity: account };
     await store.transform((s) => mergeRecordingHistory(s, alex, history));
-    // Its own player becomes the account's personal player, with nothing left under the old ID.
     const merged = state(store);
     expect(merged.self.id).toBe(account.playerId);
     expect(merged.tables[0]!.starterPlayerId).toBe(account.playerId);
@@ -380,6 +407,7 @@ describe("merging", () => {
     const remote = server();
     await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
     await pushAll(store, remote);
+
     const other = {
       ...remote.history(),
       identity: {
@@ -387,6 +415,7 @@ describe("merging", () => {
         actorId: ActorId.make(crypto.randomUUID()),
       },
     };
+
     await expect(
       store.transform((s) => mergeRecordingHistory(s, alex, other)),
     ).rejects.toBeInstanceOf(RecordingError);
@@ -410,6 +439,7 @@ describe("rejections", () => {
     await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
     const visitId = state(store).visits[0]!.id;
     await pushAll(store, remote);
+
     const rebuy = store.prepare({
       type: "add",
       visitId,
@@ -417,15 +447,19 @@ describe("rejections", () => {
       amount: 10000,
       occurredAt: at(11),
     });
+
     await store.execute(rebuy);
+
     const cashOut = await save(store, {
       type: "finish",
       visitId,
       amount: 25000,
       finishedAt: at(12),
     });
+
     remote.refuse(rebuy.operationId);
     await pushAll(store, remote);
+
     return { store, remote, visitId, rebuy, cashOut: cashOut.command };
   };
 
@@ -452,9 +486,9 @@ describe("rejections", () => {
       "Finishing with $250 didn't sync. The session changed on another device.",
     ]);
     expect(recordingSyncView(state(store), idle, visitId).rejected).toHaveLength(2);
-    expect(recordingSyncView(state(store), idle, crypto.randomUUID() as never).rejected).toEqual(
-      [],
-    );
+    expect(
+      recordingSyncView(state(store), idle, VisitId.make(crypto.randomUUID())).rejected,
+    ).toEqual([]);
     expect(recordingSyncView(state(store), null).line.text).toBe("Saved on this device");
 
     await save(store, { type: "add", visitId, kind: "buy_in", amount: 100, occurredAt: at(13) });
@@ -499,7 +533,7 @@ describe("rejections", () => {
     await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
     const visitId = state(store).visits[0]!.id;
     await pushAll(store, remote);
-    // Another device signed in to the same account adds to the visit first.
+
     const elsewhere = prepareRecordingCommand(state(store), {
       type: "add",
       visitId,
@@ -507,11 +541,12 @@ describe("rejections", () => {
       amount: 5000,
       occurredAt: at(10),
     });
+
     remote.push({
       identity: { playerId: state(store).self.id, actorId: state(store).actor.id },
       commands: [elsewhere],
     });
-    // This device's first rebuy now conflicts; its second expects the revision the server is at.
+
     const first = await save(store, {
       type: "add",
       visitId,
@@ -519,6 +554,7 @@ describe("rejections", () => {
       amount: 10000,
       occurredAt: at(11),
     });
+
     const second = await save(store, {
       type: "add",
       visitId,
@@ -526,6 +562,7 @@ describe("rejections", () => {
       amount: 7000,
       occurredAt: at(12),
     });
+
     await pushAll(store, remote);
     const afterPush = state(store);
     expect(afterPush.sync?.rejected.map((item) => item.command.operationId)).toEqual([
@@ -565,12 +602,15 @@ describe("rejections", () => {
     const remote = server();
     await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
     const opened = await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
+    const openedCommand = opened.command;
+
+    if (openedCommand.type !== "start") throw new Error("expected a start");
     const identity = { playerId: state(store).self.id, actorId: state(store).actor.id };
     remote.push({
       identity,
       commands: [
         RecordingCommand.make({
-          ...(opened.command as Extract<RecordingCommand, { type: "start" }>),
+          ...openedCommand,
           buyIn: MinorUnits.make(1),
         }),
       ],
@@ -588,7 +628,6 @@ describe("rejections", () => {
     await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
     const opened = await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
     const identity = { playerId: state(store).self.id, actorId: state(store).actor.id };
-    // A restored backup put the same session on the account under another operation ID.
     remote.push({
       identity,
       commands: [
@@ -631,10 +670,12 @@ describe("rejections", () => {
       (c) => RecordingCommand.make({ ...c, highLimit: true }),
       (c) => RecordingCommand.make({ ...c, tableId: TableId.make(crypto.randomUUID()) }),
     ];
+
     for (const differ of differences) {
       const store = await open();
       const remote = server();
       await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+
       const past = await save(store, {
         type: "record_completed",
         buyIn: 20000,
@@ -643,7 +684,9 @@ describe("rejections", () => {
         finishedAt: at(12),
         game: "blackjack",
       });
-      const command = past.command as Extract<RecordingCommand, { type: "record_completed" }>;
+
+      if (past.command.type !== "record_completed") throw new Error("expected a completed session");
+      const command = past.command;
       const identity = { playerId: state(store).self.id, actorId: state(store).actor.id };
       remote.push({
         identity,
@@ -701,11 +744,13 @@ describe("rejections", () => {
 
 describe("counterparties", () => {
   const bea = PlayerId.make("0192e7a0-0000-7000-8000-0000000000be");
+
   const synced = async () => {
     const db = memory();
     const store = await open(db);
     const remote = server();
     await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+
     return { db, store, remote, me: state(store).self.id };
   };
 
@@ -759,6 +804,7 @@ describe("engine", () => {
         let lookups = 0;
         let interrupted = 0;
         let reads = 0;
+
         const sync = makeRecordingSync(
           store,
           alex,
@@ -767,12 +813,14 @@ describe("engine", () => {
             history: () =>
               Effect.sync(() => {
                 reads++;
+
                 return remote.history();
               }),
             venue: () =>
               Effect.gen(function* () {
                 lookups++;
                 yield* Queue.offer(asked, "venue");
+
                 return yield* Effect.never;
               }).pipe(
                 Effect.ensuring(
@@ -784,6 +832,7 @@ describe("engine", () => {
           },
           memoryKeys(),
         );
+
         const fiber = yield* Effect.forkChild(sync.run);
         yield* Queue.take(asked);
         const visitId = state(store).visits[0]!.id;
@@ -814,6 +863,7 @@ describe("engine", () => {
       const store = yield* Effect.promise(() => open());
       yield* Effect.promise(() => save(store, { type: "start", buyIn: 20000, startedAt: at(10) }));
       let pushed = 0;
+
       const sync = makeRecordingSync(
         store,
         alex,
@@ -821,10 +871,10 @@ describe("engine", () => {
         memoryKeys(),
         () => (pushed += 1),
       );
+
       const fiber = yield* Effect.forkChild(sync.run);
       yield* TestClock.adjust("1 second");
       expect(pushed).toBe(1);
-      // A wake with nothing new to send changes nothing on the server.
       sync.wake();
       yield* TestClock.adjust("1 second");
       expect(pushed).toBe(1);
@@ -845,22 +895,27 @@ describe("engine", () => {
       const remote = server();
       const calls = yield* Queue.unbounded<string>();
       let offline = 3;
+
       const transport: RecordingTransport = {
         ...transportFor(remote),
         history: () =>
           Effect.suspend(() => {
             Queue.offerUnsafe(calls, "history");
+
             return offline-- > 0 ? Effect.fail(new Error("offline")) : Effect.sync(remote.history);
           }),
         push: (request) => {
           Queue.offerUnsafe(calls, "push");
+
           return Effect.sync(() => ({ results: remote.push(request) }));
         },
       };
+
       const sync = makeRecordingSync(store, alex, transport, memoryKeys());
       const statuses = yield* Queue.unbounded<string>();
       sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
       const fiber = yield* Effect.forkChild(sync.run);
+
       const retrying = Effect.gen(function* () {
         while ((yield* Queue.take(statuses)) !== "retrying");
       });
@@ -880,16 +935,17 @@ describe("engine", () => {
       yield* TestClock.adjust("4 seconds");
       expect(yield* Queue.take(calls)).toBe("history");
       expect(yield* Queue.take(calls)).toBe("push");
+
       while ((yield* Queue.take(statuses)) !== "idle");
       expect(pendingRecordingCommands(state(store))).toEqual([]);
       expect(remote.history().visits).toHaveLength(1);
 
-      // A new save while signed in pushes without waiting for a wake.
       const visitId = state(store).visits[0]!.id;
       yield* Effect.promise(() =>
         save(store, { type: "add", visitId, kind: "cash_out", amount: 5000, occurredAt: at(11) }),
       );
       expect(yield* Queue.take(calls)).toBe("push");
+
       while ((yield* Queue.take(statuses)) !== "idle");
       expect(remote.history().entries).toHaveLength(2);
       yield* Fiber.interrupt(fiber);
@@ -908,6 +964,7 @@ describe("engine", () => {
       const statuses = yield* Queue.unbounded<string>();
       sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
       const fiber = yield* Effect.forkChild(sync.run);
+
       while ((yield* Queue.take(statuses)) !== "blocked");
       expect(sync.getStatus().error).toBeInstanceOf(RecordingSyncBlocked);
       yield* Fiber.interrupt(fiber);
@@ -920,6 +977,7 @@ describe("engine", () => {
         playerId: PlayerId.make(crypto.randomUUID()),
         actorId: ActorId.make(crypto.randomUUID()),
       };
+
       const venue: Venue = {
         id: VenueId.make(crypto.randomUUID()),
         name: "Bellagio",
@@ -932,8 +990,10 @@ describe("engine", () => {
         verified: true,
         groupId: null,
       };
+
       const gone = VenueId.make(crypto.randomUUID());
       const first = otherDevice(identity);
+
       for (const venueId of [venue.id, gone])
         first.record({
           type: "record_completed",
@@ -948,16 +1008,19 @@ describe("engine", () => {
 
       const store = yield* Effect.promise(() => open());
       const asked = yield* Queue.unbounded<VenueId>();
+
       const transport: RecordingTransport = {
         ...transportFor(remote),
         venue: (id) =>
           Effect.suspend(() => {
             Queue.offerUnsafe(asked, id);
+
             return id === venue.id
               ? Effect.succeed(venue)
               : Effect.fail(new NotFound({ resource: "venue" }));
           }),
       };
+
       const sync = makeRecordingSync(store, alex, transport, memoryKeys());
       const statuses = yield* Queue.unbounded<string>();
       sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
@@ -967,6 +1030,7 @@ describe("engine", () => {
       });
       const fiber = yield* Effect.forkChild(sync.run);
       yield* Queue.take(cached);
+
       while ((yield* Queue.take(statuses)) !== "idle");
       expect(state(store).venues).toEqual([
         {
@@ -987,21 +1051,21 @@ describe("engine", () => {
       ]);
       expect((yield* Queue.takeAll(asked)).toSorted()).toEqual([venue.id, gone].toSorted());
 
-      // Another round asks for neither: one is cached, the other doesn't exist.
       sync.wake();
+
       while ((yield* Queue.take(statuses)) !== "idle");
       expect(yield* Queue.size(asked)).toBe(0);
       yield* Fiber.interrupt(fiber);
     }),
   );
 
-  /** A device that synced as its own actor before anyone signed in on it. */
   const syncedDevice = async () => {
     const store = await open();
     await store.transform((s) => ({ ...s, sync: { userId: null, synced: [], rejected: [] } }));
     await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
     const remote = server();
     await pushAll(store, remote);
+
     return { store, remote };
   };
 
@@ -1010,6 +1074,7 @@ describe("engine", () => {
       const { store, remote } = yield* Effect.promise(syncedDevice);
       const bea = { id: PlayerId.make(crypto.randomUUID()), displayName: "Bea" };
       const cal = { id: PlayerId.make(crypto.randomUUID()), displayName: "Cal" };
+
       const sync = makeRecordingSync(
         store,
         alex,
@@ -1019,9 +1084,11 @@ describe("engine", () => {
         },
         memoryKeys(),
       );
+
       const statuses = yield* Queue.unbounded<string>();
       sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
       const fiber = yield* Effect.forkChild(sync.run);
+
       while ((yield* Queue.take(statuses)) !== "idle");
       expect(claimLines(sync.getStatus().claim)).toEqual([
         { kind: "claimed", text: "Your tables from this device are now in your account." },
@@ -1043,6 +1110,7 @@ describe("engine", () => {
       const statuses = yield* Queue.unbounded<string>();
       sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
       const fiber = yield* Effect.forkChild(sync.run);
+
       while ((yield* Queue.take(statuses)) !== "idle");
       expect(sync.getStatus().claim).toBeNull();
       yield* Fiber.interrupt(fiber);
@@ -1053,6 +1121,7 @@ describe("engine", () => {
     Effect.gen(function* () {
       const { store, remote } = yield* Effect.promise(syncedDevice);
       const requests: Array<{ readonly link?: boolean }> = [];
+
       const sync = makeRecordingSync(
         store,
         alex,
@@ -1062,25 +1131,30 @@ describe("engine", () => {
             request.link === true
               ? Effect.sync(() => {
                   requests.push(request);
+
                   return { adopted: false, claimed: [], refused: [] };
                 })
               : Effect.fail(new Conflict({ reason: "recording_identity" })),
         },
         memoryKeys(),
       );
+
       const statuses = yield* Queue.unbounded<string>();
       sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
       const fiber = yield* Effect.forkChild(sync.run);
+
       while ((yield* Queue.take(statuses)) !== "blocked");
       const blocked = sync.getStatus().error;
-      expect(blocked).toBeInstanceOf(RecordingSyncBlocked);
-      expect((blocked as RecordingSyncBlocked).reason).toBe("separate_player");
+
+      if (!(blocked instanceof RecordingSyncBlocked)) throw new Error("expected a block");
+      expect(blocked.reason).toBe("separate_player");
       expect(requests).toEqual([]);
       expect(recordingSyncView(state(store), sync.getStatus()).line.text).toContain(
         "different player from the one on your account",
       );
 
       sync.link();
+
       while ((yield* Queue.take(statuses)) !== "idle");
       expect(requests).toHaveLength(1);
       yield* Fiber.interrupt(fiber);
@@ -1090,6 +1164,7 @@ describe("engine", () => {
   it.effect("stops for another account when the device's player was claimed by one", () =>
     Effect.gen(function* () {
       const { store, remote } = yield* Effect.promise(syncedDevice);
+
       const sync = makeRecordingSync(
         store,
         alex,
@@ -1099,11 +1174,16 @@ describe("engine", () => {
         },
         memoryKeys(),
       );
+
       const statuses = yield* Queue.unbounded<string>();
       sync.subscribe(() => Queue.offerUnsafe(statuses, sync.getStatus().phase));
       const fiber = yield* Effect.forkChild(sync.run);
+
       while ((yield* Queue.take(statuses)) !== "blocked");
-      expect((sync.getStatus().error as RecordingSyncBlocked).reason).toBe("other_account");
+      const blocked = sync.getStatus().error;
+
+      if (!(blocked instanceof RecordingSyncBlocked)) throw new Error("expected a block");
+      expect(blocked.reason).toBe("other_account");
       expect(recordingSyncView(state(store), sync.getStatus()).line.text).toContain(
         "belong to another account",
       );
@@ -1125,6 +1205,7 @@ describe("shared tables", () => {
       buyIn: 10000,
       startedAt: at(11),
     });
+
     return { db, store, tableId };
   };
 
@@ -1149,7 +1230,6 @@ describe("shared tables", () => {
     expect(table.addable).toEqual([]);
     expect(recordingHome(state(store)).active).toHaveLength(1);
 
-    // Bea is a saved player now: she can come back once she finishes, never twice at once.
     expect(() =>
       store.prepare({ type: "join_table", tableId, playerId: bea.id, buyIn: 100 }),
     ).not.toThrow();
@@ -1163,12 +1243,14 @@ describe("shared tables", () => {
 
   it("predicts the server's refusal for an actor who didn't start the table", async () => {
     const { store } = await withGuest();
+
     const command = store.prepare({
       type: "add",
       visitId: state(store).visits[1]!.id,
       kind: "buy_in",
       amount: 100,
     });
+
     expect(() => applyRecordingCommand(state(store), command, [])).toThrow(
       expect.objectContaining({ reason: "forbidden" }),
     );
@@ -1190,19 +1272,25 @@ describe("shared tables", () => {
       you: { player, playing: null },
       addable: [],
     });
-    // Offline: the join's buy-in and a rebuy record on the device.
     await save(joiner, { type: "join_table", tableId: table.id, playerId: player.id, buyIn: 5000 });
-    const sat = state(joiner).receipts[0]!.command as Extract<
-      RecordingCommand,
-      { type: "join_table" }
-    >;
+
+    const satCommand = state(joiner).receipts[0]!.command;
+
+    if (satCommand.type !== "join_table") throw new Error("expected a join");
+    const sat = satCommand;
+
     expect(recordingHome(state(joiner)).active.map((item) => item.visit.id)).toEqual([sat.visitId]);
-    const someoneElses = prepareRecordingCommand(state(joiner), {
+
+    const preparedJoin = prepareRecordingCommand(state(joiner), {
       type: "join_table",
       tableId: table.id,
       displayName: "Dee",
       buyIn: 100,
-    }) as Extract<RecordingCommand, { type: "join_table" }>;
+    });
+
+    if (preparedJoin.type !== "join_table") throw new Error("expected a join");
+    const someoneElses = preparedJoin;
+
     expect(() => applyRecordingCommand(state(joiner), someoneElses)).toThrow(
       expect.objectContaining({ reason: "forbidden" }),
     );
@@ -1210,7 +1298,6 @@ describe("shared tables", () => {
       applyRecordingCommand(state(joiner), { ...someoneElses, playerId: starterVisit.playerId }),
     ).toThrow(expect.objectContaining({ reason: "forbidden" }));
 
-    // The server's history: the join, then the starter's correction of it.
     const correction = RecordingCommand.make({
       type: "correct",
       operationId: RecordingOperationId.make(crypto.randomUUID()),
@@ -1227,6 +1314,7 @@ describe("shared tables", () => {
         note: null,
       },
     });
+
     const history: RecordingHistory = {
       identity: { playerId: state(joiner).self.id, actorId: state(joiner).actor.id },
       ownedPlayerIds: [player.id],
@@ -1237,13 +1325,13 @@ describe("shared tables", () => {
       visits: [],
       entries: [],
     };
+
     await joiner.transform((s) => mergeRecordingHistory(s, null, history));
     const joined = recordingTable(state(joiner), table.id)!;
     expect(joined.visits.map((item) => [item.isSelf, item.totals.buyIn])).toEqual([[true, 4000]]);
     expect(pendingRecordingCommands(state(joiner))).toEqual([]);
     await save(joiner, { type: "add", visitId: sat.visitId, kind: "buy_in", amount: 1000 });
 
-    // The starter's device takes the joiner's play from the server, under the joiner's actor.
     const own = state(starter.store).receipts.map((receipt) => receipt.command);
     await starter.store.transform((s) =>
       mergeRecordingHistory(s, null, {
@@ -1259,18 +1347,17 @@ describe("shared tables", () => {
     const view = recordingTable(state(starter.store), table.id)!;
     expect(view.role).toBe("starter");
     expect(view.visits.map((item) => item.player.displayName)).toEqual(["You", "Bea", "Cal"]);
-    // The starter keeps authority over the joiner's visit.
     await save(starter.store, { type: "finish", visitId: sat.visitId, amount: 0 });
   });
 
-  /** The starter's table as the server sends it to someone else at it. */
-  const historyFor = (
+  const historyFor: (
     starter: RecordingStore,
     device: RecordingStore,
     participant: PlayerIdentity,
-    extra: ReadonlyArray<RecordingCommand> = [],
-  ): RecordingHistory => {
+    extra?: ReadonlyArray<RecordingCommand>,
+  ) => RecordingHistory = (starter, device, participant, extra = []) => {
     const ledger = state(starter);
+
     return {
       identity: { playerId: state(device).self.id, actorId: state(device).actor.id },
       ownedPlayerIds: [participant.id],
@@ -1294,6 +1381,7 @@ describe("shared tables", () => {
     const dee = { id: PlayerId.make(crypto.randomUUID()), displayName: "Dee" };
     const db = memory();
     const device = await open(db);
+
     const appoint = RecordingCommand.make({
       type: "appoint_recorder",
       operationId: RecordingOperationId.make(crypto.randomUUID()),
@@ -1302,6 +1390,7 @@ describe("shared tables", () => {
       tableId: table.id,
       playerId: dee.id,
     });
+
     const history = {
       ...historyFor(starter.store, device, dee, [appoint]),
       participants: [
@@ -1309,8 +1398,8 @@ describe("shared tables", () => {
         { tableId: table.id, player: dee },
       ],
     };
+
     await device.transform((s) => mergeRecordingHistory(s, null, history));
-    // Rejoining a fetched participant still establishes its binding.
     await device.transform((s) => addJoinedTable(s, { table, player: dee }));
     await save(device, { type: "join_table", tableId: table.id, playerId: dee.id, buyIn: 5000 });
     const visitId = state(device).visits.find((v) => v.playerId === dee.id)!.id;
@@ -1320,11 +1409,13 @@ describe("shared tables", () => {
     expect(ownPlayers(state(reloaded))).toEqual([state(reloaded).self.id, dee.id]);
     expect(recordingHome(state(reloaded)).deleted.map((v) => v.visit.id)).toEqual([visitId]);
     expect(recordingHome(state(reloaded)).active).toEqual([]);
+
     for (const type of ["delete_visit", "restore_visit"] as const) {
       await expect(save(reloaded, { type, visitId: ledger.visits[1]!.id })).rejects.toThrow(
         "only your own",
       );
     }
+
     await save(reloaded, { type: "restore_visit", visitId });
     expect(recordingHome(state(reloaded)).active.map((v) => v.visit.id)).toEqual([visitId]);
     expect(pendingRecordingCommands(state(reloaded)).map((c) => c.type)).toEqual([
@@ -1345,6 +1436,7 @@ describe("shared tables", () => {
     const starterVisit = state(starter.store).visits[0]!;
     const dee = { id: PlayerId.make(crypto.randomUUID()), displayName: "Dee" };
     const device = await open();
+
     const appoint = RecordingCommand.make({
       type: "appoint_recorder",
       operationId: RecordingOperationId.make(crypto.randomUUID()),
@@ -1353,6 +1445,7 @@ describe("shared tables", () => {
       tableId: table.id,
       playerId: dee.id,
     });
+
     await device.transform((s) =>
       mergeRecordingHistory(
         { ...s, sync: { userId: null, synced: [], rejected: [] } },
@@ -1365,13 +1458,10 @@ describe("shared tables", () => {
     expect(view.you.player).toEqual(dee);
     expect(view.recorders).toEqual([dee]);
     expect(view.visits.map((item) => item.player.displayName)).toEqual(["Starter", "Bea"]);
-    // A recorder's own play is still only its own.
     expect(recordingHome(state(device)).active).toEqual([]);
 
-    // Offline: Dee records the starter's rebuy, which the starter revoked before it synced.
     await save(device, { type: "add", visitId: starterVisit.id, kind: "buy_in", amount: 500 });
     const queued = pendingRecordingCommands(state(device))[0]!;
-    // A recorder can't appoint or share: only the starter can.
     expect(() =>
       device.prepare({ type: "revoke_recorder", tableId: table.id, playerId: dee.id }),
     ).not.toThrow();
@@ -1399,7 +1489,6 @@ describe("shared tables", () => {
     await device.transform((s) => discardRejected(s, queued.operationId));
     expect(state(device).sync?.rejected).toEqual([]);
 
-    // The next pull: the starter's revocation, and Dee is an ordinary participant again.
     const revoke = RecordingCommand.make({
       type: "revoke_recorder",
       operationId: RecordingOperationId.make(crypto.randomUUID()),
@@ -1408,6 +1497,7 @@ describe("shared tables", () => {
       tableId: table.id,
       playerId: dee.id,
     });
+
     await device.transform((s) =>
       mergeRecordingHistory(s, null, historyFor(starter.store, device, dee, [appoint, revoke])),
     );
@@ -1425,6 +1515,7 @@ describe("shared tables", () => {
     const table = state(starter.store).tables[0]!;
     const dee = { id: PlayerId.make(crypto.randomUUID()), displayName: "Dee" };
     const eli = { id: PlayerId.make(crypto.randomUUID()), displayName: "Eli" };
+
     const appoint = (playerId: PlayerId) =>
       RecordingCommand.make({
         type: "appoint_recorder",
@@ -1434,6 +1525,7 @@ describe("shared tables", () => {
         tableId: table.id,
         playerId,
       });
+
     const device = await open();
     await device.transform((s) =>
       mergeRecordingHistory({ ...s, sync: { userId: null, synced: [], rejected: [] } }, null, {
@@ -1456,6 +1548,7 @@ describe("shared tables", () => {
     const opened = state(starter).tables[0]!;
     const dee = { id: PlayerId.make(crypto.randomUUID()), displayName: "Dee" };
     const by = { actorId: state(starter).actor.id, preparedAt: DateTime.makeUnsafe(Date.now()) };
+
     const appoint = RecordingCommand.make({
       ...by,
       type: "appoint_recorder",
@@ -1463,13 +1556,16 @@ describe("shared tables", () => {
       tableId: opened.id,
       playerId: dee.id,
     });
+
     const remove = RecordingCommand.make({
       ...by,
       type: "delete_table",
       operationId: RecordingOperationId.make(crypto.randomUUID()),
       tableId: opened.id,
     });
+
     let device = await open(db);
+
     const pull = (commands: ReadonlyArray<RecordingCommand>, deleted: boolean) =>
       device.transform((s) =>
         mergeRecordingHistory(
@@ -1482,9 +1578,9 @@ describe("shared tables", () => {
           },
         ),
       );
+
     await pull([appoint], false);
     expect(recordingHome(state(device)).tables.map((item) => item.table.id)).toEqual([opened.id]);
-    // The starter deletes it; the server now sends the table already deleted.
     await pull([appoint, remove], true);
     expect(recordingTable(state(device), opened.id)).toBeNull();
     expect(recordingHome(state(device)).tables).toEqual([]);
@@ -1525,6 +1621,7 @@ describe("shared tables", () => {
     const store = await open(db);
     await save(store, { type: "start", buyIn: 20000, startedAt: at(10) });
     const current = JSON.parse(db.document.payload!);
+
     const v1 = {
       ...current,
       version: 1,
@@ -1547,6 +1644,7 @@ describe("shared tables", () => {
         }),
       ),
     };
+
     const upgraded = decodeRecordingState(JSON.stringify(v1), db.document.revision);
     expect(upgraded).toEqual(state(store));
   });
@@ -1555,13 +1653,16 @@ describe("shared tables", () => {
     const store = await open();
     const tableId = TableId.make("10000000-0000-4000-8000-000000000001");
     const credentials: Array<ActorCredential | null> = [];
+
     const transport = {
       ...transportFor(server()),
       table: (_tableId: TableId, actor: ActorCredential | null) => {
         credentials.push(actor);
+
         return Effect.fail(new NotFound({ resource: "table" }));
       },
     } satisfies RecordingTransport;
+
     const sync = makeRecordingSync(store, null, transport, memoryKeys());
     await Promise.allSettled([sync.table(tableId), sync.table(tableId)]);
     expect(credentials).toHaveLength(2);
@@ -1578,6 +1679,7 @@ describe("shared tables", () => {
       const remote = server();
       const calls = yield* Queue.unbounded<string>();
       const keys = memoryKeys();
+
       const transport: RecordingTransport = {
         ...transportFor(remote),
         registerActor: (actor) =>
@@ -1585,14 +1687,17 @@ describe("shared tables", () => {
         history: (actor) =>
           Effect.sync(() => {
             Queue.offerUnsafe(calls, `history ${actor?.actorId}`);
+
             return remote.history();
           }),
         push: (request, actor) =>
           Effect.sync(() => {
             Queue.offerUnsafe(calls, `push ${actor?.actorId}`);
+
             return { results: remote.push(request) };
           }),
       };
+
       const sync = makeRecordingSync(store, null, transport, keys);
       const fiber = yield* Effect.forkChild(sync.run);
       const statuses = yield* Queue.unbounded<string>();
@@ -1606,14 +1711,15 @@ describe("shared tables", () => {
       expect(yield* Queue.take(calls)).toBe(`register ${actorId}`);
       expect(yield* Queue.take(calls)).toBe(`history ${actorId}`);
       expect(yield* Queue.take(calls)).toBe(`push ${actorId}`);
+
       while ((yield* Queue.take(statuses)) !== "idle");
       expect(state(store).sync).toMatchObject({ userId: null });
       expect(pendingRecordingCommands(state(store))).toEqual([]);
       expect((yield* Effect.promise(keys.load))?.actorId).toBe(actorId);
       yield* Fiber.interrupt(fiber);
 
-      // Signing in on the device: the account claims the actor's player and keeps syncing it.
       const claims: string[] = [];
+
       const signedIn = makeRecordingSync(
         store,
         alex,
@@ -1622,14 +1728,17 @@ describe("shared tables", () => {
           claimActor: (actor) =>
             Effect.sync(() => {
               claims.push(actor.actorId);
+
               return { adopted: true, claimed: [], refused: [] };
             }),
         },
         keys,
       );
+
       const states = yield* Queue.unbounded<string>();
       signedIn.subscribe(() => Queue.offerUnsafe(states, signedIn.getStatus().phase));
       const second = yield* Effect.forkChild(signedIn.run);
+
       while ((yield* Queue.take(states)) !== "idle");
       expect(claims).toEqual([actorId]);
       expect(state(store).sync).toMatchObject({ userId: alex });
@@ -1680,6 +1789,7 @@ it("rolls back a refused trip choice without losing offline play and shows it on
   const store = await open();
   await save(store, { type: "start", buyIn: 20000 });
   const started = state(store).receipts[0]!.command;
+
   if (started.type !== "start") throw new Error("Expected start");
   const before = state(store);
   const tripId = TripId.make(crypto.randomUUID());
@@ -1687,6 +1797,7 @@ it("rolls back a refused trip choice without losing offline play and shows it on
   const selected = state(store).receipts.at(-1)!.command;
   await save(store, { type: "add", visitId: started.visitId, kind: "buy_in", amount: 10000 });
   const waiting = state(store);
+
   const after = applyPushResults(
     { ...waiting, sync: { userId: alex, synced: [], rejected: [] } },
     waiting.receipts.map(({ command }) =>
@@ -1700,6 +1811,7 @@ it("rolls back a refused trip choice without losing offline play and shows it on
         : { operationId: command.operationId, status: "accepted" },
     ),
   );
+
   expect(after.tables[0]!.tripId).toBeNull();
   expect(after.entries).toHaveLength(2);
   expect(after.visits[0]!.revision).toBe(1);
@@ -1720,16 +1832,19 @@ it("retries a refused start with its table choices and joined players on the rep
   const remote = server();
   await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
   const opened = await save(store, { type: "start", buyIn: 20000 });
+
   if (opened.command.type !== "start") throw new Error("Expected start");
   const { tableId, visitId } = opened.command;
   const tripId = TripId.make(crypto.randomUUID());
   await save(store, { type: "set_table_trip", tableId, tripId });
+
   const joined = await save(store, {
     type: "join_table",
     tableId,
     displayName: "Bea",
     buyIn: 10000,
   });
+
   if (joined.command.type !== "join_table") throw new Error("Expected join");
   await save(store, { type: "add", visitId: joined.command.visitId, kind: "buy_in", amount: 5000 });
   await save(store, { type: "set_table_trip", tableId, tripId: null });

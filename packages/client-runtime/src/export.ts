@@ -40,7 +40,7 @@ export const personalCsvFilename = (now = new Date()) =>
 export const exportPersonalSessionsCsv = (
   visits: ReadonlyArray<RecordedVisit>,
   { tripNames = new Map() }: { readonly tripNames?: ReadonlyMap<TripId, string> } = {},
-): string => {
+) => {
   const finished = visits
     .filter(
       ({ visit, finalResult }) =>
@@ -57,8 +57,10 @@ export const exportPersonalSessionsCsv = (
     ...finished.map(({ visit, totals, finalResult, table, venue }) => {
       const durationMs =
         DateTime.toEpochMillis(visit.finishedAt!) - DateTime.toEpochMillis(visit.startedAt);
+
       const durationMinutes = Math.round(durationMs / 60_000);
       const tripName = table.tripId ? (tripNames.get(table.tripId) ?? "Group trip") : "";
+
       return csvRow([
         visit.id,
         DateTime.formatIso(visit.startedAt),
@@ -78,5 +80,6 @@ export const exportPersonalSessionsCsv = (
       ]);
     }),
   ];
+
   return `${lines.join("\n")}\n`;
 };

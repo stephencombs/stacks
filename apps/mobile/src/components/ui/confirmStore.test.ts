@@ -55,10 +55,16 @@ it("keeps the dialog open and pending while an async action runs, then closes on
 });
 
 it("shows why an async action failed and lets the person try again", async () => {
-  const onConfirm = vi
-    .fn<() => Promise<string | null>>()
-    .mockResolvedValueOnce("You're offline.")
-    .mockResolvedValueOnce(null);
+  const replies = ["You're offline.", null];
+  let calls = 0;
+
+  const onConfirm = () => {
+    const reply = replies[calls] ?? null;
+    calls += 1;
+
+    return Promise.resolve(reply);
+  };
+
   ask(onConfirm);
   answerConfirmation();
   await Promise.resolve();
@@ -66,6 +72,6 @@ it("shows why an async action failed and lets the person try again", async () =>
 
   answerConfirmation();
   await Promise.resolve();
-  expect(onConfirm).toHaveBeenCalledTimes(2);
+  expect(calls).toBe(2);
   expect(currentConfirmation()).toBeNull();
 });

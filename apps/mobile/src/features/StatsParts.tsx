@@ -38,6 +38,7 @@ export function StatsContent({ filters, children }: { filters?: ReactNode; child
         {children}
       </>
     );
+
   return <AndroidStatsContent filters={filters}>{children}</AndroidStatsContent>;
 }
 
@@ -45,6 +46,7 @@ function AndroidStatsContent({ filters, children }: { filters?: ReactNode; child
   const insets = useSafeAreaInsets();
   const foot = useScreenFoot();
   const [scrolled, setScrolled] = useState(false);
+
   return (
     <View className="flex-1 bg-canvas">
       <FeltStatusBar felt={false} />
@@ -178,6 +180,7 @@ export function Filters({
   gameMenu?: { readonly open: boolean; readonly setOpen: (open: boolean) => void };
 }) {
   const android = Platform.OS === "android";
+
   return (
     <ScrollView
       horizontal
@@ -191,8 +194,10 @@ export function Filters({
       {chips.map((chip) => {
         const onPick = (value: string) => {
           const option = chip.options.find((item) => item.value === value);
+
           if (option) onChange(option.filters);
         };
+
         const props = {
           name: chip.name,
           value: chip.value,
@@ -200,6 +205,7 @@ export function Filters({
           onChange: onPick,
           onClear: () => onChange(chip.cleared),
         };
+
         if (android && chip.key === "tripId" && trips)
           return (
             <TripFilter
@@ -211,6 +217,7 @@ export function Filters({
               onChange={onChange}
             />
           );
+
         if (android && (chip.key === "year" || (chip.key === "game" && gameMenu))) {
           return (
             <StatsMenu
@@ -225,6 +232,7 @@ export function Filters({
             />
           );
         }
+
         return <FilterChip key={chip.key} {...props} options={chip.options} />;
       })}
       {filtered ? (
@@ -250,6 +258,7 @@ function TripFilter({
   const [draft, setDraft] = useState<string | null>(null);
   const selected = chip.options.find((option) => option.value === draft);
   const count = trips.byId.get(draft ?? "")?.sessions ?? 0;
+
   return (
     <>
       <StatsChipTrigger
@@ -290,12 +299,14 @@ function TripFilter({
               const trip = trips.byId.get(value);
               const checked = draft === value;
               const isLive = liveTrips?.has(value);
+
               const line =
                 value === ""
                   ? `${groupName ? `Every trip in ${groupName}` : "Every trip and sessions without a trip"} · ${finishedSessions(trips.total)}`
                   : [trip?.range, finishedSessions(trip?.sessions ?? 0)]
                       .filter(Boolean)
                       .join(" · ");
+
               return (
                 <Pressable
                   key={value}
@@ -351,6 +362,7 @@ export function ByGame({
 }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
+
   return (
     <View className="gap-2">
       <StatsHeading
@@ -436,6 +448,7 @@ export function ByCasino({
   const android = Platform.OS === "android";
   const limit = android ? (group ? 4 : 3) : TOP_CASINOS;
   const more = rows.length > limit;
+
   return (
     <View className="gap-2">
       <StatsHeading
@@ -500,6 +513,7 @@ function CasinoRows({
 }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
+
   return (
     <List className={inSheet ? "bg-fill" : undefined}>
       {rows.map((row) => (

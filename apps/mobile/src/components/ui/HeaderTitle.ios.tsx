@@ -1,9 +1,9 @@
 import { Host } from "@expo/ui";
 import { Button, Popover, Text, VStack } from "@expo/ui/swift-ui";
+import * as swiftModifiers from "@expo/ui/swift-ui/modifiers";
 import {
   accessibilityHint,
   accessibilityLabel,
-  buttonBorderShape,
   buttonStyle,
   font,
   foregroundStyle,
@@ -22,13 +22,14 @@ export function HeaderTitle({ title, context, onExpand }: HeaderTitleProps) {
   const { width } = useWindowDimensions();
   const { theme } = useUniwind();
   const ink = String(useCSSVariable("--color-ink"));
+
   const trigger = (
     <Button
       label={title}
       systemImage="chevron.down"
       modifiers={[
         buttonStyle("glass"),
-        buttonBorderShape("capsule"),
+        swiftModifiers.buttonBorderShape("capsule"),
         foregroundStyle(ink),
         font({ size: 17, weight: "semibold" }),
         lineLimit(1),
@@ -39,6 +40,7 @@ export function HeaderTitle({ title, context, onExpand }: HeaderTitleProps) {
       onPress={onExpand ?? (() => setOpen(true))}
     />
   );
+
   return (
     <Host matchContents colorScheme={theme === "light" ? "light" : "dark"}>
       {onExpand ? (

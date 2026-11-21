@@ -12,10 +12,12 @@ export const seatCount = (session: Pick<Session, "game" | "tableSeats">) =>
 type Sat = Pick<Seating, "playerId" | "seat" | "occurredAt">;
 
 /** Where each player sits now, from a session's seatings oldest first. */
-export const seatsNow = (seatings: ReadonlyArray<Sat>): ReadonlyMap<PlayerId, number> => {
+export const seatsNow = (seatings: ReadonlyArray<Sat>) => {
   const now = new Map<PlayerId, number>();
+
   for (const { playerId, seat } of seatings)
     if (seat === null) now.delete(playerId);
     else now.set(playerId, seat);
+
   return now;
 };

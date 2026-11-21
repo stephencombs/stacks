@@ -2,20 +2,22 @@ import * as Option from "effect/Option";
 import { MinorUnits, type CurrencyCode } from "@stacks/contracts";
 
 /** How many digits follow the decimal point: 2 for USD, 0 for JPY, 3 for KWD. */
-export const minorUnitDigits = (currency: CurrencyCode): number =>
+export const minorUnitDigits = (currency: CurrencyCode) =>
   new Intl.NumberFormat("en", { style: "currency", currency }).resolvedOptions()
     .maximumFractionDigits ?? 2;
 
-// Intl formats decimal strings exactly, so amounts never pass through a float.
 const toDecimalString = (amount: MinorUnits, digits: number) => {
   const sign = amount < 0 ? "-" : "";
   const magnitude = String(Math.abs(amount)).padStart(digits + 1, "0");
+
   const decimal =
     digits === 0 ? magnitude : `${magnitude.slice(0, -digits)}.${magnitude.slice(-digits)}`;
+
+  // SAFETY: magnitude is the digits of an integer amount, so this is a canonical decimal literal.
   return `${sign}${decimal}` as Intl.StringNumericLiteral;
 };
 
-export const formatDecimal = (amount: MinorUnits, currency: CurrencyCode): string =>
+export const formatDecimal = (amount: MinorUnits, currency: CurrencyCode) =>
   toDecimalString(amount, minorUnitDigits(currency));
 
 export const formatMoney = (
@@ -26,32 +28,37 @@ export const formatMoney = (
     readonly signDisplay?: "auto" | "always" | "exceptZero";
     readonly trailingZeroDisplay?: "auto" | "stripIfInteger";
   } = {},
-): string => {
+) => {
   const digits = minorUnitDigits(currency);
-  // Whole amounts drop their zero cents by asking for no fraction digits, which every engine
-  // honours; Hermes on iOS ignores trailingZeroDisplay.
+
   const whole =
     (options.trailingZeroDisplay ?? "stripIfInteger") === "stripIfInteger" &&
     amount % 10 ** digits === 0;
-  // Zero has no sign to show. Hermes on Android prints "+$0" for exceptZero, so don't ask it to.
+
   const signDisplay =
     amount === 0 && options.signDisplay === "exceptZero" ? "auto" : options.signDisplay;
-  return new Intl.NumberFormat(options.locale, {
+
+  const format: Intl.NumberFormatOptions = {
     style: "currency",
     currency,
     signDisplay: signDisplay ?? "auto",
-    ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
-  }).format(toDecimalString(amount, digits));
+  };
+
+  if (whole) {
+    format.minimumFractionDigits = 0;
+    format.maximumFractionDigits = 0;
+  }
+
+  return new Intl.NumberFormat(options.locale, format).format(toDecimalString(amount, digits));
 };
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
 
-// Read off a formatted number rather than formatToParts, which Hermes on iOS doesn't have.
 const separators = (locale: string | undefined) => {
   const marks = new Intl.NumberFormat(locale).format(1234567.5).replace(/\d/g, "");
   const decimal = marks.at(-1) ?? ".";
   const group = marks.length > 1 ? marks[0]! : ",";
-  // People type a plain space where the locale uses a no-break space; any whitespace is dropped.
+
   return { decimal, group: /\s/.test(group) ? null : group };
 };
 
@@ -68,18 +75,22 @@ export const parseMoney = (
   input: string,
   currency: CurrencyCode,
   options: { readonly locale?: string } = {},
-): Option.Option<MinorUnits> => {
+) => {
   const { decimal, group } = separators(options.locale);
   const digits = minorUnitDigits(currency);
   const allowed = `\\d\\-−${escapeRegExp(decimal)}${group ? escapeRegExp(group) : ""}`;
   const cleaned = input.replace(new RegExp(`[^${allowed}]`, "g"), "").replace("−", "-");
   const whole = group ? `\\d{1,3}(?:${escapeRegExp(group)}\\d{3})+|\\d*` : `\\d*`;
   const match = new RegExp(`^(-?)(${whole})(?:${escapeRegExp(decimal)}(\\d*))?$`).exec(cleaned);
+
   if (!match) return Option.none();
   const [, sign = "", wholePart = "", fraction = ""] = match;
+
   if (wholePart === "" && fraction === "") return Option.none();
+
   if (fraction.length > digits) return Option.none();
   const integerDigits = group ? wholePart.replaceAll(group, "") : wholePart;
+
   return MinorUnits.makeOption(
     Number(`${sign}${integerDigits || "0"}${fraction.padEnd(digits, "0")}`),
   );

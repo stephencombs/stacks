@@ -4,7 +4,9 @@ import { personalMapView, type MapFilter, type PersonalMapView } from "@stacks/c
 import { useRecordingHome } from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import { tripNames } from "@stacks/client-runtime/trip";
-import type { GroupListItem, VenueId } from "@stacks/contracts";
+import { VenueId, type GroupListItem } from "@stacks/contracts";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as DateTime from "effect/DateTime";
 import { AppleMaps, GoogleMaps } from "expo-maps";
@@ -28,15 +30,24 @@ import { googleMapsEnabled } from "../lib/config";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { StacksProvider, useStacks } from "../lib/stacks";
 
+const selectedVenue = (markerId: string | undefined) => {
+  const id = markerId?.split(":")[0];
+
+  if (id === undefined) return null;
+
+  return Option.getOrNull(Schema.decodeUnknownOption(VenueId)(id));
+};
+
 type ActiveMap = Extract<PersonalMapView, { kind: "map" }>;
 
 const emptyTrips = new Map<string, string>();
 const noGroups: ReadonlyArray<GroupListItem> = [];
 
-/** Signed-in trip names when available; signed out or offline still maps every local table. */
 function TripNames({ children }: { children: (names: ReadonlyMap<string, string>) => ReactNode }) {
   const account = useAccount();
+
   if (!account.available || !account.isSignedIn || !account.userId) return children(emptyTrips);
+
   return (
     <StacksProvider>
       <SignedInTripNames>{children}</SignedInTripNames>
@@ -52,6 +63,7 @@ function SignedInTripNames({
   const result = useAtomValue(useStacks().groups);
   const groups = AsyncResult.getOrElse(result, () => noGroups);
   const names = useMemo(() => tripNames(groups), [groups]);
+
   return children(names);
 }
 
@@ -69,6 +81,7 @@ function MapContent({ tripNames: names }: { tripNames: ReadonlyMap<string, strin
   const { home } = useRecordingHome();
   const [filter, setFilter] = useState<MapFilter>({ kind: "all" });
   const timeZone = useMemo(() => DateTime.zoneMakeLocal(), []);
+
   const view = useMemo(
     () => (home ? personalMapView(home, names, timeZone, filter) : null),
     [home, names, timeZone, filter],
@@ -77,12 +90,14 @@ function MapContent({ tripNames: names }: { tripNames: ReadonlyMap<string, strin
   if (view === null || view.kind === "empty") {
     return <EmptyMap />;
   }
+
   return <PopulatedMap view={view} onFilter={setFilter} />;
 }
 
 function EmptyMap() {
   const android = Platform.OS === "android";
   const muted = String(useCSSVariable("--color-muted"));
+
   return (
     <PersonalScreen live contentClassName={android ? "gap-0 pt-0" : undefined}>
       <View className="items-center gap-3 px-6 pt-[76px]">
@@ -119,6 +134,7 @@ function PopulatedMap({
   const [showAllVenueVisits, setShowAllVenueVisits] = useState(false);
   const { theme } = useUniwind();
   const prefs = usePreferences();
+
   const [win, loss, muted, ink] = useCSSVariable([
     "--color-win",
     "--color-loss",
@@ -178,7 +194,7 @@ function PopulatedMap({
         />
       )}
 
-      {/* Floating top controls: filter pill on left, You button on right */}
+      {}
       <View
         pointerEvents="box-none"
         style={{
@@ -221,7 +237,7 @@ function PopulatedMap({
         <PersonalYouButton />
       </View>
 
-      {/* Non-modal venue detail sheet, path summary card, and unmapped session count */}
+      {}
       {selectedSheet ? (
         <View
           accessibilityRole="summary"
@@ -231,7 +247,7 @@ function PopulatedMap({
             left: 0,
             right: 0,
             bottom: bottomDock,
-            ...(android ? { elevation: 8 } : {}),
+            ...(android ? { elevation: 8 } : null),
           }}
           className={cn(
             "rounded-t-[28px] bg-surface px-4 pt-2.5 pb-4 shadow-lg",
@@ -359,6 +375,7 @@ function PopulatedMap({
                 (option.filter.kind === "trip" &&
                   view.filter.kind === "trip" &&
                   option.filter.tripId === view.filter.tripId));
+
             return (
               <Pressable
                 key={option.key}
@@ -458,8 +475,9 @@ function MapCanvas({
             : []
         }
         onMarkerClick={(marker) => {
-          const id = marker.id?.split(":")[0];
-          if (id) onSelectVenue(id as VenueId);
+          const id = selectedVenue(marker.id);
+
+          if (id) onSelectVenue(id);
         }}
         onMapClick={() => onSelectVenue(null)}
       />
@@ -498,8 +516,9 @@ function MapCanvas({
             : []
         }
         onMarkerClick={(marker) => {
-          const id = marker.id?.split(":")[0];
-          if (id) onSelectVenue(id as VenueId);
+          const id = selectedVenue(marker.id);
+
+          if (id) onSelectVenue(id);
         }}
         onMapClick={() => onSelectVenue(null)}
       />
@@ -522,10 +541,6 @@ function MapCanvas({
   );
 }
 
-/**
- * Interactive vector map when Android Google Maps API key is absent (dev builds and CI): renders
- * the design frames' subtle street canvas, dashed path, and tappable numbered or colored markers.
- */
 function FallbackMapCanvas({
   view,
   theme,
@@ -551,6 +566,7 @@ function FallbackMapCanvas({
 }) {
   const { width, height } = useWindowDimensions();
   const points = view.stops.length > 0 ? view.stops : view.pins;
+
   const project = useMemo(() => {
     const lats = points.map((p) => p.lat);
     const lngs = points.map((p) => p.lng);
@@ -564,6 +580,7 @@ function FallbackMapCanvas({
     const usableH = Math.max(120, height - topY - bottomClearance);
     const latSpan = maxLat - minLat;
     const lngSpan = maxLng - minLng;
+
     return (lat: number, lng: number) => ({
       x: lngSpan < 0.0001 ? width / 2 : padX + ((lng - minLng) / lngSpan) * usableW,
       y: latSpan < 0.0001 ? topY + usableH * 0.45 : topY + ((maxLat - lat) / latSpan) * usableH,
@@ -578,6 +595,7 @@ function FallbackMapCanvas({
   const dashColor = dark ? "#F5F5F7" : "#111114";
 
   const pathCoords = view.stops.map((s) => project(s.lat, s.lng));
+
   const pinColor = (outcome: "win" | "loss" | "even") =>
     privacyMode
       ? mutedColor
@@ -659,6 +677,7 @@ function FallbackMapCanvas({
         ? view.stops.map((stop) => {
             const { x, y } = project(stop.lat, stop.lng);
             const selected = selectedVenueId === stop.venue.id;
+
             return (
               <Pressable
                 key={`${stop.venue.id}:${stop.number}`}
@@ -694,6 +713,7 @@ function FallbackMapCanvas({
             const { x, y } = project(pin.lat, pin.lng);
             const selected = selectedVenueId === pin.venue.id;
             const color = pinColor(pin.outcome);
+
             return (
               <Pressable
                 key={pin.venue.id}

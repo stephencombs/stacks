@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import { PlayerId } from "@stacks/contracts";
 
-import { groupWith, ids, users } from "../testing/fixtures.ts";
+import { groupWith, ids, users } from "../testing/fixtures.test-utils.ts";
 import {
   device,
   rebuy,
@@ -13,17 +13,17 @@ import {
   sitDown,
   start,
   uuid,
-} from "../testing/recording.ts";
-import { TestApi } from "../testing/TestApi.ts";
+} from "../testing/recording.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 import * as Access from "./Access.ts";
 import { digest } from "./Recording.ts";
 
 const handle = (name: string) => `${name}_${uuid().slice(0, 8)}`;
 
-/** The rows a set of players' history is made of, so a claim can show it copied none. */
 const footprint = Effect.fn("test.footprint")(function* (players: ReadonlyArray<string>) {
   const sql = yield* SqlClient.SqlClient;
   const mine = sql.in(players);
+
   const [row] = yield* sql<{
     players: number;
     tables: number;
@@ -39,45 +39,50 @@ const footprint = Effect.fn("test.footprint")(function* (players: ReadonlyArray<
         where v.player_id in ${mine})::int as entries,
       (select count(*) from personal_operations where player_id in ${mine})::int as operations
   `;
+
   return row!;
 });
 
-/** Who each player belongs to: an account's user ID, or null for nobody. */
 const owners = Effect.fn("test.owners")(function* (players: ReadonlyArray<string>) {
   const sql = yield* SqlClient.SqlClient;
+
   const rows = yield* sql<{ id: string; userId: string | null }>`
     select id, user_id from players where id in ${sql.in(players)}
   `;
+
   return Object.fromEntries(rows.map((row) => [row.id, row.userId]));
 });
 
-/** A starter's shared table, and a player seated by name at it with an invite to record as them. */
 const invitedPlayer = Effect.fn("test.invitedPlayer")(function* (name = "Bea") {
   const table = yield* sharedTable();
   const seated = seatNew(table.starter.identity, table.opened.tableId, name);
   expect(yield* table.starter.push(seated)).toEqual(["accepted"]);
+
   const invite = yield* table.starter.client.recording.invitePlayer({
     params: { playerId: seated.playerId },
   });
+
   return { ...table, seated, invite };
 });
 
-/** Someone who joined a table through its link from a device, with a visit there. */
 const joined = Effect.fn("test.joined")(function* (
   table: Effect.Success<ReturnType<typeof sharedTable>>,
   displayName = "Bea",
 ) {
   const recorder = yield* device();
+
   const { player } = yield* recorder.join(table.token, {
     id: PlayerId.make(uuid()),
     displayName,
   });
+
   const sat = sitDown(recorder.identity, table.opened.tableId, player.id);
   expect(yield* recorder.push(sat)).toEqual(["accepted"]);
+
   return { recorder, player, sat };
 });
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it) => {
+it.layer(TestApi.layer)("claiming guest history", (it) => {
   it.effect("claims what a device holds without copying any of its history", () =>
     Effect.gen(function* () {
       const table = yield* sharedTable();
@@ -96,7 +101,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       expect(result.claimed.map((item) => item.id).toSorted()).toEqual(
         [guest.identity.playerId, player.id].toSorted(),
       );
-      // Linked, not copied: not one more row of any kind.
       expect(yield* footprint(players)).toEqual(before);
 
       const held = yield* owners(players);
@@ -113,27 +117,24 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       expect(history.visits.map((visit) => visit.id)).toEqual([sat.visitId]);
       expect(history.entries).toHaveLength(2);
 
-      // The account records as the player now; the table's other play isn't theirs.
       expect(yield* alex.push(rebuy(guest.identity, sat.visitId, 1))).toEqual(["accepted"]);
       expect(yield* alex.push(rebuy(guest.identity, opened.visitId))).toEqual(["forbidden"]);
-      // Claiming again changes nothing.
       expect(yield* alex.client.claim.claimActor({ payload: guest.credential })).toEqual({
         adopted: false,
         claimed: [],
         refused: [],
       });
 
-      // Another account sees nothing of it, even one with history of its own.
       const stranger = yield* signedIn(handle("cal"));
       expect(yield* stranger.push(start(stranger.identity))).toEqual(["accepted"]);
       const theirs = yield* stranger.client.recording.history();
       expect(theirs.tables.map((item) => item.id)).not.toContain(opened.tableId);
       expect(theirs.visits.map((visit) => visit.id)).not.toContain(sat.visitId);
       expect(
-        yield* stranger.client.recording
+        (yield* stranger.client.recording
           .table({ params: { tableId: opened.tableId } })
-          .pipe(Effect.flip),
-      ).toMatchObject({ _tag: "NotFound" });
+          .pipe(Effect.flip))._tag,
+      ).toBe("NotFound");
     }),
   );
 
@@ -147,22 +148,21 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       expect(yield* thief.push(start(thief.identity))).toEqual(["accepted"]);
       const alex = yield* signedIn(handle("alex"));
 
-      // The holder's actor with the thief's secret proves nothing.
       expect(
-        yield* alex.client.claim
+        (yield* alex.client.claim
           .claimActor({
             payload: { actorId: holder.identity.actorId, secret: thief.credential.secret },
           })
-          .pipe(Effect.flip),
-      ).toMatchObject({ _tag: "Unauthorized" });
-      // Claiming with a device of one's own takes only what that device holds.
+          .pipe(Effect.flip))._tag,
+      ).toBe("Unauthorized");
       const result = yield* alex.client.claim.claimActor({ payload: thief.credential });
       expect(result.claimed.map((item) => item.id)).toEqual([thief.identity.playerId]);
-      // Nobody redeemed an invite for the joiner or for the seated player, so nobody can claim them.
-      expect(yield* alex.redeem("not-an-invite").pipe(Effect.flip)).toMatchObject({
-        _tag: "NotFound",
-        resource: "invite",
-      });
+      {
+        const received = yield* alex.redeem("not-an-invite").pipe(Effect.flip);
+        expect(received._tag).toBe("NotFound");
+        expect(received).toMatchObject({ resource: "invite" });
+      }
+
       expect(yield* owners([player.id, seated.playerId])).toEqual({
         [player.id]: null,
         [seated.playerId]: null,
@@ -209,22 +209,23 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       const history = yield* alex.client.recording.history();
       expect(history.visits.map((visit) => visit.id)).toEqual([seated.visitId]);
       expect(history.participants).toHaveLength(1);
-      // Signing in on another device brings the player along.
       const other = yield* signedIn(name, alex.identity);
       expect((yield* other.client.recording.history()).visits.map((visit) => visit.id)).toEqual([
         seated.visitId,
       ]);
       expect(yield* other.push(rebuy(other.identity, seated.visitId))).toEqual(["accepted"]);
 
-      // A second account redeeming a new invite for the same player is refused, and its link stays.
       const next = yield* starter.client.recording.invitePlayer({
         params: { playerId: seated.playerId },
       });
+
       const eve = yield* signedIn(handle("eve"));
-      expect(yield* eve.redeem(next.token).pipe(Effect.flip)).toMatchObject({
-        _tag: "Conflict",
-        reason: "player_claimed",
-      });
+      {
+        const received = yield* eve.redeem(next.token).pipe(Effect.flip);
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "player_claimed" });
+      }
+
       const sql = yield* SqlClient.SqlClient;
       expect(yield* sql`select 1 from players where id = ${eve.identity.playerId}`).toEqual([]);
       expect(
@@ -241,10 +242,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
     Effect.gen(function* () {
       const table = yield* sharedTable();
       const dee = yield* signedIn(handle("dee"));
+
       const { player } = yield* dee.join(table.token, {
         id: PlayerId.make(uuid()),
         displayName: "Dee",
       });
+
       const held = yield* owners([player.id, dee.identity.playerId]);
       expect(held[player.id]).not.toBeNull();
       expect(held[player.id]).toBe(held[dee.identity.playerId]);
@@ -298,19 +301,26 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       const table = yield* sharedTable();
       const { player } = yield* joined(table, "Bea");
 
-      // Two identities made apart stay apart until the account says to link them.
-      expect(
-        yield* alex.client.claim.claimActor({ payload: phone.credential }).pipe(Effect.flip),
-      ).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
+      {
+        const received = yield* alex.client.claim
+          .claimActor({ payload: phone.credential })
+          .pipe(Effect.flip);
+
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "recording_identity" });
+      }
+
       expect((yield* owners([phone.identity.playerId]))[phone.identity.playerId]).toBeNull();
       expect((yield* alex.client.recording.history()).tables.map((item) => item.id)).not.toContain(
         opened.tableId,
       );
 
       const before = yield* footprint([phone.identity.playerId, alex.identity.playerId]);
+
       const linked = yield* alex.client.claim.claimActor({
         payload: { ...phone.credential, link: true },
       });
+
       expect(linked).toEqual({
         adopted: false,
         claimed: [{ id: phone.identity.playerId, displayName: "Starter" }],
@@ -325,12 +335,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
           and recording_actor_id is not null`,
       ).toHaveLength(1);
 
-      // The account sees both, and the account's player is still its own.
       const history = yield* alex.client.recording.history();
       expect(history.identity).toEqual(alex.identity);
       expect(history.tables.map((item) => item.id)).toContain(opened.tableId);
 
-      // The device keeps working with its own secret, and what it records is the account's too.
       expect(yield* phone.push(rebuy(phone.identity, opened.visitId))).toEqual(["accepted"]);
       expect(
         (yield* alex.client.recording.history()).entries.filter(
@@ -341,13 +349,16 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
         claimed: [],
       });
 
-      // A different account can't take what is already linked.
       const cal = yield* signedIn(handle("cal"));
-      expect(
-        yield* cal.client.claim.claimActor({ payload: phone.credential }).pipe(Effect.flip),
-      ).toMatchObject({ _tag: "Conflict", reason: "player_claimed" });
+      {
+        const received = yield* cal.client.claim
+          .claimActor({ payload: phone.credential })
+          .pipe(Effect.flip);
 
-      // A new device signed in to the account is the table's starter, as the phone was.
+        expect(received._tag).toBe("Conflict");
+        expect(received).toMatchObject({ reason: "player_claimed" });
+      }
+
       const laptop = yield* signedIn(name, alex.identity);
       expect(
         (yield* laptop.client.recording.table({ params: { tableId: opened.tableId } })).viewerRole,
@@ -367,12 +378,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       expect((yield* alex.client.claim.claimActor({ payload: starter.credential })).adopted).toBe(
         true,
       );
-      // The lost device's secret no longer signs anything.
-      expect(yield* starter.client.recording.history().pipe(Effect.flip)).toMatchObject({
-        _tag: "Unauthorized",
-      });
+      expect((yield* starter.client.recording.history().pipe(Effect.flip))._tag).toBe(
+        "Unauthorized",
+      );
 
-      // Signed in to the account on a new device, with nothing but the account.
       const fresh = yield* signedIn(name, starter.identity);
       const view = yield* fresh.client.recording.table({ params: { tableId: opened.tableId } });
       expect(view.viewerRole).toBe("starter");
@@ -387,10 +396,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
 
       const stranger = yield* signedIn(handle("eve"));
       expect(
-        yield* stranger.client.recording
+        (yield* stranger.client.recording
           .table({ params: { tableId: opened.tableId } })
-          .pipe(Effect.flip),
-      ).toMatchObject({ _tag: "NotFound" });
+          .pipe(Effect.flip))._tag,
+      ).toBe("NotFound");
     }),
   );
 
@@ -410,7 +419,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
         (yield* alex.client.recording.history()).visits.map((visit) => visit.id),
       ).not.toContain(first.seated.visitId);
 
-      // Claimed while it held, released when the starter stops that device.
       const second = yield* invitedPlayer("Cal");
       const held = yield* device();
       yield* held.redeem(second.invite.token);
@@ -437,16 +445,16 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       const { starter, seated, invite } = yield* invitedPlayer("Bea");
       const phone = yield* device();
       yield* phone.redeem(invite.token);
-      // Alex claims Bea from another device, signed in, with a new invite.
+
       const next = yield* starter.client.recording.invitePlayer({
         params: { playerId: seated.playerId },
       });
+
       const alex = yield* signedIn(handle("alex"));
       yield* alex.redeem(next.token);
       const owner = (yield* owners([seated.playerId]))[seated.playerId];
       expect(owner).not.toBeNull();
 
-      // The phone still holds Bea from before; its owner signing up as someone else can't take her.
       const dee = yield* signedIn(handle("dee"), phone.identity);
       const result = yield* dee.client.claim.claimActor({ payload: phone.credential });
       expect(result.refused).toEqual([{ id: seated.playerId, displayName: "Bea" }]);
@@ -458,7 +466,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       expect((yield* alex.client.recording.history()).visits.map((visit) => visit.id)).toContain(
         seated.visitId,
       );
-      // Nor does the account that took the device end up recording as Bea.
       expect(yield* dee.push(rebuy(phone.identity, seated.visitId))).toEqual(["forbidden"]);
     }),
   );
@@ -471,29 +478,32 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       expect(yield* alex.push(start(alex.identity))).toEqual(["accepted"]);
       yield* alex.redeem(invite.token);
       const phone = yield* device();
+
       const next = yield* starter.client.recording.invitePlayer({
         params: { playerId: seated.playerId },
       });
+
       yield* phone.redeem(next.token);
+
       const binding = sql`
         select revoked_at, bound_via, invited_by_actor from player_actors
         where player_id = ${seated.playerId} and actor_id = ${alex.identity.actorId}
       `;
 
-      // The account's own binding stays exactly as it is, however the device came by Bea.
       const held = yield* binding;
       expect(held).toHaveLength(1);
       yield* alex.client.claim.claimActor({ payload: { ...phone.credential, link: true } });
       expect(yield* binding).toEqual(held);
 
-      // Once the starter stops the account's access, linking the phone can't bring it back.
       yield* starter.client.recording.revokeBinding({
         params: { playerId: seated.playerId, actorId: alex.identity.actorId },
       });
       expect((yield* owners([seated.playerId]))[seated.playerId]).toBeNull();
+
       const again = yield* alex.client.claim.claimActor({
         payload: { ...phone.credential, link: true },
       });
+
       expect(again.claimed.map((item) => item.id)).not.toContain(seated.playerId);
       expect((yield* binding)[0]!.revokedAt).not.toBeNull();
       expect((yield* owners([seated.playerId]))[seated.playerId]).toBeNull();
@@ -508,17 +518,22 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       const { starter, seated, invite } = yield* invitedPlayer("Bea");
       const phone = yield* device();
       yield* phone.redeem(invite.token);
+
       for (let held = 1; held < 5; held += 1) {
         const next = yield* starter.client.recording.invitePlayer({
           params: { playerId: seated.playerId },
         });
+
         yield* (yield* device()).redeem(next.token);
       }
+
       const alex = yield* signedIn(handle("alex"));
       expect(yield* alex.push(start(alex.identity))).toEqual(["accepted"]);
+
       const result = yield* alex.client.claim.claimActor({
         payload: { ...phone.credential, link: true },
       });
+
       expect(result.claimed.map((item) => item.id)).toEqual([phone.identity.playerId]);
       expect((yield* owners([seated.playerId]))[seated.playerId]).toBeNull();
       const sql = yield* SqlClient.SqlClient;
@@ -534,6 +549,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
   it.effect("leaves no claim on a player whose binding a revoke ended at the same time", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
+
       for (let round = 0; round < 12; round += 1) {
         const { starter, seated, invite } = yield* invitedPlayer("Bea");
         const phone = yield* device();
@@ -548,7 +564,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
           ],
           { concurrency: "unbounded" },
         ).pipe(Effect.exit);
-        // Whichever came first, a claimed player has a live binding for the claiming account.
+
         const [row] = yield* sql<{ userId: string | null; live: boolean }>`
           select p.user_id, exists (
             select 1 from player_actors pa join players own on own.recording_actor_id = pa.actor_id
@@ -556,6 +572,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
           ) as live
           from players p where p.id = ${seated.playerId}
         `;
+
         expect(row!.userId === null || row!.live).toBe(true);
       }
     }),
@@ -567,14 +584,18 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       const { starter, seated, invite } = yield* invitedPlayer("Bea");
       const phone = yield* device();
       yield* phone.redeem(invite.token);
+
       const first = yield* starter.client.recording.invitePlayer({
         params: { playerId: seated.playerId },
       });
+
       const second = yield* phone.client.recording.invitePlayer({
         params: { playerId: seated.playerId },
       });
+
       const alex = yield* signedIn(handle("alex"));
       const bea = yield* signedIn(handle("bea"));
+
       const outcomes = yield* Effect.all(
         [alex.redeem(first.token), bea.redeem(second.token)].map((redeem) =>
           redeem.pipe(
@@ -584,6 +605,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
         ),
         { concurrency: "unbounded" },
       );
+
       expect(outcomes.toSorted()).toEqual(["claimed", "player_claimed"]);
       const winner = outcomes[0] === "claimed" ? alex : bea;
       const owner = yield* owners([seated.playerId, winner.identity.playerId]);
@@ -599,26 +621,35 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
       const sql = yield* SqlClient.SqlClient;
       const { alex, gus } = yield* users("alex", "gus");
 
-      // A legacy claim code can't claim a table player, even one that somehow carries a code.
       const table = yield* sharedTable();
       const { player } = yield* joined(table, "Bea");
       const tableCode = Access.randomCode();
       yield* sql`update players set claim_code = ${tableCode} where id = ${player.id}`;
-      expect(
-        yield* gus.guests.previewClaim({ params: { code: tableCode } }).pipe(Effect.flip),
-      ).toMatchObject({ _tag: "NotFound", resource: "claim" });
-      expect(
-        yield* gus.guests.claim({ params: { code: tableCode } }).pipe(Effect.flip),
-      ).toMatchObject({ _tag: "NotFound", resource: "claim" });
+      {
+        const received = yield* gus.guests
+          .previewClaim({ params: { code: tableCode } })
+          .pipe(Effect.flip);
+
+        expect(received._tag).toBe("NotFound");
+        expect(received).toMatchObject({ resource: "claim" });
+      }
+
+      {
+        const received = yield* gus.guests.claim({ params: { code: tableCode } }).pipe(Effect.flip);
+        expect(received._tag).toBe("NotFound");
+        expect(received).toMatchObject({ resource: "claim" });
+      }
+
       expect((yield* owners([player.id]))[player.id]).toBeNull();
 
-      // A table player's invite can't claim a legacy group guest.
       const group = yield* groupWith(alex);
       const guestId = ids.player();
+
       const withGuest = yield* alex.guests.add({
         params: { groupId: group.group.id },
         payload: { id: guestId, displayName: "Gus" },
       });
+
       const code = withGuest.players.find((item) => item.id === guestId)!.claimCode!;
       const issuer = yield* device();
       const token = `legacy-guest-${uuid()}`;
@@ -627,32 +658,40 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("claiming guest history", (it
         values (${uuid()}, ${guestId}, ${yield* digest(token)}, ${issuer.identity.actorId})
       `;
       const dee = yield* signedIn(handle("dee"));
-      expect(yield* dee.redeem(token).pipe(Effect.flip)).toMatchObject({
-        _tag: "NotFound",
-        resource: "invite",
-      });
+      {
+        const received = yield* dee.redeem(token).pipe(Effect.flip);
+        expect(received._tag).toBe("NotFound");
+        expect(received).toMatchObject({ resource: "invite" });
+      }
+
       const api = yield* TestApi;
       const anonymous = yield* api.asActor(null);
       expect(
-        yield* anonymous.publicRecording.previewInvite({ params: { token } }).pipe(Effect.flip),
-      ).toMatchObject({ _tag: "NotFound" });
+        (yield* anonymous.publicRecording.previewInvite({ params: { token } }).pipe(Effect.flip))
+          ._tag,
+      ).toBe("NotFound");
       expect((yield* owners([guestId]))[guestId]).toBeNull();
       expect(yield* sql`select 1 from player_actors where player_id = ${guestId}`).toEqual([]);
 
-      // The group's code still works, and still respects the group: nobody outside it sees it.
-      expect(
-        yield* gus.groups.get({ params: { groupId: group.group.id } }).pipe(Effect.flip),
-      ).toMatchObject({ _tag: "Forbidden", reason: "not_a_member" });
+      {
+        const received = yield* gus.groups
+          .get({ params: { groupId: group.group.id } })
+          .pipe(Effect.flip);
+
+        expect(received._tag).toBe("Forbidden");
+        expect(received).toMatchObject({ reason: "not_a_member" });
+      }
+
       const claimed = yield* gus.guests.claim({ params: { code } });
       expect(claimed.myPlayerId).toBe(guestId);
       expect(claimed.role).toBe("member");
       const hal = yield* users("hal");
-      expect(yield* hal.hal.guests.claim({ params: { code } }).pipe(Effect.flip)).toMatchObject({
-        _tag: "NotFound",
-        resource: "claim",
-      });
+      {
+        const received = yield* hal.hal.guests.claim({ params: { code } }).pipe(Effect.flip);
+        expect(received._tag).toBe("NotFound");
+        expect(received).toMatchObject({ resource: "claim" });
+      }
 
-      // A legacy claim doesn't make the group player a personal one: the account's still unique.
       expect((yield* gus.recording.history()).identity).toBeNull();
       const phone = yield* device();
       expect(yield* phone.push(start(phone.identity))).toEqual(["accepted"]);

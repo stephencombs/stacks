@@ -15,7 +15,12 @@ import {
 
 const utc = DateTime.zoneMakeOffset(0);
 
-const venue = (id: string, name: string, lat: number | null, lng: number | null): MapVenue => ({
+const venue: (id: string, name: string, lat: number | null, lng: number | null) => MapVenue = (
+  id,
+  name,
+  lat,
+  lng,
+) => ({
   id: VenueId.make(id),
   name,
   kind: "casino",
@@ -32,7 +37,7 @@ const aria = venue("0192e7a0-0000-7000-8000-000000000003", "Aria", 36.1072, -115
 const noCoords = venue("0192e7a0-0000-7000-8000-000000000004", "Home Club", null, null);
 const tripA = TripId.make("0192e7a0-0000-7000-8000-000000000101");
 
-const visit = (
+const visit: (
   n: number,
   options: {
     start: string;
@@ -42,23 +47,28 @@ const visit = (
     tripId?: TripId | null;
     deletedAt?: string;
   },
-): MapVisit => ({
-  visit: {
+) => MapVisit = (n, options) => {
+  const recorded = {
     id: VisitId.make(`0192e7a0-0000-7000-8000-00000000100${n}`),
     startedAt: DateTime.makeUnsafe(options.start),
     finishedAt: options.finish ? DateTime.makeUnsafe(options.finish) : null,
-    ...(options.deletedAt ? { deletedAt: DateTime.makeUnsafe(options.deletedAt) } : {}),
-  },
-  totals: {
-    buyIn: MinorUnits.make(20000),
-    cashOut: MinorUnits.make(20000 + (options.result ?? 0)),
-  },
-  finalResult: options.result === null ? null : MinorUnits.make(options.result),
-  table: {
-    tripId: options.tripId ?? null,
-  },
-  venue: options.venue,
-});
+  };
+
+  return {
+    visit: options.deletedAt
+      ? { ...recorded, deletedAt: DateTime.makeUnsafe(options.deletedAt) }
+      : recorded,
+    totals: {
+      buyIn: MinorUnits.make(20000),
+      cashOut: MinorUnits.make(20000 + (options.result ?? 0)),
+    },
+    finalResult: options.result === null ? null : MinorUnits.make(options.result),
+    table: {
+      tripId: options.tripId ?? null,
+    },
+    venue: options.venue,
+  };
+};
 
 it("aggregates finished venue pins colored by result and counts unmapped visits", () => {
   const visits: MapVisit[] = [
@@ -86,7 +96,6 @@ it("aggregates finished venue pins colored by result and counts unmapped visits"
       result: 5000,
       venue: wynn,
     }),
-    // Missing venue and missing coordinates count in unmappedCount.
     visit(5, {
       start: "2026-11-07T05:00:00Z",
       finish: "2026-11-07T06:00:00Z",
@@ -99,7 +108,6 @@ it("aggregates finished venue pins colored by result and counts unmapped visits"
       result: -1000,
       venue: noCoords,
     }),
-    // Live and deleted visits are excluded.
     visit(7, { start: "2026-11-07T09:00:00Z", finish: null, result: null, venue: wynn }),
     visit(8, {
       start: "2026-11-07T09:00:00Z",
@@ -141,7 +149,6 @@ it("builds chronological day and trip paths including revisits and unmapped coun
       venue: bellagio,
       tripId: tripA,
     }),
-    // Consecutive play at Bellagio stays one stop; later return to Wynn becomes stop 3.
     visit(3, {
       start: "2026-11-07T21:30:00Z",
       finish: "2026-11-07T22:00:00Z",
@@ -194,10 +201,12 @@ it("frames single and multiple venues nicely", () => {
     coordinates: { latitude: 36.1265, longitude: -115.1656 },
     zoom: 14,
   });
+
   const multi = mapCamera([
     { lat: 36.1265, lng: -115.1656 },
     { lat: 36.1072, lng: -115.1766 },
   ]);
+
   expect(multi).not.toBeNull();
   expect(multi!.zoom).toBeGreaterThanOrEqual(3);
   expect(multi!.zoom).toBeLessThanOrEqual(16);

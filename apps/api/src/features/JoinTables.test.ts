@@ -15,10 +15,10 @@ import {
   sitDown,
   start,
   uuid,
-} from "../testing/recording.ts";
-import { TestApi } from "../testing/TestApi.ts";
+} from "../testing/recording.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
+it.layer(TestApi.layer)("joining tables", (it) => {
   it.effect("lets a joiner record their own play, and refuses anyone else's", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
@@ -33,8 +33,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
         "accepted",
       ]);
 
-      // The starter's play, a new player, and the starter's entry are all someone else's.
       const cal = PlayerId.make(uuid());
+
       const sneaky = [
         rebuy(bea.identity, opened.visitId),
         sitDown(bea.identity, opened.tableId, starter.identity.playerId),
@@ -44,6 +44,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
           newPlayer: { id: cal, displayName: "Cal" },
         }),
       ];
+
       expect(yield* bea.push(...sneaky)).toEqual([
         "forbidden",
         "forbidden",
@@ -52,9 +53,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       ]);
       const ids = sneaky.map((command) => command.operationId);
       expect(yield* sql`select 1 from personal_operations where id in ${sql.in(ids)}`).toEqual([]);
+
       const [starterVisit] = yield* sql<{ revision: number }>`
         select revision from personal_visits where id = ${opened.visitId}
       `;
+
       expect(starterVisit?.revision).toBe(0);
       expect(
         yield* sql`select 1 from personal_entries where visit_id = ${opened.visitId}`,
@@ -80,14 +83,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       expect(
         yield* starter.push(edit(starter.identity, opened.visitId, 0, { table: details })),
       ).toEqual(["accepted"]);
-      // A joiner may move their own start, never the table's game or venue.
       expect(
         yield* bea.push(
           edit(bea.identity, sat.visitId, 0, { table: { ...details, game: "roulette" } }),
           edit(bea.identity, sat.visitId, 0, { startedAt: at(1) }),
         ),
       ).toEqual(["forbidden", "accepted"]);
-      // A start after the first buy-in is refused.
       expect(yield* bea.push(edit(bea.identity, sat.visitId, 1, { startedAt: at(30) }))).toEqual([
         "invalid",
       ]);
@@ -95,6 +96,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       const [table] = yield* sql<{ game: string }>`
         select game from tables where id = ${opened.tableId}
       `;
+
       expect(table?.game).toBe("craps");
       const history = yield* starter.client.recording.history();
       expect(history.tables).toMatchObject([
@@ -112,10 +114,13 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       const sql = yield* SqlClient.SqlClient;
       const { starter, token } = yield* sharedTable();
       const bea = yield* device();
+
       for (const id of [starter.identity.playerId, bea.identity.playerId]) {
         const refused = yield* bea.join(token, { id, displayName: "Alex" }).pipe(Effect.flip);
-        expect(refused).toMatchObject({ _tag: "Conflict", reason: "id_taken" });
+        expect(refused._tag).toBe("Conflict");
+        expect(refused).toMatchObject({ reason: "id_taken" });
       }
+
       expect(
         yield* sql`select 1 from player_actors where actor_id = ${bea.identity.actorId} and bound_via = 'join'`,
       ).toEqual([]);
@@ -124,7 +129,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       ).toEqual([]);
 
       const starterJoins = yield* starter.join(token).pipe(Effect.flip);
-      expect(starterJoins).toMatchObject({ _tag: "Conflict", reason: "table_starter" });
+      expect(starterJoins._tag).toBe("Conflict");
+      expect(starterJoins).toMatchObject({ reason: "table_starter" });
     }),
   );
 
@@ -139,7 +145,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       expect(yield* starter.push(correct(starter.identity, sat.visitId, sat.buyInId))).toEqual([
         "accepted",
       ]);
-      // A joiner can't correct the starter's entry back, even holding the right revision.
       expect(yield* bea.push(correct(bea.identity, opened.visitId, opened.buyInId))).toEqual([
         "forbidden",
       ]);
@@ -151,7 +156,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       expect(history.commands.map((command) => command.type)).toEqual(["join_table", "correct"]);
       expect(history.entries.find((entry) => entry.id === sat.buyInId)?.voidedAt).not.toBeNull();
 
-      // The starter's device gets the joiner's play, and who they are.
       const own = yield* starter.client.recording.history();
       expect(own.participants).toEqual([{ tableId: opened.tableId, player }]);
       expect(own.commands.map((command) => command.type)).toEqual([
@@ -192,11 +196,13 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       yield* starter.client.recording.unshare({ params: { tableId: opened.tableId } });
 
       const cal = yield* device();
-      expect(yield* cal.join(token).pipe(Effect.flip)).toMatchObject({
-        _tag: "NotFound",
-        resource: "table",
-      });
-      expect(yield* bea.join(token).pipe(Effect.flip)).toMatchObject({ _tag: "NotFound" });
+      {
+        const received = yield* cal.join(token).pipe(Effect.flip);
+        expect(received._tag).toBe("NotFound");
+        expect(received).toMatchObject({ resource: "table" });
+      }
+
+      expect((yield* bea.join(token).pipe(Effect.flip))._tag).toBe("NotFound");
 
       expect(yield* bea.push(sitDown(bea.identity, opened.tableId, player.id))).toEqual([
         "accepted",
@@ -212,20 +218,25 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       const bea = yield* device();
       const cal = yield* device();
       yield* bea.join(token);
+
       const { player: calHere } = yield* cal.join(token, {
         id: PlayerId.make(uuid()),
         displayName: "Cal",
       });
+
       yield* cal.push(sitDown(cal.identity, opened.tableId, calHere.id));
-      // Cal's own table, which Bea has never been to.
       const elsewhere = start(cal.identity);
       yield* cal.push(elsewhere);
 
-      expect(
-        yield* bea.client.recording
+      {
+        const received = yield* bea.client.recording
           .table({ params: { tableId: elsewhere.tableId } })
-          .pipe(Effect.flip),
-      ).toMatchObject({ _tag: "NotFound", resource: "table" });
+          .pipe(Effect.flip);
+
+        expect(received._tag).toBe("NotFound");
+        expect(received).toMatchObject({ resource: "table" });
+      }
+
       const history = yield* bea.client.recording.history();
       expect(history.tables.map((table) => table.id)).toEqual([opened.tableId]);
       expect(history.visits).toEqual([]);
@@ -243,7 +254,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("joining tables", (it) => {
       const first = yield* bea.join(token, player);
       const again = yield* bea.join(token, player);
       expect(again).toEqual(first);
-      // A device that lost the answer and asks with a new ID gets the player it already has.
       const fresh = yield* bea.join(token, { id: PlayerId.make(uuid()), displayName: "Bea" });
       expect(fresh.player).toEqual(first.player);
       expect(

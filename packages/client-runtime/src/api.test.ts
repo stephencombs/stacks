@@ -1,11 +1,13 @@
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import { Venue, VenueId } from "@stacks/contracts";
+import { NotFound, Venue, VenueId } from "@stacks/contracts";
+import * as Schema from "effect/Schema";
 
 import { fetchPublicVenue, searchPublicVenues } from "./api.ts";
 
 const options = { baseUrl: "https://colorup.test" };
+
 const venue = Venue.make({
   id: VenueId.make(crypto.randomUUID()),
   name: "Casino & Resort",
@@ -32,9 +34,11 @@ it.effect("searches public venues by name and location without credentials", () 
           expect(Object.fromEntries(url.searchParams)).toEqual(
             Object.fromEntries(Object.entries(query).map(([key, value]) => [key, String(value)])),
           );
+
           return Response.json([venue]);
         }),
       );
+
       expect(found).toEqual([venue]);
     }
   }),
@@ -48,9 +52,11 @@ it.effect("reads a public venue by id without credentials", () =>
         expect(request.method).toBe("GET");
         expect(request.headers.has("authorization")).toBe(false);
         expect(request.url).toBe(`${options.baseUrl}/api/public/venues/${venue.id}`);
+
         return Response.json(venue);
       }),
     );
+
     expect(found).toEqual(venue);
   }),
 );
@@ -59,10 +65,16 @@ it.effect("preserves the public read's NotFound error", () =>
   Effect.gen(function* () {
     const error = yield* fetchPublicVenue(options, venue.id).pipe(
       Effect.provideService(FetchHttpClient.Fetch, async () =>
-        Response.json({ _tag: "NotFound", resource: "venue" }, { status: 404 }),
+        Response.json(
+          Schema.encodeSync(Schema.toCodecJson(NotFound))(new NotFound({ resource: "venue" })),
+          { status: 404 },
+        ),
       ),
       Effect.flip,
     );
-    expect(error).toMatchObject({ _tag: "NotFound", resource: "venue" });
+
+    expect(Schema.is(NotFound)(error)).toBe(true);
+
+    if (Schema.is(NotFound)(error)) expect(error.resource).toBe("venue");
   }),
 );

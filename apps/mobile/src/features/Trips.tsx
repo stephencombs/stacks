@@ -131,9 +131,11 @@ function TripRow({ trip, detail }: { trip: Trip; detail: GroupDetail }) {
   const go = useGo();
   const going = trip.endedAt === null;
   const date = tripDates(trip);
+
   const row = (loaded?: TripDetail) => {
     const count = loaded ? tripPlays(loaded).length : null;
     const result = loaded && !going ? playerTrip(closedPlays(loaded), detail.myPlayerId) : null;
+
     return (
       <Row
         accessibilityLabel={`${trip.name}, ${going ? "going" : date}`}
@@ -161,6 +163,7 @@ function TripRow({ trip, detail }: { trip: Trip; detail: GroupDetail }) {
       </Row>
     );
   };
+
   return (
     <Loaded query={stacks.trip(trip.id)} skeleton={row()} renderError={() => row()}>
       {(loaded) => row(loaded)}
@@ -168,7 +171,6 @@ function TripRow({ trip, detail }: { trip: Trip; detail: GroupDetail }) {
   );
 }
 
-/** A group with no trips yet: what a trip is, and the way to start the first. */
 function NoTrips({ onStart }: { onStart: () => void }) {
   return (
     <EmptyState
@@ -181,16 +183,17 @@ function NoTrips({ onStart }: { onStart: () => void }) {
   );
 }
 
-/** The top three in the trip's standings so far. */
 function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   const prefs = usePreferences();
   const names = playerNames(detail);
   const closed = closedPlays(trip);
   const top = tripStandings(closed, localClock).slice(0, 3);
+
   if (top.length === 0)
     return (
       <Text className="text-sm text-muted">Standings start when the first table finishes.</Text>
     );
+
   return (
     <View className="flex-row flex-wrap gap-x-4 gap-y-2">
       {top.map((s) => (
@@ -217,10 +220,6 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
   );
 }
 
-/**
- * Starts a trip and puts it in scope. A group's first trip puts it in scope right away; any
- * later one opens its sessions.
- */
 function StartTripSheet({
   groupId,
   first,
@@ -230,7 +229,6 @@ function StartTripSheet({
   groupId: GroupId;
   first: boolean;
   onClose: () => void;
-  /** After the trip starts, for a sheet that opened this one. */
   onStarted?: () => void;
 }) {
   const go = useGo();
@@ -245,10 +243,11 @@ function StartTripSheet({
   const submit = async () => {
     if (!name.trim()) return setProblem({ field: "name", error: "Give the trip a name." });
     setProblem(null);
-    // A trip starts at midnight of its first day.
     const start = fieldDate(started, "date");
+
     if (!start || start > now)
       return setProblem({ field: "started", error: "Choose a start date today or earlier." });
+
     const saved = await create.run({
       params: { groupId },
       payload: {
@@ -257,10 +256,12 @@ function StartTripSheet({
         startedAt: DateTime.makeUnsafe(start.getTime()),
       },
     });
+
     if (!saved) return;
     onClose();
     onStarted?.();
     startTrip(saved);
+
     if (!first) go.trip(saved.id);
   };
 

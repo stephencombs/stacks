@@ -22,7 +22,9 @@ export function Chip({
     "--color-chip-edge",
     "--color-fill-strong",
   ]);
+
   const r = size / 2;
+
   return (
     <View
       accessible={false}

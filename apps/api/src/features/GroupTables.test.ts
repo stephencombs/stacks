@@ -18,15 +18,27 @@ import {
   type RecordingIdentity,
 } from "@stacks/contracts/recordingCommands";
 
-import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
-import { at, finish, openTable, seatNew, sitDown, start, uuid } from "../testing/recording.ts";
-import { TestApi } from "../testing/TestApi.ts";
+import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.test-utils.ts";
+import {
+  at,
+  finish,
+  openTable,
+  seatNew,
+  sitDown,
+  start,
+  uuid,
+} from "../testing/recording.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 import * as LegacyMigration from "./LegacyMigration.ts";
-import { finishHistoricalSession, seedEntry, seedSession } from "../testing/legacySessions.ts";
+import {
+  finishHistoricalSession,
+  seedEntry,
+  seedSession,
+} from "../testing/legacySessions.test-utils.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
-const identity = (): RecordingIdentity => ({
+const identity = () => ({
   playerId: PlayerId.make(uuid()),
   actorId: ActorId.make(uuid()),
 });
@@ -46,7 +58,6 @@ const toTrip = (who: RecordingIdentity, tableId: TableId, tripId: TripId | null)
     tripId,
   });
 
-/** Cashes a visit out for `amount` at `minutes` past the hour. */
 const finishAt = (who: RecordingIdentity, visitId: VisitId, minutes: number, amount: number) =>
   RecordingCommand.make({
     type: "finish",
@@ -69,15 +80,16 @@ const tableItems = (items: ReadonlyArray<CrewActivityItem>, tableId: TableId) =>
 const nets = (results: ReadonlyArray<{ readonly playerId: PlayerId; readonly net: number }>) =>
   Object.fromEntries(results.map((result) => [result.playerId, result.net]));
 
-/** Each member's result over every play in a group's stats. */
 const statNets = (stats: GroupStats) => {
   const totals: Record<string, number> = {};
+
   for (const play of stats.plays)
     for (const { playerId, net } of play.results) totals[playerId] = (totals[playerId] ?? 0) + net;
+
   return totals;
 };
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (it) => {
+it.layer(TestApi.layer)("group reads from tables", (it) => {
   it.effect(
     "shows a trip's table once in the trip, group stats and Crew, counting only linked players",
     () =>
@@ -88,15 +100,16 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         const beaId = group.players.find((player) => player.id !== alexId)!.id;
         const me = identity();
         const opened = start(me);
-        // Bea is seated by name and later takes her history over; Dave never joins the group.
         const beaSeat = seatNew(me, opened.tableId, "Bea");
         const dave = seatNew(me, opened.tableId, "Dave");
         expect(
           yield* push(alex, me, opened, beaSeat, dave, toTrip(me, opened.tableId, group.tripId)),
         ).toEqual(["accepted", "accepted", "accepted", "accepted"]);
+
         const invite = yield* alex.recording.invitePlayer({
           params: { playerId: beaSeat.playerId },
         });
+
         yield* bea.recording.redeemInvite({
           params: { token: invite.token },
           payload: { identity: identity() },
@@ -124,7 +137,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
           (yield* alex.groups.list()).find((item) => item.group.id === group.group.id)!,
         ).toMatchObject({ liveSessionCount: 1, liveTripIds: [group.tripId] });
 
-        // Each finishes on 12,000: Alex bought in 20,000 and Bea and Dave 10,000.
         expect(
           yield* push(
             alex,
@@ -154,7 +166,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
           [opened.tableId, group.tripId, "blackjack"],
         ]);
         expect(statNets(stats)).toEqual({ [alexId]: -8000, [beaId]: 2000 });
-        // Alex played from the start; Bea sat down five minutes in.
         expect(stats.plays[0]!.results.map((result) => result.milliseconds)).toEqual([
           20 * 60_000,
           15 * 60_000,
@@ -197,7 +208,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         ),
       ).toEqual(["accepted", "accepted", "accepted"]);
 
-      // Alex's table, where Bea sits down again after she's gone.
       const alexMe = identity();
       const shared = start(alexMe);
       expect(
@@ -217,10 +227,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         "rejected",
       ]);
       const { token } = yield* alex.recording.share({ params: { tableId: shared.tableId } });
+
       const { player } = yield* bea.recording.join({
         params: { token },
         payload: { identity: beaMe, player: { id: PlayerId.make(uuid()), displayName: "Bea" } },
       });
+
       const back = sitDown(beaMe, shared.tableId, player.id, 15);
       expect(yield* push(bea, beaMe, back, finish(beaMe, back.visitId))).toEqual([
         "accepted",
@@ -241,13 +253,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
       const stats = yield* alex.groups.stats({ params: { groupId: group.group.id } });
       expect(stats.plays).toHaveLength(2);
       expect(statNets(stats)).toEqual({ [beaPlayer.id]: -8000, [group.myPlayerId]: -8000 });
-      expect(yield* Effect.flip(bea.trips.get({ params: { tripId: group.tripId } }))).toMatchObject(
-        { _tag: "Forbidden" },
+      expect((yield* Effect.flip(bea.trips.get({ params: { tripId: group.tripId } })))._tag).toBe(
+        "Forbidden",
       );
-      // Removed, Bea loses the group's stats too.
       expect(
-        yield* Effect.flip(bea.groups.stats({ params: { groupId: group.group.id } })),
-      ).toMatchObject({ _tag: "Forbidden" });
+        (yield* Effect.flip(bea.groups.stats({ params: { groupId: group.group.id } })))._tag,
+      ).toBe("Forbidden");
     }),
   );
 
@@ -257,10 +268,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
       const { alex, bea } = yield* users("alex", "bea");
       const group = yield* groupWith(alex, bea);
       const beaPlayer = group.players.find((player) => player.id !== group.myPlayerId)!;
+
       const { code } = yield* alex.invites.create({
         params: { groupId: group.group.id },
         payload: { id: ids.invite(), maxUses: null },
       });
+
       const alexMe = identity();
       const opened = start(alexMe);
       expect(
@@ -268,12 +281,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
       ).toEqual(["accepted", "accepted"]);
       const { token } = yield* alex.recording.share({ params: { tableId: opened.tableId } });
       const beaMe = identity();
+
       const { player } = yield* bea.recording.join({
         params: { token },
         payload: { identity: beaMe, player: { id: PlayerId.make(uuid()), displayName: "Bea" } },
       });
 
-      // Bea plays, leaves the group and plays, comes back and plays: 10,000 in each time.
       const before = sitDown(beaMe, opened.tableId, player.id, 1);
       expect(yield* push(bea, beaMe, before, finishAt(beaMe, before.visitId, 5, 11000))).toEqual([
         "accepted",
@@ -323,8 +336,8 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
       const { alex } = yield* users("alex");
       const group = yield* groupWith(alex);
       const me = identity();
-      // A table nobody played at, deleted the usual way: it leaves its trip.
       const empty = openTable(me);
+
       const deleteEmpty = RecordingCommand.make({
         type: "delete_table",
         operationId: RecordingOperationId.make(uuid()),
@@ -332,7 +345,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         preparedAt: at(2),
         tableId: empty.tableId,
       });
-      // A played table marked deleted with its trip still set: reads must not trust trip_id alone.
+
       const played = start(me);
       expect(
         yield* push(
@@ -370,6 +383,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
         playerIds: [group.myPlayerId],
         notes: null,
       });
+
       for (const [kind, amount] of [
         ["buy_in", 10000],
         ["cash_out", 15000],
@@ -392,9 +406,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
       expect(stats.plays).toHaveLength(1);
       expect(statNets(stats)).toEqual({ [group.myPlayerId]: 5000 });
       expect(stats.venues.map((v) => v.id)).toEqual([venue.id]);
+
       const feed = (yield* alex.crew.activity({ query: {} })).items.filter(
         (item) => item.kind !== "trip_started" && item.trip.id === group.tripId,
       );
+
       expect(feed).toHaveLength(1);
 
       const stake = yield* alex.stakes.create({
@@ -408,6 +424,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("group reads from tables", (i
           note: null,
         },
       });
+
       yield* alex.stakes.end({ params: { stakeId: stake.id }, payload: {} });
       expect(yield* alex.stakes.reopen({ params: { stakeId: stake.id } })).toMatchObject({
         endedAt: null,

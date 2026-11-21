@@ -17,6 +17,7 @@ import { CurrencyCode, MinorUnits } from "./money.ts";
 import { Table } from "./recording.ts";
 
 export const MemberRole = Schema.Literals(["owner", "admin", "member"]);
+
 export type MemberRole = typeof MemberRole.Type;
 
 export const Group = Schema.Struct({
@@ -25,6 +26,7 @@ export const Group = Schema.Struct({
   currency: CurrencyCode,
   createdAt: Schema.DateTimeUtc,
 });
+
 export type Group = typeof Group.Type;
 
 /**
@@ -38,9 +40,11 @@ export const Player = Schema.Struct({
   role: Schema.NullOr(MemberRole),
   claimCode: Schema.NullOr(Schema.String),
 });
+
 export type Player = typeof Player.Type;
 
 export const Balance = Schema.Struct({ playerId: PlayerId, amount: MinorUnits });
+
 export type Balance = typeof Balance.Type;
 
 export const PlayerResult = Schema.Struct({
@@ -50,9 +54,11 @@ export const PlayerResult = Schema.Struct({
   adjustment: MinorUnits,
   net: MinorUnits,
 });
+
 export type PlayerResult = typeof PlayerResult.Type;
 
 export const VenueKind = Schema.Literals(["casino", "online", "home"]);
+
 export type VenueKind = typeof VenueKind.Type;
 
 export const Venue = Schema.Struct({
@@ -68,6 +74,7 @@ export const Venue = Schema.Struct({
   /** Set only for a home venue, which only that group can see. */
   groupId: Schema.NullOr(GroupId),
 });
+
 export type Venue = typeof Venue.Type;
 
 export const SessionSummary = Schema.Struct({
@@ -91,6 +98,7 @@ export const SessionSummary = Schema.Struct({
   ),
   results: Schema.Array(PlayerResult),
 });
+
 export type SessionSummary = typeof SessionSummary.Type;
 
 /**
@@ -122,6 +130,7 @@ export const TripTable = Schema.Struct({
   /** Your latest visit here, to open; null if you didn't play. */
   myVisitId: Schema.NullOr(VisitId),
 });
+
 export type TripTable = typeof TripTable.Type;
 
 export const SessionDetail = Schema.Struct({
@@ -135,6 +144,7 @@ export const SessionDetail = Schema.Struct({
   /** Every sit, move and stand, oldest first. */
   seatings: Schema.Array(Seating),
 });
+
 export type SessionDetail = typeof SessionDetail.Type;
 
 export const GroupListItem = Schema.Struct({
@@ -160,21 +170,22 @@ export const GroupListItem = Schema.Struct({
     }),
   ),
 });
+
 export type GroupListItem = typeof GroupListItem.Type;
 
 const ActivityGroup = Schema.Struct({ id: GroupId, name: Schema.String, currency: CurrencyCode });
 const ActivityTrip = Schema.Struct({ id: TripId, name: Schema.String });
 const ActivityPlayer = Schema.Struct({ playerId: PlayerId, displayName: Schema.String });
-/** A player at a table; `playerId` is their group player, or null if they aren't in the group. */
+
 const ActivityTablePlayer = Schema.Struct({
   playerId: Schema.NullOr(PlayerId),
   displayName: Schema.String,
 });
+
 const ActivityTable = {
   tableId: TableId,
   venue: Schema.NullOr(Venue),
   game: Schema.NullOr(Game),
-  /** Your latest visit there, to open; null if you didn't play. */
   myVisitId: Schema.NullOr(VisitId),
 };
 
@@ -228,6 +239,7 @@ export const CrewActivityItem = Schema.Union([
     startedAt: Schema.DateTimeUtc,
   }),
 ]);
+
 export type CrewActivityItem = typeof CrewActivityItem.Type;
 
 /** Newest first. Pass `nextCursor` back for older items; it's null on the last page. */
@@ -235,6 +247,7 @@ export const CrewActivityPage = Schema.Struct({
   items: Schema.Array(CrewActivityItem),
   nextCursor: Schema.NullOr(Schema.String),
 });
+
 export type CrewActivityPage = typeof CrewActivityPage.Type;
 
 /** A stake and where it stands: the borrower's result so far and what they'd hand back now. */
@@ -243,6 +256,7 @@ export const StakeView = Schema.Struct({
   result: MinorUnits,
   owed: MinorUnits,
 });
+
 export type StakeView = typeof StakeView.Type;
 
 export const GroupDetail = Schema.Struct({
@@ -253,6 +267,7 @@ export const GroupDetail = Schema.Struct({
   /** Newest first. */
   trips: Schema.Array(Trip),
 });
+
 export type GroupDetail = typeof GroupDetail.Type;
 
 /**
@@ -266,6 +281,7 @@ export const TripDetail = Schema.Struct({
   balances: Schema.Array(Balance),
   stakes: Schema.Array(StakeView),
 });
+
 export type TripDetail = typeof TripDetail.Type;
 
 export const Invite = Schema.Struct({
@@ -277,6 +293,7 @@ export const Invite = Schema.Struct({
   uses: Schema.Int,
   revokedAt: Schema.NullOr(Schema.DateTimeUtc),
 });
+
 export type Invite = typeof Invite.Type;
 
 export const InvitePreview = Schema.Struct({
@@ -287,6 +304,7 @@ export const InvitePreview = Schema.Struct({
   alreadyMember: Schema.Boolean,
   currentTripId: Schema.NullOr(TripId),
 });
+
 export type InvitePreview = typeof InvitePreview.Type;
 
 export const ClaimPreview = Schema.Struct({
@@ -297,6 +315,7 @@ export const ClaimPreview = Schema.Struct({
   /** A claim is how a guest joins, so someone already in the group can't make one. */
   alreadyMember: Schema.Boolean,
 });
+
 export type ClaimPreview = typeof ClaimPreview.Type;
 
 /**
@@ -328,4 +347,5 @@ export const GroupStats = Schema.Struct({
   /** The casinos the plays name. */
   venues: Schema.Array(Venue),
 });
+
 export type GroupStats = typeof GroupStats.Type;

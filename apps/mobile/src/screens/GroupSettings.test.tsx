@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import {
   CurrencyCode,
   GroupId,
@@ -19,7 +18,7 @@ afterEach(() => {
 
 const day = DateTime.makeUnsafe("2026-11-15T12:00:00Z");
 
-const makeGroup = (role: GroupDetail["role"]): GroupDetail => ({
+const makeGroup = (role: GroupDetail["role"]) => ({
   group: {
     id: GroupId.make(crypto.randomUUID()),
     name: "Vegas crew",
@@ -45,12 +44,15 @@ const makeGroup = (role: GroupDetail["role"]): GroupDetail => ({
 it("shows the Name row for owners and admins, hides it for members, and renames the group", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   let detail = makeGroup("owner");
+
   const runRename = vi.fn(
     async ({ payload }: { params: { groupId: GroupId }; payload: { name: string } }) => {
       detail = { ...detail, group: { ...detail.group, name: payload.name } };
+
       return detail;
     },
   );
+
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   vi.doMock("@react-navigation/native", () => ({ useNavigation: () => ({ navigate: vi.fn() }) }));
   vi.doMock("react-native", () => ({
@@ -148,23 +150,28 @@ it("shows the Name row for owners and admins, hides it for members, and renames 
   const { GroupSettingsScreen } = await import("./GroupSettings");
   const host = document.createElement("div");
   const root = createRoot(host);
+
   try {
     await act(async () =>
       root.render(<GroupSettingsScreen route={{ params: { groupId: detail.group.id } }} />),
     );
+
     const nameRow = [...host.querySelectorAll("button")].find((b) =>
       b.textContent?.startsWith("Name:"),
     );
+
     expect(nameRow?.textContent).toBe("Name: Vegas crew");
     await act(async () => nameRow!.click());
     expect(host.querySelector('[role="dialog"]')?.getAttribute("aria-label")).toBe("Rename group");
 
     const input = host.querySelector("input")!;
+
     const setInput = (next: string) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
       setter.call(input, next);
       input.dispatchEvent(new Event("input", { bubbles: true }));
     };
+
     await act(async () => setInput("   "));
     const save = [...host.querySelectorAll("button")].find((b) => b.textContent === "Save")!;
     await act(async () => save.click());
@@ -181,6 +188,7 @@ it("shows the Name row for owners and admins, hides it for members, and renames 
 
     const hasNameRow = () =>
       [...host.querySelectorAll("button")].some((b) => b.textContent?.startsWith("Name:"));
+
     for (const [role, shown] of [
       ["admin", true],
       ["member", false],

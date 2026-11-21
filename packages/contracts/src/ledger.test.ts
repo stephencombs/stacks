@@ -9,7 +9,7 @@ const BEA = "0192e7a0-0000-7000-8000-000000000002";
 const SESSION = "0192e7a0-0000-7000-8000-0000000000a1";
 const TRIP = "0192e7a0-0000-7000-8000-0000000000b1";
 
-const encodedEntry = (fields: Record<string, unknown>) => ({
+const encodedEntry = <Fields extends Record<string, unknown>>(fields: Fields) => ({
   id: "0192e7a0-0000-7000-8000-0000000000e1",
   groupId: "0192e7a0-0000-7000-8000-0000000000f1",
   sessionId: SESSION,
@@ -29,7 +29,8 @@ const encodedEntry = (fields: Record<string, unknown>) => ({
 });
 
 const decodeEntry = Schema.decodeUnknownExit(Schema.toCodecJson(Entry));
-const accepts = (fields: Record<string, unknown>) =>
+
+const accepts = <Fields extends Record<string, unknown>>(fields: Fields) =>
   Exit.isSuccess(decodeEntry(encodedEntry(fields)));
 
 describe("Entry", () => {
@@ -67,7 +68,8 @@ describe("Entry", () => {
 
 describe("Session", () => {
   const decodeSession = Schema.decodeUnknownExit(Schema.toCodecJson(Session));
-  const session = (fields: Record<string, unknown>) => ({
+
+  const session = <Fields extends Record<string, unknown>>(fields: Fields) => ({
     id: SESSION,
     groupId: "0192e7a0-0000-7000-8000-0000000000f1",
     tripId: TRIP,

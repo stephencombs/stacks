@@ -15,6 +15,7 @@ import {
 import { formatDay, formatTime, gameNames, playerNames } from "@stacks/client-runtime/format";
 import { playerResults } from "@stacks/shared/results";
 import { seatsNow } from "@stacks/shared/seats";
+import * as Option from "effect/Option";
 import { useCallback, type ReactNode } from "react";
 import { Platform, Text, View } from "react-native";
 
@@ -34,7 +35,9 @@ const skeleton = (
 
 export function SessionScreen({ route }: Props) {
   const id = SessionId.makeOption(route.params.sessionId);
-  if (id._tag === "None") return screenError("This session link is invalid.");
+
+  if (Option.isNone(id)) return screenError("This session link is invalid.");
+
   return (
     <SessionData sessionId={id.value}>
       {(detail) =>
@@ -55,6 +58,7 @@ function ImportedLink({ tableId }: { tableId: TableId }) {
       navigation.dispatch(StackActions.replace("Table", { tableId }));
     }, [navigation, tableId]),
   );
+
   return skeleton;
 }
 
@@ -66,6 +70,7 @@ function SessionData({
   children: (detail: SessionDetail) => ReactNode;
 }) {
   const stacks = useStacks();
+
   return (
     <Loaded query={stacks.session(sessionId)} renderError={screenError} skeleton={skeleton}>
       {children}
@@ -107,20 +112,26 @@ function SessionReceipt({
   const stacks = useStacks();
   const { session, venue } = detail;
   const owners = new Map(imported?.visits.map(({ visit }) => [visit.id, visit.playerId]));
+
   const entries = (imported?.entries ?? detail.entries).map((entry) => ({
     ...entry,
     playerId: "playerId" in entry ? entry.playerId : owners.get(entry.visitId)!,
   }));
+
   const results = playerResults(entries);
+
   const players: ReadonlyArray<PlayerId> = imported
     ? imported.visits.map(({ visit }) => visit.playerId)
     : detail.playerIds;
+
   const seats = seatsNow(detail.seatings);
+
   return (
     <Loaded query={stacks.group(session.groupId)} renderError={screenError} skeleton={skeleton}>
       {(group) => {
         const names = playerNames(group);
         const currency = group.group.currency;
+
         return (
           <Screen shows={{ session: session.id }}>
             {back}
@@ -148,6 +159,7 @@ function SessionReceipt({
                     .map((id) => {
                       const result = results.get(id);
                       const seat = seats.get(id);
+
                       return (
                         <Row key={id}>
                           <Text className="flex-1 text-base text-ink">

@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { act, createElement, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
@@ -17,6 +16,7 @@ it("shows a startup error and retry when App fails before its providers mount", 
   let appLoaded = false;
   vi.doMock("./src/App", () => {
     appLoaded = true;
+
     return {
       default: () => {
         throw new Error("Native font loader failed");
@@ -38,13 +38,16 @@ it("shows a startup error and retry when App fails before its providers mount", 
   const Startup = registerRootComponent.mock.calls[0]![0];
   const container = document.createElement("div");
   const root = createRoot(container, { onUncaughtError: vi.fn(), onCaughtError: vi.fn() });
+
   try {
     await act(async () => root.render(createElement(Startup)));
     expect(container.textContent).toContain("Color Up couldn't start");
     expect(container.textContent).not.toContain("Native font loader failed");
+
     const details = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Details",
     );
+
     await act(async () => details?.click());
     expect(container.textContent).toContain("Native font loader failed");
     expect(container.textContent).toContain("Component stack:");
@@ -56,9 +59,11 @@ it("shows a startup error and retry when App fails before its providers mount", 
     );
     await act(async () => details?.click());
     expect(container.textContent).not.toContain("Native font loader failed");
+
     const retry = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Try again",
     );
+
     expect(retry?.textContent).toBe("Try again");
     await act(async () => retry?.click());
     expect(reloadAppAsync).toHaveBeenCalledOnce();

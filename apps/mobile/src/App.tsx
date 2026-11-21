@@ -56,17 +56,15 @@ const headerOptions = {
   headerShadowVisible: false,
   ...(Platform.OS === "ios"
     ? { headerTitle: ({ children }: { children: string }) => <HeaderTitle title={children} /> }
-    : {}),
+    : null),
   headerBackButtonDisplayMode: "minimal",
 } as const;
 
-/** Your own play: You for anyone, signed in or not. */
 const personalOptions = { ...headerOptions, title: "", headerRight: () => <PersonalYouButton /> };
 
-/** Crew, groups and trips: You with your chip in the group in scope. */
 const crewOptions = {
   ...headerOptions,
-  ...(Platform.OS === "android" ? {} : { headerRight: () => <YouButton /> }),
+  ...(Platform.OS === "android" ? null : { headerRight: () => <YouButton /> }),
 };
 
 const PlayStack = createNativeStackNavigator({
@@ -86,11 +84,6 @@ const MapStack = createNativeStackNavigator({
   screens: { Map: { screen: MapScreen, linking: "map" } },
 });
 
-/**
- * Groups, trips and their sessions belong to an account. One gate in front of them all: they wait
- * for sign-in, and share one API client and cache for whoever is signed in. Each is pushed onto
- * Crew, so back always lands there.
- */
 const CrewStack = createNativeStackNavigator({
   initialRouteName: "Crew",
   screenOptions: crewOptions,
@@ -109,7 +102,7 @@ const CrewStack = createNativeStackNavigator({
                 </View>
               ),
             }
-          : {}),
+          : null),
       },
       linking: "crew",
     },
@@ -120,9 +113,6 @@ const CrewStack = createNativeStackNavigator({
       linking: "groups/:groupId/settings",
     },
     Sessions: { screen: SessionsScreen, options: { title: "" }, linking: "trips/:tripId" },
-    // An old address. A linking alias here would leave every screen in this stack without typed
-    // params, so each is a screen of its own: your groups and a group's People. Old Board,
-    // Results and Stats links go to Stats.
     Groups: {
       screen: Platform.OS === "android" ? GroupsScreen : CrewScreen,
       options: { title: "", headerShown: Platform.OS !== "android" },
@@ -132,9 +122,9 @@ const CrewStack = createNativeStackNavigator({
   },
 });
 
-/** Around the tabs: screens learn the bar's height, to keep clear of it. */
 function TabsLayout({ children }: { children: ReactNode }) {
   const bar = useTabBarHeight();
+
   return <TabBarHeight value={bar}>{children}</TabBarHeight>;
 }
 
@@ -154,7 +144,6 @@ const Tabs = createPlaceTabs({
   },
 });
 
-/** Opening an invite or claim link happens before you're in the group, so it has no tabs. */
 const InvitesStack = createNativeStackNavigator({
   screenOptions: crewOptions,
   layout: ({ children }) => <AccountGate invited>{children}</AccountGate>,
@@ -172,7 +161,6 @@ const InvitesStack = createNativeStackNavigator({
   },
 });
 
-/** The tabs, and above them the pages that fill the screen: a live session and invitations. */
 const RootStack = createNativeStackNavigator({
   initialRouteName: "Tabs",
   screenOptions: Platform.OS === "android" ? { ...headerOptions, title: "" } : personalOptions,
@@ -215,7 +203,6 @@ const Navigation = createStaticNavigation(RootStack);
 const linking = {
   enabled: "auto" as const,
   prefixes: appLinkPrefixes(),
-  // Back from any link lands on the tabs.
   config: { initialRouteName: "Tabs" as const },
   getStateFromPath: (path: string, options?: Parameters<typeof getStateFromPath>[1]) =>
     getStateFromPath(oldAddress(path), options),
@@ -229,7 +216,7 @@ const linking = {
 
 function Root() {
   const theme = useNavigationTheme();
-  // The navigation keeps this same place signed in or out, so sign-in never resets it.
+
   return (
     <SignedInProvider>
       <Navigation
@@ -242,15 +229,15 @@ function Root() {
   );
 }
 
-/**
- * Account screens once someone is signed in. Until then, the reason they wait, and a way back to
- * your play. An invite or claim link keeps its place, so it opens once sign-in finishes.
- */
 function AccountGate({ invited = false, children }: { invited?: boolean; children: ReactNode }) {
   const account = useAccount();
+
   if (!account.available) return <NoSignIn />;
+
   if (!account.isLoaded) return <Starting />;
+
   if (!account.isSignedIn || !account.userId) return <SignedOut invited={invited} />;
+
   return (
     <StacksProvider key={account.userId}>
       <ScopeProvider>{children}</ScopeProvider>
@@ -258,7 +245,6 @@ function AccountGate({ invited = false, children }: { invited?: boolean; childre
   );
 }
 
-/** Your own play, from anywhere: the Play tab at its start. */
 const toPlay = () =>
   CommonActions.navigate({
     name: "Tabs",
@@ -267,14 +253,15 @@ const toPlay = () =>
 
 function BackToYourPlay() {
   const navigation = useNavigation();
+
   return (
     <Button label="Back to your play" size="lg" onPress={() => navigation.dispatch(toPlay())} />
   );
 }
 
-/** Headers and screen backgrounds in the palette, so navigation follows the theme too. */
 function useNavigationTheme() {
   const { theme } = useUniwind();
+
   const [canvas, ink, line, loss, tabSurface, tabIndicator] = useCSSVariable([
     "--color-canvas",
     "--color-ink",
@@ -283,7 +270,9 @@ function useNavigationTheme() {
     "--color-surface",
     "--color-fill-strong",
   ]).map(String);
+
   const base = theme === "light" ? DefaultTheme : DarkTheme;
+
   return {
     ...base,
     tabSurface,
@@ -310,9 +299,12 @@ function Starting() {
   const [stalled, setStalled] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setStalled(true), STALLED_MS);
+
     return () => clearTimeout(timer);
   }, []);
+
   if (!stalled) return <Opening />;
+
   return (
     <View className="flex-1 justify-center gap-4 bg-canvas px-6">
       <Text accessibilityRole="header" className="type-headline text-ink">
@@ -355,6 +347,7 @@ function Opening() {
 function SignedOut({ invited }: { invited: boolean }) {
   const navigation = useNavigation();
   useEffect(() => markStartup("landing_ready"), []);
+
   return <Landing invited={invited} onRecord={() => navigation.dispatch(toPlay())} />;
 }
 
@@ -363,9 +356,9 @@ export default function App() {
   useLayoutEffect(() => markStartup("root_committed"), []);
   const { theme } = useUniwind();
   const { width, height } = useWindowDimensions();
+
   return (
     <SafeAreaProvider
-      // A lost first inset event must not hide the loading screen and error boundary.
       initialMetrics={
         initialWindowMetrics ?? {
           frame: { x: 0, y: 0, width, height },

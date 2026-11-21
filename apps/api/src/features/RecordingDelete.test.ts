@@ -14,8 +14,8 @@ import {
   sitDown,
   start,
   uuid,
-} from "../testing/recording.ts";
-import { TestApi } from "../testing/TestApi.ts";
+} from "../testing/recording.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 import { visitSummary } from "@stacks/shared/visits";
 
 const lifecycle = (
@@ -33,7 +33,7 @@ const lifecycle = (
     expectedRevision,
   });
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("delete a session", (it) => {
+it.layer(TestApi.layer)("delete a session", (it) => {
   it.effect(
     "voids live facts, preserves corrections, and restores exact entries and totals idempotently",
     () =>
@@ -135,10 +135,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("delete a session", (it) => {
       const { starter, opened, token } = yield* sharedTable();
       const guest = yield* device();
       const joined = yield* guest.join(token);
+
       const seated = {
         ...sitDown(guest.identity, opened.tableId, joined.player.id),
         counterpartyId: starter.identity.playerId,
       };
+
       expect(yield* guest.push(seated)).toEqual(["accepted"]);
       const before = yield* starter.client.recording.history();
       expect(

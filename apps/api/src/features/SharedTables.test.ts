@@ -9,25 +9,28 @@ import {
   type RecordingIdentity,
 } from "@stacks/contracts/recordingCommands";
 
-import { usd, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
+import { usd, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 
 const uuid = () => crypto.randomUUID();
 const at = (minutes: number) => DateTime.makeUnsafe(Date.UTC(2026, 10, 7, 20, minutes));
+
 const secret = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
 
-/** A signed-out device: its identity, its credential and a client that sends it. */
 const device = Effect.fn("test.device")(function* () {
   const api = yield* TestApi;
+
   const identity: RecordingIdentity = {
     playerId: PlayerId.make(uuid()),
     actorId: ActorId.make(uuid()),
   };
+
   const credential = { actorId: identity.actorId, secret: secret() };
   yield* (yield* api.asActor(null)).publicRecording.registerActor({ payload: credential });
+
   return { identity, credential, client: yield* api.asActor(credential) };
 });
 
@@ -37,6 +40,7 @@ const common = (identity: RecordingIdentity) => ({
   preparedAt: at(0),
 });
 
+// SAFETY: the payload's type is the literal "start", so this is that member of RecordingCommand.
 const start = (identity: RecordingIdentity) =>
   RecordingCommand.make({
     type: "start",
@@ -54,6 +58,8 @@ const start = (identity: RecordingIdentity) =>
 
 const addGuest = (identity: RecordingIdentity, tableId: TableId, name = "Bea") => {
   const playerId = PlayerId.make(uuid());
+
+  // SAFETY: the payload's type is the literal "join_table", so this is that member of RecordingCommand.
   return RecordingCommand.make({
     type: "join_table",
     ...common(identity),
@@ -84,18 +90,20 @@ const buyIn = (identity: RecordingIdentity, visitId: VisitId, expectedRevision =
 const outcomes = (results: ReadonlyArray<{ readonly status: string; readonly reason?: string }>) =>
   results.map((result) => result.reason ?? result.status);
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
+it.layer(TestApi.layer)("shared tables", (it) => {
   it.effect("lets a signed-out starter open a table, add a guest and record for them", () =>
     Effect.gen(function* () {
       const starter = yield* device();
       const opened = start(starter.identity);
       const guest = addGuest(starter.identity, opened.tableId);
+
       const { results } = yield* starter.client.recording.push({
         payload: {
           identity: starter.identity,
           commands: [opened, guest, buyIn(starter.identity, guest.visitId)],
         },
       });
+
       expect(outcomes(results)).toEqual(["accepted", "accepted", "accepted"]);
 
       const view = yield* starter.client.recording.table({ params: { tableId: opened.tableId } });
@@ -107,17 +115,19 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       ]);
       expect(view.visits.find((item) => item.visit.id === guest.visitId)?.totals.buyIn).toBe(15000);
 
-      // A saved player can join again once their visit is over, never twice at once.
       const { newPlayer: _, ...rest } = guest;
+
       const savedPlayer = RecordingCommand.make({
         ...rest,
         ...common(starter.identity),
         visitId: VisitId.make(uuid()),
         buyInId: EntryId.make(uuid()),
       });
+
       const second = yield* starter.client.recording.push({
         payload: { identity: starter.identity, commands: [savedPlayer] },
       });
+
       expect(outcomes(second.results)).toEqual(["invalid"]);
 
       const history = yield* starter.client.recording.history();
@@ -135,35 +145,39 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       const api = yield* TestApi;
       const starter = yield* device();
       const other = yield* device();
+
       const mismatch = yield* starter.client.recording
         .push({ payload: { identity: other.identity, commands: [start(other.identity)] } })
         .pipe(Effect.flip);
-      expect(mismatch).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
 
-      // A command naming another actor than the one that signed the push is refused too.
+      expect(mismatch._tag).toBe("Conflict");
+      expect(mismatch).toMatchObject({ reason: "recording_identity" });
+
       const foreign = yield* starter.client.recording.push({
         payload: {
           identity: starter.identity,
           commands: [{ ...start(starter.identity), actorId: other.identity.actorId }],
         },
       });
+
       expect(outcomes(foreign.results)).toEqual(["invalid"]);
 
       const forged = yield* api.asActor({ ...starter.credential, secret: secret() });
+
       const refused = yield* forged.recording
         .push({ payload: { identity: starter.identity, commands: [start(starter.identity)] } })
         .pipe(Effect.flip);
-      expect(refused).toMatchObject({ _tag: "Unauthorized" });
-      const anonymous = yield* api.asActor(null);
-      expect(yield* anonymous.recording.history().pipe(Effect.flip)).toMatchObject({
-        _tag: "Unauthorized",
-      });
 
-      // Registering someone else's actor ID with another secret doesn't take it over.
+      expect(refused._tag).toBe("Unauthorized");
+      const anonymous = yield* api.asActor(null);
+      expect((yield* anonymous.recording.history().pipe(Effect.flip))._tag).toBe("Unauthorized");
+
       const takeover = yield* anonymous.publicRecording
         .registerActor({ payload: { ...starter.credential, secret: secret() } })
         .pipe(Effect.flip);
-      expect(takeover).toMatchObject({ _tag: "Conflict", reason: "actor_taken" });
+
+      expect(takeover._tag).toBe("Conflict");
+      expect(takeover).toMatchObject({ reason: "actor_taken" });
     }),
   );
 
@@ -179,9 +193,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       const intruder = yield* device();
       const guest = addGuest(intruder.identity, opened.tableId);
       const attempts = [guest, buyIn(intruder.identity, opened.visitId)];
+
       const { results } = yield* intruder.client.recording.push({
         payload: { identity: intruder.identity, commands: attempts },
       });
+
       expect(outcomes(results)).toEqual(["forbidden", "forbidden"]);
       const ids = attempts.map((command) => command.operationId);
       expect(yield* sql`select 1 from personal_operations where id in ${sql.in(ids)}`).toEqual([]);
@@ -216,17 +232,23 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       expect(JSON.stringify(view)).not.toContain(starter.identity.actorId);
 
       const second = yield* starter.client.recording.share({ params: { tableId: shown.tableId } });
+
       const stale = yield* anonymous.publicRecording
         .shared({ params: { token: first.token } })
         .pipe(Effect.flip);
-      expect(stale).toMatchObject({ _tag: "NotFound", resource: "table" });
+
+      expect(stale._tag).toBe("NotFound");
+      expect(stale).toMatchObject({ resource: "table" });
       yield* anonymous.publicRecording.shared({ params: { token: second.token } });
 
       yield* starter.client.recording.unshare({ params: { tableId: shown.tableId } });
+
       const revoked = yield* anonymous.publicRecording
         .shared({ params: { token: second.token } })
         .pipe(Effect.flip);
-      expect(revoked).toMatchObject({ _tag: "NotFound", resource: "table" });
+
+      expect(revoked._tag).toBe("NotFound");
+      expect(revoked).toMatchObject({ resource: "table" });
     }),
   );
 
@@ -240,16 +262,11 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       const { alex } = yield* users("alex");
       const stranger = yield* device();
       const params = { params: { tableId: opened.tableId } };
+
       for (const client of [alex, stranger.client]) {
-        expect(yield* client.recording.table(params).pipe(Effect.flip)).toMatchObject({
-          _tag: "NotFound",
-        });
-        expect(yield* client.recording.share(params).pipe(Effect.flip)).toMatchObject({
-          _tag: "NotFound",
-        });
-        expect(yield* client.recording.unshare(params).pipe(Effect.flip)).toMatchObject({
-          _tag: "NotFound",
-        });
+        expect((yield* client.recording.table(params).pipe(Effect.flip))._tag).toBe("NotFound");
+        expect((yield* client.recording.share(params).pipe(Effect.flip))._tag).toBe("NotFound");
+        expect((yield* client.recording.unshare(params).pipe(Effect.flip))._tag).toBe("NotFound");
       }
     }),
   );
@@ -273,18 +290,18 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
         },
       });
 
-      // A second account can't take the same player, and a wrong secret proves nothing.
       yield* bea.claim.claimActor({ payload: starter.credential });
       expect((yield* bea.recording.history()).identity).toBeNull();
-      // The claimed actor is the account's now: its old secret no longer signs anything.
-      expect(yield* starter.client.recording.history().pipe(Effect.flip)).toMatchObject({
-        _tag: "Unauthorized",
-      });
+      expect((yield* starter.client.recording.history().pipe(Effect.flip))._tag).toBe(
+        "Unauthorized",
+      );
       const other = yield* device();
+
       const wrong = yield* bea.claim
         .claimActor({ payload: { ...other.credential, secret: secret() } })
         .pipe(Effect.flip);
-      expect(wrong).toMatchObject({ _tag: "Unauthorized" });
+
+      expect(wrong._tag).toBe("Unauthorized");
     }),
   );
 
@@ -292,10 +309,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
     Effect.gen(function* () {
       const api = yield* TestApi;
       const { alex } = yield* users("alex");
+
       const identity: RecordingIdentity = {
         playerId: PlayerId.make(uuid()),
         actorId: ActorId.make(uuid()),
       };
+
       const opened = start(identity);
       yield* alex.recording.push({ payload: { identity, commands: [opened] } });
       const { token } = yield* alex.recording.share({ params: { tableId: opened.tableId } });
@@ -304,14 +323,15 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       expect(JSON.stringify(view)).not.toContain(identity.actorId);
 
       const stolen = { actorId: identity.actorId, secret: secret() };
+
       const taken = yield* anonymous.publicRecording
         .registerActor({ payload: stolen })
         .pipe(Effect.flip);
-      expect(taken).toMatchObject({ _tag: "Conflict", reason: "actor_taken" });
+
+      expect(taken._tag).toBe("Conflict");
+      expect(taken).toMatchObject({ reason: "actor_taken" });
       const attacker = yield* api.asActor(stolen);
-      expect(yield* attacker.recording.history().pipe(Effect.flip)).toMatchObject({
-        _tag: "Unauthorized",
-      });
+      expect((yield* attacker.recording.history().pipe(Effect.flip))._tag).toBe("Unauthorized");
     }),
   );
 
@@ -324,10 +344,13 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       });
       const { bea } = yield* users("bea");
       const borrowed = { playerId: PlayerId.make(uuid()), actorId: starter.identity.actorId };
+
       const refused = yield* bea.recording
         .push({ payload: { identity: borrowed, commands: [buyIn(borrowed, opened.visitId)] } })
         .pipe(Effect.flip);
-      expect(refused).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
+
+      expect(refused._tag).toBe("Conflict");
+      expect(refused).toMatchObject({ reason: "recording_identity" });
       expect((yield* bea.recording.history()).identity).toBeNull();
 
       expect((yield* starter.client.recording.history()).identity).toEqual(starter.identity);
@@ -339,33 +362,36 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
       const fresh = yield* device();
       const { cal, dee } = yield* users("cal", "dee");
       const opened = start(fresh.identity);
-      // Without the secret, the device's actor isn't the account's to use.
+
       const refused = yield* dee.recording
         .push({ payload: { identity: fresh.identity, commands: [opened] } })
         .pipe(Effect.flip);
-      expect(refused).toMatchObject({ _tag: "Conflict", reason: "recording_identity" });
 
-      // Signed in on the device itself, the claim proves the secret and the account records as it.
+      expect(refused._tag).toBe("Conflict");
+      expect(refused).toMatchObject({ reason: "recording_identity" });
+
       yield* cal.claim.claimActor({ payload: fresh.credential });
+
       const { results } = yield* cal.recording.push({
         payload: { identity: fresh.identity, commands: [opened] },
       });
+
       expect(results.map((result) => result.status)).toEqual(["accepted"]);
       expect((yield* cal.recording.history()).identity).toEqual(fresh.identity);
-      expect(yield* fresh.client.recording.history().pipe(Effect.flip)).toMatchObject({
-        _tag: "Unauthorized",
-      });
+      expect((yield* fresh.client.recording.history().pipe(Effect.flip))._tag).toBe("Unauthorized");
     }),
   );
 
   it.effect("rolls back a claim that loses a race, leaving the other device's actor working", () =>
     Effect.gen(function* () {
       const devices = [yield* device(), yield* device()];
+
       for (const item of devices)
         yield* item.client.recording.push({
           payload: { identity: item.identity, commands: [start(item.identity)] },
         });
       const { eve } = yield* users("eve");
+
       const outcomes = yield* Effect.forEach(
         devices,
         (item) =>
@@ -375,6 +401,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("shared tables", (it) => {
           ),
         { concurrency: "unbounded" },
       );
+
       expect(outcomes.toSorted()).toEqual(["claimed", "recording_identity"]);
       const loser = devices[outcomes.indexOf("recording_identity")]!;
       expect((yield* loser.client.recording.history()).identity).toEqual(loser.identity);

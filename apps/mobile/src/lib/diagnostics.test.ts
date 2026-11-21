@@ -1,7 +1,9 @@
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 const posthog = vi.hoisted(() => ({ captureStartup: vi.fn(), captureCaughtError: vi.fn() }));
+
 vi.mock("./telemetry", () => posthog);
+
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { appVariant: "preview" } } },
 }));

@@ -29,18 +29,20 @@ const player = (n: number) => PlayerId.make(`0192e7a0-0000-7000-8000-00000000000
 const [STEPHEN, BRUCE, NICK, BRAD] = [player(1), player(2), player(3), player(4)];
 
 const money = MinorUnits.make;
+
 const seat = (
   playerId: PlayerId,
   n: number,
   inPlay = 0,
   out: { net: number; cashOut: number; buyIn: number } | null = null,
-): SeatView => ({
+) => ({
   seat: n,
   playerId,
   inPlay: money(inPlay),
   out: out && { net: money(out.net), cashOut: money(out.cashOut), buyIn: money(out.buyIn) },
 });
-const table = (seats: ReadonlyArray<SeatView>, closed = false): TableView => ({ closed, seats });
+
+const table = (seats: ReadonlyArray<SeatView>, closed = false) => ({ closed, seats });
 const kinds = (events: ReadonlyArray<TableEvent>) => events.map((e) => e.kind);
 
 describe("tableView", () => {
@@ -57,6 +59,7 @@ describe("tableView", () => {
       ]),
       cashedOut: new Set([BRUCE]),
     });
+
     expect(view.seats).toEqual([
       seat(BRUCE, 4, 0, { net: 70000, cashOut: 120000, buyIn: 50000 }),
       seat(STEPHEN, 7, 30000),
@@ -80,6 +83,7 @@ describe("tableEvents", () => {
       table([seat(STEPHEN, 7), seat(BRUCE, 4)]),
       table([seat(STEPHEN, 6)]),
     );
+
     expect(events).toEqual([
       { kind: "stand", seat: seat(BRUCE, 4) },
       { kind: "move", from: seat(STEPHEN, 7), to: seat(STEPHEN, 6) },
@@ -88,11 +92,13 @@ describe("tableEvents", () => {
 
   it("calls a zero cash-out a bust and three times the buy-in a big hit", () => {
     const playing = table([seat(STEPHEN, 7, 30000), seat(NICK, 1, 20000), seat(BRAD, 5, 20000)]);
+
     const after = table([
       seat(STEPHEN, 7, 0, { net: 80000, cashOut: 110000, buyIn: 30000 }),
       seat(NICK, 1, 0, { net: -20000, cashOut: 0, buyIn: 20000 }),
       seat(BRAD, 5, 0, { net: 6000, cashOut: 26000, buyIn: 20000 }),
     ]);
+
     expect(
       tableEvents(playing, after).map((e) =>
         e.kind === "cashOut" ? `${e.seat.seat}:${e.big}` : e.kind,
@@ -105,6 +111,7 @@ describe("tableEvents", () => {
       table([seat(BRUCE, 3)]),
       table([seat(BRUCE, 3, 0, { net: 79000, cashOut: 0, buyIn: 0 })]),
     );
+
     expect(events.map((e) => e.kind)).toEqual(["cashOut"]);
   });
 
@@ -113,6 +120,7 @@ describe("tableEvents", () => {
       table([seat(STEPHEN, 7, 30000)]),
       table([seat(STEPHEN, 7, 0, { net: 0, cashOut: 30000, buyIn: 30000 })], true),
     );
+
     expect(kinds(events)).toEqual(["close"]);
   });
 
@@ -122,22 +130,27 @@ describe("tableEvents", () => {
   });
 
   const Player = Schema.Literals([0, 1, 2, 3]);
+
   const Seat = Schema.Struct({
     player: Player,
     seat: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 7 })),
     inPlay: Schema.Literals([0, 20000, 50000]),
     out: Schema.Literals(["playing", "bust", "up"]),
   });
+
   const View = Schema.Struct({ closed: Schema.Boolean, seats: Schema.Array(Seat) });
-  const build = (v: typeof View.Type): TableView => {
+
+  const build = (v: typeof View.Type) => {
     const taken = new Set<number>();
     const players = new Set<number>();
     const seats: Array<SeatView> = [];
+
     for (const s of v.seats) {
       if (taken.has(s.seat) || players.has(s.player)) continue;
       taken.add(s.seat);
       players.add(s.player);
       const playerId = [STEPHEN, BRUCE, NICK, BRAD][s.player]!;
+
       const out =
         v.closed || s.out !== "playing"
           ? {
@@ -146,8 +159,10 @@ describe("tableEvents", () => {
               buyIn: s.inPlay,
             }
           : null;
+
       seats.push(seat(playerId, s.seat, out ? 0 : s.inPlay, out));
     }
+
     return table(
       seats.toSorted((a, b) => a.seat - b.seat),
       v.closed,
@@ -157,6 +172,7 @@ describe("tableEvents", () => {
   it.prop("plays every change between two tables, ending on the second", [View, View], ([a, b]) => {
     const [prev, next] = [build(a), build(b)];
     let shown = prev;
+
     for (const event of tableEvents(prev, next)) shown = applyEvent(shown, event, next);
     expect(shown).toEqual(next);
   });
@@ -215,6 +231,7 @@ describe("makeDirector", () => {
     let camera = start;
     const log: Array<string> = [];
     let paused = false;
+
     return {
       log,
       pause: (p: boolean) => (paused = p),
@@ -286,7 +303,6 @@ describe("makeDirector", () => {
     s.pause(true);
     const director = makeDirector(art, usd, s.stage, playing);
     await director.update(table([seat(NICK, 1, 0, { net: -20000, cashOut: 0, buyIn: 20000 })]));
-    // The first wait stands in for the sheet closing; only then does the push happen.
     expect(s.log[0]).toBe("camera 18@1.21");
   });
 });

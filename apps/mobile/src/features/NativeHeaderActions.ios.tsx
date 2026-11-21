@@ -25,6 +25,7 @@ export function useNativeHeaderActions(personal = false) {
   }, [navigation]);
 
   if (!open) return null;
+
   return personal ? (
     <PersonalYou onClose={() => setOpen(false)} />
   ) : (

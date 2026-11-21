@@ -10,14 +10,18 @@ import {
 export function instrumentAppDelegate(source: string, implementation: string) {
   if (source.includes("StartupCrashRecovery.install()")) return source;
   const anchor = "    let delegate = ReactNativeDelegate()";
+
   if (!source.includes(anchor)) throw new Error("Unrecognized Expo AppDelegate template");
+
   return `${source.replace(anchor, `    StartupCrashRecovery.install()\n${anchor}`)}\n${implementation}`;
 }
 
 export function instrumentSceneDelegate(source: string) {
   if (source.includes("StartupCrashRecovery.show(in: scene, retry:")) return source;
   const anchor = "class SceneDelegate: ExpoAppSceneDelegate {";
+
   if (!source.includes(anchor)) throw new Error("Unrecognized Expo SceneDelegate template");
+
   return (
     "import UIKit\n" +
     source.replace(
@@ -55,14 +59,17 @@ const withStartupCrashRecovery: ConfigPlugin = (config) => {
       config.modResults.contents,
       readFileSync(join(__dirname, "StartupCrashRecovery.swift"), "utf8"),
     );
+
     return config;
   });
+
   return withDangerousMod(config, [
     "ios",
     (config) => {
       const appDelegate = IOSConfig.Paths.getAppDelegateFilePath(config.modRequest.projectRoot);
       const path = join(dirname(appDelegate), "SceneDelegate.swift");
       writeFileSync(path, instrumentSceneDelegate(readFileSync(path, "utf8")));
+
       return config;
     },
   ]);

@@ -3,10 +3,14 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import { CurrencyCode, MinorUnits } from "@stacks/contracts";
 
-import { groupWith, ids, usd, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
+import { groupWith, ids, usd, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 import { csvText } from "./Export.ts";
-import { seedEntry, seedSession, voidHistoricalEntry } from "../testing/legacySessions.ts";
+import {
+  seedEntry,
+  seedSession,
+  voidHistoricalEntry,
+} from "../testing/legacySessions.test-utils.ts";
 
 it("neutralizes spreadsheet formulas including leading whitespace", () => {
   expect(csvText("=1+1")).toBe("'=1+1");
@@ -15,14 +19,15 @@ it("neutralizes spreadsheet formulas including leading whitespace", () => {
   expect(csvText("ordinary text")).toBe("ordinary text");
 });
 
-/** RFC 4180 parser for verifying exported rows round-trip cleanly with embedded newlines and quotes. */
-const parseCsv = (csv: string): ReadonlyArray<ReadonlyArray<string>> => {
+const parseCsv = (csv: string) => {
   const rows: Array<Array<string>> = [];
   let row: Array<string> = [];
   let cell = "";
   let inQuotes = false;
+
   for (let i = 0; i < csv.length; i++) {
     const ch = csv[i]!;
+
     if (inQuotes) {
       if (ch === '"') {
         if (csv[i + 1] === '"') {
@@ -48,10 +53,12 @@ const parseCsv = (csv: string): ReadonlyArray<ReadonlyArray<string>> => {
       cell += ch;
     }
   }
+
   if (cell.length > 0 || row.length > 0) {
     row.push(cell);
     rows.push(row);
   }
+
   return rows;
 };
 
@@ -70,20 +77,24 @@ layer(TestApi.layer)("Export", (it) => {
             displayName: 'Alex "Ace"',
           },
         });
+
         const invite = yield* owner.invites.create({
           params: { groupId },
           payload: { id: ids.invite(), maxUses: null },
         });
+
         const detail = yield* bea.invites.accept({
           params: { code: invite.code },
           payload: { displayName: "Bea, Jr." },
         });
+
         const [alexPlayer, beaPlayer] = detail.players;
 
         const trip = yield* owner.trips.create({
           params: { groupId },
           payload: { id: ids.trip(), name: 'Fall "26", Vegas' },
         });
+
         const venue = yield* owner.venues.create({
           payload: {
             id: ids.venue(),
@@ -95,6 +106,7 @@ layer(TestApi.layer)("Export", (it) => {
             groupId: null,
           },
         });
+
         const sessionId = yield* seedSession(trip.id, {
           id: ids.session(),
           venueId: venue.id,
@@ -114,6 +126,7 @@ layer(TestApi.layer)("Export", (it) => {
           note: 'Fronted, "cash"\nline two',
           replacesEntryId: null,
         });
+
         const correctedBuyIn = yield* seedEntry(sessionId, {
           id: ids.entry(),
           kind: "buy_in",
@@ -124,6 +137,7 @@ layer(TestApi.layer)("Export", (it) => {
           note: null,
           replacesEntryId: firstBuyIn.id,
         });
+
         const adjustment = yield* seedEntry(sessionId, {
           id: ids.entry(),
           kind: "adjustment",
@@ -134,8 +148,8 @@ layer(TestApi.layer)("Export", (it) => {
           note: "Tip",
           replacesEntryId: null,
         });
+
         yield* voidHistoricalEntry(adjustment.id, 'Wrong "player", redo');
-        // Non-admin member exports freely.
         const csv = yield* bea.groups.exportCsv({ params: { groupId } });
         const [header, ...rows] = parseCsv(csv);
 
@@ -220,6 +234,7 @@ layer(TestApi.layer)("Export", (it) => {
     Effect.gen(function* () {
       const { owner, bea, outsider } = yield* users("owner", "bea", "outsider");
       const jpyGroupId = ids.group();
+
       const jpyGroup = yield* owner.groups.create({
         payload: {
           id: jpyGroupId,
@@ -228,10 +243,12 @@ layer(TestApi.layer)("Export", (it) => {
           displayName: "Owner",
         },
       });
+
       const trip = yield* owner.trips.create({
         params: { groupId: jpyGroupId },
         payload: { id: ids.trip(), name: "Tokyo" },
       });
+
       const venue = yield* owner.venues.create({
         payload: {
           id: ids.venue(),
@@ -243,6 +260,7 @@ layer(TestApi.layer)("Export", (it) => {
           groupId: jpyGroupId,
         },
       });
+
       const sessionId = yield* seedSession(trip.id, {
         id: ids.session(),
         venueId: venue.id,
@@ -250,6 +268,7 @@ layer(TestApi.layer)("Export", (it) => {
         playerIds: [jpyGroup.players[0]!.id],
         notes: null,
       });
+
       yield* seedEntry(sessionId, {
         id: ids.entry(),
         kind: "buy_in",
@@ -267,18 +286,22 @@ layer(TestApi.layer)("Export", (it) => {
       const forbidden = yield* Effect.flip(
         outsider.groups.exportCsv({ params: { groupId: jpyGroupId } }),
       );
+
       expect(forbidden._tag).toBe("Forbidden");
 
       const missing = yield* Effect.flip(
         owner.groups.exportCsv({ params: { groupId: ids.group() } }),
       );
+
       expect(missing._tag).toBe("NotFound");
 
       const shared = yield* groupWith(owner, bea);
       yield* bea.groups.leave({ params: { groupId: shared.group.id } });
+
       const afterLeave = yield* Effect.flip(
         bea.groups.exportCsv({ params: { groupId: shared.group.id } }),
       );
+
       expect(afterLeave._tag).toBe("Forbidden");
     }),
   );

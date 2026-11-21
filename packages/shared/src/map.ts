@@ -80,10 +80,10 @@ const isPlacedVenue = (venue: MapVenue | null): venue is PlacedMapVenue =>
   Number.isFinite(venue.lat) &&
   Number.isFinite(venue.lng);
 
-const isFinishedVisit = <V extends MapVisit>(item: V): boolean =>
+const isFinishedVisit = <V extends MapVisit>(item: V) =>
   item.visit.deletedAt === undefined && item.visit.finishedAt !== null && item.finalResult !== null;
 
-const outcomeOf = (result: number): MapOutcome =>
+const outcomeOf: (result: number) => MapOutcome = (result) =>
   result > 0 ? "win" : result < 0 ? "loss" : "even";
 
 const hoursOf = (milliseconds: bigint) => Number((milliseconds + 18_000n) / 36_000n) / 100;
@@ -102,8 +102,9 @@ const compareStartedAsc = (a: MapVisit, b: MapVisit) =>
   (a.visit.id < b.visit.id ? -1 : a.visit.id > b.visit.id ? 1 : 0);
 
 /** Local YYYY-MM-DD key in the caller's time zone for a UTC timestamp. */
-export const mapDayKey = (utc: DateTime.Utc, timeZone: DateTime.TimeZone): string => {
+export const mapDayKey = (utc: DateTime.Utc, timeZone: DateTime.TimeZone) => {
   const parts = DateTime.toParts(DateTime.setZone(utc, timeZone));
+
   return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 };
 
@@ -113,6 +114,7 @@ export const mapDayKey = (utc: DateTime.Utc, timeZone: DateTime.TimeZone): strin
  */
 export const mapPins = <V extends MapVisit>(visits: ReadonlyArray<V>) => {
   const finished = visits.filter(isFinishedVisit);
+
   const groups = new Map<
     VenueId,
     {
@@ -122,17 +124,21 @@ export const mapPins = <V extends MapVisit>(visits: ReadonlyArray<V>) => {
       visits: Array<V>;
     }
   >();
+
   let unmappedCount = 0;
   let total = 0n;
 
   for (const item of finished) {
     const net = BigInt(item.finalResult!);
     total += net;
+
     if (!isPlacedVenue(item.venue)) {
       unmappedCount += 1;
       continue;
     }
+
     const existing = groups.get(item.venue.id);
+
     if (existing) {
       existing.result += net;
       existing.milliseconds += durationMs(item.visit);
@@ -150,6 +156,7 @@ export const mapPins = <V extends MapVisit>(visits: ReadonlyArray<V>) => {
   const pins: ReadonlyArray<MapVenuePin<V>> = [...groups.values()]
     .map((group) => {
       const result = checkedMinorUnits(group.result);
+
       return {
         venue: group.venue,
         lat: group.venue.lat,
@@ -174,17 +181,19 @@ export const mapPins = <V extends MapVisit>(visits: ReadonlyArray<V>) => {
 export const mapDays = <V extends MapVisit>(
   visits: ReadonlyArray<V>,
   timeZone: DateTime.TimeZone,
-): ReadonlyArray<MapDaySummary> => {
+) => {
   const groups = new Map<
     string,
     { date: DateTime.Utc; sessions: number; unmappedCount: number; result: bigint }
   >();
+
   for (const item of visits) {
     if (!isFinishedVisit(item)) continue;
     const key = mapDayKey(item.visit.startedAt, timeZone);
     const existing = groups.get(key);
     const unmapped = isPlacedVenue(item.venue) ? 0 : 1;
     const net = BigInt(item.finalResult!);
+
     if (existing) {
       existing.sessions += 1;
       existing.unmappedCount += unmapped;
@@ -198,6 +207,7 @@ export const mapDays = <V extends MapVisit>(
       });
     }
   }
+
   return [...groups]
     .toSorted(([a], [b]) => b.localeCompare(a))
     .map(([key, group]) => ({
@@ -209,8 +219,9 @@ export const mapDays = <V extends MapVisit>(
     }));
 };
 
-const buildPath = <V extends MapVisit>(visits: ReadonlyArray<V>): MapPathSummary<V> => {
+const buildPath = <V extends MapVisit>(visits: ReadonlyArray<V>) => {
   const ordered = visits.filter(isFinishedVisit).toSorted(compareStartedAsc);
+
   if (ordered.length === 0) {
     return {
       stops: [],
@@ -229,6 +240,7 @@ const buildPath = <V extends MapVisit>(visits: ReadonlyArray<V>): MapPathSummary
   let minStart = ordered[0]!.visit.startedAt;
   let maxFinish = ordered[0]!.visit.finishedAt!;
   const distinctVenues = new Set<VenueId>();
+
   const stops: Array<{
     number: number;
     venue: PlacedMapVenue;
@@ -240,14 +252,19 @@ const buildPath = <V extends MapVisit>(visits: ReadonlyArray<V>): MapPathSummary
 
   for (const item of ordered) {
     total += BigInt(item.finalResult!);
+
     if (ms(item.visit.startedAt) < ms(minStart)) minStart = item.visit.startedAt;
+
     if (ms(item.visit.finishedAt!) > ms(maxFinish)) maxFinish = item.visit.finishedAt!;
+
     if (!isPlacedVenue(item.venue)) {
       unmappedCount += 1;
       continue;
     }
+
     distinctVenues.add(item.venue.id);
     const previous = stops.at(-1);
+
     if (previous && previous.venue.id === item.venue.id) {
       previous.result += BigInt(item.finalResult!);
       previous.visits.push(item);
@@ -266,6 +283,7 @@ const buildPath = <V extends MapVisit>(visits: ReadonlyArray<V>): MapPathSummary
   return {
     stops: stops.map((stop) => {
       const result = checkedMinorUnits(stop.result);
+
       return {
         number: stop.number,
         venue: stop.venue,
@@ -291,7 +309,7 @@ export const mapDayPath = <V extends MapVisit>(
   visits: ReadonlyArray<V>,
   dayKey: string,
   timeZone: DateTime.TimeZone,
-): MapPathSummary<V> =>
+) =>
   buildPath(
     visits.filter(
       (item) => isFinishedVisit(item) && mapDayKey(item.visit.startedAt, timeZone) === dayKey,
@@ -299,30 +317,31 @@ export const mapDayPath = <V extends MapVisit>(
   );
 
 /** Chronological venue path for all finished visits played inside `tripId`. */
-export const mapTripPath = <V extends MapVisit>(
-  visits: ReadonlyArray<V>,
-  tripId: TripId,
-): MapPathSummary<V> =>
+export const mapTripPath = <V extends MapVisit>(visits: ReadonlyArray<V>, tripId: TripId) =>
   buildPath(visits.filter((item) => isFinishedVisit(item) && item.table.tripId === tripId));
 
 /** Frames all mapped pins in view, using zoom 14 when only a single casino has coordinates. */
 export const mapCamera = (
   points: ReadonlyArray<{ readonly lat: number; readonly lng: number }>,
-): MapCameraPosition | null => {
+) => {
   if (points.length === 0) return null;
+
   if (points.length === 1) {
     return {
       coordinates: { latitude: points[0]!.lat, longitude: points[0]!.lng },
       zoom: 14,
     };
   }
+
   const lats = points.map((p) => p.lat);
   const lngs = points.map((p) => p.lng);
+
   const span = Math.max(
     Math.max(...lats) - Math.min(...lats),
     Math.max(...lngs) - Math.min(...lngs),
     0.005,
   );
+
   return {
     coordinates: {
       latitude: (Math.max(...lats) + Math.min(...lats)) / 2,

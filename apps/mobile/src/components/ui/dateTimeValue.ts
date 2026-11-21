@@ -10,19 +10,21 @@ export const fieldText = (value: Date, kind: DateTimeKind) =>
 export const fieldDate = (value: string, kind: DateTimeKind) => {
   if (!(kind === "date" ? /^\d{4}-\d{2}-\d{2}$/ : /^\d{2}:\d{2}$/).test(value)) return null;
   const date = new Date(kind === "date" ? `${value}T00:00:00` : `2000-01-01T${value}:00`);
+
   return Number.isFinite(date.getTime()) && fieldText(date, kind) === value ? date : null;
 };
 
 /** `uses24Hour` is the phone's clock setting, which the locale alone doesn't say. */
 export const fieldDisplay = (value: string, kind: DateTimeKind, uses24Hour?: boolean) => {
   const date = fieldDate(value, kind);
+
   return date
     ? kind === "date"
       ? date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
       : date.toLocaleTimeString(undefined, {
           hour: "numeric",
           minute: "2-digit",
-          ...(uses24Hour === undefined ? {} : { hour12: !uses24Hour }),
+          ...(uses24Hour === undefined ? null : { hour12: !uses24Hour }),
         })
     : kind === "date"
       ? "Choose date"
@@ -36,6 +38,7 @@ export const fieldDisplay = (value: string, kind: DateTimeKind, uses24Hour?: boo
  */
 export const pickerStart = (value: string, kind: DateTimeKind, now = new Date()) => {
   const date = fieldDate(value, kind) ?? now;
+
   return kind === "date" ? `${fieldText(date, "date")}T00:00:00.000Z` : date.toISOString();
 };
 

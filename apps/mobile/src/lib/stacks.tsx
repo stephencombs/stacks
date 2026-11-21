@@ -42,6 +42,7 @@ import { lastTripStorage, statsCopyStorage } from "./tripStorage";
 export function SignedInProvider({ children }: { children: ReactNode }) {
   const account = useAccount();
   const userId = (account.available && account.isSignedIn && account.userId) || null;
+
   return (
     <SignedInRoot userId={userId} make={signIn} wake={wakeOutbox}>
       <RefusalHaptic />
@@ -85,12 +86,11 @@ export function StacksProvider({ children }: { children: ReactNode }) {
 
 export { useAction, useLastTrip, useStacks, useStatsCopies };
 
-/** Renders a query: a skeleton while it first loads, an explanation if it fails. */
-/** The app coming back to the foreground: shown data may be stale. */
 const onWake = (revalidate: () => void) => {
   const subscription = AppState.addEventListener("change", (state) =>
     state === "active" ? revalidate() : undefined,
   );
+
   return () => subscription.remove();
 };
 
@@ -114,14 +114,15 @@ export function Loaded<A, E>({
   useEffect(() => {
     if (settled) markStartup("query_settled");
   }, [settled]);
+
   return AsyncResult.match(result, {
     onInitial: () => skeleton ?? <Skeleton className="h-32" />,
-    // A failed refresh keeps showing what was there before.
     onFailure: (failure) =>
       Option.match(failure.previousSuccess, {
         onSome: (previous) => children(previous.value),
         onNone: () => {
           const message = describeError(Cause.squash(failure.cause));
+
           return renderError ? renderError(message) : <FormError>{message}</FormError>;
         },
       }),
@@ -129,7 +130,6 @@ export function Loaded<A, E>({
   });
 }
 
-/** A buzz the moment the server refuses something logged here, so it's noticed in a pocket. */
 function RefusalHaptic() {
   const outbox = useSignedInOutbox();
   const refused = useRef(new Set<string>());
@@ -137,18 +137,20 @@ function RefusalHaptic() {
     () =>
       outbox?.subscribe(() => {
         const now = outbox.pending().filter((p) => p.failed !== null);
+
         if (now.some((p) => !refused.current.has(p.entry.id)))
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         refused.current = new Set(now.map((p) => p.entry.id));
       }),
     [outbox],
   );
+
   return null;
 }
 
-/** Starts a query early, so whatever reads it later finds it loading or loaded. */
 function Prefetch<A, E>({ query }: { query: Atom.Atom<AsyncResult.AsyncResult<A, E>> }) {
   useAtomValue(query);
+
   return null;
 }
 
@@ -171,6 +173,7 @@ export function TripLoaded({
   const stacks = useStacks();
   const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
   const groupId = groups.find((item) => item.trips.some((trip) => trip.id === tripId))?.group.id;
+
   return (
     <>
       {groupId ? <Prefetch query={stacks.group(groupId)} /> : null}

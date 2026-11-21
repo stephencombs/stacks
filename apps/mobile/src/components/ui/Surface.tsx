@@ -1,4 +1,5 @@
 import { NavigationContext, NavigationRouteContext } from "@react-navigation/native";
+import * as Predicate from "effect/Predicate";
 import { use, useCallback, useLayoutEffect, type ReactNode } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 
@@ -49,6 +50,7 @@ export function Row({
   className?: string;
 }) {
   const classes = cn("flex-row items-center gap-3 border-t border-line px-4 py-3.5", className);
+
   return onPress ? (
     <Pressable
       accessibilityRole="button"
@@ -83,21 +85,25 @@ export function PageTitle({
   const navigation = use(NavigationContext);
   const route = use(NavigationRouteContext);
   const nativeTitle = navigation !== undefined && !inContent;
+
   const headerTitle = useCallback(
     () => <HeaderTitle title={children} context={context} />,
     [children, context],
   );
+
   useLayoutEffect(() => {
     if (!navigation) return;
     const scoped = ["Sessions", "Group"].includes(route?.name ?? "");
     navigation.setOptions({
       title: inContent ? "" : children,
       headerLargeTitle: false,
-      ...(Platform.OS === "ios" && !scoped && !inContent ? { headerTitle } : {}),
-      ...(headerRight ? { headerRight } : {}),
+      ...(Platform.OS === "ios" && !scoped && !inContent ? { headerTitle } : null),
+      ...(headerRight ? { headerRight } : null),
     });
   }, [navigation, children, headerTitle, headerRight, inContent, route?.name]);
+
   if (nativeTitle && !tag && !right && !context) return null;
+
   return (
     <View className="gap-1">
       {inContent && context ? <Text className="type-footnote text-muted">{context}</Text> : null}
@@ -184,6 +190,7 @@ const toneStyles: Record<Tone, { container: string; text: string }> = {
 
 export function Tag({ tone = "neutral", children }: { tone?: Tone; children: string }) {
   const style = toneStyles[tone];
+
   return (
     <View
       className={cn(
@@ -200,6 +207,7 @@ export function Tag({ tone = "neutral", children }: { tone?: Tone; children: str
 /** @public */
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: string }) {
   const style = toneStyles[tone];
+
   return (
     <View
       className={cn(
@@ -233,6 +241,7 @@ export function EmptyState({
       </View>
     );
   }
+
   return (
     <View className="gap-2 py-2">
       <Text className="text-[19px] font-bold text-ink">{title}</Text>
@@ -345,6 +354,7 @@ export function QuotaBar({
     0,
     Math.min(100, Math.round((Number.isFinite(remainingShare) ? remainingShare : 0) * 100)),
   );
+
   const pacePct =
     paceShare !== undefined && Number.isFinite(paceShare)
       ? Math.max(0, Math.min(100, Math.round(paceShare * 100)))
@@ -392,14 +402,14 @@ export function QuotaCard({
         <Text className="type-heading text-ink">{title}</Text>
         {status ? <Text className="type-footnote text-muted">{status}</Text> : null}
       </View>
-      {typeof figure === "string" || typeof figure === "number" ? (
+      {Predicate.isString(figure) || Predicate.isNumber(figure) ? (
         <Text className="type-hero text-ink">{figure}</Text>
       ) : (
         figure
       )}
       <QuotaBar remainingShare={remainingShare} paceShare={paceShare} tone={tone} />
       {footer ? (
-        typeof footer === "string" ? (
+        Predicate.isString(footer) ? (
           <Text className="type-footnote text-muted">{footer}</Text>
         ) : (
           footer
@@ -476,7 +486,7 @@ export function SettingsRow({
         ) : null}
       </View>
       {value !== undefined && value !== null ? (
-        typeof value === "string" || typeof value === "number" ? (
+        Predicate.isString(value) || Predicate.isNumber(value) ? (
           <Text className="type-callout text-muted">{value}</Text>
         ) : (
           value

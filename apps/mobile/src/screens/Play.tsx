@@ -38,6 +38,7 @@ import { MinorUnits, VisitId, type EntryId, type Game, type PlayEntry } from "@s
 import { ownPlayers } from "@stacks/shared/recording";
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
@@ -92,6 +93,7 @@ type Props = StaticScreenProps<{ visitId: string; action?: string }>;
 /** One session of your own play, saved on this device. */
 export function PlayScreen({ route }: Props) {
   const id = Option.getOrNull(VisitId.makeOption(route.params.visitId));
+
   return id ? <Visit visitId={id} action={route.params.action} /> : <Missing />;
 }
 
@@ -105,10 +107,12 @@ function Title({
   children: string;
 }) {
   const navigation = useNavigation();
+
   const headerTitle = useCallback(
     () => <HeaderTitle title={children} context={context} />,
     [children, context],
   );
+
   useLayoutEffect(() => {
     navigation.setOptions({
       title: children,
@@ -116,9 +120,10 @@ function Title({
         ? {
             headerTitle,
           }
-        : {}),
+        : null),
     });
   }, [navigation, children, headerTitle]);
+
   return (
     <View className="gap-1">
       <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
@@ -136,6 +141,7 @@ function Title({
 
 function Missing() {
   const navigation = useNavigation();
+
   return (
     <PersonalScreen>
       <Title>Session</Title>
@@ -167,13 +173,14 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
   const prefs = usePreferences();
   const navigation = useNavigation();
   const [open, setOpen] = useState<OpenSheet | null>(null);
-  // The toast for the last write here: yours, or one for another player at the table.
+
   const [saved, setSaved] = useState<{
     entryId: EntryId;
     text: string;
     undo?: boolean;
     visitId?: VisitId;
   } | null>(null);
+
   const [notice, setNotice] = useState<string | null>(null);
   const quick = useRecordingSubmit();
   const state = useRecordingState();
@@ -181,25 +188,27 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
   const table = useRecordingTable(visit?.visit.tableId ?? null);
   const server = useServerTable(visit?.visit.tableId ?? null);
   const seats = table ? liveTable(table, server) : null;
-  // Two side-by-side actions don't fit at large text on Android, so they stack.
   const { fontScale } = useWindowDimensions();
   const stacked = Platform.OS === "android" && fontScale > 1.2;
   const loadedLive = visit !== null && visit !== undefined && visit.visit.finishedAt === null;
   const loadedActive = loadedLive && visit.visit.deletedAt === undefined;
   const [handledAction, setHandledAction] = useState<string | null>(null);
+
   if (action !== "cash_out" && handledAction !== null) {
     setHandledAction(null);
   } else if (action === "cash_out" && visit !== undefined && handledAction !== action) {
     setHandledAction(action);
+
     if (loadedActive) setOpen((current) => current ?? { type: "cash_out" });
   }
+
   useEffect(() => {
     if (action !== "cash_out" || visit === undefined) return;
-    (navigation as { setParams?: (params: { action?: undefined }) => void }).setParams?.({
-      action: undefined,
-    });
+    clearCashOutAction(navigation);
   }, [action, navigation, visit]);
+
   if (visit === null) return <Missing />;
+
   if (visit === undefined)
     return (
       <PersonalScreen>
@@ -213,10 +222,11 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
   const live = visit.visit.finishedAt === null;
   const close = () => setOpen(afterClosing);
   const entry = (id: EntryId) => visit.entries.find((item) => item.id === id)!;
+
   const recorded = (entryId: EntryId, input: RecordingInput) => {
     close();
     setNotice(null);
-    // Cashing out while others play leaves you recording for them, on the table.
+
     if (
       input.type === "finish" &&
       own &&
@@ -225,10 +235,13 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       seats?.seats.some((seat) => seat.playing && seat.visitId !== visitId)
     ) {
       navigation.dispatch(StackActions.replace("Table", { tableId: table.table.id }));
+
       return;
     }
+
     const shown = (amount: number) =>
       formatDisplayMoney(MinorUnits.make(amount), RECORDING_CURRENCY, prefs);
+
     setSaved({
       entryId,
       undo: input.type === "add" && input.kind === "buy_in",
@@ -242,11 +255,12 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
               : "Saved.",
     });
   };
+
   const start = visit.visit.startedAt;
   const player = table?.visits.find((item) => item.visit.id === visitId);
   const own = player?.isSelf ?? true;
   const name = player?.player.displayName ?? "Their";
-  // Back at the table: a new visit for whoever this was, once they aren't playing here.
+
   const canReturn =
     !live &&
     !!table &&
@@ -254,11 +268,12 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
     !table.visits.some(
       (item) => item.player.id === player.player.id && item.visit.finishedAt === null,
     );
-  // Whoever records for everyone at the table changes its game and casino; a player who joined it
-  // can't.
+
   const canEditTable = table?.role !== "participant";
+
   const rebuy = async (amount: number) => {
     const receipt = await quick.submit({ type: "add", visitId, kind: "buy_in", amount });
+
     if (receipt?.command.type === "add") {
       setNotice(null);
       setSaved({
@@ -268,6 +283,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       });
     }
   };
+
   const undo = async (entryId: EntryId, of: VisitId = visitId) => {
     const receipt = await quick.submit({
       type: "correct",
@@ -276,38 +292,45 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       reason: UNDONE_REASON,
       replacement: null,
     });
+
     if (receipt)
       setSaved({ entryId, visitId: of, text: "Rebuy undone. It stays in the history, voided." });
   };
+
   const fromTable = ({ entryId, ...rest }: TableRecorded) => {
     close();
+
     if (entryId) setSaved({ entryId, ...rest });
     else {
       setSaved(null);
       setNotice(rest.text);
     }
   };
+
   const edited = (text: string) => {
     close();
     setSaved(null);
     setNotice(text);
   };
+
   const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
   const shared = (seats?.seats.length ?? 1) > 1;
+
   const actions = live
     ? tableActions(table?.role ?? "participant", { playing: true, closed: false, empty: false })
     : (["edit"] as const);
+
   const act = (action: TableAction) =>
-    setOpen(
-      action === "edit"
-        ? { type: "edit" }
-        : action === "delete_table"
-          ? null
-          : { type: "action", action },
+    Match.value(action).pipe(
+      Match.when("edit", () => setOpen({ type: "edit" })),
+      Match.when("delete_table", () => setOpen(null)),
+      Match.orElse((next) => setOpen({ type: "action", action: next })),
     );
+
   const restore = async () => {
     if (await quick.submit({ type: "restore_visit", visitId })) setDeletedHere(false);
   };
+
   const deleteVisit = () =>
     confirmAction(
       shared ? "Delete my visit?" : "Delete this session?",
@@ -324,6 +347,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       },
       { dismissLabel: "Keep session", icon: "trash" },
     );
+
   if (visit.visit.deletedAt !== undefined)
     return (
       <PersonalScreen
@@ -383,6 +407,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
         />
       </PersonalScreen>
     );
+
   const toast = saved ? (
     <RecordingToast key={saved.entryId}>
       <Text
@@ -432,6 +457,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       )}
     </RecordingToast>
   ) : null;
+
   return (
     <PersonalScreen
       session
@@ -738,8 +764,10 @@ export function RecordingToast({ children }: { children: ReactNode }) {
   const [shown] = useState(() => new Animated.Value(0));
   useEffect(() => {
     animate(shown, { toValue: 1, duration: duration.toastIn, easing: ease.enter });
+
     return () => shown.stopAnimation();
   }, [shown]);
+
   return (
     <Animated.View
       style={{
@@ -776,6 +804,7 @@ const tileCode: Record<Game, string> = {
 function GameTile({ game, gameName }: { game: Game | null; gameName?: string | null }) {
   const custom = game === "other" ? gameName?.trim().replace(/\s+/g, "").slice(0, 2) : undefined;
   const code = custom && custom.length > 0 ? custom.toUpperCase() : game ? tileCode[game] : "PL";
+
   return (
     <View className="size-12 items-center justify-center rounded-xl bg-ink">
       <Text className="type-callout font-bold text-ink-inverse">{code}</Text>
@@ -817,6 +846,7 @@ function EditSessionSheet({
   const [time, setTime] = useState(() => localTimeText(initial));
   const [startError, setStartError] = useState<string | null>(null);
   const fields = sessionEditFields(visit, canEditTable);
+
   const firstEntry = visit.entries.reduce(
     (earliest, entry) =>
       DateTime.toEpochMillis(entry.occurredAt) < DateTime.toEpochMillis(earliest)
@@ -824,22 +854,29 @@ function EditSessionSheet({
         : earliest,
     visit.visit.finishedAt ?? now,
   );
+
   const updateStarted = async (nextDate: string, nextTime: string) => {
     setDate(nextDate);
     setTime(nextTime);
     const parsed = parseStartedAt({ date: nextDate, time: nextTime }, initial, firstEntry);
+
     if (parsed.error !== null) {
       setStartError(parsed.error);
+
       return;
     }
+
     setStartError(null);
+
     const receipt = await save.submit({
       type: "edit_visit",
       visitId: visit.visit.id,
       startedAt: parsed.startedAt,
     });
+
     if (receipt) onStartedSaved();
   };
+
   if (Platform.OS !== "android")
     return (
       <Sheet
@@ -882,6 +919,7 @@ function EditSessionSheet({
   const buyInValue = fields.find((f) => f.field === "buy_in")?.value ?? "";
   const gameValue = fields.find((f) => f.field === "game")?.value ?? "Not set";
   const venueValue = fields.find((f) => f.field === "venue")?.value ?? "Not set";
+
   return (
     <Sheet
       open
@@ -985,20 +1023,23 @@ function VisitHeader({
   const navigation = useNavigation();
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
+
     return () => navigation.setOptions({ headerShown: true });
   }, [navigation]);
   const live = visit.visit.finishedAt === null;
   const routes = navigation.getState?.()?.routes;
   const prev = routes && routes.length > 1 ? routes[routes.length - 2] : undefined;
-  const nested = prev?.state as
-    | { routes?: ReadonlyArray<{ name: string }>; index?: number }
-    | undefined;
+
+  const nested = nestedStack(prev?.state);
+
   const fromStats =
     prev?.name === "Stats" ||
     prev?.name === "StatsTab" ||
     nested?.routes?.[nested.index ?? 0]?.name === "StatsTab";
+
   const fromTable = prev?.name === "Table";
   const backLabel = live && own && !fromStats && !fromTable ? "Back to your play" : undefined;
+
   return (
     <View className="flex-row items-center justify-between gap-3">
       <BackButton label={backLabel} felt={live} />
@@ -1008,23 +1049,43 @@ function VisitHeader({
   );
 }
 
+interface NestedStack {
+  readonly routes?: ReadonlyArray<{ readonly name: string }>;
+  readonly index?: number;
+}
+
+function nestedStack(state: NestedStack | null | undefined) {
+  if (state == null || state.routes === undefined) return undefined;
+
+  return state;
+}
+
+function clearCashOutAction(navigation: { setParams?: (params: { action: undefined }) => void }) {
+  navigation.setParams?.({ action: undefined });
+}
+
 const backDestinationLabel = (
   state:
-    | { readonly routes?: ReadonlyArray<{ readonly name: string; readonly state?: unknown }> }
+    | { readonly routes?: ReadonlyArray<{ readonly name: string; readonly state?: NestedStack }> }
     | undefined,
 ) => {
   const routes = state?.routes;
   const prev = routes && routes.length > 1 ? routes[routes.length - 2] : undefined;
+
   if (!prev) return "Back to your play";
+
   if (prev.name === "Table") return "Back to the table";
+
   if (prev.name === "Stats" || prev.name === "StatsTab") return "Back to Stats";
+
   if (prev.name === "Tabs") {
-    const nested = prev.state as
-      | { routes?: ReadonlyArray<{ name: string }>; index?: number }
-      | undefined;
+    const nested = nestedStack(prev.state);
+
     const active = nested?.routes?.[nested.index ?? 0]?.name;
+
     if (active === "StatsTab") return "Back to Stats";
   }
+
   return "Back to Play";
 };
 
@@ -1032,10 +1093,12 @@ const backDestinationLabel = (
 export function BackButton({ label, felt = false }: { label?: string; felt?: boolean } = {}) {
   const navigation = useNavigation();
   const resolved = label ?? backDestinationLabel(navigation.getState?.());
+
   const goBack = () =>
     navigation.canGoBack()
       ? navigation.goBack()
       : navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } });
+
   if (Platform.OS === "android")
     return (
       <Pressable
@@ -1053,6 +1116,7 @@ export function BackButton({ label, felt = false }: { label?: string; felt?: boo
         </Text>
       </Pressable>
     );
+
   return (
     <IconButton
       accessibilityLabel="Back to your play"
@@ -1068,6 +1132,7 @@ export function BackButton({ label, felt = false }: { label?: string; felt?: boo
 
 function LiveHero({ visit, name }: { visit: RecordingVisitView; name?: string | undefined }) {
   const summary = sessionReadout(visit, visit.visit.startedAt);
+
   return (
     <View className="gap-2.5 px-3 pt-16">
       <Text accessibilityRole="header" className="type-label text-[13px] text-felt-ink">
@@ -1087,9 +1152,9 @@ function LiveHero({ visit, name }: { visit: RecordingVisitView; name?: string | 
   );
 }
 
-/** The live buy-in: whole dollars big, the cents small beside them. */
 function BuyInFigure({ amount }: { amount: MinorUnits }) {
   const { showCents, privacyMode } = usePreferences();
+
   if (privacyMode) {
     return (
       <Text
@@ -1103,10 +1168,13 @@ function BuyInFigure({ amount }: { amount: MinorUnits }) {
       </Text>
     );
   }
+
   const text = formatMoney(amount, RECORDING_CURRENCY, {
     trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
   });
+
   const [, whole = text, cents = ""] = /^(.*\d)([.,]\d+\D*)$/.exec(text) ?? [];
+
   return (
     <Text
       testID="live-buy-in"
@@ -1122,6 +1190,7 @@ function BuyInFigure({ amount }: { amount: MinorUnits }) {
 
 function VisitHero({ visit, own }: { visit: RecordingVisitView; own: boolean }) {
   const summary = sessionReadout(visit, visit.visit.finishedAt!);
+
   return (
     <View className="gap-5 rounded-[22px] bg-surface p-4">
       <View className="gap-1">
@@ -1198,14 +1267,19 @@ function History({
   const state = useRecordingState();
   const view = useServerTable(visit.visit.tableId);
   const people = counterpartiesAt(state, visit.visit.tableId, visit.visit.playerId, view ?? null);
+
   const paid = (item: PlayEntry) => {
     if (item.counterpartyId === null) return null;
+
     const name =
       people.find((person) => person.id === item.counterpartyId)?.displayName ?? "someone";
+
     return `${item.kind === "cash_out" ? "Paid to" : "Paid by"} ${name}`;
   };
+
   const prefs = usePreferences();
   const lines = historyLines(visit);
+
   return (
     <View className="gap-2">
       <SectionHeading count={lines.length === 1 ? "1 entry" : `${lines.length} entries`}>
@@ -1229,9 +1303,12 @@ function History({
           const item = line.entry;
           const voided = item.voidedAt !== null;
           const name = historyEntryName(visit, item);
+
           const shownName =
             Platform.OS === "android" && name === "Final cash-out" ? "Cash-out" : name;
+
           const time = formatTime(item.occurredAt);
+
           return (
             <Row
               key={item.id}
@@ -1302,6 +1379,7 @@ function EntryInspector({
   const replacement = visit.replacedBy.get(entry.id);
   const at = (value: DateTime.Utc) => `${formatDay(value)}, ${formatTime(value)}`;
   const voided = entry.voidedAt !== null;
+
   return (
     <Sheet
       open

@@ -37,14 +37,17 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
   const members = detail.players.filter((player) => player.role !== null);
   const guests = detail.players.filter(isGuest);
   const former = detail.players.filter(isFormerMember);
+
   const names = distinctPlayerNames(
     [...members, ...guests, ...former].map((player) => [player.id, player.displayName]),
   );
+
   const canManage = (player: Player) =>
     player.userId !== null &&
     player.userId !== userId &&
     player.role !== "owner" &&
     (detail.role === "owner" || (detail.role === "admin" && player.role === "member"));
+
   const memberRows = members.map((player) => (
     <Row
       key={player.id}
@@ -76,6 +79,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
       {!android && player.role ? <Tag>{roleNames[player.role]}</Tag> : null}
     </Row>
   ));
+
   const guestRows = guests.map((player) => (
     <Row key={player.id} className="flex-wrap">
       <Chip
@@ -102,6 +106,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
           icon={android ? <Icon name="link" color="ink" size={16} /> : undefined}
           onPress={() => {
             const url = appUrl(`claim/${player.claimCode}`);
+
             if (android) {
               setCopyError(false);
               void setStringAsync(url).then(
@@ -198,6 +203,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
   const stacks = useStacks();
   const create = useAction(stacks.Client.mutation("invites", "create"));
   const revoke = useAction(stacks.Client.mutation("invites", "revoke"));
+
   return (
     <View className="gap-2">
       <SectionHeading
@@ -227,6 +233,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
             <List>
               {invites.map((invite) => {
                 const url = appUrl(`join/${invite.code}`);
+
                 return (
                   <Row key={invite.id} className="flex-col items-stretch gap-2">
                     <Text selectable numberOfLines={1} className="font-mono text-sm text-ink">
@@ -288,8 +295,8 @@ function ManageMemberSheet({
   const setRole = useAction(stacks.Client.mutation("groups", "setRole"));
   const remove = useAction(stacks.Client.mutation("groups", "removeMember"));
   const params = { groupId: detail.group.id, userId: UserId.make(player.userId!) };
-  const done = (ok: unknown) => (ok ? onClose() : undefined);
   const [confirming, setConfirming] = useState(false);
+
   if (confirming) {
     return (
       <Sheet
@@ -304,7 +311,11 @@ function ManageMemberSheet({
               variant="danger"
               size="lg"
               pending={remove.pending}
-              onPress={() => void remove.run({ params }).then(done)}
+              onPress={() =>
+                void remove.run({ params }).then((saved) => {
+                  if (saved) onClose();
+                })
+              }
             />
             <Button label="Keep them" onPress={() => setConfirming(false)} />
           </>
@@ -314,6 +325,7 @@ function ManageMemberSheet({
       </Sheet>
     );
   }
+
   return (
     <Sheet open onClose={onClose} title={player.displayName}>
       {detail.role === "owner" ? (
@@ -323,7 +335,9 @@ function ManageMemberSheet({
           onPress={() =>
             void setRole
               .run({ params, payload: { role: player.role === "admin" ? "member" : "admin" } })
-              .then(done)
+              .then((saved) => {
+                if (saved) onClose();
+              })
           }
         />
       ) : null}

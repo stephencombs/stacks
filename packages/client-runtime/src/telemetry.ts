@@ -1,3 +1,6 @@
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+
 export type TestEvent = "session_start_confirmed" | "entry_confirmed" | "session_close_confirmed";
 
 const startupStages = [
@@ -9,7 +12,9 @@ const startupStages = [
   "query_settled",
   "initial_url_timeout",
 ] as const;
+
 export type StartupStage = (typeof startupStages)[number];
+
 const safeStartupStages = new Set<string>(startupStages);
 const safeStartupEnvironments = new Set(["development", "preview", "production"]);
 
@@ -59,8 +64,8 @@ const safeProperties = new Set([
   "$ttclid",
 ]);
 
-/** Paths that carry invite, claim, or share secrets in the URL. */
 const secretPath = /^(\/(?:join|claim|invite|t))\/[^/?#]+/i;
+
 const urlProperties = new Set([
   "$current_url",
   "$pathname",
@@ -93,59 +98,79 @@ export function scrubTelemetryUrl(value: string) {
       url.pathname = scrubPathname(url.pathname);
       url.search = "";
       url.hash = "";
+
       return url.toString();
     }
-  } catch {
-    // Fall through and treat it as a path.
-  }
+  } catch {}
+
   const path = value.split(/[?#]/, 1)[0] ?? value;
+
   return scrubPathname(path);
 }
 
-export function sanitizeTelemetry(properties: Record<string, unknown>) {
-  const safe: Record<string, string | number | boolean | null | Array<Record<string, string>>> = {
-    $process_person_profile: false,
-    $geoip_disable: true,
-  };
+const JsonPrimitive = Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Null]);
+const ExceptionItem = Schema.Struct({ type: Schema.optionalKey(Schema.String) });
+const StartupStage = Schema.Literals(startupStages);
+const StartupElapsed = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const StartupEnvironment = Schema.Literals(["development", "preview", "production"]);
+
+type SanitizedValue = string | number | boolean | null | Array<{ type: string; value: string }>;
+
+export function sanitizeTelemetry<Properties extends Record<string, unknown>>(
+  properties: Properties,
+) {
+  const safe: { [key: string]: SanitizedValue } = {};
+  safe.$process_person_profile = false;
+  safe.$geoip_disable = true;
+
   for (const [key, value] of Object.entries(properties)) {
-    if (urlProperties.has(key) && typeof value === "string") {
-      safe[key] = scrubTelemetryUrl(value);
-      continue;
+    if (urlProperties.has(key)) {
+      const text = Schema.decodeUnknownOption(Schema.String)(value);
+
+      if (Option.isSome(text)) {
+        safe[key] = scrubTelemetryUrl(text.value);
+        continue;
+      }
     }
-    if (
-      safeProperties.has(key) &&
-      (typeof value === "string" ||
-        typeof value === "number" ||
-        typeof value === "boolean" ||
-        value === null)
-    ) {
-      safe[key] = value;
-    }
+
+    if (!safeProperties.has(key)) continue;
+    const primitive = Schema.decodeUnknownOption(JsonPrimitive)(value);
+
+    if (Option.isSome(primitive)) safe[key] = primitive.value;
   }
-  const { startup_stage, startup_elapsed_ms, startup_environment } = properties;
-  if (typeof startup_stage === "string" && safeStartupStages.has(startup_stage)) {
-    safe.startup_stage = startup_stage;
-  }
-  if (
-    typeof startup_elapsed_ms === "number" &&
-    Number.isSafeInteger(startup_elapsed_ms) &&
-    startup_elapsed_ms >= 0
-  ) {
-    safe.startup_elapsed_ms = startup_elapsed_ms;
-  }
-  if (typeof startup_environment === "string" && safeStartupEnvironments.has(startup_environment)) {
-    safe.startup_environment = startup_environment;
-  }
+
+  const stage = Schema.decodeUnknownOption(StartupStage)(properties["startup_stage"]);
+
+  if (Option.isSome(stage) && safeStartupStages.has(stage.value)) safe.startup_stage = stage.value;
+
+  const elapsed = Schema.decodeUnknownOption(StartupElapsed)(properties["startup_elapsed_ms"]);
+
+  if (Option.isSome(elapsed)) safe.startup_elapsed_ms = elapsed.value;
+
+  const environment = Schema.decodeUnknownOption(StartupEnvironment)(
+    properties["startup_environment"],
+  );
+
+  if (Option.isSome(environment) && safeStartupEnvironments.has(environment.value))
+    safe.startup_environment = environment.value;
+
   if ("$exception_list" in properties) {
-    const exceptions = properties.$exception_list;
-    const first = Array.isArray(exceptions) ? exceptions[0] : null;
-    const type = first && typeof first === "object" ? first.type : null;
-    safe.$exception_list = [
-      {
-        type: typeof type === "string" && safeErrorTypes.has(type) ? type : "Error",
-        value: "Unhandled application error",
-      },
-    ];
+    const list = Schema.decodeUnknownOption(Schema.Array(Schema.Unknown))(
+      properties["$exception_list"],
+    );
+
+    const head = Option.isSome(list) ? list.value[0] : undefined;
+
+    const item =
+      head === undefined ? Option.none() : Schema.decodeUnknownOption(ExceptionItem)(head);
+
+    const type =
+      Option.isSome(item) && item.value.type !== undefined && safeErrorTypes.has(item.value.type)
+        ? item.value.type
+        : "Error";
+
+    safe.$exception_list = [{ type, value: "Unhandled application error" }];
   }
+
   return safe;
 }

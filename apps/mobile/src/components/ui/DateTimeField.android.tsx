@@ -20,14 +20,17 @@ export function DateTimeField({
   const [open, setOpen] = useState(false);
   const uses24Hour = getCalendars()[0]?.uses24hourClock ?? undefined;
   const parsed = fieldDate(value, kind);
+
   const shown =
     compact && kind === "date" && parsed
       ? parsed.toLocaleDateString(undefined, { month: "short", day: "numeric" })
       : fieldDisplay(value, kind, uses24Hour);
+
   const pick = (picked: Date) => {
     onChange(pickerText(picked, kind));
     setOpen(false);
   };
+
   return (
     <View className={compact ? undefined : "gap-1.5"}>
       {compact ? (

@@ -24,23 +24,28 @@ const listeners = new Set<() => void>();
 
 const set = (next: Asking | null) => {
   current = next;
+
   for (const listener of listeners) listener();
 };
 
 export const requestConfirmation = (confirmation: Confirmation) =>
   set({ confirmation, pending: false, error: null });
+
 export const dismissConfirmation = () => set(null);
 
 /** The person confirmed. A synchronous action closes the dialog; an async one keeps it open. */
 export const answerConfirmation = () => {
   const asking = current;
+
   if (!asking || asking.pending) return;
   const result = asking.confirmation.onConfirm();
+
   if (!(result instanceof Promise)) {
-    // The action may have asked something else.
     if (current === asking) set(null);
+
     return;
   }
+
   set({ ...asking, pending: true, error: null });
   void result.then((error) => {
     if (current?.confirmation !== asking.confirmation) return;
@@ -49,8 +54,10 @@ export const answerConfirmation = () => {
 };
 
 export const currentConfirmation = () => current;
+
 export const subscribeConfirmation = (listener: () => void) => {
   listeners.add(listener);
+
   return () => void listeners.delete(listener);
 };
 

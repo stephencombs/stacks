@@ -12,6 +12,7 @@ type HostProps = Parameters<typeof Host>[0];
  */
 export function ComposeHost(props: HostProps) {
   const { theme } = useUniwind();
+
   const [ink, inverse, canvas, surface, fill, strong, muted, faint, line, scrim, loss] =
     useCSSVariable([
       "--color-ink",
@@ -26,6 +27,7 @@ export function ComposeHost(props: HostProps) {
       "--color-scrim",
       "--color-loss",
     ]);
+
   const roles = {
     primary: ink,
     onPrimary: inverse,
@@ -64,6 +66,8 @@ export function ComposeHost(props: HostProps) {
     errorContainer: fill,
     onErrorContainer: loss,
   };
+
+  // SAFETY: these token values are the hex or OKLCH strings Host reads as Material color roles.
   return (
     <Host
       colorScheme={theme === "dark" ? "dark" : "light"}

@@ -17,6 +17,7 @@ export const Table = Schema.Struct({
   /** Set when its starter deleted it before anyone played there. */
   deletedAt: Schema.optionalKey(Schema.DateTimeUtc),
 });
+
 export type Table = typeof Table.Type;
 
 export const Visit = Schema.Struct({
@@ -35,6 +36,7 @@ export const Visit = Schema.Struct({
       : undefined,
   ),
 );
+
 export type Visit = typeof Visit.Type;
 
 const auditFields = {
@@ -57,18 +59,22 @@ function auditIssue(fact: {
   if ((fact.voidedAt === null) !== (fact.voidedBy === null)) {
     return { path: ["voidedBy"], issue: "void time and actor must be recorded together" };
   }
+
   if (fact.voidedAt === null && fact.voidReason !== null) {
     return { path: ["voidReason"], issue: "a live fact has no void reason" };
   }
+
   if (
     fact.voidedAt !== null &&
     DateTime.toEpochMillis(fact.voidedAt) < DateTime.toEpochMillis(fact.createdAt)
   ) {
     return { path: ["voidedAt"], issue: "must not precede creation" };
   }
+
   if (fact.replacesEntryId === fact.id) {
     return { path: ["replacesEntryId"], issue: "a replacement must have a new ID" };
   }
+
   return undefined;
 }
 
@@ -85,12 +91,16 @@ export const PlayEntry = Schema.Struct({
 }).check(
   Schema.makeFilter((entry) => {
     const audit = auditIssue(entry);
+
     if (audit) return audit;
+
     if (entry.kind === "adjustment") {
       if (entry.counterpartyId !== null)
         return { path: ["counterpartyId"], issue: "adjustments have no counterparty" };
+
       return entry.amount !== 0 ? undefined : { path: ["amount"], issue: "must not be zero" };
     }
+
     return (entry.kind === "buy_in" ? entry.amount > 0 : entry.amount >= 0)
       ? undefined
       : {
@@ -99,29 +109,34 @@ export const PlayEntry = Schema.Struct({
         };
   }),
 );
+
 export type PlayEntry = typeof PlayEntry.Type;
 
-// Ownership comes from the visit; a fact cannot independently assign a player or table.
 export const VisitRecording = Schema.Struct({
   visit: Visit,
   entries: Schema.Array(PlayEntry),
 }).check(
   Schema.makeFilter(({ visit, entries }) => {
     const ids = new Set<EntryId>();
+
     for (const [index, entry] of entries.entries()) {
       if (entry.visitId !== visit.id)
         return { path: ["entries", index, "visitId"], issue: "must reference this visit" };
+
       if (entry.counterpartyId === visit.playerId)
         return {
           path: ["entries", index, "counterpartyId"],
           issue: "leave empty for the player's own money",
         };
+
       if (ids.has(entry.id)) return { path: ["entries", index, "id"], issue: "duplicate fact ID" };
       ids.add(entry.id);
     }
+
     return undefined;
   }),
 );
+
 export type VisitRecording = typeof VisitRecording.Type;
 
 export const VisitTotals = Schema.Struct({
@@ -129,6 +144,7 @@ export const VisitTotals = Schema.Struct({
   cashOut: MinorUnits.check(Schema.isGreaterThanOrEqualTo(0)),
   adjustment: MinorUnits,
 });
+
 export type VisitTotals = typeof VisitTotals.Type;
 
 export const VisitSummary = Schema.Struct({
@@ -139,6 +155,7 @@ export const VisitSummary = Schema.Struct({
   Schema.makeFilter(({ visit, totals, finalResult }) => {
     if ((visit.finishedAt === null) !== (finalResult === null))
       return { path: ["finalResult"], issue: "pending exactly while the visit is unfinished" };
+
     if (
       finalResult !== null &&
       BigInt(finalResult) !==
@@ -149,7 +166,9 @@ export const VisitSummary = Schema.Struct({
         issue: "must equal cash-outs plus adjustments minus buy-ins",
       };
     }
+
     return undefined;
   }),
 );
+
 export type VisitSummary = typeof VisitSummary.Type;

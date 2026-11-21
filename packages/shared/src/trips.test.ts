@@ -16,7 +16,6 @@ import {
   type TripClock,
 } from "./trips.ts";
 
-// Tests run in UTC. A night runs from 6am to 6am.
 const clock: TripClock = {
   night: (at) => new Date(DateTime.toEpochMillis(at) - 6 * 3_600_000).toISOString().slice(0, 10),
   hour: (at) => new Date(DateTime.toEpochMillis(at)).getUTCHours(),
@@ -25,8 +24,9 @@ const clock: TripClock = {
 const venue = (n: number) => ({
   id: VenueId.make(`0192e7a0-0000-7000-8000-0000000004${String(n).padStart(2, "0")}`),
 });
+
 let count = 0;
-/** A session on October `day` at `hour` UTC (hours past 23 roll into the next day). */
+
 const session = (
   day: number,
   hour: number,
@@ -55,6 +55,7 @@ describe("tripNights", () => {
       ],
       clock,
     );
+
     expect(nights.map((n) => [n.key, n.number, n.sessions.length, n.winner])).toEqual([
       ["2026-10-21", 1, 2, { playerId: BEA, net: 900 }],
       ["2026-10-22", 2, 1, { playerId: ALEX, net: -100 }],
@@ -75,6 +76,7 @@ describe("tripStandings", () => {
       ],
       clock,
     );
+
     expect(standings.map((s) => [s.playerId, s.rank])).toEqual([
       [ALEX, 1],
       [BEA, 2],
@@ -98,6 +100,7 @@ describe("tripStandings", () => {
       ],
       clock,
     );
+
     expect(standings).toEqual([
       {
         playerId: BEA,
@@ -134,6 +137,7 @@ describe("tripStandings", () => {
       [100, -50, 200, 300, 400].map((net, i) => session(21, 18 + i, [[ALEX, net]])),
       clock,
     );
+
     expect(alex?.hot).toBe(true);
     expect(alex?.streak).toEqual({ length: 3, winning: true });
   });
@@ -149,6 +153,7 @@ describe("tripStandings", () => {
     ],
     ([table]) => {
       const players = [ALEX, BEA, CAL, DEE];
+
       const sessions = table.map((nets, i) =>
         session(
           21 + Math.floor(i / 4),
@@ -156,6 +161,7 @@ describe("tripStandings", () => {
           nets.map((net, p) => [players[p]!, net]),
         ),
       );
+
       const standings = tripStandings(sessions, clock);
       expect(standings.map((s) => s.rank)).toEqual(
         standings.map((s) => 1 + standings.filter((other) => other.net > s.net).length),
@@ -163,8 +169,10 @@ describe("tripStandings", () => {
       expect(standings.reduce((sum, s) => sum + s.net, 0)).toBe(
         table.flat().reduce((a, b) => a + b, 0),
       );
+
       for (let i = 1; i < standings.length; i++)
         expect(standings[i - 1]!.net).toBeGreaterThanOrEqual(standings[i]!.net);
+
       for (const s of standings) {
         expect(s.rank + s.moved).toBeGreaterThanOrEqual(1);
         expect(s.rank + s.moved).toBeLessThanOrEqual(standings.length);
@@ -183,6 +191,7 @@ describe("tripFeed", () => {
         [CAL, 10],
       ]),
     ]);
+
     expect(feed.map((f) => [f.playerId, f.net])).toEqual([
       [BEA, 900],
       [ALEX, -50],
@@ -191,7 +200,6 @@ describe("tripFeed", () => {
   });
 });
 
-/** A live table: each player's net and buy-in so far, and who's still playing. */
 const table = (
   results: ReadonlyArray<[PlayerId, number, number]>,
   playing: ReadonlyArray<PlayerId>,
@@ -216,6 +224,7 @@ describe("inPlay", () => {
       ),
       table([[ALEX, -100, 100]], [ALEX]),
     ];
+
     expect(inPlay(tables)).toEqual(new Map([[ALEX, 400]]));
   });
 });
@@ -237,6 +246,7 @@ describe("tonightBoard", () => {
       clock,
       now,
     );
+
     expect(board).toEqual([
       { playerId: BEA, net: 300, inPlay: 0, rank: 1 },
       { playerId: CAL, net: 100, inPlay: 0, rank: 2 },
@@ -245,12 +255,12 @@ describe("tonightBoard", () => {
   });
 
   it("keeps a table player's cashed-out visit settled when they sit back down", () => {
-    // Alex cashed out 15,000 on 10,000, then bought back in for 10,000 at the same table.
     const back = {
       results: [{ playerId: ALEX, buyIn: money(10000), net: money(5000) }],
       playing: [ALEX],
       inPlay: [{ playerId: ALEX, buyIn: money(10000) }],
     };
+
     expect(tonightBoard([], [back], clock, now)).toEqual([
       { playerId: ALEX, net: 5000, inPlay: 10000, rank: 1 },
     ]);
@@ -277,7 +287,7 @@ describe("tonightBoard", () => {
       clock,
       now,
     );
-    // Alex's chips at the live table aren't a loss yet; Bea cashed out and Dee busted.
+
     expect(board).toEqual([
       { playerId: BEA, net: 150, inPlay: 0, rank: 1 },
       { playerId: DEE, net: -100, inPlay: 0, rank: 2 },
@@ -303,6 +313,7 @@ describe("tripDays", () => {
       clock,
       [ALEX, BEA, CAL],
     );
+
     expect(days.map((d) => [d.number, d.sessions])).toEqual([
       [1, 2],
       [2, 1],
@@ -332,6 +343,7 @@ describe("a table with no casino set", () => {
       noCasino(21, 21, [[ALEX, 200]]),
       noCasino(21, 22, [[ALEX, 300]]),
     ];
+
     expect(tripStandings(sessions, clock)[0]).toMatchObject({ playerId: ALEX, net: 600 });
   });
 
@@ -341,6 +353,7 @@ describe("a table with no casino set", () => {
       noCasino(21, 21, [[ALEX, 50]]),
       session(21, 22, [[ALEX, -100]], 1),
     ]);
+
     expect(route.stops.map((s) => [s.venue.id, s.visits, s.net])).toEqual([[venue(1).id, 2, 400]]);
     expect(route.path.map((v) => v.id)).toEqual([venue(1).id]);
   });
@@ -355,6 +368,7 @@ describe("tripRoute", () => {
       session(22, 23, [[BEA, -50]], 1),
       session(23, 1, [[CAL, 40]], 3),
     ]);
+
     expect(route.stops.map((s) => [s.venue.id, s.number, s.visits, s.net])).toEqual([
       [venue(1).id, 1, 3, 350],
       [venue(2).id, 2, 1, 300],
@@ -383,6 +397,7 @@ describe("playerTrip", () => {
       session(21, 23, [[BEA, -40]]),
       session(21, 22, [[ALEX, 60]]),
     ];
+
     const trip = playerTrip(sessions, ALEX);
     expect(trip).toMatchObject({
       net: 275,
@@ -413,6 +428,7 @@ describe("playerTrip", () => {
       nets.map((n, i) => session(21, i, [[ALEX, n]])),
       ALEX,
     );
+
     expect(trip.line.at(-1)).toBe(trip.net);
     expect(trip.net).toBe(nets.reduce((sum, n) => sum + n, 0));
     expect(trip.line).toHaveLength(nets.length + 1);

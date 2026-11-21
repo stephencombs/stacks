@@ -17,6 +17,7 @@ import {
   UNDONE_REASON,
 } from "@stacks/client-runtime/recordingView";
 import { TableId, type EntryId, type VisitId } from "@stacks/contracts";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import { useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
@@ -52,6 +53,7 @@ type Props = StaticScreenProps<{ tableId: string }>;
  */
 export function TableScreen({ route }: Props) {
   const id = Option.getOrNull(TableId.makeOption(route.params.tableId));
+
   return id ? <Table tableId={id} /> : <Missing />;
 }
 
@@ -80,11 +82,14 @@ function Table({ tableId }: { tableId: TableId }) {
   const [open, setOpen] = useState<Open | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<(TableRecorded & { entryId: EntryId }) | null>(null);
+
   const deletion = useDeleteTable(tableId, () =>
     navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } }),
   );
+
   if (state === null) return <PersonalScreen session>{null}</PersonalScreen>;
   const signedIn = account.available && account.isSignedIn;
+
   if (!table) {
     if (server?.legacySessionId && signedIn) {
       return (
@@ -97,20 +102,26 @@ function Table({ tableId }: { tableId: TableId }) {
         </StacksProvider>
       );
     }
+
     if (signedIn && server === undefined) return <PersonalScreen session>{null}</PersonalScreen>;
+
     return <Missing />;
   }
+
   const view = liveTable(table, server);
   const close = () => setOpen(null);
   const toVisit = (visitId: VisitId) => navigation.dispatch(StackActions.push("Play", { visitId }));
+
   const recorded = ({ entryId, ...rest }: TableRecorded) => {
     close();
+
     if (entryId) setSaved({ entryId, ...rest });
     else {
       setSaved(null);
       setNotice(rest.text);
     }
   };
+
   const undo = async ({ entryId, visitId }: { entryId: EntryId; visitId: VisitId }) => {
     const receipt = await quick.submit({
       type: "correct",
@@ -119,19 +130,23 @@ function Table({ tableId }: { tableId: TableId }) {
       reason: UNDONE_REASON,
       replacement: null,
     });
+
     if (receipt) {
       setSaved(null);
       setNotice("Rebuy undone. It stays in the history, voided.");
     }
   };
+
   const actions = tableActions(table.role, {
     playing: false,
     closed: view.closed,
     empty: view.seats.length === 0,
   });
+
   const venue = state.venues.find((item) => item.id === table.table.venueId);
   const soft = view.closed ? "text-muted" : "text-felt-soft";
   const ink = view.closed ? "text-ink" : "text-felt-ink";
+
   return (
     <PersonalScreen
       session
@@ -211,11 +226,11 @@ function Table({ tableId }: { tableId: TableId }) {
           felt={!view.closed}
           actions={actions}
           onAction={(action) =>
-            action === "delete_table"
-              ? deletion.confirm()
-              : action === "edit"
-                ? undefined
-                : setOpen({ type: "action", action })
+            Match.value(action).pipe(
+              Match.when("delete_table", () => deletion.confirm()),
+              Match.when("edit", () => undefined),
+              Match.orElse((next) => setOpen({ type: "action", action: next })),
+            )
           }
         />
       </View>
@@ -283,43 +298,48 @@ function Table({ tableId }: { tableId: TableId }) {
           onSelf={toVisit}
         />
       )}
-      {open?.type === "sit" ? (
-        <SitDownSheet
-          tableId={tableId}
-          player={table.you.player}
-          returning={table.visits.some((item) => item.isSelf)}
-          onClose={close}
-          onSeated={(visitId) => {
-            close();
-            navigation.dispatch(StackActions.replace("Play", { visitId }));
-          }}
-        />
-      ) : open?.type === "action" ? (
-        <TableActionSheet
-          action={open.action}
-          table={table}
-          onClose={close}
-          onAdded={(name) => {
-            close();
-            setSaved(null);
-            setNotice(`${name} is at the table.`);
-          }}
-        />
-      ) : open?.type === "seat" ? (
-        <SeatSheet
-          seat={open.seat}
-          table={view}
-          onClose={close}
-          onRecorded={recorded}
-          onSeated={(_, name) =>
-            recorded({ visitId: open.seat.visitId, text: `${name} is back at the table.` })
-          }
-          onHistory={(visitId) => {
-            close();
-            toVisit(visitId);
-          }}
-        />
-      ) : null}
+      {Match.value(open).pipe(
+        Match.when({ type: "sit" }, () => (
+          <SitDownSheet
+            tableId={tableId}
+            player={table.you.player}
+            returning={table.visits.some((item) => item.isSelf)}
+            onClose={close}
+            onSeated={(visitId) => {
+              close();
+              navigation.dispatch(StackActions.replace("Play", { visitId }));
+            }}
+          />
+        )),
+        Match.when({ type: "action" }, (sheet) => (
+          <TableActionSheet
+            action={sheet.action}
+            table={table}
+            onClose={close}
+            onAdded={(name) => {
+              close();
+              setSaved(null);
+              setNotice(`${name} is at the table.`);
+            }}
+          />
+        )),
+        Match.when({ type: "seat" }, (sheet) => (
+          <SeatSheet
+            seat={sheet.seat}
+            table={view}
+            onClose={close}
+            onRecorded={recorded}
+            onSeated={(_, name) =>
+              recorded({ visitId: sheet.seat.visitId, text: `${name} is back at the table.` })
+            }
+            onHistory={(visitId) => {
+              close();
+              toVisit(visitId);
+            }}
+          />
+        )),
+        Match.orElse(() => null),
+      )}
     </PersonalScreen>
   );
 }

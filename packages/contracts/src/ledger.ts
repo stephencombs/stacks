@@ -23,12 +23,14 @@ export const Game = Schema.Literals([
   "poker_tourney",
   "other",
 ]);
+
 export type Game = typeof Game.Type;
 
 /** A spot at the table, numbered from the dealer's left: seat 1 is first base at blackjack. */
 export const Seat = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 14 }));
 
 export const SessionStatus = Schema.Literals(["live", "closed"]);
+
 export type SessionStatus = typeof SessionStatus.Type;
 
 export const Session = Schema.Struct({
@@ -52,6 +54,7 @@ export const Session = Schema.Struct({
       : { path: ["endedAt"], issue: "a closed session has an end time and a live one doesn't" },
   ),
 );
+
 export type Session = typeof Session.Type;
 
 /**
@@ -65,6 +68,7 @@ export const Seating = Schema.Struct({
   seat: Schema.NullOr(Seat),
   occurredAt: Schema.DateTimeUtc,
 });
+
 export type Seating = typeof Seating.Type;
 
 /**
@@ -74,6 +78,7 @@ export type Seating = typeof Seating.Type;
  * - `adjustment`: a signed correction to the player's result. Never creates a debt.
  */
 export const EntryKind = Schema.Literals(["buy_in", "cash_out", "adjustment"]);
+
 export type EntryKind = typeof EntryKind.Type;
 
 export const Entry = Schema.Struct({
@@ -92,10 +97,11 @@ export const Entry = Schema.Struct({
   voidedBy: Schema.NullOr(UserId),
   voidReason: Schema.NullOr(Schema.String),
   replacesEntryId: Schema.NullOr(EntryId),
-}).check(Schema.makeFilter(entryShapeIssue));
+}).check(Schema.makeFilter(entryIssue));
+
 export type Entry = typeof Entry.Type;
 
-function entryShapeIssue(entry: {
+function entryIssue(entry: {
   readonly kind: EntryKind;
   readonly playerId: PlayerId;
   readonly counterpartyId: PlayerId | null;
@@ -105,15 +111,18 @@ function entryShapeIssue(entry: {
     if (entry.counterpartyId !== null) {
       return { path: ["counterpartyId"], issue: "adjustments don't involve another player" };
     }
+
     return entry.amount !== 0 ? undefined : { path: ["amount"], issue: "must not be zero" };
   }
+
   if (entry.counterpartyId === entry.playerId) {
     return { path: ["counterpartyId"], issue: "leave empty when it's the player's own money" };
   }
-  // A player who busted cashes out zero, which is what lets the session close.
+
   if (entry.kind === "cash_out") {
     return entry.amount >= 0 ? undefined : { path: ["amount"], issue: "must not be negative" };
   }
+
   return entry.amount > 0 ? undefined : { path: ["amount"], issue: "must be positive" };
 }
 
@@ -140,6 +149,7 @@ export const Stake = Schema.Struct({
   voidedBy: Schema.NullOr(UserId),
   voidReason: Schema.NullOr(Schema.String),
 });
+
 export type Stake = typeof Stake.Type;
 
 /**
@@ -155,4 +165,5 @@ export const Trip = Schema.Struct({
   createdBy: UserId,
   createdAt: Schema.DateTimeUtc,
 });
+
 export type Trip = typeof Trip.Type;

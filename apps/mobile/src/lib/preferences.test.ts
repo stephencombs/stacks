@@ -13,6 +13,7 @@ const usd = CurrencyCode.make("USD");
 
 const memoryStorage = (initial: Record<string, string> = {}) => {
   const map = new Map(Object.entries(initial));
+
   const storage: PreferencesStorage = {
     getItem: (key) => map.get(key) ?? null,
     setItem: (key, value) => {
@@ -22,6 +23,7 @@ const memoryStorage = (initial: Record<string, string> = {}) => {
       map.delete(key);
     },
   };
+
   return { map, storage };
 };
 
@@ -39,6 +41,7 @@ it("starts with safe defaults and restores valid saved preferences", () => {
   first.setShowCents(true);
   first.setPrivacyMode(true);
   first.setDefaultGame(Game.make("poker_cash"));
+
   const venue = {
     id: VenueId.make("0192e7a0-0000-7000-8000-000000000001"),
     name: "Bellagio",
@@ -49,6 +52,7 @@ it("starts with safe defaults and restores valid saved preferences", () => {
     lat: 36.1129,
     lng: -115.1765,
   };
+
   first.setDefaultVenue(venue);
 
   const second = memoryStorage(Object.fromEntries(map));
@@ -73,6 +77,7 @@ it("recovers cleanly from corrupt stored values", () => {
     "stacks-pref-default-game": "unknown_game",
     "stacks-pref-default-venue": "{bad-json",
   });
+
   const prefs = createPreferencesStore(storage).get();
   expect(prefs).toEqual({
     showCents: false,

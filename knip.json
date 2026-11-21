@@ -2,13 +2,14 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreBinaries": ["eas"],
   "ignoreDependencies": ["@leanspec/mcp"],
-  "ignore": [".agents/skills/**", "apps/mobile/maestro/scripts/**"],
+  "ignore": [".agents/skills/**", "apps/mobile/maestro/scripts/**", "tools/oxlint/anti-slop/**"],
   "workspaces": {
     "apps/mobile": {
       "entry": ["plugins/*.ts"],
       "ignoreDependencies": [
         "@expo-google-fonts/barlow-condensed",
-        "@expo-google-fonts/jetbrains-mono"
+        "@expo-google-fonts/jetbrains-mono",
+        "happy-dom"
       ]
     }
   }

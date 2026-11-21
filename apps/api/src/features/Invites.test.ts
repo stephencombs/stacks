@@ -2,18 +2,20 @@ import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as TestClock from "effect/testing/TestClock";
 
-import { groupWith, ids, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
+import { groupWith, ids, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("invites", (it) => {
+it.layer(TestApi.layer)("invites", (it) => {
   it.effect("shows a group before joining it", () =>
     Effect.gen(function* () {
       const { alex, bea } = yield* users("alex", "bea");
       const group = yield* groupWith(alex);
+
       const invite = yield* alex.invites.create({
         params: { groupId: group.group.id },
         payload: { id: ids.invite(), maxUses: null },
       });
+
       expect(yield* bea.invites.preview({ params: { code: invite.code } })).toEqual({
         groupId: group.group.id,
         groupName: "Vegas crew",
@@ -22,10 +24,12 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("invites", (it) => {
         alreadyMember: false,
         currentTripId: null,
       });
+
       const joined = yield* bea.invites.accept({
         params: { code: invite.code.toLowerCase() },
         payload: { displayName: "Bea" },
       });
+
       expect(joined.role).toBe("member");
       expect(joined.players.map((player) => player.displayName)).toEqual(["Owner", "Bea"]);
       expect(yield* bea.invites.preview({ params: { code: invite.code } })).toMatchObject({
@@ -41,14 +45,17 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("invites", (it) => {
       const group = yield* groupWith(alex, bea);
       const beaId = group.players[1]!.id;
       yield* bea.groups.leave({ params: { groupId: group.group.id } });
+
       const invite = yield* alex.invites.create({
         params: { groupId: group.group.id },
         payload: { id: ids.invite(), maxUses: 1 },
       });
+
       const back = yield* bea.invites.accept({
         params: { code: invite.code },
         payload: { displayName: "New name" },
       });
+
       expect(back.myPlayerId).toBe(beaId);
       expect(back.players).toHaveLength(2);
     }),
@@ -59,8 +66,10 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("invites", (it) => {
       const { alex, bea, cal, dee } = yield* users("alex", "bea", "cal", "dee");
       const group = yield* groupWith(alex);
       const groupId = group.group.id;
+
       const make = (maxUses: number | null) =>
         alex.invites.create({ params: { groupId }, payload: { id: ids.invite(), maxUses } });
+
       const accept = (client: typeof bea, code: string) =>
         Effect.flip(
           client.invites.accept({ params: { code }, payload: { displayName: "Someone" } }),

@@ -16,12 +16,16 @@ export const barTrack = (
   const length = (value: number) => (compress ? Math.sqrt(Math.abs(value)) : Math.abs(value));
   let low = 0;
   let high = 0;
+
   for (const value of values) {
     if (value < 0) low = Math.max(low, length(value));
+
     if (value > 0) high = Math.max(high, length(value));
   }
+
   const span = high + low || 1;
   const zero = low / span;
+
   return {
     zero,
     extent: (value: number) =>
@@ -48,16 +52,20 @@ export const lineScale = (
   const range = (lines: ReadonlyArray<ReadonlyArray<number>>) => {
     let low = 0;
     let high = 0;
+
     for (const values of lines)
       for (const value of values) {
         low = Math.min(low, value);
         high = Math.max(high, value);
       }
+
     return { low, high };
   };
+
   const count = Math.max(0, ...series.map((values) => values.length));
   let { low, high } = range(focus ? focus.map((i) => series[i] ?? []) : series);
   const reach = high - low;
+
   if (!focus || reach === 0) ({ low, high } = range(series));
   else
     for (const values of series)
@@ -66,15 +74,16 @@ export const lineScale = (
           low = Math.min(low, value);
           high = Math.max(high, value);
         }
+
   const span = high - low || 1;
   const clamp = (value: number) => Math.min(high, Math.max(low, value));
   const x = (i: number) => pad.x + (count <= 1 ? 0 : i / (count - 1)) * (size.width - 2 * pad.x);
   const y = (value: number) => pad.y + ((high - clamp(value)) / span) * (size.height - 2 * pad.y);
+
   return {
     x,
     y,
     zero: y(0),
-    /** 1 when the value runs off the top, -1 off the bottom, 0 when it's on the plot. */
     clipped: (value: number) => (value > high ? 1 : value < low ? -1 : 0),
     points: (values: ReadonlyArray<number>) => values.map((v, i) => `${x(i)},${y(v)}`).join(" "),
   };
@@ -99,13 +108,18 @@ export const spreadLabels = (
   const room = Math.max(0, bounds.max - bounds.min);
   const step = n <= 1 ? 0 : Math.min(gap, room / (n - 1));
   const placed = order.map((o) => Math.min(bounds.max, Math.max(bounds.min, o.y)));
+
   for (let k = 1; k < n; k++) placed[k] = Math.max(placed[k]!, placed[k - 1]! + step);
+
   if (n > 0 && placed[n - 1]! > bounds.max) {
     placed[n - 1] = bounds.max;
+
     for (let k = n - 2; k >= 0; k--) placed[k] = Math.min(placed[k]!, placed[k + 1]! - step);
   }
+
   const out = Array.from({ length: n }, () => bounds.min);
   order.forEach((o, k) => (out[o.i] = placed[k]!));
+
   return out;
 };
 
@@ -120,15 +134,18 @@ export const labelWidth = (text: string, fontSize: number) =>
  * Where to draw a label of `width` that wants its center on `at`. A label that would cross an
  * edge is pinned to that edge, anchor on the inside, so the first or last character stays visible.
  */
-export const placeLabel = (
+export const placeLabel: (
   at: number,
   width: number,
   bounds: { readonly min: number; readonly max: number },
-): { readonly x: number; readonly anchor: "start" | "middle" | "end" } => {
+) => { readonly x: number; readonly anchor: "start" | "middle" | "end" } = (at, width, bounds) => {
   const span = bounds.max - bounds.min;
+
   if (!(width > 0) || span <= 0 || width >= span || at - width / 2 < bounds.min)
     return { x: bounds.min, anchor: "start" };
+
   if (at + width / 2 > bounds.max) return { x: bounds.max, anchor: "end" };
+
   return { x: at, anchor: "middle" };
 };
 
@@ -146,26 +163,29 @@ export const runningLine = (
   const first = points[0]?.at ?? 0;
   const span = (points.at(-1)?.at ?? first) - first;
   const across = size.width - 2 * pad.x;
+
   const xs = points.map(
     (point, i) =>
       pad.x +
       (span > 0 ? (point.at - first) / span : points.length <= 1 ? 0 : i / (points.length - 1)) *
         across,
   );
+
   const placed = points.map((point, i) => ({ x: xs[i]!, y: scale.y(point.total) }));
   const line = [{ x: pad.x, y: scale.zero }, ...placed];
   const end = line.at(-1)!;
+
   return {
     zero: scale.zero,
     points: placed,
-    /** The line, from break-even through every point, for a polyline. */
     line: line.map((p) => `${p.x},${p.y}`).join(" "),
-    /** The region between the line and break-even, for a path. */
     area: `M${pad.x} ${scale.zero} ${line.map((p) => `L${p.x} ${p.y}`).join(" ")} L${end.x} ${scale.zero} Z`,
     nearest: (x: number) => {
       let best = 0;
+
       for (let i = 1; i < xs.length; i++)
         if (Math.abs(xs[i]! - x) < Math.abs(xs[best]! - x)) best = i;
+
       return best;
     },
   };

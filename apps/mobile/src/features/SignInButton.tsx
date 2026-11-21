@@ -17,15 +17,17 @@ export function SignInButton({
 }) {
   const { startHostedAuth } = useHostedAuth();
   const [problem, setProblem] = useState<string | null>(null);
+
   const start = async () => {
     setProblem(null);
+
     try {
       await startHostedAuth({ mode });
     } catch (error) {
-      // Clerk's errors say what went wrong in its own words; show them rather than nothing.
       setProblem(error instanceof Error ? error.message : "Signing in didn't finish. Try again.");
     }
   };
+
   return (
     <View className="gap-2">
       <Button

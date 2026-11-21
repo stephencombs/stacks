@@ -19,11 +19,23 @@ export const placeTabsConfig = {
   }),
 };
 
-const drawables: Record<string, string> = {
+const drawables = {
   Play: "tab_play",
   Stats: "tab_stats",
   Map: "tab_map",
   Crew: "tab_crew",
+} as const;
+
+const tabDrawable = (title: string) => {
+  switch (title) {
+    case "Play":
+    case "Stats":
+    case "Map":
+    case "Crew":
+      return drawables[title];
+    default:
+      return title;
+  }
 };
 
 /** Android's own tab bar, with Material Symbols from `assets/tab-icons`: filled when selected. */
@@ -31,12 +43,13 @@ export const placeTab = (title: string, _symbol: string) => ({
   title,
   tabBarIcon: ({ focused }: { focused: boolean }) => ({
     type: "image" as const,
-    source: { uri: focused ? `${drawables[title]}_selected` : drawables[title]! },
+    source: { uri: focused ? `${tabDrawable(title)}_selected` : tabDrawable(title) },
   }),
 });
 
 /** Material's tab bar (its navigation bar) is 80dp, drawn over the foot of the screens and the gesture inset. */
 export function useTabBarHeight() {
   const insets = useSafeAreaInsets();
+
   return 80 + insets.bottom;
 }

@@ -11,16 +11,20 @@ const utc = DateTime.zoneMakeOffset(0);
 
 const openStore = async () => {
   let documentState: RecordingStorageDocument = { revision: 0 };
+
   const store = makeRecordingStore({
     load: async () => documentState,
     commit: async (_revision, payload) => {
       documentState = { revision: documentState.revision + 1, payload };
+
       return documentState.revision;
     },
     subscribe: () => () => {},
     close: async () => {},
   });
+
   await store.ready;
+
   return store;
 };
 
@@ -48,6 +52,7 @@ const bellagio: CachedVenue = {
 
 it("returns empty before any finished session", async () => {
   const store = await openStore();
+
   try {
     const view = personalMapView(recordingHome(store.getSnapshot().state!), new Map(), utc);
     expect(view.kind).toBe("empty");
@@ -58,6 +63,7 @@ it("returns empty before any finished session", async () => {
 
 it("shapes pins, day paths, venue detail sheets and unmapped counts offline", async () => {
   const store = await openStore();
+
   try {
     const tripId = TripId.make("0192e7a0-0000-7000-8000-000000000301");
     await store.execute(
@@ -88,7 +94,6 @@ it("shapes pins, day paths, venue detail sheets and unmapped counts offline", as
       [bellagio],
     );
 
-    // One visit without a venue stays counted in noLocationLine.
     await store.execute(
       store.prepare({
         type: "record_completed",
@@ -104,6 +109,7 @@ it("shapes pins, day paths, venue detail sheets and unmapped counts offline", as
     const trips = new Map([[tripId, "Vegas Weekend"]]);
     const allView = personalMapView(home, trips, utc, { kind: "all" });
     expect(allView.kind).toBe("map");
+
     if (allView.kind !== "map") throw new Error("expected map");
 
     expect(allView.pins).toHaveLength(2);
@@ -123,6 +129,7 @@ it("shapes pins, day paths, venue detail sheets and unmapped counts offline", as
     expect(wynnSheet.visits[0]!.meta).toContain("Vegas Weekend");
 
     const dayView = personalMapView(home, trips, utc, { kind: "day", dayKey: "2026-11-07" });
+
     if (dayView.kind !== "map") throw new Error("expected map");
     expect(dayView.filterLabel).toBe("Vegas Weekend · Saturday");
     expect(dayView.stops).toHaveLength(2);

@@ -16,9 +16,8 @@ export function PinnedFooter({
   onLayout,
   children,
 }: PinnedFooterProps) {
-  // The content may render nothing (a render prop, a bar that isn't live), so the footer starts
-  // bare and takes its chrome once the content measures taller than 0.
   const [filled, setFilled] = useState(false);
+
   return (
     <View
       onLayout={onLayout}

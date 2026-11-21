@@ -52,15 +52,17 @@ export function HistoryScreen({ route }: Props) {
   const period = route.params?.period;
   const [by, setBy] = useState<RecordingGrouping>(recordingGroupingOf(period) ?? "month");
   const [linked, setLinked] = useState(period);
+
   if (period !== linked) {
     setLinked(period);
     setBy(recordingGroupingOf(period) ?? by);
   }
+
   const scroll = useRef<ScrollViewInstance>(null);
   const scrolledTo = useRef<string | undefined>(undefined);
-  // iOS draws the header over the list, so the list's top sits under it.
   const headerHeight = useHeaderHeight();
   const groups = home ? recordingPeriods(home, by) : [];
+
   return (
     <PersonalScreen scrollRef={scroll}>
       {Platform.OS === "android" ? <PageTitle inContent>All sessions</PageTitle> : null}

@@ -1,5 +1,6 @@
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Match from "effect/Match";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import {
@@ -30,12 +31,15 @@ const inviteStatus = (invite: typeof InviteRow.Type, now: DateTime.Utc) =>
 
 const findByCode = Effect.fn("Invites.findByCode")(function* (code: string, lock = false) {
   const sql = yield* SqlClient.SqlClient;
+
   const [invite] = yield* sql`
     select id, group_id, code, expires_at, max_uses, uses, revoked_at from invites
     where code = ${code.trim().toUpperCase()}
     ${lock ? sql`for update` : sql``}
   `.pipe(Effect.flatMap(Access.decodeRows(InviteRow)));
+
   if (!invite) return yield* new NotFound({ resource: "invite" });
+
   return invite;
 });
 
@@ -54,11 +58,14 @@ export const create = Effect.fn("Invites.create")(function* (
       ${DateTime.toDateUtc(expiresAt)}, ${request.maxUses})
     on conflict (id) do nothing
   `;
+
   const [invite] = yield* sql`
     select id, group_id, code, expires_at, max_uses, uses, revoked_at from invites
     where id = ${request.id}
   `.pipe(Effect.flatMap(Access.decodeRows(InviteRow)));
+
   if (invite!.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
+
   return invite!;
 });
 
@@ -66,6 +73,7 @@ export const list = Effect.fn("Invites.list")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   yield* Access.membership(groupId);
   const now = yield* DateTime.now;
+
   return yield* sql`
     select id, group_id, code, expires_at, max_uses, uses, revoked_at from invites
     where group_id = ${groupId} and revoked_at is null
@@ -77,6 +85,7 @@ export const list = Effect.fn("Invites.list")(function* (groupId: GroupId) {
 export const revoke = Effect.fn("Invites.revoke")(function* (inviteId: InviteId) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
+
   const [invite] = yield* sql`
     select group_id, created_by from invites where id = ${inviteId}
   `.pipe(
@@ -84,12 +93,16 @@ export const revoke = Effect.fn("Invites.revoke")(function* (inviteId: InviteId)
       Access.decodeRows(Schema.Struct({ groupId: GroupId, createdBy: Schema.String })),
     ),
   );
+
   if (!invite) return yield* new NotFound({ resource: "invite" });
   const member = yield* Access.membership(invite.groupId);
+
   if (invite.createdBy !== userId && member.role === "member") {
     return yield* new Forbidden({ reason: "admins_only" });
   }
+
   yield* sql`update invites set revoked_at = now() where id = ${inviteId} and revoked_at is null`;
+
   return { ok: true } as const;
 });
 
@@ -97,6 +110,7 @@ export const preview = Effect.fn("Invites.preview")(function* (code: string) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const invite = yield* findByCode(code);
+
   const [group] = yield* sql`
     select g.name,
       (select count(*)::int from memberships m where m.group_id = g.id and m.left_at is null)
@@ -120,6 +134,7 @@ export const preview = Effect.fn("Invites.preview")(function* (code: string) {
       ),
     ),
   );
+
   return {
     groupId: invite.groupId,
     groupName: group!.name,
@@ -138,26 +153,30 @@ export const accept = Effect.fn("Invites.accept")(function* (
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   yield* Access.ensureUser();
+
   const groupId = yield* sql.withTransaction(
     Effect.gen(function* () {
       const invite = yield* findByCode(code, true);
+
       const [existing] = yield* sql`
         select left_at is null as active from memberships
         where group_id = ${invite.groupId} and user_id = ${userId}
       `.pipe(Effect.flatMap(Access.decodeRows(Schema.Struct({ active: Schema.Boolean }))));
+
       if (existing?.active) return invite.groupId;
 
       const status = inviteStatus(invite, yield* DateTime.now);
+
       if (status !== "open") {
         return yield* new Conflict({
-          reason:
-            status === "expired"
-              ? "invite_expired"
-              : status === "revoked"
-                ? "invite_revoked"
-                : "invite_used_up",
+          reason: Match.value(status).pipe(
+            Match.when("expired", () => "invite_expired" as const),
+            Match.when("revoked", () => "invite_revoked" as const),
+            Match.orElse(() => "invite_used_up" as const),
+          ),
         });
       }
+
       if (existing) {
         yield* sql`
           insert into membership_absences (group_id, user_id, left_at, returned_at)
@@ -178,9 +197,12 @@ export const accept = Effect.fn("Invites.accept")(function* (
           values (gen_random_uuid(), ${invite.groupId}, ${request.displayName}, ${userId}, ${userId})
         `;
       }
+
       yield* sql`update invites set uses = uses + 1 where id = ${invite.id}`;
+
       return invite.groupId;
     }),
   );
+
   return yield* Views.groupDetail(yield* Access.membership(groupId).pipe(Effect.orDie));
 });

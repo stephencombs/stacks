@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+import * as Predicate from "effect/Predicate";
 import { act, createElement, useEffect, useRef, type ReactNode, type Ref } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
@@ -42,6 +42,7 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
       fired.current = true;
       onLayout({ nativeEvent: { layout: { height: 640 } } });
     }, [onLayout]);
+
     return createElement(
       "div",
       {
@@ -52,6 +53,14 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
     );
   }
 
+  const scrollTarget = { scrollTo };
+
+  function isCallbackRef(
+    ref: Ref<typeof scrollTarget> | undefined,
+  ): ref is (instance: typeof scrollTarget) => void {
+    return Predicate.isFunction(ref);
+  }
+
   function ScrollView({
     children,
     horizontal,
@@ -59,10 +68,11 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
   }: {
     children?: ReactNode;
     horizontal?: boolean;
-    ref?: Ref<{ scrollTo: typeof scrollTo }>;
+    ref?: Ref<typeof scrollTarget>;
   }) {
-    if (typeof ref === "function") ref({ scrollTo });
-    else if (ref) ref.current = { scrollTo };
+    if (isCallbackRef(ref)) ref(scrollTarget);
+    else if (ref) ref.current = scrollTarget;
+
     return createElement("div", { "data-horizontal": horizontal ? "true" : "false" }, children);
   }
 
@@ -107,13 +117,17 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
   const { Landing } = await import("./Landing");
   const container = document.createElement("div");
   const root = createRoot(container);
+
   const button = (label: string) => {
     const found = Array.from(container.querySelectorAll("button")).find(
       (node) => node.textContent === label,
     );
+
     if (!found) throw new Error(`No ${label} button`);
+
     return found;
   };
+
   const step = (label: string) => container.querySelector(`[data-label="${label}"]`);
 
   try {

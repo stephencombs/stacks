@@ -29,6 +29,7 @@ export function ActionMenu({
   vertical = false,
 }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
+
   return (
     <>
       {fab ? (

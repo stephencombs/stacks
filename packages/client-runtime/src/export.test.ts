@@ -10,14 +10,15 @@ import { RECORDING_CURRENCY, type RecordedVisit } from "./recordingView.ts";
 
 const uuid = (n: number) => `0192e7a0-0000-7000-8000-${String(n).padStart(12, "0")}`;
 
-/** RFC 4180 parser for verifying exported rows round-trip cleanly. */
-const parseCsv = (csv: string): ReadonlyArray<ReadonlyArray<string>> => {
+const parseCsv = (csv: string) => {
   const rows: Array<Array<string>> = [];
   let row: Array<string> = [];
   let cell = "";
   let inQuotes = false;
+
   for (let i = 0; i < csv.length; i++) {
     const ch = csv[i]!;
+
     if (inQuotes) {
       if (ch === '"') {
         if (csv[i + 1] === '"') {
@@ -43,10 +44,12 @@ const parseCsv = (csv: string): ReadonlyArray<ReadonlyArray<string>> => {
       cell += ch;
     }
   }
+
   if (cell.length > 0 || row.length > 0) {
     row.push(cell);
     rows.push(row);
   }
+
   return rows;
 };
 
@@ -74,22 +77,24 @@ const makeVisit = ({
   tripId?: TripId | null;
   deletedAt?: string | undefined;
   highLimit?: boolean;
-}): RecordedVisit => {
+}) => {
   const start = DateTime.makeUnsafe(startedAt);
   const end = finishedAt ? DateTime.makeUnsafe(finishedAt) : null;
   const finalResult = end === null ? null : MinorUnits.make(cashOut + adjustment - buyIn);
   const tableId = TableId.make(uuid(10_000 + num));
   const playerId = PlayerId.make(uuid(1));
+
+  const visit = {
+    id: VisitId.make(uuid(20_000 + num)),
+    tableId,
+    playerId,
+    startedAt: start,
+    finishedAt: end,
+    revision: 1,
+  };
+
   return {
-    visit: {
-      id: VisitId.make(uuid(20_000 + num)),
-      tableId,
-      playerId,
-      startedAt: start,
-      finishedAt: end,
-      revision: 1,
-      ...(deletedAt ? { deletedAt: DateTime.makeUnsafe(deletedAt) } : {}),
-    },
+    visit: deletedAt ? { ...visit, deletedAt: DateTime.makeUnsafe(deletedAt) } : visit,
     totals: {
       buyIn: MinorUnits.make(buyIn),
       cashOut: MinorUnits.make(cashOut),
@@ -119,6 +124,7 @@ it("neutralizes spreadsheet formulas and names personal CSV files by date", () =
 
 it("exports finished non-deleted sessions in chronological order with exact formula safety", () => {
   const tripId = TripId.make(uuid(500));
+
   const visits: ReadonlyArray<RecordedVisit> = [
     makeVisit({
       num: 1,
@@ -169,6 +175,7 @@ it("exports finished non-deleted sessions in chronological order with exact form
   const csv = exportPersonalSessionsCsv(visits, {
     tripNames: new Map([[tripId, "+Vegas 2026"]]),
   });
+
   const [header, row1, row2, ...rest] = parseCsv(csv);
   expect(rest).toEqual([]);
   expect(header).toEqual([
@@ -226,11 +233,15 @@ it("exports finished non-deleted sessions in chronological order with exact form
 
 it("keeps exported totals equal to personalStats across random histories", () => {
   let seed = 0x51a7_2026;
+
   const next = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
+
     return seed;
   };
+
   const games: ReadonlyArray<Game | null> = [null, ...Game.literals];
+
   const venues: ReadonlyArray<RecordedVisit["venue"]> = [
     null,
     {
@@ -256,9 +267,11 @@ it("keeps exported totals equal to personalStats across random histories", () =>
   ];
 
   let nextNum = 100;
+
   for (let trial = 0; trial < 25; trial++) {
     const count = 1 + (next() % 20);
     const visits: Array<RecordedVisit> = [];
+
     for (let i = 0; i < count; i++) {
       const startMs = Date.UTC(2026, next() % 12, 1 + (next() % 28), next() % 24, next() % 60);
       const durationMs = ((next() % 600) + 1) * 60_000;
@@ -290,6 +303,7 @@ it("keeps exported totals equal to personalStats across random histories", () =>
     let csvResultSum = 0n;
     const byGame = new Map<string, bigint>();
     const byVenue = new Map<string, bigint>();
+
     for (const cols of rows) {
       const buyIn = Option.getOrThrow(parseMoney(cols[10]!, RECORDING_CURRENCY));
       const cashOut = Option.getOrThrow(parseMoney(cols[11]!, RECORDING_CURRENCY));
@@ -305,10 +319,15 @@ it("keeps exported totals equal to personalStats across random histories", () =>
     }
 
     expect(csvResultSum).toBe(BigInt(stats.summary.result));
+
     for (const row of stats.byGame) {
       expect(byGame.get(row.game ?? "") ?? 0n).toBe(BigInt(row.result));
     }
-    const venueNameById = new Map(venues.filter(Boolean).map((v) => [v!.id, v!.name]));
+
+    const venueNameById = new Map(
+      venues.flatMap((venue) => (venue ? [[venue.id, venue.name] as const] : [])),
+    );
+
     for (const row of stats.byCasino) {
       const name = row.venueId ? venueNameById.get(row.venueId)! : "";
       expect(byVenue.get(name) ?? 0n).toBe(BigInt(row.result));

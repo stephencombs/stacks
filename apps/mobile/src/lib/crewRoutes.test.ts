@@ -2,7 +2,6 @@ import { CommonActions, StackRouter } from "@react-navigation/routers";
 import { GroupId } from "@stacks/contracts";
 import { expect, it, vi } from "vite-plus/test";
 
-// The real stack reducer, without the native package around it.
 vi.mock("@react-navigation/native", async () => await import("@react-navigation/routers"));
 
 const { afterDeletingTrip, afterLeavingGroup } = await import("./crewRoutes");
@@ -12,23 +11,34 @@ const routeNames = ["Crew", "Group", "GroupSettings", "Sessions"];
 const router = StackRouter({ initialRouteName: "Crew" });
 const options = { routeNames, routeParamList: {}, routeGetIdList: {} };
 
-/** Crew's stack with these screens pushed, in order. */
+const isCompleteStack = (
+  next: ReturnType<typeof router.getStateForAction>,
+): next is ReturnType<typeof router.getInitialState> =>
+  next != null && "key" in next && Array.isArray(next.routes);
+
 const stack = (...names: ReadonlyArray<string>) => {
   let state = router.getInitialState(options);
-  for (const name of names)
-    state = router.getStateForAction(
+
+  for (const name of names) {
+    const next = router.getStateForAction(
       state,
       { type: "PUSH", payload: { name, params: { groupId } } },
       options,
-    ) as typeof state;
+    );
+
+    if (!isCompleteStack(next)) throw new Error(`Push ${name} did not produce a stack`);
+
+    state = next;
+  }
+
   return state;
 };
+
 const names = (state: { routes: ReadonlyArray<{ name: string }> } | null | undefined) =>
   state?.routes?.map((route) => route.name);
 
 it("leaves a group for Crew's first screen, with nothing above it to go back into", () => {
   const settings = stack("Group", "GroupSettings");
-  // Navigating to Crew from here pushes a second Crew over the settings of the group just left.
   expect(
     names(router.getStateForAction(settings, CommonActions.navigate("Crew"), options)),
   ).toEqual(["Crew", "Group", "GroupSettings", "Crew"]);
@@ -41,6 +51,7 @@ it("goes back to the group after deleting a trip opened from it", () => {
     afterDeletingTrip(groupId),
     options,
   );
+
   expect(names(next)).toEqual(["Crew", "Group"]);
 });
 

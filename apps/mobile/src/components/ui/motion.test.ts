@@ -1,11 +1,12 @@
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
-/** The motion module against a fake React Native, with Reduce Motion set as given. */
 async function load(reduceMotion: boolean) {
   vi.resetModules();
+
   const timing = vi.fn(() => ({
     start: (done?: (result: { finished: boolean }) => void) => done?.({ finished: true }),
   }));
+
   vi.doMock("react-native", () => ({
     AccessibilityInfo: {
       isReduceMotionEnabled: () => Promise.resolve(reduceMotion),
@@ -17,6 +18,7 @@ async function load(reduceMotion: boolean) {
   const motion = await import("./motion");
   motion.isReducedMotion();
   await Promise.resolve();
+
   return { ...motion, timing };
 }
 
@@ -30,6 +32,7 @@ it("jumps to the end with Reduce Motion on", async () => {
   const { animate, ease, timing } = await load(true);
   const shown = value();
   const done = vi.fn();
+  // SAFETY: animate only calls stopAnimation and setValue, which this stand-in implements.
   animate(shown as never, { toValue: 1, duration: 250, easing: ease.enter }, done);
   expect(timing).not.toHaveBeenCalled();
   expect(shown.setValue).toHaveBeenCalledWith(1);
@@ -40,6 +43,7 @@ it("animates on the native driver otherwise", async () => {
   const { animate, ease, timing } = await load(false);
   const shown = value();
   const done = vi.fn();
+  // SAFETY: animate only calls stopAnimation and setValue, which this stand-in implements.
   animate(shown as never, { toValue: 1, duration: 250, easing: ease.enter }, done);
   expect(timing).toHaveBeenCalledWith(
     shown,

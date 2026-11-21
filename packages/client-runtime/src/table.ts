@@ -1,8 +1,6 @@
 import { MinorUnits, type CurrencyCode, type PlayerId } from "@stacks/contracts";
 import { minorUnitDigits } from "@stacks/shared/money";
 
-// ---- The art ------------------------------------------------------------------------------------
-
 /** Where a seat is in one rendered frame, as fractions of the frame; `e` is the angle it's seen from. */
 export interface SeatAnchor {
   readonly x: number;
@@ -51,12 +49,14 @@ export const frameAt = (art: TableArt, degrees: number) =>
   );
 
 /** Seat anchors between rendered frames, following the camera as it moves. */
-export const anchorsAt = (art: TableArt, f: number): ReadonlyArray<SeatAnchor> => {
+export const anchorsAt = (art: TableArt, f: number) => {
   const i = clamp(Math.floor(f), 0, art.frames.length - 2);
   const t = clamp(f - i, 0, 1);
   const next = art.frames[i + 1]!.seats;
+
   return art.frames[i]!.seats.map((a, n) => {
     const b = next[n]!;
+
     return {
       x: lerp(a.x, b.x, t),
       y: lerp(a.y, b.y, t),
@@ -74,11 +74,13 @@ export const anchorsAt = (art: TableArt, f: number): ReadonlyArray<SeatAnchor> =
 export const chipAngles = (art: TableArt, degrees: number) => {
   const levels = art.chipLevels;
   const e = clamp(degrees, levels[0]!, levels[levels.length - 1]!);
+
   const i = clamp(
     levels.findLastIndex((l) => l <= e),
     0,
     levels.length - 2,
   );
+
   return {
     low: levels[i]!,
     high: levels[i + 1]!,
@@ -96,9 +98,6 @@ export const chipEdge = (degrees: number) => 0.1 * Math.cos((degrees * Math.PI) 
 export const seatLabel = (seat: number, seats?: number) =>
   seat === 1 ? "Seat 1, first base" : seat === seats ? `Seat ${seat}, third base` : `Seat ${seat}`;
 
-// ---- Chips in play --------------------------------------------------------------------------------
-
-/** Casino chips by value in whole units of the currency, and the art's chip color for each. */
 const DENOMINATIONS = [
   { value: 1000, chip: 8 },
   { value: 500, chip: 5 },
@@ -115,10 +114,9 @@ export const stackOf = (amount: number, currency: CurrencyCode) => {
   if (amount <= 0) return { chip: 0, count: 0 };
   const whole = amount / 10 ** minorUnitDigits(currency);
   const d = DENOMINATIONS.find((x) => whole / x.value >= 3) ?? DENOMINATIONS[4];
+
   return { chip: d.chip, count: clamp(Math.round(whole / d.value), 1, 10) };
 };
-
-// ---- What the table shows --------------------------------------------------------------------------
 
 export interface SeatView {
   readonly seat: number;
@@ -147,11 +145,12 @@ export const tableView = (input: {
     { readonly buyIn: MinorUnits; readonly cashOut: MinorUnits; readonly net: MinorUnits }
   >;
   readonly cashedOut: ReadonlySet<PlayerId>;
-}): TableView => ({
+}) => ({
   closed: input.closed,
   seats: Array.from(input.seats, ([playerId, seat]) => {
     const result = input.results.get(playerId);
     const done = input.closed || input.cashedOut.has(playerId);
+
     return {
       seat,
       playerId,
@@ -168,7 +167,6 @@ export const tableView = (input: {
  */
 export const busted = (out: NonNullable<SeatView["out"]>) => out.buyIn > 0 && out.cashOut === 0;
 
-/** A cash-out of three times what went in gets the big-hit shot. */
 const BIG_HIT = 3;
 
 export type TableEvent =
@@ -179,7 +177,6 @@ export type TableEvent =
   | { readonly kind: "cashOut"; readonly seat: SeatView; readonly big: boolean }
   | { readonly kind: "bust"; readonly seat: SeatView }
   | { readonly kind: "back"; readonly seat: SeatView }
-  /** A result corrected after the player left. */
   | { readonly kind: "result"; readonly seat: SeatView }
   | { readonly kind: "close" }
   | { readonly kind: "reopen" };
@@ -188,20 +185,26 @@ export type TableEvent =
  * What changed between two looks at the table, in the order to show it: people sitting and
  * moving, chips changing, people leaving with their results, then the table closing.
  */
-export const tableEvents = (prev: TableView, next: TableView): ReadonlyArray<TableEvent> => {
+export const tableEvents = (prev: TableView, next: TableView) => {
   const before = new Map(prev.seats.map((s) => [s.playerId, s]));
   const after = new Map(next.seats.map((s) => [s.playerId, s]));
   const events: Array<TableEvent> = [];
+
   if (prev.closed && !next.closed) events.push({ kind: "reopen" });
+
   for (const [playerId, was] of before)
     if (!after.has(playerId)) events.push({ kind: "stand", seat: was });
+
   for (const [playerId, now] of after) {
     const was = before.get(playerId);
+
     if (!was) events.push({ kind: "sit", seat: now });
     else if (was.seat !== now.seat) events.push({ kind: "move", from: was, to: now });
   }
+
   for (const [playerId, now] of after) {
     const was = before.get(playerId) ?? { ...now, inPlay: MinorUnits.make(0), out: null };
+
     if (was.out && !now.out) events.push({ kind: "back", seat: now });
     else if (
       was.out &&
@@ -214,12 +217,14 @@ export const tableEvents = (prev: TableView, next: TableView): ReadonlyArray<Tab
     else if (!now.out && was.inPlay !== now.inPlay)
       events.push({ kind: "stack", from: { ...was, seat: now.seat }, to: now });
   }
-  // Closing settles everyone at once, so the close shot shows every result together.
+
   if (!prev.closed && next.closed) events.push({ kind: "close" });
   else
     for (const [playerId, now] of after) {
       const was = before.get(playerId);
+
       if (!now.out || was?.out) continue;
+
       if (busted(now.out)) events.push({ kind: "bust", seat: now });
       else
         events.push({
@@ -228,16 +233,19 @@ export const tableEvents = (prev: TableView, next: TableView): ReadonlyArray<Tab
           big: now.out.buyIn > 0 && now.out.cashOut >= now.out.buyIn * BIG_HIT,
         });
     }
+
   return events;
 };
 
 /** The table with one event applied: what's on screen once that event has played. */
-export const applyEvent = (view: TableView, event: TableEvent, next: TableView): TableView => {
+export const applyEvent = (view: TableView, event: TableEvent, next: TableView) => {
   const others = (playerId: PlayerId) => view.seats.filter((s) => s.playerId !== playerId);
+
   const put = (seat: SeatView) => ({
     ...view,
     seats: [...others(seat.playerId), seat].toSorted((a, b) => a.seat - b.seat),
   });
+
   switch (event.kind) {
     case "sit":
       return put({ ...event.seat, inPlay: MinorUnits.make(0), out: null });
@@ -245,8 +253,10 @@ export const applyEvent = (view: TableView, event: TableEvent, next: TableView):
       return { ...view, seats: others(event.seat.playerId) };
     case "move": {
       const current = view.seats.find((s) => s.playerId === event.from.playerId) ?? event.from;
+
       return put({ ...current, seat: event.to.seat });
     }
+
     case "stack":
     case "cashOut":
     case "bust":
@@ -259,8 +269,6 @@ export const applyEvent = (view: TableView, event: TableEvent, next: TableView):
   }
 };
 
-// ---- The camera ----------------------------------------------------------------------------------
-
 /**
  * Where the camera is: a rendered frame `f` (fractional between frames), and a 2D push over it,
  * the table scaled by `z` and offset by `x`, `y` (fractions of the table's size) from the top left.
@@ -272,13 +280,13 @@ export interface Camera {
   readonly y: number;
 }
 
-/** A camera looking at `fx`, `fy` at zoom `z`; a push pulls that point toward the middle. */
-const look = (f: number, z: number, fx: number, fy: number): Camera => {
+const look = (f: number, z: number, fx: number, fy: number) => {
   const pull = clamp((z - 1) * 3, 0, 1);
+
   return { f, z, x: lerp(fx, 0.5, pull) - fx * z, y: lerp(fy, 0.5, pull) - fy * z };
 };
 
-export const mixCamera = (a: Camera, b: Camera, t: number): Camera => ({
+export const mixCamera = (a: Camera, b: Camera, t: number) => ({
   f: lerp(a.f, b.f, t),
   z: lerp(a.z, b.z, t),
   x: lerp(a.x, b.x, t),
@@ -287,17 +295,15 @@ export const mixCamera = (a: Camera, b: Camera, t: number): Camera => ({
 
 /** The shots a session moves between. */
 export const shots = (art: TableArt) => ({
-  /** Low at the rail, stepped back: walking up to an empty table. */
   arrive: look(art.frames.length - 1, 0.86, 0.5, 0.62),
-  /** A player's-eye view, where the camera rests while the table is live. */
   home: look(frameAt(art, 46), 1, 0.5, 0.5),
-  /** Straight down, once the session closes: everyone's result on the felt. */
   overhead: look(0, 0.97, 0.5, 0.5),
 });
 
 /** Where the camera rests for a table: arriving while it's empty, home while live, overhead closed. */
 export const restShot = (art: TableArt, view: TableView) => {
   const s = shots(art);
+
   return view.closed ? s.overhead : view.seats.length === 0 ? s.arrive : s.home;
 };
 
@@ -308,8 +314,6 @@ export const pacing = {
   hold: 900,
   bounce: 0.42,
 };
-
-// ---- Choreography ----------------------------------------------------------------------------------
 
 export type Ease = "inOut" | "out";
 
@@ -334,21 +338,29 @@ export type Beat =
  * catches up with it (`show`). Sitting down and buying in leave the camera alone; leaving the
  * table, a big hit and the close each get a shot.
  */
-export const beats = (
+export const beats: (
   art: TableArt,
   event: TableEvent,
   camera: Camera,
   currency: CurrencyCode,
-): ReadonlyArray<Beat> => {
+) => ReadonlyArray<Beat> = (art, event, camera, currency) => {
   const at = (seat: number, f = camera.f) => anchorsAt(art, f)[seat - 1]!;
-  const push = (seat: number, zoom: number, ms: number): Beat => ({
+
+  const push: (seat: number, zoom: number, ms: number) => Beat = (seat, zoom, ms) => ({
     kind: "camera",
     to: look(camera.f, zoom, at(seat).x, at(seat).y),
     ms,
     ease: "inOut",
   });
-  const motion = (m: Motion, wait = true): Beat => ({ kind: "motion", motion: m, wait });
+
+  const motion: (m: Motion, wait?: boolean) => Beat = (m, wait = true) => ({
+    kind: "motion",
+    motion: m,
+    wait,
+  });
+
   const show: Beat = { kind: "show" };
+
   switch (event.kind) {
     case "sit":
       return [show, motion({ kind: "drop", seat: event.seat.seat })];
@@ -363,10 +375,11 @@ export const beats = (
     case "stack": {
       const from = stackOf(event.from.inPlay, currency);
       const to = stackOf(event.to.inPlay, currency);
-      // A rebuy in the same chips lands on the stack; a color-up rebuilds it.
       const kept = from.chip === to.chip && to.count >= from.count ? from.count : 0;
+
       return [show, motion({ kind: "grow", seat: event.to.seat, from: kept })];
     }
+
     case "back":
       return [show, motion({ kind: "grow", seat: event.seat.seat, from: 0 })];
     case "result":
@@ -381,6 +394,7 @@ export const beats = (
       ];
     case "cashOut": {
       const seat = event.seat.seat;
+
       const lead: ReadonlyArray<Beat> = event.big
         ? [
             {
@@ -397,6 +411,7 @@ export const beats = (
             motion({ kind: "shine" }, false),
           ]
         : [push(seat, pacing.push, pacing.move * 0.5)];
+
       return [
         ...lead,
         motion({ kind: "rack", seat }),
@@ -405,13 +420,12 @@ export const beats = (
         { kind: "hold", ms: pacing.hold },
       ];
     }
+
     case "close":
     case "reopen":
       return [show];
   }
 };
-
-// ---- Playing it ---------------------------------------------------------------------------------
 
 /** What a platform does for the director: move its camera, play effects, redraw the table. */
 export interface Stage {
@@ -440,16 +454,18 @@ export const makeDirector = (
   let target = initial;
   let shown = initial;
   let running: Promise<void> | null = null;
-  // Shared with whatever is playing, which checks it between beats.
   const life = { stopped: false };
+
   const untilUnpaused = async () => {
     while (stage.paused() && !life.stopped) await stage.wait(200);
   };
 
   const play = async (event: TableEvent, next: TableView) => {
     const reduced = stage.reduced();
+
     for (const beat of beats(art, event, stage.camera(), currency)) {
       if (life.stopped) return;
+
       switch (beat.kind) {
         case "camera":
           await untilUnpaused();
@@ -457,6 +473,7 @@ export const makeDirector = (
           break;
         case "motion":
           if (reduced) continue;
+
           if (beat.wait) await stage.play(beat.motion);
           else void stage.play(beat.motion);
           break;
@@ -469,49 +486,56 @@ export const makeDirector = (
           break;
       }
     }
+
     if (event.kind === "close") {
       await untilUnpaused();
       await stage.move(restShot(art, shown), reduced ? 0 : pacing.move, "inOut");
+
       if (!reduced) void stage.play({ kind: "flip", seats: shown.seats.map((s) => s.seat) });
     }
   };
 
   const drain = async () => {
-    // Start after whatever called update has finished, such as a render committing.
     await Promise.resolve();
+
     while (!life.stopped) {
       const events = tableEvents(shown, target);
+
       if (events.length === 0) break;
       const next = target;
+
       for (const event of events) {
         if (life.stopped || next !== target) break;
         await play(event, next);
       }
-      // Anything this pass skipped shows up as is.
+
       if (next === target && tableEvents(shown, target).length > 0) {
         shown = target;
         stage.show(shown);
       }
     }
+
     if (life.stopped) return;
     const rest = restShot(art, shown);
     const now = stage.camera();
+
     if (now.f !== rest.f || now.z !== rest.z || now.x !== rest.x || now.y !== rest.y) {
       await untilUnpaused();
       await stage.move(rest, stage.reduced() ? 0 : pacing.move * 0.6, "inOut");
     }
   };
 
-  const kick = (): Promise<void> =>
+  const kick = () =>
     (running ??= drain().finally(() => {
       running = null;
+
       if (!life.stopped && tableEvents(shown, target).length > 0) void kick();
     }));
 
   return {
-    /** The table as the data now has it. */
     update: (view: TableView) => {
       target = view;
+
       return kick();
     },
     stop: () => {

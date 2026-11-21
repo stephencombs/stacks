@@ -18,11 +18,13 @@ import {
 const at = (hour: number) => DateTime.makeUnsafe(Date.UTC(2026, 9, 22, hour));
 const VEGAS = TripId.make("0192e7a0-0000-7000-8000-000000000501");
 const RENO = TripId.make("0192e7a0-0000-7000-8000-000000000502");
+
 const session = (n: number, tripId = VEGAS) => ({
   id: SessionId.make(`0192e7a0-0000-7000-8000-0000000002${String(n).padStart(2, "0")}`),
   tripId,
   startedAt: at(n),
 });
+
 const stake = (
   n: number,
   fields: {
@@ -45,7 +47,7 @@ const stake = (
   endedAt: fields.to === undefined ? null : at(fields.to),
   voidedAt: fields.voided ? at(23) : null,
 });
-/** A net result for a player at a session. */
+
 const won = (n: number, playerId: typeof ALEX, amount: number) => ({
   ...entry({ kind: "adjustment", playerId, amount: money(amount) }),
   sessionId: session(n).id,
@@ -77,22 +79,26 @@ describe("stakeOutcomes", () => {
 
   it("counts only sessions in the stake's own trip", () => {
     const s = stake(1, { lender: bruce, borrower: nick, amount: 100000 });
+
     const out = stakeOutcomes(
       [s],
       [session(1), session(2, RENO)],
       [won(1, nick, 1000), won(2, nick, 99900)],
     );
+
     expect(out.get(s.id)).toEqual({ result: 1000, owed: 100500 });
   });
 
   it("counts only sessions that start while the stake is open", () => {
     const s = stake(1, { lender: bruce, borrower: nick, amount: 100000, from: 2, to: 4 });
+
     const out = stakeOutcomes([s], sessions, [
       won(1, nick, 99900),
       won(2, nick, 1000),
       won(3, nick, 2000),
       won(4, nick, 99900),
     ]);
+
     expect(out.get(s.id)?.result).toBe(3000);
   });
 
@@ -142,31 +148,36 @@ describe("stakeOutcomes", () => {
         ...e,
         sessionId: session((i % 4) + 1).id,
       }));
+
       const players = [ALEX, BEA, CAL, ...new Set(ledgerEntries.map((e) => e.playerId))];
+
       const stakes = randomStakes
-        .map((s, i) =>
-          stake(i, {
+        .map((s, i) => {
+          const fields = {
             lender: players[s.lender % players.length]!,
             borrower: players[(s.lender + s.offset) % players.length]!,
             amount: s.amount,
             share: s.share,
             from: s.from,
-            ...(s.length === null ? {} : { to: s.from + s.length }),
-          }),
-        )
+          };
+
+          return stake(i, s.length === null ? fields : { ...fields, to: s.from + s.length });
+        })
         .filter((s) => s.lenderId !== s.borrowerId);
+
       const outcomes = stakeOutcomes(stakes, sessions, ledgerEntries);
 
       for (const s of stakes) {
         const { result, owed } = outcomes.get(s.id)!;
         expect(Number.isInteger(owed) && owed >= 0).toBe(true);
+
         if (result >= 0) expect(owed).toBeGreaterThanOrEqual(s.amount);
         else expect(owed).toBe(Math.max(0, s.amount + result));
       }
 
-      // Each covered result is shared out in full across the stakes open at that session.
       for (const borrower of new Set(stakes.map((s) => s.borrowerId))) {
         const mine = stakes.filter((s) => s.borrowerId === borrower);
+
         const covered = sessions.filter((sess) =>
           mine.some(
             (s) =>
@@ -175,6 +186,7 @@ describe("stakeOutcomes", () => {
                 DateTime.toEpochMillis(sess.startedAt) < DateTime.toEpochMillis(s.endedAt)),
           ),
         );
+
         const coveredResult = ledgerEntries
           .filter(
             (e) =>
@@ -183,6 +195,7 @@ describe("stakeOutcomes", () => {
               covered.some((sess) => sess.id === e.sessionId),
           )
           .reduce((sum, e) => sum + (e.kind === "buy_in" ? -e.amount : e.amount), 0);
+
         expect(mine.reduce((sum, s) => sum + outcomes.get(s.id)!.result, 0)).toBe(coveredResult);
       }
 

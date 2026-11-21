@@ -31,8 +31,10 @@ export function NameSheet({
 
   const submit = async () => {
     const trimmed = name.trim();
+
     if (!trimmed) return setNameError(emptyError);
     setNameError(null);
+
     if (trimmed === initial || (await onSave(trimmed))) onClose();
   };
 
@@ -57,6 +59,7 @@ export function NameSheet({
         value={name}
         onChangeText={(text) => {
           setName(text);
+
           if (text.trim()) setNameError(null);
         }}
         maxLength={maxLength}

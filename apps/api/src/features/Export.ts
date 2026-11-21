@@ -55,6 +55,7 @@ const csvRow = (cells: ReadonlyArray<string>) => cells.map(csvCell).join(",");
 export const forGroup = Effect.fn("Export.forGroup")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   yield* Access.membership(groupId);
+
   const [[group], rows] = yield* Effect.all(
     [
       sql`select id, name, currency, created_at from groups where id = ${groupId}`.pipe(
@@ -88,7 +89,9 @@ export const forGroup = Effect.fn("Export.forGroup")(function* (groupId: GroupId
     ],
     { concurrency: "unbounded" },
   );
+
   const currency = group!.currency;
+
   const lines = [
     COLUMNS.join(","),
     ...rows.map((row) =>
@@ -112,5 +115,6 @@ export const forGroup = Effect.fn("Export.forGroup")(function* (groupId: GroupId
       ]),
     ),
   ];
+
   return `${lines.join("\n")}\n`;
 });

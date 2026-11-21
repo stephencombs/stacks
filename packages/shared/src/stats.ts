@@ -27,8 +27,10 @@ export interface StatsSession {
 /** A player's total after each session, carried through the ones they sat out. */
 export const runningTotals = (sessions: ReadonlyArray<StatsSession>, playerId: PlayerId) => {
   let total = 0;
+
   return sessions.map((session) => {
     total += session.results.find((result) => result.playerId === playerId)?.net ?? 0;
+
     return total;
   });
 };
@@ -41,10 +43,12 @@ export const runningTotals = (sessions: ReadonlyArray<StatsSession>, playerId: P
 export const runningReturns = (sessions: ReadonlyArray<StatsSession>, playerId: PlayerId) => {
   let net = 0;
   let buyIn = 0;
+
   return sessions.map((session) => {
     const result = session.results.find((r) => r.playerId === playerId);
     net += result?.net ?? 0;
     buyIn += result?.buyIn ?? 0;
+
     return buyIn > 0 ? net / buyIn : null;
   });
 };
@@ -64,6 +68,7 @@ export const raceLines = (
   players.map((playerId) => {
     const values: ReadonlyArray<number | null> =
       measure === "money" ? runningTotals(sessions, playerId) : runningReturns(sessions, playerId);
+
     return { playerId, values, line: [0, ...values.map((value) => value ?? 0)] };
   });
 
@@ -84,12 +89,12 @@ const compareKey = (a: string | null, b: string | null) =>
 
 const hours = (milliseconds: bigint) => Number((milliseconds + 18_000n) / 36_000n) / 100;
 
-// Divide exact minor units by elapsed hours, rounding halves away from zero.
 const hourlyResult = (result: number, milliseconds: bigint) => {
   if (milliseconds === 0n) return checkedMinorUnits(0n);
   const numerator = BigInt(result) * 3_600_000n;
   const magnitude = numerator < 0n ? -numerator : numerator;
   const rounded = (magnitude * 2n + milliseconds) / (milliseconds * 2n);
+
   return checkedMinorUnits(numerator < 0n ? -rounded : rounded);
 };
 
@@ -123,6 +128,7 @@ export const personalStats = (
           },
         ],
   );
+
   const filtered = finished
     .filter(
       (session) =>
@@ -141,10 +147,12 @@ export const personalStats = (
   const measure = (items: typeof filtered) => {
     let result = 0n;
     let milliseconds = 0n;
+
     for (const item of items) {
       result += BigInt(item.result);
       milliseconds += item.milliseconds;
     }
+
     return {
       result: checkedMinorUnits(result),
       sessions: items.length,
@@ -152,20 +160,24 @@ export const personalStats = (
       milliseconds,
     };
   };
+
   const { milliseconds, ...summary } = measure(filtered);
   const runs = sessionRuns(filtered.map((item) => item.result));
 
   const breakdown = <K extends string | null>(key: (session: (typeof filtered)[number]) => K) => {
     const groups = new Map<K, typeof filtered>();
+
     for (const session of filtered) {
       const groupKey = key(session);
       const group = groups.get(groupKey) ?? [];
       group.push(session);
       groups.set(groupKey, group);
     }
+
     return [...groups]
       .map(([key, group]) => {
         const { milliseconds: _milliseconds, ...row } = measure(group);
+
         return { key, ...row };
       })
       .toSorted((a, b) =>
@@ -174,6 +186,7 @@ export const personalStats = (
   };
 
   let total = 0n;
+
   return {
     summary: {
       ...summary,
@@ -182,6 +195,7 @@ export const personalStats = (
     },
     runningResult: filtered.map(({ sessionId, finishedAt, result }) => {
       total += BigInt(result);
+
       return { sessionId, finishedAt, result, total: checkedMinorUnits(total) };
     }),
     byGame: breakdown((session) => session.game).map(({ key, ...row }) => ({ game: key, ...row })),
@@ -193,7 +207,6 @@ export const personalStats = (
       years: [...new Set(finished.map((session) => session.year))].toSorted((a, b) => b - a),
       games: [...new Set(finished.map((session) => session.game))].toSorted(compareKey),
       venueIds: [...new Set(finished.map((session) => session.venueId))].toSorted(compareKey),
-      // Most recently played first.
       tripIds: [
         ...new Set(
           finished
@@ -252,11 +265,13 @@ export const groupStats = <P extends GroupPlay>(
   filters: PersonalStatsFilters = {},
 ) => {
   const yearOf = (play: P) => DateTime.toParts(DateTime.setZone(play.endedAt, timeZone)).year;
+
   const ordered = plays.toSorted(
     (a, b) =>
       DateTime.toEpochMillis(a.startedAt) - DateTime.toEpochMillis(b.startedAt) ||
       compareKey(a.id, b.id),
   );
+
   const shown = ordered.filter(
     (play) =>
       (filters.tripId === undefined
@@ -270,8 +285,10 @@ export const groupStats = <P extends GroupPlay>(
     PlayerId,
     { result: bigint; sessions: number; milliseconds: bigint; wins: number }
   >();
+
   for (const playerId of members)
     sheets.set(playerId, { result: 0n, sessions: 0, milliseconds: 0n, wins: 0 });
+
   for (const play of shown)
     for (const { playerId, net, milliseconds } of play.results) {
       const sheet = sheets.get(playerId) ?? {
@@ -280,12 +297,15 @@ export const groupStats = <P extends GroupPlay>(
         milliseconds: 0n,
         wins: 0,
       };
+
       sheet.result += BigInt(net);
       sheet.sessions += 1;
       sheet.milliseconds += BigInt(Math.max(0, milliseconds));
+
       if (net > 0) sheet.wins += 1;
       sheets.set(playerId, sheet);
     }
+
   const rows = Array.from(sheets, ([playerId, sheet]) => ({
     playerId,
     result: checkedMinorUnits(sheet.result),
@@ -294,8 +314,9 @@ export const groupStats = <P extends GroupPlay>(
     hourlyResult: hourlyResult(checkedMinorUnits(sheet.result), sheet.milliseconds),
     wins: sheet.wins,
   }));
-  // Played rows keep roster order among equals: a stable sort, and nothing breaks the tie.
+
   const played = rows.filter((row) => row.sessions > 0).toSorted((a, b) => b.result - a.result);
+
   const standings: ReadonlyArray<GroupStanding> = [
     ...played.map((row) => ({
       ...row,
@@ -318,7 +339,6 @@ export const groupStats = <P extends GroupPlay>(
   return {
     standings,
     result: checkedMinorUnits(played.reduce((sum, row) => sum + BigInt(row.result), 0n)),
-    /** In scope, oldest first. */
     plays: shown,
     byGame: breakdown((play) => play.game).map(({ key, ...row }) => ({ game: key, ...row })),
     byCasino: breakdown((play) => play.venueId).map(({ key, ...row }) => ({
@@ -329,7 +349,6 @@ export const groupStats = <P extends GroupPlay>(
       years: [...new Set(ordered.map(yearOf))].toSorted((a, b) => b - a),
       games: [...new Set(ordered.map((play) => play.game))].toSorted(compareKey),
       venueIds: [...new Set(ordered.map((play) => play.venueId))].toSorted(compareKey),
-      // Most recently played first.
       tripIds: [...new Set(ordered.toReversed().map((play) => play.tripId))],
     },
   };
@@ -346,7 +365,6 @@ export interface GroupAward {
   readonly play: GroupPlay | null;
 }
 
-/** Awards in the order they're handed out; earlier awards get first pick of the players. */
 const AWARDS: ReadonlyArray<AwardKey> = [
   "biggest_hit",
   "heater",
@@ -355,59 +373,72 @@ const AWARDS: ReadonlyArray<AwardKey> = [
   "night_owl",
 ];
 
-/** Hours into the night: 6pm is 0, 2am is 8. Daytime is -1 and never wins Night owl. */
 const lateness = (hour: number) => (hour >= 18 ? hour - 18 : hour < 6 ? hour + 6 : -1);
 
 /**
  * A trip's awards. Each goes to the best player for it who doesn't already hold one, so one hot
  * player doesn't sweep the lot; when everyone eligible already has one, the best takes it anyway.
  */
-export const groupAwards = (
-  plays: ReadonlyArray<GroupPlay>,
-  clock: TripClock,
-): ReadonlyArray<GroupAward> => {
+export const groupAwards = (plays: ReadonlyArray<GroupPlay>, clock: TripClock) => {
   const ordered = plays.toSorted(
     (a, b) => DateTime.toEpochMillis(a.startedAt) - DateTime.toEpochMillis(b.startedAt),
   );
+
   const players = [...new Set(ordered.flatMap((play) => play.results.map((r) => r.playerId)))];
   const claims = new Map<AwardKey, Array<GroupAward>>(AWARDS.map((key) => [key, []]));
+
   const claim = (key: AwardKey, playerId: PlayerId, value: number, play: GroupPlay | null) =>
     claims.get(key)!.push({ key, playerId, value, play });
+
   for (const playerId of players) {
     const mine = ordered.flatMap((play) => {
       const result = play.results.find((r) => r.playerId === playerId);
+
       return result ? [{ play, net: result.net }] : [];
     });
+
     const best = mine.reduce((top, m) => (m.net > top.net ? m : top));
+
     if (best.net > 0) claim("biggest_hit", playerId, best.net, best.play);
     const run = sessionRuns(mine.map((m) => m.net)).longestWinningRun;
+
     if (run >= 2) claim("heater", playerId, run, null);
     let total = 0;
     let low = 0;
+
     for (const m of mine) {
       total += m.net;
       low = Math.min(low, total);
     }
+
     if (low < 0 && total > low) claim("comeback", playerId, total - low, null);
     const venues = new Set(mine.flatMap((m) => (m.play.venueId ? [m.play.venueId] : []))).size;
+
     if (venues >= 2) claim("hopper", playerId, venues, null);
+
     const owl = mine.reduce((top, m) =>
       lateness(clock.hour(m.play.startedAt)) > lateness(clock.hour(top.play.startedAt)) ? m : top,
     );
+
     const owlHour = clock.hour(owl.play.startedAt);
+
     if (lateness(owlHour) >= 6) claim("night_owl", playerId, owlHour, owl.play);
   }
 
   const holders = new Set<PlayerId>();
+
   return AWARDS.flatMap((key) => {
     const ranking = claims
       .get(key)!
       .sort((a, b) =>
         key === "night_owl" ? lateness(b.value) - lateness(a.value) : b.value - a.value,
       );
+
     const award = ranking.find((c) => !holders.has(c.playerId)) ?? ranking[0];
+
     if (!award) return [];
     holders.add(award.playerId);
+
     return [award];
   });
 };

@@ -3,14 +3,14 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import type { CrewActivityItem, EntryId, PlayerId, SessionId, TripId } from "@stacks/contracts";
 
-import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.ts";
-import { TestApi } from "../testing/TestApi.ts";
+import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.test-utils.ts";
+import { TestApi } from "../testing/TestApi.test-utils.ts";
 import {
   finishHistoricalSession,
   seedEntry,
   seedSession,
   voidHistoricalEntry,
-} from "../testing/legacySessions.ts";
+} from "../testing/legacySessions.test-utils.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
@@ -32,6 +32,7 @@ const startSession = Effect.fn("test.startSession")(function* (
     notes: null,
     startedAt,
   });
+
   return id;
 });
 
@@ -51,6 +52,7 @@ const buyIn = Effect.fn("test.buyIn")(function* (
     note: null,
     replacesEntryId,
   });
+
   return id;
 });
 
@@ -76,7 +78,7 @@ const itemTime = (item: CrewActivityItem) =>
       : item.startedAt,
   );
 
-it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
+it.layer(TestApi.layer)("crew activity", (it) => {
   it.effect("gathers every group you're in, newest first", () =>
     Effect.gen(function* () {
       const { alex, bea, cal } = yield* users("alex", "bea", "cal");
@@ -103,7 +105,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
       );
       const times = items.map(itemTime);
       expect(times).toEqual([...times].sort((a, b) => b - a));
-      // groupWith's trips start at the TestClock's now, so only the sessions' order is fixed here.
       expect(items.map(itemId).filter((id) => id === live || id === finished)).toEqual([
         live,
         finished,
@@ -120,7 +121,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
         group: { id: vegas.group.id },
         trip: { id: vegas.tripId },
       });
-      // Players seated in one request sit down together, so their order is a tie.
       expect(byPlayer(items.find((item) => itemId(item) === finished))).toEqual(
         [
           { playerId: vegas.myPlayerId, displayName: "Owner", net: 1500 },
@@ -138,7 +138,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
     Effect.gen(function* () {
       const { alex } = yield* users("alex");
       const group = yield* groupWith(alex);
-      // Three trips at each time, so pages split between items that tie.
+
       for (let i = 0; i < 54; i++) {
         yield* alex.trips.create({
           params: { groupId: group.group.id },
@@ -149,7 +149,6 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
       const first = yield* feed(alex);
       expect(first.items).toHaveLength(50);
       expect(first.nextCursor).not.toBeNull();
-      // Something newer arriving doesn't shift the older pages.
       yield* alex.trips.create({
         params: { groupId: group.group.id },
         payload: { id: ids.trip(), name: "Late", startedAt: day(1) },
@@ -162,9 +161,7 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
       expect(new Set(pagedIds).size).toBe(55);
       const all = (yield* feed(alex)).items.map(itemId);
       expect(all.slice(1)).toEqual(pagedIds.slice(0, 49));
-      expect(yield* Effect.flip(feed(alex, "not-a-cursor"))).toMatchObject({
-        _tag: "InvalidRequest",
-      });
+      expect((yield* Effect.flip(feed(alex, "not-a-cursor")))._tag).toBe("InvalidRequest");
     }),
   );
 
@@ -174,13 +171,13 @@ it.layer(TestApi.layer, { timeout: "30 seconds" })("crew activity", (it) => {
       const group = yield* groupWith(alex, bea, cal);
       const groupId = group.group.id;
       yield* startSession(alex, group.tripId, [group.players[1]!.id], day(1));
-      // Bea also plays in a group Alex isn't in; her seat there must not show up for Alex.
       const elsewhere = yield* groupWith(dee, bea);
       const beaElsewhere = elsewhere.players.find((p) => p.id !== elsewhere.myPlayerId)!.id;
       yield* startSession(dee, elsewhere.tripId, [beaElsewhere], day(2));
 
       const groupsIn = (page: { readonly items: ReadonlyArray<CrewActivityItem> }) =>
         new Set(page.items.map((item) => item.group.id));
+
       expect(groupsIn(yield* feed(alex))).toEqual(new Set([groupId]));
       expect(groupsIn(yield* feed(bea))).toEqual(new Set([groupId, elsewhere.group.id]));
       expect((yield* feed(eve)).items).toEqual([]);
