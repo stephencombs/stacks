@@ -35,6 +35,7 @@ import { Icon } from "../components/ui/Icon";
 import { GroupStatsView } from "../features/GroupStats";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet } from "../features/RecordingForms";
+import { chipColor } from "../features/chipColor";
 import {
   AndroidGroupChip,
   AndroidStatsEmpty,
@@ -44,7 +45,6 @@ import {
   Filters,
   StatsContent,
   StatsHeading,
-  chipColor,
   signed,
 } from "../features/StatsParts";
 import { useAccount } from "../lib/account";
@@ -654,7 +654,7 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
               "absolute gap-1 rounded-xl px-3 py-2",
               android ? "bg-surface shadow-md dark:bg-fill" : "border border-line bg-surface",
             )}
-            style={{ left: callout, top: android ? -18 : 0, width: calloutWidth }}
+            style={{ left: callout, top: android ? 2 : 0, width: calloutWidth }}
           >
             <Text className="type-footnote font-semibold text-ink">{shown.day}</Text>
             <View className="flex-row justify-between gap-3">

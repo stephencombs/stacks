@@ -23,7 +23,7 @@ import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/u
 import { cn } from "../components/ui/cn";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet, StartSheet } from "../features/RecordingForms";
-import { chipColor } from "../features/StatsParts";
+import { chipColor } from "../features/chipColor";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 
 /** How many finished sessions Play lists before See all. */

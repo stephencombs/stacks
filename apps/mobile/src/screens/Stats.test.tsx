@@ -3,7 +3,16 @@ import { makeRecordingStore } from "@stacks/client-runtime/recording";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
 import { recordingHome } from "@stacks/client-runtime/recordingView";
 import type { StatsState } from "@stacks/client-runtime/statsCopy";
-import { GroupId, MinorUnits, PlayerId, TableId, TripId, UserId, VenueId } from "@stacks/contracts";
+import {
+  CurrencyCode,
+  GroupId,
+  MinorUnits,
+  PlayerId,
+  TableId,
+  TripId,
+  UserId,
+  VenueId,
+} from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 import { act, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -88,7 +97,17 @@ async function load(
     ),
     PanResponder: { create: () => ({ panHandlers: {} }) },
   }));
-  vi.doMock("react-native-svg", () => ({ default: Container }));
+  vi.doMock("react-native-svg", () => ({
+    default: Container,
+    Circle: Container,
+    ClipPath: Container,
+    Defs: Container,
+    Line: Container,
+    Path: Container,
+    Polyline: Container,
+    Rect: Container,
+    Text: Container,
+  }));
   vi.doMock("react-native-safe-area-context", () => ({
     useSafeAreaInsets: () => ({ top: 24, left: 0, right: 0 }),
   }));
@@ -270,6 +289,7 @@ const signedOut: Account = {
 };
 
 const vegas = TripId.make("0192e7a0-0000-7000-8000-0000000000e1");
+const casinoId = VenueId.make("0192e7a0-0000-7000-8000-0000000000e2");
 
 async function withFinishedSessions() {
   let saved: RecordingStorageDocument = { revision: 0 };
@@ -283,6 +303,21 @@ async function withFinishedSessions() {
     close: async () => undefined,
   });
   await store.ready;
+  await store.transform((current) => ({
+    ...current,
+    venues: [
+      {
+        id: casinoId,
+        name: "Casino",
+        kind: "casino",
+        city: null,
+        region: null,
+        country: null,
+        lat: null,
+        lng: null,
+      },
+    ],
+  }));
   const start = DateTime.makeUnsafe("2025-03-01T18:00:00.000Z");
   for (let day = 0; day < 5; day++) {
     const startedAt = DateTime.add(start, { days: day });
@@ -290,6 +325,7 @@ async function withFinishedSessions() {
       store.prepare({
         type: "record_completed",
         game: day === 4 ? "baccarat" : "blackjack",
+        ...(day < 4 ? { venueId: casinoId } : {}),
         buyIn: 10000,
         cashOut: 13000,
         startedAt,
@@ -396,7 +432,7 @@ it("shows saved group stats and opens a member's result sheet", async () => {
             group: {
               id: GroupId.make(groupId),
               name: "Thursday crew",
-              currency: "USD",
+              currency: CurrencyCode.make("USD"),
               createdAt: startedAt,
             },
             players: [

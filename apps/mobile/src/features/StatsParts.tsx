@@ -1,8 +1,8 @@
 import {
   TOP_CASINOS,
   finishedSessions,
-  type StatsTrips,
   type GameChip,
+  type StatsTrips,
   type StatsChip,
   type StatsFilters,
 } from "@stacks/client-runtime/stats";
@@ -24,6 +24,7 @@ import { formatDisplayMoney, usePreferences, type DevicePreferences } from "../l
 import { FeltStatusBar } from "./FeltStatusBar";
 import { PersonalLiveBar } from "./LiveBar";
 import { PersonalYouButton } from "./Personal";
+import { chipColor } from "./chipColor";
 
 import { StatsChipTrigger, StatsMenu, StatsRadio } from "./StatsMenus.android";
 
@@ -144,16 +145,6 @@ export function AndroidStatsEmpty({
     </View>
   );
 }
-
-export const chipColor: Record<GameChip, string> = {
-  red: "bg-chip-red",
-  blue: "bg-chip-blue",
-  green: "bg-chip-green",
-  black: "bg-chip-black",
-  purple: "bg-chip-purple",
-  orange: "bg-chip-orange",
-  grey: "bg-chip-grey",
-};
 
 export const signed = (
   amount: number,

@@ -23,7 +23,7 @@ import { cn } from "../components/ui/cn";
 import { Sheet } from "../components/ui/Sheet";
 import { Badge, List, Row } from "../components/ui/Surface";
 import { Chip } from "./Chip";
-import { chipColor } from "./StatsParts";
+import { chipColor } from "./chipColor";
 
 function TableSummarySheet({
   play,
