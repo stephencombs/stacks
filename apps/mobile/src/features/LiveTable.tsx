@@ -59,7 +59,7 @@ export function LiveClock({ since }: { since: DateTime.Utc | null }) {
   if (Platform.OS === "android")
     return (
       <View className="min-h-10 flex-row items-center gap-2 rounded-full bg-black/15 px-4">
-        <View className="size-2 rounded-full bg-live" />
+        <View className="size-2 rounded-full bg-felt-ink" />
         <Text className="type-footnote font-semibold text-felt-ink">LIVE</Text>
         {since ? (
           <Text className="type-callout font-semibold text-felt-ink tabular-nums">

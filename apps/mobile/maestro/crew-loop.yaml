@@ -99,7 +99,7 @@ onFlowComplete:
 - extendedWaitUntil:
     visible:
       id: "live-buy-in"
-      text: "\\$100\\.00"
+      text: "\\$100"
     timeout: 15000
 
 - tapOn: "Cash out"

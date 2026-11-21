@@ -87,7 +87,7 @@ const tableGameLabel = (table: Pick<Table, "game" | "gameName">) =>
       : null;
 
 /** A session's name in lists and titles: its game, or just "Session" until one is set. */
-export const visitTitle = (table: Table) =>
+export const visitTitle = (table: Pick<Table, "game" | "gameName" | "highLimit">) =>
   `${tableGameLabel(table) ?? "Session"}${table.highLimit ? " · High limit" : ""}`;
 
 /** A table you record at without playing, by name: "Blackjack table". */

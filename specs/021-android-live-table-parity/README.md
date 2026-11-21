@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-16
 priority: high
 tags:
@@ -8,7 +8,13 @@ tags:
   - design
 parent: "019"
 created_at: 2026-11-16T17:18:16.781260900Z
-updated_at: 2026-11-16T17:18:16.781260900Z
+updated_at: 2026-11-21T00:25:39.356552800Z
+completed_at: 2026-11-20T21:50:11.841254200Z
+transitions:
+  - status: complete
+    at: 2026-11-20T21:50:11.841254200Z
+  - status: in-progress
+    at: 2026-11-21T00:25:39.356552800Z
 ---
 
 # Android live table and its sheets match the frames
@@ -86,20 +92,20 @@ What the audit found against these frames, beyond the Design above:
 
 ## Plan
 
-- [ ] Felt app bar actions per role
-- [ ] Sheet header on Android (close or back at the start)
-- [ ] Amount entry order and centred amount
-- [ ] Buy-in connected button group
-- [ ] Edit sheet date and time chips
-- [ ] Delete as an alert dialog
-- [ ] Cash-out rows and buttons
-- [ ] Shared-table player list, recorder button, Add player text fields
-- [ ] Snackbar shape
-- [ ] Finished layout and copy
-- [ ] Back button label per role
-- [ ] "Other" game name; past-session amount prefix and result preview
+- [x] Felt app bar actions per role
+- [x] Sheet header on Android (close or back at the start)
+- [x] Amount entry order and centred amount
+- [x] Buy-in connected button group
+- [x] Edit sheet date and time chips
+- [x] Delete as an alert dialog
+- [x] Cash-out rows and buttons
+- [x] Shared-table player list, recorder button, Add player text fields
+- [x] Snackbar shape
+- [x] Finished layout and copy
+- [x] Back button label per role
+- [x] "Other" game name; past-session amount prefix and result preview
 
 ## Test
 
-- [ ] Each frame above matches on the emulator, light and dark (019's protocol)
+- [x] Each frame above matches on the emulator, light and dark (019's protocol)
 - [ ] `solo-recording.yaml` and `shared-table.yaml` pass on Android

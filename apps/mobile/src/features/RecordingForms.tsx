@@ -746,6 +746,37 @@ export function RebuySheet({
   const prefs = usePreferences();
   const amount = useAmount("", 1);
   const paid = usePaidBy(visit);
+  const preview = buyInTotalPreview(visit.totals.buyIn, amount.text, "add");
+  const added = parseRecordingAmount(amount.text, 1);
+  const hint =
+    preview === null ? undefined : (
+      <>
+        {who ? `${who}'s` : "Your"} buy-in becomes{" "}
+        <Money
+          amount={MinorUnits.make(preview)}
+          currency={RECORDING_CURRENCY}
+          className="type-footnote font-medium text-ink"
+        />
+        {Platform.OS === "android" && added.error === null ? (
+          <>
+            {"\n"}
+            <Text className="type-footnote text-faint">
+              <Money
+                amount={visit.totals.buyIn}
+                currency={RECORDING_CURRENCY}
+                className="type-footnote text-faint"
+              />
+              {" + "}
+              <Money
+                amount={added.amount}
+                currency={RECORDING_CURRENCY}
+                className="type-footnote text-faint"
+              />
+            </Text>
+          </>
+        ) : null}
+      </>
+    );
   return (
     <RecordingSheet
       keypad={<RecordingKeypad amount={amount} />}
@@ -771,39 +802,7 @@ export function RebuySheet({
         keypad={false}
         label={Platform.OS === "android" ? "" : "Amount"}
         amount={amount}
-        hint={(() => {
-          const preview = buyInTotalPreview(visit.totals.buyIn, amount.text, "add");
-          const added = parseRecordingAmount(amount.text, 1);
-          if (preview === null) return undefined;
-          return (
-            <>
-              {who ? `${who}'s` : "Your"} buy-in becomes{" "}
-              <Money
-                amount={MinorUnits.make(preview)}
-                currency={RECORDING_CURRENCY}
-                className="type-footnote font-medium text-ink"
-              />
-              {Platform.OS === "android" && added.error === null ? (
-                <>
-                  {"\n"}
-                  <Text className="type-footnote text-faint">
-                    <Money
-                      amount={visit.totals.buyIn}
-                      currency={RECORDING_CURRENCY}
-                      className="type-footnote text-faint"
-                    />
-                    {" + "}
-                    <Money
-                      amount={added.amount}
-                      currency={RECORDING_CURRENCY}
-                      className="type-footnote text-faint"
-                    />
-                  </Text>
-                </>
-              ) : null}
-            </>
-          );
-        })()}
+        hint={hint}
       />
       {visit.presets.length > 0 ? (
         <View

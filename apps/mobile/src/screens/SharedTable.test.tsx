@@ -70,7 +70,13 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
   const dispatch = vi.fn();
   let failSharedLoad = false;
   const joinMock = vi.fn(async (displayName: string) => {
-    const joined = { table: sharedView.table, player: { id: samId, displayName } };
+    const joined = {
+      table: {
+        ...sharedView.table,
+        starterPlayerId: sharedView.table.starterPlayerId ?? starterId,
+      },
+      player: { id: samId, displayName },
+    };
     await store.transform((current) => ({
       ...current,
       ownedPlayerIds: [...new Set([...(current.ownedPlayerIds ?? []), joined.player.id])],
