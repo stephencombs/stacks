@@ -190,6 +190,7 @@ const tableOf = (row: typeof TableRow.Type, starterPlayerId: PlayerId) =>
     id: row.id,
     tripId: row.tripId,
     game: row.game,
+    ...(row.gameName === null ? {} : { gameName: row.gameName }),
     venueId: row.venueId,
     highLimit: row.highLimit,
     starterPlayerId,
@@ -451,9 +452,9 @@ const save = Effect.fn("Recording.save")(function* (
     (table) => !before.tables.some((item) => item.id === table.id),
   )) {
     yield* sql`
-      insert into tables (id, starter_player_id, game, venue_id, high_limit)
-      values (${table.id}, ${table.starterPlayerId}, ${table.game}, ${table.venueId},
-        ${table.highLimit})
+      insert into tables (id, starter_player_id, game, game_name, venue_id, high_limit)
+      values (${table.id}, ${table.starterPlayerId}, ${table.game}, ${table.gameName ?? null},
+        ${table.venueId}, ${table.highLimit})
     `;
   }
   if (command.type === "open_table") {
@@ -470,7 +471,8 @@ const save = Effect.fn("Recording.save")(function* (
     if (previous && previous !== table)
       yield* sql`
         update tables
-        set game = ${table.game}, venue_id = ${table.venueId}, high_limit = ${table.highLimit}
+        set game = ${table.game}, game_name = ${table.gameName ?? null},
+          venue_id = ${table.venueId}, high_limit = ${table.highLimit}
         where id = ${table.id}
       `;
   }

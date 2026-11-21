@@ -68,10 +68,12 @@ vi.mock("../components/ui/Sheet", () => ({
 vi.mock("../components/ui/Icon", () => ({ Icon: () => null }));
 vi.mock("../components/ui/DateTimeField", () => ({ DateTimeField: () => null }));
 vi.mock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
+vi.mock("../components/ui/Surface", () => ({ List: Container, Row: Container }));
 vi.mock("../components/Money", () => ({ Money: () => null }));
 vi.mock("../lib/recording", () => ({ useRecordingState: () => null }));
 vi.mock("../lib/stacks", () => ({ useAction: () => null, useStacks: () => null }));
 vi.mock("./AmountKeypad", () => ({ AmountKeypad: () => null }));
+vi.mock("./Chip", () => ({ Chip: () => null }));
 vi.mock("./TableTrip", () => ({ TripChoice: () => null }));
 
 it("keeps an uncached existing casino distinct from Not listed, and clears it only when picked", async () => {

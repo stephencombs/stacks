@@ -23,6 +23,7 @@ import deleteVisit from "./0020_delete_visit.ts";
 import tableTrip from "./0021_table_trip.ts";
 import tableDeleted from "./0022_table_deleted.ts";
 import membershipAbsences from "./0023_membership_absences.ts";
+import tableGameName from "./0024_table_game_name.ts";
 
 export const records = {
   "0001_init": init,
@@ -48,6 +49,7 @@ export const records = {
   "0021_table_trip": tableTrip,
   "0022_table_deleted": tableDeleted,
   "0023_membership_absences": membershipAbsences,
+  "0024_table_game_name": tableGameName,
 };
 
 export const migrations = Migrator.fromRecord(records);

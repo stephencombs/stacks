@@ -34,6 +34,7 @@ export function Sheet({
   description,
   footer,
   busy = false,
+  back = false,
   children,
 }: {
   open: boolean;
@@ -44,6 +45,8 @@ export function Sheet({
   footer?: ReactNode;
   /** While a save is in flight, neither the close button nor Android's back closes it. */
   busy?: boolean;
+  /** Shows a back chevron/arrow instead of Close when stacked onto another sheet. */
+  back?: boolean;
   children?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -149,7 +152,25 @@ export function Sheet({
               <View className="h-1 w-8 rounded-full bg-fill-strong" />
             </View>
             <View className="min-h-14 flex-row items-center px-4">
-              <View className="w-11" />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={back ? "Back" : "Close"}
+                accessibilityState={{ disabled: busy }}
+                disabled={busy}
+                onPress={onClose}
+                hitSlop={8}
+                className="size-11 items-center justify-center"
+              >
+                <View className="size-9 items-center justify-center rounded-full bg-fill">
+                  {back ? (
+                    <View className="rotate-180">
+                      <Icon name="arrow-right" color="ink" size={18} />
+                    </View>
+                  ) : (
+                    <Icon name="close" color="ink" size={16} />
+                  )}
+                </View>
+              </Pressable>
               <Text
                 accessibilityRole="header"
                 numberOfLines={1}
@@ -157,19 +178,7 @@ export function Sheet({
               >
                 {title}
               </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-                accessibilityState={{ disabled: busy }}
-                disabled={busy}
-                onPress={onClose}
-                hitSlop={8}
-                className="size-11 items-center justify-center"
-              >
-                <View className="size-8 items-center justify-center rounded-full bg-fill">
-                  <Icon name="close" color="muted" size={14} />
-                </View>
-              </Pressable>
+              <View className="w-11" />
             </View>
             <ScrollView
               ref={scroll}

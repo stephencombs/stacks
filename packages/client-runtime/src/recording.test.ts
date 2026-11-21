@@ -11,7 +11,13 @@ import {
   type RecordingStorageChange,
   type RecordingStorageDocument,
 } from "./recordingStorage.ts";
-import { nextBuyInChange, recordingHome, recordingVisit } from "./recordingView.ts";
+import {
+  nextBuyInChange,
+  recordingHome,
+  recordingVisit,
+  tableTitle,
+  visitTitle,
+} from "./recordingView.ts";
 
 const at = (hour: number) =>
   DateTime.makeUnsafe(`2026-11-06T${hour.toString().padStart(2, "0")}:00:00.000Z`);
@@ -782,6 +788,41 @@ describe("editing a session after the fact", () => {
     const state = store.getSnapshot().state!;
     expect(state.visits[0]).toMatchObject({ startedAt: at(8), revision: 1 });
     expect(state.tables[0]).toMatchObject({ game: "blackjack", highLimit: true });
+    await store.close();
+  });
+
+  it("persists a custom Other game name through start, edit_visit, and titles", async () => {
+    const db = memory();
+    let store = await open(db);
+    await store.execute(
+      store.prepare({
+        type: "start",
+        buyIn: 20000,
+        startedAt: at(10),
+        game: "other",
+        gameName: "  Three Card Poker  ",
+      }),
+    );
+    const id = visitId(store);
+    expect(store.getSnapshot().state!.tables[0]).toMatchObject({
+      game: "other",
+      gameName: "Three Card Poker",
+    });
+    expect(recordingVisit(store.getSnapshot().state!, id)).toBeDefined();
+    await save(store, {
+      type: "edit_visit",
+      visitId: id,
+      table: { game: "other", gameName: "Pai Gow", venueId: null, highLimit: true },
+    });
+    store = await reload(store, db);
+    const updatedTable = store.getSnapshot().state!.tables[0]!;
+    expect(updatedTable).toMatchObject({
+      game: "other",
+      gameName: "Pai Gow",
+      highLimit: true,
+    });
+    expect(visitTitle(updatedTable)).toBe("Pai Gow · High limit");
+    expect(tableTitle({ ...updatedTable, gameName: null, highLimit: false })).toBe("Other table");
     await store.close();
   });
 

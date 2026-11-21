@@ -23,6 +23,9 @@ import {
   historyEntryName,
   historyLines,
   LIVE_REBUY_AMOUNTS,
+  localDateText,
+  localTimeText,
+  parseStartedAt,
   sessionReadout,
   sessionEditFields,
   RECORDING_CURRENCY,
@@ -31,16 +34,17 @@ import {
   type RecordingEvent,
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
-import { MinorUnits, VisitId, type EntryId, type PlayEntry } from "@stacks/contracts";
+import { MinorUnits, VisitId, type EntryId, type Game, type PlayEntry } from "@stacks/contracts";
 import { ownPlayers } from "@stacks/shared/recording";
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
-import { Animated, Platform, Text, View, useWindowDimensions } from "react-native";
+import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 
 import { Money } from "../components/Money";
 import { Button, IconButton } from "../components/ui/Button";
+import { DateTimeField } from "../components/ui/DateTimeField";
 import { Icon } from "../components/ui/Icon";
 import { FormError } from "../components/ui/Field";
 import { HeaderTitle } from "../components/ui/HeaderTitle";
@@ -318,6 +322,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           }
         })();
       },
+      { dismissLabel: "Keep session", icon: "trash" },
     );
   if (visit.visit.deletedAt !== undefined)
     return (
@@ -325,14 +330,34 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
         dock={
           canDelete && deletedHere ? (
             <RecordingToast>
-              <Text className="min-w-0 flex-1 text-sm text-ink-inverse">Session deleted</Text>
-              <Button
-                label="Undo"
-                size="sm"
-                pending={quick.pending}
-                onPress={() => void restore()}
-              />
-              <Button label="Dismiss" size="sm" onPress={() => setDeletedHere(false)} />
+              <Text
+                className={cn(
+                  "min-w-0 flex-1 text-sm",
+                  Platform.OS === "android" ? "text-[#F9FAFB]" : "text-ink-inverse",
+                )}
+              >
+                Session deleted
+              </Text>
+              {Platform.OS === "android" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={quick.pending}
+                  onPress={() => void restore()}
+                  className="px-2 py-1 active:opacity-70"
+                >
+                  <Text className="type-callout font-semibold text-[#6EE7B7]">Undo</Text>
+                </Pressable>
+              ) : (
+                <>
+                  <Button
+                    label="Undo"
+                    size="sm"
+                    pending={quick.pending}
+                    onPress={() => void restore()}
+                  />
+                  <Button label="Dismiss" size="sm" onPress={() => setDeletedHere(false)} />
+                </>
+              )}
             </RecordingToast>
           ) : undefined
         }
@@ -360,16 +385,44 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
     );
   const toast = saved ? (
     <RecordingToast key={saved.entryId}>
-      <Text className="min-w-0 flex-1 text-sm text-ink-inverse">{saved.text}</Text>
+      <Text
+        className={cn(
+          "min-w-0 flex-1 text-sm",
+          Platform.OS === "android" ? "text-[#F9FAFB]" : "text-ink-inverse",
+        )}
+      >
+        {saved.text}
+      </Text>
       {saved.undo ? (
-        <Button
-          label="Undo"
-          pending={quick.pending}
-          size="sm"
-          onPress={() => void undo(saved.entryId, saved.visitId)}
-        />
+        Platform.OS === "android" ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={quick.pending}
+            onPress={() => void undo(saved.entryId, saved.visitId)}
+            className="px-2 py-1 active:opacity-70"
+          >
+            <Text className="type-callout font-semibold text-[#6EE7B7]">Undo</Text>
+          </Pressable>
+        ) : (
+          <Button
+            label="Undo"
+            pending={quick.pending}
+            size="sm"
+            onPress={() => void undo(saved.entryId, saved.visitId)}
+          />
+        )
       ) : saved.visitId && saved.visitId !== visitId ? (
-        <Button label="Dismiss" size="sm" onPress={() => setSaved(null)} />
+        Platform.OS === "android" ? null : (
+          <Button label="Dismiss" size="sm" onPress={() => setSaved(null)} />
+        )
+      ) : Platform.OS === "android" ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setOpen({ type: "inspect", entryId: saved.entryId })}
+          className="px-2 py-1 active:opacity-70"
+        >
+          <Text className="type-callout font-semibold text-[#6EE7B7]">View entry</Text>
+        </Pressable>
       ) : (
         <Button
           label="View entry"
@@ -395,34 +448,46 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           {quick.error ? <FormError>{quick.error}</FormError> : null}
           {live ? (
             <>
-              <Text className="type-label text-[13px] text-felt-ink">Rebuy</Text>
-              <View
-                className="flex-row gap-2"
-                accessibilityRole="toolbar"
-                accessibilityLabel="Rebuy amounts"
-              >
-                {LIVE_REBUY_AMOUNTS.map((preset) => (
+              <View className="gap-2">
+                <Text
+                  className={cn(
+                    Platform.OS === "android"
+                      ? "type-label tracking-wider text-felt-ink/80 uppercase"
+                      : "type-label text-[13px] text-felt-ink",
+                  )}
+                >
+                  Rebuy
+                </Text>
+                <View
+                  className="flex-row gap-2"
+                  accessibilityRole="toolbar"
+                  accessibilityLabel="Rebuy amounts"
+                >
+                  {LIVE_REBUY_AMOUNTS.map((preset) => (
+                    <Button
+                      key={preset}
+                      label={`+ ${money(preset, prefs.showCents)}`}
+                      variant={Platform.OS === "android" ? "felt" : "secondary"}
+                      size="lg"
+                      haptic
+                      disabled={quick.pending}
+                      className="min-w-0 flex-1"
+                      onPress={() => void rebuy(preset)}
+                    />
+                  ))}
                   <Button
-                    key={preset}
-                    label={`+ ${money(preset, prefs.showCents)}`}
+                    label="Other"
+                    variant={Platform.OS === "android" ? "felt" : "secondary"}
                     size="lg"
-                    haptic
                     disabled={quick.pending}
                     className="min-w-0 flex-1"
-                    onPress={() => void rebuy(preset)}
+                    onPress={() => setOpen({ type: "rebuy" })}
                   />
-                ))}
-                <Button
-                  label="Other"
-                  size="lg"
-                  disabled={quick.pending}
-                  className="min-w-0 flex-1"
-                  onPress={() => setOpen({ type: "rebuy" })}
-                />
+                </View>
               </View>
               <Button
                 label="Cash out"
-                variant="primary"
+                variant={Platform.OS === "android" ? "feltPrimary" : "primary"}
                 size="lg"
                 haptic
                 disabled={quick.pending}
@@ -437,8 +502,12 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
               <View className={stacked ? "gap-2" : "flex-row gap-2"}>
                 <Button
                   label="Undo cash-out"
+                  variant={Platform.OS === "android" ? "ghost" : "secondary"}
                   size="lg"
-                  {...(stacked ? {} : { className: "flex-1" })}
+                  className={cn(
+                    !stacked && "flex-1",
+                    Platform.OS === "android" && "border border-line bg-transparent",
+                  )}
                   onPress={() => setOpen({ type: "reopen" })}
                 />
                 {canReturn ? (
@@ -461,6 +530,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
         since={seats?.startedAt ?? visit.visit.startedAt}
         actions={actions}
         onAction={act}
+        own={own}
         who={own ? undefined : name}
       />
       {live ? (
@@ -480,24 +550,48 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
         </>
       ) : (
         <>
-          <Text
-            accessibilityRole="header"
-            className="type-title text-[28px] leading-[34px] text-ink"
-          >
-            {own
-              ? visitTitle(visit.table)
-              : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
-          </Text>
-          <Text className="type-footnote text-muted">
-            {[
-              "Finished",
-              visit.venue?.name,
-              formatDay(start),
-              `${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
+          {Platform.OS === "android" ? (
+            <View className="flex-row items-center gap-3.5">
+              <GameTile game={visit.table.game} gameName={visit.table.gameName} />
+              <View className="min-w-0 flex-1 gap-0.5">
+                <Text
+                  accessibilityRole="header"
+                  className="type-title text-[24px] leading-[30px] text-ink"
+                >
+                  {own
+                    ? visitTitle(visit.table)
+                    : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
+                </Text>
+                <Text className="type-footnote text-muted">
+                  {[visit.venue?.name, formatDay(start)].filter(Boolean).join(" · ")}
+                </Text>
+                <Text className="type-footnote text-muted tabular-nums">
+                  {`${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <>
+              <Text
+                accessibilityRole="header"
+                className="type-title text-[28px] leading-[34px] text-ink"
+              >
+                {own
+                  ? visitTitle(visit.table)
+                  : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
+              </Text>
+              <Text className="type-footnote text-muted">
+                {[
+                  "Finished",
+                  visit.venue?.name,
+                  formatDay(start),
+                  `${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            </>
+          )}
           <VisitHero visit={visit} own={own} />
           <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
           <TableSection
@@ -509,46 +603,29 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
               }
             }}
           />
-          <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
+          <History
+            visit={visit}
+            own={own}
+            who={name}
+            onInspect={(entryId) => setOpen({ type: "inspect", entryId })}
+          />
         </>
       )}
       {open?.type === "edit" ? (
-        <Sheet
-          open
-          title={own ? "Edit my session" : `Edit ${name}'s session`}
+        <EditSessionSheet
+          visit={visit}
+          own={own}
+          name={name}
+          canEditTable={canEditTable}
+          canDelete={canDelete}
+          shared={shared}
+          showTrip={state !== null && ownPlayers(state).includes(visit.table.starterPlayerId)}
+          deletePending={quick.pending}
           onClose={close}
-          footer={<Button label="Done" onPress={close} />}
-        >
-          <List>
-            {sessionEditFields(visit, canEditTable).map(({ field: type, label, value }) => (
-              <Row key={type} onPress={() => setOpen({ type })}>
-                <Text className="flex-1 type-body text-ink">{label}</Text>
-                <Text className="max-w-[60%] shrink type-callout text-muted">{value}</Text>
-                <Icon name="chevron-right" color="muted" size={18} />
-              </Row>
-            ))}
-          </List>
-          {state && ownPlayers(state).includes(visit.table.starterPlayerId) ? (
-            <TableTripButton
-              attached={visit.table.tripId !== null}
-              onOpen={() => setOpen({ type: "trip" })}
-            />
-          ) : null}
-          <Button
-            label={own ? "Your history" : `${name}'s history`}
-            variant="ghost"
-            className="self-start"
-            onPress={() => setOpen({ type: "history" })}
-          />
-          {canDelete ? (
-            <Button
-              label={shared ? "Delete my visit" : "Delete session"}
-              variant="danger"
-              pending={quick.pending}
-              onPress={deleteVisit}
-            />
-          ) : null}
-        </Sheet>
+          onOpen={setOpen}
+          onDelete={deleteVisit}
+          onStartedSaved={() => setNotice("Start time saved.")}
+        />
       ) : open?.type === "action" && table ? (
         <TableActionSheet
           action={open.action}
@@ -672,11 +749,221 @@ export function RecordingToast({ children }: { children: ReactNode }) {
     >
       <View
         accessibilityLiveRegion="polite"
-        className="flex-row items-center gap-2 rounded-xl bg-ink py-2 pr-2 pl-4"
+        className={cn(
+          "flex-row items-center",
+          Platform.OS === "android"
+            ? "gap-3 rounded-[4px] bg-[#1F2120] py-2 pr-2 pl-4 shadow-lg"
+            : "gap-2 rounded-xl bg-ink py-2 pr-2 pl-4",
+        )}
       >
         {children}
       </View>
     </Animated.View>
+  );
+}
+
+const tileCode: Record<Game, string> = {
+  poker_cash: "PK",
+  poker_tourney: "PK",
+  blackjack: "BJ",
+  craps: "CR",
+  roulette: "RO",
+  baccarat: "BA",
+  slots: "SL",
+  other: "OT",
+};
+
+function GameTile({ game, gameName }: { game: Game | null; gameName?: string | null }) {
+  const custom = game === "other" ? gameName?.trim().replace(/\s+/g, "").slice(0, 2) : undefined;
+  const code = custom && custom.length > 0 ? custom.toUpperCase() : game ? tileCode[game] : "PL";
+  return (
+    <View className="size-12 items-center justify-center rounded-xl bg-ink">
+      <Text className="type-callout font-bold text-ink-inverse">{code}</Text>
+    </View>
+  );
+}
+
+function EditSessionSheet({
+  visit,
+  own,
+  name,
+  canEditTable,
+  canDelete,
+  shared,
+  showTrip,
+  deletePending,
+  onClose,
+  onOpen,
+  onDelete,
+  onStartedSaved,
+}: {
+  visit: RecordingVisitView;
+  own: boolean;
+  name: string;
+  canEditTable: boolean;
+  canDelete: boolean;
+  shared: boolean;
+  showTrip: boolean;
+  deletePending: boolean;
+  onClose: () => void;
+  onOpen: (sheet: OpenSheet) => void;
+  onDelete: () => void;
+  onStartedSaved: () => void;
+}) {
+  const save = useRecordingSubmit();
+  const [now] = useState(() => DateTime.makeUnsafe(Date.now()));
+  const initial = visit.visit.startedAt;
+  const [date, setDate] = useState(() => localDateText(new Date(DateTime.toEpochMillis(initial))));
+  const [time, setTime] = useState(() => localTimeText(initial));
+  const [startError, setStartError] = useState<string | null>(null);
+  const fields = sessionEditFields(visit, canEditTable);
+  const firstEntry = visit.entries.reduce(
+    (earliest, entry) =>
+      DateTime.toEpochMillis(entry.occurredAt) < DateTime.toEpochMillis(earliest)
+        ? entry.occurredAt
+        : earliest,
+    visit.visit.finishedAt ?? now,
+  );
+  const updateStarted = async (nextDate: string, nextTime: string) => {
+    setDate(nextDate);
+    setTime(nextTime);
+    const parsed = parseStartedAt({ date: nextDate, time: nextTime }, initial, firstEntry);
+    if (parsed.error !== null) {
+      setStartError(parsed.error);
+      return;
+    }
+    setStartError(null);
+    const receipt = await save.submit({
+      type: "edit_visit",
+      visitId: visit.visit.id,
+      startedAt: parsed.startedAt,
+    });
+    if (receipt) onStartedSaved();
+  };
+  if (Platform.OS !== "android")
+    return (
+      <Sheet
+        open
+        title={own ? "Edit my session" : `Edit ${name}'s session`}
+        onClose={onClose}
+        footer={<Button label="Done" onPress={onClose} />}
+      >
+        <List>
+          {fields.map(({ field: type, label, value }) => (
+            <Row key={type} onPress={() => onOpen({ type })}>
+              <Text className="flex-1 type-body text-ink">{label}</Text>
+              <Text className="max-w-[60%] shrink type-callout text-muted">{value}</Text>
+              <Icon name="chevron-right" color="muted" size={18} />
+            </Row>
+          ))}
+        </List>
+        {showTrip ? (
+          <TableTripButton
+            attached={visit.table.tripId !== null}
+            onOpen={() => onOpen({ type: "trip" })}
+          />
+        ) : null}
+        <Button
+          label={own ? "Your history" : `${name}'s history`}
+          variant="ghost"
+          className="self-start"
+          onPress={() => onOpen({ type: "history" })}
+        />
+        {canDelete ? (
+          <Button
+            label={shared ? "Delete my visit" : "Delete session"}
+            variant="danger"
+            pending={deletePending}
+            onPress={onDelete}
+          />
+        ) : null}
+      </Sheet>
+    );
+  const buyInValue = fields.find((f) => f.field === "buy_in")?.value ?? "";
+  const gameValue = fields.find((f) => f.field === "game")?.value ?? "Not set";
+  const venueValue = fields.find((f) => f.field === "venue")?.value ?? "Not set";
+  return (
+    <Sheet
+      open
+      title={own ? "Edit my session" : `Edit ${name}'s session`}
+      onClose={onClose}
+      footer={<Button label="Done" size="lg" onPress={onClose} />}
+    >
+      <List>
+        <Row onPress={() => onOpen({ type: "buy_in" })}>
+          <Text className="flex-1 type-body text-ink">Buy-in total</Text>
+          <Text className="max-w-[60%] shrink type-callout text-muted">{buyInValue}</Text>
+          <Icon name="chevron-right" color="muted" size={18} />
+        </Row>
+        <Row>
+          <Text className="flex-1 type-body text-ink">Started</Text>
+          <View className="flex-row items-center gap-2">
+            <DateTimeField
+              compact
+              label="Start date"
+              kind="date"
+              value={date}
+              onChange={(next) => void updateStarted(next, time)}
+              maximumDate={new Date(DateTime.toEpochMillis(now))}
+            />
+            <DateTimeField
+              compact
+              label="Start time"
+              kind="time"
+              value={time}
+              onChange={(next) => void updateStarted(date, next)}
+            />
+          </View>
+        </Row>
+        {canEditTable ? (
+          <>
+            <Row onPress={() => onOpen({ type: "game" })}>
+              <Text className="flex-1 type-body text-ink">Game</Text>
+              <View className="flex-row items-center gap-2 rounded-lg border border-line px-3 py-1.5">
+                <View className="size-2.5 rounded-full bg-live" />
+                <Text numberOfLines={1} className="max-w-44 type-callout font-medium text-ink">
+                  {gameValue}
+                </Text>
+              </View>
+            </Row>
+            <Row onPress={() => onOpen({ type: "venue" })}>
+              <Text className="flex-1 type-body text-ink">Casino</Text>
+              <Text className="max-w-[60%] shrink type-callout text-muted">{venueValue}</Text>
+              <Icon name="chevron-right" color="muted" size={18} />
+            </Row>
+          </>
+        ) : null}
+      </List>
+      {startError ? <FormError>{startError}</FormError> : null}
+      {save.error ? <FormError>{save.error}</FormError> : null}
+      {showTrip ? (
+        <TableTripButton
+          attached={visit.table.tripId !== null}
+          onOpen={() => onOpen({ type: "trip" })}
+        />
+      ) : null}
+      {canDelete ? (
+        <Pressable
+          accessibilityRole="button"
+          disabled={deletePending}
+          onPress={onDelete}
+          className="min-h-11 flex-row items-center gap-2 self-start px-1 py-1 active:opacity-70"
+        >
+          <Icon name="trash" color="loss" size={18} />
+          <Text className="type-callout font-medium text-loss">
+            {shared ? "Delete my visit" : "Delete session"}
+          </Text>
+        </Pressable>
+      ) : null}
+      {visit.visit.finishedAt === null ? (
+        <Button
+          label={own ? "Your history" : `${name}'s history`}
+          variant="ghost"
+          className="self-start"
+          onPress={() => onOpen({ type: "history" })}
+        />
+      ) : null}
+    </Sheet>
   );
 }
 
@@ -685,12 +972,14 @@ function VisitHeader({
   since,
   actions,
   onAction,
+  own = true,
   who,
 }: {
   visit: RecordingVisitView;
   since: DateTime.Utc;
   actions: ReadonlyArray<TableAction>;
   onAction: (action: TableAction) => void;
+  own?: boolean;
   who?: string | undefined;
 }) {
   const navigation = useNavigation();
@@ -699,18 +988,71 @@ function VisitHeader({
     return () => navigation.setOptions({ headerShown: true });
   }, [navigation]);
   const live = visit.visit.finishedAt === null;
+  const routes = navigation.getState?.()?.routes;
+  const prev = routes && routes.length > 1 ? routes[routes.length - 2] : undefined;
+  const nested = prev?.state as
+    | { routes?: ReadonlyArray<{ name: string }>; index?: number }
+    | undefined;
+  const fromStats =
+    prev?.name === "Stats" ||
+    prev?.name === "StatsTab" ||
+    nested?.routes?.[nested.index ?? 0]?.name === "StatsTab";
+  const fromTable = prev?.name === "Table";
+  const backLabel = live && own && !fromStats && !fromTable ? "Back to your play" : undefined;
   return (
     <View className="flex-row items-center justify-between gap-3">
-      <BackButton />
+      <BackButton label={backLabel} felt={live} />
       {live ? <LiveClock since={since} /> : <View className="flex-1" />}
-      <ActionSlot actions={actions} onAction={onAction} who={who} />
+      <ActionSlot felt={live} actions={actions} onAction={onAction} who={who} />
     </View>
   );
 }
 
+const backDestinationLabel = (
+  state:
+    | { readonly routes?: ReadonlyArray<{ readonly name: string; readonly state?: unknown }> }
+    | undefined,
+) => {
+  const routes = state?.routes;
+  const prev = routes && routes.length > 1 ? routes[routes.length - 2] : undefined;
+  if (!prev) return "Back to your play";
+  if (prev.name === "Table") return "Back to the table";
+  if (prev.name === "Stats" || prev.name === "StatsTab") return "Back to Stats";
+  if (prev.name === "Tabs") {
+    const nested = prev.state as
+      | { routes?: ReadonlyArray<{ name: string }>; index?: number }
+      | undefined;
+    const active = nested?.routes?.[nested.index ?? 0]?.name;
+    if (active === "StatsTab") return "Back to Stats";
+  }
+  return "Back to Play";
+};
+
 /** Back to wherever this screen came from, or to your play when it opened from a link. */
-export function BackButton() {
+export function BackButton({ label, felt = false }: { label?: string; felt?: boolean } = {}) {
   const navigation = useNavigation();
+  const resolved = label ?? backDestinationLabel(navigation.getState?.());
+  const goBack = () =>
+    navigation.canGoBack()
+      ? navigation.goBack()
+      : navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } });
+  if (Platform.OS === "android")
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={resolved}
+        hitSlop={8}
+        onPress={goBack}
+        className="min-h-11 flex-row items-center gap-1.5 pr-2 active:opacity-70"
+      >
+        <View className="rotate-180">
+          <Icon name="arrow-right" color={felt ? "felt-ink" : "ink"} size={20} />
+        </View>
+        <Text className={cn("type-callout font-medium", felt ? "text-felt-ink" : "text-ink")}>
+          {resolved}
+        </Text>
+      </Pressable>
+    );
   return (
     <IconButton
       accessibilityLabel="Back to your play"
@@ -719,11 +1061,7 @@ export function BackButton() {
           <Icon name="arrow-right" color="ink" />
         </View>
       }
-      onPress={() =>
-        navigation.canGoBack()
-          ? navigation.goBack()
-          : navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } })
-      }
+      onPress={goBack}
     />
   );
 }
@@ -797,6 +1135,7 @@ function VisitHero({ visit, own }: { visit: RecordingVisitView; own: boolean }) 
           className="type-hero"
         />
       </View>
+      {Platform.OS === "android" ? <View className="h-px bg-line" /> : null}
       <View className="flex-row gap-4">
         <View className="flex-1 gap-1">
           <Text className="type-footnote text-muted">Bought in</Text>
@@ -847,9 +1186,13 @@ const eventText = (event: RecordingEvent) =>
 
 function History({
   visit,
+  own = true,
+  who = "Their",
   onInspect,
 }: {
   visit: RecordingVisitView;
+  own?: boolean;
+  who?: string;
   onInspect: (entryId: EntryId) => void;
 }) {
   const state = useRecordingState();
@@ -866,7 +1209,7 @@ function History({
   return (
     <View className="gap-2">
       <SectionHeading count={lines.length === 1 ? "1 entry" : `${lines.length} entries`}>
-        History
+        {Platform.OS === "android" ? (own ? "Your history" : `${who}'s history`) : "History"}
       </SectionHeading>
       <List>
         {lines.map((line) => {
@@ -886,23 +1229,25 @@ function History({
           const item = line.entry;
           const voided = item.voidedAt !== null;
           const name = historyEntryName(visit, item);
+          const shownName =
+            Platform.OS === "android" && name === "Final cash-out" ? "Cash-out" : name;
           const time = formatTime(item.occurredAt);
           return (
             <Row
               key={item.id}
               onPress={() => onInspect(item.id)}
-              accessibilityLabel={`${name}, ${formatDisplayMoney(item.amount, RECORDING_CURRENCY, prefs, { forAccessibility: true })}, ${time}${voided ? ", voided" : ""}${item.replacesEntryId ? ", correction" : ""}`}
+              accessibilityLabel={`${shownName}, ${formatDisplayMoney(item.amount, RECORDING_CURRENCY, prefs, { forAccessibility: true })}, ${time}${voided ? ", voided" : ""}${item.replacesEntryId ? ", correction" : ""}`}
               accessibilityHint="Shows the entry, where you can correct or void it"
               className="min-h-14"
             >
-              <View className="min-w-0 flex-1 gap-0.5">
+              <View className={cn("min-w-0 flex-1 gap-0.5", voided && "opacity-50")}>
                 <Text
                   className={cn(
                     "text-base font-medium",
                     voided ? "text-muted line-through" : "text-ink",
                   )}
                 >
-                  {name}
+                  {shownName}
                 </Text>
                 <Text className="text-sm text-muted">
                   {[
@@ -918,7 +1263,9 @@ function History({
               <Money
                 amount={item.amount}
                 currency={RECORDING_CURRENCY}
-                className={voided ? "type-number text-muted line-through" : "type-number"}
+                className={
+                  voided ? "type-number text-muted line-through opacity-50" : "type-number"
+                }
               />
             </Row>
           );

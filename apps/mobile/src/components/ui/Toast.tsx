@@ -1,5 +1,5 @@
 import { createContext, use, useEffect, useRef, useState, type ReactNode } from "react";
-import { AccessibilityInfo, Animated, Pressable, Text, View } from "react-native";
+import { Platform, AccessibilityInfo, Animated, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { animate, duration, ease, useReducedMotion } from "./motion";
@@ -85,9 +85,21 @@ function ToastView({
       >
         <View
           accessibilityLiveRegion="polite"
-          className="min-h-13 flex-row items-center gap-3 rounded-xl border border-fill-strong bg-surface py-1.5 pr-1.5 pl-4"
+          className={
+            Platform.OS === "android"
+              ? "min-h-12 flex-row items-center gap-3 rounded-[4px] bg-[#1F2120] py-1.5 pr-2 pl-4 shadow-lg"
+              : "min-h-13 flex-row items-center gap-3 rounded-xl border border-fill-strong bg-surface py-1.5 pr-1.5 pl-4"
+          }
         >
-          <Text className="flex-1 text-base text-ink">{toast.message}</Text>
+          <Text
+            className={
+              Platform.OS === "android"
+                ? "flex-1 text-base text-white"
+                : "flex-1 text-base text-ink"
+            }
+          >
+            {toast.message}
+          </Text>
           {toast.action ? (
             <Pressable
               accessibilityRole="button"
@@ -96,9 +108,17 @@ function ToastView({
                 toast.action?.onPress();
                 close();
               }}
-              className="min-h-11 justify-center rounded-xl px-3 active:opacity-70"
+              className="min-h-11 justify-center rounded px-3 active:opacity-70"
             >
-              <Text className="text-base font-semibold text-ink">{toast.action.label}</Text>
+              <Text
+                className={
+                  Platform.OS === "android"
+                    ? "text-base font-semibold text-[#6EE7B7]"
+                    : "text-base font-semibold text-ink"
+                }
+              >
+                {toast.action.label}
+              </Text>
             </Pressable>
           ) : null}
         </View>

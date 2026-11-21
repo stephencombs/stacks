@@ -139,6 +139,15 @@ export const visitLiveEntryIds = (receipts: ReadonlyArray<RecordingReceipt>, vis
  * applies a command the server already accepted, from whichever actor made it: a device can't
  * know another actor's players, and the server checked them.
  */
+/** Custom name only applies when the game is `"other"`, trimmed to at most 60 characters. */
+export const normalizeGameName = (game: Table["game"], gameName: string | null | undefined) => {
+  if (game !== "other" || gameName === null || gameName === undefined) return null;
+  const trimmed = gameName.trim();
+  if (trimmed === "") return null;
+  requireValid(trimmed.length <= 60, "Keep the game name to 60 characters.");
+  return trimmed;
+};
+
 export const applyRecordingCommand = <S extends RecordingLedger>(
   state: S,
   command: RecordingCommand,
@@ -217,6 +226,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       "Start IDs are already used.",
     );
     if (known) return { ...state, receipts };
+    const gameName = normalizeGameName(command.game, command.gameName);
     return {
       ...state,
       tables: [
@@ -225,6 +235,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
           id: command.tableId,
           tripId: null,
           game: command.game,
+          ...(gameName === null ? {} : { gameName }),
           venueId: command.venueId,
           highLimit: command.highLimit,
           starterPlayerId: command.playerId,
@@ -332,17 +343,20 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
           (known || !tables.some((table) => table.id === command.tableId)),
         "Start IDs are already used.",
       );
-      if (!known)
+      if (!known) {
+        const gameName = normalizeGameName(command.game, command.gameName);
         tables.push(
           Table.make({
             id: command.tableId,
             tripId: null,
             game: command.game,
+            ...(gameName === null ? {} : { gameName }),
             venueId: command.venueId,
             highLimit: command.highLimit,
             starterPlayerId: command.playerId,
           }),
         );
+      }
     }
     visits.push(
       Visit.make({
@@ -459,8 +473,16 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
             "forbidden",
             "Only whoever records for everyone at this table can change its game or venue.",
           );
+        const gameName = normalizeGameName(command.table.game, command.table.gameName);
+        const { gameName: _previousGameName, ...rest } = table;
         const index = tables.findIndex((item) => item.id === table.id);
-        tables[index] = Table.make({ ...table, ...command.table });
+        tables[index] = Table.make({
+          ...rest,
+          game: command.table.game,
+          venueId: command.table.venueId,
+          highLimit: command.table.highLimit,
+          ...(gameName === null ? {} : { gameName }),
+        });
       }
     } else if (command.type === "add" || command.type === "finish") {
       requireValid(

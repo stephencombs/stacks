@@ -11,6 +11,7 @@ export type ActionMenuProps = {
   /** Opens from a floating "+" button, a screen's main way to add, instead of the "…" button. */
   fab?: boolean;
   vertical?: boolean;
+  felt?: boolean;
   actions: ReadonlyArray<{
     label: string;
     icon?: IconName;

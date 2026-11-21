@@ -79,13 +79,22 @@ export type RecordingHome = {
   readonly finishedResult: MinorUnits;
 };
 
+const tableGameLabel = (table: Pick<Table, "game" | "gameName">) =>
+  table.game === "other" && table.gameName?.trim()
+    ? table.gameName.trim()
+    : table.game
+      ? gameNames[table.game]
+      : null;
+
 /** A session's name in lists and titles: its game, or just "Session" until one is set. */
-export const visitTitle = (table: Table) =>
-  `${table.game ? gameNames[table.game] : "Session"}${table.highLimit ? " · High limit" : ""}`;
+export const visitTitle = (table: Pick<Table, "game" | "gameName" | "highLimit">) =>
+  `${tableGameLabel(table) ?? "Session"}${table.highLimit ? " · High limit" : ""}`;
 
 /** A table you record at without playing, by name: "Blackjack table". */
-export const tableTitle = (table: Table) =>
-  `${table.game ? `${gameNames[table.game]} table` : "Table"}${table.highLimit ? " · High limit" : ""}`;
+export const tableTitle = (table: Table) => {
+  const name = tableGameLabel(table);
+  return `${name ? `${name} table` : "Table"}${table.highLimit ? " · High limit" : ""}`;
+};
 
 const tableOf = (state: RecordingState, tableId: Table["id"]) =>
   state.tables.find((table) => table.id === tableId)!;

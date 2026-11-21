@@ -6,7 +6,15 @@ import { cn } from "./cn";
 import { ControlSurface } from "./ControlSurface";
 import { PressableScale } from "./PressableScale";
 
-type Variant = "primary" | "tint" | "secondary" | "ghost" | "link" | "danger";
+type Variant =
+  | "primary"
+  | "tint"
+  | "secondary"
+  | "ghost"
+  | "link"
+  | "danger"
+  | "felt"
+  | "feltPrimary";
 type Size = "sm" | "md" | "lg" | "xl" | "fab";
 
 const surfaces: Record<Variant, string> = {
@@ -16,6 +24,8 @@ const surfaces: Record<Variant, string> = {
   ghost: "active:bg-fill",
   link: "active:bg-fill",
   danger: "bg-fill active:opacity-70",
+  felt: "bg-white/15 active:bg-white/25",
+  feltPrimary: "bg-felt-ink active:opacity-90",
 };
 const spinners: Record<Variant, string> = {
   primary: "accent-ink-inverse",
@@ -24,6 +34,8 @@ const spinners: Record<Variant, string> = {
   ghost: "accent-ink",
   link: "accent-chip-blue",
   danger: "accent-loss",
+  felt: "accent-felt-ink",
+  feltPrimary: "accent-felt-deep",
 };
 const labels: Record<Variant, string> = {
   primary: "text-ink-inverse",
@@ -32,6 +44,8 @@ const labels: Record<Variant, string> = {
   ghost: "text-ink",
   link: "text-chip-blue",
   danger: "text-loss",
+  felt: "text-felt-ink",
+  feltPrimary: "text-[#14472B]",
 };
 // Minimum heights, so larger accessibility text sizes grow the button instead of clipping it.
 const sizes: Record<Size, string> = {
@@ -125,6 +139,7 @@ export function IconButton({
   haptic = false,
   className,
   plain = false,
+  felt = false,
 }: {
   icon: ReactNode;
   accessibilityLabel: string;
@@ -134,6 +149,7 @@ export function IconButton({
   haptic?: boolean;
   className?: string;
   plain?: boolean;
+  felt?: boolean;
 }) {
   return (
     <PressableScale
@@ -150,11 +166,12 @@ export function IconButton({
       className={cn(
         "size-11",
         plain && "items-center justify-center rounded-full active:bg-fill",
+        !plain && felt && "items-center justify-center rounded-full bg-black/15 active:bg-black/25",
         disabled && "opacity-50",
         className,
       )}
     >
-      {plain ? icon : <ControlSurface>{icon}</ControlSurface>}
+      {plain || felt ? icon : <ControlSurface>{icon}</ControlSurface>}
     </PressableScale>
   );
 }

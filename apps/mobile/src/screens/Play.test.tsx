@@ -85,6 +85,8 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.doMock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
   vi.doMock("../components/ui/HeaderTitle", () => ({ HeaderTitle: () => null }));
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
+  vi.doMock("../components/ui/DateTimeField", () => ({ DateTimeField: () => null }));
+  vi.doMock("../features/Chip", () => ({ Chip: () => null }));
   vi.doMock("../components/Money", () => ({ Money: () => null }));
   vi.doMock("../components/ui/Field", () => ({ FormError: Container }));
   vi.doMock("../components/ui/Surface", () => ({

@@ -30,6 +30,7 @@ import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
 export { applyRecordingCommand, RecordingError, RecordingReceipt } from "@stacks/shared/recording";
+import { normalizeGameName } from "@stacks/shared/recording";
 
 /**
  * Applies a receipt as it was recorded: this device's own commands under its rules, and another
@@ -331,6 +332,7 @@ const validateRecordingState = (state: RecordingState) => {
       trips.set(table.id, null);
       details.set(table.id, {
         game: command.game,
+        ...(command.gameName === undefined ? {} : { gameName: command.gameName }),
         venueId: command.venueId,
         highLimit: command.highLimit,
       });
@@ -409,6 +411,7 @@ const validateRecordingState = (state: RecordingState) => {
       starts.set(visit.id, command.startedAt);
       details.set(table.id, {
         game: command.game,
+        ...(command.gameName === undefined ? {} : { gameName: command.gameName }),
         venueId: command.venueId,
         highLimit: command.highLimit,
       });
@@ -598,6 +601,7 @@ const validateRecordingState = (state: RecordingState) => {
     requireValid(
       table &&
         table.game === expected.game &&
+        (table.gameName ?? null) === normalizeGameName(expected.game, expected.gameName) &&
         table.venueId === expected.venueId &&
         table.highLimit === expected.highLimit,
       "Table differs from its receipts.",

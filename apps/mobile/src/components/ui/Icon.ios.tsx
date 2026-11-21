@@ -35,6 +35,7 @@ export const symbols: Record<IconName, SFSymbol> = {
   person: "person.crop.circle",
   share: "square.and.arrow.up",
   trash: "trash",
+  calendar: "calendar",
 };
 
 const filledSymbols: Partial<Record<IconName, SFSymbol>> = {

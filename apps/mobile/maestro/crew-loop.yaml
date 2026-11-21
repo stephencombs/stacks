@@ -99,7 +99,7 @@ onFlowComplete:
 - extendedWaitUntil:
     visible:
       id: "live-buy-in"
-      text: "\\$100\\.00"
+      text: "\\$100"
     timeout: 15000
 
 - tapOn: "Cash out"
@@ -113,7 +113,7 @@ onFlowComplete:
     text: "\\+\\$70"
 
 # The trip counts it once the table syncs: back on the trip, the night shows the win.
-- tapOn: "Back to your play"
+- tapOn: "Back to (your play|Play)"
 - assertVisible: "Vegas weekend"
 - extendedWaitUntil:
     visible:

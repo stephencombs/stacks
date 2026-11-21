@@ -36,7 +36,12 @@ import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 
-import { applyRecordingCommand, createdEntryIds, RecordingError } from "@stacks/shared/recording";
+import {
+  applyRecordingCommand,
+  createdEntryIds,
+  normalizeGameName,
+  RecordingError,
+} from "@stacks/shared/recording";
 
 import { newId } from "./ids.ts";
 import { prepareRecordingCommand, type RecordingInput, type RecordingStore } from "./recording.ts";
@@ -398,6 +403,7 @@ const settled = (
         table.id === command.tableId &&
         (edited ||
           (table.game === command.game &&
+            (table.gameName ?? null) === normalizeGameName(command.game, command.gameName) &&
             table.venueId === command.venueId &&
             table.highLimit === command.highLimit &&
             ms(visit.startedAt) === ms(command.startedAt))) &&
@@ -511,6 +517,7 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
       type: "open_table",
       highLimit: command.highLimit,
       ...optional("game", command.game),
+      ...optional("gameName", command.gameName ?? null),
       ...optional("venueId", command.venueId),
     };
   if (command.type === "delete_table")
@@ -539,6 +546,7 @@ const inputOf = (command: RecordingCommand, ids: ReadonlyMap<string, string>): R
         startedAt: command.startedAt,
         highLimit: command.highLimit,
         ...optional("game", command.game),
+        ...optional("gameName", command.gameName ?? null),
         ...optional("venueId", command.venueId),
       };
       return command.type === "start"

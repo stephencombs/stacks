@@ -49,11 +49,17 @@ export function Money({
             ? felt
               ? "text-felt-ink"
               : "text-ink"
-            : amount > 0
-              ? "text-win"
-              : amount < 0
-                ? "text-loss"
-                : "text-muted",
+            : felt
+              ? amount > 0
+                ? "text-[#6EE7B7]"
+                : amount < 0
+                  ? "text-[#FCA5A5]"
+                  : "text-felt-soft"
+              : amount > 0
+                ? "text-win"
+                : amount < 0
+                  ? "text-loss"
+                  : "text-muted",
         !hidden && className,
         hidden && className?.replace(/\btext-(?:ink|win|loss|felt-ink)\b/g, ""),
       )}

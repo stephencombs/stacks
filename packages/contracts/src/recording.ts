@@ -9,6 +9,7 @@ export const Table = Schema.Struct({
   id: TableId,
   tripId: Schema.NullOr(TripId),
   game: Schema.NullOr(Game),
+  gameName: Schema.optionalKey(Schema.NullOr(Schema.String)),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
   /** Whoever holds this player records and corrects for everyone at the table. */

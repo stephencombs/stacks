@@ -26,7 +26,7 @@ import { shortName } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
 import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { Money } from "../components/Money";
 import { ActionMenu } from "../components/ui/ActionMenu";
@@ -37,7 +37,7 @@ import { FormError } from "../components/ui/Field";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
-import { formatDisplayMoney, usePreferences } from "../lib/preferences";
+import { formatDisplayMoney, HIDDEN_AMOUNT, usePreferences } from "../lib/preferences";
 import {
   AddPlayerSheet,
   CashOutSheet,
@@ -45,6 +45,7 @@ import {
   ReopenSheet,
   SitDownSheet,
 } from "./RecordingForms";
+import { Chip } from "./Chip";
 import { ShareSheet, TableSettingsSheet } from "./SharedTable";
 
 const money = (amount: number, showCents = false) =>
@@ -55,6 +56,18 @@ const money = (amount: number, showCents = false) =>
 /** The LIVE pill, timing the table from its first visit. With nobody there yet, it has no time. */
 export function LiveClock({ since }: { since: DateTime.Utc | null }) {
   const now = useRecordingClock();
+  if (Platform.OS === "android")
+    return (
+      <View className="min-h-10 flex-row items-center gap-2 rounded-full bg-black/15 px-4">
+        <View className="size-2 rounded-full bg-felt-ink" />
+        <Text className="type-footnote font-semibold text-felt-ink">LIVE</Text>
+        {since ? (
+          <Text className="type-callout font-semibold text-felt-ink tabular-nums">
+            {elapsedClock(since, now)}
+          </Text>
+        ) : null}
+      </View>
+    );
   return (
     <GlassSurface radius={22} className="min-h-11 flex-row items-center gap-2 rounded-full px-4">
       <View className="size-2 rounded-full bg-live" />
@@ -98,36 +111,53 @@ export function TableSeats({
   onSeat: (seat: TableSeat) => void;
   onSelf: (visitId: VisitId) => void;
 }) {
-  if (table.seats.length === 0) return null;
+  const prefs = usePreferences();
+  const androidFelt = Platform.OS === "android" && felt;
+  const seats =
+    androidFelt && current ? table.seats.filter((seat) => seat.visitId !== current) : table.seats;
+  if (seats.length === 0) return null;
   const soft = felt ? "text-felt-soft" : "text-muted";
   const ink = felt ? "text-felt-ink" : "text-ink";
   return (
     <View className="gap-2">
-      <View className="flex-row justify-between">
-        <Text accessibilityRole="header" className={cn("type-footnote font-medium", soft)}>
-          At this table
-        </Text>
-        {count ? (
-          <Text className={cn("type-footnote", soft)}>
-            {table.playing === 1 ? "1 playing" : `${table.playing} playing`}
+      {androidFelt ? null : (
+        <View className="flex-row justify-between">
+          <Text accessibilityRole="header" className={cn("type-footnote font-medium", soft)}>
+            At this table
           </Text>
-        ) : null}
-      </View>
-      <View className={cn("overflow-hidden rounded-2xl", felt ? "bg-felt-deep" : "bg-surface")}>
-        {table.seats.map((seat, index) => {
+          {count ? (
+            <Text className={cn("type-footnote", soft)}>
+              {table.playing === 1 ? "1 playing" : `${table.playing} playing`}
+            </Text>
+          ) : null}
+        </View>
+      )}
+      <View
+        className={cn(
+          !androidFelt && "overflow-hidden rounded-2xl",
+          !androidFelt && (felt ? "bg-felt-deep" : "bg-surface"),
+        )}
+      >
+        {seats.map((seat, index) => {
           const self = seat.isSelf && seat.visitId !== current;
           const press = self
             ? () => onSelf(seat.visitId)
             : seat.recordable
               ? () => onSeat(seat)
               : undefined;
+          const status = prefs.privacyMode
+            ? seat.status.replace(/\$[0-9,.]+/, HIDDEN_AMOUNT)
+            : seat.status;
           const body = (
             <>
+              {Platform.OS === "android" ? (
+                <Chip chip={(index % 8) + 1} name={seat.name} size={36} ring />
+              ) : null}
               <View className="min-w-0 flex-1 gap-0.5">
                 <Text numberOfLines={1} className={cn("type-body font-medium", ink)}>
                   {seat.name}
                 </Text>
-                <Text className={cn("type-footnote", soft)}>{seat.status}</Text>
+                <Text className={cn("type-footnote", soft)}>{status}</Text>
               </View>
               <Money
                 amount={seat.amount}
@@ -142,15 +172,17 @@ export function TableSeats({
             </>
           );
           const row = cn(
-            "min-h-16 flex-row items-center gap-3 px-4 py-3",
-            index > 0 && (felt ? "border-t border-felt-ink/10" : "border-t border-line"),
+            "min-h-16 flex-row items-center gap-3 py-3",
+            androidFelt ? "px-3" : "px-4",
+            (androidFelt || index > 0) &&
+              (felt ? "border-t border-felt-ink/15" : "border-t border-line"),
             !seat.playing && "opacity-60",
           );
           return press ? (
             <Pressable
               key={seat.visitId}
               accessibilityRole="button"
-              accessibilityLabel={`${seat.name}, ${seat.status}`}
+              accessibilityLabel={`${seat.name}, ${status}`}
               accessibilityHint={self ? "Opens your session" : "Records for them"}
               onPress={press}
               className={cn(row, felt ? "active:bg-felt" : "active:bg-fill")}
@@ -188,11 +220,13 @@ export function ActionSlot({
   actions,
   onAction,
   who,
+  felt = false,
 }: {
   actions: ReadonlyArray<TableAction>;
   onAction: (action: TableAction) => void;
   /** Whose session this is, when it isn't yours: "Priya". */
   who?: string | undefined;
+  felt?: boolean;
 }) {
   const label = (action: TableAction) =>
     action === "edit" && who ? `Edit ${who}'s session` : actionLabels[action];
@@ -201,14 +235,18 @@ export function ActionSlot({
   if (actions.length === 1)
     return (
       <IconButton
+        plain={!felt && Platform.OS === "android"}
+        felt={felt}
         accessibilityLabel={label(only)}
-        icon={<Icon name={actionIcons[only]} color="ink" />}
+        icon={<Icon name={actionIcons[only]} color={felt ? "felt-ink" : "ink"} />}
         onPress={() => onAction(only)}
       />
     );
   return (
     <ActionMenu
       label="Table actions"
+      felt={felt}
+      vertical={Platform.OS === "android"}
       actions={actions.map((action) => ({
         label: label(action),
         icon: actionIcons[action],

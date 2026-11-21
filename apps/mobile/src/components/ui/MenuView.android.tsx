@@ -2,6 +2,7 @@ import type { MenuComponentProps } from "@expo/ui/community/menu";
 import {
   DropdownMenu,
   DropdownMenuItem,
+  Icon as ComposeIcon,
   RNHostView,
   Text as ComposeText,
 } from "@expo/ui/jetpack-compose";
@@ -29,7 +30,7 @@ export function MenuView({
   children,
 }: MenuComponentProps) {
   const [expanded, setExpanded] = useState(false);
-  const loss = String(useCSSVariable("--color-loss"));
+  const [loss, ink] = useCSSVariable(["--color-loss", "--color-ink"]).map(String);
   return (
     <View style={style} testID={testID}>
       <Host matchContents>
@@ -54,30 +55,48 @@ export function MenuView({
           <DropdownMenu.Items>
             {actions
               .filter((action) => !action.attributes?.hidden)
-              .map((action) => (
-                <DropdownMenuItem
-                  key={action.id ?? action.title}
-                  enabled={!action.attributes?.disabled}
-                  elementColors={
-                    action.attributes?.destructive
-                      ? { textColor: loss, disabledTextColor: loss }
-                      : undefined
-                  }
-                  onClick={() => {
-                    onPressAction?.({ nativeEvent: { event: action.id ?? action.title } });
-                    setExpanded(false);
-                  }}
-                >
-                  <DropdownMenuItem.Text>
-                    <ComposeText>{action.title}</ComposeText>
-                  </DropdownMenuItem.Text>
-                  {action.state === "on" ? (
-                    <DropdownMenuItem.TrailingIcon>
-                      <ComposeText>✓</ComposeText>
-                    </DropdownMenuItem.TrailingIcon>
-                  ) : null}
-                </DropdownMenuItem>
-              ))}
+              .map((action) => {
+                const leading =
+                  action.image && typeof action.image !== "string" ? action.image : undefined;
+                return (
+                  <DropdownMenuItem
+                    key={action.id ?? action.title}
+                    enabled={!action.attributes?.disabled}
+                    elementColors={
+                      action.attributes?.destructive
+                        ? {
+                            textColor: loss,
+                            disabledTextColor: loss,
+                            leadingIconColor: loss,
+                            disabledLeadingIconColor: loss,
+                          }
+                        : undefined
+                    }
+                    onClick={() => {
+                      onPressAction?.({ nativeEvent: { event: action.id ?? action.title } });
+                      setExpanded(false);
+                    }}
+                  >
+                    {leading ? (
+                      <DropdownMenuItem.LeadingIcon>
+                        <ComposeIcon
+                          source={leading}
+                          size={20}
+                          tint={action.attributes?.destructive ? loss : ink}
+                        />
+                      </DropdownMenuItem.LeadingIcon>
+                    ) : null}
+                    <DropdownMenuItem.Text>
+                      <ComposeText>{action.title}</ComposeText>
+                    </DropdownMenuItem.Text>
+                    {action.state === "on" ? (
+                      <DropdownMenuItem.TrailingIcon>
+                        <ComposeText>✓</ComposeText>
+                      </DropdownMenuItem.TrailingIcon>
+                    ) : null}
+                  </DropdownMenuItem>
+                );
+              })}
           </DropdownMenu.Items>
         </DropdownMenu>
       </Host>

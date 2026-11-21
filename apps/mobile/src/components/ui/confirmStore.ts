@@ -4,6 +4,8 @@ export type Confirmation = {
   readonly title: string;
   readonly message: string;
   readonly label: string;
+  readonly dismissLabel?: string;
+  readonly icon?: "trash";
   /**
    * Return a promise to keep the dialog open while the action runs: it closes when the promise
    * resolves to null, and shows the sentence it resolves to when the action failed.

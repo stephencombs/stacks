@@ -8,6 +8,7 @@ export type DateTimeFieldProps = {
   onChange: (value: string) => void;
   error?: string | null;
   maximumDate?: Date;
+  compact?: boolean;
 };
 
 export function DateTimeField({ label, value, kind, onChange, error }: DateTimeFieldProps) {

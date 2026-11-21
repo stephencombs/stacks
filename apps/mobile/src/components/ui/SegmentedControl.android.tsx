@@ -67,7 +67,7 @@ export function SegmentedControl<A extends string>({
               ]}
             >
               <Text maxLines={1} style={{ fontWeight: "600" }}>
-                {option.label}
+                {selected ? `✓ ${option.label}` : option.label}
               </Text>
             </ToggleButton>
           );
