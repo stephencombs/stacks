@@ -24,6 +24,10 @@
       "types": "./src/balances.ts",
       "import": "./src/balances.ts"
     },
+    "./map": {
+      "types": "./src/map.ts",
+      "import": "./src/map.ts"
+    },
     "./stakes": {
       "types": "./src/stakes.ts",
       "import": "./src/stakes.ts"

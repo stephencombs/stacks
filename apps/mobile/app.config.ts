@@ -61,6 +61,7 @@ export default (): ExpoConfig => ({
       },
     ],
     "expo-web-browser",
+    "expo-maps",
     [
       "expo-location",
       {
