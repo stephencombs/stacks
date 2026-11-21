@@ -61,6 +61,32 @@ describe("formatMoney", () => {
     }
   });
 
+  it("shows a plus sign where Intl ignores signDisplay, as Hermes on iOS does", () => {
+    const NumberFormat = Intl.NumberFormat;
+    class WithoutSignDisplay extends NumberFormat {
+      constructor(locale?: string | Array<string>, options: Intl.NumberFormatOptions = {}) {
+        const { signDisplay: _ignored, ...rest } = options;
+        super(locale, rest);
+      }
+    }
+    Intl.NumberFormat = WithoutSignDisplay as typeof Intl.NumberFormat;
+    try {
+      expect(formatMoney(money(15000), USD, { locale: "en-US", signDisplay: "exceptZero" })).toBe(
+        "+$150",
+      );
+      expect(formatMoney(money(0), USD, { locale: "en-US", signDisplay: "exceptZero" })).toBe("$0");
+      expect(formatMoney(money(-500), USD, { locale: "en-US", signDisplay: "exceptZero" })).toBe(
+        "-$5",
+      );
+      expect(formatMoney(money(1000), USD, { locale: "en-US", signDisplay: "always" })).toBe(
+        "+$10",
+      );
+      expect(formatMoney(money(0), USD, { locale: "en-US", signDisplay: "always" })).toBe("+$0");
+    } finally {
+      Intl.NumberFormat = NumberFormat;
+    }
+  });
+
   it("keeps zero cents on request", () => {
     const full = { locale: "en-US", trailingZeroDisplay: "auto" } as const;
     expect(formatMoney(money(5000), USD, full)).toBe("$50.00");

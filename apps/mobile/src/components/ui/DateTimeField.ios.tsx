@@ -1,6 +1,16 @@
 import { Host } from "@expo/ui";
 import { Button, DatePicker, Popover, VStack } from "@expo/ui/swift-ui";
-import { accessibilityLabel, datePickerStyle, frame, padding } from "@expo/ui/swift-ui/modifiers";
+import {
+  accessibilityLabel,
+  buttonBorderShape,
+  buttonStyle,
+  controlSize,
+  datePickerStyle,
+  foregroundStyle,
+  frame,
+  padding,
+  tint,
+} from "@expo/ui/swift-ui/modifiers";
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -15,28 +25,35 @@ export function DateTimeField({
   onChange,
   error,
   maximumDate,
-  compact: _compact = false,
+  compact = false,
 }: DateTimeFieldProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(() => fieldDate(value, kind) ?? new Date());
   const { theme } = useUniwind();
-  const tint = useCSSVariable("--color-ink");
+  const resolvedInk = useCSSVariable("--color-ink");
+  const ink = typeof resolvedInk === "string" ? resolvedInk : undefined;
+  const triggerModifiers = compact
+    ? [
+        buttonStyle("bordered"),
+        buttonBorderShape("roundedRectangle", 10),
+        controlSize("small"),
+        ...(ink ? [foregroundStyle(ink), tint(ink)] : []),
+        accessibilityLabel(`${label}, ${fieldDisplay(value, kind)}`),
+      ]
+    : [frame({ minHeight: 44 }), accessibilityLabel(`${label}, ${fieldDisplay(value, kind)}`)];
   return (
     <View className="gap-1.5">
-      <Text className="px-1 type-footnote font-medium text-muted">{label}</Text>
+      {compact ? null : <Text className="px-1 type-footnote font-medium text-muted">{label}</Text>}
       <Host
-        style={{ height: 48 }}
+        {...(compact ? { matchContents: true } : { style: { height: 48 } })}
         colorScheme={theme === "dark" ? "dark" : "light"}
-        seedColor={typeof tint === "string" ? tint : undefined}
+        seedColor={ink}
       >
         <Popover isPresented={open} onIsPresentedChange={setOpen}>
           <Popover.Trigger>
             <Button
               label={fieldDisplay(value, kind)}
-              modifiers={[
-                frame({ minHeight: 44 }),
-                accessibilityLabel(`${label}, ${fieldDisplay(value, kind)}`),
-              ]}
+              modifiers={triggerModifiers}
               onPress={() => {
                 setDraft(fieldDate(value, kind) ?? new Date());
                 setOpen(true);

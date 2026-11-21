@@ -63,9 +63,13 @@ export function Sheet({
     };
   }, []);
 
-  const fittedHeight = contentHeight + insets.bottom + 64;
+  const fittedHeight = contentHeight + footerHeight + insets.bottom + 80;
   const detent =
-    contentHeight === 0 ? 0.5 : Math.min(0.9, Math.max(0.3, fittedHeight / screenHeight));
+    contentHeight === 0
+      ? footer
+        ? 0.65
+        : 0.5
+      : Math.min(0.9, Math.max(0.3, fittedHeight / screenHeight));
   const close = () => {
     if (!busy) setClosing(true);
   };
@@ -79,7 +83,7 @@ export function Sheet({
     if (!keyboardFrame.current) return;
     TextInput.State.currentlyFocusedInput()?.measureInWindow((_x, y, _width, height) => {
       const top = frame.current.y + 12;
-      const bottom = frame.current.y + frame.current.height - footerHeight - 12;
+      const bottom = frame.current.y + frame.current.height - 12;
       if (y < top) {
         scroll.current?.scrollTo({ y: Math.max(0, offset.current - (top - y)), animated: false });
       } else if (y + height > bottom) {
@@ -128,8 +132,7 @@ export function Sheet({
                   contentInsetAdjustmentBehavior="automatic"
                   keyboardShouldPersistTaps="handled"
                   keyboardDismissMode="interactive"
-                  contentContainerClassName="gap-5 px-4 pt-4"
-                  contentContainerStyle={{ paddingBottom: footerHeight + 24 }}
+                  contentContainerClassName="gap-5 px-4 pt-4 pb-4"
                   onContentSizeChange={(_width, height) => setContentHeight(height)}
                   onScroll={(event) => {
                     offset.current = event.nativeEvent.contentOffset.y;
@@ -151,7 +154,7 @@ export function Sheet({
                 </ScrollView>
                 {footer ? (
                   <View
-                    className="absolute right-0 bottom-0 left-0 gap-2 px-4 pt-2 pb-3"
+                    className="gap-2 bg-canvas px-4 pt-2 pb-3"
                     onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
                   >
                     {footer}

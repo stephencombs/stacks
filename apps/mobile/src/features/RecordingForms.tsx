@@ -143,7 +143,14 @@ function KeypadAmount({
   );
 }
 
-function RecordingKeypad({ amount }: { amount: Amount }) {
+function RecordingKeypad({ amount, tiled = false }: { amount: Amount; tiled?: boolean }) {
+  if (tiled) {
+    return (
+      <View className="border-t border-line pt-2.5">
+        <AmountKeypad onKey={amount.press} bottomLeft={decimal} tiled />
+      </View>
+    );
+  }
   return (
     <GlassSurface radius={22} className="rounded-2xl p-2">
       <AmountKeypad onKey={amount.press} bottomLeft={decimal} />
@@ -260,6 +267,7 @@ function RecordingSheet({
   secondaryAction,
   back = false,
   keypad,
+  keypadInFooter = Platform.OS === "android",
   save,
   onSubmit,
   onClose,
@@ -272,8 +280,8 @@ function RecordingSheet({
   cancelLabel?: string;
   secondaryAction?: { readonly label: string; readonly onPress: () => void };
   back?: boolean;
-  /** Android pins it under the action, as the frames do, so the fields scroll above it; iOS scrolls it last. */
   keypad?: ReactNode;
+  keypadInFooter?: boolean;
   save: { readonly pending: boolean; readonly error: string | null };
   onSubmit: () => void;
   onClose: () => void;
@@ -292,14 +300,16 @@ function RecordingSheet({
           {save.error ? (
             <FormError>{save.error} What you entered is still here. Try again.</FormError>
           ) : null}
-          {Platform.OS === "android" && secondaryAction ? (
+          {secondaryAction ? (
             <View className="flex-row gap-2">
               <Button
                 label={secondaryAction.label}
-                variant="ghost"
+                variant={Platform.OS === "android" ? "ghost" : "secondary"}
                 size="lg"
                 disabled={save.pending}
-                className="flex-1 border border-line bg-transparent"
+                className={
+                  Platform.OS === "android" ? "flex-1 border border-line bg-transparent" : "px-5"
+                }
                 onPress={secondaryAction.onPress}
               />
               <Button
@@ -328,12 +338,12 @@ function RecordingSheet({
           {cancelLabel ? (
             <Button label={cancelLabel} size="lg" disabled={save.pending} onPress={onClose} />
           ) : null}
-          {Platform.OS === "android" ? keypad : null}
+          {keypadInFooter ? keypad : null}
         </>
       }
     >
       {children}
-      {Platform.OS === "android" ? null : keypad}
+      {keypadInFooter ? null : keypad}
     </Sheet>
   );
 }
@@ -861,18 +871,6 @@ function useClock(initial: DateTime.Utc) {
   };
 }
 
-function ClockField({ label, clock }: { label: string; clock: ReturnType<typeof useClock> }) {
-  return (
-    <DateTimeField
-      label={label}
-      kind="time"
-      value={clock.text}
-      onChange={clock.set}
-      error={clock.error}
-    />
-  );
-}
-
 /** Cashing out finishes the visit: what they left with, and when. */
 export function CashOutSheet({
   visit,
@@ -900,22 +898,15 @@ export function CashOutSheet({
   const resultPreview = cashOutResultPreview(visit, amount.text);
   return (
     <RecordingSheet
-      keypad={<RecordingKeypad amount={amount} />}
+      keypad={<RecordingKeypad amount={amount} tiled={Platform.OS === "ios"} />}
+      keypadInFooter
       title={who ? `Cash out ${shortName(who)}` : "Cash out"}
-      description={
-        Platform.OS === "android"
-          ? note
-          : (note ?? "This finishes the session and works out its result.")
-      }
+      description={note}
       submitLabel={who ? `End ${shortName(who)}'s visit` : "End session"}
-      secondaryAction={
-        Platform.OS === "android"
-          ? {
-              label: `${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`,
-              onPress: () => amount.set(amountInputText(0)),
-            }
-          : undefined
-      }
+      secondaryAction={{
+        label: `${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`,
+        onPress: () => amount.set(amountInputText(0)),
+      }}
       save={save}
       onClose={onClose}
       onSubmit={async () => {
@@ -936,133 +927,92 @@ export function CashOutSheet({
         if (receipt?.command.type === "finish") onSaved(receipt.command.entryId, input);
       }}
     >
-      {Platform.OS === "android" ? (
-        <View className="overflow-hidden rounded-xl bg-surface">
-          <View className="gap-1 px-4 py-3">
-            <View className="flex-row items-center justify-between gap-3">
-              <Text className="type-body text-ink">Cash-out</Text>
-              {parsedCashOut.error === null ? (
-                <Money
-                  amount={parsedCashOut.amount}
-                  currency={RECORDING_CURRENCY}
-                  className="text-[28px] leading-[34px] font-bold tabular-nums"
-                />
-              ) : (
-                <Text
-                  className={cn(
-                    "text-[28px] leading-[34px] font-bold tabular-nums",
-                    amount.text ? "text-ink" : "text-faint",
-                  )}
-                >
-                  {amount.text || money(0, prefs.showCents)}
-                </Text>
-              )}
-            </View>
-            {amount.error ? (
-              <Text className="type-footnote text-loss">{amount.error}</Text>
-            ) : previous > 0 ? (
-              <Text className="type-footnote text-muted">
-                Earlier cash-outs total{" "}
-                <Money
-                  amount={previous}
-                  currency={RECORDING_CURRENCY}
-                  className="type-footnote text-muted"
-                />
-                .
+      <View className="overflow-hidden rounded-xl bg-surface">
+        <View className="gap-1 px-4 py-3">
+          <View className="flex-row items-center justify-between gap-3">
+            <Text className="type-body text-ink">Cash-out</Text>
+            {parsedCashOut.error === null ? (
+              <Money
+                amount={parsedCashOut.amount}
+                currency={RECORDING_CURRENCY}
+                className="text-[28px] leading-[34px] font-bold tabular-nums"
+              />
+            ) : (
+              <Text
+                className={cn(
+                  "text-[28px] leading-[34px] font-bold tabular-nums",
+                  amount.text ? "text-ink" : "text-faint",
+                )}
+              >
+                {amount.text || money(0, prefs.showCents)}
               </Text>
-            ) : null}
+            )}
           </View>
-          <View className="gap-1 border-t border-line px-4 py-2.5">
-            <View className="flex-row items-center justify-between gap-3">
-              <Text className="type-body text-ink">Finished</Text>
-              <View className="flex-row items-center gap-2">
+          {amount.error ? (
+            <Text className="type-footnote text-loss">{amount.error}</Text>
+          ) : previous > 0 ? (
+            <Text className="type-footnote text-muted">
+              Earlier cash-outs total{" "}
+              <Money
+                amount={previous}
+                currency={RECORDING_CURRENCY}
+                className="type-footnote text-muted"
+              />
+              .
+            </Text>
+          ) : null}
+        </View>
+        <View className="gap-1 border-t border-line px-4 py-2.5">
+          <View className="flex-row items-center justify-between gap-3">
+            <Text className="type-body text-ink">Finished</Text>
+            <View className="flex-row items-center gap-2">
+              {Platform.OS === "android" ? (
                 <View className="flex-row items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5">
                   <Icon name="calendar" color="muted" size={14} />
                   <Text className="type-footnote font-medium text-muted">{formatDay(now)}</Text>
                 </View>
-                <DateTimeField
-                  compact
-                  label="Finished at"
-                  kind="time"
-                  value={clock.text}
-                  onChange={clock.set}
-                />
-              </View>
-            </View>
-            {clock.error ? <Text className="type-footnote text-loss">{clock.error}</Text> : null}
-          </View>
-          <View className="flex-row items-center justify-between gap-3 border-t border-line px-4 py-3">
-            <View className="min-w-0 flex-1">
-              <Text numberOfLines={1} className="type-footnote text-muted">
-                {who ? `${who}'s result` : "Your result"}
-              </Text>
-              <Text className="type-footnote text-muted">
-                {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
-              </Text>
-            </View>
-            {resultPreview === null ? (
-              <Text className="text-muted">—</Text>
-            ) : (
-              <Money
-                amount={MinorUnits.make(resultPreview)}
-                currency={RECORDING_CURRENCY}
-                tone="result"
-                className="type-title"
+              ) : (
+                <View className="rounded-[10px] bg-fill px-3 py-1.5">
+                  <Text className="type-callout font-medium text-ink">
+                    {DateTime.toDateUtc(now).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </Text>
+                </View>
+              )}
+              <DateTimeField
+                compact
+                label="Finished at"
+                kind="time"
+                value={clock.text}
+                onChange={clock.set}
               />
-            )}
+            </View>
           </View>
+          {clock.error ? <Text className="type-footnote text-loss">{clock.error}</Text> : null}
         </View>
-      ) : (
-        <>
-          <KeypadAmount
-            keypad={false}
-            label="Amount"
-            amount={amount}
-            hint={
-              previous > 0 ? (
-                <>
-                  Earlier cash-outs total{" "}
-                  <Money
-                    amount={previous}
-                    currency={RECORDING_CURRENCY}
-                    className="type-footnote text-muted"
-                  />
-                  .
-                </>
-              ) : undefined
-            }
-          />
-          <View className="items-center">
-            <Button
-              label={`${previous > 0 ? "Nothing more" : "Busted"} · ${money(0, prefs.showCents)}`}
-              size="sm"
-              // Fills the amount like a preset does: one stray tap shouldn't record anything.
-              onPress={() => amount.set(amountInputText(0))}
+        <View className="flex-row items-center justify-between gap-3 border-t border-line px-4 py-3">
+          <View className="min-w-0 flex-1">
+            <Text numberOfLines={1} className="type-footnote text-muted">
+              {who ? `${who}'s result` : "Your result"}
+            </Text>
+            <Text className="type-footnote text-muted">
+              {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
+            </Text>
+          </View>
+          {resultPreview === null ? (
+            <Text className="text-muted">—</Text>
+          ) : (
+            <Money
+              amount={MinorUnits.make(resultPreview)}
+              currency={RECORDING_CURRENCY}
+              tone="result"
+              className="type-title"
             />
-          </View>
-          <ClockField label="Finished at" clock={clock} />
-          <View className="flex-row items-center justify-between gap-3 rounded-xl bg-surface px-4 py-3">
-            <View className="min-w-0 flex-1">
-              <Text numberOfLines={1} className="type-footnote text-muted">
-                {who ? `${who}'s result` : "Your result"}
-              </Text>
-              <Text className="type-footnote text-muted">
-                {formatDisplayMoney(visit.totals.buyIn, RECORDING_CURRENCY, prefs)} bought in
-              </Text>
-            </View>
-            {resultPreview === null ? (
-              <Text className="text-muted">—</Text>
-            ) : (
-              <Money
-                amount={MinorUnits.make(resultPreview)}
-                currency={RECORDING_CURRENCY}
-                tone="result"
-                className="type-title"
-              />
-            )}
-          </View>
-        </>
-      )}
+          )}
+        </View>
+      </View>
       <PaidField label="Paid to" paid={paid} />
     </RecordingSheet>
   );

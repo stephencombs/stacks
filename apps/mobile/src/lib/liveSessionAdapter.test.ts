@@ -33,6 +33,7 @@ vi.mock("./config", () => ({
 vi.mock("./preferences", () => ({
   usePreferences: () => ({ showCents: false, privacyMode: bridge.privacyMode }),
 }));
+vi.mock("./theme", () => ({ useTheme: () => "system" }));
 vi.mock("./recording", () => ({
   recordingStore: {
     subscribe: (listener: () => void) => bridge.store!.subscribe(listener),

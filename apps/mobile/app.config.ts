@@ -69,6 +69,8 @@ export default (): ExpoConfig => ({
           "Color Up uses your location to list the casinos near you first.",
       },
     ],
+    "expo-widgets",
+    "./plugins/withIosFormSheet",
     "./plugins/withStartupCrashRecovery",
     "./plugins/withAndroidTabIcons",
     "./plugins/withAndroidTheme",

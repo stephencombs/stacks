@@ -69,11 +69,15 @@ export function LiveClock({ since }: { since: DateTime.Utc | null }) {
       </View>
     );
   return (
-    <GlassSurface radius={22} className="min-h-11 flex-row items-center gap-2 rounded-full px-4">
-      <View className="size-2 rounded-full bg-live" />
-      <Text className="type-footnote font-semibold text-ink">LIVE</Text>
+    <GlassSurface
+      radius={22}
+      felt
+      className="min-h-11 flex-row items-center gap-2 rounded-full px-4"
+    >
+      <View className="size-2 rounded-full bg-felt-ink" />
+      <Text className="type-footnote font-semibold text-felt-ink">LIVE</Text>
       {since ? (
-        <Text className="type-callout font-semibold text-ink tabular-nums">
+        <Text className="type-callout font-semibold text-felt-ink tabular-nums">
           {elapsedClock(since, now)}
         </Text>
       ) : null}
