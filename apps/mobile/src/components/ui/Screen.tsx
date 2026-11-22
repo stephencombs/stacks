@@ -1,6 +1,12 @@
 import * as Predicate from "effect/Predicate";
-import type { ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { useRef, type ReactNode } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  View,
+  type ScrollViewInstance,
+} from "react-native";
 
 import { LiveBar, type ShowsTable } from "../../features/LiveBar";
 import { FeltStatusBar } from "../../features/FeltStatusBar";
@@ -9,6 +15,7 @@ import { FormError } from "./Field";
 import { cn } from "./cn";
 import { FloatingAction } from "./FloatingAction";
 import { PinnedFooter } from "./PinnedFooter";
+import { clampedScrollOffset } from "./scrollClamp";
 import { SheetHost } from "./Sheet";
 import { useScreenFoot } from "./tabBar";
 import { ToastHost, useToast, type Toast } from "./Toast";
@@ -53,6 +60,15 @@ export function Screen({
   const footer = renderFooter;
   const header = useNativeHeaderActions(false, onOpenGroups);
   const foot = useScreenFoot({ footer: !!footer, fab: !!fab, footerGap: 12 });
+  const scrollRef = useRef<ScrollViewInstance>(null);
+
+  const scrollState = useRef({
+    offsetY: 0,
+    insetTop: 0,
+    insetBottom: 0,
+    layoutHeight: 0,
+    scrolled: false,
+  });
 
   return (
     <SheetHost>
@@ -64,9 +80,30 @@ export function Screen({
         <FeltStatusBar felt={false} />
         <ToastHost {...(foot.above === undefined ? {} : { above: foot.above })}>
           <ScrollView
+            ref={scrollRef}
             contentInsetAdjustmentBehavior="automatic"
             keyboardShouldPersistTaps="handled"
             alwaysBounceVertical={false}
+            scrollEventThrottle={32}
+            onLayout={(event) => {
+              scrollState.current.layoutHeight = event.nativeEvent.layout.height;
+            }}
+            onScroll={(event) => {
+              const { contentOffset, contentInset, layoutMeasurement } = event.nativeEvent;
+              scrollState.current.offsetY = contentOffset.y;
+              scrollState.current.insetTop = contentInset?.top ?? 0;
+              scrollState.current.insetBottom = contentInset?.bottom ?? 0;
+              scrollState.current.layoutHeight = layoutMeasurement.height;
+              scrollState.current.scrolled = true;
+            }}
+            onContentSizeChange={(_width, height) => {
+              const next = clampedScrollOffset(scrollState.current, height);
+
+              if (next !== null) {
+                scrollState.current.offsetY = next;
+                scrollRef.current?.scrollTo({ y: next, animated: true });
+              }
+            }}
             className="flex-1"
             style={foot.scrollStyle}
             contentContainerClassName={cn("gap-6 px-4 pt-4 pb-24", contentClassName)}

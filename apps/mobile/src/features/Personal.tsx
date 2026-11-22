@@ -1,7 +1,7 @@
 import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import type { VisitId } from "@stacks/contracts";
-import { useState, type ReactNode, type Ref } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -20,6 +20,7 @@ import { PressableScale } from "../components/ui/PressableScale";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { FloatingAction } from "../components/ui/FloatingAction";
 import { PinnedFooter } from "../components/ui/PinnedFooter";
+import { clampedScrollOffset } from "../components/ui/scrollClamp";
 import { SheetHost } from "../components/ui/Sheet";
 import { useScreenFoot } from "../components/ui/tabBar";
 import { cn } from "../components/ui/cn";
@@ -58,7 +59,7 @@ export function PersonalScreen({
   session?: boolean;
   /** Pad scroll content from the top safe area instead of the nav bar so leading chrome scrolls. */
   topSafeArea?: boolean;
-  scrollRef?: Ref<ScrollViewInstance>;
+  scrollRef?: RefObject<ScrollViewInstance | null>;
   contentClassName?: string;
 }) {
   const floatingTopBar = topSafeArea && Platform.OS === "ios";
@@ -66,6 +67,16 @@ export function PersonalScreen({
   const insets = useSafeAreaInsets();
   const foot = useScreenFoot({ footer: !!dock, fab: !!fab });
   const manualInset = (session || topSafeArea) && Platform.OS === "ios";
+  const fallbackScroll = useRef<ScrollViewInstance>(null);
+  const scroll = scrollRef ?? fallbackScroll;
+
+  const scrollState = useRef({
+    offsetY: 0,
+    insetTop: 0,
+    insetBottom: 0,
+    layoutHeight: 0,
+    scrolled: false,
+  });
 
   const sides = {
     paddingLeft: Math.max(16, insets.left),
@@ -81,12 +92,32 @@ export function PersonalScreen({
         {header}
         <FeltStatusBar felt={felt} />
         <ScrollView
-          ref={scrollRef}
+          ref={scroll}
           className="flex-1"
           style={foot.scrollStyle}
           contentInsetAdjustmentBehavior={manualInset ? "never" : "automatic"}
           keyboardShouldPersistTaps="handled"
           alwaysBounceVertical={false}
+          scrollEventThrottle={32}
+          onLayout={(event) => {
+            scrollState.current.layoutHeight = event.nativeEvent.layout.height;
+          }}
+          onScroll={(event) => {
+            const { contentOffset, contentInset, layoutMeasurement } = event.nativeEvent;
+            scrollState.current.offsetY = contentOffset.y;
+            scrollState.current.insetTop = contentInset?.top ?? 0;
+            scrollState.current.insetBottom = contentInset?.bottom ?? 0;
+            scrollState.current.layoutHeight = layoutMeasurement.height;
+            scrollState.current.scrolled = true;
+          }}
+          onContentSizeChange={(_width, height) => {
+            const next = clampedScrollOffset(scrollState.current, height);
+
+            if (next !== null) {
+              scrollState.current.offsetY = next;
+              scroll.current?.scrollTo({ y: next, animated: true });
+            }
+          }}
           contentContainerClassName={cn("gap-6", !manualInset && "pt-4", contentClassName)}
           contentContainerStyle={{
             ...sides,
