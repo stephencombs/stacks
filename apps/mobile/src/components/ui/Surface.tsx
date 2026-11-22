@@ -446,16 +446,19 @@ export function QuotaCard({
 export function SettingsGroup({
   title,
   action,
+  footer,
   children,
 }: {
   title?: string;
   action?: ReactNode;
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <View className="gap-2">
       {title ? <SectionHeading action={action}>{title}</SectionHeading> : null}
       <List>{children}</List>
+      {footer}
     </View>
   );
 }
@@ -470,7 +473,6 @@ export function SettingsRow({
   accessibilityLabel,
   accessibilityHint,
   trailing,
-  compact = false,
 }: {
   icon?: ReactNode;
   title: string;
@@ -480,7 +482,6 @@ export function SettingsRow({
   accessibilityLabel?: string;
   accessibilityHint?: string;
   trailing?: ReactNode;
-  compact?: boolean;
 }) {
   const disclosure =
     trailing !== undefined ? (
@@ -494,7 +495,7 @@ export function SettingsRow({
       onPress={onPress}
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
-      className={compact ? "min-h-12 py-1" : "min-h-13"}
+      className={cn("py-3", subtitle ? "min-h-14" : "min-h-12")}
     >
       {icon ? (
         <View className="size-7 items-center justify-center rounded-lg bg-fill">{icon}</View>

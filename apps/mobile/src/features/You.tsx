@@ -15,7 +15,7 @@ import { Choice, FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Sheet, SheetHost } from "../components/ui/Sheet";
-import { Card, SettingsGroup, SettingsRow } from "../components/ui/Surface";
+import { Card, Row, SettingsGroup, SettingsRow } from "../components/ui/Surface";
 import { Switch } from "../components/ui/Switch";
 import { useAccount } from "../lib/account";
 import {
@@ -129,64 +129,60 @@ function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
       open
       onClose={onClose}
       title="You"
+      large={ios}
       footer={signedIn && !ios ? <SignOutButton /> : undefined}
     >
-      {signedIn && !ios ? <SignedInCard fallbackName={name} /> : null}
+      {signedIn && !ios ? (
+        <Card className="flex-row items-center gap-3 p-4">
+          <Profile fallbackName={name} />
+        </Card>
+      ) : null}
 
-      <View className={ios ? "gap-4" : "gap-5"}>
-        <View className="gap-2">
-          <Text className="px-1 type-footnote font-medium text-muted">Your sessions</Text>
-          <Card className="gap-1 p-4">
-            <Text accessibilityLiveRegion="polite" className="type-body text-ink">
-              {status === "load_failed" ? error : sync.line.text}
-            </Text>
-            {status === "load_failed" ? (
-              <Button label="Try again" variant="secondary" onPress={retryLoad} />
-            ) : (
-              <Text className="type-footnote text-muted">
-                {signedIn
-                  ? "Sessions save on this device first, then sync to your account."
-                  : "Sessions save on this device first. Sign in to sync them to your account."}
+      <View className="gap-5">
+        <SettingsGroup title="Your sessions">
+          <Row className="py-3">
+            <View className="min-w-0 flex-1 gap-1">
+              <Text accessibilityLiveRegion="polite" className="type-body text-ink">
+                {status === "load_failed" ? error : sync.line.text}
               </Text>
-            )}
-          </Card>
-        </View>
+              {status === "load_failed" ? (
+                <Button label="Try again" variant="secondary" onPress={retryLoad} />
+              ) : (
+                <Text className="type-footnote text-muted">
+                  {signedIn
+                    ? "Sessions save on this device first, then sync to your account."
+                    : "Sessions save on this device first. Sign in to sync them to your account."}
+                </Text>
+              )}
+            </View>
+          </Row>
+        </SettingsGroup>
 
         <SettingsGroup title="Recording defaults">
           <SettingsRow
-            compact={ios}
             icon={<Icon name="sessions" color="ink" size={16} />}
             title="Default game"
-            value={
-              Platform.OS === "ios"
-                ? undefined
-                : prefs.defaultGame
-                  ? gameNames[prefs.defaultGame]
-                  : "Not set"
-            }
+            value={ios ? undefined : prefs.defaultGame ? gameNames[prefs.defaultGame] : "Not set"}
             trailing={
-              Platform.OS === "ios" ? (
-                <Choice
-                  inline
-                  label="Default game"
-                  labelHidden
-                  options={defaultGameOptions}
-                  value={prefs.defaultGame ?? "none"}
-                  onChange={(next) => setDefaultGame(next === "none" ? null : next)}
-                />
+              ios ? (
+                <View className="-my-3">
+                  <Choice
+                    inline
+                    label="Default game"
+                    labelHidden
+                    options={defaultGameOptions}
+                    value={prefs.defaultGame ?? "none"}
+                    onChange={(next) => setDefaultGame(next === "none" ? null : next)}
+                  />
+                </View>
               ) : undefined
             }
             onPress={
-              Platform.OS === "ios"
-                ? undefined
-                : () => setPicking((current) => (current === "game" ? null : "game"))
+              ios ? undefined : () => setPicking((current) => (current === "game" ? null : "game"))
             }
-            accessibilityHint={
-              Platform.OS === "ios" ? undefined : "Changes the default game for new sessions"
-            }
+            accessibilityHint={ios ? undefined : "Changes the default game for new sessions"}
           />
           <SettingsRow
-            compact={ios}
             icon={<Icon name="map" color="ink" size={16} />}
             title="Default casino"
             value={prefs.defaultVenue?.name ?? "Not set"}
@@ -210,7 +206,6 @@ function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
 
         <SettingsGroup title="Display">
           <SettingsRow
-            compact={ios}
             icon={<Icon name="filter" color="ink" size={16} />}
             title="Show cents"
             subtitle="Show .00 on whole amounts"
@@ -223,7 +218,6 @@ function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
             }
           />
           <SettingsRow
-            compact={ios}
             icon={<Icon name="eye-off" color="ink" size={16} />}
             title="Privacy mode"
             subtitle="Hide amounts across the app"
@@ -237,11 +231,32 @@ function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
           />
         </SettingsGroup>
 
-        <Choice label="Appearance" options={themeChoices} value={theme} onChange={setTheme} />
+        <SettingsGroup title="Appearance">
+          <Row className="py-2">
+            <View className="flex-1">
+              <Choice
+                label="Appearance"
+                labelHidden
+                options={themeChoices}
+                value={theme}
+                onChange={setTheme}
+              />
+            </View>
+          </Row>
+        </SettingsGroup>
 
-        <SettingsGroup title="Export">
+        <SettingsGroup
+          title="Export"
+          footer={
+            <>
+              {exportState.error ? <FormError>{exportState.error}</FormError> : null}
+              <Text className="px-1 type-footnote text-muted">
+                All of your session history can always be exported as a file.
+              </Text>
+            </>
+          }
+        >
           <SettingsRow
-            compact={ios}
             icon={<Icon name="download" color="ink" size={16} />}
             title={exportState.pending ? "Exporting…" : "Export sessions (CSV)"}
             subtitle={
@@ -255,18 +270,18 @@ function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
             accessibilityHint="Exports all recorded sessions as a CSV file"
           />
         </SettingsGroup>
-        {exportState.error ? <FormError>{exportState.error}</FormError> : null}
-        <Text className="-mt-3 px-1 type-footnote text-muted">
-          All of your session history can always be exported as a file.
-        </Text>
 
         {signedIn && ios ? (
-          <SettingsGroup title="Account">
-            <SignedInCard fallbackName={name} />
-            <View className="border-t border-line p-2">
-              <SignOutButton />
-            </View>
-          </SettingsGroup>
+          <>
+            <SettingsGroup title="Account">
+              <Row className="py-3">
+                <Profile fallbackName={name} />
+              </Row>
+            </SettingsGroup>
+            <SettingsGroup>
+              <SignOutRow />
+            </SettingsGroup>
+          </>
         ) : !signedIn ? (
           <SettingsGroup title="Account">
             <View className="p-4">
@@ -279,13 +294,13 @@ function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
   );
 }
 
-function SignedInCard({ fallbackName }: { fallbackName: string }) {
+function Profile({ fallbackName }: { fallbackName: string }) {
   const { user } = useUser();
   const displayName = user?.fullName ?? fallbackName;
   const email = user?.primaryEmailAddress?.emailAddress;
 
   return (
-    <Card className="flex-row items-center gap-3 p-4">
+    <>
       <UserAvatar size={46} fallbackName={displayName} ring={false} />
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className="text-lg font-semibold text-ink">
@@ -297,7 +312,17 @@ function SignedInCard({ fallbackName }: { fallbackName: string }) {
           </Text>
         ) : null}
       </View>
-    </Card>
+    </>
+  );
+}
+
+function SignOutRow() {
+  const { signOut } = useClerk();
+
+  return (
+    <Row className="min-h-12 py-3" onPress={() => void signOut()}>
+      <Text className="type-body font-medium text-loss">Sign out</Text>
+    </Row>
   );
 }
 

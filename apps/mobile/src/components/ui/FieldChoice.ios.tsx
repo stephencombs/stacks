@@ -1,6 +1,6 @@
 import { Host } from "@expo/ui";
 import { Picker, Text } from "@expo/ui/swift-ui";
-import { accessibilityLabel, frame, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
+import { accessibilityLabel, font, frame, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
 import * as Predicate from "effect/Predicate";
 import { use } from "react";
 import { View, useWindowDimensions } from "react-native";
@@ -23,7 +23,7 @@ export function FieldChoice<A extends string>({
   const { width, fontScale } = useWindowDimensions();
   const { theme } = useUniwind();
   const inSheet = use(InSheet);
-  const tint = useCSSVariable("--color-ink");
+  const [tint, muted] = useCSSVariable(["--color-ink", "--color-muted"]);
   const segmentWidth = (width - 64) / Math.max(1, options.length);
 
   const segmented =
@@ -37,11 +37,20 @@ export function FieldChoice<A extends string>({
 
   if (inline) {
     return (
-      <Host matchContents colorScheme={colorScheme} seedColor={seedColor}>
+      <Host
+        matchContents
+        colorScheme={colorScheme}
+        seedColor={Predicate.isString(muted) ? muted : seedColor}
+      >
         <Picker
           selection={value}
           onSelectionChange={onChange}
-          modifiers={[pickerStyle("menu"), frame({ minHeight: 44 }), accessibilityLabel(label)]}
+          modifiers={[
+            pickerStyle("menu"),
+            font({ size: 15 }),
+            frame({ minHeight: 44 }),
+            accessibilityLabel(label),
+          ]}
         >
           {options.map((option) => (
             <Text key={option.value} modifiers={[tag(option.value)]}>

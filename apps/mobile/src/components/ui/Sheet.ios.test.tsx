@@ -28,6 +28,12 @@ type FormSheetSnapshot = {
   readonly onNativeDismiss?: () => void;
 };
 
+type NativeSwitchProbe = {
+  commands: boolean[];
+  renders: boolean[];
+  tap: ((next: boolean) => void) | undefined;
+};
+
 const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -36,11 +42,8 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
   let latestFormSheet: FormSheetSnapshot | null = null;
   let latestHeader: HeaderConfigSnapshot | null = null;
   let reportContentSize: ((width: number, height: number) => void) | undefined;
-  const nativeSwitch = {
-    commands: [] as boolean[],
-    renders: [] as boolean[],
-    tap: undefined as ((next: boolean) => void) | undefined,
-  };
+
+  const nativeSwitch: NativeSwitchProbe = { commands: [], renders: [], tap: undefined };
 
   const cssVars = new Map([
     ["--color-canvas", "#f4f4f6"],
