@@ -13,6 +13,7 @@ import {
 } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
+import { tripDates } from "./trip.ts";
 import { makeRecordingStore, type RecordingInput, type RecordingStore } from "./recording.ts";
 import { makeRecordingSubmission, openDeviceRecordingStore } from "./recordingReact.tsx";
 import {
@@ -39,7 +40,9 @@ import {
   recordingVisit,
   venueChoices,
   venuePlace,
+  filterTripOptions,
   tableTripOptions,
+  tripFieldValue,
   UNDONE_REASON,
   buyInTotalLabel,
   historyLines,
@@ -815,17 +818,40 @@ it("offers only live trips in the recording currency, including when a mismatche
 
   const groups = [group("USD", [live, ended]), group("EUR", [euro]), group("JPY", [yen])];
 
-  const expected = [
-    { key: "", label: "Personal · no trip" },
-    { key: live.id, label: "Crew · Vegas" },
-  ];
+  const personal = {
+    key: "",
+    title: "Personal · no trip",
+    group: "",
+    detail: "Keep this table personal",
+  };
+
+  const vegas = {
+    key: live.id,
+    title: "Vegas",
+    group: "Crew",
+    detail: `Crew · ${tripDates(live)}`,
+  };
+
+  const expected = [personal, vegas];
 
   expect(tableTripOptions(groups, null)).toEqual(expected);
   expect(tableTripOptions(groups, euro.id)).toEqual(expected);
   expect(tableTripOptions(groups, yen.id)).toEqual(expected);
-  expect(tableTripOptions(groups, ended.id)).toEqual([
-    expected[0],
-    { key: ended.id, label: "Current trip" },
-    expected[1],
-  ]);
+
+  const current = { key: ended.id, title: "Current trip", group: "", detail: "" };
+
+  expect(tableTripOptions(groups, ended.id)).toEqual([personal, current, vegas]);
+
+  const options = tableTripOptions(groups, ended.id);
+
+  expect(filterTripOptions(options, "  vEGa ")).toEqual([vegas]);
+  expect(filterTripOptions(options, "CREW")).toEqual([vegas]);
+  expect(filterTripOptions(options, "personal")).toEqual([personal]);
+  expect(filterTripOptions(options, "")).toEqual(options);
+  expect(filterTripOptions(options, "zzz")).toEqual([]);
+
+  expect(tripFieldValue(options, null)).toBe("Personal · no trip");
+  expect(tripFieldValue(options, live.id)).toBe("Crew · Vegas");
+  expect(tripFieldValue(options, ended.id)).toBe("Current trip");
+  expect(tripFieldValue(tableTripOptions(groups, euro.id), euro.id)).toBe("Current trip");
 });

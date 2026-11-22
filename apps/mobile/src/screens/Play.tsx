@@ -77,7 +77,7 @@ import {
 } from "../features/RecordingForms";
 import { LiveSessionsBar } from "../features/LiveBar";
 import { TableSection } from "../features/SharedTable";
-import { TableTripSheet, TableTripButton } from "../features/TableTrip";
+import { TableTripSheet, TripRow, useTripPickable } from "../features/TableTrip";
 import { afterClosing, type OpenSheet } from "../features/visitSheets";
 import { withoutTable } from "../lib/tableRoutes";
 import {
@@ -744,12 +744,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       ) : open?.type === "game" ? (
         <GameSheet visit={visit} back onClose={close} onSaved={() => edited("Game saved.")} />
       ) : open?.type === "trip" ? (
-        <TableTripSheet
-          table={visit.table}
-          back
-          onClose={close}
-          onSaved={() => edited("Trip saved.")}
-        />
+        <TableTripSheet table={visit.table} onClose={close} onSaved={() => edited("Trip saved.")} />
       ) : open?.type === "venue" ? (
         <VenueSheet visit={visit} onClose={close} onSaved={() => edited("Casino saved.")} />
       ) : open?.type === "reopen" ? (
@@ -918,6 +913,8 @@ function EditSessionSheet({
   const [time, setTime] = useState(() => localTimeText(initial));
   const [startError, setStartError] = useState<string | null>(null);
   const fields = sessionEditFields(visit, canEditTable);
+  const tripPickable = useTripPickable(visit.table.tripId !== null);
+  const tripRow = showTrip && tripPickable;
 
   const firstEntry = visit.entries.reduce(
     (earliest, entry) =>
@@ -965,13 +962,10 @@ function EditSessionSheet({
               <Icon name="chevron-right" color="muted" size={18} />
             </Row>
           ))}
+          {tripRow ? (
+            <TripRow value={visit.table.tripId} onPress={() => onOpen({ type: "trip" })} />
+          ) : null}
         </List>
-        {showTrip ? (
-          <TableTripButton
-            attached={visit.table.tripId !== null}
-            onOpen={() => onOpen({ type: "trip" })}
-          />
-        ) : null}
         <Button
           label={own ? "Your history" : `${name}'s history`}
           variant="ghost"
@@ -1043,15 +1037,12 @@ function EditSessionSheet({
             </Row>
           </>
         ) : null}
+        {tripRow ? (
+          <TripRow value={visit.table.tripId} onPress={() => onOpen({ type: "trip" })} />
+        ) : null}
       </List>
       {startError ? <FormError>{startError}</FormError> : null}
       {save.error ? <FormError>{save.error}</FormError> : null}
-      {showTrip ? (
-        <TableTripButton
-          attached={visit.table.tripId !== null}
-          onOpen={() => onOpen({ type: "trip" })}
-        />
-      ) : null}
       {canDelete ? (
         <Pressable
           accessibilityRole="button"

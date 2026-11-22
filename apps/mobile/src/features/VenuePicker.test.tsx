@@ -222,7 +222,11 @@ vi.mock("./AmountKeypad", () => ({
 
 vi.mock("./Chip", () => ({ Chip: () => null }));
 
-vi.mock("./TableTrip", () => ({ TripChoice: () => null }));
+vi.mock("./TableTrip", () => ({
+  TripPickerSheet: () => null,
+  TripRow: () => null,
+  useTripPickable: () => false,
+}));
 
 afterEach(() => {
   mocks.permission.current = () => Promise.resolve({ granted: false });

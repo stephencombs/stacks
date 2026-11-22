@@ -4,13 +4,12 @@ import { useVenueSearch } from "@stacks/client-runtime/recordingReact";
 import { venuePlace } from "@stacks/client-runtime/recordingView";
 import * as Location from "expo-location";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Platform, View } from "react-native";
+import { Platform, View } from "react-native";
 
 import { appleMapsSearch, type AppleMapsPlace } from "../../modules/apple-maps-search/src";
 import { Button } from "../components/ui/Button";
-import { Icon } from "../components/ui/Icon";
 import { SearchablePickerSheet } from "../components/ui/SearchablePickerSheet";
-import { List, Row } from "../components/ui/Surface";
+import { PickerRows } from "../components/ui/PickerRows";
 import { Text } from "../components/ui/Text";
 import { useDebounced } from "../lib/useDebounced";
 
@@ -126,50 +125,6 @@ function useApplePlaces(enabled: boolean, q: string, near: Near | null) {
     expected,
     settled: answer?.key === key,
   };
-}
-
-function CasinoOptions({
-  options,
-  pendingKey,
-  onChoose,
-}: {
-  options: ReadonlyArray<Option>;
-  pendingKey: string | null;
-  onChoose: (option: Option) => void;
-}) {
-  return (
-    <List>
-      {options.map((option) => {
-        const busy = pendingKey === option.key;
-
-        return (
-          <Row
-            key={option.key}
-            accessibilityLabel={option.title}
-            accessibilityState={{ selected: option.selected, busy }}
-            onPress={() => onChoose(option)}
-            className="py-4"
-          >
-            <View className="min-w-0 flex-1 gap-0.5">
-              <Text numberOfLines={2} className="type-heading text-ink">
-                {option.title}
-              </Text>
-              {option.detail ? (
-                <Text numberOfLines={1} className="type-footnote text-muted">
-                  {option.detail}
-                </Text>
-              ) : null}
-            </View>
-            {busy ? (
-              <ActivityIndicator size="small" />
-            ) : option.selected ? (
-              <Icon name="check" color="ink" size={18} />
-            ) : null}
-          </Row>
-        );
-      })}
-    </List>
-  );
 }
 
 /**
@@ -350,7 +305,7 @@ export function CasinoPickerSheet({
             {noneLabel}.
           </Text>
         ) : null}
-        <CasinoOptions options={options} pendingKey={pendingKey} onChoose={(o) => void choose(o)} />
+        <PickerRows options={options} pendingKey={pendingKey} onChoose={(o) => void choose(o)} />
       </View>
     </SearchablePickerSheet>
   );
