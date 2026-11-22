@@ -40,6 +40,7 @@ import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { chartCurve } from "../components/ui/chartCurve";
 import { offsetBelowHeader } from "../components/ui/scrollClamp";
+import { isLiquidGlassSupported } from "../lib/liquidGlass";
 import { FilterChip } from "../components/ui/FilterChip";
 import { EmptyState, List, Row, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
@@ -87,9 +88,9 @@ export function StatsScreen({ route }: Props) {
     ...(route.params?.tripId ? { tripId: TripId.make(route.params.tripId) } : null),
   };
 
-  // WARNING: y: 0 scrolls the filter chips behind the navigation bar.
+  // WARNING: under a transparent iOS 26 bar, y: 0 scrolls the filter chips behind it.
   const backToTop = () => {
-    const y = offsetBelowHeader(offset.current, headerHeight);
+    const y = offsetBelowHeader(offset.current, isLiquidGlassSupported ? headerHeight : 0);
 
     if (y !== null) scrollRef.current?.scrollTo({ y, animated: true });
   };

@@ -85,7 +85,10 @@ const PlayStack = createNativeStackNavigator({
     History: {
       screen: HistoryScreen,
       linking: "history/:period?",
-      options: { title: Platform.OS === "android" ? "" : "All sessions" },
+      options:
+        Platform.OS === "android"
+          ? { title: "", headerRight: undefined }
+          : { title: "All sessions" },
     },
   },
 });
