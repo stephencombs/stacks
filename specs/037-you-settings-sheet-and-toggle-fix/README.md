@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-22
 priority: high
 tags:
@@ -9,7 +9,10 @@ tags:
   - settings
 parent: 029-ios-ui-polish
 created_at: 2026-11-22T19:22:57.548962400Z
-updated_at: 2026-11-22T20:50:19.509862900Z
+updated_at: 2026-11-22T22:01:47.282471900Z
+transitions:
+  - status: in-progress
+    at: 2026-11-22T22:01:47.282471900Z
 ---
 
 # Fix You settings sheet layout and iOS portaled-sheet double-tap toggle bug
@@ -38,10 +41,10 @@ The You settings sheet has broken alignment, cramped spacing, inconsistent contr
 
 ## Design & Requirements
 
-- [ ] **Fix the portaled-sheet sync lag in `apps/mobile/src/components/ui/Sheet.ios.tsx`:**
+- [x] **Fix the portaled-sheet sync lag in `apps/mobile/src/components/ui/Sheet.ios.tsx`:**
   - Ensure updates to an already-mounted `PortaledSheet` propagate synchronously to `SheetPortal`: retain snapshot state only while a closing sheet is animating out, and while `open === true` render live `children` directly (or via a synchronous ref-backed store) without delaying `children` updates through `useLayoutEffect` + `useState`. (Matches `pingdotgg/t3code`'s `Sheet.tsx`, which hosts RN `Switch` inside a native `FormSheet` without a state-delayed portal copy. _Coordination note: 032 also edits `NativeFormSheet` detents in `Sheet.ios.tsx`; keep this fix scoped to `PortaledSheet`/`SheetPortal`._)
   - Add a regression test in `apps/mobile/src/components/ui/Sheet.ios.test.tsx` verifying that tapping a controlled `<Switch>` inside `<SheetHost><Sheet>` updates the `Switch`'s `value` prop on the very first commit with zero stale-prop intermediate render.
-- [ ] **Rebuild the iOS You settings sheet (`apps/mobile/src/features/You.tsx` / `You.ios.tsx`) with native HIG grouped form alignment, spacing, and sizing** (following `docs/design/mobile-redesign.md#menus-and-sheets` and `SettingsLayout.ios.tsx`):
+- [x] **Rebuild the iOS You settings sheet (`apps/mobile/src/features/You.tsx` / `You.ios.tsx`) with native HIG grouped form alignment, spacing, and sizing** (following `docs/design/mobile-redesign.md#menus-and-sheets` and `SettingsLayout.ios.tsx`):
   - Use a `large` sheet on iOS (since You holds six settings sections) and evaluate rendering the iOS body with native `@expo/ui/swift-ui` `Form` / `Section` + `Toggle` + `Picker` + `RNHostView` (for `UserAvatar`) inside a `scrollable={false}` `Sheet` mode — OR if kept in RN cards for cross-sheet consistency, strictly unify every section header, footer, row height, vertical padding (`py-3`, `min-h-12` single-line, `min-h-14` two-line), icon treatment, and trailing control alignment. Prefer native SwiftUI `Form` / `Toggle` on iOS per `expo-ui` and `mobile-redesign.md` ("Settings use native grouped form sections on iOS").
   - Align `Default game` and `Default casino` cleanly: consistent row height, matching muted trailing value color, and aligned trailing indicators (`↕` menu picker and `>` disclosure chevron).
   - Fix `Show cents` and `Privacy mode` toggles: generous vertical breathing room around title + subtitle, crisp vertical centering of the native switch, and guaranteed **single-tap** toggling on first press.
@@ -49,7 +52,7 @@ The You settings sheet has broken alignment, cramped spacing, inconsistent contr
   - Place `Export sessions (CSV)` with clean subtitle and section footer (no `-mt-3` hack).
   - Fix `Account`: no `Card`-inside-`Surface` nesting; put `Sign out` in its own separate destructive section/row (`text-loss` / SwiftUI `role="destructive"`), not a pill submit button jammed inside the profile card.
   - Ensure `Default casino` still seamlessly opens `CasinoPickerSheet` (compatible with 033).
-- [ ] Clean up `SettingsRow` (`apps/mobile/src/components/ui/Surface.tsx`) so all remaining RN usages (`Group.tsx`, Android `You.tsx`) drop the cramped `py-1` compact padding and maintain clean `py-3` spacing and alignment.
+- [x] Clean up `SettingsRow` (`apps/mobile/src/components/ui/Surface.tsx`) so all remaining RN usages (`Group.tsx`, Android `You.tsx`) drop the cramped `py-1` compact padding and maintain clean `py-3` spacing and alignment.
 - [ ] Verify single-tap toggling on every other sheet switch on iOS (`StartSheet`, `PastSessionSheet`, `GameSheet`) as well.
 
 ## Non-goals
@@ -62,4 +65,4 @@ The You settings sheet has broken alignment, cramped spacing, inconsistent contr
 - [ ] Every toggle in the You sheet (`Show cents`, `Privacy mode`) and in `StartSheet`, `PastSessionSheet`, and `GameSheet` flips smoothly and reliably on a **single tap** (both off->on and on->off).
 - [ ] All six sections of the You sheet (Your sessions, Recording defaults, Display, Appearance, Export, Account + separate destructive Sign out) have uniform horizontal margins, section header/footer spacing, row padding, icon sizing, and trailing control alignment in both light and dark mode.
 - [ ] Android You sheet remains clean and regression-free.
-- [ ] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, and `pnpm --filter @stacks/mobile test` pass (including the new portaled-`Switch` regression test in `Sheet.ios.test.tsx`).
+- [x] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, and `pnpm --filter @stacks/mobile test` pass (including the new portaled-`Switch` regression test in `Sheet.ios.test.tsx`).

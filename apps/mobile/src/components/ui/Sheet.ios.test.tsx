@@ -1,5 +1,5 @@
 import * as Predicate from "effect/Predicate";
-import { act, use, useState, type ReactNode } from "react";
+import { act, use, useLayoutEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
 
@@ -28,6 +28,12 @@ type FormSheetSnapshot = {
   readonly onNativeDismiss?: () => void;
 };
 
+type NativeSwitchProbe = {
+  commands: boolean[];
+  renders: boolean[];
+  tap: ((next: boolean) => void) | undefined;
+};
+
 const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -36,6 +42,8 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
   let latestFormSheet: FormSheetSnapshot | null = null;
   let latestHeader: HeaderConfigSnapshot | null = null;
   let reportContentSize: ((width: number, height: number) => void) | undefined;
+
+  const nativeSwitch: NativeSwitchProbe = { commands: [], renders: [], tap: undefined };
 
   const cssVars = new Map([
     ["--color-canvas", "#f4f4f6"],
@@ -62,6 +70,29 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
       reportContentSize = onContentSizeChange;
 
       return <Container>{children}</Container>;
+    },
+    Switch: ({
+      value,
+      onValueChange,
+    }: {
+      value?: boolean;
+      onValueChange?: (next: boolean) => void;
+    }) => {
+      const [native, setNative] = useState<{ value: boolean | null }>({ value: null });
+
+      nativeSwitch.renders.push(value === true);
+      nativeSwitch.tap = (next) => {
+        onValueChange?.(next);
+        setNative({ value: next });
+      };
+
+      useLayoutEffect(() => {
+        if (native.value !== null && native.value !== (value === true)) {
+          nativeSwitch.commands.push(value === true);
+        }
+      }, [value, native]);
+
+      return null;
     },
     Text: Container,
     TextInput: { State: { currentlyFocusedInput: () => null } },
@@ -109,10 +140,13 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
 
   const mod = await import("./Sheet.ios");
   const { InSheet } = await import("./sheetContext");
+  const { Switch } = await import("./Switch");
 
   return {
     ...mod,
     InSheet,
+    Switch,
+    nativeSwitch,
     formSheetTransitions,
     getLatestFormSheet: () => latestFormSheet,
     getLatestHeader: () => latestHeader,
@@ -323,5 +357,38 @@ it("resets native presentation state on swipe down so parent sheets re-open clea
   expect(formSheetTransitions.slice(mark)).toContain(false);
   expect(getLatestFormSheet()?.isOpen).toBe(true);
   expect(getLatestHeader()?.title).toBe("Edit my session");
+  await act(async () => root.unmount());
+});
+
+it("flips a controlled Switch in a portaled sheet on the first tap without a native snap-back", async () => {
+  const { Sheet, SheetHost, Switch, nativeSwitch } = await setupSheetTest();
+
+  function Settings() {
+    const [on, setOn] = useState(false);
+
+    return (
+      <Sheet open title="You" onClose={() => {}}>
+        <Switch value={on} onValueChange={setOn} />
+      </Sheet>
+    );
+  }
+
+  const root = createRoot(document.createElement("div"));
+
+  await act(async () =>
+    root.render(
+      <SheetHost>
+        <Settings />
+      </SheetHost>,
+    ),
+  );
+
+  await act(async () => nativeSwitch.tap?.(true));
+  expect(nativeSwitch.commands).toEqual([]);
+  expect(nativeSwitch.renders.at(-1)).toBe(true);
+
+  await act(async () => nativeSwitch.tap?.(false));
+  expect(nativeSwitch.commands).toEqual([]);
+  expect(nativeSwitch.renders.at(-1)).toBe(false);
   await act(async () => root.unmount());
 });
