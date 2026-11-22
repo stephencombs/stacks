@@ -3,6 +3,9 @@
     "expo": {
       "url": "https://mcp.expo.dev/mcp"
     },
+    "figma": {
+      "url": "https://mcp.figma.com/mcp"
+    },
     "leanspec": {
       "command": "pnpm",
       "args": ["exec", "leanspec-mcp"]
