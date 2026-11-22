@@ -20,6 +20,10 @@
       "type": "http",
       "url": "https://mcp.expo.dev/mcp"
     },
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp"
+    },
     "leanspec": {
       "type": "stdio",
       "command": "pnpm",
