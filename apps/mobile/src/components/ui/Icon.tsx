@@ -1,37 +1,35 @@
-import {
-  ArrowRight,
-  Calendar,
-  Check,
-  ChartColumn,
-  ChartLine,
-  ChevronDown,
-  ChevronRight,
-  CircleAlert,
-  Club,
-  CloudCheck,
-  CloudOff,
-  CloudUpload,
-  Delete,
-  Download,
-  Ellipsis,
-  EllipsisVertical,
-  EyeOff,
-  Link2,
-  Map,
-  Plane,
-  Plus,
-  Pencil,
-  Search,
-  Settings,
-  Share2,
-  SlidersHorizontal,
-  Sparkles,
-  Trash2,
-  User,
-  UserPlus,
-  Users,
-  X,
-} from "lucide-react-native";
+import ArrowRight from "lucide-react-native/icons/arrow-right";
+import Calendar from "lucide-react-native/icons/calendar";
+import ChartColumn from "lucide-react-native/icons/chart-column";
+import ChartLine from "lucide-react-native/icons/chart-line";
+import Check from "lucide-react-native/icons/check";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import CircleAlert from "lucide-react-native/icons/circle-alert";
+import CloudCheck from "lucide-react-native/icons/cloud-check";
+import CloudOff from "lucide-react-native/icons/cloud-off";
+import CloudUpload from "lucide-react-native/icons/cloud-upload";
+import Club from "lucide-react-native/icons/club";
+import Delete from "lucide-react-native/icons/delete";
+import Download from "lucide-react-native/icons/download";
+import Ellipsis from "lucide-react-native/icons/ellipsis";
+import EllipsisVertical from "lucide-react-native/icons/ellipsis-vertical";
+import EyeOff from "lucide-react-native/icons/eye-off";
+import Link2 from "lucide-react-native/icons/link-2";
+import Map from "lucide-react-native/icons/map";
+import Pencil from "lucide-react-native/icons/pencil";
+import Plane from "lucide-react-native/icons/plane";
+import Plus from "lucide-react-native/icons/plus";
+import Search from "lucide-react-native/icons/search";
+import Settings from "lucide-react-native/icons/settings";
+import Share2 from "lucide-react-native/icons/share-2";
+import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
+import Sparkles from "lucide-react-native/icons/sparkles";
+import Trash2 from "lucide-react-native/icons/trash-2";
+import User from "lucide-react-native/icons/user";
+import UserPlus from "lucide-react-native/icons/user-plus";
+import Users from "lucide-react-native/icons/users";
+import X from "lucide-react-native/icons/x";
 import { useCSSVariable } from "uniwind";
 
 const icons = {

@@ -206,6 +206,16 @@ export default defineConfig({
               name: "@stacks/client-runtime",
               message: "Import from an explicit @stacks/client-runtime/* subpath.",
             },
+            {
+              name: "lucide-react-native",
+              message:
+                "Import individual icons from lucide-react-native/icons/* so Metro doesn't bundle the whole icon barrel.",
+            },
+            {
+              name: "lucide-react-native/icons",
+              message:
+                "Import individual icons from lucide-react-native/icons/* so Metro doesn't bundle the whole icon barrel.",
+            },
           ],
         },
       ],
