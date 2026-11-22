@@ -77,7 +77,13 @@ const PlayStack = createNativeStackNavigator({
 
 const StatsStack = createNativeStackNavigator({
   screenOptions: personalOptions,
-  screens: { Stats: { screen: StatsScreen, linking: "stats" } },
+  screens: {
+    Stats: {
+      screen: StatsScreen,
+      linking: "stats",
+      options: Platform.OS === "ios" ? { headerShown: false } : {},
+    },
+  },
 });
 
 const MapStack = createNativeStackNavigator({
