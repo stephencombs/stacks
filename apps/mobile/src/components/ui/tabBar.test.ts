@@ -6,7 +6,15 @@ vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ b
 
 const { screenFoot } = await import("./tabBar");
 
-const base = { bar: 80, inset: 24, footer: null, fab: false, live: 0, footerGap: 0 } as const;
+const base = {
+  bar: 80,
+  inset: 24,
+  footer: null,
+  fab: false,
+  live: 0,
+  accessory: 0,
+  footerGap: 0,
+} as const;
 
 it("Android's list stops above the opaque tab bar, and the LiveBar and FAB float on it", () => {
   const foot = screenFoot({ ...base, platform: "android", live: 52, fab: true });
@@ -23,6 +31,14 @@ it("iOS's list scrolls under the glass tab bar and pads its end instead", () => 
   expect(foot.endSpace).toBe(80 + 52 + 88);
   expect(foot.fabBottom).toBe(80 + 60 + 16);
   expect(foot.clearance).toBe(80);
+});
+
+it("the native accessory stacks above the tab bar like a LiveBar, so the FAB and last row clear it", () => {
+  const foot = screenFoot({ ...base, platform: "ios", accessory: 56, fab: true });
+  expect(foot.endSpace).toBe(80 + 56 + 88);
+  expect(foot.fabBottom).toBe(80 + 64 + 16);
+  expect(foot.above).toBe(80);
+  expect(screenFoot({ ...base, platform: "ios", accessory: 0, fab: true }).fabBottom).toBe(96);
 });
 
 it("a footer holds the foot of the screen, and the FAB and LiveBar stack above it", () => {
@@ -51,14 +67,21 @@ it("at the end of a list, nothing floating covers the last row", () => {
 
   for (const platform of ["android", "ios"]) {
     for (const footer of [null, 96]) {
-      for (const live of [0, 52, 76]) {
-        const foot = screenFoot({ ...base, platform, footer, fab: true, live });
+      for (const [live, accessory] of [
+        [0, 0],
+        [52, 0],
+        [76, 0],
+        [0, 56],
+      ] as const) {
+        const foot = screenFoot({ ...base, platform, footer, fab: true, live, accessory });
         const listBottom = footer === null && platform === "android" ? base.bar : 0;
         const fabTop = foot.fabBottom + FAB - listBottom;
-        const liveTop = (foot.above ?? 0) + 8 + live - listBottom;
-        expect(foot.endSpace, `${platform} footer ${footer} live ${live}`).toBeGreaterThanOrEqual(
-          Math.max(fabTop, live > 0 ? liveTop : 0),
-        );
+        const stacked = live + accessory;
+        const liveTop = (foot.above ?? 0) + 8 + stacked - listBottom;
+        expect(
+          foot.endSpace,
+          `${platform} footer ${footer} live ${live} accessory ${accessory}`,
+        ).toBeGreaterThanOrEqual(Math.max(fabTop, stacked > 0 ? liveTop : 0));
       }
     }
   }

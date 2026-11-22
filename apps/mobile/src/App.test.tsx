@@ -187,6 +187,7 @@ async function load({
 
       return { config };
     },
+    PlaceTabsAccessory: ({ children }: { children: ReactNode }) => children,
     placeTab: vi.fn(),
     placeTabsConfig: {},
     useTabBarHeight: vi.fn(),

@@ -12,7 +12,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation } from "@react-navigation/native";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import type * as DateTime from "effect/DateTime";
-import { useEffect, useState, type ReactNode } from "react";
+import { use, useEffect, useState, type ReactNode } from "react";
 import { Platform, View } from "react-native";
 import { Text } from "../components/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +23,7 @@ import { GlassSurface } from "../components/ui/GlassSurface";
 import { MarqueeText } from "../components/ui/MarqueeText";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Sheet } from "../components/ui/Sheet";
+import { LiveAccessoryHeight } from "../components/ui/tabBar";
 import { useGo } from "../lib/go";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { useStacks } from "../lib/stacks";
@@ -37,7 +38,7 @@ type Placement = {
   onHeightChange?: (height: number) => void;
 };
 
-type LivePlace = {
+export type LivePlace = {
   readonly key: string;
   readonly title: string;
   readonly game: Game | null;
@@ -50,7 +51,7 @@ type LivePlace = {
 const detailOf = ({ venueName, suffix }: LivePlace) =>
   [venueName, suffix].filter(Boolean).join(" · ");
 
-function useLiveSessions(except?: string) {
+export function useLiveSessions(except?: string) {
   const { home } = useRecordingHome();
   const prefs = usePreferences();
 
@@ -84,29 +85,39 @@ function useLiveSessions(except?: string) {
  */
 export function LiveBar({ shows, ...placement }: Placement & { shows?: ShowsTable }) {
   const live = useLiveSessions().length > 0;
+  const native = use(LiveAccessoryHeight) > 0;
 
-  return live ? (
+  if (!live) return <Seat shows={shows} {...placement} />;
+
+  return native ? (
+    <Absent onHeightChange={placement.onHeightChange} />
+  ) : (
     <Pinned {...placement}>
       <LiveSessionsBar />
     </Pinned>
-  ) : (
-    <Seat shows={shows} {...placement} />
   );
 }
 
 /** Your own live sessions, for screens that read nothing from an account. */
 export function PersonalLiveBar(placement: Placement) {
   const live = useLiveSessions().length > 0;
-  const { onHeightChange } = placement;
-  useEffect(() => {
-    if (!live) onHeightChange?.(0);
-  }, [live, onHeightChange]);
+  const native = use(LiveAccessoryHeight) > 0;
 
-  return live ? (
+  return live && !native ? (
     <Pinned {...placement}>
       <LiveSessionsBar />
     </Pinned>
-  ) : null;
+  ) : (
+    <Absent onHeightChange={placement.onHeightChange} />
+  );
+}
+
+function Absent({ onHeightChange }: Pick<Placement, "onHeightChange">) {
+  useEffect(() => {
+    onHeightChange?.(0);
+  }, [onHeightChange]);
+
+  return null;
 }
 
 /**
@@ -114,65 +125,88 @@ export function PersonalLiveBar(placement: Placement) {
  * several it names the newest and opens a sheet to pick one. Nothing when there are none.
  */
 export function LiveSessionsBar({ except }: { except?: string }) {
-  const navigation = useNavigation();
   const live = useLiveSessions(except);
+  const open = useOpenLive();
   const [picking, setPicking] = useState(false);
-  const [newest, ...rest] = live;
+  const bar = liveBar(live, open, () => setPicking(true));
 
-  if (!newest) return null;
+  if (!bar) return null;
 
-  const open = (place: LivePlace) =>
+  return (
+    <>
+      <Bar {...bar} />
+      {picking ? <LivePicker live={live} onClose={() => setPicking(false)} /> : null}
+    </>
+  );
+}
+
+export function useOpenLive() {
+  const navigation = useNavigation();
+
+  return (place: LivePlace) =>
     navigation.dispatch(
       "visitId" in place.to
         ? StackActions.push("Play", { visitId: place.to.visitId })
         : StackActions.push("Table", { tableId: place.to.tableId }),
     );
+}
+
+/** What the bar says and does for these sessions: straight to one, or a pick among several. */
+export function liveBar(
+  live: ReadonlyArray<LivePlace>,
+  open: (place: LivePlace) => void,
+  pick: () => void,
+) {
+  const [newest, ...rest] = live;
+
+  if (!newest) return null;
 
   const { title, game, startedAt, venueName, suffix } = newest;
+  const content = { title, game, venueName, suffix, startedAt };
 
-  if (rest.length === 0)
-    return (
-      <Bar
-        label={`${"visitId" in newest.to ? "Back to your session" : "Back to the table"}, ${title}, ${startedAt ? `since ${formatTime(startedAt)}, ` : ""}${detailOf(newest)}`}
-        hint={"visitId" in newest.to ? "Goes back to your session" : "Goes back to the table"}
-        title={title}
-        game={game}
-        venueName={venueName}
-        suffix={suffix}
-        startedAt={startedAt}
-        onPress={() => open(newest)}
-      />
-    );
+  if (rest.length === 0) {
+    const visit = "visitId" in newest.to;
+
+    return {
+      ...content,
+      label: `${visit ? "Back to your session" : "Back to the table"}, ${title}, ${startedAt ? `since ${formatTime(startedAt)}, ` : ""}${detailOf(newest)}`,
+      hint: visit ? "Goes back to your session" : "Goes back to the table",
+      onPress: () => open(newest),
+    };
+  }
+
+  return {
+    ...content,
+    label: `${live.length} live sessions, newest ${title}`,
+    hint: "Lists your live sessions",
+    lead: `+${rest.length} more`,
+    onPress: pick,
+  };
+}
+
+export function LivePicker({
+  live,
+  onClose,
+}: {
+  live: ReadonlyArray<LivePlace>;
+  onClose: () => void;
+}) {
+  const open = useOpenLive();
 
   return (
-    <>
-      <Bar
-        label={`${live.length} live sessions, newest ${title}`}
-        hint="Lists your live sessions"
-        title={title}
-        game={game}
-        lead={`+${rest.length} more`}
-        venueName={venueName}
-        suffix={suffix}
-        startedAt={startedAt}
-        onPress={() => setPicking(true)}
-      />
-      {picking ? (
-        <Sheet open title="Live sessions" onClose={() => setPicking(false)}>
-          {live.map((item) => (
-            <Button
-              key={item.key}
-              label={`${item.title} · ${detailOf(item)}`}
-              variant="secondary"
-              onPress={() => {
-                setPicking(false);
-                open(item);
-              }}
-            />
-          ))}
-        </Sheet>
-      ) : null}
-    </>
+    <Sheet open title="Live sessions" onClose={onClose}>
+      {live.map((item) => (
+        <Button
+          key={item.key}
+          label={`${item.title} · ${detailOf(item)}`}
+          variant="secondary"
+          onPress={() => {
+            onClose();
+            open(item);
+          }}
+        />
+      ))}
+    </Sheet>
   );
 }
 
@@ -247,20 +281,29 @@ function Bar({
   );
 }
 
-type BarContentProps = {
+export type BarContentProps = {
   title: string;
   game: Game | null;
   lead?: string;
   venueName?: string | undefined;
   suffix?: string;
   startedAt: DateTime.Utc | null;
+  className?: string;
 };
 
-function BarContent({ title, game, lead, venueName, suffix, startedAt }: BarContentProps) {
+export function BarContent({
+  title,
+  game,
+  lead,
+  venueName,
+  suffix,
+  startedAt,
+  className,
+}: BarContentProps) {
   const subtitle = "type-footnote text-muted";
 
   return (
-    <View className="min-h-14 flex-row items-center gap-3 px-4 py-2">
+    <View className={cn("min-h-14 flex-row items-center gap-3 px-4 py-2", className)}>
       <View
         className={cn("size-8 rounded-full border-[3px] border-line", chipColor[gameChip(game)])}
       />

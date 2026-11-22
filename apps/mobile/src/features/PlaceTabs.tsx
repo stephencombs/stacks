@@ -1,1 +1,7 @@
-export { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./PlaceTabs.android";
+export {
+  createPlaceTabs,
+  PlaceTabsAccessory,
+  placeTab,
+  placeTabsConfig,
+  useTabBarHeight,
+} from "./PlaceTabs.android";
