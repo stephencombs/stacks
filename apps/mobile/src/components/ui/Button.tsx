@@ -175,7 +175,10 @@ export function IconButton({
       className={cn(
         "size-11",
         plain && "items-center justify-center rounded-full active:bg-fill",
-        !plain && felt && "items-center justify-center rounded-full bg-black/15 active:bg-black/25",
+        !plain &&
+          felt &&
+          Platform.OS === "android" &&
+          "items-center justify-center rounded-full bg-black/15 active:bg-black/25",
         disabled && "opacity-50",
         className,
       )}

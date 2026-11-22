@@ -73,11 +73,7 @@ export function LiveClock({ since }: { since: DateTime.Utc | null }) {
     );
 
   return (
-    <GlassSurface
-      radius={22}
-      felt
-      className="min-h-11 flex-row items-center gap-2 rounded-full px-4"
-    >
+    <GlassSurface radius={22} felt className="h-11 flex-row items-center gap-2 rounded-full px-4">
       <View className="size-2 rounded-full bg-felt-ink" />
       <Text className="type-footnote font-semibold text-felt-ink">LIVE</Text>
       {since ? (
