@@ -101,7 +101,8 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.doMock("../components/ui/Surface", () => ({
     EmptyState: Container,
     List: Container,
-    Row: Container,
+    Row: ({ children, onPress }: { children?: ReactNode; onPress?: () => void }) =>
+      onPress ? <button onClick={onPress}>{children}</button> : <div>{children}</div>,
     SectionHeading: Container,
     Skeleton: () => null,
   }));
@@ -127,6 +128,9 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   }));
   vi.doMock("../features/RecordingForms", () => ({
     CashOutSheet: () => <div>Cash out sheet</div>,
+    VenueSheet: ({ onSaved }: { onSaved: () => void }) => (
+      <button onClick={onSaved}>Pick a casino</button>
+    ),
   }));
   vi.doMock("../features/TableTrip", () => ({
     TableTripSheet: () => null,
@@ -180,6 +184,11 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     expect(element.textContent).not.toContain("View entry");
     await click("Dismiss");
     await click("Edit my session");
+    await click("CasinoNot set");
+    expect(element.textContent).not.toContain("Delete my visit");
+    await click("Pick a casino");
+    expect(element.textContent).toContain("Casino saved.");
+    expect(element.textContent).toContain("Delete my visit");
     await click("Delete my visit");
     expect(element.querySelector("footer")!.textContent).toContain("Session deletedUndoDismiss");
     await click("Bea");
