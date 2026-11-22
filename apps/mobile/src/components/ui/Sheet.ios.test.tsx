@@ -22,6 +22,7 @@ type HeaderConfigSnapshot = {
 
 type FormSheetSnapshot = {
   readonly isOpen: boolean;
+  readonly detents?: ReadonlyArray<number>;
   readonly nativeContainerStyle?: { readonly backgroundColor?: unknown };
   readonly onDismiss?: () => void;
   readonly onNativeDismiss?: () => void;
@@ -34,6 +35,7 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
   const formSheetTransitions: boolean[] = [];
   let latestFormSheet: FormSheetSnapshot | null = null;
   let latestHeader: HeaderConfigSnapshot | null = null;
+  let reportContentSize: ((width: number, height: number) => void) | undefined;
 
   const cssVars = new Map([
     ["--color-canvas", "#f4f4f6"],
@@ -50,7 +52,17 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
       View: Container,
     },
     Keyboard: { addListener: () => ({ remove: () => {} }) },
-    ScrollView: Container,
+    ScrollView: ({
+      children,
+      onContentSizeChange,
+    }: {
+      children?: ReactNode;
+      onContentSizeChange?: (width: number, height: number) => void;
+    }) => {
+      reportContentSize = onContentSizeChange;
+
+      return <Container>{children}</Container>;
+    },
     Text: Container,
     TextInput: { State: { currentlyFocusedInput: () => null } },
     View: Container,
@@ -77,13 +89,14 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
   vi.doMock("react-native-screens/experimental", () => ({
     FormSheet: ({
       isOpen,
+      detents,
       nativeContainerStyle,
       onDismiss,
       onNativeDismiss,
       children,
     }: FormSheetSnapshot & { children?: ReactNode }) => {
       formSheetTransitions.push(isOpen);
-      latestFormSheet = { isOpen, nativeContainerStyle, onDismiss, onNativeDismiss };
+      latestFormSheet = { isOpen, detents, nativeContainerStyle, onDismiss, onNativeDismiss };
 
       return <div data-open={String(isOpen)}>{children}</div>;
     },
@@ -103,8 +116,25 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
     formSheetTransitions,
     getLatestFormSheet: () => latestFormSheet,
     getLatestHeader: () => latestHeader,
+    measureContent: (height: number) => reportContentSize?.(390, height),
   };
 };
+
+it("fits measured content within the native detent range and caps overflow at full height", async () => {
+  const { Sheet, getLatestFormSheet, measureContent } = await setupSheetTest();
+  const root = createRoot(document.createElement("div"));
+
+  await act(async () => root.render(<Sheet open title="Rebuy" onClose={() => {}} />));
+  await act(async () => measureContent(620));
+
+  const [fitted, expanded] = getLatestFormSheet()?.detents ?? [];
+  expect(fitted! * (844 - 44 - 34)).toBeCloseTo(620 + 34 + 80);
+  expect(expanded).toBe(1);
+
+  await act(async () => measureContent(800));
+  expect(getLatestFormSheet()?.detents).toEqual([1]);
+  await act(async () => root.unmount());
+});
 
 it("keeps the FormSheet open across same-tick child sheet swaps and shows a back button", async () => {
   const { Sheet, SheetHost, formSheetTransitions, getLatestHeader, getLatestFormSheet } =

@@ -332,13 +332,14 @@ function NativeFormSheet({
   }, []);
 
   const fittedHeight = contentHeight + footerHeight + insets.bottom + 80;
+  const maximumDetentHeight = Math.max(1, screenHeight - insets.top - insets.bottom);
 
   const detent =
     contentHeight === 0
       ? footer
         ? 0.65
         : 0.5
-      : Math.min(0.9, Math.max(0.3, fittedHeight / screenHeight));
+      : Math.min(1, Math.max(0.3, fittedHeight / maximumDetentHeight));
 
   const revealFocusedField = () => {
     if (!keyboardFrame.current) return;
@@ -357,7 +358,7 @@ function NativeFormSheet({
   return (
     <FormSheet
       isOpen={isOpen}
-      detents={[detent, 1]}
+      detents={detent === 1 ? [1] : [detent, 1]}
       prefersGrabberVisible
       preventNativeDismiss={busy}
       nativeContainerStyle={{ backgroundColor: sheetBg }}
@@ -397,6 +398,7 @@ function NativeFormSheet({
                     ref={scroll}
                     className="flex-1"
                     contentInsetAdjustmentBehavior="automatic"
+                    alwaysBounceVertical={false}
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="interactive"
                     contentContainerClassName="gap-5 px-4 pt-4 pb-4"

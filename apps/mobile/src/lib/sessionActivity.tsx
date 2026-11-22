@@ -4,7 +4,6 @@ import {
   activityBackgroundTint,
   background,
   buttonStyle,
-  fixedSize,
   font,
   foregroundStyle,
   frame,
@@ -139,13 +138,17 @@ export const sessionActivity = createLiveActivity(
 
     const subtitle = content.kind === "live" ? content.venueLabel : content.finishedTimeText;
 
+    const identityText = (
+      <VStack alignment="leading" spacing={2}>
+        <Text modifiers={label}>{content.gameLabel}</Text>
+        <Text modifiers={secondary}>{subtitle}</Text>
+      </VStack>
+    );
+
     const identity = (
       <HStack spacing={10}>
         {chip(36)}
-        <VStack alignment="leading" spacing={2}>
-          <Text modifiers={label}>{content.gameLabel}</Text>
-          <Text modifiers={secondary}>{subtitle}</Text>
-        </VStack>
+        {identityText}
       </HStack>
     );
 
@@ -202,10 +205,25 @@ export const sessionActivity = createLiveActivity(
     const startedAt = new Date(content.startedAtMs);
 
     const timerStyle = [
-      font({ size: 13, weight: "semibold" }),
       monospacedDigit(),
       foregroundStyle(colors.live),
+      lineLimit(1),
+      minimumScaleFactor(0.75),
     ];
+
+    const liveTimer = (
+      <Text
+        modifiers={[
+          font({ size: 13, weight: "semibold" }),
+          ...timerStyle,
+          multilineTextAlignment("trailing"),
+          frame({ maxWidth: 118, alignment: "trailing" }),
+        ]}
+      >
+        {"• Live "}
+        <Text date={startedAt} dateStyle="timer" />
+      </Text>
+    );
 
     const details = (
       <HStack spacing={8}>
@@ -213,18 +231,7 @@ export const sessionActivity = createLiveActivity(
         <Spacer />
         <VStack alignment="trailing" spacing={2}>
           <Text modifiers={[...amount, foregroundStyle(colors.ink)]}>{content.buyInText}</Text>
-          <Text
-            modifiers={[
-              ...timerStyle,
-              lineLimit(1),
-              minimumScaleFactor(0.75),
-              multilineTextAlignment("trailing"),
-              frame({ maxWidth: 118, alignment: "trailing" }),
-            ]}
-          >
-            {"• Live "}
-            <Text date={startedAt} dateStyle="timer" />
-          </Text>
+          {liveTimer}
         </VStack>
       </HStack>
     );
@@ -242,23 +249,40 @@ export const sessionActivity = createLiveActivity(
       ),
       compactLeading: chip(20),
       compactTrailing: (
-        <Overlay
-          alignment="trailing"
-          modifiers={[...timerStyle, fixedSize({ horizontal: true, vertical: false })]}
-        >
-          <Text modifiers={[hidden()]}>0:00:00</Text>
+        <Overlay alignment="trailing" modifiers={[font({ size: 11, weight: "semibold" })]}>
+          <Text modifiers={[...timerStyle, hidden()]}>0000:00:00</Text>
           <Overlay.Content>
             <Text
               date={startedAt}
               dateStyle="timer"
-              modifiers={[multilineTextAlignment("trailing"), lineLimit(1)]}
+              modifiers={[...timerStyle, multilineTextAlignment("trailing")]}
             />
           </Overlay.Content>
         </Overlay>
       ),
       minimal: chip(20),
+      expandedLeading: <HStack modifiers={[padding({ leading: 8 })]}>{chip(27)}</HStack>,
+      expandedTrailing: (
+        <Text
+          modifiers={[
+            font({ size: 17, weight: "bold" }),
+            foregroundStyle(colors.ink),
+            monospacedDigit(),
+            privacySensitive(),
+            lineLimit(1),
+            minimumScaleFactor(0.65),
+            padding({ trailing: 8 }),
+          ]}
+        >
+          {content.buyInText}
+        </Text>
+      ),
       expandedBottom: (
-        <VStack modifiers={[padding({ horizontal: 10, bottom: 4 })]}>{details}</VStack>
+        <HStack spacing={8} modifiers={[padding({ horizontal: 10, bottom: 4 })]}>
+          {identityText}
+          <Spacer />
+          {liveTimer}
+        </HStack>
       ),
     };
   },
