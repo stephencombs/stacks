@@ -751,7 +751,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           onSaved={() => edited("Trip saved.")}
         />
       ) : open?.type === "venue" ? (
-        <VenueSheet visit={visit} back onClose={close} onSaved={() => edited("Casino saved.")} />
+        <VenueSheet visit={visit} onClose={close} onSaved={() => edited("Casino saved.")} />
       ) : open?.type === "reopen" ? (
         <ReopenSheet
           visit={visit}

@@ -9,6 +9,8 @@ need no doc change; follow the [documentation rules](../AGENTS.md#documentation)
 - [Design frames](./design/frames.md): the canvas each native screen is checked against, and how to
   compare on the emulator
 - [Navigation](./internals/navigation.md): where content lives and how people move between it
+- [Native bottom search bar](./internals/native-search-bar.md): why pickers use a local `UISearchBar`
+  module on iOS instead of a library search bar
 - [Claiming guest history](./internals/claims.md): how a guest's players link to an account, and
   the two claim paths that stay apart
 - [Legacy migration](./internals/legacy-migration.md): how the Group-bound ledger maps to the player

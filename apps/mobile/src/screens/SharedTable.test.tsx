@@ -224,7 +224,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
       </div>
     ),
   }));
-  vi.doMock("../features/VenuePicker", () => ({ SessionVenuePicker: () => null }));
+  vi.doMock("../features/VenuePicker", () => ({ CasinoPickerSheet: () => null }));
   vi.doMock("../features/TableTrip", () => ({ TripChoice: () => null }));
 
   const { RecordingProvider } = await import("@stacks/client-runtime/recordingReact");

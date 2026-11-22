@@ -56,7 +56,7 @@ import { useRecordingState } from "../lib/recording";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
 import { Chip } from "./Chip";
-import { CasinoPickerSheet, SessionVenuePicker } from "./VenuePicker";
+import { CasinoPickerSheet } from "./VenuePicker";
 import { applyAmountKey } from "./amountKey";
 import { TripChoice } from "./TableTrip";
 
@@ -543,7 +543,10 @@ export function StartSheet({
       <CasinoPickerSheet
         selectedId={venue?.id ?? null}
         selected={venue}
-        onSelect={setVenue}
+        onSelect={(next) => {
+          setVenue(next);
+          setPickingVenue(false);
+        }}
         onClose={() => setPickingVenue(false)}
       />
     );
@@ -691,7 +694,10 @@ export function PastSessionSheet({
       <CasinoPickerSheet
         selectedId={venue?.id ?? null}
         selected={venue}
-        onSelect={setVenue}
+        onSelect={(next) => {
+          setVenue(next);
+          setPickingVenue(false);
+        }}
         onClose={() => setPickingVenue(false)}
       />
     );
@@ -1350,32 +1356,27 @@ export function GameSheet({
   );
 }
 
-/** The table's casino, picked from a search or from those saved on this device, or none. */
+/** The table's casino. Choosing one saves it and returns, so there is no Save button. */
 export function VenueSheet({
   visit,
-  back = false,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
-  back?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const save = useRecordingSubmit();
-  // A venue another device set that this one hasn't fetched yet stays until something is picked.
-  const [picked, setPicked] = useState<{ venue: CachedVenue | null } | null>(null);
-  const selected = picked ? picked.venue : visit.venue;
 
   return (
-    <RecordingSheet
-      title="Casino"
-      submitLabel="Save casino"
-      back={back}
-      save={save}
+    <CasinoPickerSheet
+      // A venue another device set that this one hasn't fetched yet stays until something is picked.
+      selectedId={visit.table.venueId}
+      selected={visit.venue}
+      error={save.error}
       onClose={onClose}
-      onSubmit={async () => {
-        if (!picked) return onSaved();
+      onSelect={async (venue) => {
+        if ((venue?.id ?? null) === visit.table.venueId) return onSaved();
 
         const receipt = await save.submit(
           {
@@ -1384,22 +1385,16 @@ export function VenueSheet({
             table: {
               game: visit.table.game,
               gameName: visit.table.gameName ?? null,
-              venueId: picked.venue?.id ?? null,
+              venueId: venue?.id ?? null,
               highLimit: visit.table.highLimit,
             },
           },
-          picked.venue ? [picked.venue] : [],
+          venue ? [venue] : [],
         );
 
         if (receipt) onSaved();
       }}
-    >
-      <SessionVenuePicker
-        selectedId={picked ? (picked.venue?.id ?? null) : visit.table.venueId}
-        selected={selected}
-        onSelect={(venue) => setPicked({ venue })}
-      />
-    </RecordingSheet>
+    />
   );
 }
 

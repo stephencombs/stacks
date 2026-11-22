@@ -119,7 +119,10 @@ function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
         context="default"
         selectedId={prefs.defaultVenue?.id ?? null}
         selected={prefs.defaultVenue}
-        onSelect={setDefaultVenue}
+        onSelect={(venue) => {
+          setDefaultVenue(venue);
+          setPicking(null);
+        }}
         onClose={() => setPicking(null)}
       />
     );
