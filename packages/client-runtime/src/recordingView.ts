@@ -21,6 +21,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import { formatDay, formatTime, gameNames } from "./format.ts";
+import { tripDates } from "./trip.ts";
 import {
   type RecordingCommand,
   type RecordingOperationId,
@@ -956,6 +957,13 @@ export const sessionEditFields = (visit: RecordingVisitView, canEditTable: boole
   return fields;
 };
 
+export type TableTripOption = {
+  readonly key: string;
+  readonly title: string;
+  readonly group: string;
+  readonly detail: string;
+};
+
 export const tableTripOptions = (groups: ReadonlyArray<GroupListItem>, selected: TripId | null) => {
   const compatible = groups.filter(({ group }) => group.currency === RECORDING_CURRENCY);
 
@@ -967,16 +975,47 @@ export const tableTripOptions = (groups: ReadonlyArray<GroupListItem>, selected:
   const live = compatible.flatMap(({ group, trips }) =>
     trips
       .filter((trip) => trip.endedAt === null)
-      .map((trip) => ({ key: trip.id, label: `${group.name} · ${trip.name}` })),
+      .map((trip) => ({
+        key: trip.id,
+        title: trip.name,
+        group: group.name,
+        detail: `${group.name} · ${tripDates(trip)}`,
+      })),
   );
 
   return [
-    { key: "", label: "Personal · no trip" },
+    { key: "", title: "Personal · no trip", group: "", detail: "Keep this table personal" },
     ...(selected && !mismatched && !live.some((item) => item.key === selected)
-      ? [{ key: selected, label: "Current trip" }]
+      ? [{ key: selected, title: "Current trip", group: "", detail: "" }]
       : []),
     ...live,
-  ];
+  ] satisfies ReadonlyArray<TableTripOption>;
+};
+
+/** Keeps the options whose trip or group name contains `query`, ignoring case. */
+export const filterTripOptions = (options: ReadonlyArray<TableTripOption>, query: string) => {
+  const needle = query.trim().toLowerCase();
+
+  return needle === ""
+    ? options
+    : options.filter(
+        ({ title, group }) =>
+          title.toLowerCase().includes(needle) || group.toLowerCase().includes(needle),
+      );
+};
+
+/** What a Trip field shows: "Crew · Vegas", "Personal · no trip", or "Current trip" when unlisted. */
+export const tripFieldValue = (
+  options: ReadonlyArray<TableTripOption>,
+  selected: TripId | null,
+) => {
+  const option = options.find(({ key }) => key === (selected ?? ""));
+
+  return option
+    ? option.group
+      ? `${option.group} · ${option.title}`
+      : option.title
+    : "Current trip";
 };
 
 export type HistoryLine =

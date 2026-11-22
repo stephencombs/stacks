@@ -59,7 +59,7 @@ import { Chip } from "./Chip";
 import { CasinoPickerSheet } from "./VenuePicker";
 import { AmountFeedback } from "./AmountFeedback";
 import { applyAmountKey } from "./amountKey";
-import { TripChoice } from "./TableTrip";
+import { TripPickerSheet, TripRow, useTripPickable } from "./TableTrip";
 
 const money = (amount: number, showCents = false) =>
   formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY, {
@@ -529,8 +529,10 @@ export function StartSheet({
   const [gameName, setGameName] = useState("");
   const [venue, setVenue] = useState<CachedVenue | null>(() => prefs.defaultVenue);
   const [pickingVenue, setPickingVenue] = useState(false);
+  const [pickingTrip, setPickingTrip] = useState(false);
   const [highLimit, setHighLimit] = useState(false);
   const [recordingOnly, setRecordingOnly] = useState(false);
+  const tripPickable = useTripPickable(tripId !== null);
   const alreadyPlaying = Boolean(home?.active.length);
   const watching = recordingOnly && !alreadyPlaying;
 
@@ -544,6 +546,18 @@ export function StartSheet({
           setPickingVenue(false);
         }}
         onClose={() => setPickingVenue(false)}
+      />
+    );
+
+  if (pickingTrip)
+    return (
+      <TripPickerSheet
+        value={tripId}
+        onSelect={(next) => {
+          setTripId(next);
+          setPickingTrip(false);
+        }}
+        onClose={() => setPickingTrip(false)}
       />
     );
 
@@ -615,7 +629,11 @@ export function StartSheet({
           />
         </View>
       ) : null}
-      <TripChoice value={tripId} onChange={setTripId} />
+      {tripPickable ? (
+        <List>
+          <TripRow value={tripId} onPress={() => setPickingTrip(true)} />
+        </List>
+      ) : null}
       <DetailsFields
         game={game}
         gameName={gameName}

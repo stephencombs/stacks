@@ -225,7 +225,11 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
     ),
   }));
   vi.doMock("../features/VenuePicker", () => ({ CasinoPickerSheet: () => null }));
-  vi.doMock("../features/TableTrip", () => ({ TripChoice: () => null }));
+  vi.doMock("../features/TableTrip", () => ({
+    TripPickerSheet: () => null,
+    TripRow: () => null,
+    useTripPickable: () => false,
+  }));
 
   const { RecordingProvider } = await import("@stacks/client-runtime/recordingReact");
   const { SharedTableScreen } = await import("./SharedTable");

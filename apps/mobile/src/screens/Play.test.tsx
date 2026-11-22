@@ -134,7 +134,8 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   }));
   vi.doMock("../features/TableTrip", () => ({
     TableTripSheet: () => null,
-    TableTripButton: () => null,
+    TripRow: () => null,
+    useTripPickable: () => false,
   }));
   vi.doMock("../features/LiveBar", () => ({ LiveSessionsBar: () => null }));
   vi.doMock("../lib/recording", () => ({
