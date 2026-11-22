@@ -57,6 +57,7 @@ import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
 import { Chip } from "./Chip";
 import { CasinoPickerSheet } from "./VenuePicker";
+import { AmountFeedback } from "./AmountFeedback";
 import { applyAmountKey } from "./amountKey";
 import { TripChoice } from "./TableTrip";
 
@@ -98,12 +99,14 @@ function KeypadAmount({
   label,
   amount,
   hint,
+  hintLines = 1,
   keypad = true,
 }: {
   keypad?: boolean;
   label: string;
   amount: Amount;
   hint?: ReactNode;
+  hintLines?: 1 | 2;
 }) {
   const parsed = parseRecordingAmount(amount.text, 0);
 
@@ -136,14 +139,7 @@ function KeypadAmount({
           </Text>
         )}
       </View>
-      {amount.error ? (
-        <View accessibilityLiveRegion="polite" className="flex-row justify-center gap-1.5 px-1">
-          <Icon name="alert" color="loss" size={14} />
-          <Text className="type-footnote text-loss">{amount.error}</Text>
-        </View>
-      ) : hint ? (
-        <Text className="px-1 text-center type-footnote text-muted">{hint}</Text>
-      ) : null}
+      <AmountFeedback error={amount.error} hint={hint} lines={hintLines} />
       {keypad ? <RecordingKeypad amount={amount} /> : null}
     </View>
   );
@@ -738,7 +734,7 @@ export function PastSessionSheet({
         <TypedAmount label="Total in" amount={buyIn} />
         <TypedAmount label="Total out" amount={cashOut} />
       </View>
-      {Platform.OS === "android" && resultPreview !== null ? (
+      {Platform.OS === "android" ? (
         <View
           className={cn(
             "flex-row items-center justify-between rounded-xl px-4 py-3",
@@ -746,12 +742,16 @@ export function PastSessionSheet({
           )}
         >
           <Text className="type-footnote font-medium text-muted">Your result</Text>
-          <Money
-            amount={MinorUnits.make(resultPreview)}
-            currency={RECORDING_CURRENCY}
-            tone="result"
-            className="type-title"
-          />
+          {resultPreview === null ? (
+            <Text className="type-title text-muted">—</Text>
+          ) : (
+            <Money
+              amount={MinorUnits.make(resultPreview)}
+              currency={RECORDING_CURRENCY}
+              tone="result"
+              className="type-title"
+            />
+          )}
         </View>
       ) : null}
       {timeField("date", "Date")}
@@ -901,6 +901,7 @@ export function RebuySheet({
         label={Platform.OS === "android" ? "" : "Amount"}
         amount={amount}
         hint={hint}
+        hintLines={Platform.OS === "android" ? 2 : 1}
       />
       {visit.presets.length > 0 ? (
         <View
@@ -1050,19 +1051,21 @@ export function CashOutSheet({
               </Text>
             )}
           </View>
-          {amount.error ? (
-            <Text className="type-footnote text-loss">{amount.error}</Text>
-          ) : previous > 0 ? (
-            <Text className="type-footnote text-muted">
-              Earlier cash-outs total{" "}
-              <Money
-                amount={previous}
-                currency={RECORDING_CURRENCY}
-                className="type-footnote text-muted"
-              />
-              .
-            </Text>
-          ) : null}
+          <View className="min-h-[18px]">
+            {amount.error ? (
+              <Text className="type-footnote text-loss">{amount.error}</Text>
+            ) : previous > 0 ? (
+              <Text className="type-footnote text-muted">
+                Earlier cash-outs total{" "}
+                <Money
+                  amount={previous}
+                  currency={RECORDING_CURRENCY}
+                  className="type-footnote text-muted"
+                />
+                .
+              </Text>
+            ) : null}
+          </View>
         </View>
         <View className="gap-1 border-t border-line px-4 py-2.5">
           <View className="flex-row items-center justify-between gap-3">
@@ -1092,7 +1095,9 @@ export function CashOutSheet({
               />
             </View>
           </View>
-          {clock.error ? <Text className="type-footnote text-loss">{clock.error}</Text> : null}
+          <View className="min-h-[18px]">
+            {clock.error ? <Text className="type-footnote text-loss">{clock.error}</Text> : null}
+          </View>
         </View>
         <View className="flex-row items-center justify-between gap-3 border-t border-line px-4 py-3">
           <View className="min-w-0 flex-1">
@@ -1104,7 +1109,7 @@ export function CashOutSheet({
             </Text>
           </View>
           {resultPreview === null ? (
-            <Text className="text-muted">—</Text>
+            <Text className="type-title text-muted">—</Text>
           ) : (
             <Money
               amount={MinorUnits.make(resultPreview)}
@@ -1152,7 +1157,7 @@ export function BuyInTotalSheet({
   const preview =
     total === null ? (
       amount.text ? (
-        "The new total must be greater than zero and within the supported amount."
+        "The new total must be above zero."
       ) : (
         "Enter an amount to see the new total."
       )
