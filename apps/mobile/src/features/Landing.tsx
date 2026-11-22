@@ -1,4 +1,3 @@
-import { sampleTrip } from "@stacks/client-runtime/sample";
 import * as Haptics from "expo-haptics";
 import { useEffect, useEffectEvent, useRef, useState, type ComponentRef } from "react";
 import {
@@ -8,39 +7,41 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Text,
   View,
   useWindowDimensions,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { Text } from "../components/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { BrandMark } from "../components/BrandMark";
-import { Button } from "../components/ui/Button";
+import { BrandWordmark } from "../components/BrandWordmark";
+import { Button, IconButton } from "../components/ui/Button";
 import { cn } from "../components/ui/cn";
+import { Icon } from "../components/ui/Icon";
 import { useScreenFoot } from "../components/ui/tabBar";
 import { animate, ease, useReducedMotion } from "../components/ui/motion";
+import { OnboardingChart } from "./OnboardingChart";
 import { SignInButton } from "./SignInButton";
-import { TripHero } from "./TripHero";
 
 const SHIFT_MS = 250;
 
 const FRAME = 440;
 
-const TRIP_MIN_PAGE = 530;
-
 const steps = [
   {
+    chart: 0,
     title: "Keep the casino trip honest.",
     body: "Log buy-ins and cash-outs as you play. Color Up works out everyone's results and who owes whom. You pay each other however you like.",
   },
   {
+    chart: 1,
     title: "Log it at the table.",
     body: "Buy-ins and cash-outs take a few taps. Reuse a recent rebuy amount, then confirm.",
   },
   {
+    chart: 2,
     title: "Watch the board.",
     body: "Follow your trip result, session by session, and see where you stand.",
   },
@@ -55,11 +56,6 @@ const invitedCopy = {
   title: "You've been invited to a group.",
   body: "Sign in or create an account to see who invited you and join their ledger.",
 };
-
-const tripLabel =
-  "An example trip card: up $275 after three sessions and two nights, first on the board.";
-
-const tripTitle = "Watch the board.";
 
 type ScrollEnd = NativeSyntheticEvent<NativeScrollEvent>;
 
@@ -84,8 +80,8 @@ function DisplayTitle({ children, compact }: { children: string; compact: boolea
       maxFontSizeMultiplier={compact ? 1.15 : 1.3}
       className={
         compact
-          ? "type-headline text-ink"
-          : "font-display text-6xl leading-[52px] text-ink uppercase"
+          ? "text-[31px] leading-[34px] font-extrabold tracking-[-0.7px] text-ink"
+          : "text-[39px] leading-[42px] font-extrabold tracking-[-1px] text-ink"
       }
     >
       {children}
@@ -95,7 +91,7 @@ function DisplayTitle({ children, compact }: { children: string; compact: boolea
 
 function StepBody({ children }: { children: string }) {
   return (
-    <Text className="text-lg leading-7 text-muted" numberOfLines={5} maxFontSizeMultiplier={1.35}>
+    <Text className="type-body text-muted" numberOfLines={6} maxFontSizeMultiplier={1.35}>
       {children}
     </Text>
   );
@@ -128,7 +124,7 @@ export function Landing({
   const reduceMotion = useReducedMotion();
   const [bodyHeight, setBodyHeight] = useState(0);
   const [pageHeight, setPageHeight] = useState(0);
-  const compact = bodyHeight > 0 && bodyHeight < 520;
+  const compact = bodyHeight > 0 && bodyHeight < 675;
   const last = index === steps.length - 1;
 
   useEffect(() => {
@@ -221,15 +217,8 @@ export function Landing({
       <View className="flex-1" style={{ paddingHorizontal: Math.max(0, (width - frame) / 2) }}>
         <View className="flex-1">
           <View className="min-h-14 flex-row items-center justify-between px-6">
-            <View className="min-w-0 flex-1 flex-row items-center gap-2">
-              <BrandMark size={28} />
-              <Text
-                className="font-display text-2xl tracking-wide text-ink uppercase"
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.3}
-              >
-                Color Up
-              </Text>
+            <View accessible accessibilityLabel="Color Up">
+              <BrandWordmark />
             </View>
             {account ? (
               <Button
@@ -309,29 +298,25 @@ export function Landing({
                             accessibilityElementsHidden={i !== index}
                             importantForAccessibility={i === index ? "auto" : "no-hide-descendants"}
                           >
-                            <View className="flex-1 justify-center overflow-hidden px-6">
-                              {step.title === tripTitle && pageHeight >= TRIP_MIN_PAGE ? (
-                                <View
-                                  accessible
-                                  accessibilityRole="image"
-                                  accessibilityLabel={tripLabel}
-                                  pointerEvents="none"
-                                >
-                                  <TripHero {...sampleTrip} />
-                                </View>
+                            <View className={cn("px-6 pt-4", compact ? "gap-3" : "gap-5")}>
+                              {pageHeight >= 360 ? (
+                                <OnboardingChart page={step.chart} compact={compact} />
                               ) : null}
-                            </View>
-                            <View className="gap-3 px-6 pb-2">
-                              <DisplayTitle compact={compact}>{step.title}</DisplayTitle>
-                              <StepBody>{step.body}</StepBody>
+                              <View className="gap-2">
+                                <DisplayTitle compact={compact}>{step.title}</DisplayTitle>
+                                <StepBody>{step.body}</StepBody>
+                              </View>
                             </View>
                           </View>
                         ))}
                       </ScrollView>
                     ) : null}
                   </View>
-                  <View className="gap-2 px-6 pt-2" style={{ paddingBottom: clearance + 16 }}>
-                    <View className="flex-row items-center justify-center">
+                  <View
+                    className="flex-row items-center justify-between px-6 pt-2"
+                    style={{ paddingBottom: clearance + 16 }}
+                  >
+                    <View className="-ml-2 flex-row items-center">
                       {steps.map((step, i) => (
                         <Pressable
                           key={step.title}
@@ -343,20 +328,27 @@ export function Landing({
                         >
                           <View
                             className={cn(
-                              "h-2 rounded-full",
-                              i === index ? "w-6 bg-ink" : "w-2 bg-fill",
+                              "rounded-full",
+                              i === index ? "h-2 w-6 bg-ink" : "size-2 bg-fill",
                             )}
                           />
                         </Pressable>
                       ))}
                     </View>
-                    <Button
-                      label={last ? "Get started" : "Continue"}
-                      variant="primary"
-                      size="lg"
-                      className="w-full"
-                      onPress={() => (last ? openAccount() : go(index + 1))}
-                    />
+                    {last ? (
+                      <Button
+                        label="Get Started"
+                        variant="accent"
+                        size="md"
+                        onPress={openAccount}
+                      />
+                    ) : (
+                      <IconButton
+                        accessibilityLabel="Continue"
+                        icon={<Icon name="arrow-right" color="ink" size={22} />}
+                        onPress={() => go(index + 1)}
+                      />
+                    )}
                   </View>
                 </View>
                 <View
@@ -366,7 +358,10 @@ export function Landing({
                   importantForAccessibility={account ? "auto" : "no-hide-descendants"}
                   pointerEvents={account ? "auto" : "none"}
                 >
-                  <View className="flex-1 justify-end gap-3 px-6 pb-2">
+                  <View className={cn("flex-1 gap-3 px-6 pb-2", invited ? "justify-end" : "pt-4")}>
+                    {!invited && bodyHeight >= 530 ? (
+                      <OnboardingChart page={3} compact={compact} />
+                    ) : null}
                     <DisplayTitle compact={compact}>{copy.title}</DisplayTitle>
                     <StepBody>{copy.body}</StepBody>
                   </View>

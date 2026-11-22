@@ -1,7 +1,8 @@
 import * as Match from "effect/Match";
 import { useEffect, useRef } from "react";
 import * as Haptics from "expo-haptics";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "../components/ui/Text";
 import { useUniwind } from "uniwind";
 
 import { Icon } from "../components/ui/Icon";

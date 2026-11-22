@@ -7,13 +7,14 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
-  Text,
   View,
   type ScrollViewInstance,
 } from "react-native";
+import { Text } from "../components/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BrandMark } from "../components/BrandMark";
+import { BrandWordmark } from "../components/BrandWordmark";
 import { Button } from "../components/ui/Button";
 import { ControlSurface } from "../components/ui/ControlSurface";
 import { PressableScale } from "../components/ui/PressableScale";
@@ -362,8 +363,14 @@ export function PlayBrand() {
       accessibilityLabel="Color Up"
       className="flex-row items-center gap-2.5"
     >
-      <BrandMark size={30} chip={Platform.OS === "android"} />
-      <Text className="type-title text-ink">Color Up</Text>
+      {Platform.OS === "android" ? (
+        <>
+          <BrandMark size={30} />
+          <Text className="type-title text-ink">Color Up</Text>
+        </>
+      ) : (
+        <BrandWordmark />
+      )}
     </View>
   );
 }

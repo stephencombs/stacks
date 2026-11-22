@@ -12,12 +12,12 @@ import {
   Animated,
   Keyboard,
   ScrollView,
-  Text,
   TextInput,
   View,
   useWindowDimensions,
   type ScrollViewInstance,
 } from "react-native";
+import { Text } from "./Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen, ScreenStack, ScreenStackHeaderConfig } from "react-native-screens";
 import { FormSheet } from "react-native-screens/experimental";

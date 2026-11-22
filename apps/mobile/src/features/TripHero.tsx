@@ -3,7 +3,8 @@ import { lineScale } from "@stacks/client-runtime/chart";
 import { localClock, ordinal, tripLines } from "@stacks/client-runtime/trip";
 import { playerTrip, tripNights, tripStandings, type TripSession } from "@stacks/shared/trips";
 import { useState, type ReactNode } from "react";
-import { Text, View, type LayoutChangeEvent } from "react-native";
+import { View, type LayoutChangeEvent } from "react-native";
+import { Text } from "../components/ui/Text";
 import Svg, { Circle, Defs, Line, LinearGradient, Polygon, Polyline, Stop } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 

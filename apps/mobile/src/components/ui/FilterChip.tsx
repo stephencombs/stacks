@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./Text";
 
 import { cn } from "./cn";
 import { Choice } from "./Field";

@@ -1,6 +1,7 @@
 import * as Haptics from "expo-haptics";
 import type { ReactNode } from "react";
-import { ActivityIndicator, Platform, Text } from "react-native";
+import { ActivityIndicator, Platform } from "react-native";
+import { Text } from "./Text";
 
 import { cn } from "./cn";
 import { ControlSurface } from "./ControlSurface";
@@ -8,6 +9,7 @@ import { PressableScale } from "./PressableScale";
 
 type Variant =
   | "primary"
+  | "accent"
   | "tint"
   | "secondary"
   | "ghost"
@@ -20,6 +22,7 @@ type Size = "sm" | "md" | "lg" | "xl" | "fab";
 
 const surfaces: Record<Variant, string> = {
   primary: "bg-ink active:opacity-85",
+  accent: "bg-chip-blue active:opacity-85",
   tint: "bg-fill-strong active:opacity-70",
   secondary: "bg-fill active:opacity-70",
   ghost: "active:bg-fill",
@@ -31,6 +34,7 @@ const surfaces: Record<Variant, string> = {
 
 const spinners: Record<Variant, string> = {
   primary: "accent-ink-inverse",
+  accent: "accent-ink-inverse",
   tint: "accent-ink",
   secondary: "accent-ink",
   ghost: "accent-ink",
@@ -42,6 +46,7 @@ const spinners: Record<Variant, string> = {
 
 const labels: Record<Variant, string> = {
   primary: "text-ink-inverse",
+  accent: "text-ink-inverse",
   tint: "text-ink",
   secondary: "text-ink",
   ghost: "text-ink",

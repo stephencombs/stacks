@@ -38,7 +38,8 @@ import {
 import { decimalSeparator, formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
 import { use, useState, type ReactNode } from "react";
-import { Platform, Pressable, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, TextInput, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -193,7 +194,7 @@ function TypedAmount({ label, amount }: { label: string; amount: Amount }) {
             autoCorrect={false}
             placeholder="0"
             placeholderTextColorClassName="accent-muted"
-            className="flex-1 py-2.5 type-body text-ink tabular-nums"
+            className="flex-1 py-2.5 font-sans type-body text-ink tabular-nums"
           />
         </View>
         {amount.error ? (
@@ -1675,7 +1676,7 @@ export function AddPlayerSheet({
 
                   if (nameError && next.trim()) setNameError(null);
                 }}
-                className="py-1 type-body text-ink"
+                className="py-1 font-sans type-body text-ink"
               />
             </View>
             {nameError ? (
@@ -1704,7 +1705,7 @@ export function AddPlayerSheet({
                   autoCorrect={false}
                   placeholder="0"
                   placeholderTextColorClassName="accent-muted"
-                  className="flex-1 py-1 type-body text-ink tabular-nums"
+                  className="flex-1 py-1 font-sans type-body text-ink tabular-nums"
                 />
               </View>
             </View>

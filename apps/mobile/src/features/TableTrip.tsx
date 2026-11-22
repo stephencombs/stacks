@@ -2,7 +2,7 @@ import { tableTripOptions } from "@stacks/client-runtime/recordingView";
 import { useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
 import { TripId, type Table } from "@stacks/contracts";
 import { useState } from "react";
-import { Text } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Button } from "../components/ui/Button";
 import { Choice, FormError } from "../components/ui/Field";

@@ -15,7 +15,8 @@ import { gameChip } from "@stacks/client-runtime/stats";
 import { useRecordingClock } from "@stacks/client-runtime/recordingReact";
 import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Icon } from "../components/ui/Icon";

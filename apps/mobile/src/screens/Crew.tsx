@@ -35,7 +35,8 @@ import { tripStandings } from "@stacks/shared/trips";
 import type * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
 import { useState, type ReactNode } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "../components/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Money } from "../components/Money";

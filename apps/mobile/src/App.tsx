@@ -13,7 +13,8 @@ import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
-import { Platform, Text, View, useWindowDimensions } from "react-native";
+import { Platform, View, useWindowDimensions } from "react-native";
+import { Text } from "./components/ui/Text";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 
@@ -129,12 +130,12 @@ const Tabs = createPlaceTabs({
   initialRouteName: "PlayTab",
   layout: ({ children }) => <TabsLayout>{children}</TabsLayout>,
   screens: {
-    PlayTab: { screen: PlayStack, options: placeTab("Play", "suit.club.fill") },
-    StatsTab: { screen: StatsStack, options: placeTab("Stats", "chart.bar.fill") },
-    MapTab: { screen: MapStack, options: placeTab("Map", "map.fill") },
+    PlayTab: { screen: PlayStack, options: placeTab("Play") },
+    StatsTab: { screen: StatsStack, options: placeTab("Stats") },
+    MapTab: { screen: MapStack, options: placeTab("Map") },
     CrewTab: {
       screen: CrewStack,
-      options: placeTab("Crew", "person.2.fill"),
+      options: placeTab("Crew"),
       linking: { initialRouteName: "Crew" },
     },
   },
@@ -352,10 +353,12 @@ function SignedOut({ invited }: { invited: boolean }) {
 }
 
 export default function App() {
-  useAppFonts();
+  const loadingFonts = useAppFonts();
   useLayoutEffect(() => markStartup("root_committed"), []);
   const { theme } = useUniwind();
   const { width, height } = useWindowDimensions();
+
+  if (loadingFonts) return null;
 
   return (
     <SafeAreaProvider

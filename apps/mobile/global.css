@@ -2,9 +2,7 @@
 @import "uniwind";
 
 @theme {
-  /* Match the iOS PostScript names; Android embeds each weight under the same family. */
-  --font-display: "BarlowCondensed-Bold";
-  --font-mono: "JetBrainsMono-Medium";
+  --font-sans: "Allo";
 }
 
 /* The Color Up palette from docs/design/tokens.json; src/design/tokens.test.ts fails when it drifts
@@ -121,9 +119,7 @@
   }
 }
 
-/* Type roles, from the type styles in docs/design/tokens.json. Money and text both use the system
-   face (SF Pro on iOS, Roboto on Android): money with tabular figures, and no mono or condensed face
-   outside the wordmark. Text doesn't inherit color here: pair each with text-ink or another color. */
+/* App text uses Allo. Money uses its tabular figures. Pair these roles with a color token. */
 /* money-hero: the one figure a screen is about. */
 @utility type-hero {
   @apply font-sans text-[44px] leading-[46px] font-bold tracking-[-1px] tabular-nums;

@@ -1,9 +1,10 @@
 # Design frames
 
-The Claude Design canvas is the visual source of truth for the native apps:
-<https://claude.ai/artifact/TuT3hbPr6ZCyWZcBX4Rjx5>. Every iOS frame has an Android twin on the
-same canvas page, in the rows under the iOS rows. When the app and a frame disagree and no spec or
-`docs/internals/navigation.md` rule explains it, the frame wins.
+[ColorUp iOS in Figma](https://www.figma.com/design/eAiosYfyYDN9fZQ6miWtJd/ColorUp-iOS) holds the
+approved iOS frames, including onboarding, Stats, and the illustrated tab states. The
+[Claude Design canvas](https://claude.ai/artifact/TuT3hbPr6ZCyWZcBX4Rjx5) holds the Android frames
+and earlier iOS states. When the app and a frame disagree and no spec or
+`docs/internals/navigation.md` rule explains it, the applicable design frame wins.
 
 ## Reading a frame
 

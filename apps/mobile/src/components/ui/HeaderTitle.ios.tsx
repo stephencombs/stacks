@@ -12,7 +12,8 @@ import {
   padding,
 } from "@expo/ui/swift-ui/modifiers";
 import { useState } from "react";
-import { Text as NativeText, useWindowDimensions } from "react-native";
+import { useWindowDimensions } from "react-native";
+import { Text as NativeText } from "./Text";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import type { HeaderTitleProps } from "./HeaderTitle";

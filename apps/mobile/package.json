@@ -18,8 +18,6 @@
   "dependencies": {
     "@clerk/expo": "catalog:",
     "@effect/atom-react": "catalog:",
-    "@expo-google-fonts/barlow-condensed": "^0.4.1",
-    "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo/ui": "~58.0.29",
     "@react-navigation/bottom-tabs": "7.21.0",
     "@react-navigation/elements": "2.9.45",

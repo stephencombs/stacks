@@ -9,13 +9,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
   useWindowDimensions,
   type LayoutChangeEvent,
   type ScrollViewInstance,
 } from "react-native";
+import { Text } from "./Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "./Icon";

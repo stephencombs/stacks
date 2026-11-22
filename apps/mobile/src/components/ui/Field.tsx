@@ -1,5 +1,6 @@
 import { use, useId, type ReactNode } from "react";
-import { Text, TextInput, View, type TextInputProps } from "react-native";
+import { TextInput, View, type TextInputProps } from "react-native";
+import { Text } from "./Text";
 
 import { Icon } from "./Icon";
 import { cn } from "./cn";
@@ -44,7 +45,7 @@ export function TextField({
         aria-labelledby={id}
         placeholderTextColorClassName="accent-muted"
         className={cn(
-          "min-h-12 rounded-2xl border border-line px-4 py-3 type-body text-ink",
+          "min-h-12 rounded-2xl border border-line px-4 py-3 font-sans type-body text-ink",
           inSheet ? "bg-raised" : "bg-surface",
           error && "border-loss",
           inputClassName,

@@ -26,24 +26,12 @@ const drawables = {
   Crew: "tab_crew",
 } as const;
 
-const tabDrawable = (title: string) => {
-  switch (title) {
-    case "Play":
-    case "Stats":
-    case "Map":
-    case "Crew":
-      return drawables[title];
-    default:
-      return title;
-  }
-};
-
 /** Android's own tab bar, with Material Symbols from `assets/tab-icons`: filled when selected. */
-export const placeTab = (title: string, _symbol: string) => ({
+export const placeTab = (title: keyof typeof drawables) => ({
   title,
   tabBarIcon: ({ focused }: { focused: boolean }) => ({
     type: "image" as const,
-    source: { uri: focused ? `${tabDrawable(title)}_selected` : tabDrawable(title) },
+    source: { uri: focused ? `${drawables[title]}_selected` : drawables[title] },
   }),
 });
 

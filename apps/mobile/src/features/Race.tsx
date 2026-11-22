@@ -11,7 +11,8 @@ import { boardMoney, returnLabel } from "@stacks/client-runtime/trip";
 import { raceLines, type RaceMeasure, type StatsSession } from "@stacks/shared/stats";
 import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { PanResponder, Text, View } from "react-native";
+import { PanResponder, View } from "react-native";
+import { Text } from "../components/ui/Text";
 import Svg, { Circle, G, Line, Polyline, Text as SvgText } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 

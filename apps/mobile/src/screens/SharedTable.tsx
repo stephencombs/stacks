@@ -8,7 +8,8 @@ import type { TableView } from "@stacks/contracts/recordingCommands";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { useEffect, useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";

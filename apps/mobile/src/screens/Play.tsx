@@ -41,7 +41,8 @@ import * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Animated, Platform, Pressable, View, useWindowDimensions } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button, IconButton } from "../components/ui/Button";

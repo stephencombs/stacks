@@ -1,7 +1,8 @@
 import { NavigationContext, NavigationRouteContext } from "@react-navigation/native";
 import * as Predicate from "effect/Predicate";
 import { use, useCallback, useLayoutEffect, type ReactNode } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "./Text";
 
 import { cn } from "./cn";
 import { Icon } from "./Icon";

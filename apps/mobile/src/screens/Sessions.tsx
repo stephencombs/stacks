@@ -11,7 +11,8 @@ import {
 } from "@stacks/client-runtime/trip";
 import { playerTrip, tripNights, tripStandings, type TripSession } from "@stacks/shared/trips";
 import { useCallback, useState, type ReactNode } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";

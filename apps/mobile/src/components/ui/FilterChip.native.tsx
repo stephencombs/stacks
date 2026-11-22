@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "./Text";
 import { useUniwind } from "uniwind";
 
 import { cn } from "./cn";

@@ -14,7 +14,8 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import * as Predicate from "effect/Predicate";
 import { use, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./Text";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { cn } from "./cn";

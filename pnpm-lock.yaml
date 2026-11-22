@@ -159,12 +159,6 @@ importers:
       '@effect/atom-react':
         specifier: 'catalog:'
         version: 4.0.5(effect@4.0.5)(react@19.3.0)(scheduler@0.28.0)
-      '@expo-google-fonts/barlow-condensed':
-        specifier: ^0.4.1
-        version: 0.4.1
-      '@expo-google-fonts/jetbrains-mono':
-        specifier: ^0.4.1
-        version: 0.4.1
       '@expo/ui':
         specifier: ~58.0.29
         version: 58.0.29(@babel/core@7.29.7)(expo@58.0.23)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
@@ -1100,12 +1094,6 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
-
-  '@expo-google-fonts/barlow-condensed@0.4.1':
-    resolution: {integrity: sha512-9yuXU1MpI4Dw/8rR4pj2EXcT4/31H5+DrrT47auF8IzD9r7SZPRoNVq8clRq7zxOTh7v1gJk3pBhydDVf2x/dA==}
-
-  '@expo-google-fonts/jetbrains-mono@0.4.1':
-    resolution: {integrity: sha512-CslACrtMOcRwoWXCO7OMEI+9w3fukWSoBtvNz46OqPoogEuuoY0tkDY1O8sFumk8t0pC6Cx0Xr95O0TOQhpkug==}
 
   '@expo-google-fonts/material-symbols@0.4.51':
     resolution: {integrity: sha512-QkNQK848WG/vHFqfBqYcX/vM8dweAR/ORRK1r6qii5V/hdaqn4eYKxmKGj6mg61ty70SPgG1R5uP9XX9jJ3ehQ==}
@@ -6130,10 +6118,6 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
-
-  '@expo-google-fonts/barlow-condensed@0.4.1': {}
-
-  '@expo-google-fonts/jetbrains-mono@0.4.1': {}
 
   '@expo-google-fonts/material-symbols@0.4.51': {}
 

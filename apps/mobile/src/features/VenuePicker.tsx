@@ -4,7 +4,8 @@ import { useVenueSearch } from "@stacks/client-runtime/recordingReact";
 import { venuePlace } from "@stacks/client-runtime/recordingView";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Button } from "../components/ui/Button";
 import { TextField } from "../components/ui/Field";

@@ -6,7 +6,8 @@ import { useRecordingHome, useRecordingSync } from "@stacks/client-runtime/recor
 import { themeChoices } from "@stacks/client-runtime/theme";
 import { Game } from "@stacks/contracts";
 import { useState, type ReactNode } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Button } from "../components/ui/Button";
 import { ControlSurface } from "../components/ui/ControlSurface";
