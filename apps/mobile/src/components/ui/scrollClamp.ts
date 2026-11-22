@@ -15,3 +15,11 @@ export function clampedScrollOffset(metrics: ScrollMetrics, contentHeight: numbe
 
   return metrics.offsetY > maxOffset ? maxOffset : null;
 }
+
+/**
+ * Where to scroll to bring content back under a native bar that insets it, or `null` when it is
+ * already at or above that spot. The rest offset of an inset scroll view is `-headerHeight`, not 0.
+ */
+export function offsetBelowHeader(offsetY: number, headerHeight: number) {
+  return offsetY > -headerHeight ? -headerHeight : null;
+}

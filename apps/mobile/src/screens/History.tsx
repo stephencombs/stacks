@@ -26,6 +26,7 @@ import {
   SectionHeading,
   Skeleton,
 } from "../components/ui/Surface";
+import { Toolbar } from "../components/ui/Toolbar";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
 
 type Props = StaticScreenProps<{ period?: string } | undefined>;
@@ -63,9 +64,26 @@ export function HistoryScreen({ route }: Props) {
   const scrolledTo = useRef<string | undefined>(undefined);
   const headerHeight = useHeaderHeight();
   const groups = home ? recordingPeriods(home, by) : [];
+  const ios = Platform.OS === "ios";
 
   return (
-    <PersonalScreen scrollRef={scroll}>
+    <PersonalScreen scrollRef={scroll} headerActions={false}>
+      <Toolbar placement="right">
+        <Toolbar.Menu
+          title={groupings.find((item) => item.value === by)?.label ?? ""}
+          accessibilityLabel="Group by"
+          identifier="history-grouping"
+        >
+          {groupings.map((item) => (
+            <Toolbar.MenuAction
+              key={item.value}
+              title={item.label}
+              isOn={item.value === by}
+              onPress={() => setBy(item.value)}
+            />
+          ))}
+        </Toolbar.Menu>
+      </Toolbar>
       {Platform.OS === "android" ? <PageTitle inContent>All sessions</PageTitle> : null}
       <SaveStatus status={status} error={error} onRetry={retryLoad} />
       {restore.error ? <FormError>{restore.error}</FormError> : null}
@@ -79,7 +97,9 @@ export function HistoryScreen({ route }: Props) {
         </EmptyState>
       ) : (
         <>
-          <SegmentedControl label="Group by" options={groupings} value={by} onChange={setBy} />
+          {ios ? null : (
+            <SegmentedControl label="Group by" options={groupings} value={by} onChange={setBy} />
+          )}
           {groups.map(({ period: key, result, finished, minutes, visits }) => (
             <View
               key={key}

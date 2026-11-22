@@ -123,6 +123,7 @@ async function load(
   }));
   const navigation = { navigate: vi.fn(), setOptions: vi.fn() };
   vi.doMock("@react-navigation/native", () => ({ useNavigation: () => navigation }));
+  vi.doMock("@react-navigation/elements", () => ({ useHeaderHeight: () => 106 }));
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
   vi.doMock("../components/Money", () => ({ Money: () => null }));
   vi.doMock("../components/ui/Button", () => ({ Button: Touch }));

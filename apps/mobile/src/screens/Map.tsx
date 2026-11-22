@@ -21,9 +21,11 @@ import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
+import { Toolbar } from "../components/ui/Toolbar";
 import { cn } from "../components/ui/cn";
 import { TabBarHeight } from "../components/ui/tabBar";
 import { PersonalLiveBar } from "../features/LiveBar";
+import { useNativeHeaderActions } from "../features/NativeHeaderActions";
 import { PersonalScreen, PersonalYouButton } from "../features/Personal";
 import { chipColor } from "../features/chipColor";
 import { useAccount } from "../lib/account";
@@ -129,12 +131,15 @@ function PopulatedMap({
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const barHeight = use(TabBarHeight);
+  const android = Platform.OS === "android";
+  const header = useNativeHeaderActions();
 
   useLayoutEffect(() => {
+    if (!android) return;
     navigation.setOptions({ headerShown: false });
 
     return () => navigation.setOptions({ headerShown: true });
-  }, [navigation]);
+  }, [android, navigation]);
   const [liveBarHeight, setLiveBarHeight] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedVenueId, setSelectedVenueId] = useState<VenueId | null>(null);
@@ -151,7 +156,6 @@ function PopulatedMap({
 
   const selectedSheet = selectedVenueId ? view.venueSheet(selectedVenueId) : null;
   const bottomDock = barHeight + liveBarHeight;
-  const android = Platform.OS === "android";
 
   const colorFor = (outcome: "win" | "loss" | "even") =>
     prefs.privacyMode ? muted! : outcome === "win" ? win! : outcome === "loss" ? loss! : muted!;
@@ -159,6 +163,16 @@ function PopulatedMap({
   const pickVenue = (venueId: VenueId | null) => {
     setSelectedVenueId(venueId);
     setShowAllVenueVisits(false);
+  };
+
+  const openFilter = () => {
+    pickVenue(null);
+    setFilterOpen(true);
+  };
+
+  const clearFilter = () => {
+    onFilter({ kind: "all" });
+    pickVenue(null);
   };
 
   return (
@@ -201,48 +215,59 @@ function PopulatedMap({
         />
       )}
 
-      {}
-      <View
-        pointerEvents="box-none"
-        style={{
-          position: "absolute",
-          top: insets.top + 8,
-          left: Math.max(16, insets.left),
-          right: Math.max(16, insets.right),
-        }}
-        className="flex-row items-center justify-between gap-3"
-      >
-        <View className="min-w-0 flex-1 flex-row items-center gap-2">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Map filter: ${view.filterLabel}`}
-            onPress={() => {
-              pickVenue(null);
-              setFilterOpen(true);
-            }}
-            className="min-h-11 max-w-[260px] flex-row items-center gap-2 rounded-full border border-line/60 bg-surface px-4 shadow-sm active:opacity-80"
-          >
-            <Text numberOfLines={1} className="shrink type-callout font-semibold text-ink">
-              {view.filterLabel}
-            </Text>
-            <Icon name="chevron-down" color="muted" size={14} />
-          </Pressable>
-          {view.filtered ? (
+      {header}
+      <Toolbar placement="left">
+        <Toolbar.Button
+          label={view.filterLabel}
+          accessibilityLabel={`Map filter: ${view.filterLabel}`}
+          onPress={openFilter}
+        />
+        {view.filtered ? (
+          <Toolbar.Button
+            icon="xmark"
+            accessibilityLabel="Clear map filter"
+            separateBackground
+            onPress={clearFilter}
+          />
+        ) : null}
+      </Toolbar>
+      {android ? (
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: "absolute",
+            top: insets.top + 8,
+            left: Math.max(16, insets.left),
+            right: Math.max(16, insets.right),
+          }}
+          className="flex-row items-center justify-between gap-3"
+        >
+          <View className="min-w-0 flex-1 flex-row items-center gap-2">
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Clear map filter"
-              onPress={() => {
-                onFilter({ kind: "all" });
-                pickVenue(null);
-              }}
-              className="size-10 items-center justify-center rounded-full bg-surface shadow-sm active:opacity-80"
+              accessibilityLabel={`Map filter: ${view.filterLabel}`}
+              onPress={openFilter}
+              className="min-h-11 max-w-[260px] flex-row items-center gap-2 rounded-full border border-line/60 bg-surface px-4 shadow-sm active:opacity-80"
             >
-              <Icon name="close" color="ink" size={16} />
+              <Text numberOfLines={1} className="shrink type-callout font-semibold text-ink">
+                {view.filterLabel}
+              </Text>
+              <Icon name="chevron-down" color="muted" size={14} />
             </Pressable>
-          ) : null}
+            {view.filtered ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear map filter"
+                onPress={clearFilter}
+                className="size-10 items-center justify-center rounded-full bg-surface shadow-sm active:opacity-80"
+              >
+                <Icon name="close" color="ink" size={16} />
+              </Pressable>
+            ) : null}
+          </View>
+          <PersonalYouButton />
         </View>
-        <PersonalYouButton />
-      </View>
+      ) : null}
 
       {}
       {selectedSheet ? (

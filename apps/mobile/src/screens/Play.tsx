@@ -391,7 +391,15 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
         <Text className="text-muted">
           This session no longer counts. You can restore it from All sessions.
         </Text>
-        <Button label="All sessions" onPress={() => navigation.navigate("History")} />
+        <Button
+          label="All sessions"
+          onPress={() =>
+            navigation.navigate("Tabs", {
+              screen: "PlayTab",
+              params: { screen: "History", initial: false },
+            })
+          }
+        />
         {canDelete ? (
           <Button
             label="Restore"

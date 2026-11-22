@@ -7,7 +7,10 @@ import {
   useNavigation,
   type StaticParamList,
 } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import {
+  createNativeStackNavigator,
+  type NativeStackNavigationOptions,
+} from "@react-navigation/native-stack";
 import { RecordingProvider } from "@stacks/client-runtime/recordingReact";
 import { reloadAppAsync } from "expo";
 import * as Linking from "expo-linking";
@@ -30,6 +33,7 @@ import { appLinkPrefixes } from "./lib/config";
 import { markStartup, reportStartupError } from "./lib/diagnostics";
 import { useAppFonts } from "./lib/fonts";
 import { getInitialURL } from "./lib/initialUrl";
+import { isLiquidGlassSupported } from "./lib/liquidGlass";
 import { LiveSessionBridge } from "./lib/liveSessionAdapter";
 import { oldAddress } from "./lib/oldAddresses";
 import { recordingStore } from "./lib/recording";
@@ -51,17 +55,23 @@ import { SessionsScreen } from "./screens/Sessions";
 import { SharedTableScreen } from "./screens/SharedTable";
 import { StatsScreen } from "./screens/Stats";
 
-const headerOptions = {
-  headerTransparent: Platform.OS === "ios",
+const headerOptions: NativeStackNavigationOptions = {
+  headerShown: true,
+  headerTransparent: isLiquidGlassSupported,
+  headerStyle: isLiquidGlassSupported ? { backgroundColor: "transparent" } : undefined,
   headerShadowVisible: false,
+  headerLargeTitle: false,
   headerBackButtonDisplayMode: "minimal",
-} as const;
+  headerBackTitle: "",
+  scrollEdgeEffects: isLiquidGlassSupported
+    ? { top: "automatic", bottom: "hidden", left: "hidden", right: "hidden" }
+    : undefined,
+};
 
-const personalOptions = { ...headerOptions, title: "", headerRight: () => <PersonalYouButton /> };
-
-const crewOptions = {
+const personalOptions = {
   ...headerOptions,
-  ...(Platform.OS === "android" ? null : { headerRight: () => <YouButton /> }),
+  title: "",
+  ...(Platform.OS === "android" ? { headerRight: () => <PersonalYouButton /> } : null),
 };
 
 const PlayStack = createNativeStackNavigator({
@@ -70,20 +80,22 @@ const PlayStack = createNativeStackNavigator({
     Home: {
       screen: HomeScreen,
       linking: "",
-      options: Platform.OS === "ios" ? { headerShown: false } : { headerLeft: () => <PlayBrand /> },
+      options: { headerLeft: () => <PlayBrand />, headerLeftBackgroundVisible: false },
+    },
+    History: {
+      screen: HistoryScreen,
+      linking: "history/:period?",
+      options:
+        Platform.OS === "android"
+          ? { title: "", headerRight: undefined }
+          : { title: "All sessions" },
     },
   },
 });
 
 const StatsStack = createNativeStackNavigator({
   screenOptions: personalOptions,
-  screens: {
-    Stats: {
-      screen: StatsScreen,
-      linking: "stats",
-      options: Platform.OS === "ios" ? { headerShown: false } : {},
-    },
-  },
+  screens: { Stats: { screen: StatsScreen, linking: "stats" } },
 });
 
 const MapStack = createNativeStackNavigator({
@@ -93,7 +105,7 @@ const MapStack = createNativeStackNavigator({
 
 const CrewStack = createNativeStackNavigator({
   initialRouteName: "Crew",
-  screenOptions: crewOptions,
+  screenOptions: headerOptions,
   layout: ({ children }) => <AccountGate>{children}</AccountGate>,
   screens: {
     Crew: {
@@ -140,7 +152,11 @@ const Tabs = createPlaceTabs({
   initialRouteName: "PlayTab",
   layout: ({ children }) => <TabsLayout>{children}</TabsLayout>,
   screens: {
-    PlayTab: { screen: PlayStack, options: placeTab("Play") },
+    PlayTab: {
+      screen: PlayStack,
+      options: placeTab("Play"),
+      linking: { initialRouteName: "Home" },
+    },
     StatsTab: { screen: StatsStack, options: placeTab("Stats") },
     MapTab: { screen: MapStack, options: placeTab("Map") },
     CrewTab: {
@@ -152,7 +168,7 @@ const Tabs = createPlaceTabs({
 });
 
 const InvitesStack = createNativeStackNavigator({
-  screenOptions: crewOptions,
+  screenOptions: headerOptions,
   layout: ({ children }) => <AccountGate invited>{children}</AccountGate>,
   screens: {
     Join: {
@@ -196,11 +212,6 @@ const RootStack = createNativeStackNavigator({
       screen: RedeemInviteScreen,
       linking: "invite/:token",
       options: { title: Platform.OS === "android" ? "" : "Invite" },
-    },
-    History: {
-      screen: HistoryScreen,
-      linking: "history/:period?",
-      options: { title: Platform.OS === "android" ? "" : "All sessions" },
     },
     Invites: { screen: InvitesStack, options: { headerShown: false } },
   },

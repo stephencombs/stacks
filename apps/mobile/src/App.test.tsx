@@ -377,7 +377,10 @@ it("keeps every address: your play in the first tab, groups in Crew, invites abo
   expect(Object.keys(tabs.screens)).toEqual(["PlayTab", "StatsTab", "MapTab", "CrewTab"]);
   expect(tabs.initialRouteName).toBe("PlayTab");
   expect(tabs.screens.PlayTab!.screen).toEqual({ config: stack("Home") });
+  expect(tabs.screens.PlayTab!.linking).toEqual({ initialRouteName: "Home" });
   expect(stack("Home").screens.Home!.linking).toBe("");
+  expect(stack("Home").screens.History!.linking).toBe("history/:period?");
+  expect(root.screens.History).toBeUndefined();
   expect(stack("Stats").screens.Stats!.linking).toBe("stats");
   expect(stack("Map").screens.Map!.linking).toBe("map");
   expect(tabs.screens.CrewTab!.screen).toEqual({ config: crew });
