@@ -10,6 +10,8 @@ export interface SheetRegistration {
   readonly busy: boolean;
   readonly back: boolean;
   readonly large: boolean;
+  readonly hideHeader: boolean;
+  readonly floatingFooter: boolean;
   readonly onClose: () => void;
   readonly children?: ReactNode;
 }

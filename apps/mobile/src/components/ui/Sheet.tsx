@@ -41,6 +41,8 @@ export function Sheet({
   busy = false,
   back = false,
   large = false,
+  hideHeader: _hideHeader = false,
+  floatingFooter: _floatingFooter = false,
   children,
 }: {
   open: boolean;
@@ -55,6 +57,10 @@ export function Sheet({
   back?: boolean;
   /** Opens at a fixed full height instead of resizing as dynamic content loads. */
   large?: boolean;
+  /** Hides the top header bar on iOS sheets that supply their own close control. */
+  hideHeader?: boolean;
+  /** Floats the footer over the scroll content on iOS. */
+  floatingFooter?: boolean;
   children?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();

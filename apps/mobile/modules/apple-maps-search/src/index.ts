@@ -1,5 +1,6 @@
 export type AppleMapsPlace = {
   readonly name: string;
+  readonly address?: string | null;
   readonly city: string | null;
   readonly region: string | null;
   readonly country: string | null;

@@ -61,7 +61,8 @@ export function PersonalScreen({
   scrollRef?: Ref<ScrollViewInstance>;
   contentClassName?: string;
 }) {
-  const header = useNativeHeaderActions(true);
+  const floatingTopBar = topSafeArea && Platform.OS === "ios";
+  const header = useNativeHeaderActions(true, undefined, floatingTopBar);
   const insets = useSafeAreaInsets();
   const foot = useScreenFoot({ footer: !!dock, fab: !!fab });
   const manualInset = (session || topSafeArea) && Platform.OS === "ios";
@@ -96,6 +97,14 @@ export function PersonalScreen({
         >
           {children}
         </ScrollView>
+        {floatingTopBar ? (
+          <View
+            pointerEvents="box-none"
+            style={{ position: "absolute", top: insets.top, right: sides.paddingRight }}
+          >
+            <PersonalYouButton />
+          </View>
+        ) : null}
         {fab ? (
           <FloatingAction right={sides.paddingRight} bottom={foot.fabBottom}>
             {fab}

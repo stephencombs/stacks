@@ -43,6 +43,8 @@ type SheetProps = {
   busy?: boolean;
   back?: boolean;
   large?: boolean;
+  hideHeader?: boolean;
+  floatingFooter?: boolean;
   children?: ReactNode | undefined;
 };
 
@@ -73,6 +75,8 @@ export function Sheet({
   busy = false,
   back = false,
   large = false,
+  hideHeader = false,
+  floatingFooter = false,
   children,
 }: SheetProps) {
   const store = use(SheetStoreContext);
@@ -89,6 +93,8 @@ export function Sheet({
         busy={busy}
         back={back}
         large={large}
+        hideHeader={hideHeader}
+        floatingFooter={floatingFooter}
       >
         {children}
       </PortaledSheet>
@@ -105,6 +111,8 @@ export function Sheet({
       busy={busy}
       back={back}
       large={large}
+      hideHeader={hideHeader}
+      floatingFooter={floatingFooter}
     >
       {children}
     </StandaloneSheet>
@@ -121,6 +129,8 @@ function PortaledSheet({
   busy = false,
   back = false,
   large = false,
+  hideHeader = false,
+  floatingFooter = false,
   children,
 }: SheetProps & { store: SheetStore }) {
   const [id] = useState(() => nextSheetId++);
@@ -132,8 +142,34 @@ function PortaledSheet({
       return;
     }
 
-    store.claim({ id, title, description, footer, busy, back, large, onClose, children });
-  }, [store, id, open, title, description, footer, busy, back, large, onClose, children]);
+    store.claim({
+      id,
+      title,
+      description,
+      footer,
+      busy,
+      back,
+      large,
+      hideHeader,
+      floatingFooter,
+      onClose,
+      children,
+    });
+  }, [
+    store,
+    id,
+    open,
+    title,
+    description,
+    footer,
+    busy,
+    back,
+    large,
+    hideHeader,
+    floatingFooter,
+    onClose,
+    children,
+  ]);
 
   useLayoutEffect(() => () => store.release(id), [store, id]);
 
@@ -149,6 +185,8 @@ function StandaloneSheet({
   busy = false,
   back = false,
   large = false,
+  hideHeader = false,
+  floatingFooter = false,
   children,
 }: SheetProps) {
   const id = useId();
@@ -175,6 +213,8 @@ function StandaloneSheet({
       busy={busy}
       back={back}
       large={large}
+      hideHeader={hideHeader}
+      floatingFooter={floatingFooter}
       onHeaderPress={close}
       onDismiss={dismissed}
       onNativeDismiss={onClose}
@@ -233,6 +273,8 @@ function SheetPortal({ store }: { store: SheetStore }) {
       busy={presented.busy}
       back={presented.back}
       large={presented.large}
+      hideHeader={presented.hideHeader}
+      floatingFooter={presented.floatingFooter}
       onHeaderPress={() => {
         if (slot && !slot.busy) slot.onClose();
       }}
@@ -279,6 +321,8 @@ function NativeFormSheet({
   busy,
   back,
   large,
+  hideHeader,
+  floatingFooter,
   onHeaderPress,
   onDismiss,
   onNativeDismiss,
@@ -292,6 +336,8 @@ function NativeFormSheet({
   busy: boolean;
   back: boolean;
   large: boolean;
+  hideHeader: boolean;
+  floatingFooter: boolean;
   onHeaderPress: () => void;
   onDismiss: () => void;
   onNativeDismiss: () => void;
@@ -412,7 +458,11 @@ function NativeFormSheet({
                     alwaysBounceVertical={false}
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="interactive"
-                    contentContainerClassName="gap-5 px-4 pt-4 pb-4"
+                    contentContainerClassName={cn(
+                      "gap-5 px-4",
+                      hideHeader ? "pt-6" : "pt-4",
+                      floatingFooter ? "pb-24" : "pb-4",
+                    )}
                     onContentSizeChange={
                       large
                         ? undefined
@@ -443,24 +493,31 @@ function NativeFormSheet({
                     {children}
                   </ScrollView>
                   {footer ? (
-                    <View
-                      className={cn("gap-2 border-t border-line px-4 pt-2 pb-3", sheetBgClass)}
-                      onLayout={(event) => {
-                        const height = event.nativeEvent.layout.height;
-                        setMeasured((prev) =>
-                          prev.key === slotKey
-                            ? { ...prev, footer: height }
-                            : { key: slotKey, content: 0, footer: height },
-                        );
-                      }}
-                    >
-                      {footer}
-                    </View>
+                    floatingFooter ? (
+                      <View pointerEvents="box-none" className="absolute inset-x-0 bottom-3 px-4">
+                        {footer}
+                      </View>
+                    ) : (
+                      <View
+                        className={cn("gap-2 border-t border-line px-4 pt-2 pb-3", sheetBgClass)}
+                        onLayout={(event) => {
+                          const height = event.nativeEvent.layout.height;
+                          setMeasured((prev) =>
+                            prev.key === slotKey
+                              ? { ...prev, footer: height }
+                              : { key: slotKey, content: 0, footer: height },
+                          );
+                        }}
+                      >
+                        {footer}
+                      </View>
+                    )
                   ) : null}
                 </View>
               </View>
             </InSheet>
             <ScreenStackHeaderConfig
+              hidden={hideHeader}
               backgroundColor={sheetBg}
               translucent={false}
               color={ink}

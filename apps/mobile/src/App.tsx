@@ -70,7 +70,7 @@ const PlayStack = createNativeStackNavigator({
     Home: {
       screen: HomeScreen,
       linking: "",
-      options: Platform.OS === "ios" ? {} : { headerLeft: () => <PlayBrand /> },
+      options: Platform.OS === "ios" ? { headerShown: false } : { headerLeft: () => <PlayBrand /> },
     },
   },
 });

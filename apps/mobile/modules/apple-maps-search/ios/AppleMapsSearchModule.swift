@@ -80,8 +80,16 @@ public class AppleMapsSearchModule: Module {
               .uppercased()
             let country = rawCountry.flatMap { $0.count == 2 ? $0 : nil }
 
+            let street = [item.placemark.subThoroughfare, item.placemark.thoroughfare]
+              .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+              .filter { !$0.isEmpty }
+              .joined(separator: " ")
+            let addressParts = [street, city, region].compactMap { $0 }.filter { !$0.isEmpty }
+            let address = addressParts.isEmpty ? nil : addressParts.joined(separator: ", ")
+
             return [
               "name": name,
+              "address": address ?? NSNull(),
               "city": city ?? NSNull(),
               "region": region ?? NSNull(),
               "country": country ?? NSNull(),
