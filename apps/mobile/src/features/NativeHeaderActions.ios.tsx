@@ -4,8 +4,10 @@ import { useLayoutEffect, useState } from "react";
 import { View } from "react-native";
 
 import { ControlSurface } from "../components/ui/ControlSurface";
+import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon } from "../components/ui/Icon";
 import { PressableScale } from "../components/ui/PressableScale";
+import { Text } from "../components/ui/Text";
 import { useAccount } from "../lib/account";
 import { PersonalYou } from "./Personal";
 import { UserAvatar } from "./UserAvatar";
@@ -35,11 +37,15 @@ export function useNativeHeaderActions(
               accessibilityLabel="Groups"
               onPress={onOpenGroups}
               hitSlop={6}
-              className="size-11 items-center justify-center"
+              className="h-11 items-center justify-center"
             >
-              <ControlSurface>
-                <Icon name="group" color="ink" size={20} />
-              </ControlSurface>
+              <GlassSurface
+                radius={22}
+                interactive
+                className="h-11 items-center justify-center rounded-full px-4"
+              >
+                <Text className="type-callout font-semibold text-ink">Groups</Text>
+              </GlassSurface>
             </PressableScale>
           ) : null}
           <PressableScale

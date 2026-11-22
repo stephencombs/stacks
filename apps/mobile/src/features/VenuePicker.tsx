@@ -285,7 +285,15 @@ export function SessionVenuePicker({
     setResolveError(null);
 
     try {
-      const resolved = await search.resolveVenue(place);
+      const resolved = await search.resolveVenue({
+        name: place.name,
+        city: place.city,
+        region: place.region,
+        country: place.country,
+        lat: place.lat,
+        lng: place.lng,
+      });
+
       onSelect(resolved);
     } catch {
       setResolveError("Couldn't save that casino right now. Check your connection and try again.");
