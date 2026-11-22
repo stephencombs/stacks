@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../components/ui/Button";
 import { cn } from "../components/ui/cn";
 import { GlassSurface } from "../components/ui/GlassSurface";
+import { MarqueeText } from "../components/ui/MarqueeText";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Sheet } from "../components/ui/Sheet";
 import { useGo } from "../lib/go";
@@ -41,9 +42,13 @@ type LivePlace = {
   readonly title: string;
   readonly game: Game | null;
   readonly startedAt: DateTime.Utc | null;
-  readonly detail: string;
+  readonly venueName: string | undefined;
+  readonly suffix: string;
   readonly to: { readonly visitId: VisitId } | { readonly tableId: TableId };
 };
+
+const detailOf = ({ venueName, suffix }: LivePlace) =>
+  [venueName, suffix].filter(Boolean).join(" · ");
 
 function useLiveSessions(except?: string) {
   const { home } = useRecordingHome();
@@ -55,12 +60,8 @@ function useLiveSessions(except?: string) {
       title: visitTitle(item.table),
       game: item.table.game,
       startedAt: item.visit.startedAt,
-      detail: [
-        item.venue?.name,
-        `${formatDisplayMoney(item.totals.buyIn, RECORDING_CURRENCY, prefs)} in`,
-      ]
-        .filter(Boolean)
-        .join(" · "),
+      venueName: item.venue?.name,
+      suffix: `${formatDisplayMoney(item.totals.buyIn, RECORDING_CURRENCY, prefs)} in`,
       to: { visitId: item.visit.id },
     })),
     ...(home?.tables ?? []).map((item) => ({
@@ -68,9 +69,8 @@ function useLiveSessions(except?: string) {
       title: tableTitle(item.table),
       game: item.table.game,
       startedAt: item.startedAt,
-      detail: [item.venue?.name, item.playing ? `${item.playing} playing` : "Nobody playing yet"]
-        .filter(Boolean)
-        .join(" · "),
+      venueName: item.venue?.name,
+      suffix: item.playing ? `${item.playing} playing` : "Nobody playing yet",
       to: { tableId: item.table.id },
     })),
   ];
@@ -128,16 +128,17 @@ export function LiveSessionsBar({ except }: { except?: string }) {
         : StackActions.push("Table", { tableId: place.to.tableId }),
     );
 
-  const { title, game, startedAt, detail } = newest;
+  const { title, game, startedAt, venueName, suffix } = newest;
 
   if (rest.length === 0)
     return (
       <Bar
-        label={`${"visitId" in newest.to ? "Back to your session" : "Back to the table"}, ${title}, ${startedAt ? `since ${formatTime(startedAt)}, ` : ""}${detail}`}
+        label={`${"visitId" in newest.to ? "Back to your session" : "Back to the table"}, ${title}, ${startedAt ? `since ${formatTime(startedAt)}, ` : ""}${detailOf(newest)}`}
         hint={"visitId" in newest.to ? "Goes back to your session" : "Goes back to the table"}
         title={title}
         game={game}
-        detail={detail}
+        venueName={venueName}
+        suffix={suffix}
         startedAt={startedAt}
         onPress={() => open(newest)}
       />
@@ -150,7 +151,9 @@ export function LiveSessionsBar({ except }: { except?: string }) {
         hint="Lists your live sessions"
         title={title}
         game={game}
-        detail={`+${rest.length} more · ${detail}`}
+        lead={`+${rest.length} more`}
+        venueName={venueName}
+        suffix={suffix}
         startedAt={startedAt}
         onPress={() => setPicking(true)}
       />
@@ -159,7 +162,7 @@ export function LiveSessionsBar({ except }: { except?: string }) {
           {live.map((item) => (
             <Button
               key={item.key}
-              label={`${item.title} · ${item.detail}`}
+              label={`${item.title} · ${detailOf(item)}`}
               variant="secondary"
               onPress={() => {
                 setPicking(false);
@@ -227,20 +230,9 @@ function Pinned({ bottom, onHeightChange, children }: Placement & { children: Re
 function Bar({
   label,
   hint,
-  title,
-  game,
-  detail,
-  startedAt,
   onPress,
-}: {
-  label: string;
-  hint: string;
-  title: string;
-  game: Game | null;
-  detail?: string;
-  startedAt: DateTime.Utc | null;
-  onPress: () => void;
-}) {
+  ...content
+}: BarContentProps & { label: string; hint: string; onPress: () => void }) {
   return (
     <PressableScale
       accessibilityRole="button"
@@ -248,32 +240,55 @@ function Bar({
       accessibilityHint={hint}
       onPress={onPress}
     >
-      <GlassSurface
-        radius={16}
-        interactive
-        className="min-h-14 flex-row items-center gap-3 rounded-2xl px-4 py-2"
-      >
-        <View
-          className={cn("size-8 rounded-full border-[3px] border-line", chipColor[gameChip(game)])}
-        />
-        <View className="min-w-0 flex-1">
-          <Text numberOfLines={1} className="type-callout font-semibold text-ink">
-            {title}
-          </Text>
-          {detail ? (
-            <Text numberOfLines={2} className="type-footnote text-muted">
-              {detail}
-            </Text>
-          ) : null}
-        </View>
-        {startedAt ? (
-          <>
-            <Elapsed since={startedAt} />
-            <View className="size-2 rounded-full bg-live" />
-          </>
-        ) : null}
+      <GlassSurface radius={16} interactive className="rounded-2xl">
+        <BarContent {...content} />
       </GlassSurface>
     </PressableScale>
+  );
+}
+
+type BarContentProps = {
+  title: string;
+  game: Game | null;
+  lead?: string;
+  venueName?: string | undefined;
+  suffix?: string;
+  startedAt: DateTime.Utc | null;
+};
+
+function BarContent({ title, game, lead, venueName, suffix, startedAt }: BarContentProps) {
+  const subtitle = "type-footnote text-muted";
+
+  return (
+    <View className="min-h-14 flex-row items-center gap-3 px-4 py-2">
+      <View
+        className={cn("size-8 rounded-full border-[3px] border-line", chipColor[gameChip(game)])}
+      />
+      <View className="min-w-0 flex-1">
+        <Text numberOfLines={1} className="type-callout font-semibold text-ink">
+          {title}
+        </Text>
+        {suffix ? (
+          <View className="min-w-0 flex-row">
+            {lead ? (
+              <Text numberOfLines={1} className={cn("shrink-0", subtitle)}>
+                {`${lead} · `}
+              </Text>
+            ) : null}
+            {venueName ? <MarqueeText className={subtitle}>{venueName}</MarqueeText> : null}
+            <Text numberOfLines={1} className={cn("shrink-0", subtitle)}>
+              {venueName ? ` · ${suffix}` : suffix}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      {startedAt ? (
+        <>
+          <Elapsed since={startedAt} />
+          <View className="size-2 rounded-full bg-live" />
+        </>
+      ) : null}
+    </View>
   );
 }
 
