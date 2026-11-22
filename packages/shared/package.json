@@ -54,7 +54,7 @@
     }
   },
   "scripts": {
-    "test": "vp test run --config ../../vite.config.ts --dir .",
+    "test": "vp test run --config ../../vite.config.ts --dir . --no-isolate",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

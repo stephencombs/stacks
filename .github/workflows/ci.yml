@@ -7,9 +7,37 @@ on:
       - .agents/**
       - .claude/**
       - .codex/**
+      - .gemini/**
+      - .github/screenshots/**
+      - .vite-hooks/**
+      - docs/**
+      - tools/table-art/**
+      - "**/*.md"
+      - .env.example
+      - .gitignore
+      - .mcp.json
+      - .github/dependabot.yml
+      - .github/workflows/testflight.yml
+      - docker-compose.yml
   push:
     branches:
       - main
+    paths-ignore:
+      - .agents/**
+      - .claude/**
+      - .codex/**
+      - .gemini/**
+      - .github/screenshots/**
+      - .vite-hooks/**
+      - docs/**
+      - tools/table-art/**
+      - "**/*.md"
+      - .env.example
+      - .gitignore
+      - .mcp.json
+      - .github/dependabot.yml
+      - .github/workflows/testflight.yml
+      - docker-compose.yml
 
 permissions:
   contents: read
@@ -26,20 +54,21 @@ jobs:
     outputs:
       check: ${{ steps.plan.outputs.check }}
       api: ${{ steps.plan.outputs.api }}
-      build: ${{ steps.plan.outputs.build }}
       mobile: ${{ steps.plan.outputs.mobile }}
       typecheck_args: ${{ steps.plan.outputs.typecheck_args }}
       test_args: ${{ steps.plan.outputs.test_args }}
     steps:
-      # The planner diffs against the base, so the checkout needs that commit.
+      # The planner diffs against the base, so the checkout needs commit history without blobs.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          filter: blob:none
       - id: plan
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.sha }}
+          FORCE_FULL: ${{ vars.CI_FORCE_FULL }}
         run: node scripts/ci-changes.mjs >> "$GITHUB_OUTPUT"
 
   check:
@@ -66,7 +95,7 @@ jobs:
         run: vp run ${{ needs.changes.outputs.test_args }} test
 
   api:
-    name: API tests
+    name: API tests and build
     needs: changes
     if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
@@ -81,9 +110,10 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
+          --health-interval 1s
           --health-timeout 5s
-          --health-retries 10
+          --health-retries 30
+          --mount type=tmpfs,destination=/var/lib/postgresql/data
     env:
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/stacks_test
     steps:
@@ -93,25 +123,11 @@ jobs:
           node-version-file: .node-version
           cache: true
           run-install: true
+      - run: vp run --filter @stacks/api build
       - run: vp run --filter @stacks/api test
       - run: vp run --filter @stacks/api db:seed
         env:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
-
-  build:
-    name: Build API
-    needs: changes
-    if: needs.changes.outputs.build == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-        with:
-          node-version-file: .node-version
-          cache: true
-          run-install: true
-      - run: vp run --filter @stacks/api build
 
   mobile:
     name: Bundle mobile (iOS + Android JS)
@@ -137,16 +153,15 @@ jobs:
 
   deploy:
     name: Deploy development
-    needs: [changes, check, api, build, mobile]
+    needs: [changes, check, api, mobile]
     if: >-
       github.event_name == 'push' &&
       always() &&
       !cancelled() &&
       needs.changes.result == 'success' &&
       needs.check.result == 'success' &&
-      needs.build.result == 'success' &&
-      needs.mobile.result == 'success' &&
-      contains(fromJSON('["success","skipped"]'), needs.api.result)
+      needs.api.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.mobile.result)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:

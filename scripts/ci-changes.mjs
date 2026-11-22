@@ -1,10 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync, realpathSync } from "node:fs";
+import { appendFileSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const API = "@stacks/api";
+const MOBILE = "@stacks/mobile";
 
 const SKIP_PREFIXES = [
   ".agents/",
@@ -14,7 +15,7 @@ const SKIP_PREFIXES = [
   ".github/screenshots/",
   ".vite-hooks/",
   "docs/",
-  "tools/",
+  "tools/table-art/",
 ];
 
 const SKIP_EXACT = new Set([
@@ -37,7 +38,7 @@ const TOOLING = new Set([
   "vite.config.ts",
 ]);
 
-const JOB_NAMES = ["check", "api", "build", "mobile", "preview"];
+const JOB_NAMES = ["check", "api", "mobile"];
 
 let workspaces;
 
@@ -45,9 +46,7 @@ function blank(value) {
   return {
     check: value,
     api: value,
-    build: value,
     mobile: value,
-    preview: value,
   };
 }
 
@@ -111,23 +110,21 @@ export function dependentsOf(name, packages) {
   return seen;
 }
 
-function everything() {
-  const jobs = blank(true);
-  jobs.preview = false;
-
+function everything(reasons = []) {
   return {
     all: true,
     packages: new Set(load().map((pkg) => pkg.name)),
-    jobs,
+    jobs: blank(true),
+    reasons,
   };
 }
 
-function jobsOnly(partial) {
+function jobsOnly(partial, reason) {
   const jobs = blank(false);
 
   for (const [name, value] of Object.entries(partial)) jobs[name] = value;
 
-  return { all: false, packages: new Set(), jobs };
+  return { all: false, packages: new Set(), jobs, reasons: reason ? [reason] : [] };
 }
 
 function affected(name) {
@@ -135,22 +132,20 @@ function affected(name) {
   const jobs = blank(false);
   jobs.check = true;
 
-  if (packages.has(API)) {
-    jobs.api = true;
-    jobs.build = true;
-    jobs.preview = true;
-  }
+  if (packages.has(API)) jobs.api = true;
 
-  return { all: false, packages, jobs };
+  if (packages.has(MOBILE)) jobs.mobile = true;
+
+  return { all: false, packages, jobs, reasons: [`package:${name}`] };
 }
 
-function fullCheck() {
-  const jobs = blank(false);
-  jobs.check = true;
-  jobs.api = true;
-  jobs.build = true;
-
-  return { all: false, packages: new Set(load().map((pkg) => pkg.name)), jobs };
+function fullCheck(reason) {
+  return {
+    all: false,
+    packages: new Set(load().map((pkg) => pkg.name)),
+    jobs: blank(true),
+    reasons: [reason],
+  };
 }
 
 function skipped(path) {
@@ -166,13 +161,15 @@ function tooling(path) {
 }
 
 function special(path) {
-  if (path === ".github/workflows/ci.yml") return fullCheck();
+  if (path === ".github/workflows/ci.yml") return fullCheck(`workflow:${path}`);
 
   if (path === ".github/workflows/preview.yml" || path.startsWith("scripts/preview"))
-    return jobsOnly({ check: true });
+    return jobsOnly({ check: true }, `preview-script:${path}`);
 
   if (path === "scripts/ci-changes.mjs" || path === "scripts/ci-changes.test.ts")
-    return jobsOnly({ check: true });
+    return jobsOnly({ check: true }, `planner:${path}`);
+
+  if (path.startsWith("tools/oxlint/")) return jobsOnly({ check: true }, `lint-plugin:${path}`);
 
   return null;
 }
@@ -190,9 +187,9 @@ function packageFor(path) {
 }
 
 function classify(path) {
-  if (skipped(path)) return jobsOnly({});
+  if (skipped(path)) return jobsOnly({}, "skipped");
 
-  if (tooling(path)) return everything();
+  if (tooling(path)) return everything([`tooling:${path}`]);
   const known = special(path);
 
   if (known) return known;
@@ -200,40 +197,50 @@ function classify(path) {
 
   if (pkg) return affected(pkg.name);
 
-  return everything();
+  return everything([`unknown:${path}`]);
 }
 
 export function plan(paths) {
   const jobs = blank(false);
   const packages = new Set();
+  const reasonSet = new Set();
   let all = false;
+  let hasPath = false;
 
   for (const path of paths) {
     if (path === "") continue;
+    hasPath = true;
     const part = classify(path);
 
     if (part.all) all = true;
 
     for (const name of JOB_NAMES) if (part.jobs[name]) jobs[name] = true;
 
-    if (path.startsWith("apps/mobile/") || path.startsWith("packages/")) jobs.mobile = true;
-
     for (const name of part.packages) packages.add(name);
+
+    for (const reason of part.reasons) reasonSet.add(reason);
   }
 
   if (all) {
     for (const pkg of load()) packages.add(pkg.name);
   }
 
-  jobs.mobile ||= jobs.build;
+  const anyJob = JOB_NAMES.some((name) => jobs[name]);
 
-  return { all, jobs, packages };
+  if (anyJob) reasonSet.delete("skipped");
+
+  const reasons = !hasPath ? ["empty-diff"] : !anyJob ? ["all-skipped"] : [...reasonSet];
+
+  return { all, jobs, packages, reasons };
 }
 
-export function decide({ event, base, diff }) {
-  if (event === "schedule" || event === "workflow_dispatch") return everything();
+export function decide({ event, base, diff, forceFull }) {
+  if (forceFull === true || forceFull === "true" || forceFull === "1")
+    return everything(["force-full"]);
 
-  if (!base || /^0+$/.test(base)) return everything();
+  if (event === "schedule" || event === "workflow_dispatch") return everything([`event:${event}`]);
+
+  if (!base || /^0+$/.test(base)) return everything(["missing-base"]);
 
   try {
     return plan(diff());
@@ -241,7 +248,7 @@ export function decide({ event, base, diff }) {
     console.error(error instanceof Error ? error.message : error);
     console.error("Could not diff the changeset; running every check.");
 
-    return everything();
+    return everything(["diff-error"]);
   }
 }
 
@@ -264,9 +271,7 @@ export function output(result) {
   return {
     check: result.jobs.check ? "true" : "false",
     api: result.jobs.api ? "true" : "false",
-    build: result.jobs.build ? "true" : "false",
     mobile: result.jobs.mobile ? "true" : "false",
-    preview: result.jobs.preview ? "true" : "false",
     typecheck_args:
       names.length === 0 ? "" : samePackages(names) ? "-r --cache" : `--cache ${filters(names)}`,
     test_args: filters(tested),
@@ -279,21 +284,46 @@ function githubOutput(result) {
     .join("\n")}\n`;
 }
 
+function formatReasons(reasons) {
+  const shown = reasons.slice(0, 20);
+  const extra = reasons.length - shown.length;
+
+  return extra > 0 ? `${shown.join(", ")} (+${extra} more)` : shown.join(", ");
+}
+
 function main() {
-  const text = githubOutput(
-    decide({
-      event: process.env.EVENT_NAME ?? "",
-      base: process.env.BASE_SHA ?? "",
-      diff: () =>
-        execFileSync(
-          "git",
-          ["diff", "--no-renames", "--name-only", "-z", process.env.BASE_SHA, process.env.HEAD_SHA],
-          { encoding: "utf8" },
-        ).split("\0"),
-    }),
+  const result = decide({
+    event: process.env.EVENT_NAME ?? "",
+    base: process.env.BASE_SHA ?? "",
+    forceFull: process.env.FORCE_FULL,
+    diff: () =>
+      execFileSync(
+        "git",
+        ["diff", "--no-renames", "--name-only", "-z", process.env.BASE_SHA, process.env.HEAD_SHA],
+        { encoding: "utf8" },
+      ).split("\0"),
+  });
+
+  const fields = output(result);
+  const text = githubOutput(result);
+
+  console.error(
+    `${text.trim().replaceAll("\n", " ")} reasons=${result.reasons.slice(0, 20).join(",")}`,
   );
 
-  console.error(text.trim().replaceAll("\n", " "));
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    const summary = [
+      "### CI Plan",
+      `- check: \`${fields.check}\`, api: \`${fields.api}\`, mobile: \`${fields.mobile}\``,
+      `- typecheck_args: \`${fields.typecheck_args || "(none)"}\``,
+      `- test_args: \`${fields.test_args || "(none)"}\``,
+      `- reasons: ${formatReasons(result.reasons)}`,
+      "",
+    ].join("\n");
+
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+  }
+
   process.stdout.write(text);
 }
 
