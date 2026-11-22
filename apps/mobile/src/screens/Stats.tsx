@@ -19,8 +19,8 @@ import {
   type Trip,
 } from "@stacks/contracts";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
-import { PanResponder, Platform, Pressable, View } from "react-native";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { PanResponder, Platform, Pressable, View, type ScrollViewInstance } from "react-native";
 import { Text } from "../components/ui/Text";
 import Svg, {
   Circle,
@@ -73,6 +73,7 @@ type Props = StaticScreenProps<{ groupId?: string; tripId?: string } | undefined
 export function StatsScreen({ route }: Props) {
   const navigation = useNavigation();
   const android = Platform.OS === "android";
+  const scrollRef = useRef<ScrollViewInstance>(null);
   useLayoutEffect(() => {
     if (android) navigation.setOptions({ headerShown: false });
   }, [android, navigation]);
@@ -82,6 +83,8 @@ export function StatsScreen({ route }: Props) {
     ...(route.params?.tripId ? { tripId: TripId.make(route.params.tripId) } : null),
   };
 
+  const resetScroll = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
+
   const stats = (
     <YourGroups>
       {(groups) => (
@@ -89,12 +92,20 @@ export function StatsScreen({ route }: Props) {
           key={`${pick.groupId}:${pick.tripId}`}
           pick={groups ? pick : justMe}
           groups={groups ?? noGroups}
+          onFilterChange={android ? undefined : resetScroll}
         />
       )}
     </YourGroups>
   );
 
-  return android ? stats : <PersonalScreen live>{stats}</PersonalScreen>;
+  return android ? (
+    stats
+  ) : (
+    <PersonalScreen live topSafeArea scrollRef={scrollRef}>
+      <View className="h-7" />
+      {stats}
+    </PersonalScreen>
+  );
 }
 
 type Pick = { readonly groupId?: GroupId; readonly tripId?: TripId };
@@ -136,10 +147,24 @@ function SignedInGroups({
   return children(groups);
 }
 
-function StatsView({ pick, groups }: { pick: Pick; groups: ReadonlyArray<GroupListItem> }) {
+function StatsView({
+  pick,
+  groups,
+  onFilterChange,
+}: {
+  pick: Pick;
+  groups: ReadonlyArray<GroupListItem>;
+  onFilterChange?: (() => void) | undefined;
+}) {
   const copies = useStatsCopies();
   const [picked, setPicked] = useState<Pick>(pick);
   const [filters, setFilters] = useState<StatsFilters>(pick.tripId ? { tripId: pick.tripId } : {});
+
+  const updateFilters = (next: StatsFilters) => {
+    setFilters(next);
+    onFilterChange?.();
+  };
+
   const rememberedTrip = picked.tripId && copies ? copies.groupOfTrip(picked.tripId) : null;
 
   const groupId =
@@ -159,6 +184,7 @@ function StatsView({ pick, groups }: { pick: Pick; groups: ReadonlyArray<GroupLi
         fallbackName={fallbackName}
         onChange={(next) => {
           setPicked(next === null ? {} : { groupId: next });
+          onFilterChange?.();
 
           const keep =
             next === null ||
@@ -180,7 +206,7 @@ function StatsView({ pick, groups }: { pick: Pick; groups: ReadonlyArray<GroupLi
       trips={groups.flatMap((item) => item.trips)}
       chip={chip}
       filters={filters}
-      onFilters={setFilters}
+      onFilters={updateFilters}
     />
   ) : (
     <GroupStatsView
@@ -191,10 +217,10 @@ function StatsView({ pick, groups }: { pick: Pick; groups: ReadonlyArray<GroupLi
       liveTrips={new Set(group?.liveTripIds)}
       chip={chip}
       filters={filters}
-      onFilters={setFilters}
+      onFilters={updateFilters}
       onJustMe={() => {
         setPicked({});
-        setFilters({});
+        updateFilters({});
       }}
     />
   );

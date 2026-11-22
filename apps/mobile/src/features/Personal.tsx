@@ -72,8 +72,6 @@ export function PersonalScreen({
 
   const scrollState = useRef({
     offsetY: 0,
-    insetTop: 0,
-    insetBottom: 0,
     layoutHeight: 0,
     scrolled: false,
   });
@@ -97,27 +95,37 @@ export function PersonalScreen({
           style={foot.scrollStyle}
           contentInsetAdjustmentBehavior={manualInset ? "never" : "automatic"}
           keyboardShouldPersistTaps="handled"
-          alwaysBounceVertical={false}
+          alwaysBounceVertical={!manualInset}
           scrollEventThrottle={32}
-          onLayout={(event) => {
-            scrollState.current.layoutHeight = event.nativeEvent.layout.height;
-          }}
-          onScroll={(event) => {
-            const { contentOffset, contentInset, layoutMeasurement } = event.nativeEvent;
-            scrollState.current.offsetY = contentOffset.y;
-            scrollState.current.insetTop = contentInset?.top ?? 0;
-            scrollState.current.insetBottom = contentInset?.bottom ?? 0;
-            scrollState.current.layoutHeight = layoutMeasurement.height;
-            scrollState.current.scrolled = true;
-          }}
-          onContentSizeChange={(_width, height) => {
-            const next = clampedScrollOffset(scrollState.current, height);
+          onLayout={
+            manualInset
+              ? (event) => {
+                  scrollState.current.layoutHeight = event.nativeEvent.layout.height;
+                }
+              : undefined
+          }
+          onScroll={
+            manualInset
+              ? (event) => {
+                  const { contentOffset, layoutMeasurement } = event.nativeEvent;
+                  scrollState.current.offsetY = contentOffset.y;
+                  scrollState.current.layoutHeight = layoutMeasurement.height;
+                  scrollState.current.scrolled = true;
+                }
+              : undefined
+          }
+          onContentSizeChange={
+            manualInset
+              ? (_width, height) => {
+                  const next = clampedScrollOffset(scrollState.current, height);
 
-            if (next !== null) {
-              scrollState.current.offsetY = next;
-              scroll.current?.scrollTo({ y: next, animated: true });
-            }
-          }}
+                  if (next !== null) {
+                    scrollState.current.offsetY = next;
+                    scroll.current?.scrollTo({ y: next, animated: true });
+                  }
+                }
+              : undefined
+          }
           contentContainerClassName={cn("gap-6", !manualInset && "pt-4", contentClassName)}
           contentContainerStyle={{
             ...sides,
