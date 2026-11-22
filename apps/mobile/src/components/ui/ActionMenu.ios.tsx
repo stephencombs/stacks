@@ -54,8 +54,12 @@ export function ActionMenu({
               ? [foregroundStyle(triggerInk)]
               : [foregroundStyle(triggerInk), tint(triggerInk)]
             : []),
-          controlSize(fab ? "extraLarge" : "large"),
-          frame(fab ? { minWidth: 56, minHeight: 56 } : { minWidth: 44, minHeight: 44 }),
+          controlSize(fab ? "extraLarge" : "regular"),
+          frame(
+            fab
+              ? { minWidth: 56, minHeight: 56 }
+              : { minWidth: 44, maxWidth: 44, minHeight: 44, maxHeight: 44 },
+          ),
           accessibilityLabel(label),
           disable(disabled),
         ]}
