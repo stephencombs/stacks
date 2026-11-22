@@ -67,7 +67,11 @@ const crewOptions = {
 const PlayStack = createNativeStackNavigator({
   screenOptions: personalOptions,
   screens: {
-    Home: { screen: HomeScreen, linking: "", options: { headerLeft: () => <PlayBrand /> } },
+    Home: {
+      screen: HomeScreen,
+      linking: "",
+      options: { headerLeft: () => <PlayBrand />, headerLeftBackgroundVisible: false },
+    },
   },
 });
 
@@ -160,7 +164,10 @@ const InvitesStack = createNativeStackNavigator({
 
 const RootStack = createNativeStackNavigator({
   initialRouteName: "Tabs",
-  screenOptions: Platform.OS === "android" ? { ...headerOptions, title: "" } : personalOptions,
+  screenOptions: ({ theme }) =>
+    Platform.OS === "android"
+      ? { ...headerOptions, title: "" }
+      : { ...personalOptions, statusBarStyle: theme.dark ? "light" : "dark" },
   screens: {
     Tabs: { screen: Tabs, options: { headerShown: false } },
     Play: { screen: PlayScreen, linking: "play/:visitId" },

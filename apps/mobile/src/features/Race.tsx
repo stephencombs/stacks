@@ -1,6 +1,7 @@
 import type { CurrencyCode, PlayerId } from "@stacks/contracts";
 import {
   around,
+  fitAxisLabels,
   labelWidth,
   lineScale,
   placeLabel,
@@ -11,12 +12,13 @@ import { boardMoney, returnLabel } from "@stacks/client-runtime/trip";
 import { raceLines, type RaceMeasure, type StatsSession } from "@stacks/shared/stats";
 import type * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { PanResponder, View } from "react-native";
+import { PanResponder, Platform, View } from "react-native";
 import { Text } from "../components/ui/Text";
-import Svg, { Circle, G, Line, Polyline, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 
 import { Choice } from "../components/ui/Field";
+import { chartCurve } from "../components/ui/chartCurve";
 import { cn } from "../components/ui/cn";
 import { HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
 
@@ -88,10 +90,14 @@ export function Race<S extends RaceSession>({
   const prefs = usePreferences();
   const [width, setWidth] = useState(0);
 
-  const [ink, muted, ring, ...chips] = useCSSVariable([
+  const ios = Platform.OS === "ios";
+
+  const [ink, muted, ring, blue, surface, ...chips] = useCSSVariable([
     "--color-ink",
     "--color-muted",
     "--color-fill-strong",
+    "--color-chip-blue",
+    "--color-surface",
     ...Array.from({ length: 8 }, (_, index) => `--color-chip-${index + 1}`),
   ]).map(String);
 
@@ -152,6 +158,21 @@ export function Race<S extends RaceSession>({
     : marks;
 
   const edges = { min: INSET, max: Math.max(INSET, width - INSET) };
+
+  const visibleAxis = fitAxisLabels(
+    axis.map((mark, index) => ({ ...mark, x: plot.x(stats && index === 0 ? 0 : mark.index + 1) })),
+    MARK_FONT,
+    edges,
+  );
+
+  const grid = ios
+    ? [PAD.y, height / 2, height - PAD.y].filter((y) => Math.abs(y - plot.zero) >= 8)
+    : [];
+
+  const path = (points: ReadonlyArray<{ x: number; y: number }>) =>
+    ios
+      ? chartCurve(points)
+      : points.map(({ x, y }, index) => `${index === 0 ? "M" : "L"}${x} ${y}`).join(" ");
 
   const scrub = (locationX: number) =>
     setAt(
@@ -251,6 +272,18 @@ export function Race<S extends RaceSession>({
       >
         {width > 0 ? (
           <Svg width={width} height={height + MARKS} pointerEvents="none">
+            {grid.map((y) => (
+              <Line
+                key={y}
+                x1={PAD.x}
+                x2={width - labelSpace}
+                y1={y}
+                y2={y}
+                stroke={ring}
+                strokeLinecap="round"
+                strokeDasharray="0.3 3.5"
+              />
+            ))}
             <Line
               x1={0}
               x2={width - labelSpace}
@@ -259,26 +292,19 @@ export function Race<S extends RaceSession>({
               stroke={ring}
               strokeDasharray="3 4"
             />
-            {axis.map((mark, index) => {
-              const place = placeLabel(
-                plot.x(stats && index === 0 ? 0 : mark.index + 1),
-                labelWidth(mark.label, MARK_FONT),
-                edges,
-              );
-
-              return (
-                <SvgText
-                  key={mark.index}
-                  x={place.x}
-                  y={height + MARKS - 8}
-                  textAnchor={place.anchor}
-                  fill={muted}
-                  fontSize={MARK_FONT}
-                >
-                  {mark.label}
-                </SvgText>
-              );
-            })}
+            {visibleAxis.map((mark) => (
+              <SvgText
+                key={mark.index}
+                x={mark.x}
+                y={height + MARKS - 8}
+                textAnchor={mark.anchor}
+                fill={muted}
+                fontFamily="Allo"
+                fontSize={MARK_FONT}
+              >
+                {mark.label}
+              </SvgText>
+            ))}
             {stats && at === last ? null : (
               <Line
                 x1={plot.x(point)}
@@ -295,10 +321,12 @@ export function Race<S extends RaceSession>({
                 stats && !prefs.privacyMode
                   ? (chips[(chip ?? 1) - 1] ?? muted)
                   : yours
-                    ? ink
+                    ? ios && !prefs.privacyMode
+                      ? blue
+                      : ink
                     : muted;
 
-              const points = line.map((v, i) => `${plot.x(i)},${plot.y(v)}`);
+              const points = line.map((v, i) => ({ x: plot.x(i), y: plot.y(v) }));
               const now = { x: plot.x(point), y: plot.y(line[point]!) };
               const off = plot.clipped(line[point]!);
 
@@ -310,16 +338,16 @@ export function Race<S extends RaceSession>({
 
               return (
                 <G key={playerId}>
-                  <Polyline
-                    points={points.slice(point).join(" ")}
+                  <Path
+                    d={path(points.slice(point))}
                     fill="none"
                     stroke={color}
                     strokeOpacity={0.15}
                     strokeWidth={2}
                     strokeLinejoin="round"
                   />
-                  <Polyline
-                    points={points.slice(0, point + 1).join(" ")}
+                  <Path
+                    d={path(points.slice(0, point + 1))}
                     fill="none"
                     stroke={color}
                     strokeOpacity={stats || yours ? 1 : 0.45}
@@ -327,7 +355,7 @@ export function Race<S extends RaceSession>({
                     strokeLinejoin="round"
                     strokeLinecap="round"
                   />
-                  {yours && (!stats || at !== last) ? (
+                  {!ios && yours && (!stats || at !== last) ? (
                     <Circle cx={now.x} cy={now.y} r={10} fill={color} fillOpacity={0.2} />
                   ) : null}
                   {stats ? (
@@ -337,13 +365,16 @@ export function Race<S extends RaceSession>({
                     cx={now.x}
                     cy={now.y}
                     r={stats ? (yours ? 3 : 2.5) : yours ? 4.5 : 3}
-                    fill={color}
+                    fill={ios && yours ? surface : color}
+                    stroke={ios && yours ? color : undefined}
+                    strokeWidth={ios && yours ? 2 : undefined}
                   />
                   <SvgText
                     x={seat.x}
                     y={labels[i]! + 4}
                     textAnchor={seat.anchor}
                     fontSize={LETTER}
+                    fontFamily="Allo"
                     fontWeight={stats || yours ? "600" : "400"}
                     fill={stats || yours ? ink : muted}
                   >

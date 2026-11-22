@@ -1238,8 +1238,6 @@ function BuyInFigure({ amount }: { amount: MinorUnits }) {
     trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
   });
 
-  const [, whole = text, cents = ""] = /^(.*\d)([.,]\d+\D*)$/.exec(text) ?? [];
-
   return (
     <Text
       testID="live-buy-in"
@@ -1247,8 +1245,7 @@ function BuyInFigure({ amount }: { amount: MinorUnits }) {
       adjustsFontSizeToFit
       className="text-[88px] leading-[92px] font-bold tracking-[-3px] text-felt-ink tabular-nums"
     >
-      {whole}
-      <Text className="text-[36px] font-medium tracking-normal text-felt-soft">{cents}</Text>
+      {text}
     </Text>
   );
 }

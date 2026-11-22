@@ -470,6 +470,7 @@ export function SettingsRow({
   accessibilityLabel,
   accessibilityHint,
   trailing,
+  compact = false,
 }: {
   icon?: ReactNode;
   title: string;
@@ -479,6 +480,7 @@ export function SettingsRow({
   accessibilityLabel?: string;
   accessibilityHint?: string;
   trailing?: ReactNode;
+  compact?: boolean;
 }) {
   const disclosure =
     trailing !== undefined ? (
@@ -492,7 +494,7 @@ export function SettingsRow({
       onPress={onPress}
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
-      className="min-h-13"
+      className={compact ? "min-h-12 py-1" : "min-h-13"}
     >
       {icon ? (
         <View className="size-7 items-center justify-center rounded-lg bg-fill">{icon}</View>

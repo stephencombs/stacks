@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 
 import { LiveBar, type ShowsTable } from "../../features/LiveBar";
+import { FeltStatusBar } from "../../features/FeltStatusBar";
 import { useNativeHeaderActions } from "../../features/NativeHeaderActions";
 import { FormError } from "./Field";
 import { cn } from "./cn";
@@ -38,6 +39,7 @@ export function Screen({
   renderFooter,
   fab,
   contentClassName,
+  onOpenGroups,
 }: {
   children: Content;
   shows?: ShowsTable;
@@ -46,9 +48,10 @@ export function Screen({
   /** A floating action button, bottom right above the live bar. */
   fab?: ReactNode;
   contentClassName?: string;
+  onOpenGroups?: () => void;
 }) {
   const footer = renderFooter;
-  const header = useNativeHeaderActions();
+  const header = useNativeHeaderActions(false, onOpenGroups);
   const foot = useScreenFoot({ footer: !!footer, fab: !!fab, footerGap: 12 });
 
   return (
@@ -58,6 +61,7 @@ export function Screen({
         className="flex-1 bg-canvas"
       >
         {header}
+        <FeltStatusBar felt={false} />
         <ToastHost {...(foot.above === undefined ? {} : { above: foot.above })}>
           <ScrollView
             contentInsetAdjustmentBehavior="automatic"

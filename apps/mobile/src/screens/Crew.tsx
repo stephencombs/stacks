@@ -34,7 +34,7 @@ import { chipOf, closedPlays, localClock, tripDates, tripPlays } from "@stacks/c
 import { tripStandings } from "@stacks/shared/trips";
 import type * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { Text } from "../components/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -66,10 +66,12 @@ import { Loaded, TripLoaded, useAction, useStacks } from "../lib/stacks";
 export function CrewScreen() {
   const stacks = useStacks();
   const [sheet, setSheet] = useState<"groups" | "create" | null>(null);
+  const openGroups = useCallback(() => setSheet("groups"), []);
 
   return (
     <Screen
       live={Platform.OS !== "android"}
+      onOpenGroups={openGroups}
       contentClassName={Platform.OS === "android" ? "gap-4 pt-1" : undefined}
     >
       <Loaded query={stacks.groups} skeleton={<CrewSkeleton />}>
@@ -91,19 +93,7 @@ export function CrewScreen() {
                 invite link they sent you to join it.
               </EmptyState>
             ) : (
-              <>
-                {Platform.OS === "android" ? null : (
-                  <Button
-                    label="Groups"
-                    variant="tint"
-                    size="sm"
-                    icon={<Icon name="group" color="ink" size={16} />}
-                    className="self-end"
-                    onPress={() => setSheet("groups")}
-                  />
-                )}
-                <Feed groups={groups} />
-              </>
+              <Feed groups={groups} />
             )}
             <GroupsSheet
               groups={groups}
@@ -179,7 +169,6 @@ export function GroupsScreen() {
 function CrewSkeleton() {
   return (
     <View accessibilityElementsHidden className="gap-6">
-      <Skeleton className="h-11 w-28 self-end rounded-full" />
       <Skeleton className="h-[220px] rounded-2xl" />
       <RowsSkeleton rows={4} />
     </View>
