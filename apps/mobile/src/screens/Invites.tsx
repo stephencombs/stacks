@@ -2,7 +2,8 @@ import { useUser } from "@clerk/expo";
 import type { StaticScreenProps } from "@react-navigation/native";
 import type { GroupDetail, InvitePreview } from "@stacks/contracts";
 import { useState, type ReactNode } from "react";
-import { Platform, Text } from "react-native";
+import { Platform } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";

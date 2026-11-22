@@ -41,7 +41,8 @@ import * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Animated, Platform, Pressable, View, useWindowDimensions } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button, IconButton } from "../components/ui/Button";
@@ -1237,8 +1238,6 @@ function BuyInFigure({ amount }: { amount: MinorUnits }) {
     trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
   });
 
-  const [, whole = text, cents = ""] = /^(.*\d)([.,]\d+\D*)$/.exec(text) ?? [];
-
   return (
     <Text
       testID="live-buy-in"
@@ -1246,8 +1245,7 @@ function BuyInFigure({ amount }: { amount: MinorUnits }) {
       adjustsFontSizeToFit
       className="text-[88px] leading-[92px] font-bold tracking-[-3px] text-felt-ink tabular-nums"
     >
-      {whole}
-      <Text className="text-[36px] font-medium tracking-normal text-felt-soft">{cents}</Text>
+      {text}
     </Text>
   );
 }

@@ -16,9 +16,12 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
   vi.doMock("react-native-safe-area-context", () => ({
     useSafeAreaInsets: () => ({ top: 47, right: 0, bottom: 34, left: 0 }),
   }));
-  vi.doMock("../components/BrandMark", () => ({ BrandMark: () => null }));
-  vi.doMock("./TripHero", () => ({
-    TripHero: () => createElement("div", { "data-trip": "true" }),
+  vi.doMock("../components/BrandWordmark", () => ({ BrandWordmark: () => null }));
+  vi.doMock("../components/ui/Icon", () => ({
+    Icon: ({ name }: { name: string }) => createElement("span", { "data-icon": name }),
+  }));
+  vi.doMock("./OnboardingChart", () => ({
+    OnboardingChart: ({ page }: { page: number }) => createElement("div", { "data-chart": page }),
   }));
   vi.doMock("./SignInButton", () => ({
     SignInButton: ({ label }: { label: string }) =>
@@ -120,7 +123,7 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
 
   const button = (label: string) => {
     const found = Array.from(container.querySelectorAll("button")).find(
-      (node) => node.textContent === label,
+      (node) => node.textContent === label || node.getAttribute("aria-label") === label,
     );
 
     if (!found) throw new Error(`No ${label} button`);
@@ -141,7 +144,8 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
     expect(button("Create an account").closest("[data-hidden='true']")).not.toBeNull();
     expect(container.textContent).toContain("who owes whom");
     expect(container.textContent).toContain("Reuse a recent rebuy amount, then confirm");
-    expect(container.querySelector("[data-trip='true']")).not.toBeNull();
+    expect(container.querySelectorAll("[data-chart]")).toHaveLength(4);
+    expect(button("Continue").querySelector("[data-icon='arrow-right']")).not.toBeNull();
 
     await act(async () => button("Continue").click());
     expect(step("Log it at the table.")?.getAttribute("data-hidden")).toBe("false");
@@ -162,9 +166,9 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
     await act(async () => button("Continue").click());
     await act(async () => button("Continue").click());
     expect(step("Watch the board.")?.getAttribute("data-hidden")).toBe("false");
-    expect(button("Get started").textContent).toBe("Get started");
+    expect(button("Get Started").textContent).toBe("Get Started");
 
-    await act(async () => button("Get started").click());
+    await act(async () => button("Get Started").click());
     expect(step("Start a group.")?.getAttribute("data-hidden")).toBe("false");
     expect(button("Create an account").closest("[data-hidden='true']")).toBeNull();
     expect(button("Sign in").textContent).toBe("Sign in");

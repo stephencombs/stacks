@@ -1,7 +1,8 @@
 import { DatePickerDialog, TimePickerDialog } from "@expo/ui/jetpack-compose";
 import { getCalendars } from "expo-localization";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./Text";
 
 import { ComposeHost as Host } from "./ComposeHost.android";
 import type { DateTimeFieldProps } from "./DateTimeField";

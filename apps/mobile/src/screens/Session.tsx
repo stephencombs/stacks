@@ -17,7 +17,8 @@ import { playerResults } from "@stacks/shared/results";
 import { seatsNow } from "@stacks/shared/seats";
 import * as Option from "effect/Option";
 import { useCallback, type ReactNode } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Screen, screenError } from "../components/ui/Screen";

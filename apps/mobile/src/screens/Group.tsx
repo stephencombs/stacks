@@ -2,7 +2,8 @@ import type { StaticScreenProps } from "@react-navigation/native";
 import type { GroupDetail, GroupId } from "@stacks/contracts";
 import { isAdmin, isFormerMember, isGuest } from "@stacks/client-runtime/format";
 import { useCallback } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Button, IconButton } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";

@@ -40,11 +40,11 @@ What color is this text?
 
 ## Brand
 
-The product is Color Up. Its mark is a chip rack seen from above: an `ink` frame around four columns in player chips 2, 1, 3 and 8, the yellow one tallest. It's `BrandMark` on both clients, beside the uppercase Barlow wordmark at the top of the sidebar and on the sign-in screen. The mark's colors come from the tokens, so it follows the theme.
+Onboarding and the iOS Play header use `BrandWordmark`, the refreshed four-color Color Up artwork from Figma. Its wordmark ink adapts in dark mode. Android Play uses the felt chip mark next to the app name.
 
 ## Type
 
-`tokens.json` names the type styles. Money styles use its `display` family and text styles use `sans`. On mobile both are the system face (SF Pro on iOS, Roboto on Android), money with tabular figures. No mono face, and no Barlow Condensed outside the wordmark.
+`tokens.json` names the type styles. Mobile uses Allo for app text, with tabular figures for money. Native controls use their platform typography where the platform owns the text.
 
 | Style         | Use it for                                                                         |
 | ------------- | ---------------------------------------------------------------------------------- |

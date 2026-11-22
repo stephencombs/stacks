@@ -1,33 +1,34 @@
-import { useUser } from "@clerk/expo";
 import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import type { VisitId } from "@stacks/contracts";
-import { useState, type ReactNode, type Ref } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   ActivityIndicator,
   Platform,
   ScrollView,
-  Text,
   View,
   type ScrollViewInstance,
 } from "react-native";
+import { Text } from "../components/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BrandMark } from "../components/BrandMark";
+import { BrandWordmark } from "../components/BrandWordmark";
 import { Button } from "../components/ui/Button";
 import { ControlSurface } from "../components/ui/ControlSurface";
 import { PressableScale } from "../components/ui/PressableScale";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { FloatingAction } from "../components/ui/FloatingAction";
 import { PinnedFooter } from "../components/ui/PinnedFooter";
+import { clampedScrollOffset } from "../components/ui/scrollClamp";
 import { SheetHost } from "../components/ui/Sheet";
 import { useScreenFoot } from "../components/ui/tabBar";
 import { cn } from "../components/ui/cn";
 import { useAccount } from "../lib/account";
-import { Chip } from "./Chip";
 import { FeltStatusBar } from "./FeltStatusBar";
 import { PersonalLiveBar } from "./LiveBar";
 import { useNativeHeaderActions } from "./NativeHeaderActions";
+import { UserAvatar } from "./UserAvatar";
 import { YouSheet } from "./You";
 
 /**
@@ -44,6 +45,7 @@ export function PersonalScreen({
   live = false,
   felt = false,
   session = false,
+  topSafeArea = false,
   scrollRef,
   contentClassName,
 }: {
@@ -55,12 +57,26 @@ export function PersonalScreen({
   live?: boolean;
   felt?: boolean;
   session?: boolean;
-  scrollRef?: Ref<ScrollViewInstance>;
+  /** Pad scroll content from the top safe area instead of the nav bar so leading chrome scrolls. */
+  topSafeArea?: boolean;
+  scrollRef?: RefObject<ScrollViewInstance | null>;
   contentClassName?: string;
 }) {
-  const header = useNativeHeaderActions(true);
+  const floatingTopBar = topSafeArea && Platform.OS === "ios";
+  const header = useNativeHeaderActions(true, undefined, floatingTopBar);
   const insets = useSafeAreaInsets();
   const foot = useScreenFoot({ footer: !!dock, fab: !!fab });
+  const manualInset = (session || topSafeArea) && Platform.OS === "ios";
+  const fallbackScroll = useRef<ScrollViewInstance>(null);
+  const scroll = scrollRef ?? fallbackScroll;
+
+  const scrollState = useRef({
+    offsetY: 0,
+    insetTop: 0,
+    insetBottom: 0,
+    layoutHeight: 0,
+    scrolled: false,
+  });
 
   const sides = {
     paddingLeft: Math.max(16, insets.left),
@@ -76,21 +92,50 @@ export function PersonalScreen({
         {header}
         <FeltStatusBar felt={felt} />
         <ScrollView
-          ref={scrollRef}
+          ref={scroll}
           className="flex-1"
           style={foot.scrollStyle}
-          contentInsetAdjustmentBehavior={session && Platform.OS === "ios" ? "never" : "automatic"}
+          contentInsetAdjustmentBehavior={manualInset ? "never" : "automatic"}
           keyboardShouldPersistTaps="handled"
-          contentContainerClassName={cn("gap-6 pt-4 pb-8", contentClassName)}
+          alwaysBounceVertical={false}
+          scrollEventThrottle={32}
+          onLayout={(event) => {
+            scrollState.current.layoutHeight = event.nativeEvent.layout.height;
+          }}
+          onScroll={(event) => {
+            const { contentOffset, contentInset, layoutMeasurement } = event.nativeEvent;
+            scrollState.current.offsetY = contentOffset.y;
+            scrollState.current.insetTop = contentInset?.top ?? 0;
+            scrollState.current.insetBottom = contentInset?.bottom ?? 0;
+            scrollState.current.layoutHeight = layoutMeasurement.height;
+            scrollState.current.scrolled = true;
+          }}
+          onContentSizeChange={(_width, height) => {
+            const next = clampedScrollOffset(scrollState.current, height);
+
+            if (next !== null) {
+              scrollState.current.offsetY = next;
+              scroll.current?.scrollTo({ y: next, animated: true });
+            }
+          }}
+          contentContainerClassName={cn("gap-6", !manualInset && "pt-4", contentClassName)}
           contentContainerStyle={{
             ...sides,
-            flexGrow: 1,
-            ...(session ? { paddingTop: 12 } : null),
+            paddingBottom: foot.endSpace + 16,
+            ...(session ? { flexGrow: 1, paddingTop: 12 } : null),
+            ...(topSafeArea && Platform.OS === "ios" ? { paddingTop: insets.top } : null),
           }}
         >
           {children}
-          <View style={{ height: foot.endSpace }} />
         </ScrollView>
+        {floatingTopBar ? (
+          <View
+            pointerEvents="box-none"
+            style={{ position: "absolute", top: insets.top, right: sides.paddingRight }}
+          >
+            <PersonalYouButton />
+          </View>
+        ) : null}
         {fab ? (
           <FloatingAction right={sides.paddingRight} bottom={foot.fabBottom}>
             {fab}
@@ -327,11 +372,11 @@ export function PersonalYouButton() {
         className="size-11 items-center justify-center"
       >
         {Platform.OS === "android" && account.available && account.isSignedIn ? (
-          <SignedInChip />
+          <UserAvatar size={32} />
         ) : (
           <ControlSurface>
             {account.available && account.isSignedIn ? (
-              <SignedInChip />
+              <UserAvatar size={32} ring={false} />
             ) : (
               <Icon name="person" color="ink" size={20} />
             )}
@@ -343,16 +388,6 @@ export function PersonalYouButton() {
   );
 }
 
-function SignedInChip() {
-  const { user } = useUser();
-
-  if (Platform.OS === "android") {
-    return <Chip chip={5} name={user?.fullName ?? user?.firstName ?? "You"} size={32} ring />;
-  }
-
-  return <Chip chip={1} name={user?.firstName ?? user?.fullName ?? "You"} size={32} />;
-}
-
 /** Color Up's mark and name, top left of Play. */
 export function PlayBrand() {
   return (
@@ -362,8 +397,14 @@ export function PlayBrand() {
       accessibilityLabel="Color Up"
       className="flex-row items-center gap-2.5"
     >
-      <BrandMark size={30} chip={Platform.OS === "android"} />
-      <Text className="type-title text-ink">Color Up</Text>
+      {Platform.OS === "android" ? (
+        <>
+          <BrandMark size={30} />
+          <Text className="type-title text-ink">Color Up</Text>
+        </>
+      ) : (
+        <BrandWordmark />
+      )}
     </View>
   );
 }

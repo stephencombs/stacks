@@ -4,12 +4,28 @@ import * as Schema from "effect/Schema";
 import {
   around,
   barTrack,
+  fitAxisLabels,
   labelWidth,
   lineScale,
   placeLabel,
   runningLine,
   spreadLabels,
 } from "./chart.ts";
+
+it("keeps the trip endpoints and skips day labels that collide on a phone", () => {
+  const marks = [20, 80, 175, 195, 215, 235].map((x, index) => ({
+    index,
+    x,
+    label: `Day ${index + 1}`,
+  }));
+
+  expect(fitAxisLabels(marks, 11, { min: 8, max: 300 }).map(({ label }) => label)).toEqual([
+    "Day 1",
+    "Day 2",
+    "Day 3",
+    "Day 6",
+  ]);
+});
 
 describe("barTrack", () => {
   it("puts zero where the losses end and scales bars to the full range", () => {

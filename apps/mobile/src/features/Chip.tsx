@@ -1,5 +1,6 @@
 import Svg, { Circle, G, Rect } from "react-native-svg";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "../components/ui/Text";
 import { useCSSVariable } from "uniwind";
 
 const STRIPES = [0, 60, 120, 180, 240, 300];

@@ -207,6 +207,7 @@ const transportFor: (remote: ReturnType<typeof server>) => RecordingTransport = 
   redeemInvite: unused,
   searchVenues: unused,
   venue: unused,
+  resolveVenue: unused,
 });
 
 const memoryKeys: () => ActorKeyStorage = () => {

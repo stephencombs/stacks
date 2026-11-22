@@ -19,7 +19,8 @@ import {
 import { playerTrip, tripStandings } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";

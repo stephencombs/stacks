@@ -10,7 +10,8 @@ import {
   type RecordingGrouping,
 } from "@stacks/client-runtime/recordingView";
 import { useRef, useState } from "react";
-import { Platform, Text, View, type ScrollViewInstance } from "react-native";
+import { Platform, View, type ScrollViewInstance } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";

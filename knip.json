@@ -5,11 +5,7 @@
   "ignore": [".agents/skills/**", "apps/mobile/maestro/scripts/**", "tools/oxlint/anti-slop/**"],
   "workspaces": {
     "apps/mobile": {
-      "entry": ["plugins/*.ts"],
-      "ignoreDependencies": [
-        "@expo-google-fonts/barlow-condensed",
-        "@expo-google-fonts/jetbrains-mono"
-      ]
+      "entry": ["plugins/*.ts"]
     }
   }
 }

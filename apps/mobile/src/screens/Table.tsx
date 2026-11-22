@@ -20,7 +20,8 @@ import { TableId, type EntryId, type VisitId } from "@stacks/contracts";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import { useLayoutEffect, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";

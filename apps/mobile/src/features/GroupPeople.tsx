@@ -10,7 +10,8 @@ import { newId } from "@stacks/client-runtime/ids";
 import { chipOf } from "@stacks/client-runtime/trip";
 import { setStringAsync } from "expo-clipboard";
 import { useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { confirmAction } from "../components/ui/confirmAction";
 import { Button } from "../components/ui/Button";
@@ -236,7 +237,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
 
                 return (
                   <Row key={invite.id} className="flex-col items-stretch gap-2">
-                    <Text selectable numberOfLines={1} className="font-mono text-sm text-ink">
+                    <Text selectable numberOfLines={1} className="tabular-nums text-sm text-ink">
                       {url}
                     </Text>
                     <Text className="text-sm text-muted">

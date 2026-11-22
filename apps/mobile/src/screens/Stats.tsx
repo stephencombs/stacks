@@ -10,14 +10,23 @@ import {
   type StatsFilters,
 } from "@stacks/client-runtime/stats";
 import { tripNames } from "@stacks/client-runtime/trip";
-import { GroupId, TripId, VisitId, type GroupListItem, type Trip } from "@stacks/contracts";
+import {
+  GroupId,
+  MinorUnits,
+  TripId,
+  VisitId,
+  type GroupListItem,
+  type Trip,
+} from "@stacks/contracts";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
-import { PanResponder, Platform, Pressable, Text, View } from "react-native";
+import { PanResponder, Platform, Pressable, View } from "react-native";
+import { Text } from "../components/ui/Text";
 import Svg, {
   Circle,
   ClipPath,
   Defs,
+  G,
   Line,
   Path,
   Polyline,
@@ -28,6 +37,7 @@ import { useCSSVariable } from "uniwind";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
+import { chartCurve } from "../components/ui/chartCurve";
 import { FilterChip } from "../components/ui/FilterChip";
 import { EmptyState, List, Row, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
@@ -48,7 +58,7 @@ import {
   signed,
 } from "../features/StatsParts";
 import { useAccount } from "../lib/account";
-import { usePreferences } from "../lib/preferences";
+import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { StacksProvider, useStacks, useStatsCopies } from "../lib/stacks";
 
 type Summary = Extract<PersonalStatsView, { kind: "stats" }>;
@@ -328,13 +338,15 @@ function JustMe({
               centered
               title="Your stats start here"
               action={
-                <Button
-                  label="Add a past session"
-                  variant="primary"
-                  size="lg"
-                  className="mt-2 self-stretch"
-                  onPress={() => setAdding(true)}
-                />
+                <View className="gap-2 self-stretch">
+                  <EmptyChartGrid />
+                  <Button
+                    label="Add a past session"
+                    variant="primary"
+                    size="lg"
+                    onPress={() => setAdding(true)}
+                  />
+                </View>
               }
             >
               Add a finished session to see your result, hours and games here.
@@ -523,15 +535,36 @@ function Breakdown({
   );
 }
 
-const HEIGHT = 64;
+const HEIGHT = 100;
 const PAD = { x: 6, y: 6 };
 const CALLOUT = 196;
+
+function EmptyChartGrid() {
+  const rule = String(useCSSVariable("--color-fill-strong"));
+
+  return (
+    <Svg width="100%" height={72} accessibilityElementsHidden importantForAccessibility="no">
+      {[12, 36, 60].map((y) => (
+        <Line
+          key={y}
+          x1={0}
+          x2="100%"
+          y1={y}
+          y2={y}
+          stroke={rule}
+          strokeLinecap="round"
+          strokeDasharray="0.3 3.5"
+        />
+      ))}
+    </Svg>
+  );
+}
 
 function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
   const android = Platform.OS === "android";
   const height = android ? 84 : HEIGHT;
 
-  const [win, loss, winTint, lossTint, rule, surface, muted, fill] = useCSSVariable([
+  const [win, loss, winTint, lossTint, rule, surface, muted, fill, blue] = useCSSVariable([
     "--color-win",
     "--color-loss",
     "--color-win-tint",
@@ -540,6 +573,7 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
     "--color-surface",
     "--color-muted",
     "--color-fill",
+    "--color-chip-blue",
   ]).map(String);
 
   const prefs = usePreferences();
@@ -547,7 +581,9 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
   const [inspect, setInspect] = useState<number | null>(null);
   const { points } = chart;
   const last = points.length - 1;
-  const plot = runningLine(points, { width, height }, PAD);
+  const leading = android ? 0 : 46;
+  const plot = runningLine(points, { width: Math.max(width - leading, 2 * PAD.x), height }, PAD);
+  const nearest = (x: number) => plot.nearest(x - leading);
   const up = prefs.privacyMode ? muted : win;
   const down = prefs.privacyMode ? muted : loss;
   const axis = android ? chart.androidAxis : chart;
@@ -557,28 +593,29 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
     ? PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
           Math.abs(gesture.dx) > 4 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
-        onPanResponderGrant: (event) => setInspect(plot.nearest(event.nativeEvent.locationX)),
-        onPanResponderMove: (event) => setInspect(plot.nearest(event.nativeEvent.locationX)),
+        onPanResponderGrant: (event) => setInspect(nearest(event.nativeEvent.locationX)),
+        onPanResponderMove: (event) => setInspect(nearest(event.nativeEvent.locationX)),
       }).panHandlers
     : {
         onStartShouldSetResponder: () => true,
         onMoveShouldSetResponder: () => true,
         onResponderTerminationRequest: () => false,
         onResponderGrant: (event: import("react-native").GestureResponderEvent) =>
-          setInspect(plot.nearest(event.nativeEvent.locationX)),
+          setInspect(nearest(event.nativeEvent.locationX)),
         onResponderMove: (event: import("react-native").GestureResponderEvent) =>
-          setInspect(plot.nearest(event.nativeEvent.locationX)),
+          setInspect(nearest(event.nativeEvent.locationX)),
       };
 
   const shown = inspect === null ? null : points[inspect]!;
   const dot = plot.points[inspect ?? last];
+  const dotX = (dot?.x ?? 0) + leading;
   const total = (shown ?? points[last]!).total;
   const step = (by: number) => setInspect(Math.min(last, Math.max(0, (inspect ?? last) + by)));
 
   const callout =
     dot && shown
       ? Math.min(
-          Math.max(0, dot.x < width / 2 ? dot.x + 12 : dot.x - 12 - calloutWidth),
+          Math.max(0, dotX < width / 2 ? dotX + 12 : dotX - 12 - calloutWidth),
           Math.max(0, width - calloutWidth),
         )
       : 0;
@@ -616,7 +653,23 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
         }
         {...drag}
       >
-        {width > 0 ? (
+        {width > leading && !android ? (
+          <Svg width={width} height={height} pointerEvents="none">
+            <IOSRunningPlot
+              width={width}
+              height={height}
+              leading={leading}
+              points={points}
+              plot={plot}
+              dot={dot}
+              inspecting={inspect !== null}
+              color={(prefs.privacyMode ? muted : blue)!}
+              muted={muted!}
+              surface={surface!}
+              rule={rule!}
+            />
+          </Svg>
+        ) : width > 0 && android ? (
           <Svg width={width} height={height} pointerEvents="none">
             <Defs>
               <ClipPath id="up">
@@ -719,5 +772,100 @@ function RunningChart({ chart }: { chart: NonNullable<Summary["chart"]> }) {
         </Text>
       </View>
     </View>
+  );
+}
+
+function IOSRunningPlot({
+  width,
+  height,
+  leading,
+  points,
+  plot,
+  dot,
+  inspecting,
+  color,
+  muted,
+  surface,
+  rule,
+}: {
+  width: number;
+  height: number;
+  leading: number;
+  points: ReadonlyArray<{ total: number }>;
+  plot: ReturnType<typeof runningLine>;
+  dot: { x: number; y: number } | undefined;
+  inspecting: boolean;
+  color: string;
+  muted: string;
+  surface: string;
+  rule: string;
+}) {
+  const prefs = usePreferences();
+
+  const { low, high } = points.reduce(
+    (extent, { total }) => ({
+      low: Math.min(extent.low, total),
+      high: Math.max(extent.high, total),
+    }),
+    { low: 0, high: 0 },
+  );
+
+  const ticks =
+    high === low
+      ? [{ y: plot.zero, value: 0 }]
+      : [high, Math.round((low + high) / 2), low].map((value, index) => ({
+          value,
+          y: PAD.y + (index * (height - 2 * PAD.y)) / 2,
+        }));
+
+  return (
+    <>
+      {ticks.map(({ value, y }) => (
+        <G key={y}>
+          <Line
+            x1={leading}
+            x2={width - PAD.x}
+            y1={y}
+            y2={y}
+            stroke={rule}
+            strokeWidth={1.2}
+            strokeLinecap="round"
+            strokeDasharray="0.3 3.5"
+          />
+          {!prefs.privacyMode ? (
+            <SvgText
+              x={leading - 5}
+              y={Math.max(10, Math.min(height - 2, y + 4))}
+              textAnchor="end"
+              fontSize={11}
+              fontFamily="Allo"
+              fill={muted}
+            >
+              {formatDisplayMoney(MinorUnits.make(value), RECORDING_CURRENCY, {
+                ...prefs,
+                showCents: false,
+              })}
+            </SvgText>
+          ) : null}
+        </G>
+      ))}
+      <G transform={`translate(${leading} 0)`}>
+        <Path
+          d={chartCurve(plot.points)}
+          stroke={color}
+          strokeWidth={2}
+          strokeLinecap="round"
+          fill="none"
+        />
+        {dot ? (
+          <>
+            {inspecting ? (
+              <Line x1={dot.x} x2={dot.x} y1={0} y2={height} stroke={muted} strokeDasharray="3 3" />
+            ) : null}
+            <Circle cx={dot.x} cy={dot.y} r={4.5} fill={surface} stroke={color} strokeWidth={2} />
+          </>
+        ) : null}
+      </G>
+    </>
   );
 }

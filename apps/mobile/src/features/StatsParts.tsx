@@ -1,3 +1,4 @@
+import { barTrack } from "@stacks/client-runtime/chart";
 import {
   TOP_CASINOS,
   finishedSessions,
@@ -8,8 +9,11 @@ import {
 } from "@stacks/client-runtime/stats";
 import { MinorUnits, type CurrencyCode } from "@stacks/contracts";
 import { useState, type ReactNode } from "react";
-import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, View } from "react-native";
+import { Text } from "../components/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Line, Path } from "react-native-svg";
+import { useCSSVariable } from "uniwind";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
@@ -362,6 +366,7 @@ export function ByGame({
 }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
+  const track = barTrack(rows.map((row) => row.result));
 
   return (
     <View className="gap-2">
@@ -391,20 +396,19 @@ export function ByGame({
                 {row.meta}
               </Text>
             </View>
-            <View
-              className={cn(
-                "overflow-hidden rounded-full bg-fill",
-                android ? "h-1.5 w-15" : "h-1.5 w-10",
-              )}
-            >
-              <View
-                className={cn(
-                  "h-full rounded-full",
-                  prefs.privacyMode ? "bg-fill-strong" : row.result < 0 ? "bg-loss" : "bg-win",
-                )}
-                style={{ width: `${row.share * 100}%` }}
-              />
-            </View>
+            {android ? (
+              <View className="h-1.5 w-15 overflow-hidden rounded-full bg-fill">
+                <View
+                  className={cn(
+                    "h-full rounded-full",
+                    prefs.privacyMode ? "bg-fill-strong" : row.result < 0 ? "bg-loss" : "bg-win",
+                  )}
+                  style={{ width: `${row.share * 100}%` }}
+                />
+              </View>
+            ) : (
+              <ResultBar result={row.result} track={track} hidden={prefs.privacyMode} />
+            )}
             <Money
               amount={row.result}
               currency={currency}
@@ -513,6 +517,7 @@ function CasinoRows({
 }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
+  const track = barTrack(rows.map((row) => row.result));
 
   return (
     <List className={inSheet ? "bg-fill" : undefined}>
@@ -530,11 +535,64 @@ function CasinoRows({
             </Text>
             <Text className="type-footnote text-muted">{row.meta}</Text>
           </View>
-          <Money amount={row.result} currency={currency} tone="result" className="type-number" />
-          <Icon name="chevron-right" color="faint" size={16} />
+          {!android ? (
+            <ResultBar result={row.result} track={track} hidden={prefs.privacyMode} />
+          ) : null}
+          <Money
+            amount={row.result}
+            currency={currency}
+            tone="result"
+            className={android ? "type-number" : "min-w-18 text-right font-semibold"}
+          />
+          {android ? <Icon name="chevron-right" color="faint" size={16} /> : null}
         </Row>
       ))}
     </List>
+  );
+}
+
+function ResultBar({
+  result,
+  track,
+  hidden,
+}: {
+  result: number;
+  track: ReturnType<typeof barTrack>;
+  hidden: boolean;
+}) {
+  const [rule, win, loss] = useCSSVariable([
+    "--color-fill-strong",
+    "--color-win",
+    "--color-loss",
+  ]).map(String);
+
+  const zero = 5 + track.zero * 90;
+  const sign = result < 0 ? -1 : 1;
+  const length = track.extent(result) * 90;
+  const end = zero + sign * length;
+  const radius = Math.min(4, length);
+  const shoulder = end - sign * radius;
+
+  return (
+    <View className="w-[26%] max-w-25" accessibilityElementsHidden importantForAccessibility="no">
+      <Svg width="100%" height={16} viewBox="0 0 100 16">
+        <Line
+          x1={zero}
+          y1={0}
+          x2={zero}
+          y2={16}
+          stroke={rule}
+          strokeLinecap="round"
+          strokeDasharray="0.3 3.5"
+        />
+        {length > 0 ? (
+          <Path
+            d={`M${zero} 4H${shoulder}Q${end} 4 ${end} 8Q${end} 12 ${shoulder} 12H${zero}Z`}
+            fill={hidden ? rule : result < 0 ? loss : win}
+          />
+        ) : null}
+      </Svg>
+    </View>
   );
 }
 

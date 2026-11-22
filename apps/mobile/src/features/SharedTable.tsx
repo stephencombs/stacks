@@ -10,7 +10,8 @@ import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import type { PlayerId, PlayerIdentity, TableId, VisitId } from "@stacks/contracts";
 import * as Match from "effect/Match";
 import { useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { confirmAction } from "../components/ui/confirmAction";
@@ -166,7 +167,7 @@ export function ShareSheet({ tableId, onClose }: { tableId: TableId; onClose: ()
           </>
         ) : url ? (
           <>
-            <Text selectable className="rounded-lg bg-fill px-3 py-2 font-mono text-sm text-ink">
+            <Text selectable className="rounded-lg bg-fill px-3 py-2 tabular-nums text-sm text-ink">
               {url}
             </Text>
             <Button
@@ -461,7 +462,7 @@ function InviteSheet({ player, onClose }: { player: PlayerIdentity; onClose: () 
       <View className="gap-3">
         {url ? (
           <>
-            <Text selectable className="rounded-lg bg-fill px-3 py-2 font-mono text-sm text-ink">
+            <Text selectable className="rounded-lg bg-fill px-3 py-2 tabular-nums text-sm text-ink">
               {url}
             </Text>
             <Button

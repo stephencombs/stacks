@@ -13,7 +13,8 @@ import { gameChip } from "@stacks/client-runtime/stats";
 import { MinorUnits, type VisitId } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { ActionMenu } from "../components/ui/ActionMenu";
@@ -21,7 +22,7 @@ import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
-import { PersonalScreen, SaveStatus } from "../features/Personal";
+import { PersonalScreen, PlayBrand, SaveStatus } from "../features/Personal";
 import { PastSessionSheet, StartSheet } from "../features/RecordingForms";
 import { chipColor } from "../features/chipColor";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
@@ -46,6 +47,7 @@ export function HomeScreen() {
   return (
     <PersonalScreen
       live
+      topSafeArea={Platform.OS === "ios"}
       contentClassName={Platform.OS === "android" ? "gap-4 pt-2" : undefined}
       fab={
         <ActionMenu
@@ -59,6 +61,11 @@ export function HomeScreen() {
         />
       }
     >
+      {Platform.OS === "ios" ? (
+        <View className="h-11 justify-center">
+          <PlayBrand />
+        </View>
+      ) : null}
       <SaveStatus status={status} error={error} onRetry={retryLoad} />
       {home === null ? (
         status === "load_failed" ? null : (

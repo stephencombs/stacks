@@ -30,10 +30,14 @@ vi.mock("react-native", () => ({
       {children}
     </button>
   ),
+  ActivityIndicator: () => null,
   Switch: () => null,
   Text: Container,
+  TextInput: () => null,
   View: Container,
 }));
+
+vi.mock("uniwind", () => ({ useCSSVariable: () => "#999999" }));
 
 vi.mock("expo-location", () => ({
   Accuracy: { Balanced: 3 },
@@ -97,6 +101,24 @@ vi.mock("../components/ui/Icon", () => ({ Icon: () => null }));
 vi.mock("../components/ui/DateTimeField", () => ({ DateTimeField: () => null }));
 
 vi.mock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
+
+vi.mock("../components/ui/ControlSurface", () => ({ ControlSurface: Container }));
+
+vi.mock("../components/ui/PressableScale", () => ({
+  PressableScale: ({
+    accessibilityLabel,
+    onPress,
+    children,
+  }: {
+    accessibilityLabel?: string;
+    onPress?: () => void;
+    children?: ReactNode;
+  }) => (
+    <button type="button" aria-label={accessibilityLabel} onClick={onPress}>
+      {children}
+    </button>
+  ),
+}));
 
 vi.mock("../components/ui/Surface", () => ({
   List: Container,
@@ -277,7 +299,7 @@ it("preserves the entered buy-in when backing out of the start session casino sh
     await click('button[aria-label="Casino: Not set. Change"]');
     expect(host.querySelector('section[aria-label="Casino"]')).not.toBeNull();
     expect(host.querySelector('section[aria-label="Start session"]')).toBeNull();
-    await click('section[aria-label="Casino"] button');
+    await click('section[aria-label="Casino"] button[aria-label="Close"]');
     await click('section[aria-label="Start session"] [data-testid="sheet-submit"]');
     expect(started).toHaveBeenCalledOnce();
     expect(store.getSnapshot().state?.entries[0]?.amount).toBe(500);

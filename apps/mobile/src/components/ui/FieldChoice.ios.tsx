@@ -3,7 +3,8 @@ import { Picker, Text } from "@expo/ui/swift-ui";
 import { accessibilityLabel, frame, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
 import * as Predicate from "effect/Predicate";
 import { use } from "react";
-import { Text as NativeText, View, useWindowDimensions } from "react-native";
+import { View, useWindowDimensions } from "react-native";
+import { Text as NativeText } from "./Text";
 import { useCSSVariable, useUniwind } from "uniwind";
 
 import { cn } from "./cn";

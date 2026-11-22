@@ -1,7 +1,8 @@
 import { reportStartupError } from "./lib/diagnostics";
 import { reloadAppAsync } from "expo";
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
+import { Text } from "./components/ui/Text";
 
 export class StartupBoundary extends Component<
   { children: ReactNode },

@@ -6,7 +6,8 @@ import type { CurrencyCode, GroupId, PlayerId, TripId } from "@stacks/contracts"
 import * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
 import { useState, type ReactNode } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";

@@ -13,7 +13,8 @@ import { StackActions, useNavigation } from "@react-navigation/native";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import type * as DateTime from "effect/DateTime";
 import { useEffect, useState, type ReactNode } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, View } from "react-native";
+import { Text } from "../components/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "../components/ui/Button";

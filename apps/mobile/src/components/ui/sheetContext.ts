@@ -9,6 +9,9 @@ export interface SheetRegistration {
   readonly footer?: ReactNode;
   readonly busy: boolean;
   readonly back: boolean;
+  readonly large: boolean;
+  readonly hideHeader: boolean;
+  readonly floatingFooter: boolean;
   readonly onClose: () => void;
   readonly children?: ReactNode;
 }

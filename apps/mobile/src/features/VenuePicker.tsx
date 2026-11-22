@@ -4,15 +4,93 @@ import { useVenueSearch } from "@stacks/client-runtime/recordingReact";
 import { venuePlace } from "@stacks/client-runtime/recordingView";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, TextInput, View } from "react-native";
+import { useCSSVariable } from "uniwind";
+import { Text } from "../components/ui/Text";
 
+import { appleMapsSearch, type AppleMapsPlace } from "../../modules/apple-maps-search/src";
 import { Button } from "../components/ui/Button";
-import { TextField } from "../components/ui/Field";
+import { ControlSurface } from "../components/ui/ControlSurface";
+import { FormError, TextField } from "../components/ui/Field";
+import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon } from "../components/ui/Icon";
+import { PressableScale } from "../components/ui/PressableScale";
 import { Sheet } from "../components/ui/Sheet";
-import { Surface } from "../components/ui/Surface";
+import { List, Row, Surface } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useDebounced } from "../lib/useDebounced";
+
+const placeDetail = (place: AppleMapsPlace) =>
+  place.address || [place.city, place.region, place.country].filter(Boolean).join(", ");
+
+const usesAppleMapsOnly = () => Platform.OS === "ios" && appleMapsSearch !== null;
+
+function CasinoSearchField({
+  value,
+  onChangeText,
+}: {
+  value: string;
+  onChangeText: (next: string) => void;
+}) {
+  return (
+    <TextField
+      label=""
+      accessibilityLabel="Search casinos"
+      value={value}
+      onChangeText={onChangeText}
+      placeholder="Search casinos"
+      autoCorrect={false}
+      returnKeyType="search"
+      inputClassName="rounded-[10px]"
+    />
+  );
+}
+
+function FloatingCasinoSearchBar({
+  value,
+  onChangeText,
+  onClose,
+}: {
+  value: string;
+  onChangeText: (next: string) => void;
+  onClose: () => void;
+}) {
+  const muted = String(useCSSVariable("--color-muted"));
+
+  return (
+    <View className="flex-row items-center gap-2.5">
+      <GlassSurface
+        radius={22}
+        interactive
+        className="h-11 flex-1 flex-row items-center gap-2 rounded-full px-3.5"
+      >
+        <Icon name="search" color="ink" size={18} />
+        <TextInput
+          accessibilityLabel="Search casinos"
+          value={value}
+          onChangeText={onChangeText}
+          placeholder="Search casinos"
+          placeholderTextColor={muted}
+          autoCorrect={false}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          className="flex-1 text-base text-ink"
+        />
+      </GlassSurface>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel="Close"
+        onPress={onClose}
+        hitSlop={6}
+        className="size-11 items-center justify-center"
+      >
+        <ControlSurface>
+          <Icon name="close" color="ink" size={18} />
+        </ControlSurface>
+      </PressableScale>
+    </View>
+  );
+}
 
 function VenueOption({
   venue,
@@ -39,18 +117,21 @@ function OptionRow({
   title,
   detail,
   selected,
+  busy = false,
   onSelect,
 }: {
   title: string;
   detail: string;
   selected: boolean;
+  busy?: boolean;
   onSelect: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="radio"
       accessibilityLabel={title}
-      accessibilityState={{ checked: selected }}
+      accessibilityState={{ checked: selected, busy }}
+      disabled={busy}
       onPress={onSelect}
       className={cn(
         "min-h-11 flex-row items-center gap-3 rounded-xl px-3 py-2.5",
@@ -58,7 +139,7 @@ function OptionRow({
       )}
     >
       <View className="min-w-0 flex-1">
-        <Text numberOfLines={1} className="text-base font-medium text-ink">
+        <Text numberOfLines={2} className="text-base font-medium text-ink">
           {title}
         </Text>
         {detail ? (
@@ -67,7 +148,11 @@ function OptionRow({
           </Text>
         ) : null}
       </View>
-      {selected ? <Icon name="check" color="ink" size={18} /> : null}
+      {busy ? (
+        <ActivityIndicator size="small" />
+      ) : selected ? (
+        <Icon name="check" color="ink" size={18} />
+      ) : null}
     </Pressable>
   );
 }
@@ -78,16 +163,30 @@ export function CasinoPickerSheet({
   onClose,
   onSelect,
   ...picker
-}: Parameters<typeof SessionVenuePicker>[0] & { onClose: () => void }) {
+}: Omit<Parameters<typeof SessionVenuePicker>[0], "query"> & { onClose: () => void }) {
+  const [text, setText] = useState("");
+  const ios = Platform.OS === "ios";
+
   return (
     <Sheet
       open
-      back
+      back={!ios}
+      large
+      hideHeader={ios}
+      floatingFooter={ios}
       title={picker.context === "default" ? "Default casino" : "Casino"}
+      footer={
+        ios ? (
+          <FloatingCasinoSearchBar value={text} onChangeText={setText} onClose={onClose} />
+        ) : (
+          <CasinoSearchField value={text} onChangeText={setText} />
+        )
+      }
       onClose={onClose}
     >
       <SessionVenuePicker
         {...picker}
+        query={text}
         onSelect={(venue) => {
           onSelect(venue);
           onClose();
@@ -104,26 +203,38 @@ const here = () =>
   );
 
 /**
- * The casino a personal session was at: nearby casinos first when location is allowed, then by
- * name as you type, and "Not listed" for none. Searching needs the network; casinos this device
- * has saved stay pickable without it. `selectedId` keeps an uncached casino distinct from none.
+ * The casino a personal session was at. On iOS, native Apple Maps (`MKLocalSearch`) is the sole
+ * search source and picking a place resolves it to a canonical venue; Android searches the catalog.
  */
 export function SessionVenuePicker({
   selectedId,
   selected,
   onSelect,
   context = "session",
+  query,
 }: {
   selectedId: VenueId | null;
   selected: CachedVenue | null;
   onSelect: (venue: CachedVenue | null) => void;
   context?: "session" | "default";
+  /** Controlled search text when the sheet pins the search bar in its footer. */
+  query?: string;
 }) {
-  const [text, setText] = useState("");
+  const [localText, setLocalText] = useState("");
+  const text = query ?? localText;
   const q = useDebounced(text.trim());
   const [near, setNear] = useState<Near | null>(null);
   const [locating, setLocating] = useState<"idle" | "busy" | "failed">("idle");
-  const search = useVenueSearch(q, near);
+  const appleOnly = usesAppleMapsOnly();
+  const search = useVenueSearch(appleOnly ? "" : q, appleOnly ? null : near);
+
+  const [appleState, setAppleState] = useState<{
+    key: string;
+    places: ReadonlyArray<AppleMapsPlace>;
+  } | null>(null);
+
+  const [resolvingKey, setResolvingKey] = useState<string | null>(null);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   const locate = async () => {
     setLocating("busy");
@@ -147,6 +258,133 @@ export function SessionVenuePicker({
       current = false;
     };
   }, []);
+
+  const appleKey = JSON.stringify([q, near?.lat ?? null, near?.lng ?? null]);
+
+  useEffect(() => {
+    if (!appleOnly || !appleMapsSearch || (!q && !near)) return;
+    let current = true;
+
+    void appleMapsSearch.searchCasinos(q, near?.lat ?? null, near?.lng ?? null).then(
+      (places) => {
+        if (current) setAppleState({ key: appleKey, places });
+      },
+      () => {
+        if (current) setAppleState({ key: appleKey, places: [] });
+      },
+    );
+
+    return () => {
+      current = false;
+    };
+  }, [appleOnly, appleKey, q, near]);
+
+  const pickApplePlace = async (place: AppleMapsPlace, key: string) => {
+    if (resolvingKey !== null) return;
+    setResolvingKey(key);
+    setResolveError(null);
+
+    try {
+      const resolved = await search.resolveVenue({
+        name: place.name,
+        city: place.city,
+        region: place.region,
+        country: place.country,
+        lat: place.lat,
+        lng: place.lng,
+      });
+
+      onSelect(resolved);
+    } catch {
+      setResolveError("Couldn't save that casino right now. Check your connection and try again.");
+    } finally {
+      setResolvingKey(null);
+    }
+  };
+
+  if (appleOnly) {
+    const appleSearching = (q !== "" || near !== null) && appleState?.key !== appleKey;
+    const applePlaces = appleState?.key === appleKey ? appleState.places : [];
+
+    return (
+      <View className="gap-3">
+        {query === undefined ? (
+          <CasinoSearchField value={localText} onChangeText={setLocalText} />
+        ) : null}
+        {near ? null : (
+          <Button
+            label="Near me"
+            size="sm"
+            className="self-start"
+            pending={locating === "busy"}
+            onPress={() => void locate()}
+          />
+        )}
+        {locating === "failed" ? (
+          <Text className="text-sm text-muted">
+            Couldn't get your location. Search by name instead.
+          </Text>
+        ) : null}
+        {resolveError ? <FormError>{resolveError}</FormError> : null}
+        {appleSearching && applePlaces.length === 0 ? (
+          <Text accessibilityLiveRegion="polite" className="px-1 text-sm text-muted">
+            Searching…
+          </Text>
+        ) : !appleSearching && applePlaces.length === 0 && (q || near) ? (
+          <Text accessibilityLiveRegion="polite" className="px-1 text-sm text-muted">
+            {q ? `No casinos match “${q}”.` : "No casinos found near you. Search by name instead."}
+          </Text>
+        ) : null}
+        {applePlaces.length > 0 || selectedId !== null ? (
+          <List>
+            {applePlaces.map((place) => {
+              const key = `${place.name}:${place.lat.toFixed(4)}:${place.lng.toFixed(4)}`;
+              const busy = resolvingKey === key;
+
+              return (
+                <Row
+                  key={key}
+                  accessibilityLabel={place.name}
+                  onPress={busy ? undefined : () => void pickApplePlace(place, key)}
+                  className="py-4"
+                >
+                  <View className="min-w-0 flex-1 gap-0.5">
+                    <Text numberOfLines={2} className="type-heading text-ink">
+                      {place.name}
+                    </Text>
+                    {placeDetail(place) ? (
+                      <Text numberOfLines={1} className="type-footnote text-muted">
+                        {placeDetail(place)}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {busy ? <ActivityIndicator size="small" /> : null}
+                </Row>
+              );
+            })}
+            {selectedId !== null ? (
+              <Row
+                accessibilityLabel={context === "default" ? "Not set" : "Not listed"}
+                onPress={() => onSelect(null)}
+                className="py-4"
+              >
+                <View className="min-w-0 flex-1 gap-0.5">
+                  <Text className="type-heading text-ink">
+                    {context === "default" ? "Not set" : "Not listed"}
+                  </Text>
+                  <Text className="type-footnote text-muted">
+                    {context === "default"
+                      ? "Start new sessions without a casino"
+                      : "Keep this session without a casino"}
+                  </Text>
+                </View>
+              </Row>
+            ) : null}
+          </List>
+        ) : null}
+      </View>
+    );
+  }
 
   const shown =
     selected && !search.venues.some((venue) => venue.id === selected.id)
@@ -175,15 +413,9 @@ export function SessionVenuePicker({
 
   return (
     <View className="gap-3">
-      <TextField
-        label="Search casinos"
-        value={text}
-        onChangeText={setText}
-        placeholder="Search casinos"
-        autoCorrect={false}
-        returnKeyType="search"
-        inputClassName="rounded-[10px]"
-      />
+      {query === undefined ? (
+        <CasinoSearchField value={localText} onChangeText={setLocalText} />
+      ) : null}
       {near ? null : (
         <Button
           label="Near me"

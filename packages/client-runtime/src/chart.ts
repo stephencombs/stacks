@@ -149,6 +149,38 @@ export const placeLabel: (
   return { x: at, anchor: "middle" };
 };
 
+/** Keep the first and last readable, then fill gaps with the marks that fit. */
+export function fitAxisLabels(
+  marks: ReadonlyArray<{ index: number; label: string; x: number }>,
+  fontSize: number,
+  bounds: { min: number; max: number },
+) {
+  const placed = marks.map((mark) => {
+    const width = labelWidth(mark.label, fontSize);
+    const { x, anchor } = placeLabel(mark.x, width, bounds);
+    const left = x - { start: 0, middle: 0.5, end: 1 }[anchor] * width;
+
+    return { index: mark.index, label: mark.label, x, anchor, left, right: left + width };
+  });
+
+  const first = placed[0];
+  const last = placed.at(-1);
+
+  if (!first || !last) return [];
+
+  if (first === last || first.right + 4 > last.left) return [first];
+
+  const visible = [first];
+
+  for (const mark of placed.slice(1, -1)) {
+    if (mark.left >= visible.at(-1)!.right + 4 && mark.right + 4 <= last.left) {
+      visible.push(mark);
+    }
+  }
+
+  return [...visible, last];
+}
+
 /**
  * One running total drawn against time: each point sits at when it happened, and the line starts
  * at break-even at the first point's time. Points that all share one time spread evenly instead.

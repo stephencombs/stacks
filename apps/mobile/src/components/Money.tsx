@@ -1,5 +1,5 @@
 import { MinorUnits, type CurrencyCode } from "@stacks/contracts";
-import { Text } from "react-native";
+import { Text } from "./ui/Text";
 
 import { formatDisplayMoney, HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
 import { cn } from "./ui/cn";

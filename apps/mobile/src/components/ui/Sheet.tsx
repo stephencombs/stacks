@@ -9,13 +9,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
   useWindowDimensions,
   type LayoutChangeEvent,
   type ScrollViewInstance,
 } from "react-native";
+import { Text } from "./Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "./Icon";
@@ -40,6 +40,9 @@ export function Sheet({
   footer,
   busy = false,
   back = false,
+  large = false,
+  hideHeader: _hideHeader = false,
+  floatingFooter: _floatingFooter = false,
   children,
 }: {
   open: boolean;
@@ -52,6 +55,12 @@ export function Sheet({
   busy?: boolean;
   /** Shows a back chevron/arrow instead of Close when stacked onto another sheet. */
   back?: boolean;
+  /** Opens at a fixed full height instead of resizing as dynamic content loads. */
+  large?: boolean;
+  /** Hides the top header bar on iOS sheets that supply their own close control. */
+  hideHeader?: boolean;
+  /** Floats the footer over the scroll content on iOS. */
+  floatingFooter?: boolean;
   children?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -161,7 +170,11 @@ export function Sheet({
         >
           <View
             className="overflow-hidden rounded-t-[28px] border border-b-0 border-line bg-canvas"
-            style={{ maxHeight: screenHeight - insets.top - 8, paddingBottom: bottom }}
+            style={{
+              maxHeight: screenHeight - insets.top - 8,
+              ...(large ? { height: screenHeight - insets.top - 8 } : null),
+              paddingBottom: bottom,
+            }}
           >
             <View className="items-center pt-3">
               <View className="h-1 w-8 rounded-full bg-fill-strong" />

@@ -17,7 +17,8 @@ import {
   semantics,
 } from "@expo/ui/jetpack-compose/modifiers";
 import { useEffect, useState } from "react";
-import { Text as NativeText, View, useWindowDimensions } from "react-native";
+import { View, useWindowDimensions } from "react-native";
+import { Text as NativeText } from "./Text";
 
 import { ComposeHost as Host } from "./ComposeHost.android";
 import type { FieldChoiceProps } from "./FieldChoice";

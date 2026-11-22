@@ -1,5 +1,6 @@
 import { createContext, use, useEffect, useRef, useState, type ReactNode } from "react";
-import { Platform, AccessibilityInfo, Animated, Pressable, Text, View } from "react-native";
+import { Platform, AccessibilityInfo, Animated, Pressable, View } from "react-native";
+import { Text } from "./Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { animate, duration, ease, useReducedMotion } from "./motion";

@@ -4,11 +4,12 @@ import {
   CurrentUser,
   InvalidRequest,
   NotFound,
+  VenueId,
   type CreateVenueRequest,
   type GroupId,
+  type ResolvePublicVenueRequest,
   type SearchVenuesQuery,
   type SearchPublicVenuesQuery,
-  type VenueId,
 } from "@stacks/contracts";
 
 import { VenueRow } from "../db/rows.ts";
@@ -92,6 +93,64 @@ const findVisible = Effect.fn("Venues.findVisible")(function* (
 
 export const getPublic = Effect.fn("Venues.getPublic")(function* (venueId: VenueId) {
   return yield* findVisible(venueId, null);
+});
+
+/**
+ * Matches an Apple Maps / external casino pick to an existing public catalog venue, or inserts
+ * a new public casino row so solo and group sessions share one canonical VenueId.
+ */
+export const resolvePublic = Effect.fn("Venues.resolvePublic")(function* (
+  request: typeof ResolvePublicVenueRequest.Type,
+) {
+  const sql = yield* SqlClient.SqlClient;
+
+  const [existing] = yield* sql`
+    select ${venueColumns(sql)} from venues v
+    where v.group_id is null
+      and v.merged_into_id is null
+      and lower(v.name) = lower(${request.name})
+      and (
+        (
+          v.lat is not null
+          and v.lng is not null
+          and abs(v.lat - ${request.lat}) < 0.01
+          and abs(v.lng - ${request.lng}) < 0.01
+        )
+        or (
+          coalesce(lower(v.city), '') = coalesce(lower(${request.city}), '')
+          and coalesce(lower(v.region), '') = coalesce(lower(${request.region}), '')
+        )
+      )
+    order by (v.verified_at is not null) desc, v.created_at asc
+    limit 1
+  `.pipe(Effect.flatMap(Access.decodeRows(VenueRow)));
+
+  if (existing) return existing;
+
+  const id = VenueId.make(crypto.randomUUID());
+
+  yield* sql`
+    insert into venues (id, name, kind, city, region, country, lat, lng, source)
+    values (
+      ${id},
+      ${request.name},
+      'casino',
+      ${request.city},
+      ${request.region},
+      ${request.country},
+      ${request.lat},
+      ${request.lng},
+      'user'
+    )
+  `;
+
+  const [created] = yield* sql`
+    select ${venueColumns(sql)} from venues v where v.id = ${id}
+  `.pipe(Effect.flatMap(Access.decodeRows(VenueRow)));
+
+  if (!created) return yield* new InvalidRequest({ message: "Could not save venue." });
+
+  return created;
 });
 
 /**

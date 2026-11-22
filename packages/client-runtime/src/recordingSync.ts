@@ -5,6 +5,7 @@ import {
   type PlayEntry,
   type PlayerIdentity,
   type PlayerInviteId,
+  type ResolvePublicVenueRequest,
   type SearchPublicVenuesQuery,
   type TableId,
   type UserId,
@@ -115,6 +116,10 @@ export interface RecordingTransport {
   ) => Effect.Effect<ReadonlyArray<Venue>, unknown>;
   /** One public venue, for a table that names one this device hasn't cached. */
   readonly venue: (venueId: VenueId) => Effect.Effect<Venue, unknown>;
+  /** Matches or creates a public casino venue from an Apple Maps / external place pick. */
+  readonly resolveVenue: (
+    payload: typeof ResolvePublicVenueRequest.Type,
+  ) => Effect.Effect<Venue, unknown>;
 }
 
 /** Whether the server has the table, so it can be shared. */
@@ -976,6 +981,8 @@ export const makeRecordingSync = (
     unshare: (tableId: TableId) => sharing(tableId, transport.unshare),
     searchVenues: (query: typeof SearchPublicVenuesQuery.Type) =>
       Effect.runPromise(transport.searchVenues(query)),
+    resolveVenue: (payload: typeof ResolvePublicVenueRequest.Type) =>
+      Effect.runPromise(transport.resolveVenue(payload)),
     table: (tableId: TableId) => online((actor) => transport.table(tableId, actor)),
     invitePlayer: (playerId: PlayerId) =>
       online((actor) => transport.invitePlayer(playerId, actor)),

@@ -26,7 +26,8 @@ import { shortName } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
 import type * as DateTime from "effect/DateTime";
 import { use, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { ActionMenu } from "../components/ui/ActionMenu";

@@ -8,7 +8,8 @@ import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import { useEffect, useState } from "react";
-import { Platform, Text } from "react-native";
+import { Platform } from "react-native";
+import { Text } from "../components/ui/Text";
 
 import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";

@@ -6,14 +6,15 @@ import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
 import type {
   GroupId,
+  ResolvePublicVenueRequest,
   SearchPublicVenuesQuery,
   SessionId,
   TripId,
-  VenueId,
 } from "@stacks/contracts";
 import type { ActorCredential } from "@stacks/contracts/recordingCommands";
-import { StacksApi } from "@stacks/contracts";
+import { StacksApi, VenueId } from "@stacks/contracts";
 
+import { newId } from "./ids.ts";
 import type { RecordingTransport } from "./recordingSync.ts";
 
 /**
@@ -87,6 +88,10 @@ export const makeRecordingTransport: (options: StacksClientOptions) => Recording
       ),
     searchVenues: (query) => searchPublicVenues({ baseUrl }, query),
     venue: (venueId) => fetchPublicVenue({ baseUrl }, venueId),
+    resolveVenue: (payload) =>
+      resolvePublicVenue({ baseUrl }, payload).pipe(
+        Effect.catch(() => fallbackResolveVenue({ baseUrl, getToken }, payload)),
+      ),
   };
 };
 
@@ -127,6 +132,68 @@ export const fetchPublicVenue = (
     Effect.flatMap((api) => api.publicVenues.get({ params: { venueId } })),
     Effect.provide(FetchHttpClient.layer),
   );
+
+const resolvePublicVenue = (
+  { baseUrl }: Pick<StacksClientOptions, "baseUrl">,
+  payload: typeof ResolvePublicVenueRequest.Type,
+) =>
+  HttpApiClient.make(StacksApi, { baseUrl }).pipe(
+    Effect.flatMap((api) => api.publicVenues.resolve({ payload })),
+    Effect.provide(FetchHttpClient.layer),
+  );
+
+const norm = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+
+const fallbackResolveVenue = (
+  { baseUrl, getToken }: StacksClientOptions,
+  payload: typeof ResolvePublicVenueRequest.Type,
+) =>
+  Effect.gen(function* () {
+    const matches = yield* searchPublicVenues({ baseUrl }, { q: payload.name }).pipe(
+      Effect.catch(() => Effect.succeed([])),
+    );
+
+    const existing = matches.find(
+      (venue) =>
+        norm(venue.name) === norm(payload.name) &&
+        ((venue.lat !== null &&
+          venue.lng !== null &&
+          Math.abs(venue.lat - payload.lat) < 0.01 &&
+          Math.abs(venue.lng - payload.lng) < 0.01) ||
+          (norm(venue.city) === norm(payload.city) && norm(venue.region) === norm(payload.region))),
+    );
+
+    if (existing) {
+      return {
+        ...existing,
+        lat: existing.lat ?? payload.lat,
+        lng: existing.lng ?? payload.lng,
+      };
+    }
+
+    const api = yield* HttpApiClient.make(StacksApi, {
+      baseUrl,
+      transformClient: withToken(getToken),
+    }).pipe(Effect.provide(FetchHttpClient.layer));
+
+    const created = yield* api.venues.create({
+      payload: {
+        id: VenueId.make(newId()),
+        name: payload.name,
+        kind: "casino",
+        city: payload.city,
+        region: payload.region,
+        country: payload.country,
+        groupId: null,
+      },
+    });
+
+    return {
+      ...created,
+      lat: created.lat ?? payload.lat,
+      lng: created.lng ?? payload.lng,
+    };
+  });
 
 export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => {
   class StacksClient extends AtomHttpApi.Service<StacksClient>()("@stacks/StacksClient", {
