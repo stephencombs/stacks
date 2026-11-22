@@ -1,5 +1,5 @@
 import { Host } from "@expo/ui";
-import { Button, Menu } from "@expo/ui/swift-ui";
+import { Button, Image, Menu } from "@expo/ui/swift-ui";
 import {
   accessibilityLabel,
   buttonBorderShape,
@@ -8,7 +8,7 @@ import {
   disabled as disable,
   foregroundStyle,
   frame,
-  labelStyle,
+  menuIndicator,
   tint,
 } from "@expo/ui/swift-ui/modifiers";
 import * as Predicate from "effect/Predicate";
@@ -38,12 +38,17 @@ export function ActionMenu({
       seedColor={menuInk}
     >
       <Menu
-        label={label}
-        systemImage={fab ? "plus" : "ellipsis"}
+        label={
+          <Image
+            systemName={fab ? "plus" : "ellipsis"}
+            size={fab ? 22 : 18}
+            modifiers={[frame({ width: 24, height: 24 })]}
+          />
+        }
         modifiers={[
           buttonStyle(glass ? "glass" : "bordered"),
           buttonBorderShape("circle"),
-          labelStyle("iconOnly"),
+          menuIndicator("hidden"),
           ...(triggerInk
             ? felt
               ? [foregroundStyle(triggerInk)]
