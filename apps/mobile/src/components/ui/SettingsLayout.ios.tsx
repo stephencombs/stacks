@@ -13,7 +13,7 @@ import { useCSSVariable, useUniwind } from "uniwind";
 
 import { LiveBar } from "../../features/LiveBar";
 import { useNativeHeaderActions } from "../../features/NativeHeaderActions";
-import { TabBarHeight } from "./tabBar";
+import { LiveAccessoryHeight, TabBarHeight } from "./tabBar";
 import type { SettingsLayoutProps } from "./SettingsLayout";
 
 export function SettingsLayout({ groupName, currency, sections }: SettingsLayoutProps) {
@@ -29,7 +29,9 @@ export function SettingsLayout({ groupName, currency, sections }: SettingsLayout
   ]).map(String);
 
   const bar = use(TabBarHeight);
-  const [liveBarHeight, setLiveBarHeight] = useState(0);
+  const accessoryHeight = use(LiveAccessoryHeight);
+  const [pinnedHeight, setLiveBarHeight] = useState(0);
+  const liveBarHeight = pinnedHeight + accessoryHeight;
 
   return (
     <View className="flex-1 bg-canvas">

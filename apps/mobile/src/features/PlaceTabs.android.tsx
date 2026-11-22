@@ -1,5 +1,6 @@
 import type { Theme } from "@react-navigation/native";
 import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/unstable";
+import type { ReactNode } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export const createPlaceTabs = createNativeBottomTabNavigator;
@@ -18,6 +19,10 @@ export const placeTabsConfig = {
     tabBarStyle: { backgroundColor: theme.tabSurface },
   }),
 };
+
+export function PlaceTabsAccessory({ children }: { children: ReactNode }) {
+  return children;
+}
 
 const drawables = {
   Play: "tab_play",

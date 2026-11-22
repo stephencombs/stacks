@@ -7,6 +7,12 @@ import { FAB_ROOM } from "./FloatingAction";
 /** How tall the tab bar is under the current screen: zero outside the places. */
 export const TabBarHeight = createContext(0);
 
+/** How tall the iOS 26 tab bar's LiveBar accessory is when it shows above the tab bar. */
+export const LIVE_ACCESSORY_HEIGHT = 56;
+
+/** The room the native LiveBar accessory takes above the tab bar: zero unless it shows. */
+export const LiveAccessoryHeight = createContext(0);
+
 type FootInput = {
   platform: string;
   /** The tab bar, or zero. */
@@ -18,13 +24,25 @@ type FootInput = {
   fab: boolean;
   /** The LiveBar's height, or zero. */
   live: number;
+  /** The native tab accessory above the tab bar, or zero. It stacks like a LiveBar. */
+  accessory: number;
   /** Room under a footer's buttons beyond the bar or inset. */
   footerGap: number;
 };
 
 /** The arithmetic behind `useScreenFoot`, apart from the state, for tests. */
-export function screenFoot({ platform, bar, inset, footer, fab, live, footerGap }: FootInput) {
+export function screenFoot({
+  platform,
+  bar,
+  inset,
+  footer,
+  fab,
+  live: pinned,
+  accessory,
+  footerGap,
+}: FootInput) {
   const android = platform === "android";
+  const live = pinned + accessory;
   const floating = live > 0 ? live + 8 : 0;
   const base = footer ?? bar;
 
@@ -53,6 +71,7 @@ export function useScreenFoot({
   footerGap = 0,
 }: { footer?: boolean; fab?: boolean; footerGap?: number } = {}) {
   const bar = use(TabBarHeight);
+  const accessory = use(LiveAccessoryHeight);
   const { bottom } = useSafeAreaInsets();
   const [footerHeight, setFooterHeight] = useState(0);
   const [live, setLive] = useState(0);
@@ -65,6 +84,7 @@ export function useScreenFoot({
       footer: footer ? footerHeight : null,
       fab,
       live,
+      accessory,
       footerGap,
     }),
     onFooterLayout: (event: LayoutChangeEvent) => setFooterHeight(event.nativeEvent.layout.height),

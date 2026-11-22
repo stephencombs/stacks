@@ -26,7 +26,13 @@ import { ConfirmDialogHost } from "./components/ui/ConfirmDialogHost";
 import { TabBarHeight } from "./components/ui/tabBar";
 import { Landing } from "./features/Landing";
 import { PersonalYouButton, PlayBrand } from "./features/Personal";
-import { createPlaceTabs, placeTab, placeTabsConfig, useTabBarHeight } from "./features/PlaceTabs";
+import {
+  createPlaceTabs,
+  PlaceTabsAccessory,
+  placeTab,
+  placeTabsConfig,
+  useTabBarHeight,
+} from "./features/PlaceTabs";
 import { YouButton } from "./features/You";
 import { AccountProvider, useAccount } from "./lib/account";
 import { appLinkPrefixes } from "./lib/config";
@@ -144,7 +150,11 @@ const CrewStack = createNativeStackNavigator({
 function TabsLayout({ children }: { children: ReactNode }) {
   const bar = useTabBarHeight();
 
-  return <TabBarHeight value={bar}>{children}</TabBarHeight>;
+  return (
+    <TabBarHeight value={bar}>
+      <PlaceTabsAccessory>{children}</PlaceTabsAccessory>
+    </TabBarHeight>
+  );
 }
 
 const Tabs = createPlaceTabs({

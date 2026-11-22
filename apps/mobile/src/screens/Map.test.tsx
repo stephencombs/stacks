@@ -96,7 +96,10 @@ const setupMapTest = async (
     StacksProvider: Container,
     useStacks: () => ({}),
   }));
-  vi.doMock("../components/ui/tabBar", () => ({ TabBarHeight: createContext(56) }));
+  vi.doMock("../components/ui/tabBar", () => ({
+    TabBarHeight: createContext(56),
+    LiveAccessoryHeight: createContext(0),
+  }));
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
   vi.doMock("../components/ui/Button", () => ({
     Button: ({ label, onPress }: { label: string; onPress?: () => void }) => (

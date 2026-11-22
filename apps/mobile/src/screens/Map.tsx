@@ -23,7 +23,7 @@ import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { Toolbar } from "../components/ui/Toolbar";
 import { cn } from "../components/ui/cn";
-import { TabBarHeight } from "../components/ui/tabBar";
+import { LiveAccessoryHeight, TabBarHeight } from "../components/ui/tabBar";
 import { PersonalLiveBar } from "../features/LiveBar";
 import { useNativeHeaderActions } from "../features/NativeHeaderActions";
 import { PersonalScreen, PersonalYouButton } from "../features/Personal";
@@ -131,6 +131,7 @@ function PopulatedMap({
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const barHeight = use(TabBarHeight);
+  const accessoryHeight = use(LiveAccessoryHeight);
   const android = Platform.OS === "android";
   const header = useNativeHeaderActions();
 
@@ -155,7 +156,7 @@ function PopulatedMap({
   ]).map(String);
 
   const selectedSheet = selectedVenueId ? view.venueSheet(selectedVenueId) : null;
-  const bottomDock = barHeight + liveBarHeight;
+  const bottomDock = barHeight + liveBarHeight + accessoryHeight;
 
   const colorFor = (outcome: "win" | "loss" | "even") =>
     prefs.privacyMode ? muted! : outcome === "win" ? win! : outcome === "loss" ? loss! : muted!;
