@@ -50,6 +50,8 @@ type SheetProps = {
 
 let nextSheetId = 1;
 
+const detentGrowth = 24;
+
 /** Mounts one shared native `FormSheet` host so swapping child sheets never closes and drops them. */
 export function SheetHost({ children }: { children?: ReactNode }) {
   const store = useCreateSheetStore();
@@ -387,7 +389,19 @@ function NativeFormSheet({
     };
   }, []);
 
-  const fittedHeight = contentHeight + footerHeight + insets.bottom + 80;
+  const [settled, setSettled] = useState({ key: slotKey, height: 0 });
+  const settledHeight = settled.key === slotKey ? settled.height : 0;
+  const measuredHeight = contentHeight + footerHeight + insets.bottom + 80;
+
+  const fittedHeight =
+    contentHeight > 0 && (settledHeight === 0 || measuredHeight - settledHeight >= detentGrowth)
+      ? measuredHeight
+      : settledHeight || measuredHeight;
+
+  const nextSettled = !isOpen || large || contentHeight === 0 ? 0 : fittedHeight;
+
+  if (nextSettled !== settledHeight) setSettled({ key: slotKey, height: nextSettled });
+
   const maximumDetentHeight = Math.max(1, screenHeight - insets.top - insets.bottom);
 
   const detent = large

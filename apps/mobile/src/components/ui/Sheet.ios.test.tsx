@@ -170,6 +170,64 @@ it("fits measured content within the native detent range and caps overflow at fu
   await act(async () => root.unmount());
 });
 
+const fittedDetent = (content: number) => (content + 34 + 80) / (844 - 44 - 34);
+
+it("holds a settled detent through shrinking and jittering content, and grows only for a real increase", async () => {
+  const { Sheet, getLatestFormSheet, measureContent } = await setupSheetTest();
+  const root = createRoot(document.createElement("div"));
+
+  await act(async () => root.render(<Sheet open title="Rebuy" onClose={() => {}} />));
+  await act(async () => measureContent(400));
+  expect(getLatestFormSheet()?.detents?.[0]).toBeCloseTo(fittedDetent(400));
+
+  await act(async () => measureContent(360));
+  expect(getLatestFormSheet()?.detents?.[0]).toBeCloseTo(fittedDetent(400));
+
+  await act(async () => measureContent(412));
+  expect(getLatestFormSheet()?.detents?.[0]).toBeCloseTo(fittedDetent(400));
+
+  await act(async () => measureContent(440));
+  expect(getLatestFormSheet()?.detents?.[0]).toBeCloseTo(fittedDetent(440));
+  await act(async () => root.unmount());
+});
+
+it("sizes a swapped-in sheet from its own content instead of the previous sheet's", async () => {
+  const { Sheet, SheetHost, getLatestFormSheet, measureContent } = await setupSheetTest();
+  const root = createRoot(document.createElement("div"));
+
+  const Flow = ({ step }: { step: "first" | "second" }) => (
+    <SheetHost>
+      <Sheet open={step === "first"} title="First" onClose={() => {}} />
+      <Sheet open={step === "second"} back title="Second" onClose={() => {}} />
+    </SheetHost>
+  );
+
+  await act(async () => root.render(<Flow step="first" />));
+  await act(async () => measureContent(600));
+  expect(getLatestFormSheet()?.detents?.[0]).toBeCloseTo(fittedDetent(600));
+
+  await act(async () => root.render(<Flow step="second" />));
+  await act(async () => measureContent(300));
+  expect(getLatestFormSheet()?.detents?.[0]).toBeCloseTo(fittedDetent(300));
+  await act(async () => root.unmount());
+});
+
+it("sizes a reopened sheet from its current content instead of the size it had before closing", async () => {
+  const { Sheet, getLatestFormSheet, measureContent } = await setupSheetTest();
+  const root = createRoot(document.createElement("div"));
+
+  const render = (open: boolean) =>
+    root.render(<Sheet open={open} title="Rebuy" onClose={() => {}} />);
+
+  await act(async () => render(true));
+  await act(async () => measureContent(600));
+  await act(async () => render(false));
+  await act(async () => measureContent(300));
+  await act(async () => render(true));
+  expect(getLatestFormSheet()?.detents?.[0]).toBeCloseTo(fittedDetent(300));
+  await act(async () => root.unmount());
+});
+
 it("locks large sheets at full height so dynamic search results never bounce the detent", async () => {
   const { Sheet, getLatestFormSheet, measureContent } = await setupSheetTest();
   const root = createRoot(document.createElement("div"));
