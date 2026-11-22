@@ -22,7 +22,7 @@ import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
-import { PersonalScreen, PlayBrand, SaveStatus } from "../features/Personal";
+import { PersonalScreen, SaveStatus } from "../features/Personal";
 import { PastSessionSheet, StartSheet } from "../features/RecordingForms";
 import { chipColor } from "../features/chipColor";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
@@ -35,7 +35,12 @@ export function HomeScreen() {
   const navigation = useNavigation();
   const [sheet, setSheet] = useState<"start" | "past" | null>(null);
   const open = (visitId: VisitId) => navigation.navigate("Play", { visitId });
-  const showHistory = () => navigation.navigate("History");
+
+  const showHistory = () =>
+    navigation.navigate("Tabs", {
+      screen: "PlayTab",
+      params: { screen: "History", initial: false },
+    });
 
   const opened = (visitId: VisitId) => {
     setSheet(null);
@@ -47,7 +52,6 @@ export function HomeScreen() {
   return (
     <PersonalScreen
       live
-      topSafeArea={Platform.OS === "ios"}
       contentClassName={Platform.OS === "android" ? "gap-4 pt-2" : undefined}
       fab={
         <ActionMenu
@@ -61,11 +65,6 @@ export function HomeScreen() {
         />
       }
     >
-      {Platform.OS === "ios" ? (
-        <View className="h-11 justify-center">
-          <PlayBrand />
-        </View>
-      ) : null}
       <SaveStatus status={status} error={error} onRetry={retryLoad} />
       {home === null ? (
         status === "load_failed" ? null : (

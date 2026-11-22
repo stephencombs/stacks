@@ -8,6 +8,7 @@ import {
   ScrollView,
   View,
   type ScrollViewInstance,
+  type ScrollViewProps,
 } from "react-native";
 import { Text } from "../components/ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -45,8 +46,9 @@ export function PersonalScreen({
   live = false,
   felt = false,
   session = false,
-  topSafeArea = false,
+  headerActions = true,
   scrollRef,
+  onScroll,
   contentClassName,
 }: {
   children: ReactNode;
@@ -57,16 +59,16 @@ export function PersonalScreen({
   live?: boolean;
   felt?: boolean;
   session?: boolean;
-  /** Pad scroll content from the top safe area instead of the nav bar so leading chrome scrolls. */
-  topSafeArea?: boolean;
+  /** Shows You in the iOS navigation bar. Off for a screen that puts something else there. */
+  headerActions?: boolean;
   scrollRef?: RefObject<ScrollViewInstance | null>;
+  onScroll?: ScrollViewProps["onScroll"];
   contentClassName?: string;
 }) {
-  const floatingTopBar = topSafeArea && Platform.OS === "ios";
-  const header = useNativeHeaderActions(true, undefined, floatingTopBar);
+  const header = useNativeHeaderActions({ disabled: session || !headerActions });
   const insets = useSafeAreaInsets();
   const foot = useScreenFoot({ footer: !!dock, fab: !!fab });
-  const manualInset = (session || topSafeArea) && Platform.OS === "ios";
+  const manualInset = session && Platform.OS === "ios";
   const fallbackScroll = useRef<ScrollViewInstance>(null);
   const scroll = scrollRef ?? fallbackScroll;
 
@@ -91,7 +93,7 @@ export function PersonalScreen({
         <FeltStatusBar felt={felt} />
         <ScrollView
           ref={scroll}
-          className="flex-1"
+          className={felt ? "flex-1" : "flex-1 bg-canvas"}
           style={foot.scrollStyle}
           contentInsetAdjustmentBehavior={manualInset ? "never" : "automatic"}
           keyboardShouldPersistTaps="handled"
@@ -105,12 +107,16 @@ export function PersonalScreen({
               : undefined
           }
           onScroll={
-            manualInset
+            manualInset || onScroll
               ? (event) => {
-                  const { contentOffset, layoutMeasurement } = event.nativeEvent;
-                  scrollState.current.offsetY = contentOffset.y;
-                  scrollState.current.layoutHeight = layoutMeasurement.height;
-                  scrollState.current.scrolled = true;
+                  if (manualInset) {
+                    const { contentOffset, layoutMeasurement } = event.nativeEvent;
+                    scrollState.current.offsetY = contentOffset.y;
+                    scrollState.current.layoutHeight = layoutMeasurement.height;
+                    scrollState.current.scrolled = true;
+                  }
+
+                  onScroll?.(event);
                 }
               : undefined
           }
@@ -131,19 +137,10 @@ export function PersonalScreen({
             ...sides,
             paddingBottom: foot.endSpace + 16,
             ...(session ? { flexGrow: 1, paddingTop: 12 } : null),
-            ...(topSafeArea && Platform.OS === "ios" ? { paddingTop: insets.top } : null),
           }}
         >
           {children}
         </ScrollView>
-        {floatingTopBar ? (
-          <View
-            pointerEvents="box-none"
-            style={{ position: "absolute", top: insets.top, right: sides.paddingRight }}
-          >
-            <PersonalYouButton />
-          </View>
-        ) : null}
         {fab ? (
           <FloatingAction right={sides.paddingRight} bottom={foot.fabBottom}>
             {fab}
@@ -391,7 +388,7 @@ export function PersonalYouButton() {
           </ControlSurface>
         )}
       </PressableScale>
-      {open ? <PersonalYou onClose={() => setOpen(false)} /> : null}
+      {open ? <YouSheet onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -403,7 +400,7 @@ export function PlayBrand() {
       accessible
       accessibilityRole="header"
       accessibilityLabel="Color Up"
-      className="flex-row items-center gap-2.5"
+      className={cn("flex-row items-center gap-2.5", Platform.OS === "ios" && "h-11")}
     >
       {Platform.OS === "android" ? (
         <>
@@ -415,8 +412,4 @@ export function PlayBrand() {
       )}
     </View>
   );
-}
-
-export function PersonalYou({ onClose }: { onClose: () => void }) {
-  return <YouSheet onClose={onClose} />;
 }

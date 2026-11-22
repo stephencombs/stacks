@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { runningLine } from "@stacks/client-runtime/chart";
 import { groupChip } from "@stacks/client-runtime/groupStats";
@@ -38,6 +39,7 @@ import { useCSSVariable } from "uniwind";
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
 import { chartCurve } from "../components/ui/chartCurve";
+import { offsetBelowHeader } from "../components/ui/scrollClamp";
 import { FilterChip } from "../components/ui/FilterChip";
 import { EmptyState, List, Row, Skeleton } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
@@ -74,6 +76,8 @@ export function StatsScreen({ route }: Props) {
   const navigation = useNavigation();
   const android = Platform.OS === "android";
   const scrollRef = useRef<ScrollViewInstance>(null);
+  const offset = useRef(0);
+  const headerHeight = useHeaderHeight();
   useLayoutEffect(() => {
     if (android) navigation.setOptions({ headerShown: false });
   }, [android, navigation]);
@@ -83,7 +87,12 @@ export function StatsScreen({ route }: Props) {
     ...(route.params?.tripId ? { tripId: TripId.make(route.params.tripId) } : null),
   };
 
-  const resetScroll = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
+  // WARNING: y: 0 scrolls the filter chips behind the navigation bar.
+  const backToTop = () => {
+    const y = offsetBelowHeader(offset.current, headerHeight);
+
+    if (y !== null) scrollRef.current?.scrollTo({ y, animated: true });
+  };
 
   const stats = (
     <YourGroups>
@@ -92,7 +101,7 @@ export function StatsScreen({ route }: Props) {
           key={`${pick.groupId}:${pick.tripId}`}
           pick={groups ? pick : justMe}
           groups={groups ?? noGroups}
-          onFilterChange={android ? undefined : resetScroll}
+          onFilterChange={android ? undefined : backToTop}
         />
       )}
     </YourGroups>
@@ -101,8 +110,13 @@ export function StatsScreen({ route }: Props) {
   return android ? (
     stats
   ) : (
-    <PersonalScreen live topSafeArea scrollRef={scrollRef}>
-      <View className="h-7" />
+    <PersonalScreen
+      live
+      scrollRef={scrollRef}
+      onScroll={(event) => {
+        offset.current = event.nativeEvent.contentOffset.y;
+      }}
+    >
       {stats}
     </PersonalScreen>
   );

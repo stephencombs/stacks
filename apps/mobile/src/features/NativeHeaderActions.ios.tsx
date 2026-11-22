@@ -1,81 +1,76 @@
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
-import { useLayoutEffect, useState } from "react";
-import { View } from "react-native";
+import { useState } from "react";
 
 import { ControlSurface } from "../components/ui/ControlSurface";
-import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon } from "../components/ui/Icon";
 import { PressableScale } from "../components/ui/PressableScale";
-import { Text } from "../components/ui/Text";
+import { Toolbar } from "../components/ui/Toolbar";
 import { useAccount } from "../lib/account";
-import { PersonalYou } from "./Personal";
+import { isLiquidGlassSupported } from "../lib/liquidGlass";
+import type { NativeHeaderActionsOptions } from "./NativeHeaderActions";
 import { UserAvatar } from "./UserAvatar";
 import { YouSheet } from "./You";
 
-export function useNativeHeaderActions(
-  personal = false,
-  onOpenGroups?: () => void,
+/**
+ * You, top right of every iOS screen with a navigation bar, plus Groups beside it on Crew. The
+ * element it returns goes in the screen so the You sheet opens from there.
+ */
+export function useNativeHeaderActions({
+  onOpenGroups,
   disabled = false,
-) {
-  const navigation = useNavigation();
+}: NativeHeaderActionsOptions = {}) {
   const account = useAccount();
   const [open, setOpen] = useState(false);
   const signedIn = account.available && !!account.isSignedIn;
+  const openYou = () => setOpen(true);
 
-  useLayoutEffect(() => {
-    if (disabled) return;
+  if (disabled) return null;
 
-    navigation.setOptions({
-      unstable_headerRightItems: undefined,
-      headerRightBackgroundVisible: false,
-      headerRight: () => (
-        <View className="flex-row items-center gap-2">
-          {onOpenGroups ? (
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel="Groups"
-              onPress={onOpenGroups}
-              hitSlop={6}
-              className="h-11 items-center justify-center"
-            >
-              <GlassSurface
-                radius={22}
-                interactive
-                className="h-11 items-center justify-center rounded-full px-4"
-              >
-                <Text className="type-callout font-semibold text-ink">Groups</Text>
-              </GlassSurface>
-            </PressableScale>
-          ) : null}
-          <PressableScale
-            accessibilityRole="button"
+  return (
+    <>
+      <Toolbar placement="right">
+        {onOpenGroups ? (
+          <Toolbar.Button
+            label="Groups"
+            separateBackground
+            identifier="crew-groups"
+            onPress={onOpenGroups}
+          />
+        ) : null}
+        {isLiquidGlassSupported && !signedIn ? (
+          <Toolbar.Button
+            icon="person"
             accessibilityLabel="You"
-            accessibilityHint={
-              personal ? "Your sessions, appearance and account" : "Your settings and account"
-            }
-            onPress={() => setOpen(true)}
-            hitSlop={6}
-            className="size-11 items-center justify-center"
-          >
-            <ControlSurface>
-              {signedIn ? (
-                <UserAvatar size={32} ring={false} />
-              ) : (
-                <Icon name="person" color="ink" size={20} />
-              )}
-            </ControlSurface>
-          </PressableScale>
-        </View>
-      ),
-    } satisfies NativeStackNavigationOptions);
-  }, [disabled, navigation, onOpenGroups, personal, signedIn]);
+            identifier="you-account"
+            onPress={openYou}
+          />
+        ) : (
+          <Toolbar.Custom hidesSharedBackground={!isLiquidGlassSupported}>
+            <YouAvatar signedIn={signedIn} onPress={openYou} />
+          </Toolbar.Custom>
+        )}
+      </Toolbar>
+      {open ? <YouSheet onClose={() => setOpen(false)} /> : null}
+    </>
+  );
+}
 
-  if (disabled || !open) return null;
-
-  return personal ? (
-    <PersonalYou onClose={() => setOpen(false)} />
+function YouAvatar({ signedIn, onPress }: { signedIn: boolean; onPress: () => void }) {
+  const face = signedIn ? (
+    <UserAvatar size={32} ring={false} />
   ) : (
-    <YouSheet onClose={() => setOpen(false)} />
+    <Icon name="person" color="ink" size={20} />
+  );
+
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel="You"
+      accessibilityHint="Your sessions, appearance and account"
+      onPress={onPress}
+      hitSlop={6}
+      className="size-11 items-center justify-center"
+    >
+      {isLiquidGlassSupported ? face : <ControlSurface>{face}</ControlSurface>}
+    </PressableScale>
   );
 }

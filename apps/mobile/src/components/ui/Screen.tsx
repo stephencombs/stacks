@@ -51,7 +51,7 @@ export function Screen({
   onOpenGroups?: () => void;
 }) {
   const footer = renderFooter;
-  const header = useNativeHeaderActions(false, onOpenGroups);
+  const header = useNativeHeaderActions({ onOpenGroups });
   const foot = useScreenFoot({ footer: !!footer, fab: !!fab, footerGap: 12 });
 
   return (
@@ -66,7 +66,7 @@ export function Screen({
           <ScrollView
             contentInsetAdjustmentBehavior="automatic"
             keyboardShouldPersistTaps="handled"
-            className="flex-1"
+            className="flex-1 bg-canvas"
             style={foot.scrollStyle}
             contentContainerClassName={cn("gap-6 px-4 pt-4 pb-24", contentClassName)}
           >

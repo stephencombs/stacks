@@ -25,7 +25,10 @@ const openStore = async () => {
   return store;
 };
 
-const setupMapTest = async (store: Awaited<ReturnType<typeof openStore>>) => {
+const setupMapTest = async (
+  store: Awaited<ReturnType<typeof openStore>>,
+  platform: "ios" | "android" = "android",
+) => {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const navigate = vi.fn();
@@ -63,7 +66,7 @@ const setupMapTest = async (store: Awaited<ReturnType<typeof openStore>>) => {
     View: Container,
     ScrollView: Container,
     Pressable: Container,
-    Platform: { OS: "android" },
+    Platform: { OS: platform },
     useWindowDimensions: () => ({ width: 400, height: 800 }),
   }));
   vi.doMock("react-native-safe-area-context", () => ({
@@ -110,6 +113,29 @@ const setupMapTest = async (store: Awaited<ReturnType<typeof openStore>>) => {
     PersonalYouButton: () => null,
   }));
   vi.doMock("../features/LiveBar", () => ({ PersonalLiveBar: () => null }));
+  vi.doMock("../features/NativeHeaderActions", () => ({ useNativeHeaderActions: () => null }));
+  vi.doMock("../components/ui/Toolbar", () => ({
+    Toolbar: Object.assign(
+      ({ placement, children }: { placement: string; children?: ReactNode }) => (
+        <nav data-placement={placement}>{children}</nav>
+      ),
+      {
+        Button: ({
+          label,
+          accessibilityLabel,
+          onPress,
+        }: {
+          label?: string;
+          accessibilityLabel?: string;
+          onPress: () => void;
+        }) => (
+          <button aria-label={accessibilityLabel} onClick={onPress}>
+            {label}
+          </button>
+        ),
+      },
+    ),
+  }));
   vi.doMock("../components/Money", () => ({
     Money: ({ amount }: { amount: number }) => (
       <span>{amount >= 0 ? `+$${amount / 100}` : `-$${Math.abs(amount) / 100}`}</span>
@@ -220,6 +246,77 @@ it("renders venue pins, unmapped count, day path filter, and venue sheet linking
     await act(async () => day!.click());
     expect(element.querySelector('button[aria-label^="1. Wynn Las Vegas"]')).not.toBeNull();
     expect(element.textContent).toContain("in the order you played");
+  } finally {
+    await act(async () => root.unmount());
+    await store.close();
+    vi.resetModules();
+    vi.unstubAllGlobals();
+  }
+});
+
+it("keeps the native bar on iOS and puts the filter in it", async () => {
+  const store = await openStore();
+
+  const wynn: CachedVenue = {
+    id: VenueId.make("0192e7a0-0000-7000-8000-000000000001"),
+    name: "Wynn Las Vegas",
+    kind: "casino",
+    city: "Las Vegas",
+    region: "NV",
+    country: "US",
+    lat: 36.1265,
+    lng: -115.1656,
+  };
+
+  await store.execute(
+    store.prepare({
+      type: "record_completed",
+      buyIn: 20000,
+      cashOut: 34500,
+      startedAt: DateTime.makeUnsafe("2026-11-07T20:00:00Z"),
+      finishedAt: DateTime.makeUnsafe("2026-11-07T22:10:00Z"),
+      game: "craps",
+      venueId: wynn.id,
+    }),
+    [wynn],
+  );
+
+  const { element, root, setOptionsCalls } = await setupMapTest(store, "ios");
+
+  try {
+    expect(setOptionsCalls).toEqual([]);
+    const left = element.querySelector('nav[data-placement="left"]')!;
+    expect(left.textContent).toBe("All casinos");
+    expect(left.querySelector('button[aria-label="Clear map filter"]')).toBeNull();
+
+    await act(async () => left.querySelector<HTMLButtonElement>("button")!.click());
+    const [, day] = element.querySelectorAll<HTMLButtonElement>("section button");
+    await act(async () => day!.click());
+
+    const filtered = element.querySelector('nav[data-placement="left"]')!;
+    expect(filtered.textContent).not.toBe("All casinos");
+
+    const clear = filtered.querySelector<HTMLButtonElement>(
+      'button[aria-label="Clear map filter"]',
+    );
+
+    expect(clear).not.toBeNull();
+    await act(async () => clear!.click());
+    expect(element.querySelector('nav[data-placement="left"]')!.textContent).toBe("All casinos");
+  } finally {
+    await act(async () => root.unmount());
+    await store.close();
+    vi.resetModules();
+    vi.unstubAllGlobals();
+  }
+});
+
+it("has no filter in the iOS bar before there is anything to filter", async () => {
+  const store = await openStore();
+  const { element, root } = await setupMapTest(store, "ios");
+
+  try {
+    expect(element.querySelector('nav[data-placement="left"]')).toBeNull();
   } finally {
     await act(async () => root.unmount());
     await store.close();
