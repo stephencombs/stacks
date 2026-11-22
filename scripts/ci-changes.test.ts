@@ -10,6 +10,7 @@ const none = {
   check: "false",
   api: "false",
   build: "false",
+  mobile: "false",
   preview: "false",
 };
 
@@ -17,6 +18,7 @@ const all = {
   check: "true",
   api: "true",
   build: "true",
+  mobile: "true",
   preview: "true",
 };
 
@@ -32,7 +34,6 @@ describe("plan", () => {
   it.each([
     "README.md",
     "docs/internals/navigation.md",
-    ".github/workflows/mobile.yml",
     ".github/workflows/testflight.yml",
     ".github/dependabot.yml",
     "tools/table-art/scene.py",
@@ -58,6 +59,7 @@ describe("plan", () => {
     expect(jobs(["apps/mobile/src/App.tsx"])).toEqual({
       ...none,
       check: "true",
+      mobile: "true",
     });
     expect(result.typecheck_args).toBe("--cache --filter @stacks/mobile");
     expect(result.test_args).toBe("--filter @stacks/mobile");
@@ -86,6 +88,7 @@ describe("plan", () => {
     const result = output(plan(["packages/client-runtime/src/format.ts"]));
     expect(result.api).toBe("false");
     expect(result.build).toBe("false");
+    expect(result.mobile).toBe("true");
     expect(result.preview).toBe("false");
     expect(result.test_args).toContain("--filter @stacks/client-runtime");
     expect(result.test_args).toContain("--filter @stacks/mobile");
@@ -111,11 +114,17 @@ describe("plan", () => {
     expect(jobs(["README.md", "apps/mobile/src/App.tsx"])).toEqual({
       ...none,
       check: "true",
+      mobile: "true",
     });
   });
 
   it("runs every check when any path is unrecognized, without a preview", () => {
     expect(jobs(["README.md", "somewhere/new.ts"])).toEqual(checks);
+  });
+
+  it("keeps mobile export coverage for files ignored by the package checks", () => {
+    expect(jobs(["apps/mobile/README.md"])).toEqual({ ...none, mobile: "true" });
+    expect(jobs(["packages/shared/README.md"])).toEqual({ ...none, mobile: "true" });
   });
 
   it("deploys a preview only when the API changed", () => {
@@ -145,9 +154,10 @@ describe("decide", () => {
     };
 
     expect(output(decide({ event: "schedule", base: "", diff: boom })).check).toBe("true");
-    expect(output(decide({ event: "workflow_dispatch", base: "abc", diff: boom })).preview).toBe(
-      "false",
-    );
+    const manual = output(decide({ event: "workflow_dispatch", base: "abc", diff: boom }));
+    expect(manual.preview).toBe("false");
+    expect(manual.mobile).toBe("true");
+    expect(manual.typecheck_args).toBe("-r --cache");
     expect(output(decide({ event: "push", base: "0".repeat(40), diff: boom })).build).toBe("true");
     expect(output(decide({ event: "push", base: "abc", diff: boom })).api).toBe("true");
   });

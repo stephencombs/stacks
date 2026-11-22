@@ -22,7 +22,6 @@ const SKIP_EXACT = new Set([
   ".gitignore",
   ".mcp.json",
   ".github/dependabot.yml",
-  ".github/workflows/mobile.yml",
   ".github/workflows/testflight.yml",
   "docker-compose.yml",
 ]);
@@ -38,7 +37,7 @@ const TOOLING = new Set([
   "vite.config.ts",
 ]);
 
-const JOB_NAMES = ["check", "api", "build", "preview"];
+const JOB_NAMES = ["check", "api", "build", "mobile", "preview"];
 
 let workspaces;
 
@@ -47,6 +46,7 @@ function blank(value) {
     check: value,
     api: value,
     build: value,
+    mobile: value,
     preview: value,
   };
 }
@@ -208,9 +208,7 @@ export function plan(paths) {
   const packages = new Set();
   let all = false;
 
-  for (const raw of paths) {
-    const path = raw.trim();
-
+  for (const path of paths) {
     if (path === "") continue;
     const part = classify(path);
 
@@ -218,12 +216,16 @@ export function plan(paths) {
 
     for (const name of JOB_NAMES) if (part.jobs[name]) jobs[name] = true;
 
+    if (path.startsWith("apps/mobile/") || path.startsWith("packages/")) jobs.mobile = true;
+
     for (const name of part.packages) packages.add(name);
   }
 
   if (all) {
     for (const pkg of load()) packages.add(pkg.name);
   }
+
+  jobs.mobile ||= jobs.build;
 
   return { all, jobs, packages };
 }
@@ -263,6 +265,7 @@ export function output(result) {
     check: result.jobs.check ? "true" : "false",
     api: result.jobs.api ? "true" : "false",
     build: result.jobs.build ? "true" : "false",
+    mobile: result.jobs.mobile ? "true" : "false",
     preview: result.jobs.preview ? "true" : "false",
     typecheck_args:
       names.length === 0 ? "" : samePackages(names) ? "-r --cache" : `--cache ${filters(names)}`,
@@ -282,9 +285,11 @@ function main() {
       event: process.env.EVENT_NAME ?? "",
       base: process.env.BASE_SHA ?? "",
       diff: () =>
-        execFileSync("git", ["diff", "--name-only", process.env.BASE_SHA, process.env.HEAD_SHA], {
-          encoding: "utf8",
-        }).split("\n"),
+        execFileSync(
+          "git",
+          ["diff", "--no-renames", "--name-only", "-z", process.env.BASE_SHA, process.env.HEAD_SHA],
+          { encoding: "utf8" },
+        ).split("\0"),
     }),
   );
 
