@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Animated, Easing, ScrollView, View } from "react-native";
 
+import { cn } from "./cn";
 import { Text } from "./Text";
 import { useReducedMotion } from "./motion";
 
@@ -55,7 +56,7 @@ export function MarqueeText({ children, className }: { children: string; classNa
 
   if (reduced)
     return (
-      <Text numberOfLines={1} ellipsizeMode="tail" className={className}>
+      <Text numberOfLines={1} ellipsizeMode="tail" className={cn("min-w-0 shrink", className)}>
         {children}
       </Text>
     );
