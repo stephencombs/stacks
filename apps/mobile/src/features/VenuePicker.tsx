@@ -4,16 +4,58 @@ import { useVenueSearch } from "@stacks/client-runtime/recordingReact";
 import { venuePlace } from "@stacks/client-runtime/recordingView";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, View } from "react-native";
 import { Text } from "../components/ui/Text";
 
+import { appleMapsSearch, type AppleMapsPlace } from "../../modules/apple-maps-search/src";
 import { Button } from "../components/ui/Button";
-import { TextField } from "../components/ui/Field";
+import { FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { Surface } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useDebounced } from "../lib/useDebounced";
+
+const normalize = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+
+const placeDetail = (place: AppleMapsPlace) =>
+  [place.city, place.region, place.country].filter(Boolean).join(", ");
+
+const samePlace = (venue: CachedVenue, place: AppleMapsPlace) => {
+  if (normalize(venue.name) !== normalize(place.name)) return false;
+
+  if (
+    venue.lat !== null &&
+    venue.lng !== null &&
+    Math.abs(venue.lat - place.lat) < 0.01 &&
+    Math.abs(venue.lng - place.lng) < 0.01
+  ) {
+    return true;
+  }
+
+  return normalize(venue.city) === normalize(place.city);
+};
+
+function CasinoSearchField({
+  value,
+  onChangeText,
+}: {
+  value: string;
+  onChangeText: (next: string) => void;
+}) {
+  return (
+    <TextField
+      label=""
+      accessibilityLabel="Search casinos"
+      value={value}
+      onChangeText={onChangeText}
+      placeholder="Search casinos"
+      autoCorrect={false}
+      returnKeyType="search"
+      inputClassName="rounded-[10px]"
+    />
+  );
+}
 
 function VenueOption({
   venue,
@@ -40,18 +82,21 @@ function OptionRow({
   title,
   detail,
   selected,
+  busy = false,
   onSelect,
 }: {
   title: string;
   detail: string;
   selected: boolean;
+  busy?: boolean;
   onSelect: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="radio"
       accessibilityLabel={title}
-      accessibilityState={{ checked: selected }}
+      accessibilityState={{ checked: selected, busy }}
+      disabled={busy}
       onPress={onSelect}
       className={cn(
         "min-h-11 flex-row items-center gap-3 rounded-xl px-3 py-2.5",
@@ -68,7 +113,11 @@ function OptionRow({
           </Text>
         ) : null}
       </View>
-      {selected ? <Icon name="check" color="ink" size={18} /> : null}
+      {busy ? (
+        <ActivityIndicator size="small" />
+      ) : selected ? (
+        <Icon name="check" color="ink" size={18} />
+      ) : null}
     </Pressable>
   );
 }
@@ -79,16 +128,21 @@ export function CasinoPickerSheet({
   onClose,
   onSelect,
   ...picker
-}: Parameters<typeof SessionVenuePicker>[0] & { onClose: () => void }) {
+}: Omit<Parameters<typeof SessionVenuePicker>[0], "query"> & { onClose: () => void }) {
+  const [text, setText] = useState("");
+
   return (
     <Sheet
       open
       back
+      large
       title={picker.context === "default" ? "Default casino" : "Casino"}
+      footer={<CasinoSearchField value={text} onChangeText={setText} />}
       onClose={onClose}
     >
       <SessionVenuePicker
         {...picker}
+        query={text}
         onSelect={(venue) => {
           onSelect(venue);
           onClose();
@@ -106,25 +160,37 @@ const here = () =>
 
 /**
  * The casino a personal session was at: nearby casinos first when location is allowed, then by
- * name as you type, and "Not listed" for none. Searching needs the network; casinos this device
- * has saved stay pickable without it. `selectedId` keeps an uncached casino distinct from none.
+ * name as you type, and "Not listed" for none. On iOS, native Apple Maps (`MKLocalSearch`) runs
+ * alongside the catalog; picking an Apple Maps place resolves it to a canonical venue.
  */
 export function SessionVenuePicker({
   selectedId,
   selected,
   onSelect,
   context = "session",
+  query,
 }: {
   selectedId: VenueId | null;
   selected: CachedVenue | null;
   onSelect: (venue: CachedVenue | null) => void;
   context?: "session" | "default";
+  /** Controlled search text when the sheet pins the search bar in its footer. */
+  query?: string;
 }) {
-  const [text, setText] = useState("");
+  const [localText, setLocalText] = useState("");
+  const text = query ?? localText;
   const q = useDebounced(text.trim());
   const [near, setNear] = useState<Near | null>(null);
   const [locating, setLocating] = useState<"idle" | "busy" | "failed">("idle");
   const search = useVenueSearch(q, near);
+
+  const [appleState, setAppleState] = useState<{
+    key: string;
+    places: ReadonlyArray<AppleMapsPlace>;
+  } | null>(null);
+
+  const [resolvingKey, setResolvingKey] = useState<string | null>(null);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   const locate = async () => {
     setLocating("busy");
@@ -149,21 +215,48 @@ export function SessionVenuePicker({
     };
   }, []);
 
+  const appleKey = JSON.stringify([q, near?.lat ?? null, near?.lng ?? null]);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios" || !appleMapsSearch || (!q && !near)) return;
+    let current = true;
+
+    void appleMapsSearch.searchCasinos(q, near?.lat ?? null, near?.lng ?? null).then(
+      (places) => {
+        if (current) setAppleState({ key: appleKey, places });
+      },
+      () => {
+        if (current) setAppleState({ key: appleKey, places: [] });
+      },
+    );
+
+    return () => {
+      current = false;
+    };
+  }, [appleKey, q, near]);
+
   const shown =
     selected && !search.venues.some((venue) => venue.id === selected.id)
       ? [selected, ...search.venues]
       : search.venues;
 
+  const applePlaces =
+    appleState?.key === appleKey
+      ? appleState.places.filter((place) => !shown.some((venue) => samePlace(venue, place)))
+      : [];
+
+  const totalFound = search.venues.length + applePlaces.length;
+
   const status =
-    search.status === "offline"
+    search.status === "offline" && applePlaces.length === 0
       ? "Searching needs a connection. These are the casinos saved on this device."
-      : search.status === "searching" && search.venues.length === 0
+      : search.status === "searching" && totalFound === 0
         ? "Searching…"
-        : search.status === "found" && search.venues.length === 0
+        : search.status === "found" && totalFound === 0
           ? q
             ? `No casinos match “${q}”.`
             : "No casinos found near you. Search by name instead."
-          : search.status === "saved" && search.venues.length === 0
+          : search.status === "saved" && totalFound === 0
             ? "Search for where you're playing."
             : null;
 
@@ -174,17 +267,26 @@ export function SessionVenuePicker({
         ? "On this device"
         : null;
 
+  const pickApplePlace = async (place: AppleMapsPlace, key: string) => {
+    if (resolvingKey !== null) return;
+    setResolvingKey(key);
+    setResolveError(null);
+
+    try {
+      const resolved = await search.resolveVenue(place);
+      onSelect(resolved);
+    } catch {
+      setResolveError("Couldn't save that casino right now. Check your connection and try again.");
+    } finally {
+      setResolvingKey(null);
+    }
+  };
+
   return (
     <View className="gap-3">
-      <TextField
-        label="Search casinos"
-        value={text}
-        onChangeText={setText}
-        placeholder="Search casinos"
-        autoCorrect={false}
-        returnKeyType="search"
-        inputClassName="rounded-[10px]"
-      />
+      {query === undefined ? (
+        <CasinoSearchField value={localText} onChangeText={setLocalText} />
+      ) : null}
       {near ? null : (
         <Button
           label="Near me"
@@ -199,6 +301,7 @@ export function SessionVenuePicker({
           Couldn't get your location. Search by name instead.
         </Text>
       ) : null}
+      {resolveError ? <FormError>{resolveError}</FormError> : null}
       {status ? (
         <View className="flex-row items-center justify-between gap-3">
           <Text accessibilityLiveRegion="polite" className="flex-1 text-sm text-muted">
@@ -226,6 +329,25 @@ export function SessionVenuePicker({
               onSelect={() => onSelect(venue)}
             />
           ))}
+          {applePlaces.length > 0 ? (
+            <>
+              <Text className="px-2 pt-2 pb-1 text-sm text-muted">Apple Maps</Text>
+              {applePlaces.map((place) => {
+                const key = `${place.name}:${place.lat.toFixed(4)}:${place.lng.toFixed(4)}`;
+
+                return (
+                  <OptionRow
+                    key={key}
+                    title={place.name}
+                    detail={placeDetail(place)}
+                    selected={false}
+                    busy={resolvingKey === key}
+                    onSelect={() => void pickApplePlace(place, key)}
+                  />
+                );
+              })}
+            </>
+          ) : null}
           <OptionRow
             title={context === "default" ? "Not set" : "Not listed"}
             detail={

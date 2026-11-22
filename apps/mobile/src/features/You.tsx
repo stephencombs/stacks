@@ -27,8 +27,8 @@ import {
 } from "../lib/preferences";
 import { shareCsv } from "../lib/share";
 import { setTheme, useTheme } from "../lib/theme";
-import { Chip } from "./Chip";
 import { SignInButton } from "./SignInButton";
+import { UserAvatar } from "./UserAvatar";
 import { CasinoPickerSheet } from "./VenuePicker";
 
 type DefaultGameChoice = Game | "none";
@@ -59,10 +59,10 @@ export function YouButton() {
         className="size-11 items-center justify-center"
       >
         {Platform.OS === "android" ? (
-          <Chip chip={5} name={user?.fullName ?? name} size={32} ring />
+          <UserAvatar size={32} fallbackName={name} />
         ) : (
           <ControlSurface>
-            <Chip chip={1} name={name} size={32} />
+            <UserAvatar size={32} fallbackName={name} ring={false} />
           </ControlSurface>
         )}
       </PressableScale>
@@ -286,7 +286,7 @@ function SignedInCard({ fallbackName }: { fallbackName: string }) {
 
   return (
     <Card className="flex-row items-center gap-3 p-4">
-      <Chip chip={Platform.OS === "android" ? 5 : 1} name={displayName} size={46} />
+      <UserAvatar size={46} fallbackName={displayName} ring={false} />
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className="text-lg font-semibold text-ink">
           {displayName}

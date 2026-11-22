@@ -1,4 +1,3 @@
-import { useUser } from "@clerk/expo";
 import { useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import type { RecordingSyncLine } from "@stacks/client-runtime/recordingView";
 import type { VisitId } from "@stacks/contracts";
@@ -25,10 +24,10 @@ import { SheetHost } from "../components/ui/Sheet";
 import { useScreenFoot } from "../components/ui/tabBar";
 import { cn } from "../components/ui/cn";
 import { useAccount } from "../lib/account";
-import { Chip } from "./Chip";
 import { FeltStatusBar } from "./FeltStatusBar";
 import { PersonalLiveBar } from "./LiveBar";
 import { useNativeHeaderActions } from "./NativeHeaderActions";
+import { UserAvatar } from "./UserAvatar";
 import { YouSheet } from "./You";
 
 /**
@@ -45,6 +44,7 @@ export function PersonalScreen({
   live = false,
   felt = false,
   session = false,
+  topSafeArea = false,
   scrollRef,
   contentClassName,
 }: {
@@ -56,12 +56,15 @@ export function PersonalScreen({
   live?: boolean;
   felt?: boolean;
   session?: boolean;
+  /** Pad scroll content from the top safe area instead of the nav bar so leading chrome scrolls. */
+  topSafeArea?: boolean;
   scrollRef?: Ref<ScrollViewInstance>;
   contentClassName?: string;
 }) {
   const header = useNativeHeaderActions(true);
   const insets = useSafeAreaInsets();
   const foot = useScreenFoot({ footer: !!dock, fab: !!fab });
+  const manualInset = (session || topSafeArea) && Platform.OS === "ios";
 
   const sides = {
     paddingLeft: Math.max(16, insets.left),
@@ -80,17 +83,18 @@ export function PersonalScreen({
           ref={scrollRef}
           className="flex-1"
           style={foot.scrollStyle}
-          contentInsetAdjustmentBehavior={session && Platform.OS === "ios" ? "never" : "automatic"}
+          contentInsetAdjustmentBehavior={manualInset ? "never" : "automatic"}
           keyboardShouldPersistTaps="handled"
-          contentContainerClassName={cn("gap-6 pt-4 pb-8", contentClassName)}
+          alwaysBounceVertical={false}
+          contentContainerClassName={cn("gap-6", !manualInset && "pt-4", contentClassName)}
           contentContainerStyle={{
             ...sides,
-            flexGrow: 1,
-            ...(session ? { paddingTop: 12 } : null),
+            paddingBottom: foot.endSpace + 16,
+            ...(session ? { flexGrow: 1, paddingTop: 12 } : null),
+            ...(topSafeArea && Platform.OS === "ios" ? { paddingTop: insets.top } : null),
           }}
         >
           {children}
-          <View style={{ height: foot.endSpace }} />
         </ScrollView>
         {fab ? (
           <FloatingAction right={sides.paddingRight} bottom={foot.fabBottom}>
@@ -328,11 +332,11 @@ export function PersonalYouButton() {
         className="size-11 items-center justify-center"
       >
         {Platform.OS === "android" && account.available && account.isSignedIn ? (
-          <SignedInChip />
+          <UserAvatar size={32} />
         ) : (
           <ControlSurface>
             {account.available && account.isSignedIn ? (
-              <SignedInChip />
+              <UserAvatar size={32} ring={false} />
             ) : (
               <Icon name="person" color="ink" size={20} />
             )}
@@ -342,16 +346,6 @@ export function PersonalYouButton() {
       {open ? <PersonalYou onClose={() => setOpen(false)} /> : null}
     </>
   );
-}
-
-function SignedInChip() {
-  const { user } = useUser();
-
-  if (Platform.OS === "android") {
-    return <Chip chip={5} name={user?.fullName ?? user?.firstName ?? "You"} size={32} ring />;
-  }
-
-  return <Chip chip={1} name={user?.firstName ?? user?.fullName ?? "You"} size={32} />;
 }
 
 /** Color Up's mark and name, top left of Play. */

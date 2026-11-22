@@ -66,6 +66,7 @@ export function Screen({
           <ScrollView
             contentInsetAdjustmentBehavior="automatic"
             keyboardShouldPersistTaps="handled"
+            alwaysBounceVertical={false}
             className="flex-1"
             style={foot.scrollStyle}
             contentContainerClassName={cn("gap-6 px-4 pt-4 pb-24", contentClassName)}

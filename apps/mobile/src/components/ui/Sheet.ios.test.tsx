@@ -136,6 +136,21 @@ it("fits measured content within the native detent range and caps overflow at fu
   await act(async () => root.unmount());
 });
 
+it("locks large sheets at full height so dynamic search results never bounce the detent", async () => {
+  const { Sheet, getLatestFormSheet, measureContent } = await setupSheetTest();
+  const root = createRoot(document.createElement("div"));
+
+  await act(async () => root.render(<Sheet open large title="Casino" onClose={() => {}} />));
+  expect(getLatestFormSheet()?.detents).toEqual([1]);
+
+  await act(async () => measureContent(220));
+  expect(getLatestFormSheet()?.detents).toEqual([1]);
+
+  await act(async () => measureContent(900));
+  expect(getLatestFormSheet()?.detents).toEqual([1]);
+  await act(async () => root.unmount());
+});
+
 it("keeps the FormSheet open across same-tick child sheet swaps and shows a back button", async () => {
   const { Sheet, SheetHost, formSheetTransitions, getLatestHeader, getLatestFormSheet } =
     await setupSheetTest();

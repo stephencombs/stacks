@@ -6,6 +6,7 @@ import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
 import type {
   GroupId,
+  ResolvePublicVenueRequest,
   SearchPublicVenuesQuery,
   SessionId,
   TripId,
@@ -87,6 +88,7 @@ export const makeRecordingTransport: (options: StacksClientOptions) => Recording
       ),
     searchVenues: (query) => searchPublicVenues({ baseUrl }, query),
     venue: (venueId) => fetchPublicVenue({ baseUrl }, venueId),
+    resolveVenue: (payload) => resolvePublicVenue({ baseUrl }, payload),
   };
 };
 
@@ -125,6 +127,15 @@ export const fetchPublicVenue = (
 ) =>
   HttpApiClient.make(StacksApi, { baseUrl }).pipe(
     Effect.flatMap((api) => api.publicVenues.get({ params: { venueId } })),
+    Effect.provide(FetchHttpClient.layer),
+  );
+
+const resolvePublicVenue = (
+  { baseUrl }: Pick<StacksClientOptions, "baseUrl">,
+  payload: typeof ResolvePublicVenueRequest.Type,
+) =>
+  HttpApiClient.make(StacksApi, { baseUrl }).pipe(
+    Effect.flatMap((api) => api.publicVenues.resolve({ payload })),
     Effect.provide(FetchHttpClient.layer),
   );
 

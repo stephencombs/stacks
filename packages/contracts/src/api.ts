@@ -112,6 +112,15 @@ export const CreateVenueRequest = Schema.Struct({
   groupId: Schema.NullOr(GroupId),
 });
 
+export const ResolvePublicVenueRequest = Schema.Struct({
+  name: Name(80),
+  city: Schema.NullOr(Name(80)),
+  region: Schema.NullOr(Name(80)),
+  country: Schema.NullOr(Schema.String.check(Schema.isPattern(/^[A-Z]{2}$/))),
+  lat: Schema.Finite,
+  lng: Schema.Finite,
+});
+
 export const CreateSessionRequest = Schema.Struct({
   id: SessionId,
   venueId: VenueId,
@@ -375,6 +384,13 @@ const PublicVenuesGroup = HttpApiGroup.make("publicVenues")
       params: Schema.Struct({ venueId: VenueId }),
       success: Venue,
       error: NotFound,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("resolve", "/public/venues/resolve", {
+      payload: ResolvePublicVenueRequest,
+      success: Venue,
+      error: InvalidRequest,
     }),
   );
 

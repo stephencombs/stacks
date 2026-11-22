@@ -7,6 +7,7 @@ import {
   UserId,
   type ActorId,
   type PlayerId,
+  type ResolvePublicVenueRequest,
   type TableId,
   type Venue,
   type VisitId,
@@ -440,7 +441,10 @@ export const useVenueSearch = (
     [state?.venues, text, searching, found],
   );
 
-  return { ...choices, retry: () => setAttempt((n) => n + 1) };
+  const resolveVenue = (payload: typeof ResolvePublicVenueRequest.Type) =>
+    sync ? sync.resolveVenue(payload) : Promise.reject(new Error("Venue resolution unavailable"));
+
+  return { ...choices, retry: () => setAttempt((n) => n + 1), resolveVenue };
 };
 
 /** A table and everyone recorded at it. `table` is undefined while loading, null if missing. */

@@ -70,7 +70,8 @@ const venues = HttpApiBuilder.group(StacksApi, "venues", (handlers) =>
 const publicVenues = HttpApiBuilder.group(StacksApi, "publicVenues", (handlers) =>
   handlers
     .handle("search", ({ query }) => serve(Venues.searchPublic(query)))
-    .handle("get", ({ params }) => serve(Venues.getPublic(params.venueId))),
+    .handle("get", ({ params }) => serve(Venues.getPublic(params.venueId)))
+    .handle("resolve", ({ payload }) => serve(Venues.resolvePublic(payload))),
 );
 
 const retireLegacyWrite = () => Effect.fail(new Conflict({ reason: "legacy_sessions_retired" }));

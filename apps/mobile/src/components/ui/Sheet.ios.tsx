@@ -42,6 +42,7 @@ type SheetProps = {
   footer?: ReactNode | undefined;
   busy?: boolean;
   back?: boolean;
+  large?: boolean;
   children?: ReactNode | undefined;
 };
 
@@ -71,6 +72,7 @@ export function Sheet({
   footer,
   busy = false,
   back = false,
+  large = false,
   children,
 }: SheetProps) {
   const store = use(SheetStoreContext);
@@ -86,6 +88,7 @@ export function Sheet({
         footer={footer}
         busy={busy}
         back={back}
+        large={large}
       >
         {children}
       </PortaledSheet>
@@ -101,6 +104,7 @@ export function Sheet({
       footer={footer}
       busy={busy}
       back={back}
+      large={large}
     >
       {children}
     </StandaloneSheet>
@@ -116,6 +120,7 @@ function PortaledSheet({
   footer,
   busy = false,
   back = false,
+  large = false,
   children,
 }: SheetProps & { store: SheetStore }) {
   const [id] = useState(() => nextSheetId++);
@@ -127,8 +132,8 @@ function PortaledSheet({
       return;
     }
 
-    store.claim({ id, title, description, footer, busy, back, onClose, children });
-  }, [store, id, open, title, description, footer, busy, back, onClose, children]);
+    store.claim({ id, title, description, footer, busy, back, large, onClose, children });
+  }, [store, id, open, title, description, footer, busy, back, large, onClose, children]);
 
   useLayoutEffect(() => () => store.release(id), [store, id]);
 
@@ -143,6 +148,7 @@ function StandaloneSheet({
   footer,
   busy = false,
   back = false,
+  large = false,
   children,
 }: SheetProps) {
   const id = useId();
@@ -168,6 +174,7 @@ function StandaloneSheet({
       footer={footer}
       busy={busy}
       back={back}
+      large={large}
       onHeaderPress={close}
       onDismiss={dismissed}
       onNativeDismiss={onClose}
@@ -225,6 +232,7 @@ function SheetPortal({ store }: { store: SheetStore }) {
       footer={presented.footer}
       busy={presented.busy}
       back={presented.back}
+      large={presented.large}
       onHeaderPress={() => {
         if (slot && !slot.busy) slot.onClose();
       }}
@@ -270,6 +278,7 @@ function NativeFormSheet({
   footer,
   busy,
   back,
+  large,
   onHeaderPress,
   onDismiss,
   onNativeDismiss,
@@ -282,6 +291,7 @@ function NativeFormSheet({
   footer?: ReactNode | undefined;
   busy: boolean;
   back: boolean;
+  large: boolean;
   onHeaderPress: () => void;
   onDismiss: () => void;
   onNativeDismiss: () => void;
@@ -334,8 +344,9 @@ function NativeFormSheet({
   const fittedHeight = contentHeight + footerHeight + insets.bottom + 80;
   const maximumDetentHeight = Math.max(1, screenHeight - insets.top - insets.bottom);
 
-  const detent =
-    contentHeight === 0
+  const detent = large
+    ? 1
+    : contentHeight === 0
       ? footer
         ? 0.65
         : 0.5
@@ -402,12 +413,15 @@ function NativeFormSheet({
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="interactive"
                     contentContainerClassName="gap-5 px-4 pt-4 pb-4"
-                    onContentSizeChange={(_width, height) =>
-                      setMeasured((prev) =>
-                        prev.key === slotKey
-                          ? { ...prev, content: height }
-                          : { key: slotKey, content: height, footer: 0 },
-                      )
+                    onContentSizeChange={
+                      large
+                        ? undefined
+                        : (_width, height) =>
+                            setMeasured((prev) =>
+                              prev.key === slotKey
+                                ? { ...prev, content: height }
+                                : { key: slotKey, content: height, footer: 0 },
+                            )
                     }
                     onScroll={(event) => {
                       offset.current = event.nativeEvent.contentOffset.y;
