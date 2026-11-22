@@ -18,7 +18,7 @@ public final class NativeSearchBarView: ExpoView, UISearchBarDelegate {
     searchBar.enablesReturnKeyAutomatically = false
     // The field draws no capsule of its own: the glass behind this view is the bar.
     searchBar.setSearchFieldBackgroundImage(UIImage(), for: .normal)
-    searchBar.searchTextField.clearButtonMode = .whileEditing
+    searchBar.searchTextField.clearButtonMode = .always
     addSubview(searchBar)
   }
 
