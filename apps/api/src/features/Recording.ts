@@ -286,7 +286,9 @@ export const playersChanged = Effect.fn("Recording.playersChanged")(function* (
       )
       and (
         t.starter_player_id in ${mine}
-        or t.id in (select table_id from personal_visits where player_id in ${mine})
+        or t.id in (
+          select table_id from personal_visits where player_id in ${mine} and deleted_at is null
+        )
         or t.id in (select table_id from table_participants where player_id in ${mine})
       )
   `;
@@ -763,6 +765,8 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
     const [table] = before.tables;
 
     if (!table) return;
+
+    if (command.type === "set_table_trip" && command.tripId === table.tripId) return;
 
     yield* tableChanged(
       table.id,
@@ -1330,6 +1334,7 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (request: 
 
     if (separate) {
       const linked: HeldPlayer[] = [];
+      const changed: HeldPlayer[] = [];
 
       for (const player of held.filter((player) => !taken.includes(player))) {
         const [binding] = yield* sql<{ revokedAt: Date | null }>`
@@ -1352,13 +1357,20 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (request: 
             values (${player.id}, ${own.actorId},
               ${player.boundVia === "self" ? "invite" : player.boundVia}, ${request.actorId})
           `;
+          changed.push(player);
         }
 
-        yield* sql`update players set user_id = ${user.userId} where id = ${player.id}`;
+        const claimed = yield* sql`
+          update players set user_id = ${user.userId}
+          where id = ${player.id} and user_id is distinct from ${user.userId}
+          returning id
+        `;
+
+        if (claimed.length > 0 && !changed.includes(player)) changed.push(player);
         linked.push(player);
       }
 
-      yield* playersChanged(linked.map(({ id }) => id));
+      yield* playersChanged(changed.map(({ id }) => id));
 
       return {
         adopted: false,

@@ -14,6 +14,7 @@ import { groupWith, ids, users } from "../testing/fixtures.test-utils.ts";
 import {
   account,
   deleteTable,
+  deleteVisit,
   device,
   finish,
   openTable,
@@ -115,6 +116,9 @@ it.layer(TestApi.layer)("table notices", (it) => {
       expect(yield* heard(push(alex, who, setTableTrip(who, opened.tableId, reno.tripId)))).toEqual(
         scopes(table, renoScope),
       );
+      expect(yield* heard(push(alex, who, setTableTrip(who, opened.tableId, reno.tripId)))).toEqual(
+        [],
+      );
       expect(yield* heard(push(alex, who, setTableTrip(who, opened.tableId, renoAgain)))).toEqual(
         scopes(table, renoScope),
       );
@@ -194,6 +198,42 @@ it.layer(TestApi.layer)("table notices", (it) => {
         tableScope(live.tableId),
       ]);
       expect(yield* heard(alex.claim.claimActor({ payload: guest.credential }))).toEqual([]);
+    }),
+  );
+
+  it.effect(
+    "tells a claimed device's tables once when it is linked, not again for the same link",
+    () =>
+      Effect.gen(function* () {
+        const { alex } = yield* users("alex");
+        const own = identity();
+        yield* push(alex, own, start(own));
+        const guest = yield* device();
+        const live = start(guest.identity);
+        yield* guest.push(live);
+        const link = { payload: { ...guest.credential, link: true } };
+
+        expect(yield* heard(alex.claim.claimActor(link))).toEqual([tableScope(live.tableId)]);
+        expect(yield* heard(alex.claim.claimActor(link))).toEqual([]);
+      }),
+  );
+
+  it.effect("doesn't count a deleted visit as a reason to tell a table", () =>
+    Effect.gen(function* () {
+      const { starter, opened } = yield* sharedTable();
+      const seated = seatNew(starter.identity, opened.tableId, "Bea");
+      yield* starter.push(seated);
+      const params = { params: { playerId: seated.playerId } };
+      const first = yield* starter.client.recording.invitePlayer(params);
+      const phone = yield* device();
+      yield* phone.redeem(first.token);
+
+      expect(yield* phone.push(deleteVisit(phone.identity, seated.visitId))).toEqual(["accepted"]);
+
+      const second = yield* starter.client.recording.invitePlayer(params);
+      const laptop = yield* device();
+
+      expect(yield* heard(laptop.redeem(second.token))).toEqual([]);
     }),
   );
 

@@ -206,7 +206,7 @@ export const edit = (
 export const deleteVisit = (identity: RecordingIdentity, visitId: VisitId, expectedRevision = 0) =>
   RecordingCommand.make({
     type: "delete_visit",
-    ...common(identity, 2),
+    ...common(identity, 50),
     visitId,
     expectedRevision,
   });
