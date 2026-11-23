@@ -860,6 +860,68 @@ describe("engine", () => {
       }),
   );
 
+  it.effect(
+    "still pulls after a wake that lands while a push is in flight and a save follows",
+    () =>
+      Effect.gen(function* () {
+        const store = yield* Effect.promise(() => open());
+        yield* Effect.promise(() =>
+          save(store, { type: "start", buyIn: 20000, startedAt: at(10) }),
+        );
+        const remote = server();
+        const inFlight = yield* Queue.unbounded<string>();
+        const release = yield* Queue.unbounded<string>();
+        let reads = 0;
+        let gated = true;
+
+        const sync = makeRecordingSync(
+          store,
+          alex,
+          {
+            ...transportFor(remote),
+            history: () =>
+              Effect.sync(() => {
+                reads++;
+
+                return remote.history();
+              }),
+            push: (request) =>
+              Effect.gen(function* () {
+                if (gated) {
+                  gated = false;
+                  yield* Queue.offer(inFlight, "push");
+                  yield* Queue.take(release);
+                }
+
+                return { results: remote.push(request) };
+              }),
+          },
+          memoryKeys(),
+        );
+
+        const fiber = yield* Effect.forkChild(sync.run);
+        yield* Queue.take(inFlight);
+        expect(reads).toBe(1);
+        sync.wake();
+        const visitId = state(store).visits[0]!.id;
+
+        yield* Effect.promise(() =>
+          save(store, {
+            type: "add",
+            visitId,
+            kind: "buy_in",
+            amount: 5000,
+            occurredAt: at(11),
+          }),
+        );
+        yield* Queue.offer(release, "go");
+        yield* TestClock.adjust("1 second");
+        expect(pendingRecordingCommands(state(store))).toEqual([]);
+        expect(reads).toBe(2);
+        yield* Fiber.interrupt(fiber);
+      }),
+  );
+
   it.effect("says when changes reached the server, so what's on screen can refetch", () =>
     Effect.gen(function* () {
       const store = yield* Effect.promise(() => open());

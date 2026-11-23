@@ -786,6 +786,11 @@ export const makeRecordingSync = (
   let pull = true;
   let signal: ((reason: "wake" | "change") => void) | null = null;
 
+  const wake = () => {
+    pull = true;
+    signal?.("wake");
+  };
+
   const transform = (change: (state: RecordingState) => RecordingState) =>
     Effect.tryPromise({ try: () => store.transform(change), catch: (error) => error });
 
@@ -863,9 +868,14 @@ export const makeRecordingSync = (
 
     for (;;) {
       if (pull) {
-        const history = yield* transport.history(actor);
-        yield* transform((state) => mergeRecordingHistory(state, userId, history));
         pull = false;
+
+        yield* transport.history(actor).pipe(
+          Effect.flatMap((history) =>
+            transform((state) => mergeRecordingHistory(state, userId, history)),
+          ),
+          Effect.tapError(() => Effect.sync(() => void (pull = true))),
+        );
       }
 
       const state = store.getSnapshot().state;
@@ -926,7 +936,7 @@ export const makeRecordingSync = (
         attempt = 0;
         yield* Queue.offer(hydration, undefined);
 
-        if ((yield* Queue.take(wakes)) === "wake") pull = true;
+        yield* Queue.take(wakes);
         continue;
       }
 
@@ -942,9 +952,7 @@ export const makeRecordingSync = (
       setStatus({ phase: "retrying", error });
       const delay = Duration.min(Duration.times(Duration.seconds(1), 2 ** attempt), MAX_DELAY);
       attempt += 1;
-      const woke = yield* Effect.raceFirst(Effect.as(Effect.sleep(delay), null), Queue.take(wakes));
-
-      if (woke === "wake") pull = true;
+      yield* Effect.raceFirst(Effect.as(Effect.sleep(delay), null), Queue.take(wakes));
     }
   }).pipe(Effect.scoped, Effect.ensuring(Effect.sync(() => (signal = null))));
 
@@ -973,7 +981,7 @@ export const makeRecordingSync = (
   return {
     userId,
     run,
-    wake: () => signal?.("wake"),
+    wake,
     getStatus: () => status,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
@@ -983,13 +991,13 @@ export const makeRecordingSync = (
     dismissClaim: () => publish({ ...status, claim: null }),
     link: () => {
       linking = true;
-      signal?.("wake");
+      wake();
     },
     enable: async () => {
       await store.transform((state) =>
         state.sync ? state : { ...state, sync: { userId: null, synced: [], rejected: [] } },
       );
-      signal?.("wake");
+      wake();
     },
     share: (tableId: TableId) => sharing(tableId, transport.share),
     unshare: (tableId: TableId) => sharing(tableId, transport.unshare),
@@ -1023,8 +1031,7 @@ export const makeRecordingSync = (
         ),
       );
 
-      pull = true;
-      signal?.("wake");
+      wake();
 
       return player;
     },
@@ -1054,7 +1061,7 @@ export const makeRecordingSync = (
       );
 
       await store.transform((current) => addJoinedTable(current, joined));
-      signal?.("wake");
+      wake();
 
       return joined;
     },
