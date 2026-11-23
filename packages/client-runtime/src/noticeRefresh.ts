@@ -27,11 +27,11 @@ export const registryTarget = <A, E>(
   }) satisfies RefreshTarget;
 
 /**
- * A refetch target for data fetched by hand. A notice runs the fetch set with `fetchWith`, then
- * `wake` (the device ledger pulls what others changed). The fetch calls `waiting` as it starts
- * and as it ends, so a notice that lands while it runs gets one more fetch.
+ * A refetch target for data fetched by hand. A notice runs the fetch set with `fetchWith`. The
+ * fetch calls `waiting` as it starts and as it ends, so a notice that lands while it runs gets
+ * one more fetch.
  */
-export const manualTarget = ({ wake }: { wake?: () => void } = {}) => {
+export const manualTarget = () => {
   const listeners = new Set<(waiting: boolean) => void>();
   let waiting = false;
   let fetcher: (() => void) | null = null;
@@ -41,7 +41,6 @@ export const manualTarget = ({ wake }: { wake?: () => void } = {}) => {
     target: {
       refresh: () => {
         fetcher?.();
-        wake?.();
       },
       watchWaiting: (listener) => {
         listeners.add(listener);

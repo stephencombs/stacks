@@ -2,7 +2,7 @@ import { useIsFocused } from "@react-navigation/native";
 import type { ScopeId, TableId } from "@stacks/contracts";
 import type { AppStateSource, OpenSocket } from "@stacks/client-runtime/realtime";
 import { ScopeNotices as ScopeNoticesFor } from "@stacks/client-runtime/realtimeReact";
-import { useTableScopes } from "@stacks/client-runtime/recordingReact";
+import { TableRefresh, useTableScopes } from "@stacks/client-runtime/recordingReact";
 import type { ReactNode } from "react";
 import { AppState } from "react-native";
 
@@ -65,5 +65,10 @@ export function TableNotices({
   tableId: TableId | null;
   children: ReactNode;
 }) {
-  return <ScopeNotices scopes={useTableScopes(tableId)}>{children}</ScopeNotices>;
+  return (
+    <ScopeNotices scopes={useTableScopes(tableId)}>
+      <TableRefresh tableId={tableId} />
+      {children}
+    </ScopeNotices>
+  );
 }

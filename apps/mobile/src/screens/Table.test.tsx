@@ -122,6 +122,7 @@ const setupTableScreen = async ({
     },
     useServerTable: () => null,
     useTableScopes: () => [],
+    TableRefresh: () => null,
   }));
 
   const { TableScreen } = await import("./Table");

@@ -103,33 +103,31 @@ describe("screen notices", () => {
     }),
   );
 
-  it.effect(
-    "refetches a table and wakes the ledger for someone else's write, not this device's",
-    () =>
-      Effect.gen(function* () {
-        const { hub, lines, fork } = yield* setup({ origin: "this-phone" });
-        const refresh = createNoticeRefresh(fork);
-        const calls = { refetches: 0, wakes: 0 };
+  it.effect("refetches what is shown for someone else's write, not this device's", () =>
+    Effect.gen(function* () {
+      const { hub, lines, fork } = yield* setup({ origin: "this-phone" });
+      const refresh = createNoticeRefresh(fork);
+      const calls = { refetches: 0 };
 
-        const table = manualTarget({ wake: () => void (calls.wakes += 1) });
-        table.fetchWith(() => void (calls.refetches += 1));
+      const table = manualTarget();
+      table.fetchWith(() => void (calls.refetches += 1));
 
-        refresh.register(table.target);
-        watchScopes(hub, refresh).set([scopeOf(1)]);
-        const line = yield* Queue.take(lines);
-        line.handlers.open();
-        yield* TestClock.adjust("200 millis");
-        expect(calls).toEqual({ refetches: 1, wakes: 1 });
-        table.waiting(true);
-        table.waiting(false);
+      refresh.register(table.target);
+      watchScopes(hub, refresh).set([scopeOf(1)]);
+      const line = yield* Queue.take(lines);
+      line.handlers.open();
+      yield* TestClock.adjust("200 millis");
+      expect(calls).toEqual({ refetches: 1 });
+      table.waiting(true);
+      table.waiting(false);
 
-        line.handlers.message(JSON.stringify({ scope: scopeOf(1), origin: "this-phone" }));
-        yield* TestClock.adjust("1 second");
-        expect(calls).toEqual({ refetches: 1, wakes: 1 });
+      line.handlers.message(JSON.stringify({ scope: scopeOf(1), origin: "this-phone" }));
+      yield* TestClock.adjust("1 second");
+      expect(calls).toEqual({ refetches: 1 });
 
-        line.handlers.message(JSON.stringify({ scope: scopeOf(1), origin: "that-phone" }));
-        yield* TestClock.adjust("200 millis");
-        expect(calls).toEqual({ refetches: 2, wakes: 2 });
-      }),
+      line.handlers.message(JSON.stringify({ scope: scopeOf(1), origin: "that-phone" }));
+      yield* TestClock.adjust("200 millis");
+      expect(calls).toEqual({ refetches: 2 });
+    }),
   );
 });

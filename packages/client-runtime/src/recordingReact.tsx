@@ -29,6 +29,7 @@ import * as Fiber from "effect/Fiber";
 import {
   createContext,
   use,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -41,6 +42,7 @@ import { fetchSharedTable } from "./api.ts";
 import { describeError } from "./errors.ts";
 import { manualTarget } from "./noticeRefresh.ts";
 import { useNoticeRefresh, useScopeNotices } from "./realtimeReact.tsx";
+import { createTableFeed, tableRefreshTarget, type TableFeed } from "./tableFeed.ts";
 import {
   RecordingError,
   RecordingStoreLive,
@@ -215,6 +217,8 @@ export const useRecordingVisit = (visitId: VisitId) => {
 
 const RecordingSyncContext = createContext<RecordingSync | null>(null);
 
+const TableFeedContext = createContext<TableFeed | null>(null);
+
 /**
  * While someone is signed in, syncs the device ledger to their account: it uploads what was
  * recorded signed out, restores what other devices synced, and keeps pushing new saves. Signed
@@ -237,9 +241,8 @@ export function RecordingSyncRoot({
 }) {
   const store = useRecordingStore();
 
-  const hold = (id: string | null) => ({
-    userId: id,
-    sync: Effect.runSync(
+  const hold = (id: string | null) => {
+    const sync = Effect.runSync(
       Effect.gen(function* () {
         return yield* RecordingSyncService;
       }).pipe(
@@ -253,8 +256,10 @@ export function RecordingSyncRoot({
           ),
         ),
       ),
-    ),
-  });
+    );
+
+    return { userId: id, sync, feed: createTableFeed((tableId) => sync.table(tableId)) };
+  };
 
   const [held, setHeld] = useState(() => hold(userId));
 
@@ -270,7 +275,11 @@ export function RecordingSyncRoot({
     };
   }, [sync, wake]);
 
-  return <RecordingSyncContext value={sync}>{children}</RecordingSyncContext>;
+  return (
+    <RecordingSyncContext value={sync}>
+      <TableFeedContext value={held.feed}>{children}</TableFeedContext>
+    </RecordingSyncContext>
+  );
 }
 
 const idle = () => null;
@@ -582,52 +591,43 @@ export const useTableScopes = (tableId: TableId | null) => {
 
 /**
  * The whole table as the server has it, for a table this device joined: everyone else's play
- * lives there, not on this device. `undefined` while loading, null when it can't be reached. A
- * change notice under the nearest `ScopeNotices` refetches it and has the device ledger pull what
- * others recorded.
+ * lives there, not on this device. `undefined` while loading, null when it can't be reached.
+ * Every screen showing the table shares one fetch, which `TableRefresh` repeats on a change.
  */
 export const useServerTable = (tableId: TableId | null) => {
-  const { sync, enabled } = useSyncsToServer();
-  const [view, setView] = useState<{ id: TableId; view: TableView | null } | null>(null);
-  const refetching = useMemo(() => manualTarget({ wake: () => sync?.wake() }), [sync]);
+  const { enabled } = useSyncsToServer();
+  const feed = use(TableFeedContext);
+  const watching = enabled && feed !== null && tableId !== null;
 
-  useNoticeRefresh(refetching.target);
+  const subscribe = useCallback(
+    (listener: () => void) => (watching ? feed.subscribe(tableId, listener) : () => undefined),
+    [watching, feed, tableId],
+  );
 
-  useEffect(() => {
-    if (!enabled || !sync || !tableId) {
-      refetching.waiting(false);
-
-      return;
-    }
-
-    let current = true;
-    let latest = 0;
-
-    const fetchTable = () => {
-      const mine = ++latest;
-      const live = () => current && mine === latest;
-      refetching.waiting(true);
-
-      sync
-        .table(tableId)
-        .then(
-          (next) => live() && setView({ id: tableId, view: next }),
-          () => live() && setView({ id: tableId, view: null }),
-        )
-        .finally(() => live() && refetching.waiting(false));
-    };
-
-    refetching.fetchWith(fetchTable);
-    fetchTable();
-
-    return () => {
-      current = false;
-      refetching.fetchWith(null);
-    };
-  }, [enabled, sync, tableId, refetching]);
-
-  return enabled && view?.id === tableId ? view.view : undefined;
+  return useSyncExternalStore(subscribe, () => (watching ? feed.view(tableId) : undefined));
 };
+
+/**
+ * Under a table's `ScopeNotices`: a change notice refetches the table's server view once, however
+ * many screens show it, and has the device ledger pull what others recorded.
+ */
+export function TableRefresh({ tableId }: { tableId: TableId | null }) {
+  const feed = use(TableFeedContext);
+  const sync = use(RecordingSyncContext);
+
+  const target = useMemo(
+    () => (feed && sync && tableId ? tableRefreshTarget(feed, tableId, () => sync.wake()) : null),
+    [feed, sync, tableId],
+  );
+
+  return target ? <Registered target={target} /> : null;
+}
+
+function Registered({ target }: { target: Parameters<typeof useNoticeRefresh>[0] }) {
+  useNoticeRefresh(target);
+
+  return null;
+}
 
 /**
  * A table's read-only view through its share link: `undefined` while loading, null when the link
