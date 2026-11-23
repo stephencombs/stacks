@@ -26,6 +26,34 @@ it.layer(TestApi.layer)("realtime upgrade", (it) => {
     }),
   );
 
+  it.effect("sends an uppercase scope to the same channel as its lowercase form", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const { alex } = yield* users("alex");
+      const group = yield* groupWith(alex);
+      const scope = groupScope(group.group.id);
+
+      const response = yield* api.upgrade(`group:${group.group.id.toUpperCase()}`, {
+        token: group.players[0]!.userId,
+      });
+
+      expect(response.status).toBe(200);
+      expect(api.forwarded.at(-1)).toBe(scope);
+    }),
+  );
+
+  it.effect("refuses anything but GET with 405", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const scope = groupScope(ids.group());
+
+      for (const method of ["POST", "PUT", "DELETE", "PATCH"]) {
+        const response = yield* api.upgrade(scope, { token: "user_anyone", method });
+        expect(response.status).toBe(405);
+      }
+    }),
+  );
+
   it.effect("answers 426 to a request that isn't an upgrade", () =>
     Effect.gen(function* () {
       const api = yield* TestApi;

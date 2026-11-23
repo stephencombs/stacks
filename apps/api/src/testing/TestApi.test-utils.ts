@@ -148,11 +148,16 @@ const makeTestApi = Effect.gen(function* () {
 
   const upgrade = (
     path: string,
-    request: { readonly token?: string | null; readonly websocket?: boolean },
+    request: {
+      readonly token?: string | null;
+      readonly websocket?: boolean;
+      readonly method?: string;
+    },
     verify: Upgrade.Upgrade["verify"] = verifyTest,
   ) =>
     Upgrade.upgrade(
       new Request(`http://stacks.test${REALTIME_PREFIX}${path}`, {
+        method: request.method ?? "GET",
         headers: upgradeHeaders(request),
       }),
       {

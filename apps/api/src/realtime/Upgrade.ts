@@ -30,7 +30,7 @@ export interface Upgrade {
 export const isUpgradePath = (url: string) => new URL(url).pathname.startsWith(REALTIME_PREFIX);
 
 const rawScope = (url: string) =>
-  new URL(url).pathname.slice(REALTIME_PREFIX.length).replaceAll(/%3a/gi, ":");
+  new URL(url).pathname.slice(REALTIME_PREFIX.length).replaceAll(/%3a/gi, ":").toLowerCase();
 
 const kindOf = (raw: string) =>
   raw.startsWith("group:") ? "group" : raw.startsWith("table:") ? "table" : "unknown";
@@ -43,11 +43,13 @@ const bearer = (request: Request) => {
 
 /**
  * Authorizes a WebSocket upgrade to `/api/realtime/<scope>` and passes it on. Only group scopes
- * exist so far, and the group GET's membership check decides who may watch one. A refusal is a
- * plain status, since a socket client can't read a body, and it's logged without the credential.
+ * exist so far, and the group GET's membership check decides who may watch one. Ids are lowercased,
+ * so one group is one channel however the client spelled it. A refusal is a plain status, since a socket client can't read a body, and it's logged without the credential.
  */
 export const upgrade = (request: Request, { verify, connect }: Upgrade) =>
   Effect.gen(function* () {
+    if (request.method !== "GET") return yield* new Rejected({ status: 405, reason: "method" });
+
     const raw = rawScope(request.url);
     const scope = Option.getOrNull(Schema.decodeUnknownOption(ScopeId)(raw));
 
