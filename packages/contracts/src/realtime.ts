@@ -22,6 +22,9 @@ export const scopeKind = (scope: ScopeId) => (scope.startsWith("group:") ? "grou
 /** The request header a client names itself with: a random id per install, not a secret. */
 export const ORIGIN_HEADER = "x-origin";
 
+/** How the Worker hands a socket's revocation tags to the object that holds it. Never sent by a client. */
+export const TAGS_HEADER = "x-scope-tags";
+
 export const OriginId = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/));
 
 /**
@@ -47,5 +50,9 @@ export const MAX_SCOPE_SOCKETS = 100;
 
 /** Application close codes, in the range WebSocket reserves for apps. */
 export const ScopeCloseCode = {
+  /** Access to the scope was lost. The client refetches once, then stops watching it. */
+  revoked: 4403,
+  /** The table is gone. The client treats it like `revoked`. */
+  tableDeleted: 4404,
   overCapacity: 4429,
 } as const;

@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import { CurrencyCode, StakeId, groupScope, type ScopeId } from "@stacks/contracts";
+import { CurrencyCode, ScopeCloseCode, StakeId, groupScope, type ScopeId } from "@stacks/contracts";
 
 import { groupWith, ids, usd, users, type TestGroup } from "../testing/fixtures.test-utils.ts";
 import { TestApi } from "../testing/TestApi.test-utils.ts";
@@ -241,6 +241,11 @@ it.layer(TestApi.layer)("realtime notices", (it) => {
         Realtime.transaction(
           Effect.gen(function* () {
             yield* Realtime.changed(scope);
+            yield* Realtime.closed({
+              scope,
+              selector: { kind: "all" },
+              code: ScopeCloseCode.revoked,
+            });
 
             return yield* Effect.fail("refused");
           }),
@@ -249,6 +254,7 @@ it.layer(TestApi.layer)("realtime notices", (it) => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       expect(realtime.queued()).toEqual([]);
+      expect(realtime.closes()).toEqual([]);
     }),
   );
 
@@ -256,17 +262,22 @@ it.layer(TestApi.layer)("realtime notices", (it) => {
     Effect.gen(function* () {
       const scope = groupScope(ids.group());
       const sent: Array<ScopeId> = [];
+      const closed: Array<Realtime.Close> = [];
       const pending: Array<Promise<unknown>> = [];
+      const close = { scope, selector: { kind: "all" }, code: ScopeCloseCode.revoked } as const;
 
       const exit = yield* Effect.exit(
         Realtime.withRealtime(
           {
             notify: async (notice) => void sent.push(notice.scope),
+            close: async (request) => void closed.push(request),
             waitUntil: (work) => void pending.push(work),
           },
           null,
           (realtime) =>
-            Realtime.transaction(Realtime.changed(scope)).pipe(
+            Realtime.transaction(
+              Realtime.changed(scope).pipe(Effect.andThen(Realtime.closed(close))),
+            ).pipe(
               Effect.andThen(Effect.die("view failed")),
               Effect.provideService(Realtime.Realtime, realtime),
             ),
@@ -276,6 +287,7 @@ it.layer(TestApi.layer)("realtime notices", (it) => {
       yield* Effect.promise(() => Promise.all(pending));
       expect(Exit.isFailure(exit)).toBe(true);
       expect(sent).toEqual([scope]);
+      expect(closed).toEqual([close]);
     }),
   );
 });

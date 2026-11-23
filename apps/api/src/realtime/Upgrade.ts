@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import {
@@ -10,6 +11,7 @@ import {
   RecorderOf,
   ScopeId,
   TableId,
+  TAGS_HEADER,
   type ScopeId as Scope,
   type Unauthorized,
 } from "@stacks/contracts";
@@ -17,6 +19,7 @@ import {
 import { parseActor } from "../auth/Clerk.ts";
 import * as Access from "../features/Access.ts";
 import * as Recording from "../features/Recording.ts";
+import { tagsOf, writeTags, type Grant } from "./Selector.ts";
 
 class Rejected extends Schema.TaggedError<Rejected>()("Rejected", {
   status: Schema.Number,
@@ -51,13 +54,22 @@ const credentialOf = (request: Request) => {
     : Option.none();
 };
 
+const withTags = (request: Request, grant: Grant) => {
+  const headers = new Headers(request.headers);
+  headers.set(TAGS_HEADER, writeTags(tagsOf(grant)));
+
+  return new Request(request, { headers });
+};
+
 /**
  * Authorizes a WebSocket upgrade to `/api/realtime/<scope>` and passes it on. The group GET's
  * membership check decides who may watch a group, for a signed-in account only. A table accepts
  * what the table GET does (an account, a device actor) and a share link that names that table,
- * and applies the same rules: a table that was deleted, or whose visits all were, is gone. Ids are
- * lowercased, so one scope is one channel however the client spelled it. A refusal is a plain
- * status, since a socket client can't read a body, and it's logged without the credential.
+ * and applies the same rules: a table that was deleted, or whose visits all were, is gone. The
+ * socket is tagged with what it was authorized through (see `Grant`), so losing that access can
+ * close it. Ids are lowercased, so one scope is one channel however the client spelled it. A
+ * refusal is a plain status, since a socket client can't read a body, and it's logged without the
+ * credential.
  */
 export const upgrade = (request: Request, { verify, connect }: Upgrade) =>
   Effect.gen(function* () {
@@ -81,37 +93,65 @@ export const upgrade = (request: Request, { verify, connect }: Upgrade) =>
       verify(value).pipe(Effect.mapError(() => new Rejected({ status: 401, reason: "bad_token" }))),
     );
 
-    if (scope.startsWith("group:")) {
+    const ofGroup = Effect.gen(function* () {
       if (scheme !== "bearer") return yield* new Rejected({ status: 401, reason: "bad_scheme" });
+      const member = yield* user();
 
       yield* Access.membership(GroupId.make(scope.slice("group:".length))).pipe(
-        Effect.provideService(CurrentUser, yield* user()),
+        Effect.provideService(CurrentUser, member),
         Effect.catchTags({
           NotFound: () => Effect.fail(new Rejected({ status: 404, reason: "group_not_found" })),
           Forbidden: () => Effect.fail(new Rejected({ status: 403, reason: "not_a_member" })),
           SqlError: Effect.die,
         }),
       );
-    } else {
+
+      const grant: Grant = { userId: member.userId };
+
+      return grant;
+    });
+
+    const ofTable = Effect.gen(function* () {
       const tableId = TableId.make(scope.slice("table:".length));
+      const token = Redacted.value(value);
 
-      const view =
+      const viaLink = Effect.gen(function* () {
+        const seen = yield* Recording.shared(token);
+        const grant: Grant = { shareHash: yield* Recording.digest(token) };
+
+        return { seen, grant };
+      });
+
+      const viaRecorder = (recorder: typeof Recorder.Service) =>
+        Effect.gen(function* () {
+          const seen = yield* Recording.table(tableId);
+          const { self } = yield* Recording.principal();
+
+          const grant: Grant = {
+            userId: Predicate.isTagged(recorder, "Account") ? recorder.user.userId : undefined,
+            actorId: Predicate.isTagged(recorder, "Actor") ? recorder.actorId : self?.actorId,
+            groupId:
+              seen.viewerRole === "viewer"
+                ? ((yield* Recording.groupOfTrip(seen.table.tripId)) ?? undefined)
+                : undefined,
+          };
+
+          return { seen, grant };
+        }).pipe(Effect.provideService(Recorder, recorder));
+
+      const watched = yield* (
         scheme === "share"
-          ? Recording.shared(Redacted.value(value))
-          : Recording.table(tableId).pipe(
-              Effect.provideService(
-                Recorder,
-                scheme === "bearer"
-                  ? RecorderOf.Account({ user: yield* user() })
-                  : RecorderOf.Actor(
-                      yield* parseActor(value).pipe(
-                        Effect.mapError(() => new Rejected({ status: 401, reason: "bad_actor" })),
-                      ),
+          ? viaLink
+          : viaRecorder(
+              scheme === "bearer"
+                ? RecorderOf.Account({ user: yield* user() })
+                : RecorderOf.Actor(
+                    yield* parseActor(value).pipe(
+                      Effect.mapError(() => new Rejected({ status: 401, reason: "bad_actor" })),
                     ),
-              ),
-            );
-
-      const seen = yield* view.pipe(
+                  ),
+            )
+      ).pipe(
         Effect.catchTags({
           NotFound: () => Effect.fail(new Rejected({ status: 404, reason: "table_not_found" })),
           Unauthorized: () => Effect.fail(new Rejected({ status: 401, reason: "bad_actor" })),
@@ -119,12 +159,16 @@ export const upgrade = (request: Request, { verify, connect }: Upgrade) =>
         }),
       );
 
-      if (seen.table.id.toLowerCase() !== tableId) {
+      if (watched.seen.table.id.toLowerCase() !== tableId) {
         return yield* new Rejected({ status: 404, reason: "table_not_found" });
       }
-    }
 
-    return yield* Effect.promise(() => connect(scope, request));
+      return watched.grant;
+    });
+
+    const grant = yield* scope.startsWith("group:") ? ofGroup : ofTable;
+
+    return yield* Effect.promise(() => connect(scope, withTags(request, grant)));
   }).pipe(
     Effect.catchTag("Rejected", ({ status, reason }) =>
       Effect.logWarning("Realtime upgrade rejected").pipe(

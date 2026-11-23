@@ -1,16 +1,21 @@
 import { expect, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
-import { groupScope, tableScope } from "@stacks/contracts";
+import { ActorId, PlayerId, groupScope, tableScope } from "@stacks/contracts";
 
 import * as Clerk from "../auth/Clerk.ts";
 import { clerkJwtKey, sessionToken } from "../testing/clerk.test-utils.ts";
+import * as Recording from "../features/Recording.ts";
 import { groupWith, ids, users } from "../testing/fixtures.test-utils.ts";
 import {
+  account,
   deleteTable,
   deleteVisit,
   device,
   openTable,
+  seatNew,
+  setTableTrip,
+  sharedTable,
   signedIn,
   start,
   uuid,
@@ -272,6 +277,134 @@ it.layer(TestApi.layer)("realtime upgrade of a table", (it) => {
 
       expect((yield* api.upgrade(scope, {})).status).toBe(401);
       expect((yield* api.upgrade(scope, { authorization: "Basic abc" })).status).toBe(401);
+    }),
+  );
+});
+
+it.layer(TestApi.layer)("realtime upgrade tags", (it) => {
+  it.effect("tags a group socket with the member", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const { alex } = yield* users("alex");
+      const group = yield* groupWith(alex);
+      const member = group.players[0]!.userId!;
+
+      yield* api.upgrade(groupScope(group.group.id), { token: member });
+
+      expect(api.forwardedTags.at(-1)).toEqual([`user:${member}`]);
+    }),
+  );
+
+  it.effect("tags a table socket with what it was let in through, and no credential", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const { alex, scope, token, bearer } = yield* tableOf();
+      const actorId = alex.identity.actorId.toLowerCase();
+
+      yield* api.upgrade(scope, { authorization: bearer });
+      expect(api.forwardedTags.at(-1)).toEqual([`user:${bearer.slice(7)}`, `actor:${actorId}`]);
+
+      yield* api.upgrade(scope, { authorization: `Share ${token}` });
+      expect(api.forwardedTags.at(-1)).toEqual([`share:${yield* Recording.digest(token)}`]);
+
+      const starter = yield* device();
+      const own = start(starter.identity);
+      yield* starter.push(own);
+      const actor = `Actor ${starter.credential.actorId}.${starter.credential.secret}`;
+
+      yield* api.upgrade(tableScope(own.tableId), { authorization: actor });
+      expect(api.forwardedTags.at(-1)).toEqual([`actor:${starter.identity.actorId.toLowerCase()}`]);
+
+      const sent = JSON.stringify(api.forwardedTags);
+      expect(sent).not.toContain(token);
+      expect(sent).not.toContain(starter.credential.secret);
+    }),
+  );
+
+  it.effect("tags a group member who only looks at a trip's table with that group", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const { alex, bea } = yield* users("alex", "bea");
+      const group = yield* groupWith(alex, bea);
+      const groupId = group.group.id.toLowerCase();
+      const [alexId, beaId] = [group.players[0]!.userId!, group.players[1]!.userId!];
+      const who = { playerId: PlayerId.make(uuid()), actorId: ActorId.make(uuid()) };
+      const opened = start(who);
+
+      yield* alex.recording.push({
+        payload: {
+          identity: who,
+          commands: [opened, setTableTrip(who, opened.tableId, group.tripId)],
+        },
+      });
+
+      const scope = tableScope(opened.tableId);
+
+      yield* api.upgrade(scope, { token: beaId });
+      expect(api.forwardedTags.at(-1)).toEqual([
+        `user:${beaId}`,
+        `group:${groupId}`,
+        `member:${groupId}:${beaId}`,
+      ]);
+
+      yield* api.upgrade(scope, { token: alexId });
+      expect(api.forwardedTags.at(-1)).toEqual([
+        `user:${alexId}`,
+        `actor:${who.actorId.toLowerCase()}`,
+      ]);
+    }),
+  );
+
+  it.effect("refuses a share link once it was replaced or removed", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const { alex, opened, scope, token } = yield* tableOf();
+      const params = { params: { tableId: opened.tableId } };
+
+      expect((yield* api.upgrade(scope, { authorization: `Share ${token}` })).status).toBe(200);
+      const next = yield* alex.client.recording.share(params);
+      expect((yield* api.upgrade(scope, { authorization: `Share ${token}` })).status).toBe(404);
+      expect((yield* api.upgrade(scope, { authorization: `Share ${next.token}` })).status).toBe(
+        200,
+      );
+
+      yield* alex.client.recording.unshare(params);
+      expect((yield* api.upgrade(scope, { authorization: `Share ${next.token}` })).status).toBe(
+        404,
+      );
+    }),
+  );
+
+  it.effect("refuses a device, and an account, whose binding to the player was revoked", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const { starter, opened } = yield* sharedTable();
+      const seated = seatNew(starter.identity, opened.tableId, "Bea");
+      yield* starter.push(seated);
+      const scope = tableScope(opened.tableId);
+      const params = { params: { playerId: seated.playerId } };
+
+      const phone = yield* device();
+      yield* phone.redeem((yield* starter.client.recording.invitePlayer(params)).token);
+      const dee = yield* account("dee");
+      yield* dee.redeem((yield* phone.client.recording.invitePlayer(params)).token);
+
+      const asPhone = {
+        authorization: `Actor ${phone.credential.actorId}.${phone.credential.secret}`,
+      };
+
+      const asDee = { authorization: `Bearer user_${dee.handle}` };
+
+      expect((yield* api.upgrade(scope, asPhone)).status).toBe(200);
+      expect((yield* api.upgrade(scope, asDee)).status).toBe(200);
+      expect(api.forwardedTags.at(-1)).toContain(`actor:${dee.identity.actorId.toLowerCase()}`);
+
+      yield* starter.client.recording.revokeBinding({
+        params: { playerId: seated.playerId, actorId: phone.identity.actorId },
+      });
+
+      expect((yield* api.upgrade(scope, asPhone)).status).toBe(404);
+      expect((yield* api.upgrade(scope, asDee)).status).toBe(404);
     }),
   );
 });

@@ -15,6 +15,7 @@ import {
   PlayEntry,
   PlayerIdentity,
   Recorder,
+  ScopeCloseCode,
   Table,
   tableScope,
   Unauthorized,
@@ -243,7 +244,7 @@ const open = (sql: SqlClient.SqlClient) => sql`(
     not exists (select 1 from personal_visits where table_id = tables.id)
     or exists (select 1 from personal_visits where table_id = tables.id and deleted_at is null)))`;
 
-const groupOfTrip = Effect.fn("Recording.groupOfTrip")(function* (tripId: TripId | null) {
+export const groupOfTrip = Effect.fn("Recording.groupOfTrip")(function* (tripId: TripId | null) {
   if (tripId === null) return null;
   const sql = yield* SqlClient.SqlClient;
   const [row] = yield* sql<{ groupId: GroupId }>`select group_id from trips where id = ${tripId}`;
@@ -264,6 +265,33 @@ const tableChanged = Effect.fn("Recording.tableChanged")(function* (
   }
 });
 
+const live = (sql: SqlClient.SqlClient) => sql`(
+  t.deleted_at is null
+  and (
+    not exists (select 1 from personal_visits where table_id = t.id)
+    or exists (
+      select 1 from personal_visits where table_id = t.id and finished_at is null and deleted_at is null
+    )
+  )
+)`;
+
+const playersTables = Effect.fn("Recording.playersTables")(function* (
+  players: ReadonlyArray<PlayerId>,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const mine = sql.in(players);
+
+  return yield* sql<{ id: TableId; tripId: TripId | null }>`
+    with at as (
+      select id from tables where starter_player_id in ${mine}
+      union select table_id from personal_visits where player_id in ${mine} and deleted_at is null
+      union select table_id from table_participants where player_id in ${mine}
+    )
+    select t.id, t.trip_id from tables t join at on at.id = t.id
+    where ${live(sql)}
+  `;
+});
+
 /**
  * Who may record for these players, or as whom, changed. Their open tables show it (a table that
  * is over or deleted is nobody's screen), and so do those tables' groups.
@@ -272,26 +300,54 @@ export const playersChanged = Effect.fn("Recording.playersChanged")(function* (
   players: ReadonlyArray<PlayerId>,
 ) {
   if (players.length === 0) return;
-  const sql = yield* SqlClient.SqlClient;
-  const mine = sql.in(players);
 
-  const tables = yield* sql<{ id: TableId; tripId: TripId | null }>`
-    with at as (
-      select id from tables where starter_player_id in ${mine}
-      union select table_id from personal_visits where player_id in ${mine} and deleted_at is null
-      union select table_id from table_participants where player_id in ${mine}
-    )
-    select t.id, t.trip_id from tables t join at on at.id = t.id
-    where t.deleted_at is null
-      and (
-        not exists (select 1 from personal_visits where table_id = t.id)
-        or exists (
-          select 1 from personal_visits where table_id = t.id and finished_at is null and deleted_at is null
-        )
-      )
+  for (const table of yield* playersTables(players)) yield* tableChanged(table.id, [table.tripId]);
+});
+
+/**
+ * These devices stopped recording for the player, so on the player's open tables the sockets they
+ * opened as themselves close. A device that also records through another player, or starts the
+ * table, just reconnects.
+ */
+export const bindingsRevoked = Effect.fn("Recording.bindingsRevoked")(function* (
+  player: PlayerId,
+  actors: ReadonlyArray<string>,
+) {
+  for (const table of yield* playersTables([player])) {
+    yield* tableChanged(table.id, [table.tripId]);
+
+    for (const actorId of actors) {
+      yield* Realtime.closed({
+        scope: tableScope(table.id),
+        selector: { kind: "actor", actorId },
+        code: ScopeCloseCode.revoked,
+      });
+    }
+  }
+});
+
+/**
+ * A member left a group or was removed. Its open tables lose the sockets that watched through
+ * the membership, not the ones the member opened as a starter or a player.
+ */
+export const memberGone = Effect.fn("Recording.memberGone")(function* (
+  groupId: GroupId,
+  userId: string,
+) {
+  const sql = yield* SqlClient.SqlClient;
+
+  const tables = yield* sql<{ id: TableId }>`
+    select t.id from tables t join trips tr on tr.id = t.trip_id
+    where tr.group_id = ${groupId} and ${live(sql)}
   `;
 
-  for (const table of tables) yield* tableChanged(table.id, [table.tripId]);
+  for (const table of tables) {
+    yield* Realtime.closed({
+      scope: tableScope(table.id),
+      selector: { kind: "member", groupId, userId },
+      code: ScopeCloseCode.revoked,
+    });
+  }
 });
 
 const participantsAt = Effect.fn("Recording.participantsAt")(function* (tableId: TableId) {
@@ -766,6 +822,26 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
 
     if (command.type === "set_table_trip" && command.tripId === table.tripId) return;
 
+    if (command.type === "delete_table") {
+      yield* Realtime.closed({
+        scope: tableScope(table.id),
+        selector: { kind: "all" },
+        code: ScopeCloseCode.tableDeleted,
+      });
+    }
+
+    if (command.type === "set_table_trip") {
+      const [from, to] = [yield* groupOfTrip(table.tripId), yield* groupOfTrip(command.tripId)];
+
+      if (from !== null && from !== to) {
+        yield* Realtime.closed({
+          scope: tableScope(table.id),
+          selector: { kind: "group", groupId: from },
+          code: ScopeCloseCode.revoked,
+        });
+      }
+    }
+
     yield* tableChanged(
       table.id,
       command.type === "set_table_trip"
@@ -1117,13 +1193,34 @@ export const table = Effect.fn("Recording.table")(function* (tableId: TableId) {
   return yield* viewOf(row, role, playerId, yield* tripMember(row.tripId));
 });
 
+const linkClosed = Effect.fn("Recording.linkClosed")(function* (
+  tableId: TableId,
+  shareHash: string | null,
+) {
+  if (shareHash === null) return;
+
+  yield* Realtime.closed({
+    scope: tableScope(tableId),
+    selector: { kind: "share", shareHash },
+    code: ScopeCloseCode.revoked,
+  });
+});
+
 /** A new read-only link. Only its hash is kept, so an earlier link stops working. */
 export const share = Effect.fn("Recording.share")(function* (tableId: TableId) {
   const sql = yield* SqlClient.SqlClient;
   const row = yield* startedTable(tableId);
   const token = randomToken();
-  yield* sql`update tables set share_token_hash = ${yield* digest(token)} where id = ${row.id}`;
+
+  const [replaced] = yield* sql<{ shareHash: string | null }>`
+    update tables set share_token_hash = ${yield* digest(token)}
+    from (select share_token_hash as before from tables where id = ${row.id}) old
+    where id = ${row.id}
+    returning old.before as share_hash
+  `;
+
   yield* Realtime.changed(tableScope(row.id));
+  yield* linkClosed(row.id, replaced?.shareHash ?? null);
 
   return { token };
 });
@@ -1132,13 +1229,16 @@ export const unshare = Effect.fn("Recording.unshare")(function* (tableId: TableI
   const sql = yield* SqlClient.SqlClient;
   const row = yield* startedTable(tableId);
 
-  const unshared = yield* sql`
+  const [unshared] = yield* sql<{ shareHash: string | null }>`
     update tables set share_token_hash = null
-    where id = ${row.id} and share_token_hash is not null
-    returning id
+    from (select share_token_hash as before from tables where id = ${row.id}) old
+    where id = ${row.id} and old.before is not null
+    returning old.before as share_hash
   `;
 
-  if (unshared.length > 0) yield* Realtime.changed(tableScope(row.id));
+  if (!unshared) return;
+  yield* Realtime.changed(tableScope(row.id));
+  yield* linkClosed(row.id, unshared.shareHash);
 });
 
 /** The one table a share link names, read-only, for anyone holding the link. */

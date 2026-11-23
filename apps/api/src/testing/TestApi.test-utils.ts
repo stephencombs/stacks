@@ -23,6 +23,7 @@ import {
   ORIGIN_HEADER,
   REALTIME_PREFIX,
   StacksApi,
+  TAGS_HEADER,
   Unauthorized,
   UserId,
   type ScopeId,
@@ -35,6 +36,7 @@ import * as Database from "../db/Database.ts";
 import { migrations } from "../db/migrations/index.ts";
 import * as Realtime from "../features/Realtime.ts";
 import * as Api from "../http/Api.ts";
+import { readTags } from "../realtime/Selector.ts";
 import * as Upgrade from "../realtime/Upgrade.ts";
 
 const TEST_DATABASE_URL =
@@ -107,6 +109,7 @@ const makeTestApi = Effect.gen(function* () {
   yield* Effect.addFinalizer(() => Effect.promise(dispose));
 
   const sent: Array<ScopeNotice> = [];
+  const closing: Array<Realtime.Close> = [];
   const flushing = new Set<Promise<unknown>>();
   let refusing = false;
 
@@ -114,6 +117,10 @@ const makeTestApi = Effect.gen(function* () {
     notify: async (notice) => {
       if (refusing) throw new Error("channel unavailable");
       sent.push(notice);
+    },
+    close: async (close) => {
+      if (refusing) throw new Error("channel unavailable");
+      closing.push(close);
     },
     waitUntil: (work) => void flushing.add(work),
   };
@@ -147,6 +154,15 @@ const makeTestApi = Effect.gen(function* () {
       Array.from(new Set(notices.map(({ scope }) => scope))),
     );
 
+  const closes = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.gen(function* () {
+      closing.length = 0;
+      yield* effect;
+      yield* settled;
+
+      return [...closing];
+    });
+
   const refuseNotices = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     Effect.acquireUseRelease(
       Effect.sync(() => void (refusing = true)),
@@ -155,6 +171,7 @@ const makeTestApi = Effect.gen(function* () {
     );
 
   const forwarded: Array<ScopeId> = [];
+  const forwardedTags: Array<ReadonlyArray<string>> = [];
 
   const upgrade = (
     path: string,
@@ -173,8 +190,9 @@ const makeTestApi = Effect.gen(function* () {
       }),
       {
         verify,
-        connect: async (scope) => {
+        connect: async (scope, forwarding) => {
           forwarded.push(scope);
+          forwardedTags.push(readTags(forwarding.headers.get(TAGS_HEADER)));
 
           return new Response("forwarded", { status: 200 });
         },
@@ -219,7 +237,17 @@ const makeTestApi = Effect.gen(function* () {
       Effect.provideService(FetchHttpClient.Fetch, fetch),
     );
 
-  return { as, asActor, notified, noticed, refuseNotices, upgrade, forwarded };
+  return {
+    as,
+    asActor,
+    notified,
+    noticed,
+    closes,
+    refuseNotices,
+    upgrade,
+    forwarded,
+    forwardedTags,
+  };
 });
 
 export class TestApi extends Context.Service<TestApi, Effect.Success<typeof makeTestApi>>()(

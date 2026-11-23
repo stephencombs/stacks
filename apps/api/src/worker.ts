@@ -38,6 +38,8 @@ const handleRequest = (request: Request, env: Env, ctx: ExecutionContext) =>
   Realtime.withRealtime(
     {
       notify: (notice) => env.SCOPE_CHANNEL.getByName(notice.scope).notify(notice),
+      close: ({ scope, selector, code }) =>
+        env.SCOPE_CHANNEL.getByName(scope).close(selector, code),
       waitUntil: (work) => ctx.waitUntil(work),
     },
     Realtime.originOf(request.headers),

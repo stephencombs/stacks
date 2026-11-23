@@ -1,6 +1,7 @@
 import { ScopeId } from "@stacks/contracts";
 
 import { ScopeChannel } from "../realtime/ScopeChannel.ts";
+import type { Selector } from "../realtime/Selector.ts";
 import worker from "../worker.ts";
 
 const unsendable = {
@@ -22,8 +23,8 @@ export class ProbedScopeChannel extends ScopeChannel {
     ctx.storage.kv.put("wakes", (ctx.storage.kv.get<number>("wakes") ?? 0) + 1);
   }
 
-  protected override sockets() {
-    return this.#poisoned ? [...super.sockets(), unsendable] : super.sockets();
+  protected override sockets(tag?: string) {
+    return this.#poisoned ? [...super.sockets(tag), unsendable] : super.sockets(tag);
   }
 
   override webSocketMessage() {
@@ -58,6 +59,13 @@ export default {
         await channel.notify({ scope: ScopeId.make(scope!), origin: null });
 
         return new Response(null, { status: 204 });
+      case "close": {
+        const { selector, code }: { selector: Selector; code: number } = await request.json();
+        await channel.close(selector, code);
+
+        return new Response(null, { status: 204 });
+      }
+
       case "poison":
         await channel.poison();
 

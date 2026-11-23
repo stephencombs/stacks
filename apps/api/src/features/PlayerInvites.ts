@@ -23,6 +23,7 @@ import { PlayerIdentityRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
 import * as Realtime from "./Realtime.ts";
 import {
+  bindingsRevoked,
   digest,
   establish,
   MAX_DEVICES,
@@ -170,7 +171,10 @@ export const revokeBinding = Effect.fn("PlayerInvites.revokeBinding")(function* 
       `;
 
       if (revoked.length === 0) return yield* new NotFound({ resource: "player" });
-      yield* playersChanged([playerId]);
+      yield* bindingsRevoked(
+        playerId,
+        revoked.map((row) => row.actorId),
+      );
       yield* sql`
         update player_invites set revoked_at = now()
         where player_id = ${playerId}

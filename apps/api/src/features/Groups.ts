@@ -10,6 +10,7 @@ import {
   type CreateGroupRequest,
   GroupId,
   groupScope,
+  ScopeCloseCode,
   SessionId,
   TripId,
   type GroupListItem,
@@ -22,6 +23,7 @@ import { balances } from "@stacks/shared/balances";
 import { EntryRow, GroupRow, MembershipRow, TripRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
 import * as Realtime from "./Realtime.ts";
+import * as Recording from "./Recording.ts";
 import * as Views from "./Views.ts";
 
 const ok = { ok: true } as const;
@@ -205,6 +207,15 @@ export const rename = Effect.fn("Groups.rename")(function* (
   return yield* Views.groupDetail(member);
 });
 
+const memberGone = Effect.fn("Groups.memberGone")(function* (groupId: GroupId, userId: UserId) {
+  yield* Realtime.closed({
+    scope: groupScope(groupId),
+    selector: { kind: "user", userId },
+    code: ScopeCloseCode.revoked,
+  });
+  yield* Recording.memberGone(groupId, userId);
+});
+
 export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
@@ -225,7 +236,10 @@ export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
     returning user_id
   `;
 
-  if (left.length > 0) yield* Realtime.changed(groupScope(groupId));
+  if (left.length > 0) {
+    yield* Realtime.changed(groupScope(groupId));
+    yield* memberGone(groupId, userId);
+  }
 
   return ok;
 });
@@ -268,7 +282,10 @@ export const removeMember = Effect.fn("Groups.removeMember")(function* (
     returning user_id
   `;
 
-  if (removed.length > 0) yield* Realtime.changed(groupScope(groupId));
+  if (removed.length > 0) {
+    yield* Realtime.changed(groupScope(groupId));
+    yield* memberGone(groupId, targetUserId);
+  }
 
   return ok;
 });
