@@ -53,6 +53,7 @@ import {
   recordRejectedAgain,
   RecordingSyncBlocked,
   syncsAsDevice,
+  syncsToServer,
   tableOnServer,
   type ActorKeyStorage,
   type RecordingTransport,
@@ -1747,6 +1748,58 @@ describe("shared tables", () => {
       expect(tableOnServer({ ...own, sync: synced }, tableId)).toBe(true);
       expect(tableOnServer(own, TableId.make(crypto.randomUUID()))).toBe(true);
     }));
+
+  it.effect(
+    "holds a signed-in account's server reads until the claim has bound this device's tables",
+    () =>
+      Effect.gen(function* () {
+        const store = yield* Effect.promise(() => open());
+        yield* Effect.promise(() =>
+          save(store, { type: "start", buyIn: 20000, startedAt: at(10) }),
+        );
+        const remote = server();
+        const keys = memoryKeys();
+        const device = makeRecordingSync(store, null, transportFor(remote), keys);
+        const asDevice = yield* Effect.forkChild(device.run);
+        yield* Effect.promise(() => device.enable());
+        yield* TestClock.adjust("1 second");
+        expect(syncsToServer(state(store), null)).toBe(true);
+        expect(syncsToServer(state(store), alex)).toBe(false);
+        yield* Fiber.interrupt(asDevice);
+
+        const claiming = Promise.withResolvers<void>();
+        const asked = Promise.withResolvers<void>();
+
+        const account = makeRecordingSync(
+          store,
+          alex,
+          {
+            ...transportFor(remote),
+            claimActor: () =>
+              Effect.promise(async () => {
+                asked.resolve();
+                await claiming.promise;
+
+                return { adopted: true, claimed: [], refused: [] };
+              }),
+          },
+          keys,
+        );
+
+        const statuses = yield* Queue.unbounded<string>();
+        account.subscribe(() => Queue.offerUnsafe(statuses, account.getStatus().phase));
+        const asAccount = yield* Effect.forkChild(account.run);
+        yield* Effect.promise(() => asked.promise);
+        expect(syncsToServer(state(store), alex)).toBe(false);
+        expect(syncsToServer(state(store), null)).toBe(true);
+
+        claiming.resolve();
+
+        while ((yield* Queue.take(statuses)) !== "idle");
+        expect(syncsToServer(state(store), alex)).toBe(true);
+        yield* Fiber.interrupt(asAccount);
+      }),
+  );
 
   it("keeps solo play on a signed-out device, and syncs a shared table as the device's actor", () =>
     Effect.gen(function* () {

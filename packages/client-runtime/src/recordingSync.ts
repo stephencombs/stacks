@@ -137,6 +137,15 @@ export const tableSynced = (state: RecordingState, tableId: TableId) => {
 };
 
 /**
+ * Whether the server holds this device's tables for whoever `userId` is, so reading them there
+ * can work. Signed out, it's the device's own actor. Signed in, it's once sync has claimed the
+ * device's tables for the account: before that, and while the claim waits for the user, the
+ * account can't see them.
+ */
+export const syncsToServer = (state: RecordingState, userId: UserId | null) =>
+  userId === null ? syncsAsDevice(state) : state.sync?.userId === userId;
+
+/**
  * Whether the server has the table: it's synced, or this device never created it (it joined from
  * a link, which needs the server), so a socket for it can be accepted.
  */

@@ -58,6 +58,7 @@ import {
   RecordingSyncLive,
   RecordingSyncService,
   syncsAsDevice,
+  syncsToServer,
   tableOnServer,
   tableSynced,
   type ActorKeyStorage,
@@ -570,10 +571,7 @@ const useSyncsToServer = () => {
   return {
     sync,
     state: snapshot.state,
-    enabled:
-      snapshot.state !== null &&
-      sync !== null &&
-      (sync.userId !== null || syncsAsDevice(snapshot.state)),
+    enabled: snapshot.state !== null && sync !== null && syncsToServer(snapshot.state, sync.userId),
   };
 };
 
