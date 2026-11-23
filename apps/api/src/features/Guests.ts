@@ -5,6 +5,7 @@ import {
   Conflict,
   CurrentUser,
   GroupId,
+  groupScope,
   NotFound,
   PlayerId,
   type AddGuestRequest,
@@ -12,6 +13,7 @@ import {
 } from "@stacks/contracts";
 
 import * as Access from "./Access.ts";
+import * as Realtime from "./Realtime.ts";
 import * as Views from "./Views.ts";
 
 const ClaimRow = Schema.Struct({
@@ -50,14 +52,22 @@ export const add = Effect.fn("Guests.add")(function* (
   const { userId } = yield* CurrentUser;
   const member = yield* Access.membership(groupId);
 
-  const [row] = yield* sql`
+  const inserted = yield* sql`
     insert into players (id, group_id, display_name, claim_code, created_by)
     values (${request.id}, ${groupId}, ${request.displayName}, ${Access.randomCode()}, ${userId})
-    on conflict (id) do update set id = players.id
-    returning group_id
-  `.pipe(Effect.flatMap(Access.decodeRows(Schema.Struct({ groupId: GroupId }))));
+    on conflict (id) do nothing
+    returning id
+  `;
 
-  if (row!.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
+  if (inserted.length > 0) {
+    yield* Realtime.changed(groupScope(groupId));
+  } else {
+    const [row] = yield* sql`select group_id from players where id = ${request.id}`.pipe(
+      Effect.flatMap(Access.decodeRows(Schema.Struct({ groupId: GroupId }))),
+    );
+
+    if (row!.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
+  }
 
   return yield* Views.groupDetail(member);
 });
@@ -85,7 +95,7 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
   const { userId } = yield* CurrentUser;
   yield* Access.ensureUser();
 
-  const groupId = yield* sql.withTransaction(
+  const groupId = yield* Realtime.transaction(
     Effect.gen(function* () {
       const guest = yield* findClaim(code, true);
 
@@ -130,6 +140,7 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
         on conflict (group_id, user_id) do update set left_at = null
           where memberships.left_at is not null
       `;
+      yield* Realtime.changed(groupScope(guest.groupId));
 
       return guest.groupId;
     }),

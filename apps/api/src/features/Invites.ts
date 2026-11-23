@@ -8,6 +8,7 @@ import {
   CurrentUser,
   Forbidden,
   GroupId,
+  groupScope,
   NotFound,
   TripId,
   type AcceptInviteRequest,
@@ -18,6 +19,7 @@ import {
 
 import { InviteRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as Realtime from "./Realtime.ts";
 import * as Views from "./Views.ts";
 
 const inviteStatus = (invite: typeof InviteRow.Type, now: DateTime.Utc) =>
@@ -52,12 +54,16 @@ export const create = Effect.fn("Invites.create")(function* (
   const { userId } = yield* CurrentUser;
   yield* Access.membership(groupId);
   const expiresAt = DateTime.add(yield* DateTime.now, { days: 7 });
-  yield* sql`
+
+  const inserted = yield* sql`
     insert into invites (id, group_id, code, created_by, expires_at, max_uses)
     values (${request.id}, ${groupId}, ${Access.randomCode()}, ${userId},
       ${DateTime.toDateUtc(expiresAt)}, ${request.maxUses})
     on conflict (id) do nothing
+    returning id
   `;
+
+  if (inserted.length > 0) yield* Realtime.changed(groupScope(groupId));
 
   const [invite] = yield* sql`
     select id, group_id, code, expires_at, max_uses, uses, revoked_at from invites
@@ -101,7 +107,12 @@ export const revoke = Effect.fn("Invites.revoke")(function* (inviteId: InviteId)
     return yield* new Forbidden({ reason: "admins_only" });
   }
 
-  yield* sql`update invites set revoked_at = now() where id = ${inviteId} and revoked_at is null`;
+  const revoked = yield* sql`
+    update invites set revoked_at = now() where id = ${inviteId} and revoked_at is null
+    returning id
+  `;
+
+  if (revoked.length > 0) yield* Realtime.changed(groupScope(invite.groupId));
 
   return { ok: true } as const;
 });
@@ -154,7 +165,7 @@ export const accept = Effect.fn("Invites.accept")(function* (
   const { userId } = yield* CurrentUser;
   yield* Access.ensureUser();
 
-  const groupId = yield* sql.withTransaction(
+  const groupId = yield* Realtime.transaction(
     Effect.gen(function* () {
       const invite = yield* findByCode(code, true);
 
@@ -199,6 +210,7 @@ export const accept = Effect.fn("Invites.accept")(function* (
       }
 
       yield* sql`update invites set uses = uses + 1 where id = ${invite.id}`;
+      yield* Realtime.changed(groupScope(invite.groupId));
 
       return invite.groupId;
     }),

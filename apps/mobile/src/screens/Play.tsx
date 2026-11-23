@@ -62,6 +62,7 @@ import {
   HIDDEN_AMOUNT_LABEL,
   usePreferences,
 } from "../lib/preferences";
+import { TableNotices } from "../lib/realtime";
 import { useRecordingState } from "../lib/recording";
 import {
   BuyInTotalSheet,
@@ -95,7 +96,17 @@ type Props = StaticScreenProps<{ visitId: string; action?: string }>;
 export function PlayScreen({ route }: Props) {
   const id = Option.getOrNull(VisitId.makeOption(route.params.visitId));
 
-  return id ? <Visit visitId={id} action={route.params.action} /> : <Missing />;
+  return id ? <WatchedVisit visitId={id} action={route.params.action} /> : <Missing />;
+}
+
+function WatchedVisit({ visitId, action }: { visitId: VisitId; action?: string }) {
+  const { visit } = useRecordingVisit(visitId);
+
+  return (
+    <TableNotices tableId={visit?.visit.tableId ?? null}>
+      <Visit visitId={visitId} action={action} />
+    </TableNotices>
+  );
 }
 
 function Title({

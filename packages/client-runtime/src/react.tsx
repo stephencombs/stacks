@@ -55,6 +55,7 @@ import {
   type LastTripStorage,
   type LastTripStore,
 } from "./trip.ts";
+import { useNoticeTarget } from "./realtimeReact.tsx";
 import type { TestEvent } from "./telemetry.ts";
 
 export const TelemetryContext = createContext<(event: TestEvent) => void>(() => {});
@@ -388,6 +389,7 @@ export function useRevalidate<A, E>(
   onWake: (revalidate: () => void) => () => void,
 ) {
   const refresh = useAtomRefresh(query);
+  useNoticeTarget(query);
 
   const revalidate = useEffectEvent(() => {
     const now = Date.now();

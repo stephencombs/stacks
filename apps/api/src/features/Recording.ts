@@ -10,13 +10,17 @@ import {
   Conflict,
   CurrentUser,
   Forbidden,
+  groupScope,
   NotFound,
   PlayEntry,
   PlayerIdentity,
   Recorder,
+  ScopeCloseCode,
   Table,
+  tableScope,
   Unauthorized,
   Visit,
+  type GroupId,
   type PlayerId,
   type TableId,
   type TripId,
@@ -53,6 +57,7 @@ import {
   TableRow,
 } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as Realtime from "./Realtime.ts";
 import * as Venues from "./Venues.ts";
 
 class Rejected extends Data.TaggedError("Rejected")<{
@@ -238,6 +243,112 @@ const open = (sql: SqlClient.SqlClient) => sql`(
   tables.deleted_at is null and (
     not exists (select 1 from personal_visits where table_id = tables.id)
     or exists (select 1 from personal_visits where table_id = tables.id and deleted_at is null)))`;
+
+export const groupOfTrip = Effect.fn("Recording.groupOfTrip")(function* (tripId: TripId | null) {
+  if (tripId === null) return null;
+  const sql = yield* SqlClient.SqlClient;
+  const [row] = yield* sql<{ groupId: GroupId }>`select group_id from trips where id = ${tripId}`;
+
+  return row?.groupId ?? null;
+});
+
+const tableChanged = Effect.fn("Recording.tableChanged")(function* (
+  tableId: TableId,
+  trips: ReadonlyArray<TripId | null>,
+) {
+  yield* Realtime.changed(tableScope(tableId));
+
+  for (const trip of new Set(trips)) {
+    const groupId = yield* groupOfTrip(trip);
+
+    if (groupId !== null) yield* Realtime.changed(groupScope(groupId));
+  }
+});
+
+const live = (sql: SqlClient.SqlClient) => sql`(
+  t.deleted_at is null
+  and (
+    not exists (select 1 from personal_visits where table_id = t.id)
+    or exists (
+      select 1 from personal_visits where table_id = t.id and finished_at is null and deleted_at is null
+    )
+  )
+)`;
+
+const playersTables = Effect.fn("Recording.playersTables")(function* (
+  players: ReadonlyArray<PlayerId>,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const mine = sql.in(players);
+
+  return yield* sql<{ id: TableId; tripId: TripId | null }>`
+    with at as (
+      select id from tables where starter_player_id in ${mine}
+      union select table_id from personal_visits where player_id in ${mine} and deleted_at is null
+      union select table_id from table_participants where player_id in ${mine}
+    )
+    select t.id, t.trip_id from tables t join at on at.id = t.id
+    where ${live(sql)}
+  `;
+});
+
+/**
+ * Who may record for these players, or as whom, changed. Their open tables show it (a table that
+ * is over or deleted is nobody's screen), and so do those tables' groups.
+ */
+export const playersChanged = Effect.fn("Recording.playersChanged")(function* (
+  players: ReadonlyArray<PlayerId>,
+) {
+  if (players.length === 0) return;
+
+  for (const table of yield* playersTables(players)) yield* tableChanged(table.id, [table.tripId]);
+});
+
+/**
+ * These devices stopped recording for the player, so on the player's open tables the sockets they
+ * opened as themselves close. A device that also records through another player, or starts the
+ * table, just reconnects.
+ */
+export const bindingsRevoked = Effect.fn("Recording.bindingsRevoked")(function* (
+  player: PlayerId,
+  actors: ReadonlyArray<string>,
+) {
+  for (const table of yield* playersTables([player])) {
+    yield* tableChanged(table.id, [table.tripId]);
+
+    for (const actorId of actors) {
+      yield* Realtime.closed({
+        scope: tableScope(table.id),
+        selector: { kind: "actor", actorId },
+        code: ScopeCloseCode.revoked,
+      });
+    }
+  }
+});
+
+/**
+ * A member left a group or was removed. Its open tables lose the sockets that watched through
+ * the membership, not the ones the member opened as a starter or a player.
+ */
+export const memberGone = Effect.fn("Recording.memberGone")(function* (
+  groupId: GroupId,
+  userId: string,
+) {
+  const sql = yield* SqlClient.SqlClient;
+
+  const tables = yield* sql<{ id: TableId }>`
+    select t.id from tables t join trips tr on tr.id = t.trip_id
+    where tr.group_id = ${groupId} and ${live(sql)}
+  `;
+
+  for (const table of tables) {
+    yield* Realtime.closed({
+      scope: tableScope(table.id),
+      selector: { kind: "member", groupId, userId },
+      code: ScopeCloseCode.revoked,
+    });
+  }
+});
 
 const participantsAt = Effect.fn("Recording.participantsAt")(function* (tableId: TableId) {
   const sql = yield* SqlClient.SqlClient;
@@ -705,9 +816,43 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
         ),
       );
     yield* save(self, before, after, command);
+    const [table] = before.tables;
+
+    if (!table) return;
+
+    if (command.type === "set_table_trip" && command.tripId === table.tripId) return;
+
+    if (command.type === "delete_table") {
+      yield* Realtime.closed({
+        scope: tableScope(table.id),
+        selector: { kind: "all" },
+        code: ScopeCloseCode.tableDeleted,
+      });
+    }
+
+    if (command.type === "set_table_trip") {
+      const [from, to] = [yield* groupOfTrip(table.tripId), yield* groupOfTrip(command.tripId)];
+
+      if (from !== null && from !== to) {
+        yield* Realtime.closed({
+          scope: tableScope(table.id),
+          selector: { kind: "group", groupId: from },
+          code: ScopeCloseCode.revoked,
+        });
+      }
+    }
+
+    yield* tableChanged(
+      table.id,
+      command.type === "set_table_trip"
+        ? [table.tripId, command.tripId]
+        : command.type === "appoint_recorder" || command.type === "revoke_recorder"
+          ? []
+          : [table.tripId],
+    );
   });
 
-  return yield* sql.withTransaction(apply).pipe(
+  return yield* Realtime.transaction(apply).pipe(
     Effect.catchReason("SqlError", "UniqueViolation", (reason) =>
       reason.constraint === "personal_operations_pkey"
         ? Effect.flatMap(replayed, (same) =>
@@ -1048,12 +1193,36 @@ export const table = Effect.fn("Recording.table")(function* (tableId: TableId) {
   return yield* viewOf(row, role, playerId, yield* tripMember(row.tripId));
 });
 
+const linkClosed = Effect.fn("Recording.linkClosed")(function* (
+  tableId: TableId,
+  shareHash: string | null,
+) {
+  if (shareHash === null) return;
+
+  yield* Realtime.closed({
+    scope: tableScope(tableId),
+    selector: { kind: "share", shareHash },
+    code: ScopeCloseCode.revoked,
+  });
+});
+
 /** A new read-only link. Only its hash is kept, so an earlier link stops working. */
 export const share = Effect.fn("Recording.share")(function* (tableId: TableId) {
   const sql = yield* SqlClient.SqlClient;
   const row = yield* startedTable(tableId);
   const token = randomToken();
-  yield* sql`update tables set share_token_hash = ${yield* digest(token)} where id = ${row.id}`;
+
+  const hash = yield* digest(token);
+
+  yield* Realtime.transaction(
+    Effect.gen(function* () {
+      const before = yield* lockedLink(row.id);
+
+      yield* sql`update tables set share_token_hash = ${hash} where id = ${row.id}`;
+      yield* Realtime.changed(tableScope(row.id));
+      yield* linkClosed(row.id, before);
+    }),
+  );
 
   return { token };
 });
@@ -1061,7 +1230,29 @@ export const share = Effect.fn("Recording.share")(function* (tableId: TableId) {
 export const unshare = Effect.fn("Recording.unshare")(function* (tableId: TableId) {
   const sql = yield* SqlClient.SqlClient;
   const row = yield* startedTable(tableId);
-  yield* sql`update tables set share_token_hash = null where id = ${row.id}`;
+
+  yield* Realtime.transaction(
+    Effect.gen(function* () {
+      const before = yield* lockedLink(row.id);
+
+      if (before === null) return;
+
+      yield* sql`update tables set share_token_hash = null where id = ${row.id}`;
+      yield* Realtime.changed(tableScope(row.id));
+      yield* linkClosed(row.id, before);
+    }),
+  );
+});
+
+// WARNING: without `for update`, a racing share returns the hash before the other writer's, leaving its sockets open.
+const lockedLink = Effect.fn("Recording.lockedLink")(function* (tableId: TableId) {
+  const sql = yield* SqlClient.SqlClient;
+
+  const [row] = yield* sql<{ shareTokenHash: string | null }>`
+    select share_token_hash from tables where id = ${tableId} for update
+  `;
+
+  return row?.shareTokenHash ?? null;
 });
 
 /** The one table a share link names, read-only, for anyone holding the link. */
@@ -1134,18 +1325,17 @@ export const join = Effect.fn("Recording.join")(function* (
       insert into table_participants (table_id, player_id, joined_via)
       values (${table.id}, ${id}, 'link')
     `;
+    yield* Realtime.changed(tableScope(table.id));
     const joined: JoinedTable = { table, player: PlayerIdentity.make({ id, displayName }) };
 
     return joined;
   });
 
-  return yield* sql
-    .withTransaction(attempt)
-    .pipe(
-      Effect.catchReason("SqlError", "UniqueViolation", () =>
-        Effect.fail(new Conflict({ reason: "id_taken" })),
-      ),
-    );
+  return yield* Realtime.transaction(attempt).pipe(
+    Effect.catchReason("SqlError", "UniqueViolation", () =>
+      Effect.fail(new Conflict({ reason: "id_taken" })),
+    ),
+  );
 });
 
 /** Registers a device actor. Registering again with the same secret changes nothing. */
@@ -1256,6 +1446,7 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (request: 
 
     if (separate) {
       const linked: HeldPlayer[] = [];
+      const changed: HeldPlayer[] = [];
 
       for (const player of held.filter((player) => !taken.includes(player))) {
         const [binding] = yield* sql<{ revokedAt: Date | null }>`
@@ -1278,11 +1469,20 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (request: 
             values (${player.id}, ${own.actorId},
               ${player.boundVia === "self" ? "invite" : player.boundVia}, ${request.actorId})
           `;
+          changed.push(player);
         }
 
-        yield* sql`update players set user_id = ${user.userId} where id = ${player.id}`;
+        const claimed = yield* sql`
+          update players set user_id = ${user.userId}
+          where id = ${player.id} and user_id is distinct from ${user.userId}
+          returning id
+        `;
+
+        if (claimed.length > 0 && !changed.includes(player)) changed.push(player);
         linked.push(player);
       }
+
+      yield* playersChanged(changed.map(({ id }) => id));
 
       return {
         adopted: false,
@@ -1315,6 +1515,8 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (request: 
         update players set user_id = ${user.userId} where id in ${sql.in(others.map(({ id }) => id))}
       `;
 
+    yield* playersChanged(held.map(({ id }) => id));
+
     return {
       adopted: self?.userId === null,
       claimed: fresh.map((player) =>
@@ -1324,11 +1526,9 @@ export const claimActor = Effect.fn("Recording.claimActor")(function* (request: 
     } satisfies ClaimResult;
   });
 
-  return yield* sql
-    .withTransaction(claim)
-    .pipe(
-      Effect.catchReason("SqlError", "UniqueViolation", () =>
-        Effect.fail(new Conflict({ reason: "recording_identity" })),
-      ),
-    );
+  return yield* Realtime.transaction(claim).pipe(
+    Effect.catchReason("SqlError", "UniqueViolation", () =>
+      Effect.fail(new Conflict({ reason: "recording_identity" })),
+    ),
+  );
 });

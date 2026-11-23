@@ -104,6 +104,10 @@ async function load({
   }));
   vi.doMock("./lib/theme", () => ({ useTheme: () => "system" }));
   vi.doMock("./lib/actorKeys", () => ({ actorKeys: {} }));
+  vi.doMock("./lib/origin", () => ({ installOrigin: "install-test" }));
+  vi.doMock("./lib/scopeHub", () => ({
+    rootHubFor: () => ({ watch: () => () => {}, dispose: () => {} }),
+  }));
   vi.doMock("./lib/fonts", () => ({ useAppFonts: () => {} }));
   vi.doMock("./lib/recording", async () => {
     const { openDeviceRecordingStore } = await vi.importActual<

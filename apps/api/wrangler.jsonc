@@ -13,12 +13,19 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/stacks",
     },
   ],
+  // One object per scope, named by its scope id. Bindings aren't inherited by `env`, so they're
+  // repeated there; `migrations` is inherited, and a Durable Object migration can't be undone.
+  "durable_objects": { "bindings": [{ "name": "SCOPE_CHANNEL", "class_name": "ScopeChannel" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ScopeChannel"] }],
   "env": {
     // API Worker used by native builds.
     "development": {
       "name": "colorup",
       "workers_dev": true,
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "b31cff468a5645638b063167ded46c50" }],
+      "durable_objects": {
+        "bindings": [{ "name": "SCOPE_CHANNEL", "class_name": "ScopeChannel" }],
+      },
     },
   },
 }

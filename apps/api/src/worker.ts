@@ -1,3 +1,4 @@
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -8,7 +9,12 @@ import * as HttpRouter from "effect/http/HttpRouter";
 
 import * as Clerk from "./auth/Clerk.ts";
 import * as Database from "./db/Database.ts";
+import * as Realtime from "./features/Realtime.ts";
 import * as Api from "./http/Api.ts";
+import { ScopeChannel } from "./realtime/ScopeChannel.ts";
+import * as Upgrade from "./realtime/Upgrade.ts";
+
+export { ScopeChannel };
 
 const layerWorkerPlatform = Layer.mergeAll(
   HttpPlatform.layer.pipe(Layer.provide(FileSystem.layerNoop({}))),
@@ -25,15 +31,34 @@ const { handler } = HttpRouter.toWebHandler(
 
 interface Env {
   readonly HYPERDRIVE: Hyperdrive;
+  readonly SCOPE_CHANNEL: DurableObjectNamespace<ScopeChannel>;
 }
 
-const handleRequest = (request: Request, env: Env) =>
-  Effect.gen(function* () {
-    const database = yield* Layer.build(Database.layer(env.HYPERDRIVE.connectionString));
+const handleRequest = (request: Request, env: Env, ctx: ExecutionContext) =>
+  Realtime.withRealtime(
+    {
+      notify: (notice) => env.SCOPE_CHANNEL.getByName(notice.scope).notify(notice),
+      close: ({ scope, selector, code }) =>
+        env.SCOPE_CHANNEL.getByName(scope).close(selector, code),
+      waitUntil: (work) => ctx.waitUntil(work),
+    },
+    Realtime.originOf(request.headers),
+    (realtime) =>
+      Effect.gen(function* () {
+        const database = yield* Layer.build(Database.layer(env.HYPERDRIVE.connectionString));
 
-    return yield* Effect.promise(() => handler(request, database));
-  }).pipe(
-    Effect.scoped,
+        if (Upgrade.isUpgradePath(request.url)) {
+          return yield* Upgrade.upgrade(request, {
+            verify: yield* Clerk.makeVerify,
+            connect: (scope, upgrading) => env.SCOPE_CHANNEL.getByName(scope).fetch(upgrading),
+          }).pipe(Effect.provide(database));
+        }
+
+        return yield* Effect.promise(() =>
+          handler(request, Context.add(database, Realtime.Realtime, realtime)),
+        );
+      }).pipe(Effect.scoped),
+  ).pipe(
     Effect.catchCause((cause) =>
       Effect.as(
         Effect.logError("Request failed before reaching the API", cause),
@@ -43,5 +68,5 @@ const handleRequest = (request: Request, env: Env) =>
   );
 
 export default {
-  fetch: (request, env) => Effect.runPromise(handleRequest(request, env)),
+  fetch: (request, env, ctx) => Effect.runPromise(handleRequest(request, env, ctx)),
 } satisfies ExportedHandler<Env>;

@@ -1,8 +1,12 @@
+import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
+import * as Exit from "effect/Exit";
+import * as Predicate from "effect/Predicate";
 import {
   Conflict,
   Forbidden,
   NotFound,
+  tableScope,
   Unauthorized,
   UserId,
   type ActorId,
@@ -25,6 +29,7 @@ import * as Fiber from "effect/Fiber";
 import {
   createContext,
   use,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -33,7 +38,11 @@ import {
   type ReactNode,
 } from "react";
 
+import { fetchSharedTable } from "./api.ts";
 import { describeError } from "./errors.ts";
+import { manualTarget } from "./noticeRefresh.ts";
+import { useNoticeRefresh, useScopeNotices } from "./realtimeReact.tsx";
+import { createTableFeed, tableRefreshTarget, type TableFeed } from "./tableFeed.ts";
 import {
   RecordingError,
   RecordingStoreLive,
@@ -49,6 +58,8 @@ import {
   RecordingSyncLive,
   RecordingSyncService,
   syncsAsDevice,
+  syncsToServer,
+  tableOnServer,
   tableSynced,
   type ActorKeyStorage,
   type RecordingSync,
@@ -207,6 +218,8 @@ export const useRecordingVisit = (visitId: VisitId) => {
 
 const RecordingSyncContext = createContext<RecordingSync | null>(null);
 
+const TableFeedContext = createContext<TableFeed | null>(null);
+
 /**
  * While someone is signed in, syncs the device ledger to their account: it uploads what was
  * recorded signed out, restores what other devices synced, and keeps pushing new saves. Signed
@@ -229,9 +242,8 @@ export function RecordingSyncRoot({
 }) {
   const store = useRecordingStore();
 
-  const hold = (id: string | null) => ({
-    userId: id,
-    sync: Effect.runSync(
+  const hold = (id: string | null) => {
+    const sync = Effect.runSync(
       Effect.gen(function* () {
         return yield* RecordingSyncService;
       }).pipe(
@@ -245,8 +257,10 @@ export function RecordingSyncRoot({
           ),
         ),
       ),
-    ),
-  });
+    );
+
+    return { userId: id, sync, feed: createTableFeed((tableId) => sync.table(tableId)) };
+  };
 
   const [held, setHeld] = useState(() => hold(userId));
 
@@ -262,7 +276,11 @@ export function RecordingSyncRoot({
     };
   }, [sync, wake]);
 
-  return <RecordingSyncContext value={sync}>{children}</RecordingSyncContext>;
+  return (
+    <RecordingSyncContext value={sync}>
+      <TableFeedContext value={held.feed}>{children}</TableFeedContext>
+    </RecordingSyncContext>
+  );
 }
 
 const idle = () => null;
@@ -545,35 +563,118 @@ const describeJoinError = (error: typeof Schema.Unknown.Encoded) => {
   return "Joining needs a connection. Try again once you're online.";
 };
 
-/**
- * The whole table as the server has it, for a table this device joined: everyone else's play
- * lives there, not on this device. `undefined` while loading, null when it can't be reached.
- */
-export const useServerTable = (tableId: TableId | null) => {
+const useSyncsToServer = () => {
   const store = useRecordingStore();
   const sync = use(RecordingSyncContext);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
 
-  const enabled =
-    snapshot.state !== null &&
-    sync !== null &&
-    (sync.userId !== null || syncsAsDevice(snapshot.state));
+  return {
+    sync,
+    state: snapshot.state,
+    enabled: snapshot.state !== null && sync !== null && syncsToServer(snapshot.state, sync.userId),
+  };
+};
 
-  const [view, setView] = useState<{ id: TableId; view: TableView | null } | null>(null);
+/**
+ * The scopes to watch for a table: its own, once the server has it and this device syncs. Hand
+ * them to the screen's `ScopeNotices`, so what changes at the table refetches what it shows.
+ */
+export const useTableScopes = (tableId: TableId | null) => {
+  const { state, enabled } = useSyncsToServer();
+
+  return enabled && state !== null && tableId !== null && tableOnServer(state, tableId)
+    ? [tableScope(tableId)]
+    : [];
+};
+
+/**
+ * The whole table as the server has it, for a table this device joined: everyone else's play
+ * lives there, not on this device. `undefined` while loading, null when it can't be reached.
+ * Every screen showing the table shares one fetch, which `TableRefresh` repeats on a change.
+ */
+export const useServerTable = (tableId: TableId | null) => {
+  const { enabled } = useSyncsToServer();
+  const feed = use(TableFeedContext);
+  const watching = enabled && feed !== null && tableId !== null;
+
+  const subscribe = useCallback(
+    (listener: () => void) => (watching ? feed.subscribe(tableId, listener) : () => undefined),
+    [watching, feed, tableId],
+  );
+
+  return useSyncExternalStore(subscribe, () => (watching ? feed.view(tableId) : undefined));
+};
+
+/**
+ * Under a table's `ScopeNotices`: a change notice refetches the table's server view once, however
+ * many screens show it, and has the device ledger pull what others recorded.
+ */
+export function TableRefresh({ tableId }: { tableId: TableId | null }) {
+  const feed = use(TableFeedContext);
+  const sync = use(RecordingSyncContext);
+
+  const target = useMemo(
+    () => (feed && sync && tableId ? tableRefreshTarget(feed, tableId, () => sync.wake()) : null),
+    [feed, sync, tableId],
+  );
+
+  return target ? <Registered target={target} /> : null;
+}
+
+function Registered({ target }: { target: Parameters<typeof useNoticeRefresh>[0] }) {
+  useNoticeRefresh(target);
+
+  return null;
+}
+
+/**
+ * A table's read-only view through its share link: `undefined` while loading, null when the link
+ * doesn't work. Once loaded it watches the table while `watching`, and refetches on a change
+ * notice; a refetch that fails for another reason keeps what's shown.
+ */
+export const useSharedTable = (baseUrl: string, token: string, watching: boolean) => {
+  const [loaded, setLoaded] = useState<{ token: string; view: TableView | null } | null>(null);
+  const view = loaded?.token === token ? loaded.view : undefined;
+  const refetching = useMemo(() => manualTarget(), []);
+  const refresh = useScopeNotices(view ? [tableScope(view.table.id)] : [], watching);
+
+  useEffect(() => refresh.register(refetching.target), [refresh, refetching]);
+
   useEffect(() => {
-    if (!enabled || !sync || !tableId) return;
     let current = true;
-    sync.table(tableId).then(
-      (next) => current && setView({ id: tableId, view: next }),
-      () => current && setView({ id: tableId, view: null }),
-    );
+    let latest = 0;
+
+    const fetchTable = () => {
+      const mine = ++latest;
+      refetching.waiting(true);
+
+      void Effect.runPromiseExit(fetchSharedTable({ baseUrl }, token)).then((exit) => {
+        if (!current || mine !== latest) return;
+
+        if (Exit.isSuccess(exit)) setLoaded({ token, view: exit.value });
+        else
+          setLoaded((shown) => ({
+            token,
+            view:
+              shown?.token === token && !Predicate.isTagged(Cause.squash(exit.cause), "NotFound")
+                ? shown.view
+                : null,
+          }));
+
+        refetching.waiting(false);
+      });
+    };
+
+    refetching.fetchWith(fetchTable);
+    fetchTable();
 
     return () => {
       current = false;
+      refetching.fetchWith(null);
     };
-  }, [enabled, sync, tableId]);
+  }, [baseUrl, token, refetching]);
 
-  return enabled && view?.id === tableId ? view.view : undefined;
+  return view;
 };
 
 /**

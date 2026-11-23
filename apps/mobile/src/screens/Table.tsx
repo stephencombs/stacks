@@ -41,6 +41,7 @@ import {
 import { PersonalScreen } from "../features/Personal";
 import { SitDownSheet } from "../features/RecordingForms";
 import { useAccount } from "../lib/account";
+import { TableNotices } from "../lib/realtime";
 import { useRecordingState } from "../lib/recording";
 import { StacksProvider } from "../lib/stacks";
 import { BackButton, RecordingToast } from "./Play";
@@ -55,7 +56,13 @@ type Props = StaticScreenProps<{ tableId: string }>;
 export function TableScreen({ route }: Props) {
   const id = Option.getOrNull(TableId.makeOption(route.params.tableId));
 
-  return id ? <Table tableId={id} /> : <Missing />;
+  return id ? (
+    <TableNotices tableId={id}>
+      <Table tableId={id} />
+    </TableNotices>
+  ) : (
+    <Missing />
+  );
 }
 
 function Missing() {

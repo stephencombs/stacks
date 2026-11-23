@@ -53,6 +53,8 @@ import {
   recordRejectedAgain,
   RecordingSyncBlocked,
   syncsAsDevice,
+  syncsToServer,
+  tableOnServer,
   type ActorKeyStorage,
   type RecordingTransport,
 } from "./recordingSync.ts";
@@ -856,6 +858,68 @@ describe("engine", () => {
         expect(interrupted).toBe(1);
         yield* Fiber.interrupt(fiber);
         expect(interrupted).toBe(lookups);
+      }),
+  );
+
+  it.effect(
+    "still pulls after a wake that lands while a push is in flight and a save follows",
+    () =>
+      Effect.gen(function* () {
+        const store = yield* Effect.promise(() => open());
+        yield* Effect.promise(() =>
+          save(store, { type: "start", buyIn: 20000, startedAt: at(10) }),
+        );
+        const remote = server();
+        const inFlight = yield* Queue.unbounded<string>();
+        const release = yield* Queue.unbounded<string>();
+        let reads = 0;
+        let gated = true;
+
+        const sync = makeRecordingSync(
+          store,
+          alex,
+          {
+            ...transportFor(remote),
+            history: () =>
+              Effect.sync(() => {
+                reads++;
+
+                return remote.history();
+              }),
+            push: (request) =>
+              Effect.gen(function* () {
+                if (gated) {
+                  gated = false;
+                  yield* Queue.offer(inFlight, "push");
+                  yield* Queue.take(release);
+                }
+
+                return { results: remote.push(request) };
+              }),
+          },
+          memoryKeys(),
+        );
+
+        const fiber = yield* Effect.forkChild(sync.run);
+        yield* Queue.take(inFlight);
+        expect(reads).toBe(1);
+        sync.wake();
+        const visitId = state(store).visits[0]!.id;
+
+        yield* Effect.promise(() =>
+          save(store, {
+            type: "add",
+            visitId,
+            kind: "buy_in",
+            amount: 5000,
+            occurredAt: at(11),
+          }),
+        );
+        yield* Queue.offer(release, "go");
+        yield* TestClock.adjust("1 second");
+        expect(pendingRecordingCommands(state(store))).toEqual([]);
+        expect(reads).toBe(2);
+        yield* Fiber.interrupt(fiber);
       }),
   );
 
@@ -1670,6 +1734,72 @@ describe("shared tables", () => {
     expect(credentials[0]).not.toBeNull();
     expect(credentials[0]?.secret === credentials[1]?.secret).toBe(true);
   });
+
+  it("takes a table for the server's once it synced, or when this device never created it", () =>
+    Effect.gen(function* () {
+      const store = yield* Effect.promise(() => open());
+      yield* Effect.promise(() => save(store, { type: "start", buyIn: 20000, startedAt: at(10) }));
+      const own = state(store);
+      const { command } = own.receipts.find(({ command }) => command.type === "start")!;
+      const tableId = "tableId" in command ? command.tableId : TableId.make(crypto.randomUUID());
+      const synced = { userId: null, synced: [command.operationId], rejected: [] };
+
+      expect(tableOnServer(own, tableId)).toBe(false);
+      expect(tableOnServer({ ...own, sync: synced }, tableId)).toBe(true);
+      expect(tableOnServer(own, TableId.make(crypto.randomUUID()))).toBe(true);
+    }));
+
+  it.effect(
+    "holds a signed-in account's server reads until the claim has bound this device's tables",
+    () =>
+      Effect.gen(function* () {
+        const store = yield* Effect.promise(() => open());
+        yield* Effect.promise(() =>
+          save(store, { type: "start", buyIn: 20000, startedAt: at(10) }),
+        );
+        const remote = server();
+        const keys = memoryKeys();
+        const device = makeRecordingSync(store, null, transportFor(remote), keys);
+        const asDevice = yield* Effect.forkChild(device.run);
+        yield* Effect.promise(() => device.enable());
+        yield* TestClock.adjust("1 second");
+        expect(syncsToServer(state(store), null)).toBe(true);
+        expect(syncsToServer(state(store), alex)).toBe(false);
+        yield* Fiber.interrupt(asDevice);
+
+        const claiming = Promise.withResolvers<void>();
+        const asked = Promise.withResolvers<void>();
+
+        const account = makeRecordingSync(
+          store,
+          alex,
+          {
+            ...transportFor(remote),
+            claimActor: () =>
+              Effect.promise(async () => {
+                asked.resolve();
+                await claiming.promise;
+
+                return { adopted: true, claimed: [], refused: [] };
+              }),
+          },
+          keys,
+        );
+
+        const statuses = yield* Queue.unbounded<string>();
+        account.subscribe(() => Queue.offerUnsafe(statuses, account.getStatus().phase));
+        const asAccount = yield* Effect.forkChild(account.run);
+        yield* Effect.promise(() => asked.promise);
+        expect(syncsToServer(state(store), alex)).toBe(false);
+        expect(syncsToServer(state(store), null)).toBe(true);
+
+        claiming.resolve();
+
+        while ((yield* Queue.take(statuses)) !== "idle");
+        expect(syncsToServer(state(store), alex)).toBe(true);
+        yield* Fiber.interrupt(asAccount);
+      }),
+  );
 
   it("keeps solo play on a signed-out device, and syncs a shared table as the device's actor", () =>
     Effect.gen(function* () {

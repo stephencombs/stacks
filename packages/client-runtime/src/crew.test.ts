@@ -9,6 +9,7 @@ import {
   UserId,
   VenueId,
   VisitId,
+  groupScope,
   type CrewActivityItem,
   type GroupListItem,
   type Trip,
@@ -19,6 +20,7 @@ import * as DateTime from "effect/DateTime";
 import {
   activityTarget,
   crewFeed,
+  crewScopes,
   groupHappening,
   livePlayerIds,
   nameList,
@@ -99,6 +101,27 @@ it("pins the older open trip with a live table over a newer quiet open trip in t
 
   expect(pinnedTrip([crew])).toEqual({ item: crew, trip: openTahoe });
   expect(groupHappening(crew)).toEqual({ kind: "live", trip: openTahoe });
+});
+
+it("watches the pinned trip's group first, then the groups in the activity, once each", () => {
+  const crew = group("crew", [vegas]);
+  const work = group("work", [poker]);
+  const inCrew = { group: { id: crew.group.id } };
+  const inWork = { group: { id: work.group.id } };
+
+  expect(crewScopes([work, crew], [inWork, inCrew, inWork])).toEqual([
+    groupScope(crew.group.id),
+    groupScope(work.group.id),
+  ]);
+  expect(crewScopes([], [])).toEqual([]);
+});
+
+it("watches at most ten groups", () => {
+  const many = Array.from({ length: 12 }, (_, i) => ({
+    group: { id: GroupId.make(`0192e7a0-0000-7000-8000-9${String(i).padStart(11, "0")}`) },
+  }));
+
+  expect(crewScopes([], many)).toHaveLength(10);
 });
 
 it("pins nothing once every trip has ended", () => {

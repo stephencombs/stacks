@@ -16,6 +16,7 @@ import {
   MinorUnits,
   TripId,
   VisitId,
+  groupScope,
   type GroupListItem,
   type Trip,
 } from "@stacks/contracts";
@@ -62,6 +63,7 @@ import {
 } from "../features/StatsParts";
 import { useAccount } from "../lib/account";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
+import { ScopeNotices } from "../lib/realtime";
 import { StacksProvider, useStacks, useStatsCopies } from "../lib/stacks";
 
 type Summary = Extract<PersonalStatsView, { kind: "stats" }>;
@@ -224,20 +226,21 @@ function StatsView({
       onFilters={updateFilters}
     />
   ) : (
-    <GroupStatsView
-      key={groupId}
-      groupId={groupId}
-      groupName={group?.group.name ?? fallbackName ?? "This group"}
-      currentTripId={group?.currentTripId ?? null}
-      liveTrips={new Set(group?.liveTripIds)}
-      chip={chip}
-      filters={filters}
-      onFilters={updateFilters}
-      onJustMe={() => {
-        setPicked({});
-        updateFilters({});
-      }}
-    />
+    <ScopeNotices key={groupId} scopes={[groupScope(groupId)]}>
+      <GroupStatsView
+        groupId={groupId}
+        groupName={group?.group.name ?? fallbackName ?? "This group"}
+        currentTripId={group?.currentTripId ?? null}
+        liveTrips={new Set(group?.liveTripIds)}
+        chip={chip}
+        filters={filters}
+        onFilters={updateFilters}
+        onJustMe={() => {
+          setPicked({});
+          updateFilters({});
+        }}
+      />
+    </ScopeNotices>
   );
 }
 

@@ -3,16 +3,17 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
+import * as Predicate from "effect/Predicate";
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
 import type {
-  GroupId,
   ResolvePublicVenueRequest,
+  ScopeId,
   SearchPublicVenuesQuery,
   SessionId,
   TripId,
 } from "@stacks/contracts";
 import type { ActorCredential } from "@stacks/contracts/recordingCommands";
-import { StacksApi, VenueId } from "@stacks/contracts";
+import { GroupId, ORIGIN_HEADER, StacksApi, TableId, VenueId } from "@stacks/contracts";
 
 import { newId } from "./ids.ts";
 import type { RecordingTransport } from "./recordingSync.ts";
@@ -28,18 +29,32 @@ export interface StacksClientOptions {
   readonly baseUrl: string;
   /** The signed-in user's Clerk session token, fetched fresh for each request. */
   readonly getToken: () => Promise<string | null>;
+  /** This install's id, sent as `X-Origin` so the API can tell notices it caused from others. */
+  readonly origin: string;
 }
 
-const withToken = (getToken: StacksClientOptions["getToken"]) =>
+const withToken = ({ getToken, origin }: Pick<StacksClientOptions, "getToken" | "origin">) =>
   HttpClient.mapRequestEffect((request) =>
     Effect.map(Effect.promise(getToken), (token) =>
-      token ? HttpClientRequest.bearerToken(request, token) : request,
+      HttpClientRequest.setHeader(
+        token ? HttpClientRequest.bearerToken(request, token) : request,
+        ORIGIN_HEADER,
+        origin,
+      ),
     ),
   );
 
-const withActor = (actor: ActorCredential) =>
+const withActor = (actor: ActorCredential, origin: string) =>
   HttpClient.mapRequest((request) =>
-    HttpClientRequest.setHeader(request, "authorization", `Actor ${actor.actorId}.${actor.secret}`),
+    HttpClientRequest.setHeader(
+      HttpClientRequest.setHeader(
+        request,
+        "authorization",
+        `Actor ${actor.actorId}.${actor.secret}`,
+      ),
+      ORIGIN_HEADER,
+      origin,
+    ),
   );
 
 /**
@@ -49,11 +64,12 @@ const withActor = (actor: ActorCredential) =>
 export const makeRecordingTransport: (options: StacksClientOptions) => RecordingTransport = ({
   baseUrl,
   getToken,
+  origin,
 }: StacksClientOptions) => {
   const client = (actor: ActorCredential | null) =>
     HttpApiClient.make(StacksApi, {
       baseUrl,
-      transformClient: actor ? withActor(actor) : withToken(getToken),
+      transformClient: actor ? withActor(actor, origin) : withToken({ getToken, origin }),
     }).pipe(Effect.provide(FetchHttpClient.layer));
 
   return {
@@ -90,7 +106,7 @@ export const makeRecordingTransport: (options: StacksClientOptions) => Recording
     venue: (venueId) => fetchPublicVenue({ baseUrl }, venueId),
     resolveVenue: (payload) =>
       resolvePublicVenue({ baseUrl }, payload).pipe(
-        Effect.catch(() => fallbackResolveVenue({ baseUrl, getToken }, payload)),
+        Effect.catch(() => fallbackResolveVenue({ baseUrl, getToken, origin }, payload)),
       ),
   };
 };
@@ -142,10 +158,65 @@ const resolvePublicVenue = (
     Effect.provide(FetchHttpClient.layer),
   );
 
+const unlessRefused = <A, E, R>(check: Effect.Effect<A, E, R>) =>
+  check.pipe(
+    Effect.as(true),
+    Effect.catch((error) =>
+      Effect.succeed(
+        !(
+          Predicate.isTagged(error, "Unauthorized") ||
+          Predicate.isTagged(error, "Forbidden") ||
+          Predicate.isTagged(error, "NotFound")
+        ),
+      ),
+    ),
+  );
+
+/**
+ * Whether the API still lets the caller read the scope's view, with the same `Authorization` the
+ * socket connects with: the group's for a `group:` scope, the table's for a `table:` one.
+ */
+export const makeScopeWatchable =
+  ({
+    baseUrl,
+    authorization,
+  }: {
+    readonly baseUrl: string;
+    readonly authorization: () => Promise<string | null>;
+  }) =>
+  (scope: ScopeId) =>
+    unlessRefused(
+      Effect.gen(function* () {
+        const api = yield* HttpApiClient.make(StacksApi, {
+          baseUrl,
+          transformClient: HttpClient.mapRequestEffect((request) =>
+            Effect.map(Effect.promise(authorization), (value) =>
+              value ? HttpClientRequest.setHeader(request, "authorization", value) : request,
+            ),
+          ),
+        });
+
+        if (scope.startsWith("group:")) {
+          yield* api.groups.get({
+            params: { groupId: GroupId.make(scope.slice("group:".length)) },
+          });
+        } else {
+          yield* api.recording.table({
+            params: { tableId: TableId.make(scope.slice("table:".length)) },
+          });
+        }
+      }).pipe(Effect.provide(FetchHttpClient.layer)),
+    );
+
+/** The same check for a table watched through its share link. */
+export const makeSharedWatchable =
+  (options: Pick<StacksClientOptions, "baseUrl">, token: string) => () =>
+    unlessRefused(fetchSharedTable(options, token));
+
 const norm = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
 
 const fallbackResolveVenue = (
-  { baseUrl, getToken }: StacksClientOptions,
+  { baseUrl, getToken, origin }: StacksClientOptions,
   payload: typeof ResolvePublicVenueRequest.Type,
 ) =>
   Effect.gen(function* () {
@@ -173,7 +244,7 @@ const fallbackResolveVenue = (
 
     const api = yield* HttpApiClient.make(StacksApi, {
       baseUrl,
-      transformClient: withToken(getToken),
+      transformClient: withToken({ getToken, origin }),
     }).pipe(Effect.provide(FetchHttpClient.layer));
 
     const created = yield* api.venues.create({
@@ -195,12 +266,12 @@ const fallbackResolveVenue = (
     };
   });
 
-export const makeStacksClient = ({ baseUrl, getToken }: StacksClientOptions) => {
+export const makeStacksClient = ({ baseUrl, getToken, origin }: StacksClientOptions) => {
   class StacksClient extends AtomHttpApi.Service<StacksClient>()("@stacks/StacksClient", {
     api: StacksApi,
     httpClient: FetchHttpClient.layer,
     baseUrl,
-    transformClient: withToken(getToken),
+    transformClient: withToken({ getToken, origin }),
   }) {}
 
   const keys = { reactivityKeys: LEDGER_KEYS };

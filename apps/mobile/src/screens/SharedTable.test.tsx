@@ -112,6 +112,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
   );
 
   vi.doMock("@react-navigation/native", () => ({
+    useIsFocused: () => true,
     useNavigation: () => ({ navigate, dispatch }),
     StackActions: {
       replace: (
@@ -128,6 +129,9 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
     View: Container,
   }));
   vi.doMock("../lib/config", () => ({ apiUrl: "https://api.example.com" }));
+  vi.doMock("../lib/scopeHub", () => ({
+    createHub: () => ({ watch: () => () => {}, dispose: () => {} }),
+  }));
   vi.doMock("../lib/recording", () => ({
     useRecordingState: () => useSyncExternalStore(store.subscribe, store.getSnapshot).state,
   }));
@@ -135,6 +139,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
     fetchSharedTable: () =>
       failSharedLoad ? Effect.fail(new Error("gone")) : Effect.succeed(sharedView),
     fetchInvitePreview: () => Effect.fail(new Error("unused")),
+    makeSharedWatchable: () => () => Effect.succeed(true),
   }));
   vi.doMock("@stacks/client-runtime/recordingReact", async () => {
     const actual = await vi.importActual<typeof import("@stacks/client-runtime/recordingReact")>(

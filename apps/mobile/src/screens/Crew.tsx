@@ -56,12 +56,26 @@ import {
 } from "../components/ui/Surface";
 import { Chip } from "../features/Chip";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
+import { useCrewScopes } from "../lib/crewScopes";
 import { useGo } from "../lib/go";
 import { usePreferences } from "../lib/preferences";
+import { ScopeNotices } from "../lib/realtime";
 import { Loaded, TripLoaded, useAction, useStacks } from "../lib/stacks";
 
 /** Crew: the trip going now, pinned, then what everyone in your groups has been playing. */
 export function CrewScreen() {
+  return (
+    <CrewNotices>
+      <CrewContent />
+    </CrewNotices>
+  );
+}
+
+function CrewNotices({ children }: { children: ReactNode }) {
+  return <ScopeNotices scopes={useCrewScopes()}>{children}</ScopeNotices>;
+}
+
+function CrewContent() {
   const stacks = useStacks();
   const [sheet, setSheet] = useState<"groups" | "create" | null>(null);
   const openGroups = useCallback(() => setSheet("groups"), []);

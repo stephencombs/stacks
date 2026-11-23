@@ -49,6 +49,7 @@ const setupTableScreen = async ({
 
   vi.doMock("@react-navigation/native", () => ({
     StackActions: {},
+    useIsFocused: () => true,
     useNavigation: () => navigation,
   }));
 
@@ -120,6 +121,8 @@ const setupTableScreen = async ({
       return current && parsed ? recordingTable(current, parsed) : null;
     },
     useServerTable: () => null,
+    useTableScopes: () => [],
+    TableRefresh: () => null,
   }));
 
   const { TableScreen } = await import("./Table");

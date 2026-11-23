@@ -4,6 +4,10 @@
   "ignoreDependencies": ["@leanspec/mcp"],
   "ignore": [".agents/skills/**", "apps/mobile/maestro/scripts/**", "tools/oxlint/anti-slop/**"],
   "workspaces": {
+    "apps/api": {
+      "entry": ["src/testing/scopeChannelWorker.test-utils.ts"],
+      "ignoreDependencies": ["cloudflare"]
+    },
     "apps/mobile": {
       "entry": ["plugins/*.ts"]
     }

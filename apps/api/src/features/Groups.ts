@@ -9,6 +9,8 @@ import {
   NotFound,
   type CreateGroupRequest,
   GroupId,
+  groupScope,
+  ScopeCloseCode,
   SessionId,
   TripId,
   type GroupListItem,
@@ -20,6 +22,8 @@ import { balances } from "@stacks/shared/balances";
 
 import { EntryRow, GroupRow, MembershipRow, TripRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as Realtime from "./Realtime.ts";
+import * as Recording from "./Recording.ts";
 import * as Views from "./Views.ts";
 
 const ok = { ok: true } as const;
@@ -191,9 +195,25 @@ export const rename = Effect.fn("Groups.rename")(function* (
   const sql = yield* SqlClient.SqlClient;
   const member = yield* Access.membership(groupId);
   yield* Access.requireAdmin(member);
-  yield* sql`update groups set name = ${request.name} where id = ${groupId}`;
+
+  const renamed = yield* sql`
+    update groups set name = ${request.name}
+    where id = ${groupId} and name is distinct from ${request.name}
+    returning id
+  `;
+
+  if (renamed.length > 0) yield* Realtime.changed(groupScope(groupId));
 
   return yield* Views.groupDetail(member);
+});
+
+const memberGone = Effect.fn("Groups.memberGone")(function* (groupId: GroupId, userId: UserId) {
+  yield* Realtime.closed({
+    scope: groupScope(groupId),
+    selector: { kind: "user", userId },
+    code: ScopeCloseCode.revoked,
+  });
+  yield* Recording.memberGone(groupId, userId);
 });
 
 export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
@@ -210,13 +230,28 @@ export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
     if (others!.count > 0) return yield* new Conflict({ reason: "last_owner" });
   }
 
-  yield* sql`
-    update memberships set left_at = now()
-    where group_id = ${groupId} and user_id = ${userId} and left_at is null
-  `;
+  yield* depart(groupId, userId);
 
   return ok;
 });
+
+const depart = (groupId: GroupId, userId: UserId) =>
+  Realtime.transaction(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+
+      const gone = yield* sql`
+        update memberships set left_at = now()
+        where group_id = ${groupId} and user_id = ${userId} and left_at is null
+        returning user_id
+      `;
+
+      if (gone.length > 0) {
+        yield* Realtime.changed(groupScope(groupId));
+        yield* memberGone(groupId, userId);
+      }
+    }),
+  );
 
 const activeMember = Effect.fn("Groups.activeMember")(function* (groupId: GroupId, userId: UserId) {
   const sql = yield* SqlClient.SqlClient;
@@ -238,7 +273,6 @@ export const removeMember = Effect.fn("Groups.removeMember")(function* (
   groupId: GroupId,
   targetUserId: UserId,
 ) {
-  const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
 
   if (targetUserId === userId) return yield* leave(groupId);
@@ -250,10 +284,7 @@ export const removeMember = Effect.fn("Groups.removeMember")(function* (
     return yield* new Forbidden({ reason: "owner_only" });
   }
 
-  yield* sql`
-    update memberships set left_at = now()
-    where group_id = ${groupId} and user_id = ${targetUserId} and left_at is null
-  `;
+  yield* depart(groupId, targetUserId);
 
   return ok;
 });
@@ -269,10 +300,14 @@ export const setRole = Effect.fn("Groups.setRole")(function* (
 
   if (targetUserId === userId) return yield* new Conflict({ reason: "last_owner" });
   yield* activeMember(groupId, targetUserId);
-  yield* sql`
+
+  const changed = yield* sql`
     update memberships set role = ${request.role}
-    where group_id = ${groupId} and user_id = ${targetUserId}
+    where group_id = ${groupId} and user_id = ${targetUserId} and role <> ${request.role}
+    returning user_id
   `;
+
+  if (changed.length > 0) yield* Realtime.changed(groupScope(groupId));
 
   return ok;
 });

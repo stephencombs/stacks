@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev --ip 0.0.0.0 --port 8787",
     "build": "wrangler deploy --env development --dry-run --outdir dist",
-    "test": "node scripts/migrate.ts --test && vp test run --config ../../vite.config.ts --dir .",
+    "test": "node scripts/migrate.ts --test && vp test run --config ../../vite.config.ts --dir . --maxWorkers 4 --exclude src/worker.test.ts && vp test run --config ../../vite.config.ts --dir . src/worker.test.ts",
     "typecheck": "tsc --noEmit",
     "db:migrate": "node scripts/migrate.ts",
     "db:seed": "node scripts/seed.ts",

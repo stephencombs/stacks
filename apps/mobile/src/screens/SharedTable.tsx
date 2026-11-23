@@ -1,13 +1,21 @@
-import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { fetchSharedTable } from "@stacks/client-runtime/api";
+import {
+  StackActions,
+  useIsFocused,
+  useNavigation,
+  type StaticScreenProps,
+} from "@react-navigation/native";
+import { makeSharedWatchable } from "@stacks/client-runtime/api";
+import { ScopeHubProvider } from "@stacks/client-runtime/realtimeReact";
 import { distinctPlayerNames, formatDay, formatTime } from "@stacks/client-runtime/format";
-import { useJoinTable, useRecordingTable } from "@stacks/client-runtime/recordingReact";
+import {
+  useJoinTable,
+  useRecordingTable,
+  useSharedTable,
+} from "@stacks/client-runtime/recordingReact";
 import { RECORDING_CURRENCY, visitTitle } from "@stacks/client-runtime/recordingView";
 import type { VisitId } from "@stacks/contracts";
 import type { TableView } from "@stacks/contracts/recordingCommands";
-import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Platform, View } from "react-native";
 import { Text } from "../components/ui/Text";
 
@@ -26,24 +34,36 @@ import { PersonalScreen } from "../features/Personal";
 import { JoinSheet, SitDownSheet } from "../features/RecordingForms";
 import { apiUrl } from "../lib/config";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
+import { createHub } from "../lib/scopeHub";
 
 type Props = StaticScreenProps<{ token: string }>;
 
-/** A table someone shared: anyone can watch it, and join it to record their own play. */
+/**
+ * A table someone shared: anyone can watch it, and join it to record their own play. It watches
+ * with the link itself, which needs no account, so what's recorded at the table shows as it happens.
+ */
 export function SharedTableScreen({ route }: Props) {
   const { token } = route.params;
-  const navigation = useNavigation();
-  const [view, setView] = useState<TableView | null | undefined>(undefined);
-  useEffect(() => {
-    let current = true;
-    void Effect.runPromiseExit(fetchSharedTable({ baseUrl: apiUrl }, token)).then((exit) => {
-      if (current) setView(Exit.isSuccess(exit) ? exit.value : null);
-    });
 
-    return () => {
-      current = false;
-    };
-  }, [token]);
+  const makeHub = useCallback(
+    () =>
+      createHub({
+        authorization: async () => `Share ${token}`,
+        watchable: makeSharedWatchable({ baseUrl: apiUrl }, token),
+      }),
+    [token],
+  );
+
+  return (
+    <ScopeHubProvider make={makeHub}>
+      <SharedTableView token={token} />
+    </ScopeHubProvider>
+  );
+}
+
+function SharedTableView({ token }: { token: string }) {
+  const navigation = useNavigation();
+  const view = useSharedTable(apiUrl, token, useIsFocused());
 
   return (
     <PersonalScreen>

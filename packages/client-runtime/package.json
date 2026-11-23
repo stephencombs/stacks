@@ -60,6 +60,10 @@
       "types": "./src/motion.ts",
       "import": "./src/motion.ts"
     },
+    "./noticeRefresh": {
+      "types": "./src/noticeRefresh.ts",
+      "import": "./src/noticeRefresh.ts"
+    },
     "./outbox": {
       "types": "./src/outbox.ts",
       "import": "./src/outbox.ts"
@@ -67,6 +71,14 @@
     "./react": {
       "types": "./src/react.tsx",
       "import": "./src/react.tsx"
+    },
+    "./realtime": {
+      "types": "./src/realtime.ts",
+      "import": "./src/realtime.ts"
+    },
+    "./realtimeReact": {
+      "types": "./src/realtimeReact.tsx",
+      "import": "./src/realtimeReact.tsx"
     },
     "./recording": {
       "types": "./src/recording.ts",

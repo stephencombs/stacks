@@ -17,3 +17,5 @@ export * from "./recording.ts";
 export * from "./views.ts";
 
 export * from "./recordingCommands.ts";
+
+export * from "./realtime.ts";

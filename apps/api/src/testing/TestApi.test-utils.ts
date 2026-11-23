@@ -20,16 +20,24 @@ import {
   Recorder,
   RecorderOf,
   RecordingAuthentication,
+  ORIGIN_HEADER,
+  REALTIME_PREFIX,
   StacksApi,
+  TAGS_HEADER,
   Unauthorized,
   UserId,
+  type ScopeId,
+  type ScopeNotice,
 } from "@stacks/contracts";
 
 import { parseActor } from "../auth/Clerk.ts";
 
 import * as Database from "../db/Database.ts";
 import { migrations } from "../db/migrations/index.ts";
+import * as Realtime from "../features/Realtime.ts";
 import * as Api from "../http/Api.ts";
+import { readTags } from "../realtime/Selector.ts";
+import * as Upgrade from "../realtime/Upgrade.ts";
 
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/stacks_test";
@@ -40,12 +48,17 @@ const testUser = (credential: Redacted.Redacted) => {
   return { userId, displayName: userId.replace(/^user_/, ""), avatarUrl: null };
 };
 
+const verifyTest: Upgrade.Upgrade["verify"] = (credential) =>
+  Redacted.value(credential) === ""
+    ? Effect.fail(new Unauthorized())
+    : Effect.succeed(testUser(credential));
+
 const layerTestAuthentication = Layer.mergeAll(
   Layer.succeed(Authentication, {
     bearer: (httpEffect, { credential }) =>
-      Redacted.value(credential) === ""
-        ? Effect.fail(new Unauthorized())
-        : Effect.provideService(httpEffect, CurrentUser, testUser(credential)),
+      Effect.flatMap(verifyTest(credential), (user) =>
+        Effect.provideService(httpEffect, CurrentUser, user),
+      ),
   }),
   Layer.succeed(RecordingAuthentication, {
     bearer: (httpEffect, { credential }) =>
@@ -70,6 +83,21 @@ const layerPlatform = Layer.mergeAll(
   Etag.layerWeak,
 );
 
+const upgradeHeaders = (request: {
+  readonly token?: string | null;
+  readonly authorization?: string;
+  readonly websocket?: boolean;
+}) => {
+  const headers = new Headers();
+
+  if (request.websocket !== false) headers.set("upgrade", "websocket");
+
+  if (request.authorization) headers.set("authorization", request.authorization);
+  else if (request.token) headers.set("authorization", `Bearer ${request.token}`);
+
+  return headers;
+};
+
 const makeTestApi = Effect.gen(function* () {
   yield* PgMigrator.run({ loader: migrations });
   const database = yield* Effect.context<SqlClient.SqlClient>();
@@ -80,36 +108,146 @@ const makeTestApi = Effect.gen(function* () {
 
   yield* Effect.addFinalizer(() => Effect.promise(dispose));
 
-  const fetch: typeof globalThis.fetch = (input, init) =>
-    handler(new Request(input, init), database);
+  const sent: Array<ScopeNotice> = [];
+  const closing: Array<Realtime.Close> = [];
+  const flushing = new Set<Promise<unknown>>();
+  let refusing = false;
 
-  const as = (user: string) =>
-    HttpApiClient.make(StacksApi, {
-      baseUrl: "http://stacks.test",
-      transformClient: HttpClient.mapRequest(HttpClientRequest.bearerToken(`user_${user}`)),
-    }).pipe(
-      Effect.provide(FetchHttpClient.layer),
-      Effect.provideService(FetchHttpClient.Fetch, fetch),
-    );
+  const dispatch: Realtime.Dispatch = {
+    notify: async (notice) => {
+      if (refusing) throw new Error("channel unavailable");
+      sent.push(notice);
+    },
+    close: async (close) => {
+      if (refusing) throw new Error("channel unavailable");
+      closing.push(close);
+    },
+    waitUntil: (work) => void flushing.add(work),
+  };
 
-  const asActor = (credential: { readonly actorId: string; readonly secret: string } | null) =>
-    HttpApiClient.make(StacksApi, {
-      baseUrl: "http://stacks.test",
-      transformClient: HttpClient.mapRequest((request) =>
-        credential
-          ? HttpClientRequest.setHeader(
-              request,
-              "authorization",
-              `Actor ${credential.actorId}.${credential.secret}`,
-            )
-          : request,
+  const fetch: typeof globalThis.fetch = (input, init) => {
+    const request = new Request(input, init);
+
+    return Effect.runPromise(
+      Realtime.withRealtime(dispatch, Realtime.originOf(request.headers), (realtime) =>
+        Effect.promise(() => handler(request, Context.add(database, Realtime.Realtime, realtime))),
       ),
+    );
+  };
+
+  const settled = Effect.promise(async () => {
+    await Promise.all(flushing);
+    flushing.clear();
+  });
+
+  const noticed = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.gen(function* () {
+      sent.length = 0;
+      yield* effect;
+      yield* settled;
+
+      return [...sent];
+    });
+
+  const notified = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.map(noticed(effect), (notices) =>
+      Array.from(new Set(notices.map(({ scope }) => scope))),
+    );
+
+  const closes = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.gen(function* () {
+      closing.length = 0;
+      yield* effect;
+      yield* settled;
+
+      return [...closing];
+    });
+
+  const refuseNotices = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => void (refusing = true)),
+      () => Effect.andThen(effect, settled),
+      () => Effect.sync(() => void (refusing = false)),
+    );
+
+  const forwarded: Array<ScopeId> = [];
+  const forwardedTags: Array<ReadonlyArray<string>> = [];
+
+  const upgrade = (
+    path: string,
+    request: {
+      readonly token?: string | null;
+      readonly authorization?: string;
+      readonly websocket?: boolean;
+      readonly method?: string;
+    },
+    verify: Upgrade.Upgrade["verify"] = verifyTest,
+  ) =>
+    Upgrade.upgrade(
+      new Request(`http://stacks.test${REALTIME_PREFIX}${path}`, {
+        method: request.method ?? "GET",
+        headers: upgradeHeaders(request),
+      }),
+      {
+        verify,
+        connect: async (scope, forwarding) => {
+          forwarded.push(scope);
+          forwardedTags.push(readTags(forwarding.headers.get(TAGS_HEADER)));
+
+          return new Response("forwarded", { status: 200 });
+        },
+      },
+    ).pipe(Effect.provide(database));
+
+  const named = (origin: string | null) =>
+    HttpClient.mapRequest((request) =>
+      origin ? HttpClientRequest.setHeader(request, ORIGIN_HEADER, origin) : request,
+    );
+
+  const as = (user: string, origin: string | null = null) =>
+    HttpApiClient.make(StacksApi, {
+      baseUrl: "http://stacks.test",
+      transformClient: (client) =>
+        named(origin)(HttpClient.mapRequest(HttpClientRequest.bearerToken(`user_${user}`))(client)),
     }).pipe(
       Effect.provide(FetchHttpClient.layer),
       Effect.provideService(FetchHttpClient.Fetch, fetch),
     );
 
-  return { as, asActor };
+  const asActor = (
+    credential: { readonly actorId: string; readonly secret: string } | null,
+    origin: string | null = null,
+  ) =>
+    HttpApiClient.make(StacksApi, {
+      baseUrl: "http://stacks.test",
+      transformClient: (client) =>
+        named(origin)(
+          HttpClient.mapRequest((request) =>
+            credential
+              ? HttpClientRequest.setHeader(
+                  request,
+                  "authorization",
+                  `Actor ${credential.actorId}.${credential.secret}`,
+                )
+              : request,
+          )(client),
+        ),
+    }).pipe(
+      Effect.provide(FetchHttpClient.layer),
+      Effect.provideService(FetchHttpClient.Fetch, fetch),
+    );
+
+  return {
+    as,
+    asActor,
+    notified,
+    noticed,
+    closes,
+    refuseNotices,
+    upgrade,
+    forwarded,
+    forwardedTags,
+  };
 });
 
 export class TestApi extends Context.Service<TestApi, Effect.Success<typeof makeTestApi>>()(

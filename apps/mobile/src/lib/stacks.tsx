@@ -6,6 +6,7 @@ import * as Option from "effect/Option";
 import type * as Atom from "effect/reactivity/Atom";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { makeRecordingTransport, makeStacksClient } from "@stacks/client-runtime/api";
+import { RootScopeHub } from "@stacks/client-runtime/realtimeReact";
 import { RecordingSyncRoot } from "@stacks/client-runtime/recordingReact";
 import { describeError } from "@stacks/client-runtime/errors";
 import {
@@ -32,6 +33,8 @@ import { actorKeys } from "./actorKeys";
 import { apiUrl, clerkPublishableKey } from "./config";
 import { markStartup } from "./diagnostics";
 import { outboxStorage, wakeOutbox } from "./outbox";
+import { installOrigin } from "./origin";
+import { rootHubFor } from "./scopeHub";
 import { captureTestEvent } from "./telemetry";
 import { lastTripStorage, statsCopyStorage } from "./tripStorage";
 
@@ -52,7 +55,9 @@ export function SignedInProvider({ children }: { children: ReactNode }) {
         keys={actorKeys}
         wake={wakeOutbox}
       >
-        {children}
+        <RootScopeHub userId={userId} bearer={bearer} actor={asActor} make={rootHubFor}>
+          {children}
+        </RootScopeHub>
       </RecordingSyncRoot>
     </SignedInRoot>
   );
@@ -62,6 +67,19 @@ const api = {
   baseUrl: apiUrl,
   getToken: async () =>
     (await getClerkInstance({ publishableKey: clerkPublishableKey }).session?.getToken()) ?? null,
+  origin: installOrigin,
+};
+
+const bearer = async () => {
+  const token = await api.getToken();
+
+  return token ? `Bearer ${token}` : null;
+};
+
+const asActor = async () => {
+  const actor = await actorKeys.load();
+
+  return actor ? `Actor ${actor.actorId}.${actor.secret}` : null;
 };
 
 const connectRecording = () => makeRecordingTransport(api);

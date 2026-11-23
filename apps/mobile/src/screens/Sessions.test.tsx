@@ -47,7 +47,10 @@ it("starts from a trip in Play with that trip preselected, then opens the new vi
 
   const navigate = vi.fn();
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
-  vi.doMock("@react-navigation/native", () => ({ useNavigation: () => ({ navigate }) }));
+  vi.doMock("@react-navigation/native", () => ({
+    useIsFocused: () => true,
+    useNavigation: () => ({ navigate }),
+  }));
   vi.doMock("react-native", () => ({ View: Container, Text: Container, Platform: { OS: "ios" } }));
   vi.doMock("../lib/go", () => ({ useGo: () => ({ stats: vi.fn() }) }));
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
