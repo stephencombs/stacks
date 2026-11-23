@@ -75,14 +75,14 @@ export const layer = Layer.effect(
 );
 
 /** `Actor <actorId>.<secret>`: the service checks the secret against the database. */
-export const parseActor = (credential: Redacted.Redacted) => {
+export const parseActor = Effect.fn("Clerk.parseActor")(function* (credential: Redacted.Redacted) {
   const value = Redacted.value(credential);
   const dot = value.indexOf(".");
 
-  return dot > 0
-    ? Effect.succeed({ actorId: value.slice(0, dot), secret: value.slice(dot + 1) })
-    : Effect.fail(new Unauthorized());
-};
+  if (dot <= 0) return yield* new Unauthorized();
+
+  return { actorId: value.slice(0, dot), secret: value.slice(dot + 1) };
+});
 
 export const layerRecording = Layer.effect(
   RecordingAuthentication,

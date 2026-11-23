@@ -4,10 +4,19 @@ import { afterAll, beforeAll, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { createTestHarness } from "wrangler";
-import { MAX_SCOPE_SOCKETS, SCOPE_PING, SCOPE_PONG, groupScope } from "@stacks/contracts";
+import {
+  MAX_SCOPE_SOCKETS,
+  ORIGIN_HEADER,
+  SCOPE_PING,
+  SCOPE_PONG,
+  groupScope,
+  tableScope,
+} from "@stacks/contracts";
+import { PushRecordingRequest } from "@stacks/contracts/recordingCommands";
 
 import { clerkJwtKey, sessionToken } from "./testing/clerk.test-utils.ts";
 import { groupWith, ids, users } from "./testing/fixtures.test-utils.ts";
+import { rebuy, sharedTable } from "./testing/recording.test-utils.ts";
 import { TestApi } from "./testing/TestApi.test-utils.ts";
 
 const TEST_DATABASE_URL =
@@ -49,7 +58,7 @@ beforeAll(async () => {
 
 afterAll(() => workerd.harness.close());
 
-const upgradeStatus = (path: string, token: string | null) =>
+const upgradeStatus = (path: string, authorization: string | null) =>
   new Promise<number>((resolve, reject) => {
     const headers: OutgoingHttpHeaders = {
       connection: "Upgrade",
@@ -58,7 +67,7 @@ const upgradeStatus = (path: string, token: string | null) =>
       "sec-websocket-key": Buffer.from(crypto.randomUUID().slice(0, 16)).toString("base64"),
     };
 
-    if (token) headers.authorization = `Bearer ${token}`;
+    if (authorization) headers.authorization = authorization;
     const attempt = request(`${workerd.origin}${path}`, { headers });
 
     attempt.on("response", (response) => resolve(response.statusCode ?? 0));
@@ -70,14 +79,14 @@ const upgradeStatus = (path: string, token: string | null) =>
     attempt.end();
   });
 
-const watch = (path: string, token: string | null = null) =>
+const watch = (path: string, authorization: string | null = null) =>
   new Promise<{ readonly socket: WebSocket; readonly next: () => Promise<string> }>(
     (resolve, reject) => {
       const url = `${workerd.origin.replace("http", "ws")}${path}`;
 
       // SAFETY: Node's WebSocket takes request headers in a second argument that the Workers type omits.
-      const socket: WebSocket = token
-        ? Reflect.construct(WebSocket, [url, { headers: { authorization: `Bearer ${token}` } }])
+      const socket: WebSocket = authorization
+        ? Reflect.construct(WebSocket, [url, { headers: { authorization } }])
         : new WebSocket(url);
 
       const inbox: Array<string> = [];
@@ -126,7 +135,8 @@ const evict = (scope: string) =>
       if (!error.message.includes("not currently running")) throw error;
     });
 
-const noticeFor = (scope: string) => JSON.stringify({ scope, origin: null });
+const noticeFor = (scope: string, origin: string | null = null) =>
+  JSON.stringify({ scope, origin });
 
 it.effect("keeps two scopes apart and sends a notice only to its own", () =>
   Effect.gen(function* () {
@@ -216,10 +226,14 @@ it.layer(TestApi.layer)("the Worker", (it) => {
 
       expect(yield* Effect.promise(() => upgradeStatus(path, null))).toBe(401);
       expect(
-        yield* Effect.promise(() => upgradeStatus(path, sessionToken("user_stranger", 300))),
+        yield* Effect.promise(() =>
+          upgradeStatus(path, `Bearer ${sessionToken("user_stranger", 300)}`),
+        ),
       ).toBe(403);
 
-      const watcher = yield* Effect.promise(() => watch(path, sessionToken(alexId, 300)));
+      const watcher = yield* Effect.promise(() =>
+        watch(path, `Bearer ${sessionToken(alexId, 300)}`),
+      );
 
       const started = yield* Effect.promise(() =>
         fetch(`${workerd.origin}/api/groups/${groupId}/trips`, {
@@ -235,6 +249,40 @@ it.layer(TestApi.layer)("the Worker", (it) => {
       expect(started.status).toBe(200);
 
       expect(yield* Effect.promise(watcher.next)).toBe(noticeFor(groupScope(groupId)));
+      watcher.socket.close();
+    }),
+  );
+
+  it.effect("tells a share-link viewer when someone records at the table, naming who did", () =>
+    Effect.gen(function* () {
+      const { starter, opened, token } = yield* sharedTable();
+      const scope = tableScope(opened.tableId);
+      const path = `/api/realtime/${scope}`;
+
+      expect(yield* Effect.promise(() => upgradeStatus(path, null))).toBe(401);
+      expect(yield* Effect.promise(() => upgradeStatus(path, "Share nonsense"))).toBe(404);
+
+      const watcher = yield* Effect.promise(() => watch(path, `Share ${token}`));
+
+      const body = Schema.encodeSync(Schema.toCodecJson(PushRecordingRequest))({
+        identity: starter.identity,
+        commands: [rebuy(starter.identity, opened.visitId)],
+      });
+
+      const pushed = yield* Effect.promise(() =>
+        fetch(`${workerd.origin}/api/recording/commands`, {
+          method: "POST",
+          headers: {
+            authorization: `Actor ${starter.credential.actorId}.${starter.credential.secret}`,
+            "content-type": "application/json",
+            [ORIGIN_HEADER]: "phone-1",
+          },
+          body: JSON.stringify(body),
+        }),
+      );
+
+      expect(pushed.status).toBe(200);
+      expect(yield* Effect.promise(watcher.next)).toBe(noticeFor(scope, "phone-1"));
       watcher.socket.close();
     }),
   );

@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import type { GroupId } from "./ids.ts";
+import type { GroupId, TableId } from "./ids.ts";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
@@ -14,11 +14,19 @@ export type ScopeId = typeof ScopeId.Type;
 /** Lowercased: a Durable Object is named by the exact string, and ids arrive in either case. */
 export const groupScope = (groupId: GroupId) => ScopeId.make(`group:${groupId.toLowerCase()}`);
 
+/** Lowercased for the same reason as `groupScope`. */
+export const tableScope = (tableId: TableId) => ScopeId.make(`table:${tableId.toLowerCase()}`);
+
 export const scopeKind = (scope: ScopeId) => (scope.startsWith("group:") ? "group" : "table");
+
+/** The request header a client names itself with: a random id per install, not a secret. */
+export const ORIGIN_HEADER = "x-origin";
+
+export const OriginId = Schema.String.check(Schema.isPattern(/^[\w-]{1,64}$/));
 
 /**
  * Something in the scope changed. It carries no ledger data: whoever hears it refetches through
- * the API. `origin` names the writer so a client can skip its own echo; group writes send none.
+ * the API. `origin` is the `X-Origin` of the request that wrote, so a client can skip its own echo.
  */
 export const ScopeNotice = Schema.Struct({
   scope: ScopeId,

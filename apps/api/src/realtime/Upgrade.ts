@@ -6,12 +6,17 @@ import {
   CurrentUser,
   GroupId,
   REALTIME_PREFIX,
+  Recorder,
+  RecorderOf,
   ScopeId,
+  TableId,
   type ScopeId as Scope,
   type Unauthorized,
 } from "@stacks/contracts";
 
+import { parseActor } from "../auth/Clerk.ts";
 import * as Access from "../features/Access.ts";
+import * as Recording from "../features/Recording.ts";
 
 class Rejected extends Schema.TaggedError<Rejected>()("Rejected", {
   status: Schema.Number,
@@ -35,16 +40,24 @@ const rawScope = (url: string) =>
 const kindOf = (raw: string) =>
   raw.startsWith("group:") ? "group" : raw.startsWith("table:") ? "table" : "unknown";
 
-const bearer = (request: Request) => {
-  const match = /^Bearer\s+(\S+)$/i.exec(request.headers.get("authorization") ?? "");
+const Scheme = Schema.Literals(["bearer", "actor", "share"]);
 
-  return match ? Option.some(Redacted.make(match[1]!)) : Option.none();
+const credentialOf = (request: Request) => {
+  const match = /^(w+)s+(S+)$/.exec(request.headers.get("authorization") ?? "");
+  const scheme = Schema.decodeUnknownOption(Scheme)(match?.[1]?.toLowerCase());
+
+  return match && Option.isSome(scheme)
+    ? Option.some({ scheme: scheme.value, value: Redacted.make(match[2]!) })
+    : Option.none();
 };
 
 /**
- * Authorizes a WebSocket upgrade to `/api/realtime/<scope>` and passes it on. Only group scopes
- * exist so far, and the group GET's membership check decides who may watch one. Ids are lowercased,
- * so one group is one channel however the client spelled it. A refusal is a plain status, since a socket client can't read a body, and it's logged without the credential.
+ * Authorizes a WebSocket upgrade to `/api/realtime/<scope>` and passes it on. The group GET's
+ * membership check decides who may watch a group, for a signed-in account only. A table accepts
+ * what the table GET does (an account, a device actor) and a share link that names that table,
+ * and applies the same rules: a table that was deleted, or whose visits all were, is gone. Ids are
+ * lowercased, so one scope is one channel however the client spelled it. A refusal is a plain
+ * status, since a socket client can't read a body, and it's logged without the credential.
  */
 export const upgrade = (request: Request, { verify, connect }: Upgrade) =>
   Effect.gen(function* () {
@@ -57,26 +70,59 @@ export const upgrade = (request: Request, { verify, connect }: Upgrade) =>
       return yield* new Rejected({ status: 426, reason: "upgrade_required" });
     }
 
-    if (scope === null || !scope.startsWith("group:")) {
-      return yield* new Rejected({ status: 400, reason: "bad_scope" });
-    }
+    if (scope === null) return yield* new Rejected({ status: 400, reason: "bad_scope" });
 
-    const credential = bearer(request);
+    const credential = credentialOf(request);
 
     if (Option.isNone(credential)) return yield* new Rejected({ status: 401, reason: "no_token" });
+    const { scheme, value } = credential.value;
 
-    const user = yield* verify(credential.value).pipe(
-      Effect.mapError(() => new Rejected({ status: 401, reason: "bad_token" })),
+    const user = Effect.fn("Upgrade.user")(() =>
+      verify(value).pipe(Effect.mapError(() => new Rejected({ status: 401, reason: "bad_token" }))),
     );
 
-    yield* Access.membership(GroupId.make(scope.slice("group:".length))).pipe(
-      Effect.provideService(CurrentUser, user),
-      Effect.catchTags({
-        NotFound: () => Effect.fail(new Rejected({ status: 404, reason: "group_not_found" })),
-        Forbidden: () => Effect.fail(new Rejected({ status: 403, reason: "not_a_member" })),
-        SqlError: Effect.die,
-      }),
-    );
+    if (scope.startsWith("group:")) {
+      if (scheme !== "bearer") return yield* new Rejected({ status: 401, reason: "bad_scheme" });
+
+      yield* Access.membership(GroupId.make(scope.slice("group:".length))).pipe(
+        Effect.provideService(CurrentUser, yield* user()),
+        Effect.catchTags({
+          NotFound: () => Effect.fail(new Rejected({ status: 404, reason: "group_not_found" })),
+          Forbidden: () => Effect.fail(new Rejected({ status: 403, reason: "not_a_member" })),
+          SqlError: Effect.die,
+        }),
+      );
+    } else {
+      const tableId = TableId.make(scope.slice("table:".length));
+
+      const view =
+        scheme === "share"
+          ? Recording.shared(Redacted.value(value))
+          : Recording.table(tableId).pipe(
+              Effect.provideService(
+                Recorder,
+                scheme === "bearer"
+                  ? RecorderOf.Account({ user: yield* user() })
+                  : RecorderOf.Actor(
+                      yield* parseActor(value).pipe(
+                        Effect.mapError(() => new Rejected({ status: 401, reason: "bad_actor" })),
+                      ),
+                    ),
+              ),
+            );
+
+      const seen = yield* view.pipe(
+        Effect.catchTags({
+          NotFound: () => Effect.fail(new Rejected({ status: 404, reason: "table_not_found" })),
+          Unauthorized: () => Effect.fail(new Rejected({ status: 401, reason: "bad_actor" })),
+          SqlError: Effect.die,
+        }),
+      );
+
+      if (seen.table.id.toLowerCase() !== tableId) {
+        return yield* new Rejected({ status: 404, reason: "table_not_found" });
+      }
+    }
 
     return yield* Effect.promise(() => connect(scope, request));
   }).pipe(

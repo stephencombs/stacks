@@ -40,6 +40,7 @@ const handleRequest = (request: Request, env: Env, ctx: ExecutionContext) =>
       notify: (notice) => env.SCOPE_CHANNEL.getByName(notice.scope).notify(notice),
       waitUntil: (work) => ctx.waitUntil(work),
     },
+    Realtime.originOf(request.headers),
     (realtime) =>
       Effect.gen(function* () {
         const database = yield* Layer.build(Database.layer(env.HYPERDRIVE.connectionString));

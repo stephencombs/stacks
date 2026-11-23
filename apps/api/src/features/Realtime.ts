@@ -1,25 +1,39 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
-import { scopeKind, type ScopeId, type ScopeNotice } from "@stacks/contracts";
+import {
+  ORIGIN_HEADER,
+  OriginId,
+  scopeKind,
+  type ScopeId,
+  type ScopeNotice,
+} from "@stacks/contracts";
 
-/** The scopes this request changed, waiting for the handler to finish. */
+/** The scopes this request changed, waiting for the handler to finish, and who asked. */
 export class Realtime extends Context.Service<
   Realtime,
   {
+    readonly origin: string | null;
     readonly queue: (scope: ScopeId) => void;
     readonly queued: () => ReadonlyArray<ScopeId>;
   }
 >()("@stacks/api/Realtime") {}
 
-export const makeRealtime = () => {
+export const makeRealtime = (origin: string | null = null) => {
   const scopes = new Set<ScopeId>();
 
   return Realtime.of({
+    origin,
     queue: (scope) => void scopes.add(scope),
     queued: () => Array.from(scopes),
   });
 };
+
+/** The caller's `X-Origin`, or null when it sent none or one that isn't a short plain id. */
+export const originOf = (headers: Headers) =>
+  Option.getOrNull(Schema.decodeUnknownOption(OriginId)(headers.get(ORIGIN_HEADER)));
 
 const Staged = Context.Reference<Set<ScopeId> | null>("@stacks/api/Realtime/Staged", {
   defaultValue: () => null,
@@ -62,7 +76,7 @@ const flush = (realtime: Realtime["Service"], notify: Notify) =>
   Effect.forEach(
     realtime.queued(),
     (scope) =>
-      Effect.tryPromise(() => notify({ scope, origin: null })).pipe(
+      Effect.tryPromise(() => notify({ scope, origin: realtime.origin })).pipe(
         Effect.catchCause((cause) =>
           Effect.logWarning("Realtime notice failed", cause).pipe(
             Effect.annotateLogs({ scopeKind: scopeKind(scope) }),
@@ -78,10 +92,11 @@ const flush = (realtime: Realtime["Service"], notify: Notify) =>
  */
 export const withRealtime = <A, E, R>(
   dispatch: Dispatch,
+  origin: string | null,
   run: (realtime: Realtime["Service"]) => Effect.Effect<A, E, R>,
 ) =>
   Effect.suspend(() => {
-    const realtime = makeRealtime();
+    const realtime = makeRealtime(origin);
 
     return run(realtime).pipe(
       Effect.ensuring(

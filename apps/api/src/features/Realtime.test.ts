@@ -264,6 +264,7 @@ it.layer(TestApi.layer)("realtime notices", (it) => {
             notify: async (notice) => void sent.push(notice.scope),
             waitUntil: (work) => void pending.push(work),
           },
+          null,
           (realtime) =>
             Realtime.transaction(Realtime.changed(scope)).pipe(
               Effect.andThen(Effect.die("view failed")),

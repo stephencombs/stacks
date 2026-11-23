@@ -21,7 +21,15 @@ import type {
 
 import { PlayerIdentityRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
-import { digest, establish, MAX_DEVICES, principal, randomToken } from "./Recording.ts";
+import * as Realtime from "./Realtime.ts";
+import {
+  digest,
+  establish,
+  MAX_DEVICES,
+  playersChanged,
+  principal,
+  randomToken,
+} from "./Recording.ts";
 
 const lockPlayer = (sql: SqlClient.SqlClient, playerId: PlayerId) =>
   sql`select 1 from players where id = ${playerId} for update`;
@@ -143,7 +151,7 @@ export const revokeBinding = Effect.fn("PlayerInvites.revokeBinding")(function* 
   const { self, starter } = yield* authority(playerId);
 
   if (!starter && actorId !== self.actorId) return yield* new Forbidden({ reason: "starter_only" });
-  yield* sql.withTransaction(
+  yield* Realtime.transaction(
     Effect.gen(function* () {
       yield* lockPlayer(sql, playerId);
 
@@ -162,6 +170,7 @@ export const revokeBinding = Effect.fn("PlayerInvites.revokeBinding")(function* 
       `;
 
       if (revoked.length === 0) return yield* new NotFound({ resource: "player" });
+      yield* playersChanged([playerId]);
       yield* sql`
         update player_invites set revoked_at = now()
         where player_id = ${playerId}
@@ -273,7 +282,7 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
   yield* unclaimed;
   const { self, actorPlayers } = yield* establish(request.identity);
 
-  return yield* sql.withTransaction(
+  return yield* Realtime.transaction(
     Effect.gen(function* () {
       yield* lockPlayer(sql, found.playerId);
 
@@ -328,6 +337,8 @@ export const redeem = Effect.fn("PlayerInvites.redeem")(function* (
 
         if (claimed.length === 0) return yield* new Conflict({ reason: "player_claimed" });
       }
+
+      yield* playersChanged([invite.playerId]);
 
       const [player] = yield* sql`
         select id, display_name from players where id = ${invite.playerId}

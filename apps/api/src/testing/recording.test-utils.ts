@@ -1,7 +1,7 @@
 import { expect } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import { ActorId, EntryId, PlayerId, TableId, VisitId } from "@stacks/contracts";
+import { ActorId, EntryId, PlayerId, TableId, TripId, VisitId } from "@stacks/contracts";
 import {
   RecordingCommand,
   RecordingOperationId,
@@ -203,6 +203,14 @@ export const edit = (
   }) as Extract<RecordingCommand, { type: "edit_visit" }>;
 };
 
+export const deleteVisit = (identity: RecordingIdentity, visitId: VisitId, expectedRevision = 0) =>
+  RecordingCommand.make({
+    type: "delete_visit",
+    ...common(identity, 2),
+    visitId,
+    expectedRevision,
+  });
+
 export const recorderCommand = (
   type: "appoint_recorder" | "revoke_recorder",
   identity: RecordingIdentity,
@@ -219,3 +227,9 @@ export const sharedTable = Effect.fn("test.sharedTable")(function* () {
 
   return { starter, opened, token };
 });
+
+export const setTableTrip = (
+  identity: RecordingIdentity,
+  tableId: TableId,
+  tripId: TripId | null,
+) => RecordingCommand.make({ type: "set_table_trip", ...common(identity, 3), tableId, tripId });
