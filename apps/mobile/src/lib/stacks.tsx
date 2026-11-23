@@ -5,7 +5,12 @@ import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import type * as Atom from "effect/reactivity/Atom";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import { makeRecordingTransport, makeStacksClient } from "@stacks/client-runtime/api";
+import {
+  makeRecordingTransport,
+  makeScopeWatchable,
+  makeStacksClient,
+} from "@stacks/client-runtime/api";
+import { makeScopeHub } from "@stacks/client-runtime/realtime";
 import { RecordingSyncRoot } from "@stacks/client-runtime/recordingReact";
 import { describeError } from "@stacks/client-runtime/errors";
 import {
@@ -32,6 +37,7 @@ import { actorKeys } from "./actorKeys";
 import { apiUrl, clerkPublishableKey } from "./config";
 import { markStartup } from "./diagnostics";
 import { outboxStorage, wakeOutbox } from "./outbox";
+import { appStateSource, openSocket } from "./realtime";
 import { captureTestEvent } from "./telemetry";
 import { lastTripStorage, statsCopyStorage } from "./tripStorage";
 
@@ -72,6 +78,13 @@ const signIn = (userId: string) =>
     outbox: outboxStorage(userId),
     lastTrip: lastTripStorage(userId),
     statsCopies: statsCopyStorage(userId),
+    scopeHub: makeScopeHub({
+      baseUrl: apiUrl,
+      getToken: api.getToken,
+      openSocket,
+      appState: appStateSource,
+      watchable: makeScopeWatchable(api),
+    }),
     capture: captureTestEvent,
   });
 

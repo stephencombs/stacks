@@ -1,5 +1,5 @@
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { MinorUnits, type GroupDetail, type TripDetail } from "@stacks/contracts";
+import { MinorUnits, groupScope, type GroupDetail, type TripDetail } from "@stacks/contracts";
 import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import {
   localClock,
@@ -25,6 +25,7 @@ import { SessionList } from "../features/SessionList";
 import { ReopenTrip, TripOptionsButton } from "../features/TripOptions";
 import { TripHero } from "../features/TripHero";
 import { useGo } from "../lib/go";
+import { ScopeNotices } from "../lib/realtime";
 import { ScopeLoaded, usePlaceAddress } from "../lib/scope";
 import { TripLoaded } from "../lib/stacks";
 
@@ -48,17 +49,19 @@ export function SessionsScreen({ route }: Props) {
     >
       {({ trip }) =>
         trip ? (
-          <TripLoaded
-            renderError={screenError}
-            tripId={trip.id}
-            skeleton={
-              <Screen>
-                <SessionsSkeleton />
-              </Screen>
-            }
-          >
-            {(detail, group) => <SessionsView trip={detail} group={group} />}
-          </TripLoaded>
+          <ScopeNotices scopes={[groupScope(trip.groupId)]}>
+            <TripLoaded
+              renderError={screenError}
+              tripId={trip.id}
+              skeleton={
+                <Screen>
+                  <SessionsSkeleton />
+                </Screen>
+              }
+            >
+              {(detail, group) => <SessionsView trip={detail} group={group} />}
+            </TripLoaded>
+          </ScopeNotices>
         ) : null
       }
     </ScopeLoaded>

@@ -1,4 +1,5 @@
 import { useUser } from "@clerk/expo";
+import { useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
 import {
   CurrencyCode,
@@ -16,6 +17,7 @@ import {
 import {
   activityTarget,
   crewFeed,
+  crewScopes,
   groupHappening,
   livePlayerIds,
   nameList,
@@ -34,6 +36,7 @@ import { chipOf, closedPlays, localClock, tripDates, tripPlays } from "@stacks/c
 import { tripStandings } from "@stacks/shared/trips";
 import type * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { useCallback, useState, type ReactNode } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { Text } from "../components/ui/Text";
@@ -58,10 +61,27 @@ import { Chip } from "../features/Chip";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
 import { useGo } from "../lib/go";
 import { usePreferences } from "../lib/preferences";
+import { ScopeNotices } from "../lib/realtime";
 import { Loaded, TripLoaded, useAction, useStacks } from "../lib/stacks";
 
 /** Crew: the trip going now, pinned, then what everyone in your groups has been playing. */
 export function CrewScreen() {
+  return (
+    <CrewNotices>
+      <CrewContent />
+    </CrewNotices>
+  );
+}
+
+function CrewNotices({ children }: { children: ReactNode }) {
+  const stacks = useStacks();
+  const groups = AsyncResult.getOrElse(useAtomValue(stacks.groups), () => []);
+  const activity = AsyncResult.getOrElse(useAtomValue(stacks.crewActivity()), () => null);
+
+  return <ScopeNotices scopes={crewScopes(groups, activity?.items ?? [])}>{children}</ScopeNotices>;
+}
+
+function CrewContent() {
   const stacks = useStacks();
   const [sheet, setSheet] = useState<"groups" | "create" | null>(null);
   const openGroups = useCallback(() => setSheet("groups"), []);
