@@ -10,7 +10,7 @@ import {
   makeScopeWatchable,
   makeStacksClient,
 } from "@stacks/client-runtime/api";
-import { makeScopeHub } from "@stacks/client-runtime/realtime";
+import { createScopeHub } from "@stacks/client-runtime/realtime";
 import { RecordingSyncRoot } from "@stacks/client-runtime/recordingReact";
 import { describeError } from "@stacks/client-runtime/errors";
 import {
@@ -78,7 +78,7 @@ const signIn = (userId: string) =>
     outbox: outboxStorage(userId),
     lastTrip: lastTripStorage(userId),
     statsCopies: statsCopyStorage(userId),
-    scopeHub: makeScopeHub({
+    scopeHub: createScopeHub({
       baseUrl: apiUrl,
       getToken: api.getToken,
       openSocket,
