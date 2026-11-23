@@ -388,7 +388,7 @@ export function PersonalYouButton() {
           </ControlSurface>
         )}
       </PressableScale>
-      {open ? <YouSheet onClose={() => setOpen(false)} /> : null}
+      <YouSheet open={open} onClose={() => setOpen(false)} />
     </>
   );
 }

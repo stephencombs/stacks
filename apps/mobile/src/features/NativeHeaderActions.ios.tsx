@@ -49,7 +49,7 @@ export function useNativeHeaderActions({
           </Toolbar.Custom>
         )}
       </Toolbar>
-      {open ? <YouSheet onClose={() => setOpen(false)} /> : null}
+      <YouSheet open={open} onClose={() => setOpen(false)} />
     </>
   );
 }
