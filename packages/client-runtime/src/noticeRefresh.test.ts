@@ -104,22 +104,30 @@ describe("noticeRefresh", () => {
     }),
   );
 
-  it.effect("catches every query up once, including one that is already fetching", () =>
-    Effect.gen(function* () {
-      const refresh = createNoticeRefresh(yield* testFork);
-      const [idle, busy] = [shownQuery(), shownQuery()];
-      refresh.register(idle.target);
-      refresh.register(busy.target);
-      busy.target.refresh();
-      refresh.catchUp();
+  it.effect(
+    "refetches every query once for a burst, one already fetching getting a single more",
+    () =>
+      Effect.gen(function* () {
+        const refresh = createNoticeRefresh(yield* testFork);
+        const [idle, busy] = [shownQuery(), shownQuery()];
+        refresh.register(idle.target);
+        refresh.register(busy.target);
+        busy.target.refresh();
 
-      expect([idle.fetches(), busy.fetches()]).toEqual([1, 1]);
-      busy.finish();
-      expect(busy.fetches()).toBe(2);
-      idle.finish();
-      busy.finish();
-      expect([idle.fetches(), busy.fetches()]).toEqual([1, 2]);
-    }),
+        for (let i = 0; i < 3; i++) {
+          refresh.notice();
+          yield* TestClock.adjust("50 millis");
+        }
+
+        yield* TestClock.adjust("200 millis");
+        expect([idle.fetches(), busy.fetches()]).toEqual([1, 1]);
+        busy.finish();
+        expect(busy.fetches()).toBe(2);
+        idle.finish();
+        busy.finish();
+        yield* TestClock.adjust("5 seconds");
+        expect([idle.fetches(), busy.fetches()]).toEqual([1, 2]);
+      }),
   );
 
   it.effect("stops refetching a query once it's unregistered", () =>

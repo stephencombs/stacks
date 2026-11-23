@@ -99,7 +99,7 @@ const wsUrl = (baseUrl: string, scope: ScopeId) =>
  * every 30s and reconnects when the pong doesn't come, backing off with jitter. It closes while
  * the app is in the background and opens again when it's active. A refused view stops it.
  */
-export const makeScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.runFork) => {
+export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.runFork) => {
   const entries = new Map<ScopeId, Entry>();
 
   const session = (scope: ScopeId, listeners: ReadonlySet<ScopeListener>) =>
@@ -151,7 +151,12 @@ export const makeScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.runFo
               return { kind: "dropped", opened: true, code: null } satisfies Outcome;
             }
 
-            socket.send(SCOPE_PING);
+            const sent = yield* Effect.try(() => socket.send(SCOPE_PING)).pipe(Effect.option);
+
+            if (Option.isNone(sent)) {
+              return { kind: "dropped", opened: true, code: null } satisfies Outcome;
+            }
+
             pongBy = at + Duration.toMillis(PONG_WITHIN);
             continue;
           }
@@ -261,4 +266,4 @@ export const makeScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.runFo
   };
 };
 
-export type ScopeHub = ReturnType<typeof makeScopeHub>;
+export type ScopeHub = ReturnType<typeof createScopeHub>;

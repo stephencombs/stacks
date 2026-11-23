@@ -1,89 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
-import { SCOPE_PING, SCOPE_PONG, groupScope, GroupId } from "@stacks/contracts";
+import { SCOPE_PING, SCOPE_PONG } from "@stacks/contracts";
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as TestClock from "effect/testing/TestClock";
 
-import {
-  makeScopeHub,
-  type AppStateName,
-  type RealtimeSocket,
-  type SocketHandlers,
-  type ScopeListener,
-} from "./realtime.ts";
-
-const scope = groupScope(GroupId.make("0192e7a0-0000-7000-8000-000000000001"));
-const notice = JSON.stringify({ scope, origin: null });
-
-class Line implements RealtimeSocket {
-  readonly sent: Array<string> = [];
-  closed = false;
-  readonly url: string;
-  readonly authorization: string;
-  readonly handlers: SocketHandlers;
-
-  constructor(url: string, authorization: string, handlers: SocketHandlers) {
-    this.url = url;
-    this.authorization = authorization;
-    this.handlers = handlers;
-  }
-
-  send(data: string) {
-    this.sent.push(data);
-  }
-
-  close() {
-    this.closed = true;
-  }
-}
-
-const setup = (options: { token?: string | null; watchable?: boolean } = {}) =>
-  Effect.gen(function* () {
-    const lines = yield* Queue.unbounded<Line>();
-    let tokens = 0;
-    let state: AppStateName = "active";
-    const changes = new Set<(state: AppStateName) => void>();
-
-    const fork = Effect.runForkWith(yield* Effect.context<never>());
-
-    const hub = makeScopeHub(
-      {
-        baseUrl: "https://api.example.com",
-        getToken: async () => (options.token === null ? null : `token-${++tokens}`),
-        openSocket: (url, headers, handlers) => {
-          const line = new Line(url, headers.authorization, handlers);
-          Queue.offerUnsafe(lines, line);
-
-          return line;
-        },
-        appState: {
-          current: () => state,
-          subscribe: (listener) => {
-            changes.add(listener);
-
-            return () => void changes.delete(listener);
-          },
-        },
-        watchable: () => Effect.succeed(options.watchable ?? true),
-      },
-      fork,
-    );
-
-    const heard = { notices: 0, connections: 0 };
-
-    const listener: ScopeListener = {
-      notice: () => void (heard.notices += 1),
-      connected: () => void (heard.connections += 1),
-    };
-
-    const appState = (next: AppStateName) => {
-      state = next;
-
-      for (const change of changes) change(next);
-    };
-
-    return { hub, lines, heard, listener, appState };
-  });
+import type { ScopeListener } from "./realtime.ts";
+import { notice, scope, setup } from "./realtimeFake.test-utils.ts";
 
 describe("scope hub", () => {
   it.effect("opens with the user's token, tells listeners of notices, and ignores other text", () =>
@@ -149,6 +71,23 @@ describe("scope hub", () => {
       second.handlers.open();
       yield* Effect.yieldNow;
       expect(heard.connections).toBe(2);
+    }),
+  );
+
+  it.effect("reconnects when a ping can't be sent", () =>
+    Effect.gen(function* () {
+      const { hub, lines, listener } = yield* setup();
+      hub.watch(scope, listener);
+      const first = yield* Queue.take(lines);
+      first.handlers.open();
+      yield* Effect.yieldNow;
+      first.failing = true;
+      yield* TestClock.adjust("30 seconds");
+      expect(first.closed).toBe(true);
+
+      yield* TestClock.adjust("30 seconds");
+      const second = yield* Queue.take(lines);
+      expect(second.authorization).toBe("Bearer token-2");
     }),
   );
 

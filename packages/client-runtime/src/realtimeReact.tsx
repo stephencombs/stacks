@@ -2,10 +2,11 @@ import { RegistryContext } from "@effect/atom-react";
 import { ScopeId } from "@stacks/contracts";
 import type * as Atom from "effect/reactivity/Atom";
 import type * as AsyncResult from "effect/reactivity/AsyncResult";
-import { createContext, use, useEffect, useState, type ReactNode } from "react";
+import { createContext, use, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { createNoticeRefresh, registryTarget, type NoticeRefresh } from "./noticeRefresh.ts";
 import type { ScopeHub } from "./realtime.ts";
+import { watchScopes } from "./screenNotices.ts";
 
 /** The signed-in user's connections, or null while nobody is signed in. */
 export const ScopeHubContext = createContext<ScopeHub | null>(null);
@@ -19,17 +20,14 @@ const NoticeRefreshContext = createContext<NoticeRefresh | null>(null);
 export function useScopeNotices(scopes: ReadonlyArray<ScopeId>, enabled: boolean) {
   const hub = use(ScopeHubContext);
   const [refresh] = useState(() => createNoticeRefresh());
+  const watching = useMemo(() => (hub ? watchScopes(hub, refresh) : null), [hub, refresh]);
   const key = scopes.join(",");
 
-  useEffect(() => {
-    if (!hub || !enabled || key === "") return;
-    const listener = { notice: refresh.notice, connected: refresh.catchUp };
-    const releases = key.split(",").map((scope) => hub.watch(ScopeId.make(scope), listener));
+  useEffect(() => () => watching?.set([]), [watching]);
 
-    return () => {
-      for (const release of releases) release();
-    };
-  }, [hub, enabled, key, refresh]);
+  useEffect(() => {
+    watching?.set(enabled && key !== "" ? key.split(",").map((scope) => ScopeId.make(scope)) : []);
+  }, [watching, enabled, key]);
 
   return refresh;
 }

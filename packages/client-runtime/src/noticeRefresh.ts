@@ -82,10 +82,6 @@ export const createNoticeRefresh = (fork: Fork = Effect.runFork) => {
         ),
       );
     },
-    catchUp: () => {
-      mark();
-      flush();
-    },
   };
 };
 
