@@ -53,7 +53,13 @@ export interface ScopeListener {
 export interface ScopeHubOptions {
   /** The API origin, `http(s)://` and no path. */
   readonly baseUrl: string;
-  readonly getToken: () => Promise<string | null>;
+  /**
+   * The `Authorization` header value for a handshake, fetched fresh for each attempt: `Bearer`,
+   * `Actor` or `Share`. Null means there is nothing to connect with yet.
+   */
+  readonly authorization: () => Promise<string | null>;
+  /** This install's `X-Origin`: a notice it caused isn't passed on. */
+  readonly origin: string | null;
   readonly openSocket: OpenSocket;
   readonly appState: AppStateSource;
   /** False when the API refuses the scope's view (401, 403, 404); true for anything else. */
@@ -77,11 +83,11 @@ type Outcome =
 
 type Entry = { readonly listeners: Set<ScopeListener>; fiber: Fiber.Fiber<void> | null };
 
-const isNotice = (data: string) => {
+const parseNotice = (data: string) => {
   try {
-    return Option.isSome(Schema.decodeUnknownOption(ScopeNotice)(JSON.parse(data)));
+    return Schema.decodeUnknownOption(ScopeNotice)(JSON.parse(data));
   } catch {
-    return false;
+    return Option.none();
   }
 };
 
@@ -104,17 +110,17 @@ export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.run
 
   const session = (scope: ScopeId, listeners: ReadonlySet<ScopeListener>) =>
     Effect.gen(function* () {
-      const token = yield* Effect.tryPromise(options.getToken).pipe(
+      const authorization = yield* Effect.tryPromise(options.authorization).pipe(
         Effect.catch(() => Effect.succeed(null)),
       );
 
-      if (token === null) return { kind: "no_token" } satisfies Outcome;
+      if (authorization === null) return { kind: "no_token" } satisfies Outcome;
 
       const events = yield* Queue.unbounded<SocketEvent>();
 
       const socket = options.openSocket(
         wsUrl(options.baseUrl, scope),
-        { authorization: `Bearer ${token}` },
+        { authorization },
         {
           open: () => void Queue.offerUnsafe(events, { kind: "open" }),
           message: (data) => void Queue.offerUnsafe(events, { kind: "message", data }),
@@ -171,7 +177,14 @@ export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.run
             pongBy = null;
             pingAt = at + Duration.toMillis(PING_EVERY);
 
-            if (event.data !== SCOPE_PONG && isNotice(event.data)) {
+            const heard = event.data === SCOPE_PONG ? Option.none() : parseNotice(event.data);
+
+            const own =
+              Option.isSome(heard) &&
+              options.origin !== null &&
+              heard.value.origin === options.origin;
+
+            if (Option.isSome(heard) && !own) {
               for (const listener of listeners) listener.notice();
             }
           }

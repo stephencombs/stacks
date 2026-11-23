@@ -8,6 +8,23 @@ import type { ScopeListener } from "./realtime.ts";
 import { notice, scope, setup } from "./realtimeFake.test-utils.ts";
 
 describe("scope hub", () => {
+  it.effect("ignores the notices its own install wrote, and hears everyone else", () =>
+    Effect.gen(function* () {
+      const { hub, lines, heard, listener } = yield* setup({ origin: "mine" });
+      hub.watch(scope, listener);
+      const line = yield* Queue.take(lines);
+      line.handlers.open();
+      yield* Effect.yieldNow;
+
+      for (const origin of ["mine", "theirs", null]) {
+        line.handlers.message(JSON.stringify({ scope, origin }));
+        yield* Effect.yieldNow;
+      }
+
+      expect(heard.notices).toBe(2);
+    }),
+  );
+
   it.effect("opens with the user's token, tells listeners of notices, and ignores other text", () =>
     Effect.gen(function* () {
       const { hub, lines, heard, listener } = yield* setup();

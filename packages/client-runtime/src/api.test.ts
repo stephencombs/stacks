@@ -1,10 +1,28 @@
 import { expect, it } from "@effect/vitest";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import { NotFound, Venue, VenueId } from "@stacks/contracts";
+import {
+  ActorId,
+  GroupId,
+  NotFound,
+  PlayerId,
+  TableId,
+  Venue,
+  VenueId,
+  groupScope,
+  tableScope,
+} from "@stacks/contracts";
 import * as Schema from "effect/Schema";
+import { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
 
-import { fetchPublicVenue, searchPublicVenues } from "./api.ts";
+import {
+  fetchPublicVenue,
+  makeRecordingTransport,
+  makeScopeWatchable,
+  makeSharedWatchable,
+  searchPublicVenues,
+} from "./api.ts";
 
 const options = { baseUrl: "https://colorup.test" };
 
@@ -76,5 +94,107 @@ it.effect("preserves the public read's NotFound error", () =>
     expect(Schema.is(NotFound)(error)).toBe(true);
 
     if (Schema.is(NotFound)(error)) expect(error.resource).toBe("venue");
+  }),
+);
+
+const notFound = () =>
+  Response.json(
+    Schema.encodeSync(Schema.toCodecJson(NotFound))(new NotFound({ resource: "table" })),
+    { status: 404 },
+  );
+
+const capture = (respond: (request: Request) => Response) => {
+  const seen: Array<Request> = [];
+
+  const fetch: typeof globalThis.fetch = async (input, init) => {
+    const request = new Request(input, init);
+    seen.push(request);
+
+    return respond(request);
+  };
+
+  return { seen, fetch };
+};
+
+it.effect("names its install in X-Origin on a push, signed in or as a device", () =>
+  Effect.gen(function* () {
+    const { seen, fetch } = capture(() => Response.json({ results: [] }));
+    const actorId = ActorId.make(crypto.randomUUID());
+
+    const payload = {
+      identity: { playerId: PlayerId.make(crypto.randomUUID()), actorId },
+      commands: [
+        RecordingCommand.make({
+          type: "delete_table",
+          operationId: RecordingOperationId.make(crypto.randomUUID()),
+          actorId,
+          preparedAt: DateTime.makeUnsafe(0),
+          tableId: TableId.make(crypto.randomUUID()),
+        }),
+      ],
+    };
+
+    const transport = makeRecordingTransport({
+      baseUrl: options.baseUrl,
+      getToken: async () => "session",
+      origin: "install-1",
+    });
+
+    for (const actor of [null, { actorId, secret: "secret-1" }]) {
+      yield* transport
+        .push(payload, actor)
+        .pipe(Effect.provideService(FetchHttpClient.Fetch, fetch));
+    }
+
+    expect(seen.map((request) => request.headers.get("x-origin"))).toEqual([
+      "install-1",
+      "install-1",
+    ]);
+    expect(seen.map((request) => request.headers.get("authorization"))).toEqual([
+      "Bearer session",
+      `Actor ${actorId}.secret-1`,
+    ]);
+  }),
+);
+
+it.effect("checks the view a scope names with the credential its socket uses", () =>
+  Effect.gen(function* () {
+    const { seen, fetch } = capture(() => notFound());
+
+    const watchable = makeScopeWatchable({
+      baseUrl: options.baseUrl,
+      authorization: async () => "Actor a.b",
+    });
+
+    const table = TableId.make(crypto.randomUUID());
+    const group = GroupId.make(crypto.randomUUID());
+
+    expect(
+      yield* watchable(tableScope(table)).pipe(Effect.provideService(FetchHttpClient.Fetch, fetch)),
+    ).toBe(false);
+    yield* watchable(groupScope(group)).pipe(Effect.provideService(FetchHttpClient.Fetch, fetch));
+
+    expect(seen.map((request) => new URL(request.url).pathname)).toEqual([
+      `/api/tables/${table}`,
+      `/api/groups/${group}`,
+    ]);
+    expect(seen.every((request) => request.headers.get("authorization") === "Actor a.b")).toBe(
+      true,
+    );
+  }),
+);
+
+it.effect("keeps watching on a server error, and stops on a refused share link", () =>
+  Effect.gen(function* () {
+    const broken = capture(() => new Response("boom", { status: 500 }));
+    const gone = capture(() => notFound());
+    const watchable = makeSharedWatchable({ baseUrl: options.baseUrl }, "link");
+
+    expect(
+      yield* watchable().pipe(Effect.provideService(FetchHttpClient.Fetch, broken.fetch)),
+    ).toBe(true);
+    expect(yield* watchable().pipe(Effect.provideService(FetchHttpClient.Fetch, gone.fetch))).toBe(
+      false,
+    );
   }),
 );

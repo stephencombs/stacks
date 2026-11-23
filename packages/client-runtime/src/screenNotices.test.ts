@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as TestClock from "effect/testing/TestClock";
 
-import { createNoticeRefresh, type RefreshTarget } from "./noticeRefresh.ts";
+import { createNoticeRefresh, manualTarget, type RefreshTarget } from "./noticeRefresh.ts";
 import { setup } from "./realtimeFake.test-utils.ts";
 import { watchScopes } from "./screenNotices.ts";
 
@@ -101,5 +101,35 @@ describe("screen notices", () => {
       yield* TestClock.adjust("5 seconds");
       expect(query.fetches()).toBe(1);
     }),
+  );
+
+  it.effect(
+    "refetches a table and wakes the ledger for someone else's write, not this device's",
+    () =>
+      Effect.gen(function* () {
+        const { hub, lines, fork } = yield* setup({ origin: "this-phone" });
+        const refresh = createNoticeRefresh(fork);
+        const calls = { refetches: 0, wakes: 0 };
+
+        const table = manualTarget({ wake: () => void (calls.wakes += 1) });
+        table.fetchWith(() => void (calls.refetches += 1));
+
+        refresh.register(table.target);
+        watchScopes(hub, refresh).set([scopeOf(1)]);
+        const line = yield* Queue.take(lines);
+        line.handlers.open();
+        yield* TestClock.adjust("200 millis");
+        expect(calls).toEqual({ refetches: 1, wakes: 1 });
+        table.waiting(true);
+        table.waiting(false);
+
+        line.handlers.message(JSON.stringify({ scope: scopeOf(1), origin: "this-phone" }));
+        yield* TestClock.adjust("1 second");
+        expect(calls).toEqual({ refetches: 1, wakes: 1 });
+
+        line.handlers.message(JSON.stringify({ scope: scopeOf(1), origin: "that-phone" }));
+        yield* TestClock.adjust("200 millis");
+        expect(calls).toEqual({ refetches: 2, wakes: 2 });
+      }),
   );
 });

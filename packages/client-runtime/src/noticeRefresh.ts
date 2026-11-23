@@ -27,6 +27,38 @@ export const registryTarget = <A, E>(
   }) satisfies RefreshTarget;
 
 /**
+ * A refetch target for data fetched by hand. A notice runs the fetch set with `fetchWith`, then
+ * `wake` (the device ledger pulls what others changed). The fetch calls `waiting` as it starts
+ * and as it ends, so a notice that lands while it runs gets one more fetch.
+ */
+export const manualTarget = ({ wake }: { wake?: () => void } = {}) => {
+  const listeners = new Set<(waiting: boolean) => void>();
+  let waiting = false;
+  let fetcher: (() => void) | null = null;
+
+  return {
+    fetchWith: (next: (() => void) | null) => void (fetcher = next),
+    target: {
+      refresh: () => {
+        fetcher?.();
+        wake?.();
+      },
+      watchWaiting: (listener) => {
+        listeners.add(listener);
+        listener(waiting);
+
+        return () => void listeners.delete(listener);
+      },
+    } satisfies RefreshTarget,
+    waiting: (next: boolean) => {
+      waiting = next;
+
+      for (const listener of listeners) listener(next);
+    },
+  };
+};
+
+/**
  * Refetches the queries on a screen when the scope they're about changes. A notice marks each
  * query dirty and the mark clears when a fetch starts, so a notice that lands while a fetch is
  * already running gets one more fetch when it ends. It doesn't ask `shouldRevalidate`: a notice

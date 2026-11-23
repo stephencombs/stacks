@@ -4,7 +4,12 @@ import type * as Atom from "effect/reactivity/Atom";
 import type * as AsyncResult from "effect/reactivity/AsyncResult";
 import { createContext, use, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { createNoticeRefresh, registryTarget, type NoticeRefresh } from "./noticeRefresh.ts";
+import {
+  createNoticeRefresh,
+  registryTarget,
+  type NoticeRefresh,
+  type RefreshTarget,
+} from "./noticeRefresh.ts";
 import type { ScopeHub } from "./realtime.ts";
 import { watchScopes } from "./screenNotices.ts";
 
@@ -45,6 +50,13 @@ export function ScopeNotices({
   const refresh = useScopeNotices(scopes, enabled);
 
   return <NoticeRefreshContext value={refresh}>{children}</NoticeRefreshContext>;
+}
+
+/** Puts a refetch of your own among those the nearest `ScopeNotices` runs. */
+export function useNoticeRefresh(target: RefreshTarget) {
+  const refresh = use(NoticeRefreshContext);
+
+  useEffect(() => refresh?.register(target), [refresh, target]);
 }
 
 /** Puts a shown query among those the nearest `ScopeNotices` refetches. */

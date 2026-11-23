@@ -136,6 +136,20 @@ export const tableSynced = (state: RecordingState, tableId: TableId) => {
   );
 };
 
+/**
+ * Whether the server has the table: it's synced, or this device never created it (it joined from
+ * a link, which needs the server), so a socket for it can be accepted.
+ */
+export const tableOnServer = (state: RecordingState, tableId: TableId) =>
+  tableSynced(state, tableId) ||
+  !state.receipts.some(
+    ({ command }) =>
+      (command.type === "start" ||
+        command.type === "record_completed" ||
+        command.type === "open_table") &&
+      command.tableId === tableId,
+  );
+
 /** Where a platform keeps the device actor's secret: never in the ledger, never synced. */
 export interface ActorKeyStorage {
   readonly load: () => Promise<ActorCredential | null>;

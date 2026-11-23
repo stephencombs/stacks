@@ -32,6 +32,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   const setParams = vi.fn();
   const navigation = { setOptions: vi.fn(), setParams, dispatch };
   vi.doMock("@react-navigation/native", () => ({
+    useIsFocused: () => true,
     useNavigation: () => navigation,
     StackActions: {
       push: (screen: string, params: { readonly visitId: string }) => ({ screen, params }),

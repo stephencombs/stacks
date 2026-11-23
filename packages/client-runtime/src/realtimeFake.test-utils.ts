@@ -38,7 +38,9 @@ export class Line implements RealtimeSocket {
   }
 }
 
-export const setup = (options: { token?: string | null; watchable?: boolean } = {}) =>
+export const setup = (
+  options: { token?: string | null; watchable?: boolean; origin?: string } = {},
+) =>
   Effect.gen(function* () {
     const lines = yield* Queue.unbounded<Line>();
     let tokens = 0;
@@ -50,7 +52,8 @@ export const setup = (options: { token?: string | null; watchable?: boolean } = 
     const hub = createScopeHub(
       {
         baseUrl: "https://api.example.com",
-        getToken: async () => (options.token === null ? null : `token-${++tokens}`),
+        authorization: async () => (options.token === null ? null : `Bearer token-${++tokens}`),
+        origin: options.origin ?? null,
         openSocket: (url, headers, handlers) => {
           const line = new Line(url, headers.authorization, handlers);
           Queue.offerUnsafe(lines, line);

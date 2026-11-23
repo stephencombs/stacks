@@ -1,7 +1,8 @@
 import { useIsFocused } from "@react-navigation/native";
-import type { ScopeId } from "@stacks/contracts";
+import type { ScopeId, TableId } from "@stacks/contracts";
 import type { AppStateSource, OpenSocket } from "@stacks/client-runtime/realtime";
 import { ScopeNotices as ScopeNoticesFor } from "@stacks/client-runtime/realtimeReact";
+import { useTableScopes } from "@stacks/client-runtime/recordingReact";
 import type { ReactNode } from "react";
 import { AppState } from "react-native";
 
@@ -50,4 +51,19 @@ export function ScopeNotices({
       {children}
     </ScopeNoticesFor>
   );
+}
+
+/**
+ * A table's scope while this device syncs it and the screen is in front. The server tables shown
+ * under it refetch when something at the table changes, and the device ledger pulls what others
+ * recorded.
+ */
+export function TableNotices({
+  tableId,
+  children,
+}: {
+  tableId: TableId | null;
+  children: ReactNode;
+}) {
+  return <ScopeNotices scopes={useTableScopes(tableId)}>{children}</ScopeNotices>;
 }

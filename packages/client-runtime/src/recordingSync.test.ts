@@ -53,6 +53,7 @@ import {
   recordRejectedAgain,
   RecordingSyncBlocked,
   syncsAsDevice,
+  tableOnServer,
   type ActorKeyStorage,
   type RecordingTransport,
 } from "./recordingSync.ts";
@@ -1670,6 +1671,20 @@ describe("shared tables", () => {
     expect(credentials[0]).not.toBeNull();
     expect(credentials[0]?.secret === credentials[1]?.secret).toBe(true);
   });
+
+  it("takes a table for the server's once it synced, or when this device never created it", () =>
+    Effect.gen(function* () {
+      const store = yield* Effect.promise(() => open());
+      yield* Effect.promise(() => save(store, { type: "start", buyIn: 20000, startedAt: at(10) }));
+      const own = state(store);
+      const { command } = own.receipts.find(({ command }) => command.type === "start")!;
+      const tableId = "tableId" in command ? command.tableId : TableId.make(crypto.randomUUID());
+      const synced = { userId: null, synced: [command.operationId], rejected: [] };
+
+      expect(tableOnServer(own, tableId)).toBe(false);
+      expect(tableOnServer({ ...own, sync: synced }, tableId)).toBe(true);
+      expect(tableOnServer(own, TableId.make(crypto.randomUUID()))).toBe(true);
+    }));
 
   it("keeps solo play on a signed-out device, and syncs a shared table as the device's actor", () =>
     Effect.gen(function* () {

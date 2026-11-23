@@ -10,7 +10,6 @@ import {
   makeScopeWatchable,
   makeStacksClient,
 } from "@stacks/client-runtime/api";
-import { createScopeHub } from "@stacks/client-runtime/realtime";
 import { RecordingSyncRoot } from "@stacks/client-runtime/recordingReact";
 import { describeError } from "@stacks/client-runtime/errors";
 import {
@@ -37,7 +36,8 @@ import { actorKeys } from "./actorKeys";
 import { apiUrl, clerkPublishableKey } from "./config";
 import { markStartup } from "./diagnostics";
 import { outboxStorage, wakeOutbox } from "./outbox";
-import { appStateSource, openSocket } from "./realtime";
+import { installOrigin } from "./origin";
+import { createHub, ScopeHubProvider } from "./scopeHub";
 import { captureTestEvent } from "./telemetry";
 import { lastTripStorage, statsCopyStorage } from "./tripStorage";
 
@@ -58,7 +58,7 @@ export function SignedInProvider({ children }: { children: ReactNode }) {
         keys={actorKeys}
         wake={wakeOutbox}
       >
-        {children}
+        <ScopeHubProvider make={makeDeviceHub}>{children}</ScopeHubProvider>
       </RecordingSyncRoot>
     </SignedInRoot>
   );
@@ -68,7 +68,29 @@ const api = {
   baseUrl: apiUrl,
   getToken: async () =>
     (await getClerkInstance({ publishableKey: clerkPublishableKey }).session?.getToken()) ?? null,
+  origin: installOrigin,
 };
+
+const bearer = async () => {
+  const token = await api.getToken();
+
+  return token ? `Bearer ${token}` : null;
+};
+
+const asDevice = async () => {
+  const signedIn = await bearer().catch(() => null);
+
+  if (signedIn) return signedIn;
+  const actor = await actorKeys.load();
+
+  return actor ? `Actor ${actor.actorId}.${actor.secret}` : null;
+};
+
+const makeDeviceHub = () =>
+  createHub({
+    authorization: asDevice,
+    watchable: makeScopeWatchable({ baseUrl: apiUrl, authorization: asDevice }),
+  });
 
 const connectRecording = () => makeRecordingTransport(api);
 
@@ -78,12 +100,9 @@ const signIn = (userId: string) =>
     outbox: outboxStorage(userId),
     lastTrip: lastTripStorage(userId),
     statsCopies: statsCopyStorage(userId),
-    scopeHub: createScopeHub({
-      baseUrl: apiUrl,
-      getToken: api.getToken,
-      openSocket,
-      appState: appStateSource,
-      watchable: makeScopeWatchable(api),
+    scopeHub: createHub({
+      authorization: bearer,
+      watchable: makeScopeWatchable({ baseUrl: apiUrl, authorization: bearer }),
     }),
     capture: captureTestEvent,
   });
