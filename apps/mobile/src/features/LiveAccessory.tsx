@@ -60,11 +60,7 @@ const renderLiveAccessory = ({ placement }: { placement: Placement }) => (
   <LiveAccessory placement={placement} />
 );
 
-/**
- * Hands the tab bar its accessory while something is live. With nothing live the option must be
- * undefined, not a function returning null: that would still mount an empty glass capsule.
- */
-export function LiveAccessoryOptions({ children }: { children: ReactNode }) {
+function LiveAccessoryOptions({ children }: { children: ReactNode }) {
   const navigation = useNavigation<NativeBottomTabNavigationProp<ParamListBase>>();
   const live = use(LiveAccessoryHeight) > 0;
 
@@ -74,3 +70,14 @@ export function LiveAccessoryOptions({ children }: { children: ReactNode }) {
 
   return children;
 }
+
+/**
+ * Hands the tab bar its accessory while something is live. With nothing live the option must be
+ * undefined, not a function returning null: that would still mount an empty glass capsule.
+ *
+ * React Navigation calls `screenLayout` as a plain function while the navigator renders, so this
+ * must return an element and keep its hooks in a component below it.
+ */
+export const liveAccessoryLayout = ({ children }: { children: ReactNode }) => (
+  <LiveAccessoryOptions>{children}</LiveAccessoryOptions>
+);
