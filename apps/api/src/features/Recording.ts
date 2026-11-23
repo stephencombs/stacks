@@ -276,20 +276,18 @@ export const playersChanged = Effect.fn("Recording.playersChanged")(function* (
   const mine = sql.in(players);
 
   const tables = yield* sql<{ id: TableId; tripId: TripId | null }>`
-    select t.id, t.trip_id from tables t
+    with at as (
+      select id from tables where starter_player_id in ${mine}
+      union select table_id from personal_visits where player_id in ${mine} and deleted_at is null
+      union select table_id from table_participants where player_id in ${mine}
+    )
+    select t.id, t.trip_id from tables t join at on at.id = t.id
     where t.deleted_at is null
       and (
         not exists (select 1 from personal_visits where table_id = t.id)
         or exists (
           select 1 from personal_visits where table_id = t.id and finished_at is null and deleted_at is null
         )
-      )
-      and (
-        t.starter_player_id in ${mine}
-        or t.id in (
-          select table_id from personal_visits where player_id in ${mine} and deleted_at is null
-        )
-        or t.id in (select table_id from table_participants where player_id in ${mine})
       )
   `;
 
