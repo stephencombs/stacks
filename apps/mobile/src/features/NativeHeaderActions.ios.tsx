@@ -44,7 +44,7 @@ export function useNativeHeaderActions({
             onPress={openYou}
           />
         ) : (
-          <Toolbar.Custom hidesSharedBackground={!isLiquidGlassSupported}>
+          <Toolbar.Custom hidesSharedBackground>
             <YouAvatar signedIn={signedIn} onPress={openYou} />
           </Toolbar.Custom>
         )}
@@ -70,7 +70,7 @@ function YouAvatar({ signedIn, onPress }: { signedIn: boolean; onPress: () => vo
       hitSlop={6}
       className="size-11 items-center justify-center"
     >
-      {isLiquidGlassSupported ? face : <ControlSurface>{face}</ControlSurface>}
+      <ControlSurface>{face}</ControlSurface>
     </PressableScale>
   );
 }
