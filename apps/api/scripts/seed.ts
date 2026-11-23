@@ -23,6 +23,7 @@ import * as Database from "../src/db/Database.ts";
 import * as Groups from "../src/features/Groups.ts";
 import * as Guests from "../src/features/Guests.ts";
 import * as Invites from "../src/features/Invites.ts";
+import * as Realtime from "../src/features/Realtime.ts";
 import * as Trips from "../src/features/Trips.ts";
 import * as Venues from "../src/features/Venues.ts";
 import {
@@ -227,4 +228,8 @@ Effect.gen(function* () {
       `${trips.length} trips of ${sessionCount} sessions. ` +
       `Owner: ${ownerId}`,
   );
-}).pipe(Effect.provide(Database.layer(url)), NodeRuntime.runMain);
+}).pipe(
+  Effect.provide(Database.layer(url)),
+  Effect.provideService(Realtime.Realtime, Realtime.makeRealtime()),
+  NodeRuntime.runMain,
+);

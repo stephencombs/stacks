@@ -28,7 +28,7 @@ const claimText = (decoded: Option.Option<string>) =>
 /** Native session tokens do not name a browser origin. */
 export const isNativeSession = (azp: string | undefined) => azp === undefined;
 
-const makeVerify = Effect.gen(function* () {
+export const makeVerify = Effect.gen(function* () {
   const secretKey = yield* Config.option(Config.Redacted("CLERK_SECRET_KEY"));
   const jwtKey = yield* Config.option(Config.String("CLERK_JWT_KEY"));
 

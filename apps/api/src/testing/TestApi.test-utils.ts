@@ -20,16 +20,20 @@ import {
   Recorder,
   RecorderOf,
   RecordingAuthentication,
+  REALTIME_PREFIX,
   StacksApi,
   Unauthorized,
   UserId,
+  type ScopeId,
 } from "@stacks/contracts";
 
 import { parseActor } from "../auth/Clerk.ts";
 
 import * as Database from "../db/Database.ts";
 import { migrations } from "../db/migrations/index.ts";
+import * as Realtime from "../features/Realtime.ts";
 import * as Api from "../http/Api.ts";
+import * as Upgrade from "../realtime/Upgrade.ts";
 
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/stacks_test";
@@ -40,12 +44,17 @@ const testUser = (credential: Redacted.Redacted) => {
   return { userId, displayName: userId.replace(/^user_/, ""), avatarUrl: null };
 };
 
+const verifyTest: Upgrade.Upgrade["verify"] = (credential) =>
+  Redacted.value(credential) === ""
+    ? Effect.fail(new Unauthorized())
+    : Effect.succeed(testUser(credential));
+
 const layerTestAuthentication = Layer.mergeAll(
   Layer.succeed(Authentication, {
     bearer: (httpEffect, { credential }) =>
-      Redacted.value(credential) === ""
-        ? Effect.fail(new Unauthorized())
-        : Effect.provideService(httpEffect, CurrentUser, testUser(credential)),
+      Effect.flatMap(verifyTest(credential), (user) =>
+        Effect.provideService(httpEffect, CurrentUser, user),
+      ),
   }),
   Layer.succeed(RecordingAuthentication, {
     bearer: (httpEffect, { credential }) =>
@@ -70,6 +79,19 @@ const layerPlatform = Layer.mergeAll(
   Etag.layerWeak,
 );
 
+const upgradeHeaders = (request: {
+  readonly token?: string | null;
+  readonly websocket?: boolean;
+}) => {
+  const headers = new Headers();
+
+  if (request.websocket !== false) headers.set("upgrade", "websocket");
+
+  if (request.token) headers.set("authorization", `Bearer ${request.token}`);
+
+  return headers;
+};
+
 const makeTestApi = Effect.gen(function* () {
   yield* PgMigrator.run({ loader: migrations });
   const database = yield* Effect.context<SqlClient.SqlClient>();
@@ -80,8 +102,68 @@ const makeTestApi = Effect.gen(function* () {
 
   yield* Effect.addFinalizer(() => Effect.promise(dispose));
 
+  const sent: Array<ScopeId> = [];
+  const flushing = new Set<Promise<unknown>>();
+  let refusing = false;
+
+  const dispatch: Realtime.Dispatch = {
+    notify: async ({ scope }) => {
+      if (refusing) throw new Error("channel unavailable");
+      sent.push(scope);
+    },
+    waitUntil: (work) => void flushing.add(work),
+  };
+
   const fetch: typeof globalThis.fetch = (input, init) =>
-    handler(new Request(input, init), database);
+    Effect.runPromise(
+      Realtime.withRealtime(dispatch, (realtime) =>
+        Effect.promise(() =>
+          handler(new Request(input, init), Context.add(database, Realtime.Realtime, realtime)),
+        ),
+      ),
+    );
+
+  const settled = Effect.promise(async () => {
+    await Promise.all(flushing);
+    flushing.clear();
+  });
+
+  const notified = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.gen(function* () {
+      sent.length = 0;
+      yield* effect;
+      yield* settled;
+
+      return Array.from(new Set(sent));
+    });
+
+  const refuseNotices = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => void (refusing = true)),
+      () => Effect.andThen(effect, settled),
+      () => Effect.sync(() => void (refusing = false)),
+    );
+
+  const forwarded: Array<ScopeId> = [];
+
+  const upgrade = (
+    path: string,
+    request: { readonly token?: string | null; readonly websocket?: boolean },
+    verify: Upgrade.Upgrade["verify"] = verifyTest,
+  ) =>
+    Upgrade.upgrade(
+      new Request(`http://stacks.test${REALTIME_PREFIX}${path}`, {
+        headers: upgradeHeaders(request),
+      }),
+      {
+        verify,
+        connect: async (scope) => {
+          forwarded.push(scope);
+
+          return new Response("forwarded", { status: 200 });
+        },
+      },
+    ).pipe(Effect.provide(database));
 
   const as = (user: string) =>
     HttpApiClient.make(StacksApi, {
@@ -109,7 +191,7 @@ const makeTestApi = Effect.gen(function* () {
       Effect.provideService(FetchHttpClient.Fetch, fetch),
     );
 
-  return { as, asActor };
+  return { as, asActor, notified, refuseNotices, upgrade, forwarded };
 });
 
 export class TestApi extends Context.Service<TestApi, Effect.Success<typeof makeTestApi>>()(

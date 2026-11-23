@@ -7,6 +7,7 @@ import {
   Forbidden,
   InvalidRequest,
   NotFound,
+  groupScope,
   type CreateStakeRequest,
   type EndStakeRequest,
   type StakeId,
@@ -16,6 +17,7 @@ import {
 
 import { StakeRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as Realtime from "./Realtime.ts";
 import * as Trips from "./Trips.ts";
 
 const load = Effect.fn("Stakes.load")(function* (stakeId: StakeId) {
@@ -65,7 +67,7 @@ export const create = Effect.fn("Stakes.create")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
 
-  return yield* sql.withTransaction(
+  return yield* Realtime.transaction(
     Effect.gen(function* () {
       const { userId } = yield* CurrentUser;
       yield* sql`select id from trips where id = ${tripId} for update`;
@@ -81,14 +83,18 @@ export const create = Effect.fn("Stakes.create")(function* (
 
       if (existing.length === 0) yield* requireNoTables(tripId);
       const startedAt = request.startedAt ?? (yield* DateTime.now);
-      yield* sql`
+
+      const inserted = yield* sql`
         insert into stakes (id, group_id, trip_id, lender_id, borrower_id, amount, lender_share,
           started_at, note, created_by)
         values (${request.id}, ${groupId}, ${tripId}, ${request.lenderId}, ${request.borrowerId},
           ${BigInt(request.amount)}, ${request.lenderShare}, ${DateTime.toDateUtc(startedAt)},
           ${request.note}, ${userId})
         on conflict (id) do nothing
+        returning id
       `;
+
+      if (inserted.length > 0) yield* Realtime.changed(groupScope(groupId));
       const stored = yield* load(request.id);
 
       if (stored.groupId !== groupId) return yield* new Conflict({ reason: "id_taken" });
@@ -112,7 +118,13 @@ export const end = Effect.fn("Stakes.end")(function* (
     return yield* new InvalidRequest({ message: "A stake can't end before it started." });
   }
 
-  yield* sql`update stakes set ended_at = ${DateTime.toDateUtc(endedAt)} where id = ${stakeId}`;
+  const ended = yield* sql`
+    update stakes set ended_at = ${DateTime.toDateUtc(endedAt)}
+    where id = ${stakeId} and ended_at is null
+    returning id
+  `;
+
+  if (ended.length > 0) yield* Realtime.changed(groupScope(stake.groupId));
 
   return yield* load(stakeId);
 });
@@ -120,7 +132,7 @@ export const end = Effect.fn("Stakes.end")(function* (
 export const reopen = Effect.fn("Stakes.reopen")(function* (stakeId: StakeId) {
   const sql = yield* SqlClient.SqlClient;
 
-  return yield* sql.withTransaction(
+  return yield* Realtime.transaction(
     Effect.gen(function* () {
       const { tripId } = yield* load(stakeId);
       yield* sql`select id from trips where id = ${tripId} for update`;
@@ -128,7 +140,13 @@ export const reopen = Effect.fn("Stakes.reopen")(function* (stakeId: StakeId) {
 
       if (stake.endedAt === null) return yield* new Conflict({ reason: "stake_open" });
       yield* requireNoTables(tripId);
-      yield* sql`update stakes set ended_at = null where id = ${stakeId}`;
+
+      const reopened = yield* sql`
+        update stakes set ended_at = null where id = ${stakeId} and ended_at is not null
+        returning id
+      `;
+
+      if (reopened.length > 0) yield* Realtime.changed(groupScope(stake.groupId));
 
       return yield* load(stakeId);
     }),
@@ -141,11 +159,15 @@ export const voidStake = Effect.fn("Stakes.void")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
-  yield* loadToChange(stakeId);
-  yield* sql`
+  const stake = yield* loadToChange(stakeId);
+
+  const voided = yield* sql`
     update stakes set voided_at = now(), voided_by = ${userId}, void_reason = ${request.reason}
     where id = ${stakeId} and voided_at is null
+    returning id
   `;
+
+  if (voided.length > 0) yield* Realtime.changed(groupScope(stake.groupId));
 
   return yield* load(stakeId);
 });

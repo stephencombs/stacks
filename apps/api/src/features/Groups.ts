@@ -9,6 +9,7 @@ import {
   NotFound,
   type CreateGroupRequest,
   GroupId,
+  groupScope,
   SessionId,
   TripId,
   type GroupListItem,
@@ -20,6 +21,7 @@ import { balances } from "@stacks/shared/balances";
 
 import { EntryRow, GroupRow, MembershipRow, TripRow } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as Realtime from "./Realtime.ts";
 import * as Views from "./Views.ts";
 
 const ok = { ok: true } as const;
@@ -191,7 +193,14 @@ export const rename = Effect.fn("Groups.rename")(function* (
   const sql = yield* SqlClient.SqlClient;
   const member = yield* Access.membership(groupId);
   yield* Access.requireAdmin(member);
-  yield* sql`update groups set name = ${request.name} where id = ${groupId}`;
+
+  const renamed = yield* sql`
+    update groups set name = ${request.name}
+    where id = ${groupId} and name is distinct from ${request.name}
+    returning id
+  `;
+
+  if (renamed.length > 0) yield* Realtime.changed(groupScope(groupId));
 
   return yield* Views.groupDetail(member);
 });
@@ -210,10 +219,13 @@ export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
     if (others!.count > 0) return yield* new Conflict({ reason: "last_owner" });
   }
 
-  yield* sql`
+  const left = yield* sql`
     update memberships set left_at = now()
     where group_id = ${groupId} and user_id = ${userId} and left_at is null
+    returning user_id
   `;
+
+  if (left.length > 0) yield* Realtime.changed(groupScope(groupId));
 
   return ok;
 });
@@ -250,10 +262,13 @@ export const removeMember = Effect.fn("Groups.removeMember")(function* (
     return yield* new Forbidden({ reason: "owner_only" });
   }
 
-  yield* sql`
+  const removed = yield* sql`
     update memberships set left_at = now()
     where group_id = ${groupId} and user_id = ${targetUserId} and left_at is null
+    returning user_id
   `;
+
+  if (removed.length > 0) yield* Realtime.changed(groupScope(groupId));
 
   return ok;
 });
@@ -269,10 +284,14 @@ export const setRole = Effect.fn("Groups.setRole")(function* (
 
   if (targetUserId === userId) return yield* new Conflict({ reason: "last_owner" });
   yield* activeMember(groupId, targetUserId);
-  yield* sql`
+
+  const changed = yield* sql`
     update memberships set role = ${request.role}
-    where group_id = ${groupId} and user_id = ${targetUserId}
+    where group_id = ${groupId} and user_id = ${targetUserId} and role <> ${request.role}
+    returning user_id
   `;
+
+  if (changed.length > 0) yield* Realtime.changed(groupScope(groupId));
 
   return ok;
 });
