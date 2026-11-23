@@ -17,21 +17,29 @@ const variant: AppVariant =
 
 const { name, scheme, id } = VARIANTS[variant];
 
+const lightIcon = "./assets/icon.png";
+
 export default () => ({
   name,
   slug: "stacks",
   scheme,
   version: "1.0.0",
-  icon: "./assets/icon.png",
+  icon: lightIcon,
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   ios: {
     bundleIdentifier: id,
     supportsTablet: true,
+    icon: { light: lightIcon, dark: "./assets/icon-dark.png" },
     config: { usesNonExemptEncryption: false },
   },
   android: {
     package: id,
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-icon.png",
+      monochromeImage: "./assets/adaptive-icon-monochrome.png",
+      backgroundColor: "#F2F2F6",
+    },
     config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_API_KEY } },
   },
   plugins: [
