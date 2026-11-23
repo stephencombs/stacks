@@ -66,7 +66,7 @@ export function YouButton() {
           </ControlSurface>
         )}
       </PressableScale>
-      {open ? <YouSheet name={name} onClose={() => setOpen(false)} /> : null}
+      <YouSheet open={open} name={name} onClose={() => setOpen(false)} />
     </>
   );
 }
@@ -75,15 +75,38 @@ export function YouButton() {
  * The shared You settings sheet opened from Play, Stats, Map, and Crew. Safe both signed in and
  * signed out by guarding Clerk hooks behind `AccountProvider`.
  */
-export function YouSheet({ name = "You", onClose }: { name?: string; onClose: () => void }) {
+export function YouSheet({
+  open,
+  name = "You",
+  onClose,
+}: {
+  open: boolean;
+  name?: string;
+  onClose: () => void;
+}) {
+  const [opened, setOpened] = useState(open);
+
+  if (open && !opened) setOpened(true);
+
+  // WARNING: unmounting the host tears the native sheet down mid-dismiss, so it stays once opened.
+  if (!opened) return null;
+
   return (
     <SheetHost>
-      <YouSettings name={name} onClose={onClose} />
+      <YouSettings open={open} name={name} onClose={onClose} />
     </SheetHost>
   );
 }
 
-function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
+function YouSettings({
+  open,
+  name,
+  onClose,
+}: {
+  open: boolean;
+  name: string;
+  onClose: () => void;
+}) {
   const account = useAccount();
   const sync = useRecordingSync();
   const { home, status, error, retryLoad } = useRecordingHome();
@@ -113,7 +136,7 @@ function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
     }
   };
 
-  if (picking === "venue")
+  if (open && picking === "venue")
     return (
       <CasinoPickerSheet
         context="default"
@@ -129,7 +152,7 @@ function YouSettings({ name, onClose }: { name: string; onClose: () => void }) {
 
   return (
     <Sheet
-      open
+      open={open}
       onClose={onClose}
       title="You"
       large={ios}

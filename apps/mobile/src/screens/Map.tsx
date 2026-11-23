@@ -19,6 +19,7 @@ import { useCSSVariable, useUniwind } from "uniwind";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
+import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { Toolbar } from "../components/ui/Toolbar";
@@ -273,94 +274,91 @@ function PopulatedMap({
       {}
       {selectedSheet ? (
         <View
-          accessibilityRole="summary"
-          accessibilityLabel={selectedSheet.name}
+          pointerEvents="box-none"
           style={{
             position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: bottomDock,
-            ...(android ? { elevation: 8 } : null),
+            left: Math.max(12, insets.left),
+            right: Math.max(12, insets.right),
+            bottom: bottomDock + 12,
           }}
-          className={cn(
-            "rounded-t-[28px] bg-surface px-4 pt-2.5 pb-4 shadow-lg",
-            android ? "" : "border-t border-line",
-          )}
         >
-          <View className="mb-3 items-center">
-            <View className="h-1 w-9 rounded-full bg-fill-strong" />
-          </View>
-          <View className="flex-row items-start justify-between gap-3 px-1">
-            <View className="min-w-0 flex-1 gap-0.5">
-              <Text numberOfLines={1} className="type-title text-ink">
-                {selectedSheet.name}
-              </Text>
-              <Text numberOfLines={1} className="type-footnote text-muted">
-                {selectedSheet.subtitle}
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-2">
-              <Money
-                amount={selectedSheet.result}
-                currency={RECORDING_CURRENCY}
-                tone="result"
-                className="type-title"
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close venue details"
-                onPress={() => pickVenue(null)}
-                hitSlop={8}
-                className="size-8 items-center justify-center rounded-full bg-fill active:opacity-70"
-              >
-                <Icon name="close" color="ink" size={14} />
-              </Pressable>
-            </View>
-          </View>
-          <ScrollView className="mt-3 max-h-52 rounded-2xl bg-fill/50">
-            {(showAllVenueVisits ? selectedSheet.visits : selectedSheet.visits.slice(0, 2)).map(
-              (item, index) => (
-                <Pressable
-                  key={item.visitId}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.title}, ${item.meta}`}
-                  onPress={() => navigation.navigate("Play", { visitId: item.visitId })}
-                  className={cn(
-                    "flex-row items-center gap-3 px-3.5 py-3 active:bg-fill",
-                    index > 0 && "border-t border-line",
-                  )}
-                >
-                  <View className={cn("h-8 w-1 rounded-full", chipColor[item.gameChip])} />
-                  <View className="min-w-0 flex-1 gap-0.5">
-                    <Text numberOfLines={1} className="type-heading text-ink">
-                      {item.title}
-                    </Text>
-                    <Text numberOfLines={1} className="type-footnote text-muted">
-                      {item.meta}
-                    </Text>
-                  </View>
+          <GlassSurface radius={32} className="rounded-[32px] p-4">
+            <View
+              accessibilityRole="summary"
+              accessibilityLabel={selectedSheet.name}
+              className="flex-row items-start gap-3"
+            >
+              <View className="min-w-0 flex-1 gap-1 pl-1">
+                <Text numberOfLines={2} className="type-headline text-ink">
+                  {selectedSheet.name}
+                </Text>
+                <View className="flex-row items-baseline gap-2">
                   <Money
-                    amount={item.result}
+                    amount={selectedSheet.result}
                     currency={RECORDING_CURRENCY}
                     tone="result"
                     className="type-heading"
                   />
-                  <Icon name="chevron-right" color="faint" size={16} />
-                </Pressable>
-              ),
-            )}
-          </ScrollView>
-          {selectedSheet.visits.length > 2 && !showAllVenueVisits ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setShowAllVenueVisits(true)}
-              className="mt-3 items-center rounded-full bg-fill py-3 active:opacity-80"
-            >
-              <Text className="type-callout font-semibold text-ink">
-                {`All ${selectedSheet.sessions} sessions here`}
-              </Text>
-            </Pressable>
-          ) : null}
+                  <Text numberOfLines={1} className="min-w-0 shrink type-footnote text-muted">
+                    {selectedSheet.subtitle}
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close venue details"
+                onPress={() => pickVenue(null)}
+                hitSlop={6}
+                className="size-8 items-center justify-center rounded-full bg-fill active:opacity-70"
+              >
+                <Icon name="close" color="muted" size={14} />
+              </Pressable>
+            </View>
+            <ScrollView className="mt-3 max-h-52 rounded-2xl bg-surface">
+              {(showAllVenueVisits ? selectedSheet.visits : selectedSheet.visits.slice(0, 2)).map(
+                (item, index) => (
+                  <Pressable
+                    key={item.visitId}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.title}, ${item.meta}`}
+                    onPress={() => navigation.navigate("Play", { visitId: item.visitId })}
+                    className={cn(
+                      "min-h-14 flex-row items-center gap-3 px-3.5 py-2.5 active:bg-fill",
+                      index > 0 && "border-t border-line",
+                    )}
+                  >
+                    <View className={cn("size-2.5 rounded-full", chipColor[item.gameChip])} />
+                    <View className="min-w-0 flex-1 gap-0.5">
+                      <Text numberOfLines={1} className="type-callout font-semibold text-ink">
+                        {item.title}
+                      </Text>
+                      <Text numberOfLines={1} className="type-footnote text-muted">
+                        {item.meta}
+                      </Text>
+                    </View>
+                    <Money
+                      amount={item.result}
+                      currency={RECORDING_CURRENCY}
+                      tone="result"
+                      className="type-callout font-semibold"
+                    />
+                    <Icon name="chevron-right" color="faint" size={14} />
+                  </Pressable>
+                ),
+              )}
+            </ScrollView>
+            {selectedSheet.visits.length > 2 && !showAllVenueVisits ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setShowAllVenueVisits(true)}
+                className="mt-2 min-h-11 items-center justify-center rounded-full active:bg-fill"
+              >
+                <Text className="type-callout font-semibold text-ink">
+                  {`All ${selectedSheet.sessions} sessions here`}
+                </Text>
+              </Pressable>
+            ) : null}
+          </GlassSurface>
         </View>
       ) : (
         <View
