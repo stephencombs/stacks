@@ -2,10 +2,10 @@
 status: draft
 created: 2026-11-23
 tags:
-- api
-- client-runtime
-- mobile
-- realtime
+  - api
+  - client-runtime
+  - mobile
+  - realtime
 parent: 038-realtime-scope-notices
 created_at: 2026-11-23T17:39:55.356501400Z
 updated_at: 2026-11-23T17:39:55.356501400Z
@@ -20,19 +20,21 @@ This is the first slice of `038-realtime-scope-notices`. It builds the whole pip
 ## Design
 
 **Server.**
+
 - A `Realtime` service queues scopes only after a transaction or autocommit statement succeeds. Only writes that change a row queue anything; check with `returning`. Idempotent replays and `on conflict do nothing` queue nothing.
 - `worker.ts` gains `ctx` and calls `ctx.waitUntil(flush)` when the handler finishes, whatever the HTTP status. `Guests.claim`, for example, commits and then builds a view that can still fail.
 - The flush wrapper and upgrade auth live in shared modules, so `TestApi` exercises them too.
 - The flush makes one RPC per scope and logs failures with the scope kind.
 
-| Write | Scopes |
-|---|---|
-| Stakes: create, end, reopen, void. Trips: create, rename, end, reopen, delete. | `group` |
+| Write                                                                                         | Scopes  |
+| --------------------------------------------------------------------------------------------- | ------- |
+| Stakes: create, end, reopen, void. Trips: create, rename, end, reopen, delete.                | `group` |
 | Groups: rename, leave, remove, set role. Guests: add, claim. Invites: create, revoke, accept. | `group` |
 
 `Groups.create` notifies nothing, because nobody can be subscribed to a group that didn't exist yet.
 
 **`ScopeChannel` Durable Object.**
+
 - `acceptWebSocket`, `getWebSockets()`, `setWebSocketAutoResponse("ping", "pong")`. No timers, alarms or outbound fetches. It stores nothing.
 - A send that fails affects only its own socket.
 - At most 100 sockets per object. Past that, the upgrade gets 503, and an existing socket can be closed with `4429`.
@@ -41,6 +43,7 @@ This is the first slice of `038-realtime-scope-notices`. It builds the whole pip
 - Deploy the API before any app build that connects. A Durable Object migration can't be undone by reverting a commit.
 
 **Upgrade.**
+
 - `GET /api/realtime/group:<id>`, routed in `worker.ts` before the HttpApi handler.
 - `Authorization: Bearer <clerk jwt>`, checked with the verifier exported from `Clerk.ts` so the `isNativeSession` check is kept.
 - It applies the group GET's membership check. Logs record rejections by status, reason and scope kind, never credentials.
@@ -48,6 +51,7 @@ This is the first slice of `038-realtime-scope-notices`. It builds the whole pip
 **Config.** Disable query caching on the development Hyperdrive config. Hyperdrive can't skip its cache for one query.
 
 **Client.**
+
 - `packages/client-runtime` takes an injected `openSocket(url, headers)` and an app-state adapter. `apps/mobile` implements `openSocket` with `new WebSocket(url, null, { headers })`.
 - Each scope gets one shared, ref-counted connection.
 - `useScopeNotices` connects only while its screen is focused (`useIsFocused()`). It closes on `background`, not `inactive`, reopens on `active`, and fetches a fresh token on every attempt. If `getToken()` returns null, it doesn't connect.
