@@ -11,7 +11,8 @@ export const ScopeId = Schema.String.check(
 
 export type ScopeId = typeof ScopeId.Type;
 
-export const groupScope = (groupId: GroupId) => ScopeId.make(`group:${groupId}`);
+/** Lowercased: a Durable Object is named by the exact string, and ids arrive in either case. */
+export const groupScope = (groupId: GroupId) => ScopeId.make(`group:${groupId.toLowerCase()}`);
 
 export const scopeKind = (scope: ScopeId) => (scope.startsWith("group:") ? "group" : "table");
 
