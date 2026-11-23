@@ -70,12 +70,10 @@ const setup = async (initial: ReadonlyArray<Place>) => {
         ))
       : null;
 
+    const screen = accessory.liveAccessoryLayout({ children: placements });
+
     return act(async () => {
-      root.render(
-        <accessory.LiveAccessoryHost>
-          <accessory.LiveAccessoryOptions>{placements}</accessory.LiveAccessoryOptions>
-        </accessory.LiveAccessoryHost>,
-      );
+      root.render(<accessory.LiveAccessoryHost>{screen}</accessory.LiveAccessoryHost>);
     });
   };
 
@@ -149,4 +147,11 @@ it("hands the tab bar an accessory only while something is live", async () => {
   await act(async () => {
     root.unmount();
   });
+});
+
+it("calls no hooks when the navigator invokes the screen layout", async () => {
+  await setup(one);
+  const accessory = await import("./LiveAccessory");
+
+  expect(() => accessory.liveAccessoryLayout({ children: null })).not.toThrow();
 });

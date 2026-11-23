@@ -7,7 +7,7 @@ import { PlatformColor } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { isLiquidGlassSupported } from "../lib/liquidGlass";
-import { LiveAccessoryHost, LiveAccessoryOptions } from "./LiveAccessory";
+import { LiveAccessoryHost, liveAccessoryLayout } from "./LiveAccessory";
 
 export const createPlaceTabs = createNativeBottomTabNavigator;
 
@@ -17,7 +17,7 @@ export const placeTabsConfig = {
     tabBarActiveTintColor: PlatformColor("systemBlue"),
     ...(isLiquidGlassSupported ? { tabBarMinimizeBehavior: "onScrollDown" as const } : null),
   },
-  ...(isLiquidGlassSupported ? { screenLayout: LiveAccessoryOptions } : null),
+  ...(isLiquidGlassSupported ? { screenLayout: liveAccessoryLayout } : null),
 };
 
 /** On iOS 26 the tab bar carries the LiveBar as its own accessory; elsewhere the LiveBar is pinned. */
