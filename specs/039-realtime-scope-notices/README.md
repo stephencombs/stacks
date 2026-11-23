@@ -35,9 +35,9 @@ At about 500 active players it costs nothing beyond the Workers Paid base ($5 a 
 
 ## Slices
 
-- `039-realtime-group-notices`: the notice pipeline, `ScopeChannel`, the upgrade route, the phone connection, and the Crew, Group and trip board screens. It ships first.
-- `040-realtime-table-notices`: recording writes, `Actor` and `Share` auth, echo suppression, and the table screens. Depends on 039.
-- `041-realtime-revocation`: closing sockets when access is lost. Depends on 039. **It must land before this reaches production.**
+- `040-realtime-group-notices`: the notice pipeline, `ScopeChannel`, the upgrade route, the phone connection, and the Crew, Group and trip board screens. It ships first.
+- `041-realtime-table-notices`: recording writes, `Actor` and `Share` auth, echo suppression, and the table screens. Depends on 040.
+- `042-realtime-revocation`: closing sockets when access is lost. Depends on 040. **It must land before this reaches production.**
 
 ## Acceptance criteria
 

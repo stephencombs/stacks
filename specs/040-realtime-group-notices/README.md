@@ -6,7 +6,7 @@ tags:
   - client-runtime
   - mobile
   - realtime
-parent: 038-realtime-scope-notices
+parent: 039-realtime-scope-notices
 created_at: 2026-11-23T17:39:55.356501400Z
 updated_at: 2026-11-23T17:39:55.356501400Z
 ---
@@ -15,7 +15,7 @@ updated_at: 2026-11-23T17:39:55.356501400Z
 
 ## Overview
 
-This is the first slice of `038-realtime-scope-notices`. It builds the whole pipeline and proves it on the simplest data path, group writes, which feed screens that already refetch through atom queries (`AtomHttpApi`, `useRevalidate`). See the umbrella for the decisions.
+This is the first slice of `039-realtime-scope-notices`. It builds the whole pipeline and proves it on the simplest data path, group writes, which feed screens that already refetch through atom queries (`AtomHttpApi`, `useRevalidate`). See the umbrella for the decisions.
 
 ## Design
 

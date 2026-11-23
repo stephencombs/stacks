@@ -7,8 +7,8 @@ tags:
   - mobile
   - realtime
 depends_on:
-  - 039-realtime-group-notices
-parent: 038-realtime-scope-notices
+  - 040-realtime-group-notices
+parent: 039-realtime-scope-notices
 created_at: 2026-11-23T17:39:55.984231700Z
 updated_at: 2026-11-23T17:39:55.984231700Z
 ---
@@ -17,7 +17,7 @@ updated_at: 2026-11-23T17:39:55.984231700Z
 
 ## Overview
 
-The second slice of `038-realtime-scope-notices` extends the pipeline from `039-realtime-group-notices` to tables. That's harder: Recording push commits each command separately, and table screens read through three different paths.
+The second slice of `039-realtime-scope-notices` extends the pipeline from `040-realtime-group-notices` to tables. That's harder: Recording push commits each command separately, and table screens read through three different paths.
 
 - **One-shot fetches** that never refresh: `useServerTable` (joined participants on `Play` and `Table`, and starters in `TableSettingsSheet`) and `SharedTableScreen`'s `fetchSharedTable`.
 - **The on-device recording store.** Starters and appointed recorders render other players from local SQLite (`liveTable.ts`). It changes only when `sync.wake()` pulls `GET /api/recording`.

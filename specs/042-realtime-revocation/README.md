@@ -5,8 +5,8 @@ tags:
   - api
   - realtime
 depends_on:
-  - 039-realtime-group-notices
-parent: 038-realtime-scope-notices
+  - 040-realtime-group-notices
+parent: 039-realtime-scope-notices
 created_at: 2026-11-23T17:39:56.620033500Z
 updated_at: 2026-11-23T17:39:56.620033500Z
 ---
@@ -15,7 +15,7 @@ updated_at: 2026-11-23T17:39:56.620033500Z
 
 ## Overview
 
-The third slice of `038-realtime-scope-notices`. A notice carries no data, so someone who lost access learns only _when_ activity happens, until their next reconnect. That's acceptable on the development environment, but this slice must land before production. Immediate revocation isn't promised: a handshake can race a revoke, and the client's next refetch re-authorizes.
+The third slice of `039-realtime-scope-notices`. A notice carries no data, so someone who lost access learns only _when_ activity happens, until their next reconnect. That's acceptable on the development environment, but this slice must land before production. Immediate revocation isn't promised: a handshake can race a revoke, and the client's next refetch re-authorizes.
 
 ## Design
 
