@@ -14,21 +14,19 @@ type Entry = {
  */
 export const createTableFeed = (load: (tableId: TableId) => Promise<TableView>) => {
   const entries = new Map<TableId, Entry>();
-  const loading = new Set<TableId>();
+  const loading = new Map<TableId, Entry>();
   const watchers = new Map<TableId, Set<(waiting: boolean) => void>>();
 
-  const setLoading = (tableId: TableId, waiting: boolean) => {
-    if (waiting) loading.add(tableId);
-    else loading.delete(tableId);
-
+  const announce = (tableId: TableId, waiting: boolean) => {
     for (const watcher of watchers.get(tableId) ?? []) watcher(waiting);
   };
 
   const refresh = (tableId: TableId) => {
     const entry = entries.get(tableId);
 
-    if (!entry || loading.has(tableId)) return;
-    setLoading(tableId, true);
+    if (!entry || loading.get(tableId) === entry) return;
+    loading.set(tableId, entry);
+    announce(tableId, true);
 
     const settle = (view: TableView | null) => {
       if (entries.get(tableId) === entry) {
@@ -37,7 +35,10 @@ export const createTableFeed = (load: (tableId: TableId) => Promise<TableView>) 
         for (const listener of entry.listeners) listener();
       }
 
-      setLoading(tableId, false);
+      if (loading.get(tableId) === entry) {
+        loading.delete(tableId);
+        announce(tableId, false);
+      }
     };
 
     load(tableId).then(settle, () => settle(null));
@@ -70,7 +71,11 @@ export const createTableFeed = (load: (tableId: TableId) => Promise<TableView>) 
       set.add(listener);
       listener(loading.has(tableId));
 
-      return () => void set.delete(listener);
+      return () => {
+        set.delete(listener);
+
+        if (set.size === 0 && watchers.get(tableId) === set) watchers.delete(tableId);
+      };
     },
   };
 };

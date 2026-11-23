@@ -112,4 +112,26 @@ describe("table feed", () => {
       expect(feed.view(tableId)).toBeUndefined();
     }),
   );
+
+  it.effect("loads for a screen that subscribes while a screen that left is still loading", () =>
+    Effect.gen(function* () {
+      const fetches = gate();
+      const feed = createTableFeed(fetches.load);
+      const leaving = feed.subscribe(tableId, () => {});
+      leaving();
+      let heard = 0;
+      const stop = feed.subscribe(tableId, () => void (heard += 1));
+      expect(fetches.requests).toHaveLength(2);
+
+      fetches.requests[1]!.resolve(viewOf(true));
+      yield* settle;
+      expect(feed.view(tableId)).toEqual(viewOf(true));
+      expect(heard).toBe(1);
+
+      fetches.requests[0]!.resolve(viewOf(false));
+      yield* settle;
+      expect(feed.view(tableId)).toEqual(viewOf(true));
+      stop();
+    }),
+  );
 });
