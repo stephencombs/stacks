@@ -243,19 +243,29 @@ export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.run
     if (fiber) fork(Fiber.interrupt(fiber));
   };
 
-  const stopWatchingAppState = options.appState.subscribe((state) => {
-    if (state === "background") {
-      for (const entry of entries.values()) close(entry);
-    } else if (state === "active") {
-      for (const [scope, entry] of entries) if (entry.fiber === null) open(scope, entry);
-    }
-  });
+  let stopWatchingAppState: (() => void) | null = null;
+
+  const watchAppState = () => {
+    stopWatchingAppState ??= options.appState.subscribe((state) => {
+      if (state === "background") {
+        for (const entry of entries.values()) close(entry);
+      } else if (state === "active") {
+        for (const [scope, entry] of entries) if (entry.fiber === null) open(scope, entry);
+      }
+    });
+  };
+
+  const ignoreAppState = () => {
+    stopWatchingAppState?.();
+    stopWatchingAppState = null;
+  };
 
   return {
     watch: (scope: ScopeId, listener: ScopeListener) => {
       const entry = entries.get(scope) ?? { listeners: new Set<ScopeListener>(), fiber: null };
       entries.set(scope, entry);
       entry.listeners.add(listener);
+      watchAppState();
 
       if (entry.fiber === null && options.appState.current() !== "background") {
         open(scope, entry);
@@ -267,11 +277,13 @@ export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.run
         if (entry.listeners.size === 0) {
           close(entry);
           entries.delete(scope);
+
+          if (entries.size === 0) ignoreAppState();
         }
       };
     },
     dispose: () => {
-      stopWatchingAppState();
+      ignoreAppState();
 
       for (const entry of entries.values()) close(entry);
       entries.clear();

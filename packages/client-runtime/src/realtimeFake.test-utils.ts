@@ -46,6 +46,7 @@ export const setup = (
     let tokens = 0;
     let state: AppStateName = "active";
     const changes = new Set<(state: AppStateName) => void>();
+    const subscriptions = { opened: 0, closed: 0 };
 
     const fork = Effect.runForkWith(yield* Effect.context<never>());
 
@@ -64,8 +65,12 @@ export const setup = (
           current: () => state,
           subscribe: (listener) => {
             changes.add(listener);
+            subscriptions.opened += 1;
 
-            return () => void changes.delete(listener);
+            return () => {
+              changes.delete(listener);
+              subscriptions.closed += 1;
+            };
           },
         },
         watchable: () => Effect.succeed(options.watchable ?? true),
@@ -86,5 +91,5 @@ export const setup = (
       for (const change of changes) change(next);
     };
 
-    return { hub, lines, heard, listener, appState, fork };
+    return { hub, lines, heard, listener, appState, fork, subscriptions, changes };
   });

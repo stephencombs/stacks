@@ -8,6 +8,27 @@ import type { ScopeListener } from "./realtime.ts";
 import { notice, scope, setup } from "./realtimeFake.test-utils.ts";
 
 describe("scope hub", () => {
+  it.effect("listens to the app's state only while something is watched", () =>
+    Effect.gen(function* () {
+      const { hub, lines, listener, subscriptions, changes } = yield* setup();
+      expect(subscriptions).toEqual({ opened: 0, closed: 0 });
+      expect(changes.size).toBe(0);
+
+      const stop = hub.watch(scope, listener);
+      yield* Queue.take(lines);
+      expect(subscriptions).toEqual({ opened: 1, closed: 0 });
+
+      stop();
+      expect(subscriptions).toEqual({ opened: 1, closed: 1 });
+      expect(changes.size).toBe(0);
+
+      hub.watch(scope, listener);
+      expect(subscriptions).toEqual({ opened: 2, closed: 1 });
+      hub.dispose();
+      expect(subscriptions).toEqual({ opened: 2, closed: 2 });
+    }),
+  );
+
   it.effect("ignores the notices its own install wrote, and hears everyone else", () =>
     Effect.gen(function* () {
       const { hub, lines, heard, listener } = yield* setup({ origin: "mine" });

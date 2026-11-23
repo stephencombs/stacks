@@ -43,7 +43,7 @@ const kindOf = (raw: string) =>
 const Scheme = Schema.Literals(["bearer", "actor", "share"]);
 
 const credentialOf = (request: Request) => {
-  const match = /^(\w+)\s+(\S+)$/.exec((request.headers.get("authorization") ?? "").trim());
+  const match = /^(\w+)\s+(\S+)$/.exec(request.headers.get("authorization") ?? "");
   const scheme = Schema.decodeUnknownOption(Scheme)(match?.[1]?.toLowerCase());
 
   return match && Option.isSome(scheme)
