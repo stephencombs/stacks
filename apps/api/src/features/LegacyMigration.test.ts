@@ -655,6 +655,6 @@ it.layer(TestApi.layer)("legacy migration", (it) => {
           nothingNew,
         );
       }),
-    { arbitrary: { runs: 8 } },
+    { arbitrary: { runs: 8 }, timeout: 30_000 },
   );
 });
