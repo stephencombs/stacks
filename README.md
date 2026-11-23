@@ -50,7 +50,7 @@ One Cloudflare Worker serves the API. It's the development environment, at <http
 4. Store the Clerk secret: `pnpm --filter @stacks/api exec wrangler secret put CLERK_SECRET_KEY --env development`.
 5. `pnpm run deploy` deploys the API Worker.
 
-After that first setup, every push to `main` migrates the development database and deploys the Worker once checks pass. CI needs the repo secrets `DATABASE_URL`, `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Migrations run before the new Worker goes live, so each one has to work with the Worker it replaces. To undo a bad deploy, use `npx wrangler rollback --env development`; it doesn't revert migrations.
+After that first setup, every push to `main` migrates the development database and deploys the Worker once checks pass. CI needs the repo secrets `DATABASE_URL`, `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Migrations run before the new Worker goes live, so each one has to work with the Worker it replaces. To undo a bad deploy, use `npx wrangler rollback --env development`; it doesn't revert migrations. The Worker also hosts the `ScopeChannel` Durable Object behind live updates, and reverting a commit can't undo its migration. Deploy the API before any app build that opens its sockets.
 
 The mobile `preview` build profile in `apps/mobile/eas.json` points at the deployed address.
 

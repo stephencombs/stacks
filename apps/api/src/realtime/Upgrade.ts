@@ -13,7 +13,7 @@ import {
 
 import * as Access from "../features/Access.ts";
 
-export class Rejected extends Schema.TaggedError<Rejected>()("Rejected", {
+class Rejected extends Schema.TaggedError<Rejected>()("Rejected", {
   status: Schema.Number,
   reason: Schema.String,
 }) {}

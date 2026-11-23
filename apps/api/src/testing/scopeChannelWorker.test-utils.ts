@@ -1,6 +1,7 @@
 import { ScopeId } from "@stacks/contracts";
 
 import { ScopeChannel } from "../realtime/ScopeChannel.ts";
+import worker from "../worker.ts";
 
 const unsendable = {
   send: () => {
@@ -39,12 +40,15 @@ export class ProbedScopeChannel extends ScopeChannel {
 }
 
 interface Env {
+  readonly HYPERDRIVE: Hyperdrive;
   readonly SCOPE_CHANNEL: DurableObjectNamespace<ProbedScopeChannel>;
 }
 
 export default {
-  fetch: async (request, env) => {
-    const [, verb, scope] = new URL(request.url).pathname.split("/");
+  fetch: async (request, env, ctx) => {
+    const [, prefix, verb, scope] = new URL(request.url).pathname.split("/");
+
+    if (prefix !== "_probe") return worker.fetch(request, env, ctx);
     const channel = env.SCOPE_CHANNEL.getByName(scope!);
 
     switch (verb) {
