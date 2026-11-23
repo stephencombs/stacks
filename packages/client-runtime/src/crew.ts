@@ -1,11 +1,13 @@
-import type {
-  CrewActivityItem,
-  GroupListItem,
-  PlayerId,
-  SessionId,
-  Trip,
-  TripId,
-  VisitId,
+import {
+  groupScope,
+  type CrewActivityItem,
+  type GroupId,
+  type GroupListItem,
+  type PlayerId,
+  type SessionId,
+  type Trip,
+  type TripId,
+  type VisitId,
 } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
@@ -30,6 +32,25 @@ export const pinnedTrip = (groups: ReadonlyArray<GroupListItem>) => {
     );
 
   return going[0] ?? null;
+};
+
+/** The most groups Crew keeps a socket open for. */
+export const MAX_CREW_SCOPES = 10;
+
+/**
+ * The groups Crew shows live: the pinned trip's, then each one in the activity loaded so far,
+ * newest first, up to ten.
+ */
+export const crewScopes = (
+  groups: ReadonlyArray<GroupListItem>,
+  items: ReadonlyArray<{ readonly group: { readonly id: GroupId } }>,
+) => {
+  const pinned = pinnedTrip(groups);
+  const ids = new Set(pinned ? [pinned.item.group.id] : []);
+
+  for (const item of items) ids.add(item.group.id);
+
+  return Array.from(ids).slice(0, MAX_CREW_SCOPES).map(groupScope);
 };
 
 /**

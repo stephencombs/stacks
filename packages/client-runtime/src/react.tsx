@@ -55,6 +55,8 @@ import {
   type LastTripStorage,
   type LastTripStore,
 } from "./trip.ts";
+import { ScopeHubContext, useNoticeTarget } from "./realtimeReact.tsx";
+import type { ScopeHub } from "./realtime.ts";
 import type { TestEvent } from "./telemetry.ts";
 
 export const TelemetryContext = createContext<(event: TestEvent) => void>(() => {});
@@ -124,12 +126,14 @@ export const makeSignedIn = ({
   outbox,
   lastTrip,
   statsCopies,
+  scopeHub,
   capture,
 }: {
   stacks: Stacks;
   outbox: OutboxStorage;
   lastTrip: LastTripStorage;
   statsCopies: StatsCopyStorage;
+  scopeHub: ScopeHub;
   capture: (event: TestEvent) => void;
 }) => {
   const registry = AtomRegistry.make({ scheduleTask, defaultIdleTTL: CACHE_MS });
@@ -171,6 +175,7 @@ export const makeSignedIn = ({
         lastTrip: yield* LastTripStoreService,
         statsCopies: yield* StatsCopiesService,
         outbox: yield* OutboxService,
+        scopeHub,
       };
     }).pipe(
       Effect.provide(LastTripStoreLive(lastTrip)),
@@ -219,7 +224,7 @@ export function SignedInRoot({
 }
 
 function KeepSending({
-  signedIn: { outbox, registry },
+  signedIn: { outbox, registry, scopeHub },
   wake,
 }: {
   signedIn: SignedIn;
@@ -243,9 +248,12 @@ function KeepSending({
     clearTimeout(leaving.current);
 
     return () => {
-      leaving.current = setTimeout(() => registry.dispose(), 500);
+      leaving.current = setTimeout(() => {
+        registry.dispose();
+        scopeHub.dispose();
+      }, 500);
     };
-  }, [registry]);
+  }, [registry, scopeHub]);
 
   return null;
 }
@@ -259,11 +267,13 @@ export function SignedInScope({ children }: { children: ReactNode }) {
   return (
     <StacksContext value={signedIn.stacks}>
       <RegistryContext value={signedIn.registry}>
-        <LastTripContext value={signedIn.lastTrip}>
-          <StatsCopiesContext value={signedIn.statsCopies}>
-            <OutboxContext value={signedIn.outbox}>{children}</OutboxContext>
-          </StatsCopiesContext>
-        </LastTripContext>
+        <ScopeHubContext value={signedIn.scopeHub}>
+          <LastTripContext value={signedIn.lastTrip}>
+            <StatsCopiesContext value={signedIn.statsCopies}>
+              <OutboxContext value={signedIn.outbox}>{children}</OutboxContext>
+            </StatsCopiesContext>
+          </LastTripContext>
+        </ScopeHubContext>
       </RegistryContext>
     </StacksContext>
   );
@@ -388,6 +398,7 @@ export function useRevalidate<A, E>(
   onWake: (revalidate: () => void) => () => void,
 ) {
   const refresh = useAtomRefresh(query);
+  useNoticeTarget(query);
 
   const revalidate = useEffectEvent(() => {
     const now = Date.now();

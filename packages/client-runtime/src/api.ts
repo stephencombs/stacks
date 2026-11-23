@@ -5,14 +5,14 @@ import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
 import type {
-  GroupId,
   ResolvePublicVenueRequest,
+  ScopeId,
   SearchPublicVenuesQuery,
   SessionId,
   TripId,
 } from "@stacks/contracts";
 import type { ActorCredential } from "@stacks/contracts/recordingCommands";
-import { StacksApi, VenueId } from "@stacks/contracts";
+import { GroupId, StacksApi, VenueId } from "@stacks/contracts";
 
 import { newId } from "./ids.ts";
 import type { RecordingTransport } from "./recordingSync.ts";
@@ -141,6 +141,32 @@ const resolvePublicVenue = (
     Effect.flatMap((api) => api.publicVenues.resolve({ payload })),
     Effect.provide(FetchHttpClient.layer),
   );
+
+/**
+ * Whether the API still lets the user read the scope's view. Only a 401, 403 or 404 says no; a
+ * network failure or a server error is no reason to stop watching.
+ */
+export const makeScopeWatchable =
+  ({ baseUrl, getToken }: StacksClientOptions) =>
+  (scope: ScopeId) =>
+    Effect.gen(function* () {
+      const api = yield* HttpApiClient.make(StacksApi, {
+        baseUrl,
+        transformClient: withToken(getToken),
+      });
+
+      yield* api.groups.get({ params: { groupId: GroupId.make(scope.slice("group:".length)) } });
+
+      return true;
+    }).pipe(
+      Effect.provide(FetchHttpClient.layer),
+      Effect.catchTags({
+        Unauthorized: () => Effect.succeed(false),
+        Forbidden: () => Effect.succeed(false),
+        NotFound: () => Effect.succeed(false),
+      }),
+      Effect.catch(() => Effect.succeed(true)),
+    );
 
 const norm = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
 
