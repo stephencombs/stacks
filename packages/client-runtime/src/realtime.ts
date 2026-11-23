@@ -81,7 +81,14 @@ type Outcome =
   | { readonly kind: "no_token" }
   | { readonly kind: "dropped"; readonly opened: boolean; readonly code: number | null };
 
-type Entry = { readonly listeners: Set<ScopeListener>; fiber: Fiber.Fiber<void> | null };
+type Entry = {
+  readonly listeners: Set<ScopeListener>;
+  fiber: Fiber.Fiber<void> | null;
+  revoked: boolean;
+};
+
+const revokes = (code: number | null) =>
+  code === ScopeCloseCode.revoked || code === ScopeCloseCode.tableDeleted;
 
 const parseNotice = (data: string) => {
   try {
@@ -103,7 +110,9 @@ const wsUrl = (baseUrl: string, scope: ScopeId) =>
 /**
  * One socket per scope, shared by everything watching it. It opens with a fresh token, pings
  * every 30s and reconnects when the pong doesn't come, backing off with jitter. It closes while
- * the app is in the background and opens again when it's active. A refused view stops it.
+ * the app is in the background and opens again when it's active. A refused view stops it, and so
+ * does the server closing the socket because access was lost or the table deleted: that refetches
+ * once, for the answer, and doesn't reconnect.
  */
 export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.runFork) => {
   const entries = new Map<ScopeId, Entry>();
@@ -209,9 +218,15 @@ export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.run
       for (;;) {
         const outcome = yield* session(scope, listeners);
 
-        if (outcome.kind === "no_token") return;
+        if (outcome.kind === "no_token") return false;
 
-        if (!outcome.opened && !(yield* options.watchable(scope))) return;
+        if (revokes(outcome.code)) {
+          for (const listener of listeners) listener.notice();
+
+          return true;
+        }
+
+        if (!outcome.opened && !(yield* options.watchable(scope))) return false;
 
         failures = outcome.opened ? 0 : failures + 1;
 
@@ -226,6 +241,9 @@ export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.run
 
     started = fork(
       run(scope, entry.listeners).pipe(
+        Effect.map((revoked) => {
+          entry.revoked = revoked;
+        }),
         Effect.ensuring(
           Effect.sync(() => {
             if (entry.fiber === started) entry.fiber = null;
@@ -250,7 +268,9 @@ export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.run
       if (state === "background") {
         for (const entry of entries.values()) close(entry);
       } else if (state === "active") {
-        for (const [scope, entry] of entries) if (entry.fiber === null) open(scope, entry);
+        for (const [scope, entry] of entries) {
+          if (entry.fiber === null && !entry.revoked) open(scope, entry);
+        }
       }
     });
   };
@@ -262,9 +282,15 @@ export const createScopeHub = (options: ScopeHubOptions, fork: Fork = Effect.run
 
   return {
     watch: (scope: ScopeId, listener: ScopeListener) => {
-      const entry = entries.get(scope) ?? { listeners: new Set<ScopeListener>(), fiber: null };
+      const entry = entries.get(scope) ?? {
+        listeners: new Set<ScopeListener>(),
+        fiber: null,
+        revoked: false,
+      };
+
       entries.set(scope, entry);
       entry.listeners.add(listener);
+      entry.revoked = false;
       watchAppState();
 
       if (entry.fiber === null && options.appState.current() !== "background") {

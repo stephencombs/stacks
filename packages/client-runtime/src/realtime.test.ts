@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { SCOPE_PING, SCOPE_PONG } from "@stacks/contracts";
+import { SCOPE_PING, SCOPE_PONG, ScopeCloseCode } from "@stacks/contracts";
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as TestClock from "effect/testing/TestClock";
@@ -201,6 +201,67 @@ describe("scope hub", () => {
       yield* Effect.yieldNow;
       yield* TestClock.adjust("1 minute");
       expect(yield* Queue.size(flaky.lines)).toBe(1);
+    }),
+  );
+
+  it.effect("refetches once and stops watching when access is revoked or the table is gone", () =>
+    Effect.gen(function* () {
+      for (const code of [ScopeCloseCode.revoked, ScopeCloseCode.tableDeleted]) {
+        const { hub, lines, heard, listener, appState } = yield* setup();
+        const stop = hub.watch(scope, listener);
+        const line = yield* Queue.take(lines);
+        line.handlers.open();
+        yield* Effect.yieldNow;
+        expect(heard).toEqual({ notices: 0, connections: 1 });
+
+        line.handlers.close(code);
+        yield* Effect.yieldNow;
+        expect(heard).toEqual({ notices: 1, connections: 1 });
+        expect(line.closed).toBe(true);
+
+        yield* TestClock.adjust("5 minutes");
+        appState("background");
+        appState("active");
+        yield* TestClock.adjust("5 minutes");
+        expect(yield* Queue.size(lines)).toBe(0);
+        expect(heard.notices).toBe(1);
+
+        stop();
+        hub.watch(scope, listener);
+        expect((yield* Queue.take(lines)).authorization).toBe("Bearer token-2");
+        hub.dispose();
+      }
+    }),
+  );
+
+  it.effect("tries again when something new watches a scope that was revoked", () =>
+    Effect.gen(function* () {
+      const { hub, lines, listener } = yield* setup();
+      hub.watch(scope, listener);
+      const line = yield* Queue.take(lines);
+      line.handlers.open();
+      yield* Effect.yieldNow;
+      line.handlers.close(ScopeCloseCode.revoked);
+      yield* Effect.yieldNow;
+      expect(yield* Queue.size(lines)).toBe(0);
+
+      hub.watch(scope, { notice: () => {}, connected: () => {} });
+      expect((yield* Queue.take(lines)).authorization).toBe("Bearer token-2");
+    }),
+  );
+
+  it.effect("keeps reconnecting after an ordinary close", () =>
+    Effect.gen(function* () {
+      const { hub, lines, listener } = yield* setup();
+      hub.watch(scope, listener);
+      const line = yield* Queue.take(lines);
+      line.handlers.open();
+      yield* Effect.yieldNow;
+      line.handlers.close(1001);
+      yield* Effect.yieldNow;
+      yield* TestClock.adjust("1 minute");
+
+      expect(yield* Queue.size(lines)).toBe(1);
     }),
   );
 });
