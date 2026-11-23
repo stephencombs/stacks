@@ -230,19 +230,28 @@ export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
     if (others!.count > 0) return yield* new Conflict({ reason: "last_owner" });
   }
 
-  const left = yield* sql`
-    update memberships set left_at = now()
-    where group_id = ${groupId} and user_id = ${userId} and left_at is null
-    returning user_id
-  `;
-
-  if (left.length > 0) {
-    yield* Realtime.changed(groupScope(groupId));
-    yield* memberGone(groupId, userId);
-  }
+  yield* depart(groupId, userId);
 
   return ok;
 });
+
+const depart = (groupId: GroupId, userId: UserId) =>
+  Realtime.transaction(
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+
+      const gone = yield* sql`
+        update memberships set left_at = now()
+        where group_id = ${groupId} and user_id = ${userId} and left_at is null
+        returning user_id
+      `;
+
+      if (gone.length > 0) {
+        yield* Realtime.changed(groupScope(groupId));
+        yield* memberGone(groupId, userId);
+      }
+    }),
+  );
 
 const activeMember = Effect.fn("Groups.activeMember")(function* (groupId: GroupId, userId: UserId) {
   const sql = yield* SqlClient.SqlClient;
@@ -264,7 +273,6 @@ export const removeMember = Effect.fn("Groups.removeMember")(function* (
   groupId: GroupId,
   targetUserId: UserId,
 ) {
-  const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
 
   if (targetUserId === userId) return yield* leave(groupId);
@@ -276,16 +284,7 @@ export const removeMember = Effect.fn("Groups.removeMember")(function* (
     return yield* new Forbidden({ reason: "owner_only" });
   }
 
-  const removed = yield* sql`
-    update memberships set left_at = now()
-    where group_id = ${groupId} and user_id = ${targetUserId} and left_at is null
-    returning user_id
-  `;
-
-  if (removed.length > 0) {
-    yield* Realtime.changed(groupScope(groupId));
-    yield* memberGone(groupId, targetUserId);
-  }
+  yield* depart(groupId, targetUserId);
 
   return ok;
 });

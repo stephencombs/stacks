@@ -1212,15 +1212,17 @@ export const share = Effect.fn("Recording.share")(function* (tableId: TableId) {
   const row = yield* startedTable(tableId);
   const token = randomToken();
 
-  const [replaced] = yield* sql<{ shareHash: string | null }>`
-    update tables set share_token_hash = ${yield* digest(token)}
-    from (select share_token_hash as before from tables where id = ${row.id}) old
-    where id = ${row.id}
-    returning old.before as share_hash
-  `;
+  const hash = yield* digest(token);
 
-  yield* Realtime.changed(tableScope(row.id));
-  yield* linkClosed(row.id, replaced?.shareHash ?? null);
+  yield* Realtime.transaction(
+    Effect.gen(function* () {
+      const before = yield* lockedLink(row.id);
+
+      yield* sql`update tables set share_token_hash = ${hash} where id = ${row.id}`;
+      yield* Realtime.changed(tableScope(row.id));
+      yield* linkClosed(row.id, before);
+    }),
+  );
 
   return { token };
 });
@@ -1229,16 +1231,28 @@ export const unshare = Effect.fn("Recording.unshare")(function* (tableId: TableI
   const sql = yield* SqlClient.SqlClient;
   const row = yield* startedTable(tableId);
 
-  const [unshared] = yield* sql<{ shareHash: string | null }>`
-    update tables set share_token_hash = null
-    from (select share_token_hash as before from tables where id = ${row.id}) old
-    where id = ${row.id} and old.before is not null
-    returning old.before as share_hash
+  yield* Realtime.transaction(
+    Effect.gen(function* () {
+      const before = yield* lockedLink(row.id);
+
+      if (before === null) return;
+
+      yield* sql`update tables set share_token_hash = null where id = ${row.id}`;
+      yield* Realtime.changed(tableScope(row.id));
+      yield* linkClosed(row.id, before);
+    }),
+  );
+});
+
+// WARNING: without `for update`, a racing share returns the hash before the other writer's, leaving its sockets open.
+const lockedLink = Effect.fn("Recording.lockedLink")(function* (tableId: TableId) {
+  const sql = yield* SqlClient.SqlClient;
+
+  const [row] = yield* sql<{ shareTokenHash: string | null }>`
+    select share_token_hash from tables where id = ${tableId} for update
   `;
 
-  if (!unshared) return;
-  yield* Realtime.changed(tableScope(row.id));
-  yield* linkClosed(row.id, unshared.shareHash);
+  return row?.shareTokenHash ?? null;
 });
 
 /** The one table a share link names, read-only, for anyone holding the link. */
