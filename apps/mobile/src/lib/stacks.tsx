@@ -5,11 +5,8 @@ import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import type * as Atom from "effect/reactivity/Atom";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
-import {
-  makeRecordingTransport,
-  makeScopeWatchable,
-  makeStacksClient,
-} from "@stacks/client-runtime/api";
+import { makeRecordingTransport, makeStacksClient } from "@stacks/client-runtime/api";
+import { RootScopeHub } from "@stacks/client-runtime/realtimeReact";
 import { RecordingSyncRoot } from "@stacks/client-runtime/recordingReact";
 import { describeError } from "@stacks/client-runtime/errors";
 import {
@@ -37,7 +34,7 @@ import { apiUrl, clerkPublishableKey } from "./config";
 import { markStartup } from "./diagnostics";
 import { outboxStorage, wakeOutbox } from "./outbox";
 import { installOrigin } from "./origin";
-import { createHub, ScopeHubProvider } from "./scopeHub";
+import { rootHubFor } from "./scopeHub";
 import { captureTestEvent } from "./telemetry";
 import { lastTripStorage, statsCopyStorage } from "./tripStorage";
 
@@ -58,7 +55,9 @@ export function SignedInProvider({ children }: { children: ReactNode }) {
         keys={actorKeys}
         wake={wakeOutbox}
       >
-        <ScopeHubProvider make={makeDeviceHub}>{children}</ScopeHubProvider>
+        <RootScopeHub userId={userId} bearer={bearer} actor={asActor} make={rootHubFor}>
+          {children}
+        </RootScopeHub>
       </RecordingSyncRoot>
     </SignedInRoot>
   );
@@ -77,20 +76,11 @@ const bearer = async () => {
   return token ? `Bearer ${token}` : null;
 };
 
-const asDevice = async () => {
-  const signedIn = await bearer().catch(() => null);
-
-  if (signedIn) return signedIn;
+const asActor = async () => {
   const actor = await actorKeys.load();
 
   return actor ? `Actor ${actor.actorId}.${actor.secret}` : null;
 };
-
-const makeDeviceHub = () =>
-  createHub({
-    authorization: asDevice,
-    watchable: makeScopeWatchable({ baseUrl: apiUrl, authorization: asDevice }),
-  });
 
 const connectRecording = () => makeRecordingTransport(api);
 
@@ -100,10 +90,6 @@ const signIn = (userId: string) =>
     outbox: outboxStorage(userId),
     lastTrip: lastTripStorage(userId),
     statsCopies: statsCopyStorage(userId),
-    scopeHub: createHub({
-      authorization: bearer,
-      watchable: makeScopeWatchable({ baseUrl: apiUrl, authorization: bearer }),
-    }),
     capture: captureTestEvent,
   });
 

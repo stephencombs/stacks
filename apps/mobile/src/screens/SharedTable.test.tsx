@@ -130,8 +130,7 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
   }));
   vi.doMock("../lib/config", () => ({ apiUrl: "https://api.example.com" }));
   vi.doMock("../lib/scopeHub", () => ({
-    createHub: () => ({}),
-    ScopeHubProvider: ({ children }: { children: ReactNode }) => children,
+    createHub: () => ({ watch: () => () => {}, dispose: () => {} }),
   }));
   vi.doMock("../lib/recording", () => ({
     useRecordingState: () => useSyncExternalStore(store.subscribe, store.getSnapshot).state,

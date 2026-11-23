@@ -5,6 +5,7 @@ import {
   type StaticScreenProps,
 } from "@react-navigation/native";
 import { makeSharedWatchable } from "@stacks/client-runtime/api";
+import { ScopeHubProvider } from "@stacks/client-runtime/realtimeReact";
 import { distinctPlayerNames, formatDay, formatTime } from "@stacks/client-runtime/format";
 import {
   useJoinTable,
@@ -33,7 +34,7 @@ import { PersonalScreen } from "../features/Personal";
 import { JoinSheet, SitDownSheet } from "../features/RecordingForms";
 import { apiUrl } from "../lib/config";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
-import { createHub, ScopeHubProvider } from "../lib/scopeHub";
+import { createHub } from "../lib/scopeHub";
 
 type Props = StaticScreenProps<{ token: string }>;
 
