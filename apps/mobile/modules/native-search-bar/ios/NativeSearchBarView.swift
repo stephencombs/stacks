@@ -36,11 +36,11 @@ public final class NativeSearchBarView: ExpoView, UISearchBarDelegate {
     searchBar.placeholder = placeholder
   }
 
-  func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+  public func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
     onChangeText(["text": searchText])
   }
 
-  func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+  public func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
     searchBar.resignFirstResponder()
   }
 }
