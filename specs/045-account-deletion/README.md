@@ -18,12 +18,13 @@ updated_at: 2026-11-24T03:33:37.146142700Z
 Both stores require that anyone who can create an account can delete it from inside the app.
 Apple's rule is guideline 5.1.1(v), and Google Play's is its account deletion policy, which also
 asks for a web link. `You.tsx` only signs out. This spec adds real deletion: the account record
-and the person's data are removed, except the ledger rows their friends' balances depend on.
-Those stay, with nothing left that ties them to the person.
+are removed, and their player in each group becomes a guest again, as if a friend had added them
+by name.
 
 ## Research: do we delete all their data?
 
-Not quite all. Delete everything that is only theirs, and make the shared ledger rows anonymous.
+Not all of it. Delete the account and everything that is only theirs. In shared groups, their
+player goes back to being a guest, with the name and ledger rows kept.
 
 - **Apple.** Delete "the entire account record, along with associated personal data". Turning
   the account off for a while doesn't count, and data you must keep by law may stay if you tell
@@ -41,41 +42,41 @@ Not quite all. Delete everything that is only theirs, and make the shared ledger
 - **Why rows stay.** A buy-in or a stake is also the friends' record of money that changed hands.
   Hard-deleting it would rewrite their results and debts. Keeping it rests on their legitimate
   interest and on possible claims, such as open stakes.
-- **Limit to state openly.** Friends at the same table know who "Former member" was. Their memory
-  isn't our data. Everything we can control is cut: the name, account, claim codes, invites,
-  devices and free-text notes.
+- **Why the name stays too.** Friends can track anyone at a table or in a group by name, whether
+  or not that person ever has an account (a guest). Deleting an account removes what the account
+  added: sign-in, email, avatar, memberships and devices. It doesn't remove the friends' own
+  record of who played. This goes further than Splitwise, which removes names. It rests on the
+  same legitimate interest, so the confirmation and the privacy policy must say the name stays.
 
 ## Model
 
 - **The server deletes in one transaction** (`Account.delete`, in a new
   `apps/api/src/features/Account.ts`). It is an all-or-nothing operation, then Clerk.
-- **One tombstone per deletion.** Insert a `users` row with a new random ID, the name "Former
-  member" and no avatar. Point every audit column that can't be null at it: `created_by` on
+- **One tombstone per deletion.** Insert a `users` row with a new random ID, the name "Deleted
+  account" and no avatar. Point every audit column that can't be null at it: `created_by` on
   `entries`, `stakes`, `sessions`, `seatings`, `trips`, `groups`, `invites` and
   `personal_entries`, plus `membership_absences.user_id`. Set nullable ones (`voided_by`,
   `closed_by`, `players.created_by`, `venues.created_by`) to `null`. The tombstone links to
   nothing, so it carries no identity.
-- **Their players stay as anonymous rows.** Set `user_id`, `claim_code` and `claimed_at` to null
-  and rename the player "Former member". `tellApart` already separates two of them. Balances,
-  results and stakes stay keyed by the same player ID and don't change.
+- **Their players become guests.** Set `user_id`, `claim_code` and `claimed_at` to null and keep
+  `display_name`. Balances, results and stakes stay keyed by the same player ID and don't change.
+  Friends can rename the guest or send a new invite as with any guest. If the person signs up
+  again, they can claim that history through the invite.
 - **Delete what is only theirs.**
   - Memberships.
   - Group invites they created.
   - Personal invites for their players.
   - Their account recording actor and every `player_actors` binding to their players, so no
     device can record as them again.
-  - Notes on entries for their players.
   - Visits, entries and operations at tables where no one else took part.
   - Groups where they are the only member, with everything in them.
-  - Names in `personal_operations.command` (for example `join_table.displayName`) for their
-    players.
   - Finally, the `users` row.
 - **Ownership passes on, it doesn't block.** In a group with other active members, ownership goes
   to the longest-standing admin, or else to the longest-standing member. Blocking deletion until
   the user settles up or hands groups over is the "unnecessarily difficult" pattern Apple
   rejects.
 - **Unsettled money doesn't block either.** The confirmation shows what they still owe or are
-  owed. Those balances remain for friends, owed to or by "Former member".
+  owed. Those balances remain for friends, owed to or by the guest.
 - **Clerk afterwards.** Once the transaction commits, the server deletes the Clerk user with the
   Backend API (`DELETE /v1/users/{id}`). If that call fails, the app data is already gone. Retry
   it, and log it so it can be finished by hand. Clerk holds the email and sign-in methods, so
@@ -93,23 +94,26 @@ Not quite all. Delete everything that is only theirs, and make the shared ledger
 - [ ] **Failing test first** (`Account.test.ts`, using the fixture `users(...)`): Alice and Bob
       share a group, a trip, a shared table, a stake and an open balance, and Alice also has a
       solo table. Delete Alice. Bob's balances, results and stake are unchanged. Nothing anywhere
-      references Alice's user ID. Her solo table is gone. Her player is "Former member" with no
-      claim code, binding or invites.
+      references Alice's user ID. Her solo table is gone. Her player is a guest named "Alice",
+      with no claim code, binding or invites. Bob invites that guest, and a new account claims it.
 - [ ] **Contracts.** `POST /account/delete`, with an optional Apple `authorizationCode`. Errors
       are typed.
 - [ ] **Server.** `Account.delete` and its thin handler. Transfer ownership. Close realtime.
       Delete the Clerk user with a retry. Revoke the Apple token when a code is sent.
 - [ ] **Mobile: You.** A destructive "Delete account" row, under sign-out.
-- [ ] **Mobile: the confirmation sheet.** It lists what is deleted, what stays anonymous for
-      friends, groups whose ownership moves, and open balances. It offers the existing CSV export
+- [ ] **Mobile: the confirmation sheet.** It lists what is deleted, and what friends keep (your
+      name and play in shared groups, as a guest). It also shows groups whose ownership moves, and
+      open balances. It offers the existing CSV export
       first. Confirming needs one deliberate tap on "Delete account" and shows a pending state.
       On success, wipe local data and show Landing.
-- [ ] **Web link for Play.** A public page served by the Worker that explains how deletion works
-      and takes a request by email. Put its URL in Play Console's Data safety form.
+- [ ] **Web link for Play.** Deletion happens in the app, but Play also requires a URL that works
+      without it, for someone who has uninstalled. Serve a static page from the Worker that walks
+      through **You → Delete account**, says what friends keep, and gives a contact for anyone
+      without the app. Put its URL in Play Console's Data safety form.
 - [ ] **Disclosures.** The privacy policy, App Store privacy details and Play Data safety say what
-      is deleted and what stays anonymous.
-- [ ] **Docs.** A short `docs/internals/` note: why ledger rows are made anonymous rather than
-      deleted, and the tombstone rule for new audit columns.
+      is deleted, and that the name and play stay with friends' groups as a guest.
+- [ ] **Docs.** A short `docs/internals/` note: why a deleted account's player goes back to being
+      a guest instead of being deleted, and the tombstone rule for new audit columns.
 
 ## Tests
 
@@ -117,7 +121,7 @@ Not quite all. Delete everything that is only theirs, and make the shared ledger
       from `information_schema`, so a new one fails until it's handled.
 - [ ] Ownership moves to an admin first, then to a member. A group with only the deleted user is
       deleted.
-- [ ] Two deleted members in one group stay separate rows that `tellApart` can tell apart.
+- [ ] The guest left behind behaves like any guest: it can be renamed, invited and claimed.
 - [ ] A failed Clerk delete leaves the app data deleted and records a retry. A second request is
       harmless.
 - [ ] Component: the sheet shows balances and ownership moves, and success wipes local data.
@@ -132,9 +136,7 @@ Not quite all. Delete everything that is only theirs, and make the shared ledger
 
 ## Open decisions
 
-- **Email for the web request.** Which address goes on the page? Or should a Clerk-authenticated
-  page be added instead?
-- **Placeholder name.** "Former member", or something warmer?
+- **Contact on the web page.** Which address do people without the app use?
 
 ## Acceptance criteria
 
