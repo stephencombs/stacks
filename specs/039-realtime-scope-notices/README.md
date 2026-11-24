@@ -1,12 +1,20 @@
 ---
-status: draft
+status: complete
 created: 2026-11-23
 priority: medium
 tags:
   - api
   - realtime
 created_at: 2026-11-23T04:49:53.063215400Z
-updated_at: 2026-11-23T05:19:46.711289400Z
+updated_at: 2026-11-24T02:36:44.150417600Z
+completed_at: 2026-11-24T02:36:44.150417600Z
+transitions:
+  - status: planned
+    at: 2026-11-24T02:36:35.966879400Z
+  - status: in-progress
+    at: 2026-11-24T02:36:36.571402800Z
+  - status: complete
+    at: 2026-11-24T02:36:44.150417600Z
 ---
 
 # Push change notices to clients watching a group or table
@@ -41,5 +49,5 @@ At about 500 active players it costs nothing beyond the Workers Paid base ($5 a 
 
 ## Acceptance criteria
 
-- [ ] All three children are complete.
+- [x] All three children are complete.
 - [ ] Deployed `development`: billed idle duration for `ScopeChannel` stays flat across a week of normal use.
