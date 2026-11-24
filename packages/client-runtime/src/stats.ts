@@ -1,17 +1,25 @@
 import type { Game, Trip, TripId, VenueId } from "@stacks/contracts";
-import { personalStats, type PersonalStatsFilters } from "@stacks/shared/stats";
+import {
+  LENGTH_EDGES_HOURS,
+  leadingBucket,
+  personalStats,
+  type PatternBucket,
+  type PersonalStatsFilters,
+} from "@stacks/shared/stats";
 import * as DateTime from "effect/DateTime";
 
 import { gameNames } from "./format.ts";
 import { visitTitle, type RecordedVisit } from "./recordingView.ts";
+import { returnLabel } from "./trip.ts";
 
 /** What Stats is filtered to. An omitted key means all; null picks sessions with it unset. */
 export type StatsFilters = PersonalStatsFilters;
 
-const FEW = 3;
+/** The running line needs at least two points to be a line. */
+export const CHART_MIN_SESSIONS = 2;
 
 /** How many casinos show before "See all". */
-export const TOP_CASINOS = 2;
+export const TOP_CASINOS = 4;
 
 export const finishedSessions = (count: number) =>
   `${count} finished ${count === 1 ? "session" : "sessions"}`;
@@ -301,10 +309,58 @@ export const filterChips = (
   };
 };
 
+const monthShort = new Intl.DateTimeFormat(undefined, { month: "short", timeZone: "UTC" });
+const monthLong = new Intl.DateTimeFormat(undefined, { month: "long", timeZone: "UTC" });
+const weekdayShort = new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" });
+const weekdayLong = new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: "UTC" });
+
+const nightDate = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+const dateOfKey = (key: string) => {
+  const [year = 0, month = 1, day = 1] = key.split("-").map(Number);
+
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+const weekdayName = (index: number) => weekdayLong.format(new Date(Date.UTC(2023, 0, 1 + index)));
+
+const lengthName = (index: number) => {
+  const edges = LENGTH_EDGES_HOURS;
+
+  if (index === 0) return `Under ${edges[0]}h`;
+
+  if (index === edges.length) return `${edges[index - 1]}h+`;
+
+  return `${edges[index - 1]}–${edges[index]}h`;
+};
+
+const percentOf = (part: number, whole: number) =>
+  whole === 0 ? "–" : `${Math.round((part * 100) / whole)}%`;
+
+/** A return on what you bought in for, and which way to color it: by the figure it prints. */
+export const returnFigure = (result: number, buyIn: number) => {
+  if (buyIn === 0) return { label: returnLabel(null), tone: "none" as const };
+  const ratio = result / buyIn;
+  const shown = Math.round(ratio * 100);
+
+  return {
+    label: returnLabel(ratio),
+    tone: shown > 0 ? ("win" as const) : shown < 0 ? ("loss" as const) : ("even" as const),
+  };
+};
+
+const countOf = (rows: ReadonlyArray<{ readonly status: string }>, status: string) =>
+  rows.filter((row) => row.status === status).length;
+
 /**
  * Stats as a screen shows them, from the device's visits: the filter chips, then either why
- * there's nothing to show or the summary, running line and breakdowns. Live visits never count.
- * `tripNames` names the trips the signed-in account can see; the device alone doesn't know them.
+ * there's nothing to show or the hero, money, charts, sentences, records and breakdowns. Live
+ * visits never count. `tripNames` names the trips the signed-in account can see; the device
+ * alone doesn't know them. `now` bounds a year's months.
  */
 export const personalStatsView = (
   visits: ReadonlyArray<RecordedVisit>,
@@ -313,10 +369,12 @@ export const personalStatsView = (
     timeZone = DateTime.zoneMakeLocal(),
     tripNames = new Map(),
     trips = [],
+    now = DateTime.nowUnsafe(),
   }: {
     readonly timeZone?: DateTime.TimeZone;
     readonly tripNames?: ReadonlyMap<TripId, string>;
     readonly trips?: ReadonlyArray<Trip>;
+    readonly now?: DateTime.Utc;
   } = {},
 ) => {
   const venues = new Map(
@@ -327,7 +385,7 @@ export const personalStatsView = (
     id === null ? "No casino set" : (venues.get(id) ?? "Casino");
 
   const tripName = (id: TripId) => tripNames.get(id) ?? "Group trip";
-  const stats = personalStats(visits, timeZone, filters);
+  const stats = personalStats(visits, timeZone, filters, now);
 
   const finished = visits.flatMap(({ visit, table, finalResult }) =>
     visit.deletedAt !== undefined || visit.finishedAt === null || finalResult === null
@@ -371,7 +429,6 @@ export const personalStatsView = (
   const shortDay = (at: DateTime.DateTime) =>
     DateTime.format(DateTime.setZone(at, timeZone), { month: "short", day: "numeric" });
 
-  const day = filters.year === undefined ? fullDay : shortDay;
   const yearOf = (at: DateTime.DateTime) => DateTime.toParts(DateTime.setZone(at, timeZone)).year;
 
   const running = stats.runningResult.map((point) => ({
@@ -382,9 +439,154 @@ export const personalStatsView = (
 
   const from = running[0]!.finishedAt;
   const to = running.at(-1)!.finishedAt;
+
+  const day =
+    (filters.year !== undefined || filters.tripId !== undefined) && yearOf(from) === yearOf(to)
+      ? shortDay
+      : fullDay;
+
   const visit = new Map(visits.map((item) => [item.visit.id, item]));
   const matching = running.map((point) => visit.get(point.sessionId)!);
-  const biggest = Math.max(...stats.byGame.map((row) => Math.abs(row.result)));
+  const { money } = stats;
+
+  const bars = (() => {
+    if (stats.periods === null) return null;
+    const { by, rows } = stats.periods;
+
+    const status = (row: (typeof rows)[number]) =>
+      !row.played
+        ? ("none" as const)
+        : row.result > 0
+          ? ("up" as const)
+          : row.result < 0
+            ? ("down" as const)
+            : ("even" as const);
+
+    const playedRows = rows.filter((row) => row.played);
+    const high = Math.max(...playedRows.map((row) => row.result));
+    const low = Math.min(...playedRows.map((row) => row.result));
+    const unique = (value: number) => playedRows.filter((row) => row.result === value).length === 1;
+
+    const items = rows.map((row, index) => {
+      const date = dateOfKey(row.key);
+
+      return {
+        key: row.key,
+        label:
+          by === "month"
+            ? monthShort.format(date)
+            : rows.length > 7
+              ? String(date.getUTCDate())
+              : weekdayShort.format(date),
+        year:
+          by === "month" && filters.year === undefined && (index === 0 || date.getUTCMonth() === 0)
+            ? String(date.getUTCFullYear())
+            : null,
+        name:
+          by === "month"
+            ? monthLong.format(date)
+            : `${weekdayLong.format(date)}, ${nightDate.format(date)}`,
+        result: row.result,
+        status: status(row),
+        emphasis:
+          row.played && ((row.result === high && high > 0) || (row.result === low && low < 0)),
+      };
+    });
+
+    const noun = by === "month" ? "month" : "night";
+
+    const sentence = (kind: "best" | "worst") => {
+      const value = kind === "best" ? high : low;
+
+      if ((kind === "best" ? value <= 0 : value >= 0) || !unique(value)) return [];
+      const item = items.find((entry) => entry.status !== "none" && entry.result === value)!;
+
+      return [
+        {
+          key: kind,
+          before:
+            kind === "best"
+              ? `${item.name} was your best ${noun} at`
+              : `${item.name} was your worst at`,
+          amount: item.result,
+        },
+      ];
+    };
+
+    return {
+      by,
+      title: by === "month" ? "By month" : "By night",
+      count: `${countOf(items, "up")} up · ${countOf(items, "down")} down`,
+      summary: [
+        `Result by ${noun}, ${items[0]!.name} to ${items.at(-1)!.name}:`,
+        [
+          `${countOf(items, "up")} up`,
+          `${countOf(items, "down")} down`,
+          countOf(items, "even") ? `${countOf(items, "even")} even` : null,
+          countOf(items, "none") ? `${countOf(items, "none")} with no play` : null,
+        ]
+          .filter((part) => part !== null)
+          .join(", ") + ".",
+      ].join(" "),
+      sentences: [...sentence("best"), ...sentence("worst")],
+      bars: items,
+    };
+  })();
+
+  const leader = (
+    buckets: ReadonlyArray<PatternBucket>,
+    lead: (bucket: PatternBucket) => string,
+    tail: (bucket: PatternBucket) => string,
+  ) => {
+    const top = leadingBucket(buckets);
+
+    return top === null
+      ? []
+      : [
+          {
+            key: lead(top),
+            before: `${lead(top)} averaged`,
+            amount: top.average!,
+            after: tail(top),
+          },
+        ];
+  };
+
+  const patterns = [
+    ...leader(
+      stats.weekdays,
+      (bucket) => `${weekdayName(bucket.index)}s`,
+      (bucket) => ` a session, across ${bucket.sessions}.`,
+    ),
+    ...leader(
+      stats.lengths,
+      (bucket) => `${lengthName(bucket.index)} sessions`,
+      (bucket) => `, across ${bucket.sessions}.`,
+    ),
+  ];
+
+  const record = (kind: "win" | "loss", label: string) => {
+    const found = stats.records[kind];
+
+    if (found === null) return [];
+    const item = visit.get(found.sessionId)!;
+
+    return [
+      {
+        key: kind,
+        label,
+        meta: [
+          visitTitle(item.table),
+          found.venueId === null ? null : venueName(found.venueId),
+          fullDay(found.finishedAt),
+        ]
+          .filter((part) => part !== null)
+          .join(" · "),
+        result: found.result,
+        visitId: found.sessionId,
+      },
+    ];
+  };
 
   return {
     ...head,
@@ -393,55 +595,32 @@ export const personalStatsView = (
     result: summary.result,
     sessions: summary.sessions,
     hours: formatHours(hoursOf(matching)),
+    played: played(summary.sessions, hoursOf(matching)),
     hourlyResult: summary.hourlyResult,
-    winRate: `${Math.round((summary.winRate.wins * 100) / summary.winRate.sessions)}%`,
-    winRateLine: `${summary.winRate.wins} of ${summary.winRate.sessions}`,
+    winRate: percentOf(summary.winRate.wins, summary.winRate.sessions),
+    returnRate: returnFigure(summary.result, money.buyIn),
+    climb: stats.climb,
     chart:
-      summary.sessions <= FEW && filters.year === undefined
+      summary.sessions < CHART_MIN_SESSIONS
         ? null
         : {
             points: running,
             from: day(from),
             to: day(to),
-            androidAxis:
-              filters.year !== undefined
-                ? { from: "Jan", to: "Dec" }
-                : filters.tripId !== undefined
-                  ? { from: shortDay(from), to: shortDay(to) }
-                  : {
-                      from: fullDay(from),
-                      middle:
-                        yearOf(from) === yearOf(to)
-                          ? undefined
-                          : String(
-                              yearOf(
-                                DateTime.makeUnsafe(
-                                  Math.floor((running[0]!.at + running.at(-1)!.at) / 2),
-                                ),
-                              ),
-                            ),
-                      to: fullDay(to),
-                    },
+            low: Math.min(0, ...running.map((point) => point.total)),
+            high: Math.max(0, ...running.map((point) => point.total)),
           },
-    list:
-      summary.sessions > FEW
-        ? null
-        : running.toReversed().map((point) => {
-            const item = visit.get(point.sessionId)!;
-
-            const hours =
-              (DateTime.toEpochMillis(point.finishedAt) -
-                DateTime.toEpochMillis(item.visit.startedAt)) /
-              3_600_000;
-
-            return {
-              key: point.sessionId,
-              title: visitTitle(item.table),
-              meta: `${point.day} · ${formatHours(hours)}`,
-              chip: gameChip(item.table.game),
-              result: point.result,
-            };
-          }),
+    money: {
+      won: money.won,
+      lost: money.lost,
+      even: money.even,
+      buyIn: money.buyIn,
+      cashOut: money.cashOut,
+      adjustment: money.adjustment === 0 ? null : money.adjustment,
+    },
+    bars,
+    patterns,
+    records: [...record("win", "Biggest win"), ...record("loss", "Biggest loss")],
     byGame:
       filters.game !== undefined
         ? null
@@ -454,7 +633,6 @@ export const personalStatsView = (
             ),
             chip: gameChip(row.game),
             result: row.result,
-            share: biggest === 0 ? 0 : Math.abs(row.result) / biggest,
             filters: { ...filters, game: row.game },
           })),
     byCasino:

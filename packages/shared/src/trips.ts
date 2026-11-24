@@ -46,6 +46,31 @@ export interface TripNight<S> {
   readonly winner: { readonly playerId: PlayerId; readonly net: number } | null;
 }
 
+/** A night ends at this local hour: a 2am session still belongs to the evening before it. */
+export const NIGHT_ENDS_HOUR = 6;
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * The night a moment belongs to in `timeZone`, as the local date it began on: "2026-11-06". It
+ * takes a zone, not a `TripClock`, for play that has no trip board, like your own history.
+ */
+export const nightKey = (at: DateTime.Utc, timeZone: DateTime.TimeZone) => {
+  const { year, month, day } = DateTime.toParts(
+    DateTime.setZone(DateTime.subtract(at, { hours: NIGHT_ENDS_HOUR }), timeZone),
+  );
+
+  return `${year}-${pad(month)}-${pad(day)}`;
+};
+
+/** The night after `key`: "2026-02-28" is followed by "2026-03-01". */
+export const nextNightKey = (key: string) => {
+  const [year = 0, month = 1, day = 1] = key.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+
+  return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}`;
+};
+
 const startOf = (s: TripSession) => DateTime.toEpochMillis(s.session.startedAt);
 
 const netsOf = (sessions: ReadonlyArray<TripSession>) => {
