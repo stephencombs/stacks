@@ -51,9 +51,10 @@ and until the listings exist the fallback page says how to get the app.
 
 ## Requirements
 
-- [ ] **Decide the domain** before building. Use a domain we own, not `*.workers.dev`. It goes
-      into every link, so changing it later breaks links already sent. Spec 049's Play page uses
-      it too.
+- [ ] **The domain.** It is a product domain we own, never `*.workers.dev`. Production uses the
+      domain itself and preview builds use `preview.<domain>`. It goes into every link, so it
+      can't change once links are out. Spec 049's Play page and its `support@<domain>` use it
+      too. Which domain is still to be chosen, and it must be registered before building.
 - [ ] **Worker routes**, served before `Database.layer` is built (`worker.ts:48`), with no database
       access:
   - `/.well-known/apple-app-site-association`, served as `application/json` with HTTP 200 and no

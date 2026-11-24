@@ -232,9 +232,11 @@ player goes back to being a guest, and keeps the name and ledger rows.
   account.
 - Renaming guests in the app.
 
-## Open decisions
+## Decisions
 
-- **Support address** for the web page and the email requests.
+- **Support address.** A dedicated `support@<domain>` on spec 050's domain, never a personal
+  address, since it is public on the web page and the store listing. It receives deletion
+  requests made outside the app and requests to remove a guest's name.
 
 ## Acceptance criteria
 
