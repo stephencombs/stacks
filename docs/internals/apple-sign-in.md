@@ -17,7 +17,8 @@ Do this in each Clerk instance a build uses, and for each bundle ID (`app.config
 - Clerk: make first and last name optional. Apple sends a name only on the first authorization, and
   the person can withhold it.
 
-A build only shows the button once its native app is registered in the Clerk instance it points at.
+Every iOS build with a Clerk key shows the button. Apple sign-in only succeeds once that build's
+native app is registered in the Clerk instance it points at.
 The EAS `production` profile still points at a Clerk test instance.
 
 ## Traps

@@ -364,13 +364,21 @@ export function Landing({
                   importantForAccessibility={account ? "auto" : "no-hide-descendants"}
                   pointerEvents={account ? "auto" : "none"}
                 >
-                  <View className={cn("flex-1 gap-3 px-6 pb-2", invited ? "justify-end" : "pt-4")}>
+                  <ScrollView
+                    className="flex-1"
+                    alwaysBounceVertical={false}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerClassName={cn(
+                      "grow gap-3 px-6 pb-2",
+                      invited ? "justify-end" : "pt-4",
+                    )}
+                  >
                     {!invited && bodyHeight >= 530 + accountRoom ? (
                       <OnboardingChart page={3} compact={accountCompact} />
                     ) : null}
                     <DisplayTitle compact={accountCompact}>{copy.title}</DisplayTitle>
                     <StepBody>{copy.body}</StepBody>
-                  </View>
+                  </ScrollView>
                   <View className="gap-3 px-6" style={{ paddingBottom: clearance + 16 }}>
                     <AppleSignInButton />
                     <SignInButton
