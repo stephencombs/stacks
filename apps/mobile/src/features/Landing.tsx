@@ -131,6 +131,7 @@ export function Landing({
   const compact = bodyHeight > 0 && bodyHeight < 675;
   const accountRoom = apple ? APPLE_ROOM : 0;
   const accountCompact = bodyHeight > 0 && bodyHeight < 675 + accountRoom;
+  const accountChartMin = apple ? 660 + APPLE_ROOM : 530;
   const last = index === steps.length - 1;
 
   useEffect(() => {
@@ -364,21 +365,13 @@ export function Landing({
                   importantForAccessibility={account ? "auto" : "no-hide-descendants"}
                   pointerEvents={account ? "auto" : "none"}
                 >
-                  <ScrollView
-                    className="flex-1"
-                    alwaysBounceVertical={false}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerClassName={cn(
-                      "grow gap-3 px-6 pb-2",
-                      invited ? "justify-end" : "pt-4",
-                    )}
-                  >
-                    {!invited && bodyHeight >= 530 + accountRoom ? (
+                  <View className={cn("flex-1 gap-3 px-6 pb-2", invited ? "justify-end" : "pt-4")}>
+                    {!invited && bodyHeight >= accountChartMin ? (
                       <OnboardingChart page={3} compact={accountCompact} />
                     ) : null}
                     <DisplayTitle compact={accountCompact}>{copy.title}</DisplayTitle>
                     <StepBody>{copy.body}</StepBody>
-                  </ScrollView>
+                  </View>
                   <View className="gap-3 px-6" style={{ paddingBottom: clearance + 16 }}>
                     <AppleSignInButton />
                     <SignInButton
