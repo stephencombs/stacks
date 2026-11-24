@@ -161,6 +161,16 @@ describe.each(Object.entries(themes))("the %s palette", (name, theme) => {
   });
 });
 
+it.each(["felt-ink", "felt-win", "felt-loss"])(
+  "%s on the dark felt, where a share card is pinned, passes AA",
+  (fg) => {
+    const dark = themes.dark;
+
+    for (const bg of ["felt", "felt-deep"])
+      expect(contrast(dark[`--color-${fg}`]!, dark[`--color-${bg}`]!)).toBeGreaterThanOrEqual(4.5);
+  },
+);
+
 it("defines every type role the screens use", () => {
   const defined = new Set([...css.matchAll(/@utility (type-[a-z0-9-]+)/g)].map((m) => m[1]));
   const src = new URL("..", import.meta.url);

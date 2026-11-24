@@ -2,6 +2,7 @@ import {
   CurrencyCode,
   GroupId,
   PlayerId,
+  TableId,
   TripId,
   UserId,
   type GroupDetail,
@@ -17,7 +18,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("opens the Rename trip sheet from Trip options and saves the trimmed name", async () => {
+const mount = async (tables: TripDetail["tables"] = []) => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const day = DateTime.makeUnsafe("2026-11-15T12:00:00Z");
   const groupId = GroupId.make(crypto.randomUUID());
@@ -34,7 +35,7 @@ it("opens the Rename trip sheet from Trip options and saves the trimmed name", a
       createdBy: UserId.make("alex"),
     },
     sessions: [],
-    tables: [],
+    tables,
     balances: [],
     stakes: [],
   };
@@ -57,6 +58,7 @@ it("opens the Rename trip sheet from Trip options and saves the trimmed name", a
     Platform: { OS: "ios" },
   }));
   vi.doMock("../lib/go", () => ({ useGo: () => ({ trip: vi.fn() }) }));
+  vi.doMock("./ShareCardSheet", () => ({ ShareCardSheet: () => null }));
   vi.doMock("../lib/scope", () => ({ useScope: () => ({ forgetTrip: vi.fn() }) }));
   vi.doMock("../lib/stacks", () => ({
     useStacks: () => ({
@@ -133,9 +135,19 @@ it("opens the Rename trip sheet from Trip options and saves the trimmed name", a
   const { TripOptionsButton } = await import("./TripOptions");
   const host = document.createElement("div");
   const root = createRoot(host);
+  await act(async () => root.render(<TripOptionsButton trip={trip} group={group} />));
+
+  return { host, tripId, runRename, unmount: () => act(async () => root.unmount()) };
+};
+
+const actionLabels = (host: HTMLElement) =>
+  [...host.querySelectorAll("button")].map((button) => button.textContent);
+
+it("opens the Rename trip sheet from Trip options and saves the trimmed name", async () => {
+  const { host, tripId, runRename, unmount } = await mount();
 
   try {
-    await act(async () => root.render(<TripOptionsButton trip={trip} group={group} />));
+    expect(actionLabels(host)).not.toContain("Share card");
 
     const renameAction = [...host.querySelectorAll("button")].find(
       (b) => b.textContent === "Rename",
@@ -167,6 +179,51 @@ it("opens the Rename trip sheet from Trip options and saves the trimmed name", a
     });
     expect(host.querySelector('[role="dialog"]')).toBeNull();
   } finally {
-    await act(async () => root.unmount());
+    await unmount();
+  }
+});
+
+const tableAt = (endedAt: DateTime.Utc | null) => {
+  const playerId = PlayerId.make(crypto.randomUUID());
+
+  return {
+    table: {
+      id: TableId.make(crypto.randomUUID()),
+      tripId: null,
+      game: "craps",
+      venueId: null,
+      highLimit: false,
+      starterPlayerId: playerId,
+    },
+    venue: null,
+    startedAt: DateTime.makeUnsafe("2026-11-15T20:00:00Z"),
+    endedAt,
+    minutesPlayed: 0,
+    playerIds: [playerId],
+    playing: [],
+    results: [],
+    inPlay: [],
+    others: [],
+    myVisitId: null,
+  } satisfies TripDetail["tables"][number];
+};
+
+it("offers Share card once the trip has a finished table", async () => {
+  const { host, unmount } = await mount([tableAt(DateTime.makeUnsafe("2026-11-15T23:00:00Z"))]);
+
+  try {
+    expect(actionLabels(host)).toContain("Share card");
+  } finally {
+    await unmount();
+  }
+});
+
+it("offers no Share card while the trip's only table is live", async () => {
+  const { host, unmount } = await mount([tableAt(null)]);
+
+  try {
+    expect(actionLabels(host)).not.toContain("Share card");
+  } finally {
+    await unmount();
   }
 });

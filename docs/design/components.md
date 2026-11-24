@@ -51,6 +51,16 @@ Mobile has a few more card parts beside `Surface`: `ProportionalBarRow` for a br
 
 Don't put a `Surface` inside a `Surface`. A card on a card is `bg-raised`.
 
+## Share cards: TripCard, SessionCard
+
+A trip or a finished session of yours becomes a 4:5 image for the share sheet. Both cards take a model from `@stacks/client-runtime/shareCard` and draw nothing it doesn't hold, never fetching and never reading preferences. The felt is pinned to the dark theme with `ScopedTheme` and read through the felt tokens, so a card looks the same from either app theme; its figures use `felt-win` and `felt-loss`, which pass AA on it. The Color Up wordmark (`<BrandWordmark felt />`) sits small at the bottom, with no glow or gradient. Players are initials on a `Chip`, never contact photos.
+
+`TripCard` shows the name, dates and venues, up to 8 standings (you are always one, the rest are "+N more"), then your result, place, sessions and nights, and your running line. `SessionCard` shows venue, game, date, duration, result, buy-in, cash-out and hourly, with no curve.
+
+**Hidden is a different card, not a masked one.** `hidden` is privacy mode or the sheet's **Hide amounts**. The model then holds no amounts, so the card has no figure, no `••••`, no line or axis and no win or loss color: ranks, names and chips remain, and for a session the venue, game, date and duration. `Money` takes `hidden` for this, and it defaults to privacy mode elsewhere.
+
+The sheet shows the mounted card, and **Share** captures that same view when pressed, at 1080×1350 physical pixels whatever the screen density (the capture size is in logical pixels, so it is `1080 / PixelRatio`). Nothing is captured ahead of time, so hiding amounts can't be followed by sharing an older image. The card is laid out at 360×450 and scaled down in the sheet by an ancestor, never by the captured view.
+
 ## Hero cards: TripHero, BalanceHero
 
 A place can open on one hero card: the figure that place exists to show, big enough to read across a table. A trip has `TripHero` (your trip total, your running line, win rate, best session, your place). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. Your own live session is never a card on a page: the LiveBar holds it.

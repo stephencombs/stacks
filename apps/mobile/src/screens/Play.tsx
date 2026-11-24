@@ -7,12 +7,8 @@ import {
 import { formatDay, formatDuration, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
 import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
-import {
-  cashOutNote,
-  liveTable,
-  tableActions,
-  type TableAction,
-} from "@stacks/client-runtime/liveTable";
+import { sessionCardModel } from "@stacks/client-runtime/shareCard";
+import { cashOutNote, liveTable, tableActions } from "@stacks/client-runtime/liveTable";
 import {
   useRecordingSubmit,
   useRecordingTable,
@@ -77,6 +73,7 @@ import {
   VoidSheet,
 } from "../features/RecordingForms";
 import { LiveSessionsBar } from "../features/LiveBar";
+import { ShareCardSheet } from "../features/ShareCardSheet";
 import { TableSection } from "../features/SharedTable";
 import { TableTripSheet, TripRow, useTripPickable } from "../features/TableTrip";
 import { afterClosing, type OpenSheet } from "../features/visitSheets";
@@ -87,6 +84,7 @@ import {
   SeatSheet,
   TableActionSheet,
   TableSeats,
+  type SlotAction,
   type TableRecorded,
 } from "../features/LiveTable";
 
@@ -185,6 +183,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
   const prefs = usePreferences();
   const navigation = useNavigation();
   const [open, setOpen] = useState<OpenSheet | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const [saved, setSaved] = useState<{
     entryId: EntryId;
@@ -328,13 +327,16 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
   const canDelete = state !== null && ownPlayers(state).includes(visit.visit.playerId);
   const shared = (seats?.seats.length ?? 1) > 1;
 
-  const actions = live
+  const actions: ReadonlyArray<SlotAction> = live
     ? tableActions(table?.role ?? "participant", { playing: true, closed: false, empty: false })
-    : (["edit"] as const);
+    : canDelete && visit.finalResult !== null
+      ? ["edit", "share_card"]
+      : ["edit"];
 
-  const act = (action: TableAction) =>
+  const act = (action: SlotAction) =>
     Match.value(action).pipe(
       Match.when("edit", () => setOpen({ type: "edit" })),
+      Match.when("share_card", () => setSharing(true)),
       Match.when("delete_table", () => setOpen(null)),
       Match.orElse((next) => setOpen({ type: "action", action: next })),
     );
@@ -723,6 +725,26 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
         </Sheet>
       ) : null}
+      {sharing && visit.finalResult !== null ? (
+        <ShareCardSheet
+          title={visit.venue?.name ?? "Session"}
+          onClose={() => setSharing(false)}
+          card={(hidden) =>
+            sessionCardModel({
+              venue: visit.venue?.name ?? null,
+              game: visitTitle(visit.table),
+              startedAt: visit.visit.startedAt,
+              finishedAt: visit.visit.finishedAt!,
+              currency: RECORDING_CURRENCY,
+              result: visit.finalResult!,
+              buyIn: visit.totals.buyIn,
+              cashOut: visit.totals.cashOut,
+              hourly: sessionReadout(visit, visit.visit.finishedAt!).hourly,
+              hidden,
+            })
+          }
+        />
+      ) : null}
       {open?.type === "rebuy" ? (
         <RebuySheet
           visit={visit}
@@ -1089,8 +1111,8 @@ function VisitHeader({
 }: {
   visit: RecordingVisitView;
   since: DateTime.Utc;
-  actions: ReadonlyArray<TableAction>;
-  onAction: (action: TableAction) => void;
+  actions: ReadonlyArray<SlotAction>;
+  onAction: (action: SlotAction) => void;
   own?: boolean;
   who?: string | undefined;
 }) {
@@ -1118,7 +1140,13 @@ function VisitHeader({
     <View className="flex-row items-center justify-between gap-3">
       <BackButton label={backLabel} felt={live} />
       {live ? <LiveClock since={since} /> : <View className="flex-1" />}
-      <ActionSlot felt={live} actions={actions} onAction={onAction} who={who} />
+      <ActionSlot
+        felt={live}
+        actions={actions}
+        onAction={onAction}
+        who={who}
+        menuLabel={live ? undefined : "Session actions"}
+      />
     </View>
   );
 }
