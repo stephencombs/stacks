@@ -22,7 +22,12 @@ import { Icon } from "../components/ui/Icon";
 import { List, Row, Surface } from "../components/ui/Surface";
 import { Text } from "../components/ui/Text";
 import { cn } from "../components/ui/cn";
-import { HIDDEN_AMOUNT, HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
+import {
+  HIDDEN_AMOUNT,
+  HIDDEN_AMOUNT_LABEL,
+  formatDisplayMoney,
+  usePreferences,
+} from "../lib/preferences";
 
 import { StatsHeading, signed } from "./StatsParts";
 
@@ -79,6 +84,8 @@ function ReturnFigure({ figure }: { figure: StatsSummary["returnRate"] }) {
 
 /** Your result at a glance: the figure, how far it has climbed, the line that drew it, and three rates. */
 export function StatsHero({ view }: { view: StatsSummary }) {
+  const prefs = usePreferences();
+
   return (
     <View className="overflow-hidden rounded-[22px] bg-surface">
       <View className="px-5 pt-5">
@@ -96,7 +103,10 @@ export function StatsHero({ view }: { view: StatsSummary }) {
           className="mt-1.5 type-hero"
         />
         {view.climb !== null ? (
-          <Text className="mt-1 type-footnote text-muted">
+          <Text
+            accessibilityLabel={`Up ${formatDisplayMoney(view.climb, currency, prefs, { forAccessibility: true })} from your low`}
+            className="mt-1 type-footnote text-muted"
+          >
             Up <Money amount={view.climb} currency={currency} className="font-medium" /> from your
             low
           </Text>
@@ -150,9 +160,10 @@ function RunningChart({ chart }: { chart: NonNullable<StatsSummary["chart"]> }) 
   ]).map(String);
 
   const [width, setWidth] = useState(0);
-  const [inspect, setInspect] = useState<number | null>(null);
+  const [picked, setInspect] = useState<number | null>(null);
   const { points } = chart;
   const last = points.length - 1;
+  const inspect = picked !== null && picked <= last ? picked : null;
   const plot = runningLine(points, { width: Math.max(width, 2 * PAD.x), height }, PAD);
   const nearest = (x: number) => plot.nearest(x);
   const finish = points[last]!.total;
@@ -199,7 +210,7 @@ function RunningChart({ chart }: { chart: NonNullable<StatsSummary["chart"]> }) 
           onPress={() => setInspect(inspect === null ? last : null)}
           suppressHighlighting
           className={cn(
-            "-my-3 py-3 type-footnote",
+            "-mx-2 -my-3.5 px-2 py-3.5 type-footnote",
             android ? "font-semibold text-ink" : "text-muted",
           )}
         >
@@ -271,7 +282,7 @@ function RunningChart({ chart }: { chart: NonNullable<StatsSummary["chart"]> }) 
             pointerEvents="none"
             className={cn(
               "absolute gap-1 rounded-xl px-3 py-2",
-              android ? "bg-surface shadow-md dark:bg-fill" : "border border-line bg-surface",
+              android ? "bg-raised shadow-(--elevation-float)" : "border border-line bg-surface",
             )}
             style={{ left: callout, top: android ? 2 : 0, width: calloutWidth }}
           >
@@ -408,7 +419,15 @@ export function PeriodSection({ bars }: { bars: NonNullable<StatsSummary["bars"]
       <StatsHeading count={bars.count}>{bars.title}</StatsHeading>
       <Surface className="gap-3.5 p-4">
         {bars.sentences.length > 0 ? (
-          <Text className="type-callout text-ink">
+          <Text
+            accessibilityLabel={bars.sentences
+              .map(
+                (sentence) =>
+                  `${sentence.before} ${signed(sentence.amount, currency, prefs, true)}.`,
+              )
+              .join(" ")}
+            className="type-callout text-ink"
+          >
             {bars.sentences.map((sentence, index) => (
               <Text key={sentence.key}>
                 {index > 0 ? " " : ""}
@@ -506,13 +525,18 @@ export function PeriodSection({ bars }: { bars: NonNullable<StatsSummary["bars"]
 
 /** What the pattern sentences say, once enough sessions stand behind them. */
 export function PatternsSection({ patterns }: { patterns: StatsSummary["patterns"] }) {
+  const prefs = usePreferences();
+
   return (
     <View className="gap-2">
       <StatsHeading>Patterns</StatsHeading>
       <List>
         {patterns.map((pattern) => (
           <Row key={pattern.key}>
-            <Text className="flex-1 type-callout text-ink">
+            <Text
+              accessibilityLabel={`${pattern.before} ${signed(pattern.amount, currency, prefs, true)}${pattern.after}`}
+              className="flex-1 type-callout text-ink"
+            >
               {pattern.before}{" "}
               <Money
                 amount={pattern.amount}

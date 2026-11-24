@@ -530,7 +530,10 @@ function CasinoRows({
             amount={row.result}
             currency={currency}
             tone="result"
-            className={android ? "type-number" : "min-w-18 text-right font-semibold"}
+            fit={android}
+            className={
+              android ? "min-w-18 text-right type-number" : "min-w-18 text-right font-semibold"
+            }
           />
           {android ? <Icon name="chevron-right" color="faint" size={16} /> : null}
         </Row>
