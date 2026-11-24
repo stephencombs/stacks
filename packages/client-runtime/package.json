@@ -104,6 +104,10 @@
       "types": "./src/scope.ts",
       "import": "./src/scope.ts"
     },
+    "./shareCard": {
+      "types": "./src/shareCard.ts",
+      "import": "./src/shareCard.ts"
+    },
     "./stats": {
       "types": "./src/stats.ts",
       "import": "./src/stats.ts"

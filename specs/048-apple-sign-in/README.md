@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in-progress
 created: 2026-11-24
 priority: medium
 tags:
@@ -7,7 +7,12 @@ tags:
   - ios
   - auth
 created_at: 2026-11-24T03:28:46.164102100Z
-updated_at: 2026-11-24T03:28:46.164102100Z
+updated_at: 2026-11-24T08:25:16.309431500Z
+transitions:
+  - status: planned
+    at: 2026-11-24T08:25:15.612716Z
+  - status: in-progress
+    at: 2026-11-24T08:25:16.309431500Z
 ---
 
 # Sign in with Apple on iOS

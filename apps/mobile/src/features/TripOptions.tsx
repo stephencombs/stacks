@@ -2,6 +2,8 @@ import { useAuth } from "@clerk/expo";
 import { useNavigation } from "@react-navigation/native";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
+import { tripCardModel } from "@stacks/client-runtime/shareCard";
+import { chipOf, closedPlays, localClock, tripDates } from "@stacks/client-runtime/trip";
 import { useEffect, useState } from "react";
 import { Alert, Platform, View } from "react-native";
 
@@ -14,6 +16,7 @@ import { useGo } from "../lib/go";
 import { useScope } from "../lib/scope";
 import { useAction, useStacks } from "../lib/stacks";
 import { NameSheet } from "./NameSheet";
+import { ShareCardSheet } from "./ShareCardSheet";
 
 export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
   const go = useGo();
@@ -21,6 +24,7 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
   const stacks = useStacks();
   const { userId } = useAuth();
   const [renaming, setRenaming] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const end = useAction(stacks.Client.mutation("trips", "end"));
   const reopen = useAction(stacks.Client.mutation("trips", "reopen"));
   const remove = useAction(stacks.Client.mutation("trips", "delete"));
@@ -38,11 +42,14 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
     trip.tables.length === 0 &&
     (isAdmin(group) || trip.trip.createdBy === userId);
 
+  const finished = closedPlays(trip);
+
   const actions = [
     {
       label: "Rename",
       onPress: () => setRenaming(true),
     },
+    ...(finished.length > 0 ? [{ label: "Share card", onPress: () => setSharing(true) }] : []),
     trip.trip.endedAt === null
       ? {
           label: "End trip",
@@ -86,6 +93,26 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
       <ActionMenu label="Trip options" disabled={pending} actions={actions} vertical />
       {!android && error ? <FormError>{error}</FormError> : null}
       {renaming ? <RenameTripSheet trip={trip} onClose={() => setRenaming(false)} /> : null}
+      {sharing ? (
+        <ShareCardSheet
+          title={trip.trip.name}
+          onClose={() => setSharing(false)}
+          card={(hidden) =>
+            tripCardModel({
+              name: trip.trip.name,
+              dates: tripDates(trip.trip),
+              venues: finished.map((play) => play.venue?.name ?? null),
+              currency: group.group.currency,
+              me: group.myPlayerId,
+              closed: finished,
+              players: group.players,
+              chip: (playerId) => chipOf(group, playerId),
+              clock: localClock,
+              hidden,
+            })
+          }
+        />
+      ) : null}
     </View>
   );
 }

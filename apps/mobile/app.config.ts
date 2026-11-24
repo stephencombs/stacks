@@ -34,6 +34,7 @@ export default () => ({
   ios: {
     bundleIdentifier: id,
     supportsTablet: true,
+    usesAppleSignIn: true,
     icon: { light: lightIcon, dark: "./assets/icon-dark.png" },
     config: { usesNonExemptEncryption: false },
     ...(linkHost ? { associatedDomains: [`applinks:${linkHost}`] } : null),
@@ -62,6 +63,7 @@ export default () => ({
   plugins: [
     "@clerk/expo",
     "expo-secure-store",
+    "expo-apple-authentication",
     "expo-web-browser",
     "expo-maps",
     [
