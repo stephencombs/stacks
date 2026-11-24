@@ -1,5 +1,5 @@
 ---
-status: draft
+status: complete
 created: 2026-11-23
 tags:
   - api
@@ -10,7 +10,15 @@ depends_on:
   - 040-realtime-group-notices
 parent: 039-realtime-scope-notices
 created_at: 2026-11-23T17:39:55.984231700Z
-updated_at: 2026-11-23T17:39:55.984231700Z
+updated_at: 2026-11-24T02:36:43.523238700Z
+completed_at: 2026-11-24T02:36:43.523238700Z
+transitions:
+  - status: planned
+    at: 2026-11-24T02:36:32.242471200Z
+  - status: in-progress
+    at: 2026-11-24T02:36:32.845161500Z
+  - status: complete
+    at: 2026-11-24T02:36:43.523238700Z
 ---
 
 # Table change notices, end to end
@@ -57,26 +65,26 @@ Every scheme applies the table GET's check, including `viewOf`'s rule that a tab
 
 ## Requirements
 
-- [ ] The write rows above queue their scopes after commit, with old group IDs captured.
-- [ ] `X-Origin` on every request that writes, and in the notice.
-- [ ] `Actor` and `Share` schemes on the upgrade route, and `table:` scopes accepted.
-- [ ] Refetch triggers for `useServerTable` and `SharedTableScreen`, `sync.wake()` on notice, and filtering by origin.
+- [x] The write rows above queue their scopes after commit, with old group IDs captured.
+- [x] `X-Origin` on every request that writes, and in the notice.
+- [x] `Actor` and `Share` schemes on the upgrade route, and `table:` scopes accepted.
+- [x] Refetch triggers for `useServerTable` and `SharedTableScreen`, `sync.wake()` on notice, and filtering by origin.
 
 ## Acceptance criteria
 
-- [ ] API tests cover:
+- [x] API tests cover:
   - a mixed batch of accepted and rejected commands
   - a replay
   - `delete_table`
   - `set_table_trip` within one group, across groups, and to `null`
   - `claimActor` limited to open tables
-- [ ] Upgrade tests:
+- [x] Upgrade tests:
   - each scheme
   - a share token for another table
   - a deleted table, and a table whose visits are all deleted
   - an unknown actor
-- [ ] A client test: the device's own `origin` triggers no refresh and no `sync.wake()`.
+- [x] A client test: the device's own `origin` triggers no refresh and no `sync.wake()`.
 - [ ] Deployed `development`, normally within 2s of commit:
   - a joined participant's cash-out shows on the starter's `Play` screen
   - a cash-out shows for a share-link viewer
-- [ ] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, `pnpm test` pass.
+- [x] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, `pnpm test` pass.

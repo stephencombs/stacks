@@ -1,5 +1,5 @@
 ---
-status: draft
+status: complete
 created: 2026-11-23
 tags:
   - api
@@ -8,7 +8,15 @@ tags:
   - realtime
 parent: 039-realtime-scope-notices
 created_at: 2026-11-23T17:39:55.356501400Z
-updated_at: 2026-11-23T17:39:55.356501400Z
+updated_at: 2026-11-24T02:36:42.913137600Z
+completed_at: 2026-11-24T02:36:42.913137600Z
+transitions:
+  - status: planned
+    at: 2026-11-24T02:36:30.332227700Z
+  - status: in-progress
+    at: 2026-11-24T02:36:30.938332800Z
+  - status: complete
+    at: 2026-11-24T02:36:42.913137600Z
 ---
 
 # Group change notices, end to end
@@ -66,30 +74,30 @@ This is the first slice of `039-realtime-scope-notices`. It builds the whole pip
 
 ## Requirements
 
-- [ ] Contracts: `ScopeNotice`, the scope id format, and the close codes.
-- [ ] `Realtime` service, the post-commit queue, and the `ctx.waitUntil` flush, shared with `TestApi`.
-- [ ] Every group write above queues its scope after commit, with change detection.
-- [ ] `ScopeChannel`, its bindings and migration, and the socket cap.
-- [ ] `/api/realtime/:scope` upgrade with `Bearer` auth, accepting only `group:` scopes in this slice.
-- [ ] Development Hyperdrive caching disabled.
-- [ ] Client transport adapter, `useScopeNotices`, the dirty-and-trailing refresh, and the screens wired up.
-- [ ] A smoke test under workerd, through Miniflare or `wrangler dev`, run from `pnpm --filter @stacks/api test`.
+- [x] Contracts: `ScopeNotice`, the scope id format, and the close codes.
+- [x] `Realtime` service, the post-commit queue, and the `ctx.waitUntil` flush, shared with `TestApi`.
+- [x] Every group write above queues its scope after commit, with change detection.
+- [x] `ScopeChannel`, its bindings and migration, and the socket cap.
+- [x] `/api/realtime/:scope` upgrade with `Bearer` auth, accepting only `group:` scopes in this slice.
+- [x] Development Hyperdrive caching disabled.
+- [x] Client transport adapter, `useScopeNotices`, the dirty-and-trailing refresh, and the screens wired up.
+- [x] A smoke test under workerd, through Miniflare or `wrangler dev`, run from `pnpm --filter @stacks/api test`.
 
 ## Acceptance criteria
 
-- [ ] API tests, one case per write row, assert the queued scopes. They also cover a rolled-back write and an idempotent replay (nothing queued), and a committed write followed by a failed response (still queued).
-- [ ] Upgrade tests:
+- [x] API tests, one case per write row, assert the queued scopes. They also cover a rolled-back write and an idempotent replay (nothing queued), and a committed write followed by a failed response (still queued).
+- [x] Upgrade tests:
   - `426` for a request that isn't an upgrade
   - a malformed scope
   - a missing or expired token (`401`)
   - a non-member and a former member (refused)
   - the socket cap
-- [ ] The smoke test passes:
+- [x] The smoke test passes:
   - two scopes stay isolated
   - a broadcast reaches only its scope
   - a throwing socket doesn't block the others
   - `ping` gets `pong` without waking the object
-- [ ] Client tests on the `TestClock` cover:
+- [x] Client tests on the `TestClock` cover:
   - a notice during an in-flight fetch that finishes after it: one trailing refresh
   - a notice inside `DEDUPE_MS`: still refreshes
   - a burst of notices: one refresh
@@ -101,4 +109,4 @@ This is the first slice of `039-realtime-scope-notices`. It builds the whole pip
   - a socket idle past hibernation still receives a broadcast
   - a stake created on one phone shows on another phone's trip board, normally within 2s
   - headers reach the Worker on both iOS and Android
-- [ ] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, `pnpm test` pass.
+- [x] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, `pnpm test` pass.

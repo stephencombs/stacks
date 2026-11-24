@@ -1,5 +1,5 @@
 ---
-status: draft
+status: complete
 created: 2026-11-23
 tags:
   - api
@@ -8,7 +8,15 @@ depends_on:
   - 040-realtime-group-notices
 parent: 039-realtime-scope-notices
 created_at: 2026-11-23T17:39:56.620033500Z
-updated_at: 2026-11-23T17:39:56.620033500Z
+updated_at: 2026-11-24T02:36:35.356941400Z
+completed_at: 2026-11-24T02:36:35.356941400Z
+transitions:
+  - status: planned
+    at: 2026-11-24T02:36:34.135098600Z
+  - status: in-progress
+    at: 2026-11-24T02:36:34.745886Z
+  - status: complete
+    at: 2026-11-24T02:36:35.356941400Z
 ---
 
 # Close notice sockets when access is lost
@@ -43,16 +51,16 @@ The third slice of `039-realtime-scope-notices`. A notice carries no data, so so
 
 ## Requirements
 
-- [ ] Selectors set at upgrade for every grant kind.
-- [ ] A `close(scope, selector, code)` RPC on `ScopeChannel`.
-- [ ] Close RPCs queued after commit on every path in the table.
-- [ ] Client handling of `4403` and `4404`.
+- [x] Selectors set at upgrade for every grant kind.
+- [x] A `close(scope, selector, code)` RPC on `ScopeChannel`.
+- [x] Close RPCs queued after commit on every path in the table.
+- [x] Client handling of `4403` and `4404`.
 
 ## Acceptance criteria
 
-- [ ] API tests assert the close RPCs for each table row. That includes a move within one group (none), a move to `null`, and the full `revokeBinding` chain, with an account-authenticated socket in the chain.
-- [ ] The smoke test checks that a targeted close drops only matching sockets.
-- [ ] Upgrade tests refuse a rotated link and a revoked binding.
-- [ ] A client test: `4403` and `4404` don't reconnect.
-- [ ] Deployed `development`: removing a member closes their open trip-board socket.
-- [ ] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, `pnpm test` pass.
+- [x] API tests assert the close RPCs for each table row. That includes a move within one group (none), a move to `null`, and the full `revokeBinding` chain, with an account-authenticated socket in the chain.
+- [x] The smoke test checks that a targeted close drops only matching sockets.
+- [x] Upgrade tests refuse a rotated link and a revoked binding.
+- [x] A client test: `4403` and `4404` don't reconnect.
+- [x] Deployed `development`: removing a member closes their open trip-board socket.
+- [x] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, `pnpm test` pass.
