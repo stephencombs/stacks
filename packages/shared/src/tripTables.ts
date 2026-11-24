@@ -1,13 +1,16 @@
 import { MinorUnits, type PlayEntry, type PlayerId, type Visit } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
+import { type VisitFunding } from "./funding.ts";
 import { playerResults, type PlayerResult } from "./results.ts";
 
 export type TableVisit = Pick<Visit, "id" | "playerId" | "startedAt" | "finishedAt"> & {
   readonly deletedAt?: DateTime.Utc | null | undefined;
 };
 
-export type TableEntry = Pick<PlayEntry, "visitId" | "kind" | "amount" | "voidedAt">;
+export type TableEntry = Pick<PlayEntry, "visitId" | "kind" | "amount" | "voidedAt"> & {
+  readonly counterpartyId?: PlayerId | null | undefined;
+};
 
 export interface GroupTable {
   readonly startedAt: DateTime.Utc;
@@ -32,6 +35,8 @@ export interface GroupTable {
   readonly others: ReadonlyArray<
     PlayerResult & { readonly playerId: PlayerId; readonly playing: boolean }
   >;
+  /** Each finished visit that counts for a member and has an entry, for funding stats. */
+  readonly visits: ReadonlyArray<VisitFunding>;
 }
 
 const none = MinorUnits.make(0);
@@ -56,11 +61,13 @@ const covered = (intervals: ReadonlyArray<readonly [number, number]>) => {
  * A table as its trip's group sees it. `memberOf` names the group member a visit counts for, or
  * null when it counts for no one. It takes the visit, not the player, because a link can hold for
  * some of a player's visits and not others. Deleted visits don't count; null if nothing's left.
+ * `payerOf` names the member a buy-in's counterparty counts for at a visit, or null for no one.
  */
 export const groupTable = (
   visits: Iterable<TableVisit>,
   entries: Iterable<TableEntry>,
   memberOf: (visit: TableVisit) => PlayerId | null,
+  payerOf: (counterpartyId: PlayerId, visit: TableVisit) => PlayerId | null = () => null,
 ) => {
   const shown = Array.from(visits)
     .filter((visit) => (visit.deletedAt ?? null) === null)
@@ -155,6 +162,33 @@ export const groupTable = (
       playerId,
       buyIn: MinorUnits.make(buyIn),
     })),
+    visits: shown.flatMap((visit) => {
+      const { member } = byVisit.get(visit.id)!;
+      const own = counted.filter((entry) => entry.visit.id === visit.id);
+
+      if (member === null || visit.finishedAt === null || own.length === 0) return [];
+
+      const buyIns = own.filter((entry) => entry.kind === "buy_in");
+
+      return [
+        {
+          playerId: member,
+          buyIns: buyIns.length,
+          net: own.reduce(
+            (sum, entry) => sum + (entry.kind === "buy_in" ? -entry.amount : entry.amount),
+            0,
+          ),
+          covered: buyIns.flatMap((entry) => {
+            const payer =
+              entry.counterpartyId == null ? null : payerOf(entry.counterpartyId, visit);
+
+            return payer === null || payer === member
+              ? []
+              : [{ payerId: payer, amount: entry.amount }];
+          }),
+        },
+      ];
+    }),
     others: Array.from(others, ([playerId, playing]) => ({
       playerId,
       playing,

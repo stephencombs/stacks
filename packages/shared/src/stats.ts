@@ -1076,3 +1076,123 @@ export const returnStandings = (plays: ReadonlyArray<GroupPlay>) => {
       buyIn: checkedMinorUnits(row.buyIn),
     }));
 };
+
+/** With additional buy-ins needs this many visits that had one. */
+export const RELOAD_MIN_VISITS = 5;
+
+/** The covered-buy-ins row needs this many covered entries in scope. */
+export const COVERED_MIN_ENTRIES = 2;
+
+/** Backing lists this many stakes before "All N stakes". */
+export const STAKES_SHOWN = 3;
+
+/** A visit with more than one active buy-in, as `GroupStats.reloads` carries it. */
+export interface GroupReload {
+  readonly playId: string;
+  readonly playerId: PlayerId;
+  readonly additional: number;
+  readonly net: MinorUnits;
+}
+
+/** A buy-in one group player paid for another, as `GroupStats.covered` carries it. */
+export interface GroupCovered {
+  readonly playId: string;
+  readonly payerId: PlayerId;
+  readonly playerId: PlayerId;
+  readonly amount: MinorUnits;
+}
+
+/** A stake, as `GroupStats.stakes` carries it. */
+export interface GroupStake {
+  readonly stakeId: string;
+  readonly tripId: TripId;
+  readonly lenderId: PlayerId;
+  readonly borrowerId: PlayerId;
+  readonly amount: MinorUnits;
+  readonly owed: MinorUnits;
+  readonly final: boolean;
+}
+
+/**
+ * The visits with an additional buy-in at `plays`, and how they finished. `most` is whoever added
+ * the most buy-ins, or null on a tie. Null below `RELOAD_MIN_VISITS`.
+ */
+export const additionalBuyIns = (
+  plays: ReadonlyArray<Pick<GroupPlay, "id">>,
+  reloads: ReadonlyArray<GroupReload>,
+) => {
+  const scoped = new Set(plays.map((play) => play.id));
+  const visits = reloads.filter((reload) => scoped.has(reload.playId));
+
+  if (visits.length < RELOAD_MIN_VISITS) return null;
+  const added = new Map<PlayerId, number>();
+
+  for (const { playerId, additional } of visits)
+    added.set(playerId, (added.get(playerId) ?? 0) + additional);
+
+  const top = Math.max(...added.values());
+  const leaders = [...added].filter(([, count]) => count === top);
+
+  return {
+    visits: visits.length,
+    finishedUp: visits.filter((visit) => visit.net > 0).length,
+    result: checkedMinorUnits(visits.reduce((sum, visit) => sum + BigInt(visit.net), 0n)),
+    most: leaders.length === 1 ? { playerId: leaders[0]![0], additional: top } : null,
+  };
+};
+
+/**
+ * Who covered the most at `plays`, by the amount they paid for other players' buy-ins. Null below
+ * `COVERED_MIN_ENTRIES` entries, and on a tie for the largest amount.
+ */
+export const coveredBy = (
+  plays: ReadonlyArray<Pick<GroupPlay, "id">>,
+  covered: ReadonlyArray<GroupCovered>,
+) => {
+  const scoped = new Set(plays.map((play) => play.id));
+  const entries = covered.filter((entry) => scoped.has(entry.playId));
+
+  if (entries.length < COVERED_MIN_ENTRIES) return null;
+  const payers = new Map<PlayerId, { amount: bigint; entries: number; friends: Set<PlayerId> }>();
+
+  for (const entry of entries) {
+    const payer = payers.get(entry.payerId) ?? { amount: 0n, entries: 0, friends: new Set() };
+    payer.amount += BigInt(entry.amount);
+    payer.entries += 1;
+    payer.friends.add(entry.playerId);
+    payers.set(entry.payerId, payer);
+  }
+
+  const top = [...payers.values()].reduce(
+    (best, payer) => (payer.amount > best ? payer.amount : best),
+    -1n,
+  );
+
+  const leaders = [...payers].filter(([, payer]) => payer.amount === top);
+
+  if (leaders.length !== 1) return null;
+  const [payerId, payer] = leaders[0]!;
+
+  return {
+    payerId,
+    entries: payer.entries,
+    friends: payer.friends.size,
+    amount: checkedMinorUnits(payer.amount),
+  };
+};
+
+/**
+ * Each stake in `tripIds` (all of them when null) with what the backer made from it: what the
+ * borrower owes back minus what was put in. Newest first, since stakes arrive oldest first.
+ */
+export const backingResults = (
+  stakes: ReadonlyArray<GroupStake>,
+  tripIds: ReadonlySet<TripId> | null,
+) =>
+  stakes
+    .filter((stake) => tripIds === null || tripIds.has(stake.tripId))
+    .toReversed()
+    .map((stake) => ({
+      ...stake,
+      result: checkedMinorUnits(BigInt(stake.owed) - BigInt(stake.amount)),
+    }));

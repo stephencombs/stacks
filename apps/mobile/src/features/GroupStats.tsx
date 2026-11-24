@@ -303,6 +303,7 @@ function ShownStats({
       {view.habits ? (
         <InsightSection title="Habits" rows={view.habits} currency={view.currency} />
       ) : null}
+      {view.backing ? <Backing backing={view.backing} currency={view.currency} /> : null}
       {view.records ? (
         <InsightSection title="Records" rows={view.records} currency={view.currency} />
       ) : null}
@@ -555,6 +556,69 @@ function InsightSection({
           />
         ))}
       </List>
+    </View>
+  );
+}
+
+type BackingView = NonNullable<Shown["backing"]>;
+
+function Backing({ backing, currency }: { backing: BackingView; currency: CurrencyCode }) {
+  const go = useGo();
+  const [all, setAll] = useState(false);
+  const android = Platform.OS === "android";
+  const { covered, stakes } = backing;
+  const tripId = covered?.tripId ?? null;
+
+  const rows = (list: ReadonlyArray<NonNullable<BackingView["stakes"]>["rows"][number]>) =>
+    list.map((row) => (
+      <InsightRow
+        key={row.key}
+        people={row.people}
+        title={row.title}
+        line={row.line}
+        trailing={row.trailing}
+        currency={currency}
+      />
+    ));
+
+  return (
+    <View className="gap-2">
+      <StatsHeading {...(backing.whole ? { count: "Whole trips" } : {})}>Backing</StatsHeading>
+      <List>
+        {covered ? (
+          <InsightRow
+            people={covered.people}
+            title={covered.title}
+            line={covered.line}
+            trailing={covered.trailing}
+            currency={currency}
+            {...(tripId === null
+              ? {}
+              : { hint: "Opens this trip", onPress: () => go.trip(tripId) })}
+          />
+        ) : null}
+        {stakes ? rows(stakes.rows) : null}
+        {stakes?.all ? (
+          <Row
+            onPress={() => setAll(true)}
+            accessibilityLabel={`All ${stakes.all.length} stakes`}
+            accessibilityHint="Lists every stake"
+          >
+            <Text className="flex-1 type-body text-ink">{`All ${stakes.all.length} stakes`}</Text>
+            <Icon name="chevron-right" color="faint" size={16} />
+          </Row>
+        ) : null}
+      </List>
+      {all && stakes?.all ? (
+        <Sheet
+          open
+          title="Stakes"
+          description={android ? undefined : `${stakes.all.length} stakes`}
+          onClose={() => setAll(false)}
+        >
+          <List>{rows(stakes.all)}</List>
+        </Sheet>
+      ) : null}
     </View>
   );
 }

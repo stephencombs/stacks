@@ -6,6 +6,7 @@ import {
   InviteId,
   PlayerId,
   SessionId,
+  StakeId,
   TableId,
   TripId,
   UserId,
@@ -346,6 +347,60 @@ export const GroupStats = Schema.Struct({
   ),
   /** The casinos the plays name. */
   venues: Schema.Array(Venue),
+  /**
+   * Visits with more than one active buy-in, one item per visit: a table merges return visits, so
+   * counting per table would turn two single buy-ins into a false extra. A missing field means the
+   * server didn't say, not none.
+   */
+  reloads: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        playId: Schema.Union([SessionId, TableId]),
+        playerId: PlayerId,
+        /** Active buy-ins beyond the first. */
+        additional: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+        /** What the player made over this visit. */
+        net: MinorUnits,
+      }),
+    ),
+  ),
+  /** How many finished visits each play has, as context for `reloads`. */
+  allVisits: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        playId: Schema.Union([SessionId, TableId]),
+        visits: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+      }),
+    ),
+  ),
+  /** Active buy-ins one group player paid for another. */
+  covered: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        playId: Schema.Union([SessionId, TableId]),
+        payerId: PlayerId,
+        playerId: PlayerId,
+        amount: MinorUnits,
+      }),
+    ),
+  ),
+  /**
+   * Stakes on older group sessions, oldest first, with what the borrower owes back. `final` is
+   * false while the stake and its trip are both open, or a session it covers is live.
+   */
+  stakes: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        stakeId: StakeId,
+        tripId: TripId,
+        lenderId: PlayerId,
+        borrowerId: PlayerId,
+        amount: MinorUnits,
+        owed: MinorUnits,
+        final: Schema.Boolean,
+      }),
+    ),
+  ),
 });
 
 export type GroupStats = typeof GroupStats.Type;

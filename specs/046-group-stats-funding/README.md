@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-24
 tags:
   - stats
@@ -9,7 +9,10 @@ depends_on:
   - 045-group-stats-insights
 parent: 043-stats-redesign
 created_at: 2026-11-24T03:30:29.100455400Z
-updated_at: 2026-11-24T03:30:29.100455400Z
+updated_at: 2026-11-24T17:15:49.056612300Z
+transitions:
+  - status: in-progress
+    at: 2026-11-24T17:15:49.056612300Z
 ---
 
 # Group stats: additional buy-ins, covered buy-ins and backing
@@ -34,7 +37,7 @@ Every new field uses `Schema.optionalKey`.
 - Active means `voided_at is null`. A correction voids the original and adds one replacement, so it counts once. A void without a replacement drops out.
 - An upward edit to a buy-in total is recorded as a new buy-in, so it counts. The UI therefore says "additional buy-ins", never "rebuys".
 - The count must be per visit. A table merges return visits, so a per-table count would turn two single buy-ins into a false extra.
-- `allVisits?: Int` counts the eligible finished visits in scope, for context.
+- `allVisits?: Array<{ playId, visits: Int }>` counts the finished visits at each play, so the clients can total the visits in scope as the filters change. A single number couldn't follow them.
 
 ### `GroupStats.covered?: Array<{ playId, payerId, playerId, amount: MinorUnits }>`
 
