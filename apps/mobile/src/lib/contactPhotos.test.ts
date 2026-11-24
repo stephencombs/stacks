@@ -126,11 +126,12 @@ it("sweeps leftover temporary files when it opens, and discard deletes one", () 
 });
 
 it("signing out keeps photos, and only clearing them wipes the folder", () => {
-  const { files, pick, photos } = openFiles();
+  const { disk, files, pick, photos } = openFiles();
   createContactPhotoStore(files, counter()).set("ada", pick("a"));
 
   const afterSignOut = createContactPhotoStore(files, counter());
   expect(afterSignOut.uriOf("ada")).toBe("file:///photos/photo-1.jpg");
+  const leftover = pick("unfinished");
 
   let notified = 0;
   afterSignOut.subscribe(() => notified++);
@@ -138,6 +139,7 @@ it("signing out keeps photos, and only clearing them wipes the folder", () => {
 
   expect(afterSignOut.uriOf("ada")).toBeNull();
   expect(photos()).toEqual([]);
+  expect(disk.has(leftover)).toBe(false);
   expect(createContactPhotoStore(files, counter()).uriOf("ada")).toBeNull();
   expect(notified).toBe(1);
 });

@@ -8,7 +8,13 @@ const calls = vi.hoisted(() => {
   return log;
 });
 
-const faults = vi.hoisted(() => ({ database: false, signOut: false }));
+const faults = vi.hoisted(() => ({
+  database: false,
+  close: false,
+  signOut: false,
+  signOutHangs: false,
+  clearToken: false,
+}));
 
 vi.mock("expo-file-system", () => {
   class File {
@@ -57,7 +63,23 @@ vi.mock("./contactPhotos", () => ({ clearContactPhotos: () => void calls.push("p
 vi.mock("./liveSessionAdapter", () => ({ endLiveSurface: async () => void calls.push("live") }));
 
 vi.mock("./recording", () => ({
-  recordingStore: { close: async () => void calls.push("close") },
+  recordingStore: {
+    close: async () => {
+      if (faults.close) throw new Error("close failed");
+      calls.push("close");
+    },
+  },
+}));
+
+vi.mock("./share", () => ({ deleteSharedCsvFiles: () => void calls.push("csv") }));
+
+vi.mock("@clerk/expo/token-cache", () => ({
+  tokenCache: {
+    clearToken: async (key: string) => {
+      if (faults.clearToken) throw new Error("keychain is locked");
+      calls.push(`token:${key}`);
+    },
+  },
 }));
 
 vi.mock("./recordingStorageSqlite", () => ({
@@ -70,6 +92,8 @@ vi.mock("./recordingStorageSqlite", () => ({
 const session = vi.hoisted(() => ({ signedIn: true }));
 
 const signOut = vi.fn(async () => {
+  if (faults.signOutHangs) return new Promise<void>(() => {});
+
   if (faults.signOut) throw new Error("offline");
   calls.push("sign out");
 });
@@ -104,7 +128,10 @@ beforeEach(() => {
   disk.clear();
   calls.length = 0;
   faults.database = false;
+  faults.close = false;
   faults.signOut = false;
+  faults.signOutHangs = false;
+  faults.clearToken = false;
   session.signedIn = true;
   signOut.mockClear();
   stock();
@@ -120,7 +147,7 @@ it("sets the marker, then ends the live surface, closes and wipes the ledger, th
 
   await device.continueAccountWipe();
 
-  expect(calls).toEqual(["live", "close", "database", "secure:color-up-actor", "photos"]);
+  expect(calls).toEqual(["live", "close", "database", "secure:color-up-actor", "photos", "csv"]);
   expect([...disk.keys()].sort()).toEqual([
     "account-wipe.json",
     "last-trip-user_bob",
@@ -147,6 +174,7 @@ it("finishes at the next launch when the app was killed before the wipe ran", as
     "database",
     "secure:color-up-actor",
     "photos",
+    "csv",
     "sign out",
   ]);
   expect(disk.has("outbox-user_alice.json")).toBe(false);
@@ -174,7 +202,7 @@ it("keeps the marker through a failure, then finishes on a repeat that clears th
   expect(disk.has("outbox-user_bob.json")).toBe(true);
 });
 
-it("leaves the marker when sign-out fails, so the next launch signs out again", async () => {
+it("signs out locally when Clerk's sign-out is refused, so the wipe still reaches done", async () => {
   const device = await freshLaunch();
   device.beginAccountWipe(wipe);
   faults.signOut = true;
@@ -182,15 +210,71 @@ it("leaves the marker when sign-out fails, so the next launch signs out again", 
   await device.continueAccountWipe();
   await device.finishAccountWipe();
 
-  expect(disk.has("account-wipe.json")).toBe(true);
-  faults.signOut = false;
-
-  const nextLaunch = await freshLaunch();
-  await nextLaunch.continueAccountWipe();
-  await nextLaunch.finishAccountWipe();
-
-  expect(signOut).toHaveBeenCalledTimes(2);
+  expect(calls.at(-1)).toBe("token:__clerk_client_jwt");
   expect(disk.has("account-wipe.json")).toBe(false);
+});
+
+it("signs out locally when Clerk never answers, such as offline at launch", async () => {
+  vi.useFakeTimers();
+
+  try {
+    const device = await freshLaunch();
+    device.beginAccountWipe(wipe);
+    faults.signOutHangs = true;
+
+    await device.continueAccountWipe();
+    const finishing = device.finishAccountWipe();
+
+    expect(disk.has("account-wipe.json")).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    await finishing;
+
+    expect(calls.at(-1)).toBe("token:__clerk_client_jwt");
+    expect(disk.has("account-wipe.json")).toBe(false);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("keeps the marker when even the local sign-out fails, and finishes on a repeat", async () => {
+  const device = await freshLaunch();
+  device.beginAccountWipe(wipe);
+  faults.signOut = true;
+  faults.clearToken = true;
+
+  await device.continueAccountWipe();
+  await device.finishAccountWipe();
+
+  expect(disk.has("account-wipe.json")).toBe(true);
+
+  faults.signOut = false;
+  faults.clearToken = false;
+  await device.continueAccountWipe();
+  await device.finishAccountWipe();
+
+  expect(disk.has("account-wipe.json")).toBe(false);
+});
+
+it("goes on to delete the ledger when closing it fails, and reports a delete that fails too", async () => {
+  const device = await freshLaunch();
+  device.beginAccountWipe(wipe);
+  faults.close = true;
+
+  await device.continueAccountWipe();
+  await device.finishAccountWipe();
+
+  expect(calls).toContain("database");
+  expect(disk.has("account-wipe.json")).toBe(false);
+
+  const nextDevice = await freshLaunch();
+  nextDevice.beginAccountWipe(wipe);
+  faults.database = true;
+
+  await nextDevice.continueAccountWipe();
+  await nextDevice.finishAccountWipe();
+
+  expect(disk.has("account-wipe.json")).toBe(true);
 });
 
 it("does nothing at launch when no wipe is pending", async () => {

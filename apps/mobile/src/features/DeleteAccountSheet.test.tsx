@@ -66,6 +66,9 @@ const mount = async ({
 
   vi.doMock("react-native", () => ({ Platform: { OS: os }, View: Plain }));
   vi.doMock("../components/ui/Text", () => ({ Text: Plain }));
+  vi.doMock("./ScreenSkeletons", () => ({
+    DeleteAccountSkeleton: () => createElement("div", { "data-skeleton": "" }),
+  }));
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
   vi.doMock("../components/Money", () => ({
     Money: ({ amount }: { amount: number }) => createElement("span", { "data-money": amount }),
@@ -101,7 +104,6 @@ const mount = async ({
   }));
   vi.doMock("../components/ui/Surface", () => ({
     Row: Plain,
-    Skeleton: () => createElement("div", { "data-skeleton": "" }),
     SettingsGroup: ({
       title,
       children,
@@ -255,8 +257,11 @@ it("lists what is deleted, what friends keep, new owners, balances and stakes", 
   expect(sheet.container.querySelector("[data-row='Vegas crew']")?.textContent).toContain(
     "Bob becomes the owner",
   );
-  expect(sheet.container.querySelector("[data-money='-2500']")).not.toBeNull();
+  expect(sheet.container.querySelector("[data-money='2500']")).not.toBeNull();
+  expect(sheet.container.querySelector("[data-money='-2500']")).toBeNull();
   expect(text).toContain("You owe");
+  expect(text).toContain("Your solo sessions, unless a trip you share with friends counts them.");
+  expect(text).not.toContain("nobody else played");
   expect(text).toContain("2 open stakes");
   expect(text).not.toContain("Apple");
   expect(sheet.button("Delete account")?.dataset.variant).toBe("danger");
@@ -378,6 +383,47 @@ it("says Apple will be left for later on Android, where there is no Apple sheet"
     status: "complete",
     appleManual: true,
   });
+
+  await sheet.unmount();
+});
+
+it("shows an amount you're owed as it is, under what it means", async () => {
+  const sheet = await mount({
+    load: async () =>
+      preview({
+        openBalances: [
+          {
+            group: group("00000000-0000-4000-8000-000000000002", "Vegas crew"),
+            currency: usd,
+            amount: MinorUnits.make(4000),
+          },
+        ],
+      }),
+  });
+
+  expect(sheet.container.querySelector("[data-money='4000']")).not.toBeNull();
+  expect(sheet.text()).toContain("You're owed");
+
+  await sheet.unmount();
+});
+
+it("turns the export off while the account is being deleted", async () => {
+  const sheet = await mount({
+    load: async () => preview(),
+    remove: () => new Promise(() => {}),
+  });
+
+  const exportRow = () =>
+    sheet.container.querySelector<HTMLElement>("[data-row='Export sessions (CSV)']");
+
+  expect(exportRow()?.dataset.pressable).toBe("true");
+
+  await sheet.press("Delete account");
+
+  expect(exportRow()?.dataset.pressable).toBe("false");
+
+  await act(async () => exportRow()?.click());
+  expect(sheet.runExport).not.toHaveBeenCalled();
 
   await sheet.unmount();
 });

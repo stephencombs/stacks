@@ -1,6 +1,6 @@
 import { previewFailure, type PreviewFailure } from "@stacks/client-runtime/accountDeletion";
 import { describeError } from "@stacks/client-runtime/errors";
-import type { AccountDeletionPreview } from "@stacks/contracts";
+import { MinorUnits, type AccountDeletionPreview } from "@stacks/contracts";
 import { useEffect, useState, type ReactNode } from "react";
 import { Platform, View } from "react-native";
 
@@ -9,10 +9,11 @@ import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
-import { Row, SettingsGroup, SettingsRow, Skeleton } from "../components/ui/Surface";
+import { Row, SettingsGroup, SettingsRow } from "../components/ui/Surface";
 import { Text } from "../components/ui/Text";
 import { useAccount } from "../lib/account";
 import { accountApi, askAppleForCode, beginAccountWipe } from "../lib/accountDeletion";
+import { DeleteAccountSkeleton } from "./ScreenSkeletons";
 import { useSessionsExport } from "./useSessionsExport";
 
 type Load =
@@ -120,12 +121,14 @@ export function DeleteAccountSheet({ onClose }: { onClose: () => void }) {
           subtitle={
             csv.count === 0 ? "Nothing to export yet" : `${plural(csv.count, "finished session")}`
           }
-          onPress={csv.count > 0 && !csv.pending ? () => void csv.run() : undefined}
+          onPress={
+            csv.count > 0 && !csv.pending && !deleting.pending ? () => void csv.run() : undefined
+          }
           accessibilityHint="Exports all recorded sessions as a CSV file"
         />
       </SettingsGroup>
 
-      {load.status === "loading" ? <Skeleton className="h-40" /> : null}
+      {load.status === "loading" ? <DeleteAccountSkeleton /> : null}
 
       {load.status === "failed" ? (
         <View className="gap-3">
@@ -160,7 +163,7 @@ function Consequences({ preview }: { preview: AccountDeletionPreview }) {
     <>
       <SettingsGroup title="Deleted">
         <Line>Your account and sign-in.</Line>
-        <Line>Your sessions at tables nobody else played at.</Line>
+        <Line>Your solo sessions, unless a trip you share with friends counts them.</Line>
         <Line>Everything saved only on this phone, including play that hasn't synced.</Line>
         {preview.soloGroups.map((group) => (
           <Line
@@ -202,7 +205,12 @@ function Consequences({ preview }: { preview: AccountDeletionPreview }) {
               key={`${balance.group.id}-${balance.currency}`}
               title={balance.group.name}
               subtitle={balance.amount > 0 ? "You're owed" : "You owe"}
-              value={<Money amount={balance.amount} currency={balance.currency} tone="result" />}
+              value={
+                <Money
+                  amount={MinorUnits.make(Math.abs(balance.amount))}
+                  currency={balance.currency}
+                />
+              }
             />
           ))}
           {preview.openStakes.map((stake) => (

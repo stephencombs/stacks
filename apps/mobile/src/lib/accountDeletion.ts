@@ -1,5 +1,6 @@
 import { makeDeviceWipe, type WipeMarker } from "@stacks/client-runtime/accountDeletion";
 import { makeAccountApi, settle } from "@stacks/client-runtime/api";
+import { tokenCache } from "@clerk/expo/token-cache";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { File, Paths } from "expo-file-system";
 import { useSyncExternalStore } from "react";
@@ -14,6 +15,7 @@ import { deleteOutbox } from "./outbox";
 import { recordingStore } from "./recording";
 import { deleteRecordingDatabase } from "./recordingStorageSqlite";
 import { clerk, sessionToken } from "./sessionToken";
+import { deleteSharedCsvFiles } from "./share";
 import { deleteTripFiles } from "./tripStorage";
 
 const markerFile = new File(Paths.document, "account-wipe.json");
@@ -29,8 +31,19 @@ const deviceWipe = makeDeviceWipe({
   steps: [
     endLiveSurface,
     async () => {
-      await recordingStore.close().catch(() => undefined);
-      await deleteRecordingDatabase();
+      const closeFailures: Array<unknown> = [];
+
+      try {
+        await recordingStore.close();
+      } catch (error) {
+        closeFailures.push(error);
+      }
+
+      try {
+        await deleteRecordingDatabase();
+      } catch (error) {
+        throw closeFailures[0] ?? error;
+      }
     },
     forgetActorKey,
     (userId) => {
@@ -38,6 +51,7 @@ const deviceWipe = makeDeviceWipe({
       deleteTripFiles(userId);
     },
     clearContactPhotos,
+    deleteSharedCsvFiles,
   ],
 });
 
@@ -102,14 +116,41 @@ export const continueAccountWipe = async () => {
   }
 };
 
-/** Signs out of Clerk, then forgets the marker: the last thing a wipe does. */
+const SIGN_OUT_MS = 8_000;
+
+// WARNING: the key Clerk's Expo client saves its session under; it isn't exported.
+const CLERK_CLIENT_KEY = "__clerk_client_jwt";
+
+const signOutOfClerk = async () => {
+  if (!clerkPublishableKey) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    await Promise.race([
+      clerk().signOut(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Sign-out timed out")), SIGN_OUT_MS);
+      }),
+    ]);
+  } catch {
+    await tokenCache?.clearToken?.(CLERK_CLIENT_KEY);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+ * Signs out of Clerk, then forgets the marker: the last thing a wipe does. Clerk can't always
+ * answer, offline or once its user is deleted, so a refused or silent sign-out falls back to
+ * deleting the saved session, which the restart then finds gone.
+ */
 export const finishAccountWipe = async () => {
   const active = read();
 
   if (active?.stage !== "signing_out") return;
 
   try {
-    if (clerkPublishableKey) await clerk().signOut();
+    await signOutOfClerk();
     deviceWipe.finish();
     set({ wipe: active.wipe, stage: "done" });
   } catch {

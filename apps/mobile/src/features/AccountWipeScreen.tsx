@@ -4,7 +4,6 @@ import { Platform, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Text } from "../components/ui/Text";
-import { useAccount } from "../lib/account";
 import { continueAccountWipe, finishAccountWipe, type AccountWipe } from "../lib/accountDeletion";
 
 const status = {
@@ -25,16 +24,13 @@ const appleSteps =
  * button that restarts the app signed out, on Play.
  */
 export function AccountWipeScreen({ wipe: { wipe, stage } }: { wipe: AccountWipe }) {
-  const account = useAccount();
-  const signedOutReady = !account.available || account.isLoaded;
-
   useEffect(() => {
     if (stage === "waiting") void continueAccountWipe();
   }, [stage]);
 
   useEffect(() => {
-    if (stage === "signing_out" && signedOutReady) void finishAccountWipe();
-  }, [stage, signedOutReady]);
+    if (stage === "signing_out") void finishAccountWipe();
+  }, [stage]);
 
   if (stage === "done") {
     return (
@@ -42,8 +38,8 @@ export function AccountWipeScreen({ wipe: { wipe, stage } }: { wipe: AccountWipe
         <Text accessibilityRole="header" className="type-headline text-ink">
           Account deleted
         </Text>
-        <Text className="text-lg text-muted">{status[wipe.status]}</Text>
-        {wipe.appleManual ? <Text className="text-lg text-muted">{appleSteps}</Text> : null}
+        <Text className="type-body text-muted">{status[wipe.status]}</Text>
+        {wipe.appleManual ? <Text className="type-body text-muted">{appleSteps}</Text> : null}
         <Button label="Done" variant="primary" size="lg" onPress={() => void reloadAppAsync()} />
       </View>
     );
@@ -55,7 +51,7 @@ export function AccountWipeScreen({ wipe: { wipe, stage } }: { wipe: AccountWipe
         <Text accessibilityRole="header" className="type-headline text-ink">
           Couldn't finish clearing this phone
         </Text>
-        <Text className="text-lg text-muted">
+        <Text className="type-body text-muted">
           Your account is deleted, but some of its data is still here. Try again.
         </Text>
         <Button
@@ -70,7 +66,7 @@ export function AccountWipeScreen({ wipe: { wipe, stage } }: { wipe: AccountWipe
 
   return (
     <View className="flex-1 items-center justify-center bg-canvas px-6">
-      <Text accessibilityLiveRegion="polite" className="text-center text-lg text-ink">
+      <Text accessibilityLiveRegion="polite" className="text-center type-body text-ink">
         Clearing your data from this phone…
       </Text>
     </View>

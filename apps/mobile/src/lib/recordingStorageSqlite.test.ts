@@ -10,6 +10,7 @@ interface SqliteDriver {
   failOpen: boolean;
   failRead: boolean;
   failAfterWrite: boolean;
+  deleteError: Error | undefined;
   beforeCommit: (() => Promise<void>) | undefined;
   connections: Set<{ closeAsync(): Promise<void> }>;
   scopes: string[];
@@ -21,6 +22,7 @@ const driver = vi.hoisted(() => {
     failOpen: false,
     failRead: false,
     failAfterWrite: false,
+    deleteError: undefined,
     beforeCommit: undefined,
     connections: new Set<{ closeAsync(): Promise<void> }>(),
     scopes: [],
@@ -30,6 +32,9 @@ const driver = vi.hoisted(() => {
 });
 
 vi.mock("expo-sqlite", () => ({
+  deleteDatabaseAsync: async () => {
+    if (driver.deleteError) throw driver.deleteError;
+  },
   openDatabaseAsync: async (name: string) => {
     if (driver.failOpen) throw new Error("cannot open");
     const path = join(driver.directory, name);
@@ -89,7 +94,7 @@ vi.mock("expo-sqlite", () => ({
   },
 }));
 
-import { openSQLiteRecordingStorage } from "./recordingStorageSqlite";
+import { deleteRecordingDatabase, openSQLiteRecordingStorage } from "./recordingStorageSqlite";
 import { openRecordingStorage } from "./recordingStorage";
 import { makeRecordingStore, type CachedVenue } from "@stacks/client-runtime/recording";
 import { VenueId } from "@stacks/contracts";
@@ -99,6 +104,7 @@ beforeEach(() => {
   driver.failOpen = false;
   driver.failRead = false;
   driver.failAfterWrite = false;
+  driver.deleteError = undefined;
   driver.beforeCommit = undefined;
   driver.scopes = [];
 });
@@ -412,4 +418,17 @@ it("exposes an unsupported saved document without replacing history", async () =
   expect(refused.getSnapshot()).toMatchObject({ state: null, status: "load_failed" });
   expect(await storage.load()).toEqual({ revision: saved.revision + 1, payload: future });
   await refused.close();
+});
+
+it("deletes the device ledger's file, counting one that's already gone as deleted", async () => {
+  await expect(deleteRecordingDatabase()).resolves.toBeUndefined();
+
+  driver.deleteError = new Error("Database color-up-recording.db not found");
+  await expect(deleteRecordingDatabase()).resolves.toBeUndefined();
+});
+
+it("reports a delete that fails for any other reason", async () => {
+  driver.deleteError = new Error("The file is locked");
+
+  await expect(deleteRecordingDatabase()).rejects.toThrow("The file is locked");
 });

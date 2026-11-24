@@ -30,7 +30,7 @@ vi.mock("expo-file-system", () => ({
 
 vi.mock("react-native", () => ({ Platform: { OS: "ios" }, AppState: {} }));
 
-import { outboxStorage } from "./outbox";
+import { deleteOutbox, outboxStorage } from "./outbox";
 import { lastTripStorage } from "./tripStorage";
 
 beforeEach(() => files.clear());
@@ -59,4 +59,15 @@ it("saves and clears the last trip before returning, isolated by user", () => {
   expect(lastTripStorage("alice").load()).toBe("trip-two");
   storage.save(null);
   expect(lastTripStorage("alice").load()).toBeNull();
+});
+
+it("keeps a deleted outbox deleted when a send already in flight saves afterwards", () => {
+  const storage = outboxStorage("alice");
+  storage.save("queued entry");
+
+  deleteOutbox("alice");
+  storage.save("[]");
+  outboxStorage("alice").save("[]");
+
+  expect(outboxStorage("alice").load()).toBeNull();
 });

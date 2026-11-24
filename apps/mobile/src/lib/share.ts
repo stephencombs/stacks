@@ -1,4 +1,4 @@
-import { File, Paths } from "expo-file-system";
+import { Directory, File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { PixelRatio, Platform, Share } from "react-native";
 import { captureRef } from "react-native-view-shot";
@@ -22,6 +22,13 @@ export const shareCsv = async (filename: string, csv: string) => {
   }
 
   await Share.share({ title: filename, message: csv, url: file.uri });
+};
+
+/** Deletes the CSV exports `shareCsv` left in cache. */
+export const deleteSharedCsvFiles = () => {
+  for (const entry of new Directory(Paths.cache).list()) {
+    if (entry instanceof File && /^color-up-sessions-.*.csv$/.test(entry.name)) entry.delete();
+  }
 };
 
 const CARD_PIXELS = { width: 1080, height: 1350 } as const;

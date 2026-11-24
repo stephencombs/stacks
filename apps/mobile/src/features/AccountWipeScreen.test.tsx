@@ -3,10 +3,7 @@ import { act, createElement, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
-const mount = async (
-  wipe: AccountWipe,
-  { os = "ios", clerkLoaded = true }: { os?: string; clerkLoaded?: boolean } = {},
-) => {
+const mount = async (wipe: AccountWipe, { os = "ios" }: { os?: string } = {}) => {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const reload = vi.fn();
@@ -20,14 +17,6 @@ const mount = async (
   vi.doMock("../components/ui/Button", () => ({
     Button: ({ label, onPress }: { label: string; onPress: () => void }) =>
       createElement("button", { onClick: onPress }, label),
-  }));
-  vi.doMock("../lib/account", () => ({
-    useAccount: () => ({
-      available: true,
-      isLoaded: clerkLoaded,
-      isSignedIn: true,
-      userId: "user_alice",
-    }),
   }));
   vi.doMock("../lib/accountDeletion", () => ({
     continueAccountWipe: continueWipe,
@@ -62,16 +51,12 @@ const wipe = (stage: AccountWipe["stage"], overrides: Partial<AccountWipe["wipe"
 
 afterEach(() => vi.unstubAllGlobals());
 
-it("starts a wipe that is waiting, and signs out only once Clerk has loaded", async () => {
+it("starts a wipe that is waiting, and signs out once the files are gone", async () => {
   const waiting = await mount(wipe("waiting"));
 
   expect(waiting.continueWipe).toHaveBeenCalledTimes(1);
   expect(waiting.text()).toContain("Clearing your data from this phone");
   await waiting.unmount();
-
-  const early = await mount(wipe("signing_out"), { clerkLoaded: false });
-  expect(early.finishWipe).not.toHaveBeenCalled();
-  await early.unmount();
 
   const ready = await mount(wipe("signing_out"));
   expect(ready.finishWipe).toHaveBeenCalledTimes(1);
