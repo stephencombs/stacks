@@ -6,6 +6,7 @@ import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
 import { useAction, useStacks } from "../lib/stacks";
+import { ChooseFromContacts } from "./ChooseFromContacts";
 
 export function AddGuestSheet({
   detail,
@@ -64,6 +65,13 @@ export function AddGuestSheet({
         maxLength={60}
         autoFocus
         error={nameError}
+      />
+      <ChooseFromContacts
+        onName={(picked) => {
+          setName(picked);
+          setNameError(null);
+        }}
+        onError={setNameError}
       />
       {add.error ? <FormError>{add.error}</FormError> : null}
     </Sheet>

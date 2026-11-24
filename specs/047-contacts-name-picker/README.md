@@ -1,13 +1,18 @@
 ---
-status: draft
+status: in-progress
 created: 2026-11-24
 priority: medium
 tags:
-- mobile
-- ios
-- android
+  - mobile
+  - ios
+  - android
 created_at: 2026-11-24T03:28:45.528384700Z
-updated_at: 2026-11-24T03:28:45.528384700Z
+updated_at: 2026-11-24T04:56:28.882348500Z
+transitions:
+  - status: planned
+    at: 2026-11-24T04:56:28.196786600Z
+  - status: in-progress
+    at: 2026-11-24T04:56:28.882348500Z
 ---
 
 # Pick players from Contacts
