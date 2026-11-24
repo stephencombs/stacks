@@ -17,3 +17,5 @@ need no doc change; follow the [documentation rules](../AGENTS.md#documentation)
   what the native flow does and doesn't return
 - [Legacy migration](./internals/legacy-migration.md): how the Group-bound ledger maps to the player
   model, and what the preflight flags
+- [Account deletion](./internals/account-deletion.md): what a deleted account leaves behind (the audit
+  user and actor, a detached table player, pinned attribution) and the rule for new user columns

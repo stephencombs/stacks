@@ -17,6 +17,8 @@
   // repeated there; `migrations` is inherited, and a Durable Object migration can't be undone.
   "durable_objects": { "bindings": [{ "name": "SCOPE_CHANNEL", "class_name": "ScopeChannel" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ScopeChannel"] }],
+  // Finishes deleting the Clerk user of any account whose request couldn't (`Account.retryClerkDeletions`).
+  "triggers": { "crons": ["*/15 * * * *"] },
   "env": {
     // API Worker used by native builds.
     "development": {
@@ -26,6 +28,7 @@
       "durable_objects": {
         "bindings": [{ "name": "SCOPE_CHANNEL", "class_name": "ScopeChannel" }],
       },
+      "triggers": { "crons": ["*/15 * * * *"] },
       // Link hosts, one per build: { host, scheme, appleAppId ("<TeamID>.<bundleId>"),
       // androidPackage, androidSha256: [...] }. Empty until the product domain is registered; then
       // fill it and add each host to "routes" as a custom domain.

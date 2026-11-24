@@ -5,6 +5,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { GroupId } from "@stacks/contracts";
 
 import * as Access from "./Access.ts";
+import { DELETED_ACTOR } from "./AccountFence.ts";
 
 const blocking = ["live_session", "broken_correction", "invalid_audit", "unsafe_amount"] as const;
 
@@ -184,7 +185,7 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       insert into players (id, group_id, display_name, user_id, created_by, recording_actor_id)
       select gen_random_uuid(), null, u.display_name, u.id, u.id, gen_random_uuid()
       from users u
-      where not exists (
+      where u.id <> 'deleted-account' and not exists (
         select 1 from players own where own.user_id = u.id and own.recording_actor_id is not null
       )
         and (
@@ -249,7 +250,8 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
         created_at, voided_at, voided_by, void_reason, replaces_entry_id, counterparty_id)
       select e.id, ${sql.literal(participationId("e.session_id", "e.player_id"))},
         e.kind::text::play_entry_kind, e.amount, e.occurred_at, e.note,
-        made.recording_actor_id, e.created_at, e.voided_at, undone.recording_actor_id,
+        coalesce(made.recording_actor_id, ${DELETED_ACTOR}::uuid), e.created_at, e.voided_at,
+        coalesce(undone.recording_actor_id, case when e.voided_at is not null then ${DELETED_ACTOR}::uuid end),
         e.void_reason, e.replaces_entry_id, e.counterparty_id
       from entries e
       ${actor("made", "e.created_by")}

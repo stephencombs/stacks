@@ -293,6 +293,7 @@ export const makeStacksClient = ({ baseUrl, getToken, origin }: StacksClientOpti
       StacksClient.query("sessions", "get", { params: { sessionId }, ...keys }),
     invites: (groupId: GroupId) =>
       StacksClient.query("invites", "list", { params: { groupId }, ...keys }),
+    accountDeletionPreview: StacksClient.query("account", "deletionPreview", keys),
     invitePreview: (code: string) =>
       StacksClient.query("invites", "preview", { params: { code }, ...keys }),
     claimPreview: (code: string) =>

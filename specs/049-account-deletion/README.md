@@ -164,7 +164,7 @@ player goes back to being a guest, and keeps the name and ledger rows.
 
 ## Requirements
 
-- [ ] **Failing test first** (`Account.test.ts`, with `users(...)` from
+- [x] **Failing test first** (`Account.test.ts`, with `users(...)` from
       `apps/api/src/testing/fixtures.test-utils.ts`). Alice and Bob share a group, a trip with a
       table and an absence, a shared table Alice started with an appointed recorder, a stake, an
       open balance, and a voided entry. Alice also has a solo table and a solo group. Delete
@@ -175,16 +175,16 @@ player goes back to being a guest, and keeps the name and ledger rows.
   - Her group player is a claimable guest named "Alice", and her table player is detached.
   - The recorder can still record at her table, and its share link no longer works.
   - Bob sends the claim link, and a new account claims it.
-- [ ] **Migration `0025_account_deletion`.** Adds the audit user and actor,
+- [x] **Migration `0025_account_deletion`.** Adds the audit user and actor,
       `personal_visits.group_player_id`, `account_deletions`, the trigger guard, and the relaxed
       `players_kind`.
-- [ ] **Contracts.**
+- [x] **Contracts.**
   - `GET /account/deletion-preview` returns solo groups to delete, ownership moves with the new
     owner, open balances and stakes, and whether Apple is linked.
   - `POST /account/delete` takes an optional Apple `authorizationCode`, and returns `pending` or
     `complete`.
   - Errors are typed.
-- [ ] **Server.** `Account.ts` with `Account.preview` and `Account.delete`, thin handlers, the
+- [x] **Server.** `Account.ts` with `Account.preview` and `Account.delete`, thin handlers, the
       fence in both auth layers, the cron retry, the Apple revoke, and the after-commit realtime.
 - [ ] **Mobile: You.** On both platforms, Sign out and Delete account sit together in an account
       `SettingsGroup`. On Android they move out of the sheet footer.
@@ -212,17 +212,17 @@ player goes back to being a guest, and keeps the name and ledger rows.
 - [ ] **Disclosures.** The privacy policy, App Store privacy details, Play Data safety and App
       Review notes cover what is deleted, what friends keep and why, how long, and how to ask for
       the name to be removed.
-- [ ] **Docs.** A short `docs/internals/` note: why a deleted account becomes a guest, the audit
+- [x] **Docs.** A short `docs/internals/` note: why a deleted account becomes a guest, the audit
       user and actor, the trigger guard, and the rule that any new user or player column needs a
       deletion rule.
 
 ## Tests
 
-- [ ] Every foreign key that references `users`, `players` or `recording_actors` has a deletion
+- [x] Every foreign key that references `users`, `players` or `recording_actors` has a deletion
       rule. A test reads them from `information_schema`, so a new key fails until it's handled.
-- [ ] A test covers both a native table and an imported legacy table, with replay after deletion.
-- [ ] Ownership moves to an admin first, then a member.
-- [ ] Each of these is safe: a lost response, a failed Clerk call that the cron later finishes, a
+- [x] A test covers both a native table and an imported legacy table, with replay after deletion.
+- [x] Ownership moves to an admin first, then a member.
+- [x] Each of these is safe: a lost response, a failed Clerk call that the cron later finishes, a
       stale token used after deletion (rejected), a duplicate request, and Clerk's "not found".
 - [ ] The device wipe is safe to repeat, and resumes after the app is killed partway.
 - [ ] Component: the sheet's states, and the Apple-cancelled path that shows manual removal steps.

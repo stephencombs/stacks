@@ -97,6 +97,7 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
 
   const groupId = yield* Realtime.transaction(
     Effect.gen(function* () {
+      yield* Access.lockGroup((yield* findClaim(code)).groupId);
       const guest = yield* findClaim(code, true);
 
       if (guest.alreadyMember) return yield* new Conflict({ reason: "claim_already_member" });
@@ -134,10 +135,13 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
         select group_id, user_id, left_at, now() from memberships
         where group_id = ${guest.groupId} and user_id = ${userId} and left_at is not null
       `;
+      const role = yield* Access.joiningRole(guest.groupId);
+
       yield* sql`
         insert into memberships (group_id, user_id, role)
-        values (${guest.groupId}, ${userId}, 'member')
-        on conflict (group_id, user_id) do update set left_at = null
+        values (${guest.groupId}, ${userId}, ${role})
+        on conflict (group_id, user_id) do update
+          set left_at = null, role = ${role}, joined_at = now()
           where memberships.left_at is not null
       `;
       yield* Realtime.changed(groupScope(guest.groupId));

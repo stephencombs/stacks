@@ -216,42 +216,54 @@ const memberGone = Effect.fn("Groups.memberGone")(function* (groupId: GroupId, u
   yield* Recording.memberGone(groupId, userId);
 });
 
+const locked = <A, E, R>(groupId: GroupId, decide: Effect.Effect<A, E, R>) =>
+  Realtime.transaction(
+    Effect.gen(function* () {
+      yield* Access.lockGroup(groupId);
+
+      return yield* decide;
+    }),
+  );
+
 export const leave = Effect.fn("Groups.leave")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
-  const member = yield* Access.membership(groupId);
 
-  if (member.role === "owner") {
-    const [others] = yield* sql`
-      select count(*)::int as count from memberships
-      where group_id = ${groupId} and user_id <> ${userId} and left_at is null
-    `.pipe(Effect.flatMap(Access.decodeRows(Schema.Struct({ count: Schema.Int }))));
+  yield* locked(
+    groupId,
+    Effect.gen(function* () {
+      const member = yield* Access.membership(groupId);
 
-    if (others!.count > 0) return yield* new Conflict({ reason: "last_owner" });
-  }
+      if (member.role === "owner") {
+        const [others] = yield* sql`
+          select count(*)::int as count from memberships
+          where group_id = ${groupId} and user_id <> ${userId} and left_at is null
+        `.pipe(Effect.flatMap(Access.decodeRows(Schema.Struct({ count: Schema.Int }))));
 
-  yield* depart(groupId, userId);
+        if (others!.count > 0) return yield* new Conflict({ reason: "last_owner" });
+      }
+
+      yield* depart(groupId, userId);
+    }),
+  );
 
   return ok;
 });
 
-const depart = (groupId: GroupId, userId: UserId) =>
-  Realtime.transaction(
-    Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
+const depart = Effect.fn("Groups.depart")(function* (groupId: GroupId, userId: UserId) {
+  const sql = yield* SqlClient.SqlClient;
 
-      const gone = yield* sql`
-        update memberships set left_at = now()
-        where group_id = ${groupId} and user_id = ${userId} and left_at is null
-        returning user_id
-      `;
+  const gone = yield* sql`
+    update memberships set left_at = now()
+    where group_id = ${groupId} and user_id = ${userId} and left_at is null
+    returning user_id
+  `;
 
-      if (gone.length > 0) {
-        yield* Realtime.changed(groupScope(groupId));
-        yield* memberGone(groupId, userId);
-      }
-    }),
-  );
+  if (gone.length > 0) {
+    yield* Realtime.changed(groupScope(groupId));
+    yield* memberGone(groupId, userId);
+  }
+});
 
 const activeMember = Effect.fn("Groups.activeMember")(function* (groupId: GroupId, userId: UserId) {
   const sql = yield* SqlClient.SqlClient;
@@ -276,15 +288,21 @@ export const removeMember = Effect.fn("Groups.removeMember")(function* (
   const { userId } = yield* CurrentUser;
 
   if (targetUserId === userId) return yield* leave(groupId);
-  const member = yield* Access.membership(groupId);
-  yield* Access.requireAdmin(member);
-  const target = yield* activeMember(groupId, targetUserId);
 
-  if (target.role === "owner" || (target.role === "admin" && member.role !== "owner")) {
-    return yield* new Forbidden({ reason: "owner_only" });
-  }
+  yield* locked(
+    groupId,
+    Effect.gen(function* () {
+      const member = yield* Access.membership(groupId);
+      yield* Access.requireAdmin(member);
+      const target = yield* activeMember(groupId, targetUserId);
 
-  yield* depart(groupId, targetUserId);
+      if (target.role === "owner" || (target.role === "admin" && member.role !== "owner")) {
+        return yield* new Forbidden({ reason: "owner_only" });
+      }
+
+      yield* depart(groupId, targetUserId);
+    }),
+  );
 
   return ok;
 });
@@ -296,18 +314,26 @@ export const setRole = Effect.fn("Groups.setRole")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
-  yield* Access.requireOwner(yield* Access.membership(groupId));
 
-  if (targetUserId === userId) return yield* new Conflict({ reason: "last_owner" });
-  yield* activeMember(groupId, targetUserId);
+  yield* locked(
+    groupId,
+    Effect.gen(function* () {
+      yield* Access.requireOwner(yield* Access.membership(groupId));
 
-  const changed = yield* sql`
-    update memberships set role = ${request.role}
-    where group_id = ${groupId} and user_id = ${targetUserId} and role <> ${request.role}
-    returning user_id
-  `;
+      if (targetUserId === userId) return yield* new Conflict({ reason: "last_owner" });
+      const target = yield* activeMember(groupId, targetUserId);
 
-  if (changed.length > 0) yield* Realtime.changed(groupScope(groupId));
+      if (target.role === "owner") return yield* new Forbidden({ reason: "owner_only" });
+
+      const changed = yield* sql`
+        update memberships set role = ${request.role}
+        where group_id = ${groupId} and user_id = ${targetUserId} and role <> ${request.role}
+        returning user_id
+      `;
+
+      if (changed.length > 0) yield* Realtime.changed(groupScope(groupId));
+    }),
+  );
 
   return ok;
 });
