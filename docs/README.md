@@ -13,5 +13,7 @@ need no doc change; follow the [documentation rules](../AGENTS.md#documentation)
   module on iOS instead of a library search bar
 - [Claiming guest history](./internals/claims.md): how a guest's players link to an account, and
   the two claim paths that stay apart
+- [Sign in with Apple](./internals/apple-sign-in.md): the Apple and Clerk setup per bundle ID, and
+  what the native flow does and doesn't return
 - [Legacy migration](./internals/legacy-migration.md): how the Group-bound ledger maps to the player
   model, and what the preflight flags

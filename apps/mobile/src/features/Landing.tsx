@@ -22,12 +22,15 @@ import { cn } from "../components/ui/cn";
 import { Icon } from "../components/ui/Icon";
 import { useScreenFoot } from "../components/ui/tabBar";
 import { animate, ease, useReducedMotion } from "../components/ui/motion";
+import { AppleSignInButton, useAppleSignInAvailable } from "./AppleSignInButton";
 import { OnboardingChart } from "./OnboardingChart";
 import { SignInButton } from "./SignInButton";
 
 const SHIFT_MS = 250;
 
 const FRAME = 440;
+
+const APPLE_ROOM = 64;
 
 const steps = [
   {
@@ -124,7 +127,10 @@ export function Landing({
   const reduceMotion = useReducedMotion();
   const [bodyHeight, setBodyHeight] = useState(0);
   const [pageHeight, setPageHeight] = useState(0);
+  const apple = useAppleSignInAvailable();
   const compact = bodyHeight > 0 && bodyHeight < 675;
+  const accountRoom = apple ? APPLE_ROOM : 0;
+  const accountCompact = bodyHeight > 0 && bodyHeight < 675 + accountRoom;
   const last = index === steps.length - 1;
 
   useEffect(() => {
@@ -359,14 +365,19 @@ export function Landing({
                   pointerEvents={account ? "auto" : "none"}
                 >
                   <View className={cn("flex-1 gap-3 px-6 pb-2", invited ? "justify-end" : "pt-4")}>
-                    {!invited && bodyHeight >= 530 ? (
-                      <OnboardingChart page={3} compact={compact} />
+                    {!invited && bodyHeight >= 530 + accountRoom ? (
+                      <OnboardingChart page={3} compact={accountCompact} />
                     ) : null}
-                    <DisplayTitle compact={compact}>{copy.title}</DisplayTitle>
+                    <DisplayTitle compact={accountCompact}>{copy.title}</DisplayTitle>
                     <StepBody>{copy.body}</StepBody>
                   </View>
                   <View className="gap-3 px-6" style={{ paddingBottom: clearance + 16 }}>
-                    <SignInButton mode="sign-up" label="Create an account" variant="primary" />
+                    <AppleSignInButton />
+                    <SignInButton
+                      mode="sign-up"
+                      label="Create an account"
+                      variant={apple ? "secondary" : "primary"}
+                    />
                     <SignInButton mode="sign-in" label="Sign in" variant="secondary" />
                     {onRecord ? (
                       <Button
