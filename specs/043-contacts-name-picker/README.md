@@ -10,7 +10,7 @@ created_at: 2026-11-24T03:28:45.528384700Z
 updated_at: 2026-11-24T03:28:45.528384700Z
 ---
 
-# Pick a player's name from Contacts
+# Pick players from Contacts
 
 ## Overview
 
@@ -62,6 +62,29 @@ asking for any contacts permission.
       `displayName` is the only field that comes from the contact.
 - [ ] Device, on a fresh install on iOS and Android: picking fills the name with no permission
       prompt, and the merged Android manifest has neither `READ_CONTACTS` nor `WRITE_CONTACTS`.
+
+## Phase 2: contact photos on this device
+
+Players show as coloured initials (`Chip`) everywhere. Phase 2 lets each person see a friend's
+photo from their own address book, the way Flighty puts faces on friends. Phase 1 ships first and
+doesn't wait for this.
+
+- **Local only.** Picking a contact for a player also stores its photo thumbnail on this device,
+  keyed by player ID. The photo is never uploaded or sent. Each friend sees the photo from their
+  own address book, or initials if they never linked one.
+- **Linking.** Pick a contact when you add a player, or use "Link contact" on an existing player.
+  "Unlink" removes the photo from this device. With no contacts permission, the app can't match
+  players to contacts by itself, so each person picks once.
+- **Lasts through changes.** The link uses the player ID, so it survives renames, claims, and the
+  account deletion in spec 045, which turns a member back into a guest.
+- **The module returns `{ name, photo }`.** The photo is a small JPEG written to app storage, or
+  `null`. Check on a device whether the picker's grant gives access to the photo: on iOS
+  through `thumbnailImageData` on the snapshot, and on Android through the photo for the granted
+  URI. Where it doesn't, that platform falls back to initials.
+- **Where photos show.** Everywhere a player `Chip` appears, with initials as the fallback when
+  there is no photo or it fails to load.
+- **Signing out and wiping.** Linked photos are part of the device's local data. Signing out and
+  deleting an account (spec 045) clear them.
 
 ## Non-goals
 
