@@ -121,6 +121,8 @@ Every amount goes through `Money`, the hero figures included, except the compact
 
 A player's identity: `chip` comes from `chipOf(group, playerId)`. Pair it with the player's name. Use `28×28px` (`rounded-lg` monogram/color badge) in mobile feed and breakdown rows, and smaller in dense lists and awards.
 
+Use `PlayerChip` for a person, so a photo linked to them on this phone shows in a 2px ring in their chip color (1.5px under 26pt) and fails back to their initial. At a table, `TableChip` does the same with a color from `tableChipOf(playerId)`, because a table has no group to number its players: 32pt on iOS, a 36pt ring on Android. A venue's chip, a race-chart endpoint and a share card use plain `Chip` and never get a photo.
+
 ## Page actions
 
 On phones, keep a live session's Buy in / Rebuy and Cash out above the places, labeled with the player they affect. Keep Undo separate and above the buttons so a second tap still rebuys.

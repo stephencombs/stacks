@@ -24,6 +24,7 @@ import { cn } from "../components/ui/cn";
 import { Sheet } from "../components/ui/Sheet";
 import { Badge, List, Row } from "../components/ui/Surface";
 import { Chip } from "./Chip";
+import { PlayerChip } from "./PlayerChip";
 import { chipColor } from "./chipColor";
 
 function TableSummarySheet({
@@ -76,7 +77,12 @@ function TableSummarySheet({
 
             return (
               <Row key={playerId}>
-                <Chip chip={chipOf(detail, playerId)} name={name} size={28} />
+                <PlayerChip
+                  playerId={playerId}
+                  chip={chipOf(detail, playerId)}
+                  name={name}
+                  size={28}
+                />
                 <View className="flex-1 gap-0.5">
                   <Text numberOfLines={1} className="type-heading text-ink">
                     {name}

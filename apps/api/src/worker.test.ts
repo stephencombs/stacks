@@ -51,7 +51,18 @@ const start = async () => {
           },
           migrations: [{ tag: "v1", new_sqlite_classes: ["ProbedScopeChannel"] }],
         },
-        vars: { CLERK_JWT_KEY: clerkJwtKey },
+        vars: {
+          CLERK_JWT_KEY: clerkJwtKey,
+          LINK_SITES: [
+            {
+              host: "links.colorup.test",
+              scheme: "stacks-preview",
+              appleAppId: "TEAMID1234.com.example.colorup.preview",
+              androidPackage: "com.example.colorup.preview",
+              androidSha256: ["AA:BB"],
+            },
+          ],
+        },
       },
     ],
   });
@@ -463,3 +474,52 @@ it.layer(TestApi.layer)("the Worker", (it) => {
     }),
   );
 });
+
+const linkGet = (host: string, path: string) =>
+  new Promise<{ readonly status: number; readonly type: string; readonly body: string }>(
+    (resolve, reject) => {
+      const attempt = request(`${workerd.origin}${path}`, { headers: { host } });
+      attempt.on("error", reject);
+
+      attempt.on("response", (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk: string) => (body += chunk));
+
+        response.on("end", () =>
+          resolve({
+            status: response.statusCode ?? 0,
+            type: String(response.headers["content-type"]),
+            body,
+          }),
+        );
+      });
+
+      attempt.end();
+    },
+  );
+
+it.effect("serves the link pages and association files before opening the database", () =>
+  Effect.gen(function* () {
+    const page = yield* Effect.promise(() => linkGet("links.colorup.test", "/join"));
+
+    const apple = yield* Effect.promise(() =>
+      linkGet("links.colorup.test", "/.well-known/apple-app-site-association"),
+    );
+
+    expect(page.status).toBe(200);
+    expect(page.type).toBe("text/html; charset=utf-8");
+    expect(page.body).toContain("Join a group on Color Up");
+    expect(apple.status).toBe(200);
+    expect(apple.type).toBe("application/json");
+    expect(apple.body).toContain("TEAMID1234.com.example.colorup.preview");
+  }),
+);
+
+it.effect("leaves other hosts' link paths to the API", () =>
+  Effect.gen(function* () {
+    const other = yield* Effect.promise(() => linkGet("colorup.workers.dev", "/join"));
+
+    expect(other.status).not.toBe(200);
+  }),
+);

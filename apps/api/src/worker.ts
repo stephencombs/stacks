@@ -15,6 +15,7 @@ import * as Database from "./db/Database.ts";
 import * as Account from "./features/Account.ts";
 import * as Realtime from "./features/Realtime.ts";
 import * as Api from "./http/Api.ts";
+import * as Links from "./links/Links.ts";
 import { ScopeChannel } from "./realtime/ScopeChannel.ts";
 import * as Upgrade from "./realtime/Upgrade.ts";
 
@@ -40,6 +41,7 @@ const { handler } = HttpRouter.toWebHandler(
 interface Env {
   readonly HYPERDRIVE: Hyperdrive;
   readonly SCOPE_CHANNEL: DurableObjectNamespace<ScopeChannel>;
+  readonly LINK_SITES?: ReadonlyArray<Links.LinkSite>;
 }
 
 const handleRequest = (request: Request, env: Env, ctx: ExecutionContext) =>
@@ -92,6 +94,8 @@ const retryClerkDeletions = (env: Env) =>
   );
 
 export default {
-  fetch: (request, env, ctx) => Effect.runPromise(handleRequest(request, env, ctx)),
+  fetch: async (request, env, ctx) =>
+    Links.respond(request, env.LINK_SITES) ??
+    (await Effect.runPromise(handleRequest(request, env, ctx))),
   scheduled: (_controller, env, ctx) => ctx.waitUntil(Effect.runPromise(retryClerkDeletions(env))),
 } satisfies ExportedHandler<Env>;

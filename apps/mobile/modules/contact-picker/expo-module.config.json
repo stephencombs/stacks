@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ContactPickerModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.contactpicker.ContactPickerModule"]
+  }
+}

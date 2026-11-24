@@ -55,7 +55,9 @@ import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { useRecordingState } from "../lib/recording";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
-import { Chip } from "./Chip";
+import { TableChip } from "./PlayerChip";
+import { useContactPhotoDraft } from "./ContactPhoto";
+import { ChooseFromContacts } from "./ChooseFromContacts";
 import { CasinoPickerSheet } from "./VenuePicker";
 import { AmountFeedback } from "./AmountFeedback";
 import { applyAmountKey } from "./amountKey";
@@ -1616,6 +1618,7 @@ export function AddPlayerSheet({
   const [choice, setChoice] = useState<string>(NEW_PLAYER);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+  const photo = useContactPhotoDraft();
   const savedNames = tellApart(saved.map((player) => player.displayName));
 
   const chosen =
@@ -1624,6 +1627,11 @@ export function AddPlayerSheet({
       : (saved.find((player) => player.id === choice)?.displayName ?? "");
 
   const typed = parseRecordingAmount(amount.text, 1);
+
+  const pickName = (picked: string) => {
+    setName(picked);
+    setNameError(null);
+  };
 
   const submitSaved = async (playerId: PlayerId, label: string) => {
     const value = amount.read();
@@ -1654,7 +1662,10 @@ export function AddPlayerSheet({
           : "Add player"
       }
       save={save}
-      onClose={onClose}
+      onClose={() => {
+        photo.drop();
+        onClose();
+      }}
       onSubmit={async () => {
         const isNew = Platform.OS === "android" || choice === NEW_PLAYER;
         const trimmed = name.trim();
@@ -1669,7 +1680,10 @@ export function AddPlayerSheet({
             : { type: "join_table", tableId, playerId: choice as PlayerId, buyIn: value },
         );
 
-        if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId, chosen);
+        if (receipt?.command.type === "join_table") {
+          if (isNew && receipt.command.playerId) photo.commit(receipt.command.playerId);
+          onAdded(receipt.command.visitId, chosen);
+        }
       }}
     >
       {Platform.OS === "android" ? (
@@ -1704,6 +1718,7 @@ export function AddPlayerSheet({
               </View>
             ) : null}
           </View>
+          <ChooseFromContacts onName={pickName} onError={setNameError} photo={photo} />
           <View className="gap-1.5">
             <View
               className={cn(
@@ -1745,7 +1760,7 @@ export function AddPlayerSheet({
 
                   return (
                     <Row key={player.id}>
-                      <Chip chip={(index % 8) + 1} name={label} size={36} ring />
+                      <TableChip playerId={player.id} name={label} />
                       <Text numberOfLines={1} className="min-w-0 flex-1 type-body text-ink">
                         {label}
                       </Text>
@@ -1782,8 +1797,15 @@ export function AddPlayerSheet({
               maxLength={60}
               autoComplete="off"
               error={nameError}
-              onChangeText={setName}
+              onChangeText={(next) => {
+                setName(next);
+
+                if (nameError && next.trim()) setNameError(null);
+              }}
             />
+          ) : null}
+          {choice === NEW_PLAYER ? (
+            <ChooseFromContacts onName={pickName} onError={setNameError} photo={photo} />
           ) : null}
           <TypedAmount label="Buy-in" amount={amount} />
         </>
