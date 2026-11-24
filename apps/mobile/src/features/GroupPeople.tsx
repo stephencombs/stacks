@@ -33,7 +33,8 @@ const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 /** Everyone in the group: members and their roles, guests, invite links, and who left. */
 export function GroupPeople({ detail }: { detail: GroupDetail }) {
   const [action, setAction] = useState<"invite" | "guest" | null>(null);
-  const [opened, setOpened] = useState<Player | null>(null);
+  const [openedId, setOpenedId] = useState<Player["id"] | null>(null);
+  const opened = detail.players.find((player) => player.id === openedId);
   const android = Platform.OS === "android";
   const { userId } = useAuth();
   const members = detail.players.filter((player) => player.role !== null);
@@ -47,7 +48,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
   const open = (player: Player) =>
     player.id === detail.myPlayerId
       ? {}
-      : { onPress: () => setOpened(player), accessibilityHint: "Opens their details" };
+      : { onPress: () => setOpenedId(player.id), accessibilityHint: "Opens their details" };
 
   const memberRows = members.map((player) => (
     <Row key={player.id} {...open(player)}>
@@ -170,7 +171,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
           detail={detail}
           player={opened}
           viewer={{ role: detail.role, userId }}
-          onClose={() => setOpened(null)}
+          onClose={() => setOpenedId(null)}
         />
       ) : null}
     </>

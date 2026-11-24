@@ -1,6 +1,6 @@
 import type { PlayerId } from "@stacks/contracts";
 import { useState } from "react";
-import { Image, View } from "react-native";
+import { Image, Platform, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
 import { Text } from "../components/ui/Text";
@@ -105,7 +105,9 @@ export function ContactPhotoControls({
   name: string;
 }) {
   const uri = useContactPhoto(playerId);
-  const available = useContactPhotosAvailable();
+  const offered = useContactPhotosAvailable();
+  // WARNING: Android's Contacts provider refuses photo reads without READ_CONTACTS (seen on a Pixel).
+  const available = Platform.OS !== "android" && offered;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 

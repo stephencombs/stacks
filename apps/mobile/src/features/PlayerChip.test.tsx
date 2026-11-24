@@ -68,8 +68,8 @@ const render = async (
     host,
     image: () => host.querySelector("img"),
     initial: () => host.querySelector("[data-initial]")?.textContent ?? null,
-    border: () => {
-      const style = host.querySelector("[data-style]")?.getAttribute("data-style");
+    border: (layer = 1) => {
+      const style = host.querySelectorAll("[data-style]")[layer]?.getAttribute("data-style");
 
       const parsed: { borderWidth?: number; borderColor?: string } | null = style
         ? JSON.parse(style)
@@ -98,6 +98,8 @@ it("draws a linked photo inside a ring in the player's chip color, with no strip
   try {
     expect(view.image()?.getAttribute("src")).toBe("file:///photos/ada.jpg");
     expect(view.border()).toMatchObject({ borderWidth: 2, borderColor: "#999999" });
+    expect(view.border(0)).toMatchObject({ borderWidth: 1 });
+    expect(mocks.variables).toContain("--color-fill-strong");
     expect(mocks.variables).toContain("--color-chip-3");
     expect(view.host.querySelector("svg")).toBeNull();
   } finally {

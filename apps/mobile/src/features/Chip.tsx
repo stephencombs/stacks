@@ -28,11 +28,13 @@ export function Chip({ photoUri, ...props }: ChipProps & { photoUri?: string | n
 
 function PhotoChip({ photoUri, ...props }: ChipProps & { photoUri: string }) {
   const [failed, setFailed] = useState(false);
-  const face = useCSSVariable(`--color-chip-${props.chip}`);
+  const [face, edge] = useCSSVariable([`--color-chip-${props.chip}`, "--color-fill-strong"]);
   const size = props.size ?? 32;
   const border = size < 26 ? 1.5 : 2;
 
   if (failed) return <InitialChip {...props} />;
+
+  const inner = size - 2;
 
   return (
     <View
@@ -42,17 +44,27 @@ function PhotoChip({ photoUri, ...props }: ChipProps & { photoUri: string }) {
         width: size,
         height: size,
         borderRadius: size / 2,
-        borderWidth: border,
-        borderColor: String(face),
+        borderWidth: 1,
+        borderColor: String(edge),
       }}
-      className="overflow-hidden bg-fill"
     >
-      <Image
-        source={{ uri: photoUri }}
-        style={{ width: size - border * 2, height: size - border * 2 }}
-        resizeMode="cover"
-        onError={() => setFailed(true)}
-      />
+      <View
+        style={{
+          width: inner,
+          height: inner,
+          borderRadius: inner / 2,
+          borderWidth: border,
+          borderColor: String(face),
+        }}
+        className="overflow-hidden bg-fill"
+      >
+        <Image
+          source={{ uri: photoUri }}
+          style={{ width: inner - border * 2, height: inner - border * 2 }}
+          resizeMode="cover"
+          onError={() => setFailed(true)}
+        />
+      </View>
     </View>
   );
 }

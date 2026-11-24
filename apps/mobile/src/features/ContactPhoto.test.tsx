@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
   return {
     photo,
     available: { current: true },
+    os: { current: "ios" },
     pick: { current: () => Promise.resolve<PickedContact | null>(null) },
     linked,
     removed,
@@ -22,6 +23,11 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("react-native", () => ({
+  Platform: {
+    get OS() {
+      return mocks.os.current;
+    },
+  },
   Image: () => null,
   View: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
@@ -181,6 +187,19 @@ it("hides the controls once a phone won't share photos, but still lets one be re
     await view.render();
     expect(view.labels()).toEqual(["Remove"]);
   } finally {
+    await view.unmount();
+  }
+});
+
+it("never offers to link a photo on Android, whose Contacts app won't share one", async () => {
+  mocks.os.current = "android";
+  mocks.photo.current = null;
+  const view = await mount();
+
+  try {
+    expect(view.labels()).toEqual([]);
+  } finally {
+    mocks.os.current = "ios";
     await view.unmount();
   }
 });
