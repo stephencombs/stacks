@@ -2,9 +2,9 @@
 status: planned
 created: 2026-11-24
 tags:
-- stats
-- mobile
-- design
+  - stats
+  - mobile
+  - design
 parent: 043-stats-redesign
 created_at: 2026-11-24T03:30:28.451991600Z
 updated_at: 2026-11-24T03:30:28.451991600Z
@@ -27,6 +27,7 @@ The new view leads with how each trip went and what the crew did at the same tab
 It uses `GroupStats.plays`: each finished play's trip, game, venue, start and end, and each group player's `buyIn`, `net` and `milliseconds`. It joins the `GroupDetail.trips` the screen already fetches, for names, order and end dates.
 
 Definitions:
+
 - An **appearance** is one group player at one finished play.
 - Two players **share a table** when both have a result at the same play.
 - A per-appearance average is the sum of signed results ÷ the number of appearances.
@@ -80,6 +81,7 @@ Definitions:
    With Game or Casino applied, rows read "Top in {slice}", not "won".
 
    With an explicit Trip selected, this section shows the existing `groupAwards` instead. Each award gets a floor of 2 or more plays.
+
 6. **Habits, After midnight.**
    - The per-appearance average for plays starting from 00:00 up to 06:00 (`TripClock.hour(startedAt)`), against "other start times". Each side shows its count.
    - The summed late Result is shown on the right.

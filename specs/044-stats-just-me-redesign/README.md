@@ -2,9 +2,9 @@
 status: planned
 created: 2026-11-24
 tags:
-- stats
-- mobile
-- design
+  - stats
+  - mobile
+  - design
 parent: 043-stats-redesign
 created_at: 2026-11-24T03:30:27.810630600Z
 updated_at: 2026-11-24T03:30:27.810630600Z

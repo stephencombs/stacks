@@ -3,12 +3,12 @@ status: planned
 created: 2026-11-24
 priority: medium
 tags:
-- stats
-- mobile
-- api
-- design
+  - stats
+  - mobile
+  - api
+  - design
 depends_on:
-- '011'
+  - "011"
 created_at: 2026-11-24T03:30:27.095525300Z
 updated_at: 2026-11-24T03:30:27.095525300Z
 ---
