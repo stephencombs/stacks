@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in-progress
 created: 2026-11-24
 priority: medium
 tags:
@@ -8,7 +8,12 @@ tags:
   - ios
   - android
 created_at: 2026-11-24T04:24:14.016967100Z
-updated_at: 2026-11-24T04:38:26.736924Z
+updated_at: 2026-11-24T08:08:26.304972900Z
+transitions:
+  - status: planned
+    at: 2026-11-24T08:08:25.594179700Z
+  - status: in-progress
+    at: 2026-11-24T08:08:26.304972900Z
 ---
 
 # Universal links and rich invite cards

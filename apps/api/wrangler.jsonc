@@ -26,6 +26,10 @@
       "durable_objects": {
         "bindings": [{ "name": "SCOPE_CHANNEL", "class_name": "ScopeChannel" }],
       },
+      // Link hosts, one per build: { host, scheme, appleAppId ("<TeamID>.<bundleId>"),
+      // androidPackage, androidSha256: [...] }. Empty until the product domain is registered; then
+      // fill it and add each host to "routes" as a custom domain.
+      "vars": { "LINK_SITES": [] },
     },
   },
 }

@@ -41,6 +41,7 @@ import { useAppFonts } from "./lib/fonts";
 import { getInitialURL } from "./lib/initialUrl";
 import { isLiquidGlassSupported } from "./lib/liquidGlass";
 import { LiveSessionBridge } from "./lib/liveSessionAdapter";
+import { linkAddress } from "./lib/linkAddress";
 import { oldAddress } from "./lib/oldAddresses";
 import { recordingStore } from "./lib/recording";
 import { ScopeProvider } from "./lib/scope";
@@ -240,7 +241,7 @@ const linking = {
   prefixes: appLinkPrefixes(),
   config: { initialRouteName: "Tabs" as const },
   getStateFromPath: (path: string, options?: Parameters<typeof getStateFromPath>[1]) =>
-    getStateFromPath(oldAddress(path), options),
+    getStateFromPath(oldAddress(linkAddress(path)), options),
   getInitialURL: () =>
     getInitialURL(
       () => Linking.getInitialURL(),

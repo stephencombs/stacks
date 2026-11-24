@@ -4,7 +4,7 @@ import { PixelRatio, Platform, Share } from "react-native";
 import { captureRef } from "react-native-view-shot";
 
 export const shareLink = async (url: string, message: string) => {
-  await Share.share({ message: `${message} ${url}` });
+  await Share.share(Platform.OS === "ios" ? { url, message } : { message: `${message} ${url}` });
 };
 
 export const shareCsv = async (filename: string, csv: string) => {

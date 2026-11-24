@@ -68,7 +68,7 @@ vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
   return 0;
 });
 
-import { shareCsv, shareImage } from "./share";
+import { shareCsv, shareImage, shareLink } from "./share";
 
 beforeEach(() => {
   state.written.clear();
@@ -102,6 +102,22 @@ it("falls back to React Native Share when native file sharing is unavailable", a
     title: "sessions.csv",
     message: "a,b\n",
     url: "file:///cache/sessions.csv",
+  });
+});
+
+it("shares a link on iOS as a url, so the share sheet treats it as one", async () => {
+  await shareLink("https://colorup.test/t#abc", "Follow our table on Color Up:");
+  expect(state.rnShare).toHaveBeenCalledWith({
+    url: "https://colorup.test/t#abc",
+    message: "Follow our table on Color Up:",
+  });
+});
+
+it("shares a link on Android inside the message, which is all it reads", async () => {
+  state.android = true;
+  await shareLink("https://colorup.test/t#abc", "Follow our table on Color Up:");
+  expect(state.rnShare).toHaveBeenCalledWith({
+    message: "Follow our table on Color Up: https://colorup.test/t#abc",
   });
 });
 

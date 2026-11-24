@@ -138,7 +138,11 @@ async function load({
   const dispatch = vi.fn();
 
   type NavigationProps = {
-    linking: { config: { initialRouteName: string }; getInitialURL: () => Promise<string | null> };
+    linking: {
+      config: { initialRouteName: string };
+      getInitialURL: () => Promise<string | null>;
+      getStateFromPath: (path: string) => { opened: string };
+    };
     onReady: () => void;
   };
 
@@ -147,6 +151,7 @@ async function load({
   vi.doMock("@react-navigation/native", () => ({
     DarkTheme: { colors: {}, fonts: {} },
     DefaultTheme: { colors: {}, fonts: {} },
+    getStateFromPath: (path: string) => ({ opened: path }),
     CommonActions: {
       navigate: (payload: {
         readonly name: string;
@@ -395,6 +400,18 @@ it("keeps every address: your play in the first tab, groups in Crew, invites abo
   expect(invites.screens.Join!.linking).toBe("join/:code");
   expect(invites.screens.Claim!.linking).toBe("claim/:code");
 });
+
+it.each(["t", "invite", "join", "claim"])(
+  "opens %s links the same from an https fragment and from the scheme path",
+  async (kind) => {
+    const app = await load();
+    await app.render(createElement(app.App));
+    const { linking } = app.navigation.mock.calls[0]![0];
+
+    expect(linking.getStateFromPath(`/${kind}#abc123`)).toEqual({ opened: `${kind}/abc123` });
+    expect(linking.getStateFromPath(`${kind}/abc123`)).toEqual({ opened: `${kind}/abc123` });
+  },
+);
 
 it.each([
   {
