@@ -120,8 +120,10 @@ the photos.
 - **Android.** The pick grants only the exact URI it returns, and photo sub-URIs often fall
   outside that grant, especially in Samsung's and Xiaomi's Contacts apps. Try
   `openContactPhotoInputStream(cr, uri, false)` and map `SecurityException` to `"unavailable"`.
-  Test on a Pixel and a Samsung. If either blocks it, Android hides the photo controls. Never add
-  `READ_CONTACTS`.
+  Never add `READ_CONTACTS`.
+  - **Decided (2026-11-24):** a Pixel on Android 17 refuses the photo sub-URI without
+    `READ_CONTACTS`. So Android never shows the photo controls, and photos are iOS-only. Android
+    still picks names.
 
 ### UI
 
@@ -157,9 +159,9 @@ the photos.
 
 ### Tests
 
-- [ ] Unit: the index (link, change and remove), the temporary-file sweep, and that sign-out keeps
+- [x] Unit: the index (link, change and remove), the temporary-file sweep, and that sign-out keeps
       photos while account deletion wipes them.
-- [ ] Component: `PlayerChip` falls back to initials, and a venue chip never shows a photo.
+- [x] Component: `PlayerChip` falls back to initials, and a venue chip never shows a photo.
 - [ ] Device: iOS shows a photo with no permission prompt. On Android, a Pixel and a Samsung each
       show either a photo or no photo controls. Photos aren't in an iCloud backup or an Android
       cloud backup.

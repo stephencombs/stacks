@@ -62,7 +62,7 @@ export default () => ({
   },
   plugins: [
     "@clerk/expo",
-    "expo-secure-store",
+    ["expo-secure-store", { configureAndroidBackup: false }],
     "expo-apple-authentication",
     "expo-web-browser",
     "expo-maps",
@@ -79,6 +79,7 @@ export default () => ({
     "./plugins/withAndroidTabIcons",
     "./plugins/withAndroidTheme",
     "./plugins/withAndroidLiveUpdates",
+    "./plugins/withAndroidContactPhotoBackup",
   ],
   extra: {
     appVariant: variant,

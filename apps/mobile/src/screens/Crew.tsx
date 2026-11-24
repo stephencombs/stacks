@@ -54,7 +54,7 @@ import {
   Skeleton,
   Surface,
 } from "../components/ui/Surface";
-import { Chip } from "../features/Chip";
+import { PlayerChip } from "../features/PlayerChip";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
 import { useCrewScopes } from "../lib/crewScopes";
 import { useGo } from "../lib/go";
@@ -247,7 +247,8 @@ function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
               className="min-h-11 flex-row items-center gap-3 px-4 py-1.5"
             >
               <Text className="w-4 type-footnote text-muted">{standing.rank}</Text>
-              <Chip
+              <PlayerChip
+                playerId={standing.playerId}
                 chip={chipOf(group, standing.playerId)}
                 name={names.get(standing.playerId) ?? ""}
                 size={26}
@@ -533,7 +534,15 @@ function ActivityChip({
 
   return (
     <Loaded query={stacks.group(groupId)} skeleton={neutral} renderError={() => neutral}>
-      {(detail) => <Chip chip={chipOf(detail, playerId)} name={displayName} size={32} ring />}
+      {(detail) => (
+        <PlayerChip
+          playerId={playerId}
+          chip={chipOf(detail, playerId)}
+          name={displayName}
+          size={32}
+          ring
+        />
+      )}
     </Loaded>
   );
 }
@@ -625,7 +634,13 @@ function GroupRow({ item }: { item: GroupListItem }) {
             <View className="flex-row">
               {people.slice(0, 3).map((player, index) => (
                 <View key={player.id} className={index ? "-ml-1.5" : undefined}>
-                  <Chip chip={chipOf(detail, player.id)} name={player.displayName} size={26} ring />
+                  <PlayerChip
+                    playerId={player.id}
+                    chip={chipOf(detail, player.id)}
+                    name={player.displayName}
+                    size={26}
+                    ring
+                  />
                 </View>
               ))}
             </View>

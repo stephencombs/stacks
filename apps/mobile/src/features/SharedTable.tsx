@@ -22,7 +22,7 @@ import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { useAccount } from "../lib/account";
 import { inviteUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
-import { Chip } from "./Chip";
+import { TableChip } from "./PlayerChip";
 import { AddPlayerSheet } from "./RecordingForms";
 
 const players = (count: number, closed: boolean) =>
@@ -66,20 +66,16 @@ export function TableSection({
         At this table
       </SectionHeading>
       <List>
-        {table.visits.map((item, index) => (
+        {table.visits.map((item) => (
           <Row
             key={item.visit.id}
             onPress={() => onOpen(item.visit.id)}
             accessibilityHint="Opens their session"
           >
-            {Platform.OS === "android" ? (
-              <Chip
-                chip={(index % 8) + 1}
-                name={names.get(item.player.id) ?? item.player.displayName}
-                size={36}
-                ring
-              />
-            ) : null}
+            <TableChip
+              playerId={item.player.id}
+              name={names.get(item.player.id) ?? item.player.displayName}
+            />
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="font-medium text-ink">{names.get(item.player.id)}</Text>
               <Text className="text-sm text-muted">
@@ -259,21 +255,17 @@ function JoinedTableSection({
         At this table
       </SectionHeading>
       <List>
-        {rows.map((item, index) => (
+        {rows.map((item) => (
           <Row
             key={item.visit.id}
             {...(item.mine
               ? { onPress: () => onOpen(item.visit.id), accessibilityHint: "Opens your session" }
               : {})}
           >
-            {Platform.OS === "android" ? (
-              <Chip
-                chip={(index % 8) + 1}
-                name={labels.get(item.visit.playerId) ?? item.name}
-                size={36}
-                ring
-              />
-            ) : null}
+            <TableChip
+              playerId={item.visit.playerId}
+              name={labels.get(item.visit.playerId) ?? item.name}
+            />
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="font-medium text-ink">{labels.get(item.visit.playerId)}</Text>
               <Text className="text-sm text-muted">
