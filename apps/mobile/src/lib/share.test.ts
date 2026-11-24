@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from "vite-plus/test";
 const state = vi.hoisted(() => ({
   written: new Map<string, string>(),
   available: true,
+  os: "ios",
   shareAsync: vi.fn<(...args: ReadonlyArray<unknown>) => Promise<void>>(async () => {}),
   rnShare: vi.fn<(...args: ReadonlyArray<unknown>) => Promise<void>>(async () => {}),
 }));
@@ -29,16 +30,22 @@ vi.mock("expo-sharing", () => ({
 }));
 
 vi.mock("react-native", () => ({
+  Platform: {
+    get OS() {
+      return state.os;
+    },
+  },
   Share: {
     share: (...args: ReadonlyArray<unknown>) => state.rnShare(...args),
   },
 }));
 
-import { shareCsv } from "./share";
+import { shareCsv, shareLink } from "./share";
 
 beforeEach(() => {
   state.written.clear();
   state.available = true;
+  state.os = "ios";
   state.shareAsync.mockClear();
   state.rnShare.mockClear();
 });
@@ -62,5 +69,21 @@ it("falls back to React Native Share when native file sharing is unavailable", a
     title: "sessions.csv",
     message: "a,b\n",
     url: "file:///cache/sessions.csv",
+  });
+});
+
+it("shares a link on iOS as a url, so the share sheet treats it as one", async () => {
+  await shareLink("https://colorup.test/t#abc", "Follow our table on Color Up:");
+  expect(state.rnShare).toHaveBeenCalledWith({
+    url: "https://colorup.test/t#abc",
+    message: "Follow our table on Color Up:",
+  });
+});
+
+it("shares a link on Android inside the message, which is all it reads", async () => {
+  state.os = "android";
+  await shareLink("https://colorup.test/t#abc", "Follow our table on Color Up:");
+  expect(state.rnShare).toHaveBeenCalledWith({
+    message: "Follow our table on Color Up: https://colorup.test/t#abc",
   });
 });

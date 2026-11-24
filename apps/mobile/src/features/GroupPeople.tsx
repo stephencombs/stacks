@@ -19,7 +19,7 @@ import { FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
-import { appUrl } from "../lib/config";
+import { inviteUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { AddGuestSheet } from "./AddGuestSheet";
@@ -106,7 +106,9 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
           className="ml-auto"
           icon={android ? <Icon name="link" color="ink" size={16} /> : undefined}
           onPress={() => {
-            const url = appUrl(`claim/${player.claimCode}`);
+            if (!player.claimCode) return;
+
+            const url = inviteUrl("claim", player.claimCode);
 
             if (android) {
               setCopyError(false);
@@ -233,7 +235,7 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
           ) : (
             <List>
               {invites.map((invite) => {
-                const url = appUrl(`join/${invite.code}`);
+                const url = inviteUrl("join", invite.code);
 
                 return (
                   <Row key={invite.id} className="flex-col items-stretch gap-2">

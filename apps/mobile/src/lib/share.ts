@@ -1,9 +1,9 @@
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { Share } from "react-native";
+import { Platform, Share } from "react-native";
 
 export const shareLink = async (url: string, message: string) => {
-  await Share.share({ message: `${message} ${url}` });
+  await Share.share(Platform.OS === "ios" ? { url, message } : { message: `${message} ${url}` });
 };
 
 export const shareCsv = async (filename: string, csv: string) => {

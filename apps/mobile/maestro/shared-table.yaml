@@ -1,4 +1,5 @@
-# One phone starts a table and shares its stacks-preview:// link. With the app's data and keychain
+# One phone starts a table and shares its link, an https link on the preview host or, until a host
+# is set, stacks-preview://. With the app's data and keychain
 # wiped, the same simulator is a stranger who opens that link, joins as a new player and buys in.
 appId: com.stephencombs.colorup.preview
 name: Join a shared table from its link
@@ -40,9 +41,9 @@ tags:
     timeout: 60000
 - tapOn: "Create link"
 - extendedWaitUntil:
-    visible: "stacks-preview://t/.+"
+    visible: "(stacks-preview://t/|https://[^ ]+/t#).+"
     timeout: 30000
-- copyTextFrom: "stacks-preview://t/.+"
+- copyTextFrom: "(stacks-preview://t/|https://[^ ]+/t#).+"
 - evalScript: ${output.link = maestro.copiedText}
 
 # A stranger: nothing of the starter's is left on this phone. The link opens in the running app,

@@ -51,3 +51,71 @@ it.each(["test-map-key", ""])("publishes only map availability for key %s", asyn
   expect(config.android?.config?.googleMaps?.apiKey).toBe(key);
   expect(JSON.stringify(config.extra)).not.toContain("test-map-key");
 });
+
+const buildFor = async (variant: string, host: string | undefined) => {
+  vi.stubEnv("APP_VARIANT", variant);
+  vi.stubEnv("EXPO_PUBLIC_LINK_HOST", host ?? "");
+  const { default: appConfig } = await import("../../app.config");
+  const built = appConfig();
+  Constants.expoConfig = {
+    name: built.name,
+    slug: built.slug,
+    scheme: built.scheme,
+    extra: built.extra,
+  };
+
+  return { built, config: await import("./config") };
+};
+
+const PATHS = ["/t", "/invite", "/join", "/claim"];
+
+it.each([
+  ["preview", "preview.colorup.test", "stacks-preview"],
+  ["production", "colorup.test", "stacks"],
+])("sends https links with the token in the fragment on %s", async (variant, host, scheme) => {
+  const { config } = await buildFor(variant, host);
+
+  expect(config.inviteUrl("t", "tok1")).toBe(`https://${host}/t#tok1`);
+  expect(config.inviteUrl("invite", "tok2")).toBe(`https://${host}/invite#tok2`);
+  expect(config.inviteUrl("join", "code3")).toBe(`https://${host}/join#code3`);
+  expect(config.inviteUrl("claim", "code4")).toBe(`https://${host}/claim#code4`);
+  expect(config.appLinkPrefixes()).toContain(`https://${host}`);
+  expect(config.appLinkPrefixes()).toContain(`${scheme}://`);
+  expect(config.appUrl("t/tok1")).toBe(`${scheme}://t/tok1`);
+});
+
+it.each(["preview", "production"])(
+  "falls back to the scheme on %s with no host set",
+  async (variant) => {
+    const { config, built } = await buildFor(variant, undefined);
+    const scheme = variant === "preview" ? "stacks-preview" : "stacks";
+
+    expect(config.inviteUrl("t", "tok1")).toBe(`${scheme}://t/tok1`);
+    expect(config.inviteUrl("claim", "code4")).toBe(`${scheme}://claim/code4`);
+    expect(config.appLinkPrefixes().some((prefix) => prefix.startsWith("https:"))).toBe(false);
+    expect(built.ios).not.toHaveProperty("associatedDomains");
+    expect(built.android).not.toHaveProperty("intentFilters");
+  },
+);
+
+it("never verifies links for a dev build, whatever the host", async () => {
+  const { config, built } = await buildFor("development", "preview.colorup.test");
+
+  expect(config.inviteUrl("invite", "tok2")).toBe("stacks-dev://invite/tok2");
+  expect(built.ios).not.toHaveProperty("associatedDomains");
+  expect(built.android).not.toHaveProperty("intentFilters");
+});
+
+it("associates the app with its own host, and only the four link paths", async () => {
+  const { built } = await buildFor("preview", "preview.colorup.test");
+
+  expect(built.ios.associatedDomains).toEqual(["applinks:preview.colorup.test"]);
+  expect(built.android.intentFilters).toEqual([
+    {
+      autoVerify: true,
+      action: "VIEW",
+      data: PATHS.map((path) => ({ scheme: "https", host: "preview.colorup.test", path })),
+      category: ["BROWSABLE", "DEFAULT"],
+    },
+  ]);
+});
