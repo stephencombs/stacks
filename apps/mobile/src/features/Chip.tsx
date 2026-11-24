@@ -125,7 +125,10 @@ function InitialChip({ chip, name, size = 32, ring = false }: ChipProps) {
           strokeWidth={Math.max(1, size * 0.04)}
         />
       </Svg>
-      <Text style={{ color: String(ink), fontSize: size * 0.34, fontWeight: "600" }}>
+      <Text
+        maxFontSizeMultiplier={1}
+        style={{ color: String(ink), fontSize: size * 0.34, fontWeight: "600" }}
+      >
         {(ring
           ? name
               .trim()

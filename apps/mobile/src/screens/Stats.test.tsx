@@ -147,7 +147,6 @@ async function load(
       ),
     Skeleton: () => <span>Loading your play</span>,
   }));
-  vi.doMock("../features/Race", () => ({ Race: () => null }));
   vi.doMock("../features/Chip", () => ({ Chip: () => null }));
   vi.doMock("../lib/go", () => ({ useGo: () => ({ trip: vi.fn(), group: vi.fn() }) }));
   vi.doMock("../features/GroupStats", async () => {

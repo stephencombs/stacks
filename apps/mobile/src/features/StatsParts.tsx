@@ -400,7 +400,7 @@ export function ByGame({
             label={row.label}
             labelLines={android ? 2 : 1}
             meta={row.meta}
-            metaLines={1}
+            metaLines={2}
             result={row.result}
             currency={currency}
             track={track}

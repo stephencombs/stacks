@@ -161,7 +161,11 @@ export function GroupStatsView({
         )
       ) : null}
       {android && tripRange ? (
-        <Text className="px-1 type-footnote text-muted">{tripRange} · Whole trip</Text>
+        <Text className="px-1 type-footnote text-muted">
+          {filters.game === undefined && filters.venueId === undefined
+            ? `${tripRange} · Whole trip`
+            : tripRange}
+        </Text>
       ) : null}
       {Match.value(view).pipe(
         Match.when({ kind: "empty" }, () =>
