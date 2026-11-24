@@ -27,6 +27,7 @@ import {
 } from "../lib/preferences";
 import { shareCsv } from "../lib/share";
 import { setTheme, useTheme } from "../lib/theme";
+import { AppleSignInButton } from "./AppleSignInButton";
 import { SignInButton } from "./SignInButton";
 import { UserAvatar } from "./UserAvatar";
 import { CasinoPickerSheet } from "./VenuePicker";
@@ -374,6 +375,7 @@ function AccountActions() {
   return (
     <View className="gap-3">
       <Note>An account opens groups and trips with friends.</Note>
+      <AppleSignInButton />
       <SignInButton mode="sign-in" label="Sign in" variant="secondary" />
       <SignInButton mode="sign-up" label="Create an account" variant="secondary" />
     </View>
