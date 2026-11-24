@@ -135,10 +135,13 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
         select group_id, user_id, left_at, now() from memberships
         where group_id = ${guest.groupId} and user_id = ${userId} and left_at is not null
       `;
+      const role = yield* Access.joiningRole(guest.groupId);
+
       yield* sql`
         insert into memberships (group_id, user_id, role)
-        values (${guest.groupId}, ${userId}, 'member')
-        on conflict (group_id, user_id) do update set left_at = null
+        values (${guest.groupId}, ${userId}, ${role})
+        on conflict (group_id, user_id) do update
+          set left_at = null, role = case when ${role} = 'owner' then 'owner' else memberships.role end
           where memberships.left_at is not null
       `;
       yield* Realtime.changed(groupScope(guest.groupId));

@@ -58,9 +58,9 @@ const legacyLedger = Effect.fn("test.legacyLedger")(function* (groupId: GroupId)
   }>`
     select e.id, e.kind, e.player_id, e.counterparty_id, e.amount, e.occurred_at, e.note,
       e.created_at, e.voided_at, e.void_reason, e.replaces_entry_id, s.trip_id as trip
-
     from entries e join sessions s on s.id = e.session_id
     where e.group_id = ${groupId}
+    order by e.id
   `;
 
   const entries = rows.map((row) => ({

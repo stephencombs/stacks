@@ -2,11 +2,14 @@ import { generateKeyPairSync, verify } from "node:crypto";
 
 import { expect, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Predicate from "effect/Predicate";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
+import * as TestClock from "effect/testing/TestClock";
 
 import * as AppleSignIn from "./AppleSignIn.ts";
 
@@ -143,5 +146,33 @@ it.effect("fails at the step Apple refuses, and without configuration", () =>
     expect(
       yield* Effect.flip(revoke(badKey, { ...settings, APPLE_PRIVATE_KEY: "not a key" }, "code")),
     ).toMatchObject({ step: "sign" });
+  }),
+);
+
+it.effect("gives up on an Apple that never answers", () =>
+  Effect.gen(function* () {
+    const asked = yield* Deferred.make<void>();
+
+    const silent = AppleSignIn.layer.pipe(
+      Layer.provide(
+        Layer.succeed(
+          HttpClient.HttpClient,
+          HttpClient.make(() => Effect.andThen(Deferred.succeed(asked, undefined), Effect.never)),
+        ),
+      ),
+      Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(settings))),
+    );
+
+    const revoking = yield* Effect.forkChild(
+      Effect.flip(
+        Effect.gen(function* () {
+          yield* (yield* AppleSignIn.AppleSignIn).revoke("code");
+        }).pipe(Effect.provide(silent)),
+      ),
+    );
+
+    yield* Deferred.await(asked);
+    yield* TestClock.adjust("11 seconds");
+    expect(yield* Fiber.join(revoking)).toMatchObject({ step: "token" });
   }),
 );

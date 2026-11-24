@@ -97,7 +97,10 @@ export const layer = Layer.effect(
             HttpClientRequest.bodyUrlParams(fields),
           ),
         )
-        .pipe(Effect.mapError(() => new AppleRevokeFailed({ step: path })));
+        .pipe(
+          Effect.timeout("10 seconds"),
+          Effect.mapError(() => new AppleRevokeFailed({ step: path })),
+        );
 
       if (response.status < 200 || response.status >= 300)
         return yield* new AppleRevokeFailed({ step: path });

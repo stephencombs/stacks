@@ -1,8 +1,9 @@
 import * as Schema from "effect/Schema";
 
+/** `account_deleted` says the token is good but its account is gone, so the app should wipe itself. */
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
   "Unauthorized",
-  {},
+  { reason: Schema.optionalKey(Schema.Literals(["account_deleted"])) },
   { httpApiStatus: 401 },
 ) {}
 
