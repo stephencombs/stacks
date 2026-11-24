@@ -350,9 +350,14 @@ type GameRow = {
   readonly meta: string;
   readonly chip: GameChip;
   readonly result: MinorUnits;
-  readonly share: number;
   readonly filters: StatsFilters;
 };
+
+const resultTrack = (rows: ReadonlyArray<{ readonly result: number }>) =>
+  barTrack(
+    rows.map((row) => row.result),
+    { compress: true, minimum: 0.06 },
+  );
 
 /** Results by game, each row narrowing the page to that game. */
 export function ByGame({
@@ -366,7 +371,7 @@ export function ByGame({
 }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
-  const track = barTrack(rows.map((row) => row.result));
+  const track = resultTrack(rows);
 
   return (
     <View className="gap-2">
@@ -396,19 +401,7 @@ export function ByGame({
                 {row.meta}
               </Text>
             </View>
-            {android ? (
-              <View className="h-1.5 w-15 overflow-hidden rounded-full bg-fill">
-                <View
-                  className={cn(
-                    "h-full rounded-full",
-                    prefs.privacyMode ? "bg-fill-strong" : row.result < 0 ? "bg-loss" : "bg-win",
-                  )}
-                  style={{ width: `${row.share * 100}%` }}
-                />
-              </View>
-            ) : (
-              <ResultBar result={row.result} track={track} hidden={prefs.privacyMode} />
-            )}
+            <ResultBar result={row.result} track={track} hidden={prefs.privacyMode} />
             <Money
               amount={row.result}
               currency={currency}
@@ -436,7 +429,6 @@ export function ByCasino({
   rows,
   currency,
   line,
-  group = false,
   liveCasino,
   onFilter,
 }: {
@@ -444,14 +436,12 @@ export function ByCasino({
   currency: CurrencyCode;
   /** What See all covers: "All time · 12 finished sessions". */
   line: string;
-  group?: boolean;
   liveCasino?: string | undefined;
   onFilter: (filters: StatsFilters) => void;
 }) {
   const [all, setAll] = useState(false);
   const android = Platform.OS === "android";
-  const limit = android ? (group ? 4 : 3) : TOP_CASINOS;
-  const more = rows.length > limit;
+  const more = rows.length > TOP_CASINOS;
 
   return (
     <View className="gap-2">
@@ -469,7 +459,7 @@ export function ByCasino({
       >
         By casino
       </StatsHeading>
-      <CasinoRows rows={rows.slice(0, limit)} currency={currency} onFilter={onFilter} />
+      <CasinoRows rows={rows.slice(0, TOP_CASINOS)} currency={currency} onFilter={onFilter} />
       {all ? (
         <Sheet
           open
@@ -517,7 +507,7 @@ function CasinoRows({
 }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
-  const track = barTrack(rows.map((row) => row.result));
+  const track = resultTrack(rows);
 
   return (
     <List className={inSheet ? "bg-fill" : undefined}>
@@ -535,9 +525,7 @@ function CasinoRows({
             </Text>
             <Text className="type-footnote text-muted">{row.meta}</Text>
           </View>
-          {!android ? (
-            <ResultBar result={row.result} track={track} hidden={prefs.privacyMode} />
-          ) : null}
+          <ResultBar result={row.result} track={track} hidden={prefs.privacyMode} />
           <Money
             amount={row.result}
             currency={currency}

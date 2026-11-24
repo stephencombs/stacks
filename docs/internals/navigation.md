@@ -39,7 +39,7 @@ To record as a player already at the table, the starter opens **Table settings**
 
 ## Stats
 
-Stats opens on **Just me**: your result, hours, hourly and win rate from every session you've recorded, filtered by period, game, casino and trip. It reads the device's recording store, so it works signed out and offline. The filters are chips that live in screen state.
+Stats opens on **Just me**: your result and its running line, then money, results by month (or by night, for one trip), patterns, records, and results by game and casino, from every session you've recorded, filtered by period, game, casino and trip. Stats lists no sessions: Play's history owns that, and a record opens its session there. It reads the device's recording store, so it works signed out and offline. The filters are chips that live in screen state.
 
 Signed in, a **Group** chip switches the same page to that group's stats: standings first, everyone's running result, awards, and results by game and casino. Each member's row opens their stat sheet. Group numbers count only sessions recorded in that group, never anyone's device-only play. With a group picked, the trip chip lists that group's trips, so one trip's stats are the group and trip chips together. Awards belong to a single trip, so they show only with a trip picked. Offline, the group view shows the last copy it fetched and says when. A trip has no stats page of its own: its **Stats** button, and Crew's pinned trip, open Stats with the group and trip already picked, carried in navigation state rather than the address.
 

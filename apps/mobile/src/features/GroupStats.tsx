@@ -307,7 +307,6 @@ function ShownStats({
           rows={view.byCasino}
           currency={view.currency}
           line={`${view.title} · ${finishedSessions(view.sessions)}`}
-          group
           onFilter={onFilter}
         />
       ) : null}

@@ -67,6 +67,7 @@ Players at very different stakes would flatten each other, so:
 
 - **A race fits the people near you.** Pass `lineScale` a `focus` from `around(index, count)`. A line far outside that range pins to the edge, and its initial gets an arrow (`J ↓`) from `clipped`.
 - **A race can compare stakes fairly.** The running result in Stats has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
+- **Results by month or night are bars around break-even.** `PeriodSection` draws rounded-cap vertical bars on a dashed zero line. The best and worst are solid and the rest 35%; a month that was played and broke even is a muted dot, and one that wasn't played is only its `faint` label. Every bar has an accessible label with its exact signed amount, "even" or "no play". In privacy mode every bar is `fill-strong`.
 - **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
 
 ## Navigation: PlaceTabs and LiveBar

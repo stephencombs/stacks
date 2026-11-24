@@ -104,9 +104,11 @@ async function load(
     ClipPath: Container,
     Defs: Container,
     Line: Container,
+    LinearGradient: Container,
     Path: Container,
     Polyline: Container,
     Rect: Container,
+    Stop: Container,
     Text: Container,
   }));
   vi.doMock("react-native-safe-area-context", () => ({
@@ -135,6 +137,7 @@ async function load(
     EmptyState: Container,
     List: Container,
     SectionHeading: Container,
+    Surface: Container,
     Row: (props: Parameters<typeof Container>[0] & { onPress?: () => void }) =>
       props.onPress ? (
         <Touch onPress={props.onPress}>{props.children}</Touch>
@@ -511,5 +514,48 @@ it("shows saved group stats and opens a member's result sheet", async () => {
   const sheet = element.querySelector('[role="dialog"][aria-label="Maya"]')!;
   expect(sheet.textContent).toContain("Best session");
   expect(sheet.textContent).toContain("1st of 1 player");
+  await act(async () => root.unmount());
+});
+
+it("reads as the hero, money, records and breakdowns, with no session list", async () => {
+  for (const platform of ["ios", "android"] as const) {
+    const { StatsScreen, element, errors, navigation, root } = await load(signedOut, {
+      platform,
+      home: await withFinishedSessions(),
+    });
+
+    await act(async () => root.render(<StatsScreen route={route} />));
+    expect(errors).toEqual([]);
+
+    for (const text of ["Result · all time", "Per hour", "Win rate", "Return", "Bought in"]) {
+      expect(element.textContent).toContain(text);
+    }
+
+    expect(element.textContent).toContain("Biggest win");
+    expect(element.textContent).not.toContain("Biggest loss");
+    expect(element.textContent).not.toContain("Adjustments");
+    expect(element.textContent).not.toContain("Matching sessions");
+    expect(element.textContent).not.toMatch(/By month|Patterns/);
+    await act(async () => button(element, "Biggest win").click());
+    expect(navigation.navigate).toHaveBeenCalledWith("Play", { visitId: expect.any(String) });
+    await act(async () => root.unmount());
+  }
+});
+
+it("resets every filter from a no-match page", async () => {
+  const { StatsScreen, element, errors, root } = await load(signedOut, {
+    platform: "android",
+    home: await withFinishedSessions(),
+  });
+
+  await act(async () => root.render(<StatsScreen route={route} />));
+  expect(errors).toEqual([]);
+  await act(async () => button(element, "Casino").click());
+  await act(async () => button(element, "All games").click());
+  await act(async () => button(element.querySelector('[role="menu"]')!, "Baccarat").click());
+  expect(element.textContent).toContain("No matching sessions");
+  await act(async () => button(element, "Reset all filters").click());
+  expect(element.textContent).not.toContain("No matching sessions");
+  expect(element.textContent).toContain("Result · all time");
   await act(async () => root.unmount());
 });
