@@ -6,6 +6,7 @@ import { makeRecordingStore, type RecordingInput, type RecordingStore } from "./
 import type { RecordingStorageDocument } from "./recordingStorage.ts";
 import { recordingHome } from "./recordingView.ts";
 import {
+  axisLabelled,
   formatHours,
   personalStatsView,
   returnFigure,
@@ -620,6 +621,67 @@ describe("the Just me figures", () => {
       expect(bars?.summary).toBe(
         "Result by night, Thursday, Nov 5 to Saturday, Nov 7: 1 up, 1 down, 1 with no play.",
       );
+    });
+  });
+
+  describe("axis labels", () => {
+    const shown = (count: number) =>
+      Array.from({ length: count }, (_, index) => index).filter(axisLabelled(count));
+
+    it("labels every column up to 18", () => {
+      expect(shown(18)).toHaveLength(18);
+    });
+
+    it("thins to every other column, keeping the first and the last", () => {
+      expect(shown(19)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
+      expect(shown(20)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 19]);
+    });
+
+    it("thins further for a longer run, and never labels two neighbours", () => {
+      for (const count of [37, 40, 55, 90]) {
+        const picked = shown(count);
+
+        expect(picked[0]).toBe(0);
+        expect(picked.at(-1)).toBe(count - 1);
+        expect(picked.length).toBeLessThanOrEqual(18);
+        expect(picked.every((index, i) => i === 0 || index - picked[i - 1]! >= 2)).toBe(true);
+      }
+    });
+
+    it("keeps every night's full name on a long trip", async () => {
+      const vegas = TripId.make("0192e7a0-0000-7000-8000-0000000000e2");
+
+      const visits = (
+        await played(
+          Array.from({ length: 21 }, (_, i) => ({
+            day: `2026-06-${String(i + 1).padStart(2, "0")}`,
+            hours: 1,
+            buyIn: 10_000,
+            cashOut: 12_000,
+          })),
+        )
+      ).map((item) => ({ ...item, table: { ...item.table, tripId: vegas } }));
+
+      const result = view(visits, { tripId: vegas });
+
+      if (result.kind !== "stats") throw new Error(result.kind);
+
+      const { bars } = result.bars!;
+
+      expect(bars.map((bar) => bar.label).filter(Boolean)).toEqual([
+        "1",
+        "3",
+        "5",
+        "7",
+        "9",
+        "11",
+        "13",
+        "15",
+        "17",
+        "19",
+        "21",
+      ]);
+      expect(bars.every((bar) => bar.name.length > 0)).toBe(true);
     });
   });
 

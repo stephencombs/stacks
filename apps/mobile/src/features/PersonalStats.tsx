@@ -22,6 +22,7 @@ import { Icon } from "../components/ui/Icon";
 import { List, Row, Surface } from "../components/ui/Surface";
 import { Text } from "../components/ui/Text";
 import { cn } from "../components/ui/cn";
+import { useLargeText } from "../lib/useLargeText";
 import {
   HIDDEN_AMOUNT,
   HIDDEN_AMOUNT_LABEL,
@@ -52,8 +53,20 @@ function Tile({
   divided?: boolean;
   children: ReactNode;
 }) {
+  const large = useLargeText();
+
   return (
-    <View accessible className={cn("flex-1 gap-0.5 px-4 py-3", divided && "border-l border-line")}>
+    <View
+      accessible
+      className={
+        large
+          ? cn(
+              "flex-row items-center justify-between gap-3 px-4 py-3",
+              divided && "border-t border-line",
+            )
+          : cn("flex-1 gap-0.5 px-4 py-3", divided && "border-l border-line")
+      }
+    >
       <Text className="type-label text-muted">{label}</Text>
       {children}
     </View>
@@ -68,6 +81,8 @@ function ReturnFigure({ figure }: { figure: StatsSummary["returnRate"] }) {
   return (
     <Text
       accessibilityLabel={privacyMode ? HIDDEN_AMOUNT_LABEL : undefined}
+      numberOfLines={1}
+      adjustsFontSizeToFit
       className={cn(
         "type-number tabular-nums",
         privacyMode || figure.tone === "even"
@@ -85,15 +100,21 @@ function ReturnFigure({ figure }: { figure: StatsSummary["returnRate"] }) {
 /** Your result at a glance: the figure, how far it has climbed, the line that drew it, and three rates. */
 export function StatsHero({ view }: { view: StatsSummary }) {
   const prefs = usePreferences();
+  const large = useLargeText();
 
   return (
     <View className="overflow-hidden rounded-[22px] bg-surface">
       <View className="px-5 pt-5">
-        <View className="flex-row items-baseline justify-between gap-3">
-          <Text accessibilityRole="header" className="min-w-0 flex-1 type-label text-muted">
+        <View className={large ? "gap-1" : "flex-row items-baseline justify-between gap-3"}>
+          <Text
+            accessibilityRole="header"
+            className={cn("type-label text-muted", !large && "min-w-0 flex-1")}
+          >
             {view.title}
           </Text>
-          <Text className="shrink-0 type-footnote text-muted">{view.played}</Text>
+          <Text className={cn("type-footnote text-muted", !large && "shrink-0")}>
+            {view.played}
+          </Text>
         </View>
         <Money
           amount={view.result}
@@ -120,7 +141,7 @@ export function StatsHero({ view }: { view: StatsSummary }) {
       ) : (
         <View className="h-5" />
       )}
-      <View className="flex-row border-t border-line">
+      <View className={cn("border-t border-line", !large && "flex-row")}>
         <Tile label="Per hour">
           {view.hourlyResult === null ? (
             <Dash />
@@ -138,7 +159,9 @@ export function StatsHero({ view }: { view: StatsSummary }) {
           {view.winRate === "–" ? (
             <Dash />
           ) : (
-            <Text className="type-number text-ink">{view.winRate}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit className="type-number text-ink">
+              {view.winRate}
+            </Text>
           )}
         </Tile>
         <Tile label="Return" divided>
@@ -156,6 +179,7 @@ function RunningChart({ chart }: { chart: NonNullable<StatsSummary["chart"]> }) 
   const android = Platform.OS === "android";
   const height = android ? 88 : 96;
   const prefs = usePreferences();
+  const large = useLargeText();
 
   const [win, loss, ink, strong, surface, muted] = useCSSVariable([
     "--color-win",
@@ -209,7 +233,12 @@ function RunningChart({ chart }: { chart: NonNullable<StatsSummary["chart"]> }) 
 
   return (
     <View className="mt-3 gap-1">
-      <View className="flex-row items-center justify-between px-5">
+      <View
+        className={cn(
+          "flex-row items-center justify-between px-5",
+          large && "flex-wrap gap-x-3 gap-y-1",
+        )}
+      >
         <Text className="type-footnote text-muted">Running result</Text>
         <Text
           accessibilityRole="button"
@@ -318,7 +347,7 @@ function RunningChart({ chart }: { chart: NonNullable<StatsSummary["chart"]> }) 
           </View>
         ) : null}
       </View>
-      <View className="flex-row justify-between px-5 pb-4">
+      <View className={cn("flex-row justify-between px-5 pb-4", large && "flex-wrap gap-x-3")}>
         <Text className="type-footnote text-muted">{chart.from}</Text>
         <Text className="type-footnote text-muted">{chart.to}</Text>
       </View>
@@ -339,10 +368,16 @@ function MoneyTile({
   even?: number;
   divided?: boolean;
 }) {
+  const large = useLargeText();
+
   return (
     <View
       accessible
-      className={cn("min-w-0 flex-1 gap-0.5 px-4 py-3", divided && "border-l border-line")}
+      className={cn(
+        "min-w-0 gap-0.5 px-4 py-3",
+        !large && "flex-1",
+        divided && (large ? "border-t border-line" : "border-l border-line"),
+      )}
     >
       <Text className="type-label text-muted">{label}</Text>
       <Money amount={amount} currency={currency} tone="result" fit className="type-number-lg" />
@@ -354,13 +389,34 @@ function MoneyTile({
   );
 }
 
+function MoneyRow({
+  label,
+  amount,
+  tone,
+}: {
+  label: string;
+  amount: StatsSummary["money"]["buyIn"];
+  tone?: "result";
+}) {
+  const large = useLargeText();
+
+  return (
+    <Row className={large ? "flex-col items-stretch gap-0.5" : undefined}>
+      <Text className={cn("type-body text-ink", !large && "flex-1")}>{label}</Text>
+      <Money amount={amount} currency={currency} tone={tone} fit={large} className="type-number" />
+    </Row>
+  );
+}
+
 /** What you won and lost, and the money behind the result. */
 export function MoneySection({ money }: { money: StatsSummary["money"] }) {
+  const large = useLargeText();
+
   return (
     <View className="gap-2">
       <StatsHeading>Money</StatsHeading>
       <Surface>
-        <View className="flex-row">
+        <View className={large ? undefined : "flex-row"}>
           <MoneyTile label="Won" amount={money.won.result} sessions={money.won.sessions} />
           <MoneyTile
             label="Lost"
@@ -370,24 +426,10 @@ export function MoneySection({ money }: { money: StatsSummary["money"] }) {
             divided
           />
         </View>
-        <Row>
-          <Text className="flex-1 type-body text-ink">Bought in</Text>
-          <Money amount={money.buyIn} currency={currency} className="type-number" />
-        </Row>
-        <Row>
-          <Text className="flex-1 type-body text-ink">Cashed out</Text>
-          <Money amount={money.cashOut} currency={currency} className="type-number" />
-        </Row>
+        <MoneyRow label="Bought in" amount={money.buyIn} />
+        <MoneyRow label="Cashed out" amount={money.cashOut} />
         {money.adjustment !== null ? (
-          <Row>
-            <Text className="flex-1 type-body text-ink">Adjustments</Text>
-            <Money
-              amount={money.adjustment}
-              currency={currency}
-              tone="result"
-              className="type-number"
-            />
-          </Row>
+          <MoneyRow label="Adjustments" amount={money.adjustment} tone="result" />
         ) : null}
       </Surface>
     </View>

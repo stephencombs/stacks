@@ -356,6 +356,20 @@ export const returnFigure = (result: number, buyIn: number) => {
 const countOf = (rows: ReadonlyArray<{ readonly status: string }>, status: string) =>
   rows.filter((row) => row.status === status).length;
 
+const AXIS_LABELS = 18;
+
+/**
+ * Which columns of an axis of `count` get a label. Past 18 columns the labels thin to every
+ * other, then every third, and so on, always keeping the first and the last.
+ */
+export function axisLabelled(count: number) {
+  const step = Math.max(1, Math.ceil(count / AXIS_LABELS));
+  const last = count - 1;
+
+  return (index: number) =>
+    index === 0 || index === last || (index % step === 0 && last - index >= step);
+}
+
 /**
  * Stats as a screen shows them, from the device's visits: the filter chips, then either why
  * there's nothing to show or the hero, money, charts, sentences, records and breakdowns. Live
@@ -467,13 +481,16 @@ export const personalStatsView = (
     const low = Math.min(...playedRows.map((row) => row.result));
     const unique = (value: number) => playedRows.filter((row) => row.result === value).length === 1;
 
+    const labelled = axisLabelled(rows.length);
+
     const items = rows.map((row, index) => {
       const date = dateOfKey(row.key);
 
       return {
         key: row.key,
-        label:
-          by === "month"
+        label: !labelled(index)
+          ? ""
+          : by === "month"
             ? monthShort.format(date)
             : rows.length > 7
               ? String(date.getUTCDate())

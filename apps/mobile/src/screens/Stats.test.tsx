@@ -76,6 +76,7 @@ async function load(
 
   vi.doMock("react-native", () => ({
     Platform: { OS: platform },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
     View: Container,
     Text: (props: Parameters<typeof Container>[0] & { onPress?: () => void }) =>
       props.onPress ? (

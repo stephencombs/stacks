@@ -104,6 +104,7 @@ async function render(privacyMode: boolean) {
     View: Container,
     Text: Container,
     PanResponder: { create: () => ({ panHandlers: {} }) },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   }));
   vi.doMock("react-native-svg", () => ({
     default: Container,
