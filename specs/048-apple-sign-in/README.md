@@ -3,9 +3,9 @@ status: draft
 created: 2026-11-24
 priority: medium
 tags:
-- mobile
-- ios
-- auth
+  - mobile
+  - ios
+  - auth
 created_at: 2026-11-24T03:28:46.164102100Z
 updated_at: 2026-11-24T03:28:46.164102100Z
 ---
