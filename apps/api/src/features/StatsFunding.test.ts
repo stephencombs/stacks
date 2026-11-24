@@ -96,7 +96,7 @@ const fix = (
   visitId: VisitId,
   revision: number,
   entryId: EntryId,
-  replacementId: EntryId,
+  replacementId: EntryId | null,
 ) =>
   RecordingCommand.make({
     type: "correct",
@@ -105,7 +105,10 @@ const fix = (
     expectedRevision: revision,
     entryId,
     reason: "Wrong amount",
-    replacement: { id: replacementId, amount: usd(9000), occurredAt: at(5), note: null },
+    replacement:
+      replacementId === null
+        ? null
+        : { id: replacementId, amount: usd(9000), occurredAt: at(5), note: null },
   });
 
 const statsOf = (client: Client, group: TestGroup) =>
@@ -270,6 +273,32 @@ it.layer(TestApi.layer)("group stats funding", (it) => {
       expect(stats.reloads).toEqual([
         { playId: opened.tableId, playerId: group.myPlayerId, additional: 1, net: 11000 },
       ]);
+    }),
+  );
+
+  it.effect("drops a native buy-in voided with no replacement", () =>
+    Effect.gen(function* () {
+      const { alex } = yield* users("alex");
+      const group = yield* groupWith(alex);
+      const me = identity();
+      const opened = start(me);
+      const extra = buyIn(me, opened.visitId, 0, 5000);
+
+      expect(
+        yield* push(
+          alex,
+          me,
+          opened,
+          toTrip(me, opened.tableId, group.tripId),
+          extra,
+          fix(me, opened.visitId, 1, extra.entryId, null),
+          cashOut(me, opened.visitId, 2, 40000),
+        ),
+      ).toEqual(["accepted", "accepted", "accepted", "accepted", "accepted"]);
+
+      const stats = yield* statsOf(alex, group);
+      expect(stats.reloads).toEqual([]);
+      expect(stats.allVisits).toEqual([{ playId: opened.tableId, visits: 1 }]);
     }),
   );
 

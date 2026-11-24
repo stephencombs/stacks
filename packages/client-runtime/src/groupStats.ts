@@ -668,7 +668,7 @@ export const groupStatsView = (
     covered === null && stakeRows.length === 0
       ? null
       : {
-          whole: slice !== null,
+          whole: slice !== null && stakeRows.length > 0,
           covered:
             covered === null
               ? null

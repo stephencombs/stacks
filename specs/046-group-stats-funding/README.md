@@ -62,7 +62,7 @@ Every new field uses `Schema.optionalKey`.
 ## Group view
 
 - **Habits, With additional buy-ins.** Placed above After midnight.
-  - "N of M visits with an additional buy-in finished up · {name} added the most (N)".
+  - "N of M visits with an additional buy-in finished up · {name} added the most (N) · N of M visits had one".
   - Their summed Result is shown on the right.
   - "Most" is the largest sum of `additional`. On a tie, the clause is hidden.
   - Floor: 5 visits.
