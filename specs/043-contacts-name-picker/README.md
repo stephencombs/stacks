@@ -69,22 +69,71 @@ Players show as coloured initials (`Chip`) everywhere. Phase 2 lets each person 
 photo from their own address book, the way Flighty puts faces on friends. Phase 1 ships first and
 doesn't wait for this.
 
-- **Local only.** Picking a contact for a player also stores its photo thumbnail on this device,
-  keyed by player ID. The photo is never uploaded or sent. Each friend sees the photo from their
-  own address book, or initials if they never linked one.
-- **Linking.** Pick a contact when you add a player, or use "Link contact" on an existing player.
-  "Unlink" removes the photo from this device. With no contacts permission, the app can't match
-  players to contacts by itself, so each person picks once.
-- **Lasts through changes.** The link uses the player ID, so it survives renames, claims, and the
-  account deletion in spec 045, which turns a member back into a guest.
-- **The module returns `{ name, photo }`.** The photo is a small JPEG written to app storage, or
-  `null`. Check on a device whether the picker's grant gives access to the photo: on iOS
-  through `thumbnailImageData` on the snapshot, and on Android through the photo for the granted
-  URI. Where it doesn't, that platform falls back to initials.
-- **Where photos show.** Everywhere a player `Chip` appears, with initials as the fallback when
-  there is no photo or it fails to load.
-- **Signing out and wiping.** Linked photos are part of the device's local data. Signing out and
-  deleting an account (spec 045) clear them.
+### Model
+
+- **Local only.** A photo is never uploaded, synced, logged or sent. Each friend sees the photo
+  from their own address book, or initials if they never linked one. On-device data doesn't count
+  as "collected" for Apple's privacy details or Play's Data safety, so there's no new label.
+- **Keyed by player and by account.** One friend can be a different player row in each group.
+  - A small index maps `p:<playerId>` (always written) and `u:<userId>` (written when the player
+    has an account) to a random `photoId`.
+  - Lookup tries `p:` and then `u:`, so one link shows that friend in every shared group.
+  - It works offline for table guests and survives renames. A claim writes `u:` the next time
+    the group loads. Account deletion (spec 045) clears `userId` and keeps `p:`.
+  - Never match players by name.
+- **A snapshot, not a sync.** Without the contacts permission the app can't see later changes to
+  the contact, so re-pick to update. Don't store contact identifiers, since they're useless without
+  the permission.
+- **Storage.** Use `expo-file-system` under `Paths.document`, because the cache can be purged and
+  a photo can't be fetched again:
+  - `contact-photos/<photoId>.jpg`, 192×192 JPEG with EXIF stripped, about 10–20 KB.
+  - `contact-photos/index.json`, read into a store at startup the way `lib/preferences.ts` does,
+    so a `Chip` never flickers.
+  - Ordinary device backups and phone transfers carry the photos. A second device starts with
+    initials.
+- **Wiping.** "Unlink" removes every key that points at the `photoId`, and the file. Signing out
+  (`You.tsx`) and deleting an account (spec 045) delete the whole folder.
+
+### Native module
+
+- **It returns `{ name, photoUri }`.** `photoUri` is a normalized temporary JPEG, or `null`.
+  Cropping and scaling happen natively; no base64 crosses the bridge.
+- **iOS.** Read `thumbnailImageData`, or `imageData` as a fallback, from the picker's snapshot.
+  Check `isKeyAvailable` first: an unfetched key throws an Objective-C exception that Swift can't
+  catch. Never touch `CNContactStore`, and don't use iOS 18's `ContactAccessButton`, which needs
+  the permission.
+- **Android, the risky part.** The pick only grants access to the exact URI it returns, and photo
+  URIs are separate sub-URIs. Try `openContactPhotoInputStream(cr, uri, false)` and catch
+  `SecurityException`. If device testing shows Android blocks this, hide the photo controls on
+  Android rather than add `READ_CONTACTS`.
+
+### UI
+
+- **On add.** In `AddGuestSheet` and `AddPlayerSheet`, a picked photo previews beside the Name
+  field, with a way to drop it. It is saved under the new player's ID on submit, and the temporary
+  file is deleted on cancel.
+- **Existing players.**
+  - In `GroupPeople`, any other member or guest opens a player sheet, generalized from
+    `ManageMemberSheet`, for every role. It offers "Link contact photo", or "Change" and "Remove",
+    with "Only on this phone." No confirmation is needed, since a photo is local and quick to
+    re-pick.
+  - The same action appears in the standings `StatSheet` and the table's `SeatSheet`.
+- **Chip.** `Chip` takes an explicit `photoUri`. Venue chips (for example `SessionList.tsx:199`)
+  must never get a player photo.
+  - With a photo, it draws the photo inside a 2px ring in the player's chip colour, 1.5px below
+    26pt, with no stripes. It falls back to initials when loading fails.
+  - Race-chart endpoints stay initials.
+  - Your own rows use your Clerk avatar (`UserAvatar`) when you have one.
+- **Open decision: iOS tables.** iOS live and shared table rows show no `Chip` today
+  (`SharedTable.tsx:75`, `LiveTable.tsx:163`), so a linked photo wouldn't show there. Decide whether
+  to add one for parity with Android.
+
+### Phase 2 tests
+
+- [ ] Unit: index lookup order, `u:` filled in after a claim, unlink removes every key, and the
+      folder is wiped on sign-out.
+- [ ] Device: on iOS and Android, a photo appears with no permission prompt, or Android falls back
+      to hiding the controls as described above.
 
 ## Non-goals
 
@@ -93,6 +142,7 @@ doesn't wait for this.
 - Finding friends who already use Color Up from the address book (App Review guideline 5.1.1).
 - Full contacts access, searching contacts inside the app, or syncing contacts.
 - Sign in with Apple, which is in its own spec.
+- Opening the system contact card from a player, which needs the contacts permission.
 
 ## Acceptance criteria
 
