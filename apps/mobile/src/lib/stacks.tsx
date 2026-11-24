@@ -28,7 +28,7 @@ import { AppState } from "react-native";
 import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
 import { useAccount } from "./account";
-import { onAccountRefused } from "./accountDeletion";
+import { onAccountDeleted } from "./accountDeletion";
 import { actorKeys } from "./actorKeys";
 import { apiUrl } from "./config";
 import { markStartup } from "./diagnostics";
@@ -68,7 +68,7 @@ const api = {
   baseUrl: apiUrl,
   getToken: () => sessionToken(),
   origin: installOrigin,
-  onUnauthorized: onAccountRefused,
+  onAccountDeleted,
 };
 
 const bearer = async () => {

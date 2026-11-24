@@ -16,19 +16,6 @@ import { deleteRecordingDatabase } from "./recordingStorageSqlite";
 import { clerk, sessionToken } from "./sessionToken";
 import { deleteTripFiles } from "./tripStorage";
 
-const account = makeAccountApi({
-  baseUrl: apiUrl,
-  getToken: () => sessionToken(),
-  freshToken: () => sessionToken(true),
-  origin: installOrigin,
-});
-
-export const accountApi = {
-  preview: () => settle(account.preview),
-  remove: (authorizationCode?: string) => settle(account.remove(authorizationCode)),
-  gone: () => settle(account.gone),
-};
-
 const markerFile = new File(Paths.document, "account-wipe.json");
 
 const deviceWipe = makeDeviceWipe({
@@ -130,29 +117,24 @@ export const finishAccountWipe = async () => {
   }
 };
 
-const REFUSAL_COOLDOWN_MS = 60_000;
-let lastRefusalCheck = 0;
-
-/**
- * The API refused the session. A deleted account gets that on every request, and so does a token
- * the API can't verify, which must never cost someone their play. So it wipes only when a fresh
- * token is refused too, and asks at most once a minute.
- */
-export const onAccountRefused = () => {
-  const now = Date.now();
-
-  if (read() || now - lastRefusalCheck < REFUSAL_COOLDOWN_MS) return;
-  lastRefusalCheck = now;
+/** The API said 401 `account_deleted`: this account is gone, so its data goes from this phone. */
+export const onAccountDeleted = () => {
   const userId = clerk().user?.id;
 
-  if (!userId) return;
+  if (!userId || read()) return;
+  beginAccountWipe({ userId, status: "unknown", appleManual: false });
+};
 
-  void accountApi.gone().then(
-    (gone) => {
-      if (gone) beginAccountWipe({ userId, status: "unknown", appleManual: false });
-    },
-    () => undefined,
-  );
+const account = makeAccountApi({
+  baseUrl: apiUrl,
+  getToken: () => sessionToken(),
+  origin: installOrigin,
+  onAccountDeleted: () => onAccountDeleted(),
+});
+
+export const accountApi = {
+  preview: () => settle(account.preview),
+  remove: (authorizationCode?: string) => settle(account.remove(authorizationCode)),
 };
 
 /** The Apple sheet's one-use code, for the server to revoke. Null when it's skipped or can't show. */

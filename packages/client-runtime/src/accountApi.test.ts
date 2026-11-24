@@ -6,10 +6,15 @@ import { Unauthorized } from "@stacks/contracts";
 
 import { makeAccountApi, makeRecordingTransport } from "./api.ts";
 
-const unauthorized = () =>
-  Response.json(Schema.encodeSync(Schema.toCodecJson(Unauthorized))(new Unauthorized()), {
-    status: 401,
-  });
+const refusal = (reason?: "account_deleted") =>
+  Response.json(
+    Schema.encodeSync(Schema.toCodecJson(Unauthorized))(
+      reason ? new Unauthorized({ reason }) : new Unauthorized(),
+    ),
+    { status: 401 },
+  );
+
+const unauthorized = () => refusal();
 
 const capture = (respond: (request: Request, count: number) => Response) => {
   const seen: Array<Request> = [];
@@ -24,11 +29,10 @@ const capture = (respond: (request: Request, count: number) => Response) => {
   return { seen, fetch };
 };
 
-const account = (freshToken: () => Promise<string | null> = async () => "fresh") =>
+const account = () =>
   makeAccountApi({
     baseUrl: "https://colorup.test",
     getToken: async () => "cached",
-    freshToken,
     origin: "install-1",
   });
 
@@ -58,36 +62,25 @@ it.effect("sends the optional Apple code to delete, and reports pending or compl
   }),
 );
 
-it.effect("counts a refused delete as done when a fresh token is refused too", () =>
+it.effect("asks again after a lost response and gets the deletion's state", () =>
   Effect.gen(function* () {
-    const { seen, fetch } = capture(unauthorized);
+    const { fetch } = capture((_, count) =>
+      Response.json({ status: count === 1 ? "pending" : "complete" }),
+    );
 
-    const result = yield* account()
-      .remove()
-      .pipe(Effect.provideService(FetchHttpClient.Fetch, fetch));
+    const api = account();
 
-    expect(result).toEqual({ status: "complete" });
-    expect(seen.map((request) => request.headers.get("authorization"))).toEqual([
-      "Bearer cached",
-      "Bearer fresh",
-    ]);
-    expect(new URL(seen[1]!.url).pathname).toBe("/api/account/deletion-preview");
+    const first = yield* api.remove().pipe(Effect.provideService(FetchHttpClient.Fetch, fetch));
+    const second = yield* api.remove().pipe(Effect.provideService(FetchHttpClient.Fetch, fetch));
+
+    expect(first).toEqual({ status: "pending" });
+    expect(second).toEqual({ status: "complete" });
   }),
 );
 
-it.effect("keeps a refused delete an error when a fresh token is accepted", () =>
+it.effect("keeps a bare 401 on delete an error", () =>
   Effect.gen(function* () {
-    const { fetch } = capture((request) =>
-      request.method === "POST"
-        ? unauthorized()
-        : Response.json({
-            soloGroups: [],
-            ownershipMoves: [],
-            openBalances: [],
-            openStakes: [],
-            appleLinked: false,
-          }),
-    );
+    const { fetch } = capture(unauthorized);
 
     const error = yield* account()
       .remove()
@@ -97,49 +90,50 @@ it.effect("keeps a refused delete an error when a fresh token is accepted", () =
   }),
 );
 
-it.effect("doesn't call an account gone without a fresh token, or when it can't ask", () =>
+it.effect("tells the app only when the 401 says the account was deleted", () =>
   Effect.gen(function* () {
-    const none = capture(unauthorized);
+    const deleted: Array<number> = [];
 
-    expect(
-      yield* account(async () => null).gone.pipe(
-        Effect.provideService(FetchHttpClient.Fetch, none.fetch),
-      ),
-    ).toBe(false);
-    expect(none.seen).toEqual([]);
+    const transport = makeRecordingTransport({
+      baseUrl: "https://colorup.test",
+      getToken: async () => "session",
+      origin: "install-1",
+      onAccountDeleted: () => void deleted.push(deleted.length),
+    });
 
-    const offline: typeof globalThis.fetch = async () => {
-      throw new TypeError("Network request failed");
-    };
+    const history = (response: Response) =>
+      transport.history(null).pipe(
+        Effect.provideService(FetchHttpClient.Fetch, async () => response),
+        Effect.flip,
+      );
 
-    expect(yield* account().gone.pipe(Effect.provideService(FetchHttpClient.Fetch, offline))).toBe(
-      false,
-    );
+    const bare = yield* history(refusal());
+    yield* history(new Response("not json", { status: 401 }));
+    const gone = yield* history(refusal("account_deleted"));
+
+    expect(deleted).toEqual([0]);
+    expect(Schema.is(Unauthorized)(bare)).toBe(true);
+    expect(Schema.is(Unauthorized)(gone)).toBe(true);
   }),
 );
 
-it.effect("tells the app when a request that carried the session was refused", () =>
+it.effect("tells the app from the account screens' client too", () =>
   Effect.gen(function* () {
-    const refused: Array<string> = [];
+    const deleted: Array<string> = [];
 
-    const transport = (token: string | null) =>
-      makeRecordingTransport({
+    const preview = (token: string | null) =>
+      makeAccountApi({
         baseUrl: "https://colorup.test",
         getToken: async () => token,
         origin: "install-1",
-        onUnauthorized: () => void refused.push(token ?? "none"),
-      });
+        onAccountDeleted: () => void deleted.push(token ?? "none"),
+      }).preview.pipe(
+        Effect.provideService(FetchHttpClient.Fetch, async () => refusal("account_deleted")),
+        Effect.flip,
+      );
 
-    const { fetch } = capture(unauthorized);
+    yield* preview("session");
 
-    yield* transport("session")
-      .history(null)
-      .pipe(Effect.provideService(FetchHttpClient.Fetch, fetch), Effect.flip);
-
-    yield* transport(null)
-      .history(null)
-      .pipe(Effect.provideService(FetchHttpClient.Fetch, fetch), Effect.flip);
-
-    expect(refused).toEqual(["session"]);
+    expect(deleted).toEqual(["session"]);
   }),
 );

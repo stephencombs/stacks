@@ -82,11 +82,12 @@ then signs out of Clerk. _Done_ reloads the app signed out, on Play.
   sign-out, so an app killed partway finishes at the next launch, from the same screen. Every
   step must succeed when what it removes is already gone. A new file or key kept per user needs a
   step in `lib/accountDeletion.ts`.
-- **A refused token is not proof.** The fence answers a deleted account's other devices with 401,
-  but the API gives the same 401 to a token it can't verify, such as a bad deploy. Wiping on that
-  would cost people play that exists only on their phone. So a 401 starts a wipe only when a fresh
-  session token is refused too, checked at most once a minute. A typed "account deleted" error
-  from the fence would remove the doubt.
+- **Only the reason wipes.** The fence answers a deleted account with `Unauthorized` carrying
+  `reason: "account_deleted"`, and a request that sees it starts a wipe at once. A bare 401, such as
+  a token the API can't verify, never wipes: it takes the normal signed-out path, so a bad deploy
+  can't cost anyone the play that exists only on their phone. A device whose Clerk token can't
+  refresh any more never reaches the fence, so it never sees the reason. Once Clerk deletes the
+  user, that device just signs out and keeps its local files.
 - **Apple.** The code comes from `expo-apple-authentication` on iOS just before the request. A
   cancelled sheet, or Android, doesn't stop the deletion; the wipe screen then shows how to remove
   Color Up from the Apple Account by hand.

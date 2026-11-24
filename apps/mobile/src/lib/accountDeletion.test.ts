@@ -67,13 +67,15 @@ vi.mock("./recordingStorageSqlite", () => ({
   },
 }));
 
+const session = vi.hoisted(() => ({ signedIn: true }));
+
 const signOut = vi.fn(async () => {
   if (faults.signOut) throw new Error("offline");
   calls.push("sign out");
 });
 
 vi.mock("./sessionToken", () => ({
-  clerk: () => ({ signOut, user: { id: "user_alice" } }),
+  clerk: () => ({ signOut, user: session.signedIn ? { id: "user_alice" } : null }),
   sessionToken: async () => "token",
 }));
 
@@ -103,6 +105,7 @@ beforeEach(() => {
   calls.length = 0;
   faults.database = false;
   faults.signOut = false;
+  session.signedIn = true;
   signOut.mockClear();
   stock();
 });
@@ -198,4 +201,38 @@ it("does nothing at launch when no wipe is pending", async () => {
 
   expect(calls).toEqual([]);
   expect(disk.has("outbox-user_alice.json")).toBe(true);
+});
+
+it("starts a wipe of the signed-in account when the API says it was deleted", async () => {
+  const device = await freshLaunch();
+
+  device.onAccountDeleted();
+
+  expect(JSON.parse(disk.get("account-wipe.json") ?? "")).toEqual({
+    userId: "user_alice",
+    status: "unknown",
+    appleManual: false,
+  });
+
+  await device.continueAccountWipe();
+  await device.finishAccountWipe();
+
+  expect(disk.has("outbox-user_alice.json")).toBe(false);
+  expect(disk.has("outbox-user_bob.json")).toBe(true);
+  expect(signOut).toHaveBeenCalledTimes(1);
+});
+
+it("leaves the marker alone when nobody is signed in or a wipe is already under way", async () => {
+  const device = await freshLaunch();
+  session.signedIn = false;
+
+  device.onAccountDeleted();
+
+  expect(disk.has("account-wipe.json")).toBe(false);
+
+  session.signedIn = true;
+  device.beginAccountWipe({ userId: "user_alice", status: "pending", appleManual: true });
+  device.onAccountDeleted();
+
+  expect(JSON.parse(disk.get("account-wipe.json") ?? "").status).toBe("pending");
 });

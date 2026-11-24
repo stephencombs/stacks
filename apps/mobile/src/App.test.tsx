@@ -107,7 +107,7 @@ async function load({
   vi.doMock("./lib/actorKeys", () => ({ actorKeys: {} }));
   vi.doMock("./lib/accountDeletion", () => ({
     useAccountWipe: () => wipe,
-    onAccountRefused: () => {},
+    onAccountDeleted: () => {},
   }));
   vi.doMock("./features/AccountWipeScreen", () => ({
     AccountWipeScreen: () => createElement("section", null, "Clearing this phone"),

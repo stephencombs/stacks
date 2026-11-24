@@ -5,7 +5,9 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
+import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import * as AtomHttpApi from "effect/reactivity/AtomHttpApi";
 import type {
   ResolvePublicVenueRequest,
@@ -15,7 +17,14 @@ import type {
   TripId,
 } from "@stacks/contracts";
 import type { ActorCredential } from "@stacks/contracts/recordingCommands";
-import { GroupId, ORIGIN_HEADER, StacksApi, TableId, VenueId } from "@stacks/contracts";
+import {
+  GroupId,
+  ORIGIN_HEADER,
+  StacksApi,
+  TableId,
+  Unauthorized,
+  VenueId,
+} from "@stacks/contracts";
 
 import { newId } from "./ids.ts";
 import type { RecordingTransport } from "./recordingSync.ts";
@@ -33,20 +42,18 @@ export interface StacksClientOptions {
   readonly getToken: () => Promise<string | null>;
   /** This install's id, sent as `X-Origin` so the API can tell notices it caused from others. */
   readonly origin: string;
-  /**
-   * Called when the API refuses a request that carried the session token. A deleted account gets
-   * this on every request, but so does a token the API can't verify, so a caller confirms it
-   * before acting on it.
-   */
-  readonly onUnauthorized?: (() => void) | undefined;
+  /** Called when the API answers 401 with `account_deleted`. A bare 401 never calls it. */
+  readonly onAccountDeleted?: (() => void) | undefined;
 }
+
+const decodeRefusal = Schema.decodeUnknownOption(Schema.toCodecJson(Unauthorized));
 
 const withToken =
   ({
     getToken,
     origin,
-    onUnauthorized,
-  }: Pick<StacksClientOptions, "getToken" | "origin" | "onUnauthorized">) =>
+    onAccountDeleted,
+  }: Pick<StacksClientOptions, "getToken" | "origin" | "onAccountDeleted">) =>
   (client: HttpClient.HttpClient) =>
     client.pipe(
       HttpClient.mapRequestEffect((request) =>
@@ -59,10 +66,16 @@ const withToken =
         ),
       ),
       HttpClient.tap((response) =>
-        onUnauthorized &&
-        response.status === 401 &&
-        response.request.headers["authorization"] !== undefined
-          ? Effect.sync(onUnauthorized)
+        onAccountDeleted && response.status === 401
+          ? response.json.pipe(
+              Effect.map(decodeRefusal),
+              Effect.tap((refusal) =>
+                Option.exists(refusal, (error) => error.reason === "account_deleted")
+                  ? Effect.sync(onAccountDeleted)
+                  : Effect.void,
+              ),
+              Effect.ignore,
+            )
           : Effect.void,
       ),
     );
@@ -88,14 +101,14 @@ export const makeRecordingTransport: (options: StacksClientOptions) => Recording
   baseUrl,
   getToken,
   origin,
-  onUnauthorized,
+  onAccountDeleted,
 }: StacksClientOptions) => {
   const client = (actor: ActorCredential | null) =>
     HttpApiClient.make(StacksApi, {
       baseUrl,
       transformClient: actor
         ? withActor(actor, origin)
-        : withToken({ getToken, origin, onUnauthorized }),
+        : withToken({ getToken, origin, onAccountDeleted }),
     }).pipe(Effect.provide(FetchHttpClient.layer));
 
   return {
@@ -296,13 +309,13 @@ export const makeStacksClient = ({
   baseUrl,
   getToken,
   origin,
-  onUnauthorized,
+  onAccountDeleted,
 }: StacksClientOptions) => {
   class StacksClient extends AtomHttpApi.Service<StacksClient>()("@stacks/StacksClient", {
     api: StacksApi,
     httpClient: FetchHttpClient.layer,
     baseUrl,
-    transformClient: withToken({ getToken, origin, onUnauthorized }),
+    transformClient: withToken({ getToken, origin, onAccountDeleted }),
   }) {}
 
   const keys = { reactivityKeys: LEDGER_KEYS };
@@ -366,53 +379,25 @@ export const settle = <A, E>(effect: Effect.Effect<A, E>) =>
 
 /**
  * Deleting the signed-in account, outside the query cache: the You sheet opens with no account
- * screens mounted. `preview` reads what deleting would change. `remove` deletes; a refusal
- * counts as done only when `gone` agrees, which covers a repeat after a lost response and a
- * deletion from another device. `gone` asks again with a token from `freshToken`, so a stale one
- * isn't mistaken for a deleted account.
+ * screens mounted. `preview` reads what deleting would change; `remove` deletes, and asking again
+ * after a lost response returns the deletion's state.
  */
 export const makeAccountApi = ({
   baseUrl,
   getToken,
-  freshToken,
   origin,
-}: Pick<StacksClientOptions, "baseUrl" | "getToken" | "origin"> & {
-  readonly freshToken: () => Promise<string | null>;
-}) => {
-  const clientWith = (token: () => Promise<string | null>) =>
-    HttpApiClient.make(StacksApi, {
-      baseUrl,
-      transformClient: withToken({ getToken: token, origin }),
-    }).pipe(Effect.provide(FetchHttpClient.layer));
-
-  const client = clientWith(getToken);
-
-  const gone = Effect.gen(function* () {
-    const token = yield* Effect.promise(freshToken);
-
-    if (token === null) return false;
-
-    return yield* Effect.flatMap(
-      clientWith(() => Promise.resolve(token)),
-      (api) => api.account.deletionPreview(),
-    ).pipe(
-      Effect.as(false),
-      Effect.catch((error) => Effect.succeed(Predicate.isTagged(error, "Unauthorized"))),
-    );
-  });
+  onAccountDeleted,
+}: Pick<StacksClientOptions, "baseUrl" | "getToken" | "origin" | "onAccountDeleted">) => {
+  const client = HttpApiClient.make(StacksApi, {
+    baseUrl,
+    transformClient: withToken({ getToken, origin, onAccountDeleted }),
+  }).pipe(Effect.provide(FetchHttpClient.layer));
 
   return {
     preview: Effect.flatMap(client, (api) => api.account.deletionPreview()),
     remove: (authorizationCode?: string) =>
       Effect.flatMap(client, (api) =>
         api.account.delete({ payload: authorizationCode ? { authorizationCode } : {} }),
-      ).pipe(
-        Effect.catchTag("Unauthorized", (refused) =>
-          Effect.flatMap(gone, (deleted) =>
-            deleted ? Effect.succeed({ status: "complete" as const }) : Effect.fail(refused),
-          ),
-        ),
       ),
-    gone,
   };
 };
