@@ -1,6 +1,4 @@
 import { useClerk, useUser } from "@clerk/expo";
-import { describeError } from "@stacks/client-runtime/errors";
-import { exportPersonalSessionsCsv, personalCsvFilename } from "@stacks/client-runtime/export";
 import { gameNames } from "@stacks/client-runtime/format";
 import { useRecordingHome, useRecordingSync } from "@stacks/client-runtime/recordingReact";
 import { themeChoices } from "@stacks/client-runtime/theme";
@@ -25,11 +23,12 @@ import {
   setShowCents,
   usePreferences,
 } from "../lib/preferences";
-import { shareCsv } from "../lib/share";
 import { setTheme, useTheme } from "../lib/theme";
 import { AppleSignInButton } from "./AppleSignInButton";
 import { SignInButton } from "./SignInButton";
 import { UserAvatar } from "./UserAvatar";
+import { DeleteAccountSheet } from "./DeleteAccountSheet";
+import { useSessionsExport } from "./useSessionsExport";
 import { CasinoPickerSheet } from "./VenuePicker";
 
 type DefaultGameChoice = Game | "none";
@@ -110,32 +109,15 @@ function YouSettings({
 }) {
   const account = useAccount();
   const sync = useRecordingSync();
-  const { home, status, error, retryLoad } = useRecordingHome();
+  const { status, error, retryLoad } = useRecordingHome();
   const theme = useTheme();
   const prefs = usePreferences();
   const [picking, setPicking] = useState<"game" | "venue" | null>(null);
-
-  const [exportState, setExportState] = useState<{ pending: boolean; error: string | null }>({
-    pending: false,
-    error: null,
-  });
+  const [deleting, setDeleting] = useState(false);
+  const csv = useSessionsExport();
 
   const signedIn = account.available && account.isLoaded && !!account.isSignedIn;
   const ios = Platform.OS === "ios";
-  const finished = home?.finished ?? [];
-
-  const exportSessions = async () => {
-    if (exportState.pending || finished.length === 0) return;
-    setExportState({ pending: true, error: null });
-
-    try {
-      const csv = exportPersonalSessionsCsv(finished);
-      await shareCsv(personalCsvFilename(), csv);
-      setExportState({ pending: false, error: null });
-    } catch (error) {
-      setExportState({ pending: false, error: describeError(error) });
-    }
-  };
 
   if (open && picking === "venue")
     return (
@@ -151,14 +133,10 @@ function YouSettings({
       />
     );
 
+  if (open && deleting) return <DeleteAccountSheet onClose={() => setDeleting(false)} />;
+
   return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="You"
-      large={ios}
-      footer={signedIn && !ios ? <SignOutButton /> : undefined}
-    >
+    <Sheet open={open} onClose={onClose} title="You" large={ios}>
       {signedIn && !ios ? (
         <Card className="flex-row items-center gap-3 p-4">
           <Profile fallbackName={name} />
@@ -276,7 +254,7 @@ function YouSettings({
           title="Export"
           footer={
             <>
-              {exportState.error ? <FormError>{exportState.error}</FormError> : null}
+              {csv.error ? <FormError>{csv.error}</FormError> : null}
               <Text className="px-1 type-footnote text-muted">
                 All of your session history can always be exported as a file.
               </Text>
@@ -285,37 +263,34 @@ function YouSettings({
         >
           <SettingsRow
             icon={<Icon name="download" color="ink" size={16} />}
-            title={exportState.pending ? "Exporting…" : "Export sessions (CSV)"}
+            title={csv.pending ? "Exporting…" : "Export sessions (CSV)"}
             subtitle={
-              finished.length === 0
+              csv.count === 0
                 ? "Finish a session to export it"
-                : `${finished.length} finished ${finished.length === 1 ? "session" : "sessions"}`
+                : `${csv.count} finished ${csv.count === 1 ? "session" : "sessions"}`
             }
-            onPress={
-              finished.length > 0 && !exportState.pending ? () => void exportSessions() : undefined
-            }
+            onPress={csv.count > 0 && !csv.pending ? () => void csv.run() : undefined}
             accessibilityHint="Exports all recorded sessions as a CSV file"
           />
         </SettingsGroup>
 
-        {signedIn && ios ? (
-          <>
-            <SettingsGroup title="Account">
+        {signedIn ? (
+          <SettingsGroup title="Account">
+            {ios ? (
               <Row className="py-3">
                 <Profile fallbackName={name} />
               </Row>
-            </SettingsGroup>
-            <SettingsGroup>
-              <SignOutRow />
-            </SettingsGroup>
-          </>
-        ) : !signedIn ? (
+            ) : null}
+            <SignOutRow />
+            <DeleteAccountRow onPress={() => setDeleting(true)} />
+          </SettingsGroup>
+        ) : (
           <SettingsGroup title="Account">
             <View className="p-4">
               <AccountActions />
             </View>
           </SettingsGroup>
-        ) : null}
+        )}
       </View>
     </Sheet>
   );
@@ -353,10 +328,16 @@ function SignOutRow() {
   );
 }
 
-function SignOutButton() {
-  const { signOut } = useClerk();
-
-  return <Button label="Sign out" variant="danger" onPress={() => void signOut()} />;
+function DeleteAccountRow({ onPress }: { onPress: () => void }) {
+  return (
+    <Row
+      className="min-h-12 py-3"
+      accessibilityHint="Deletes your account and the data on this phone"
+      onPress={onPress}
+    >
+      <Text className="type-body font-medium text-loss">Delete account</Text>
+    </Row>
+  );
 }
 
 function Note({ children }: { children: ReactNode }) {

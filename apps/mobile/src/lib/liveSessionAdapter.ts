@@ -124,6 +124,14 @@ const defaultDrivers: LiveSurfaceDrivers = {
   },
 };
 
+/** Ends the Live Activity or Android Live Update, whatever session it showed. */
+export async function endLiveSurface() {
+  if (Platform.OS === "ios") {
+    const { dispatchIosLiveSession } = await import("./iosLiveSession");
+    await dispatchIosLiveSession({ kind: "idle" }, null);
+  } else await dispatchLiveSessionSurface({ kind: "idle" }, defaultDrivers);
+}
+
 /** Synchronizes the recording session with the system's live surface. */
 export function LiveSessionBridge() {
   const snapshot = useSyncExternalStore(recordingStore.subscribe, recordingStore.getSnapshot);

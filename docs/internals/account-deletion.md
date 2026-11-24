@@ -60,3 +60,24 @@ A foreign key that points at `users`, `players` or `recording_actors` needs a de
 such key from `pg_constraint` and fails on one it doesn't know. A column that holds a user or actor id
 without a foreign key (`personal_entries.created_by`) needs the same care and has no test to remind
 you.
+
+## On the phone
+
+Deleting from You asks the API first, then hands the phone to a wipe. `AccountWipeScreen` replaces
+the whole app while it runs, which is what stops sync and realtime: nothing is mounted to keep
+writing. The wipe ends the Live Activity or Live Update, closes the recording store and deletes
+its database, forgets the device actor, removes the account's outbox, last trip and stats copies,
+then signs out of Clerk. _Done_ reloads the app signed out, on Play.
+
+- **The marker comes first.** `account-wipe.json` is written before any step and removed only after
+  sign-out, so an app killed partway finishes at the next launch, from the same screen. Every
+  step must succeed when what it removes is already gone. A new file or key kept per user needs a
+  step in `lib/accountDeletion.ts`.
+- **A refused token is not proof.** The fence answers a deleted account's other devices with 401,
+  but the API gives the same 401 to a token it can't verify, such as a bad deploy. Wiping on that
+  would cost people play that exists only on their phone. So a 401 starts a wipe only when a fresh
+  session token is refused too, checked at most once a minute. A typed "account deleted" error
+  from the fence would remove the doubt.
+- **Apple.** The code comes from `expo-apple-authentication` on iOS just before the request. A
+  cancelled sheet, or Android, doesn't stop the deletion; the wipe screen then shows how to remove
+  Color Up from the Apple Account by hand.

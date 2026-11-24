@@ -9,7 +9,7 @@ Color Up has four tabs and a You sheet. Each tab answers one question:
 | **Map**   | Where have I played?              | Venues as pins colored by result, and a day or trip drawn as a path between them |
 | **Crew**  | What are my friends doing?        | Activity from your groups, newest first, with the current trip pinned on top     |
 
-**You** opens from the avatar on every tab: account, recording defaults, display (cents, privacy mode, theme) and export. It is a sheet, not a tab, because nobody opens the app to change a setting.
+**You** opens from the avatar on every tab: account (sign out and delete account), recording defaults, display (cents, privacy mode, theme) and export. It is a sheet, not a tab, because nobody opens the app to change a setting.
 
 iOS uses native bottom tabs and Android uses the platform destination bar. Both have the same destinations and names.
 

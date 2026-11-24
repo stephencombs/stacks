@@ -23,3 +23,10 @@ export const wakeOutbox = (flush: () => void) => {
 
   return () => subscription.remove();
 };
+
+/** Drops a person's queued entries. */
+export const deleteOutbox = (userId: string) => {
+  const file = new File(Paths.document, `outbox-${userId}.json`);
+
+  if (file.exists) file.delete();
+};
