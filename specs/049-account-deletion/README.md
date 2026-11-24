@@ -140,7 +140,7 @@ player goes back to being a guest, and keeps the name and ledger rows.
     `APPLE_PRIVATE_KEY`.
   - On Android, or if the sheet is cancelled or revocation fails, deletion still completes. The
     app then shows how to remove Color Up under Settings → Apple Account → Sign in with Apple, as
-    TN3194 advises. Depends on spec 044.
+    TN3194 advises. Depends on spec 048.
 - **Removing the name on request.** An admin script (`apps/api/scripts`) renames a former
   account's guest to "Former player" and wipes notes on its entries. It handles Art. 21
   objections and requests made to the support address. The runbook is the internal doc.
@@ -153,7 +153,7 @@ player goes back to being a guest, and keeps the name and ledger rows.
     confirmation says so,
   - the SecureStore actor key (`color-up-actor`),
   - `outbox-<userId>.json`, `last-trip-<userId>` and `stats-<userId>-*.json`,
-  - `contact-photos/` (spec 043).
+  - `contact-photos/` (spec 047).
 
   Then sign out of Clerk and go to the signed-out Play tab. Crew shows Landing.
 - **Recovery.** The wipe is safe to repeat. If the app is killed partway through, it finishes the
@@ -195,7 +195,7 @@ player goes back to being a guest, and keeps the name and ledger rows.
   It offers the CSV export first. Its buttons are "Delete account" (`danger`) and "Keep account"
   (`secondary`), with `busy` while pending. On success it runs the device wipe. On `pending` it
   wipes anyway and says the sign-in record will finish deleting shortly.
-- [ ] **Web page for Play.** This depends on spec 046's domain, not `workers.dev`. It is a public
+- [ ] **Web page for Play.** This depends on spec 050's domain, not `workers.dev`. It is a public
       page with no login, which leads with how to ask for deletion without the app: email the
       support address from your account's email. It also lists:
   - the app and developer name,

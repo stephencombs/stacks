@@ -22,7 +22,7 @@ equivalent privacy-preserving option like this.
 ## Prerequisites
 
 - **Account deletion (App Store guideline 5.1.1(v)).** Any app that creates accounts must let
-  users start deleting their account inside the app. `You.tsx` has sign-out only. Spec 045
+  users start deleting their account inside the app. `You.tsx` has sign-out only. Spec 049
   covers deletion, including revoking Apple tokens. This
   spec can be built first, but it can't ship to the App Store without deletion.
 - **Production Clerk instance.** The EAS `production` profile (`eas.json:51`) points at a Clerk

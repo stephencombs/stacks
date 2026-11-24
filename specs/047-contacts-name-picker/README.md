@@ -74,7 +74,7 @@ the photos.
 ### Model
 
 - **Never leaves the phone.** A photo is never uploaded, synced, logged or sent. It is left out of
-  shared images (spec 047 draws initials), and out of cloud backups: on iOS
+  shared images (spec 051 draws initials), and out of cloud backups: on iOS
   `isExcludedFromBackup`, on Android a `<cloud-backup>` exclude. Each friend sees the photo from
   their own address book, or initials. Data that stays on the device doesn't count as
   "collected" for Apple's privacy details or Play's Data safety.
@@ -82,7 +82,7 @@ the photos.
   matching by account, and never by name.
   - A friend in two groups is two players, and is linked twice. That keeps Change and Remove
     simple: they act on one player, with no fallback that could bring back an old photo.
-  - Renames, claims, and account deletion (spec 045, which keeps the player ID) don't affect it.
+  - Renames, claims, and account deletion (spec 049, which keeps the player ID) don't affect it.
   - Linking across groups by account needs `userId` on table and stats views. That belongs in a
     later spec, if people ask for it.
 - **A snapshot, not a sync.** Without the contacts permission the app can't see later changes to
@@ -101,7 +101,7 @@ the photos.
     the key.
   - Signing out keeps photos, like the device's recording ledger (`lib/recording.ts:6`), which
     also stays.
-  - Deleting an account (spec 045) deletes the folder.
+  - Deleting an account (spec 049) deletes the folder.
 
 ### Native module
 

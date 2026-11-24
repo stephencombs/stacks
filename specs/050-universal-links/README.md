@@ -52,7 +52,7 @@ and until the listings exist the fallback page says how to get the app.
 ## Requirements
 
 - [ ] **Decide the domain** before building. Use a domain we own, not `*.workers.dev`. It goes
-      into every link, so changing it later breaks links already sent. Spec 045's Play page uses
+      into every link, so changing it later breaks links already sent. Spec 049's Play page uses
       it too.
 - [ ] **Worker routes**, served before `Database.layer` is built (`worker.ts:48`), with no database
       access:

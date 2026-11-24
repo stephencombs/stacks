@@ -39,7 +39,7 @@ share sheet.
   - Preview and capture render from the same redacted model.
   - Toggling throws away any earlier capture, so an unredacted image can't be shared after
     hiding.
-- **Initials only.** The card never shows contact photos (spec 043 keeps them on the phone).
+- **Initials only.** The card never shows contact photos (spec 047 keeps them on the phone).
 - **Your money only, unless it's a group trip.** A session card is offered only for your own
   visit, closed and not deleted (`Play.tsx` can open other players' visits). A trip card shows
   the group's standings, which every member already sees.
@@ -87,7 +87,7 @@ share sheet.
 
 ## Non-goals
 
-- Server-rendered images, or putting the card in invite links (spec 046 uses static cards).
+- Server-rendered images, or putting the card in invite links (spec 050 uses static cards).
 - Contact photos on cards.
 - Video, animation, or a year-in-review summary.
 
