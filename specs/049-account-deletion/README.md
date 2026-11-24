@@ -3,10 +3,10 @@ status: draft
 created: 2026-11-24
 priority: high
 tags:
-- api
-- mobile
-- contracts
-- privacy
+  - api
+  - mobile
+  - contracts
+  - privacy
 created_at: 2026-11-24T03:33:37.146142700Z
 updated_at: 2026-11-24T03:33:37.146142700Z
 ---
@@ -96,6 +96,7 @@ player goes back to being a guest, and keeps the name and ledger rows.
   - `sessions.closed_by`.
 
   `venues.created_by` (nullable) is set to null. Void timestamps don't change.
+
 - **`personal_entries` and `personal_operations` use UUIDs, not users.** Their `created_by`,
   `voided_by` and `actor_id` hold recording-actor IDs; confirm this against
   `0012_personal_recording.ts`. Where the deleted account's actor appears, replace it with one
@@ -156,6 +157,7 @@ player goes back to being a guest, and keeps the name and ledger rows.
   - `contact-photos/` (spec 047).
 
   Then sign out of Clerk and go to the signed-out Play tab. Crew shows Landing.
+
 - **Recovery.** The wipe is safe to repeat. If the app is killed partway through, it finishes the
   wipe at the next launch, because a marker is set before the wipe starts. Another signed-in
   device gets an auth rejection from the fence, and runs the same wipe.
@@ -195,6 +197,7 @@ player goes back to being a guest, and keeps the name and ledger rows.
   It offers the CSV export first. Its buttons are "Delete account" (`danger`) and "Keep account"
   (`secondary`), with `busy` while pending. On success it runs the device wipe. On `pending` it
   wipes anyway and says the sign-in record will finish deleting shortly.
+
 - [ ] **Web page for Play.** This depends on spec 050's domain, not `workers.dev`. It is a public
       page with no login, which leads with how to ask for deletion without the app: email the
       support address from your account's email. It also lists:
@@ -205,6 +208,7 @@ player goes back to being a guest, and keeps the name and ledger rows.
 
   The runbook covers checking that the request came from the account's email address and
   running `Account.delete` for that user.
+
 - [ ] **Disclosures.** The privacy policy, App Store privacy details, Play Data safety and App
       Review notes cover what is deleted, what friends keep and why, how long, and how to ask for
       the name to be removed.

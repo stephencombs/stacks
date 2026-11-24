@@ -29,6 +29,8 @@
       --color-felt-deep: oklch(0.435 0.095 155.9);
       --color-felt-ink: oklch(1 0 0);
       --color-felt-soft: oklch(1 0 0 / 0.76);
+      --color-felt-win: oklch(0.845 0.13 165);
+      --color-felt-loss: oklch(0.808 0.103 19.6);
       --color-live: oklch(0.515 0.113 155.3);
       --color-chip-red: oklch(0.602 0.202 24.6);
       --color-chip-blue: oklch(0.563 0.182 260.6);
@@ -82,6 +84,8 @@
       --color-felt-deep: oklch(0.337 0.072 156);
       --color-felt-ink: oklch(0.988 0.017 159.1);
       --color-felt-soft: oklch(0.988 0.017 159.1 / 0.72);
+      --color-felt-win: oklch(0.845 0.13 165);
+      --color-felt-loss: oklch(0.838 0.088 25.1);
       --color-live: oklch(0.79 0.166 154.9);
       --color-chip-red: oklch(0.692 0.198 22.5);
       --color-chip-blue: oklch(0.677 0.17 262.2);

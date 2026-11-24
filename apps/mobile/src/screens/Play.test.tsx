@@ -97,6 +97,9 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
   vi.doMock("../components/ui/DateTimeField", () => ({ DateTimeField: () => null }));
   vi.doMock("../features/Chip", () => ({ Chip: () => null }));
+  vi.doMock("../features/ShareCardSheet", () => ({
+    ShareCardSheet: ({ title }: { title: string }) => <div>Card preview for {title}</div>,
+  }));
   vi.doMock("../components/Money", () => ({ Money: () => null }));
   vi.doMock("../components/ui/Field", () => ({ FormError: Container }));
   vi.doMock("../components/ui/Surface", () => ({
@@ -225,6 +228,20 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     );
     expect(element.textContent).not.toContain("Cash out sheet");
     expect(setParams).toHaveBeenCalledWith({ action: undefined });
+    expect(element.textContent).toContain("Edit my session");
+    expect(element.textContent).not.toContain("Card preview");
+    await click("Share card");
+    expect(element.textContent).toContain("Card preview for Session");
+
+    await act(async () =>
+      root.render(
+        <RecordingProvider store={store}>
+          <PlayScreen key="theirs" route={{ params: { visitId: guest.id } }} />
+        </RecordingProvider>,
+      ),
+    );
+    expect(element.textContent).toContain("Edit Bea's session");
+    expect(element.textContent).not.toContain("Share card");
   } finally {
     await act(async () => root.unmount());
     await store.close();

@@ -26,6 +26,7 @@ What color is this text?
  ├── Something destructive or a failure → text-loss
  ├── "Live" or a running time on a card or the page → text-live
  ├── The amount, clock and labels on felt → text-felt-ink, and text-felt-soft for large secondary text
+ ├── A result on felt → text-felt-win / text-felt-loss (through Money felt)
  └── A placeholder dash, a chevron, a disabled label → text-faint
 ```
 
@@ -40,7 +41,7 @@ What color is this text?
 
 ## Brand
 
-Onboarding and the iOS Play header use `BrandWordmark`, the refreshed four-color Color Up artwork from Figma. Its wordmark ink adapts in dark mode. Android Play uses the felt chip mark next to the app name.
+Onboarding and the iOS Play header use `BrandWordmark`, the refreshed four-color Color Up artwork from Figma. Its wordmark ink adapts in dark mode, and `felt` sets it in felt ink for a share card. Android Play uses the felt chip mark next to the app name.
 
 ## Type
 

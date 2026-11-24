@@ -58,6 +58,7 @@
     "react-native-safe-area-context": "~5.11.1",
     "react-native-screens": "~4.30.1",
     "react-native-svg": "15.16.0",
+    "react-native-view-shot": "6.1.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "catalog:",
     "uniwind": "1.13.0"

@@ -7,7 +7,7 @@ import { cn } from "./ui/cn";
 /**
  * An amount in the group's currency. `result` colors wins and losses and always shows the sign,
  * so the number reads correctly without the color. Privacy mode masks both the figure and the
- * win/loss tint.
+ * win/loss tint; `hidden` overrides it, for a card that decides for itself.
  */
 export function Money({
   amount,
@@ -15,6 +15,7 @@ export function Money({
   tone = "plain",
   felt = false,
   fit = false,
+  hidden: hiddenProp,
   testID,
   className,
 }: {
@@ -24,16 +25,23 @@ export function Money({
   felt?: boolean;
   /** Shrink to one line instead of wrapping, for a hero figure on a narrow phone. */
   fit?: boolean;
+  /** Masks the amount whatever privacy mode says; by default it follows privacy mode. */
+  hidden?: boolean;
   /** For the simulator E2E flows in apps/mobile/maestro. */
   testID?: string;
   className?: string;
 }) {
   const prefs = usePreferences();
-  const hidden = prefs.privacyMode;
+  const hidden = hiddenProp ?? prefs.privacyMode;
 
-  const formatted = formatDisplayMoney(amount, currency, prefs, {
-    signDisplay: tone === "result" ? "exceptZero" : "auto",
-  });
+  const formatted = formatDisplayMoney(
+    amount,
+    currency,
+    { ...prefs, privacyMode: hidden },
+    {
+      signDisplay: tone === "result" ? "exceptZero" : "auto",
+    },
+  );
 
   return (
     <Text
@@ -53,9 +61,9 @@ export function Money({
               : "text-ink"
             : felt
               ? amount > 0
-                ? "text-[#6EE7B7]"
+                ? "text-felt-win"
                 : amount < 0
-                  ? "text-[#FCA5A5]"
+                  ? "text-felt-loss"
                   : "text-felt-soft"
               : amount > 0
                 ? "text-win"

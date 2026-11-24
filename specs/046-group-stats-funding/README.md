@@ -2,11 +2,11 @@
 status: planned
 created: 2026-11-24
 tags:
-- stats
-- api
-- mobile
+  - stats
+  - api
+  - mobile
 depends_on:
-- 045-group-stats-insights
+  - 045-group-stats-insights
 parent: 043-stats-redesign
 created_at: 2026-11-24T03:30:29.100455400Z
 updated_at: 2026-11-24T03:30:29.100455400Z
