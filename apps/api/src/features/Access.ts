@@ -50,6 +50,18 @@ export const lockGroup = Effect.fn("Access.lockGroup")(function* (groupId: Group
   yield* sql`select id from groups where id = ${groupId} for update`;
 });
 
+/** What a person joining a group becomes: its owner, when it has none left. Needs the group lock. */
+export const joiningRole = Effect.fn("Access.joiningRole")(function* (groupId: GroupId) {
+  const sql = yield* SqlClient.SqlClient;
+
+  const [owners] = yield* sql`
+    select count(*)::int as count from memberships
+    where group_id = ${groupId} and role = 'owner' and left_at is null
+  `.pipe(Effect.flatMap(decodeRows(Schema.Struct({ count: Schema.Int }))));
+
+  return owners!.count === 0 ? ("owner" as const) : ("member" as const);
+});
+
 export const requireAdmin = (member: Membership) =>
   member.role === "member" ? Effect.fail(new Forbidden({ reason: "admins_only" })) : Effect.void;
 

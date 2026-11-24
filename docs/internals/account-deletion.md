@@ -25,11 +25,17 @@ balances and stakes come out the same. `Account.remove` does it in one transacti
   `on` for the transaction, which only `Account.remove` sets. Never disable the trigger instead.
 - A group is deleted only if no one else was ever in it (`memberships` rows, active or left): a
   former member's entries and stakes live there. Whether the deleted account was still a member
-  doesn't matter. A group kept with no active member to inherit it stays as it is, with no owner and
-  its guests, reachable by no one; nothing restores a former member without their say.
-- Deleting, leaving, removal, roles, joins and claims all lock the group row first
-  (`Access.lockGroup`), so the successor `Account.remove` picks can't leave while it promotes them.
-  A promotion that touches no row fails the transaction, which retries.
+  doesn't matter. A group kept with no active member to inherit it stays as it is, with its guests and
+  no owner. Nobody sees it until a former member rejoins through an invite that is still open, or
+  someone claims a guest; whoever joins a group with no active owner becomes its owner
+  (`Access.joiningRole`).
+- Deleting, leaving, removal, roles, joins and claims all take the group row lock first
+  (`Access.lockGroup`) and read who is in the group only after it, so the successor
+  `Account.remove` picks can't leave while it promotes them. A promotion that touches no row fails
+  the transaction, which retries. An owner's role is never changed through `setRole`.
+- Locks are taken in one order, the order recording commands use: the group, `player_actors` rows,
+  the account's tables, then memberships. `Account.remove` takes all of them up front, so it can't
+  deadlock with a push.
 - A table is deleted only if nobody else played at it **and** no surviving group's trip counts it.
   A table that only the deleted account played, in a trip with friends, is part of their results.
 - The fence is `account_deletions`. Authentication rejects a token whose subject hash is in it, so a
@@ -37,10 +43,13 @@ balances and stakes come out the same. `Account.remove` does it in one transacti
   `AccountAuthentication`, which verifies the token but skips the fence, so a lost response is
   recovered by asking again: the answer is the job's state, `pending` or `complete`, and nothing is
   repeated. The fence row stays for good because it holds a hash, not an identity. `user_id` is kept
-  on it only until Clerk confirms the deletion.
+  on it only until Clerk confirms the deletion. A refused token carries `reason: "account_deleted"`
+  on its 401, so an app can tell a deleted account from an expired session. `RecordingAuthentication`
+  lists the `bearer` scheme last, because the middleware returns the last scheme's error.
 - The cron claims due jobs with a lease (`for update skip locked`), so overlapping runs take
-  different jobs, and a job that fails waits `2^attempts` minutes (to six hours). Each Clerk call is
-  cut off after ten seconds.
+  different jobs, and a job that fails waits `2^attempts` minutes (capped at six hours; the exponent is
+  capped too, or `power` overflows). A new job isn't due for ten minutes, so the cron doesn't race the
+  request that made it. Each Clerk and Apple call is cut off after ten seconds.
 - A write that was in flight when the fence committed is stopped inside its own transaction:
   recording commands and share links take the shared fence lock and read the recorder's bindings
   `for share`, so a recorder resolved before the deletion can't write after it.

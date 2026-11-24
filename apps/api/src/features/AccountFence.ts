@@ -27,7 +27,7 @@ const isFenced = Effect.fn("AccountFence.isFenced")(function* (userId: string) {
 
 /** Rejects a token whose subject was deleted. */
 export const reject = Effect.fn("AccountFence.reject")(function* (userId: string) {
-  if (yield* isFenced(userId)) return yield* new Unauthorized();
+  if (yield* isFenced(userId)) return yield* new Unauthorized({ reason: "account_deleted" });
 });
 
 /**

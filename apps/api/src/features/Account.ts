@@ -386,6 +386,48 @@ const moveAudit = Effect.fn("Account.moveAudit")(function* (userId: string) {
   yield* sql`update venues set created_by = null where created_by = ${userId}`;
 });
 
+const lockInOrder = Effect.fn("Account.lockInOrder")(function* (
+  userId: string,
+  mine: ReadonlyArray<typeof PlayerRow.Type>,
+  groups: ReadonlyArray<{ readonly groupId: GroupId }>,
+  handovers: ReadonlyArray<{
+    readonly group: { readonly groupId: GroupId };
+    readonly successor: { readonly userId: UserId };
+  }>,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const actor = mine.find((player) => player.actorId !== null)?.actorId ?? null;
+
+  const players =
+    mine.length === 0 ? sql`false` : sql`player_id in ${sql.in(mine.map(({ id }) => id))}`;
+
+  const bindings =
+    actor === null ? sql`false` : sql`actor_id = ${actor} or invited_by_actor = ${actor}`;
+
+  yield* sql`
+    select 1 from player_actors where ${players} or ${bindings} order by player_id, actor_id for update
+  `;
+
+  if (mine.length > 0)
+    yield* sql`
+      select id from tables where starter_player_id in ${sql.in(mine.map(({ id }) => id))}
+      order by id for update
+    `;
+
+  const rows = [
+    ...groups.map(({ groupId }) => ({ groupId, userId })),
+    ...handovers.map(({ group, successor }) => ({
+      groupId: group.groupId,
+      userId: successor.userId,
+    })),
+  ].toSorted((a, b) => a.groupId.localeCompare(b.groupId) || a.userId.localeCompare(b.userId));
+
+  for (const row of rows)
+    yield* sql`
+      select 1 from memberships where group_id = ${row.groupId} and user_id = ${row.userId} for update
+    `;
+});
+
 const cleanup = Effect.fn("Account.cleanup")(function* (userId: string) {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`select set_config('stacks.account_deletion', 'on', true)`;
@@ -394,12 +436,14 @@ const cleanup = Effect.fn("Account.cleanup")(function* (userId: string) {
     where id in (select group_id from memberships where user_id = ${userId})
     order by id for update
   `;
-  const { solo, handovers } = yield* plan(userId);
+  const { solo, staying, handovers } = yield* plan(userId);
   const soloGroups = solo.map((row) => row.groupId);
 
   const mine = yield* sql`
     select id, group_id, recording_actor_id as actor_id from players where user_id = ${userId}
   `.pipe(Effect.flatMap(Access.decodeRows(PlayerRow)));
+
+  yield* lockInOrder(userId, mine, [...solo, ...staying], handovers);
 
   const memberOf = yield* sql`select group_id from memberships where user_id = ${userId}`.pipe(
     Effect.flatMap(Access.decodeRows(Schema.Struct({ groupId: GroupId }))),
@@ -482,7 +526,10 @@ export const remove = Effect.fn("Account.remove")(function* (
 
       if (done !== null) return done;
       yield* cleanup(userId);
-      yield* sql`insert into account_deletions (user_id_hash, user_id) values (${hash}, ${userId})`;
+      yield* sql`
+        insert into account_deletions (user_id_hash, user_id, next_attempt_at)
+        values (${hash}, ${userId}, now() + interval '10 minutes')
+      `;
 
       return null;
     }),
@@ -547,9 +594,12 @@ export const retryClerkDeletions = Effect.fn("Account.retryClerkDeletions")(func
           sql`
             update account_deletions
             set attempts = attempts + 1,
-              next_attempt_at = now() + least(power(2, attempts) * interval '1 minute', interval '6 hours')
+              next_attempt_at = now() + make_interval(mins => least(power(2, least(attempts, 9)), 360)::int)
             where user_id_hash = ${job.userIdHash}
           `.pipe(Effect.as(false)),
+        ),
+        Effect.catchCause((cause) =>
+          Effect.logError("Retrying a Clerk deletion failed", cause).pipe(Effect.as(false)),
         ),
       ),
     { concurrency: 5 },

@@ -189,6 +189,8 @@ export const accept = Effect.fn("Invites.accept")(function* (
         });
       }
 
+      const role = yield* Access.joiningRole(invite.groupId);
+
       if (existing) {
         yield* sql`
           insert into membership_absences (group_id, user_id, left_at, returned_at)
@@ -196,13 +198,13 @@ export const accept = Effect.fn("Invites.accept")(function* (
           where group_id = ${invite.groupId} and user_id = ${userId} and left_at is not null
         `;
         yield* sql`
-          update memberships set left_at = null, role = 'member', joined_at = now()
+          update memberships set left_at = null, role = ${role}, joined_at = now()
           where group_id = ${invite.groupId} and user_id = ${userId}
         `;
       } else {
         yield* sql`
           insert into memberships (group_id, user_id, role)
-          values (${invite.groupId}, ${userId}, 'member')
+          values (${invite.groupId}, ${userId}, ${role})
         `;
         yield* sql`
           insert into players (id, group_id, display_name, user_id, created_by)

@@ -58,5 +58,5 @@ export class RecordingAuthentication extends HttpApiMiddleware.Service<
   { provides: Recorder }
 >()("@stacks/contracts/RecordingAuthentication", {
   error: Unauthorized,
-  security: { bearer: HttpApiSecurity.bearer, actor: HttpApiSecurity.http({ scheme: "Actor" }) },
+  security: { actor: HttpApiSecurity.http({ scheme: "Actor" }), bearer: HttpApiSecurity.bearer },
 }) {}

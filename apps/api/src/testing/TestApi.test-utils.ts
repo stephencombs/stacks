@@ -64,7 +64,7 @@ const verifyTest: Upgrade.Upgrade["verify"] = (credential) =>
 interface Outside {
   clerkDown: boolean;
   appleDown: boolean;
-  clerkAttempts: number;
+  readonly clerkAttempts: Map<string, number>;
   readonly clerkFailing: Set<string>;
   readonly clerkDeleted: Array<string>;
   readonly appleLinked: Set<string>;
@@ -74,7 +74,7 @@ interface Outside {
 const outside: Outside = {
   clerkDown: false,
   appleDown: false,
-  clerkAttempts: 0,
+  clerkAttempts: new Map(),
   clerkFailing: new Set(),
   clerkDeleted: [],
   appleLinked: new Set(),
@@ -84,7 +84,7 @@ const outside: Outside = {
 const testClerk = ClerkAdmin.of({
   deleteUser: (userId) =>
     Effect.suspend(() => {
-      outside.clerkAttempts += 1;
+      outside.clerkAttempts.set(userId, (outside.clerkAttempts.get(userId) ?? 0) + 1);
 
       return outside.clerkDown || outside.clerkFailing.has(userId)
         ? Effect.fail(new ClerkUnavailable({ status: 503 }))
