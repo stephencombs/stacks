@@ -190,9 +190,9 @@ describe("groupStats", () => {
     );
 
     expect(stats.byGame).toEqual([
-      { game: "blackjack", sessions: 1, result: 300 },
-      { game: "craps", sessions: 1, result: 50 },
-      { game: null, sessions: 1, result: -20 },
+      { game: "blackjack", sessions: 1, appearances: 1, result: 300 },
+      { game: "craps", sessions: 1, appearances: 2, result: 50 },
+      { game: null, sessions: 1, appearances: 1, result: -20 },
     ]);
     expect(stats.byCasino.map((row) => [row.venueId, row.sessions, row.result])).toEqual([
       [bellagio, 1, 300],

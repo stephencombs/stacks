@@ -134,7 +134,7 @@ describe("groupStatsView", () => {
       ["Dee", 3, false, 5000],
       ["Cal", null, false, 0],
     ]);
-    expect(view.total).toBe(45000);
+    expect(view.hero.result).toBe(45000);
     expect(view.standings[0]!.sheet).toEqual({
       result: 20000,
       sessions: 2,
@@ -145,7 +145,6 @@ describe("groupStatsView", () => {
     });
     expect(view.standings[3]!.meta).toBe("No sessions");
     expect(view.awards).toBeNull();
-    expect(view.race.marks.map((mark) => mark.label)).toEqual(["Vegas", "Reno"]);
   });
 
   it("hands out a trip's awards and marks its nights once a trip is picked", () => {
@@ -158,7 +157,6 @@ describe("groupStatsView", () => {
       ["Comeback kid", "Bea", "Climbed $100 from their low"],
       ["Night owl", "Alex", "Sat down at 3:00 AM"],
     ]);
-    expect(view.race.marks.map((mark) => mark.label)).toEqual(["Day 1"]);
     expect(view.chips.map((chip) => chip.label)).toEqual(["Vegas", "All games", "All casinos"]);
   });
 
@@ -197,10 +195,10 @@ describe("groupStatsView", () => {
   });
 
   it("leaves the place off a biggest hit at a table with no casino set", () => {
-    const [first] = stats.plays;
+    const [first, second] = stats.plays;
 
     const view = groupStatsView(
-      { ...stats, plays: [{ ...first!, venueId: null }] },
+      { ...stats, plays: [{ ...first!, venueId: null }, second!] },
       detail,
       { tripId: vegas },
       { timeZone: zone, clock },

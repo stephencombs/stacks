@@ -183,6 +183,30 @@ export function StatsSkeleton({ chips = false }: { chips?: boolean }) {
   );
 }
 
+/**
+ * A group's stats loading: the hero with its trip chart and tiles, the standings, and the rows of
+ * what the crew did together. iOS draws its filter chips in the page, so it waits with them too.
+ */
+export function GroupStatsSkeleton({ chips = false }: { chips?: boolean }) {
+  return (
+    <SkeletonScreen label="Loading group stats">
+      {chips ? (
+        <View className="flex-row gap-2">
+          <Skeleton className="h-11 w-32 rounded-full" />
+          <Skeleton className="h-11 w-28 rounded-full" />
+        </View>
+      ) : null}
+      <HeroSkeleton />
+      <SectionSkeleton>
+        <RowsSkeleton rows={4} chip />
+      </SectionSkeleton>
+      <SectionSkeleton>
+        <RowsSkeleton rows={3} chip />
+      </SectionSkeleton>
+    </SkeletonScreen>
+  );
+}
+
 /** The group loading: its name and who's in it, its trips, its people, its settings. */
 export function GroupSkeleton() {
   return (
