@@ -5,6 +5,7 @@ import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
 import * as OpenApi from "effect/http-api/OpenApi";
 
+import { AccountDeletionPreview, AccountDeletionResult, DeleteAccountRequest } from "./account.ts";
 import { Authentication, RecordingAuthentication } from "./auth.ts";
 import { Conflict, Forbidden, InvalidRequest, NotFound, Unauthorized } from "./errors.ts";
 import {
@@ -701,6 +702,25 @@ const ClaimGroup = HttpApiGroup.make("claim")
   )
   .middleware(Authentication);
 
+const AccountGroup = HttpApiGroup.make("account")
+  .add(
+    HttpApiEndpoint.get("deletionPreview", "/account/deletion-preview", {
+      success: AccountDeletionPreview,
+      error: Unauthorized,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("delete", "/account/delete", {
+      payload: DeleteAccountRequest,
+      success: AccountDeletionResult,
+      error: Unauthorized,
+    }).annotate(
+      OpenApi.Summary,
+      "Deletes the account and keeps its players in shared groups as claimable guests",
+    ),
+  )
+  .middleware(Authentication);
+
 export class StacksApi extends HttpApi.make("stacks")
   .add(HealthGroup)
   .add(GroupsGroup)
@@ -716,4 +736,5 @@ export class StacksApi extends HttpApi.make("stacks")
   .add(RecordingGroup)
   .add(PublicRecordingGroup)
   .add(ClaimGroup)
+  .add(AccountGroup)
   .prefix("/api") {}

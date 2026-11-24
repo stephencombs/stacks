@@ -15,6 +15,8 @@ import {
   UserId,
 } from "@stacks/contracts";
 
+import * as AccountFence from "../features/AccountFence.ts";
+
 const claimText = (decoded: Option.Option<string>) =>
   Option.match(decoded, {
     onNone: () => null,
@@ -52,6 +54,7 @@ export const makeVerify = Effect.gen(function* () {
     const userId = yield* UserId.makeEffect(claims.sub).pipe(
       Effect.mapError(() => new Unauthorized()),
     );
+    yield* AccountFence.rejectInRequest(userId);
 
     return CurrentUser.of({
       userId,

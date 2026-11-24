@@ -11,6 +11,7 @@ import {
 } from "@stacks/contracts";
 
 import { MembershipRow } from "../db/rows.ts";
+import * as AccountFence from "./AccountFence.ts";
 
 /** Decodes query rows; a row that doesn't match its schema is a bug, so it dies. */
 export const decodeRows =
@@ -46,18 +47,29 @@ export const requireAdmin = (member: Membership) =>
 export const requireOwner = (member: Membership) =>
   member.role === "owner" ? Effect.void : Effect.fail(new Forbidden({ reason: "owner_only" }));
 
-/** Creates or refreshes the current user's row; needed before a non-member writes anything. */
+/**
+ * Creates or refreshes the current user's row; needed before a non-member writes anything. The
+ * only write that can bring back a deleted account, so it waits out a deletion in flight and is
+ * refused after one.
+ */
 export const ensureUser = Effect.fn("Access.ensureUser")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const user = yield* CurrentUser;
-  yield* sql`
-    insert into users (id, display_name, avatar_url)
-    values (${user.userId}, ${user.displayName}, ${user.avatarUrl})
-    on conflict (id) do update
-      set display_name = excluded.display_name, avatar_url = excluded.avatar_url
-      where (users.display_name, users.avatar_url)
-        is distinct from (excluded.display_name, excluded.avatar_url)
-  `;
+
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      yield* AccountFence.lockShared(user.userId);
+      yield* AccountFence.reject(user.userId);
+      yield* sql`
+        insert into users (id, display_name, avatar_url)
+        values (${user.userId}, ${user.displayName}, ${user.avatarUrl})
+        on conflict (id) do update
+          set display_name = excluded.display_name, avatar_url = excluded.avatar_url
+          where (users.display_name, users.avatar_url)
+            is distinct from (excluded.display_name, excluded.avatar_url)
+      `;
+    }),
+  );
 });
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

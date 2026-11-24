@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import { Conflict, StacksApi } from "@stacks/contracts";
 
+import * as Account from "../features/Account.ts";
 import * as Crew from "../features/Crew.ts";
 import * as Export from "../features/Export.ts";
 import * as Groups from "../features/Groups.ts";
@@ -141,6 +142,12 @@ const claim = HttpApiBuilder.group(StacksApi, "claim", (handlers) =>
   handlers.handle("claimActor", ({ payload }) => serve(Recording.claimActor(payload))),
 );
 
+const account = HttpApiBuilder.group(StacksApi, "account", (handlers) =>
+  handlers
+    .handle("deletionPreview", () => serve(Account.preview()))
+    .handle("delete", ({ payload }) => serve(Account.remove(payload))),
+);
+
 export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openapi.json" }).pipe(
   Layer.provide([
     health,
@@ -157,5 +164,6 @@ export const layer = HttpApiBuilder.layer(StacksApi, { openapiPath: "/api/openap
     recording,
     publicRecording,
     claim,
+    account,
   ]),
 );
