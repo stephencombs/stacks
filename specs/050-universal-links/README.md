@@ -54,7 +54,10 @@ and until the listings exist the fallback page says how to get the app.
 - [ ] **The domain.** It is a product domain we own, never `*.workers.dev`. Production uses the
       domain itself and preview builds use `preview.<domain>`. It goes into every link, so it
       can't change once links are out. Spec 049's Play page and its `support@<domain>` use it
-      too. Which domain is still to be chosen, and it must be registered before building.
+      too. The domain isn't registered yet, and that doesn't block building: the host is
+      configuration (`EXPO_PUBLIC_LINK_HOST` per EAS profile, plus a Worker var). Until it's
+      set, `inviteUrl` falls back to the scheme and the Worker doesn't serve link routes. Before
+      the first release that sends https links, register the domain and set it.
 - [ ] **Worker routes**, served before `Database.layer` is built (`worker.ts:48`), with no database
       access:
   - `/.well-known/apple-app-site-association`, served as `application/json` with HTTP 200 and no
