@@ -4,6 +4,7 @@ const state = vi.hoisted(() => ({
   written: new Map<string, string>(),
   available: true,
   ratio: 3,
+  android: false,
   captured: new Array<ReadonlyArray<unknown>>(),
   deleted: new Array<string>(),
   gone: false,
@@ -43,6 +44,11 @@ vi.mock("expo-sharing", () => ({
 
 vi.mock("react-native", () => ({
   PixelRatio: { get: () => state.ratio },
+  Platform: {
+    get OS() {
+      return state.android ? "android" : "ios";
+    },
+  },
   Share: {
     share: (...args: ReadonlyArray<unknown>) => state.rnShare(...args),
   },
@@ -68,6 +74,7 @@ beforeEach(() => {
   state.written.clear();
   state.available = true;
   state.ratio = 3;
+  state.android = false;
   state.captured = [];
   state.deleted = [];
   state.gone = false;
@@ -98,26 +105,31 @@ it("falls back to React Native Share when native file sharing is unavailable", a
   });
 });
 
-it("captures the card at 1080 by 1350 physical pixels on any density", async () => {
+it("asks iOS for points, so the capture is 1080 by 1350 physical pixels on any density", async () => {
   const view = { current: null };
 
-  for (const ratio of [2, 2.625, 3]) {
+  for (const ratio of [2, 3]) {
     state.ratio = ratio;
     state.captured = [];
     await shareImage(view, "Vegas weekend");
     expect(state.captured).toEqual([
       [
         view,
-        {
-          format: "png",
-          quality: 1,
-          result: "tmpfile",
-          width: 1080 / ratio,
-          height: 1350 / ratio,
-        },
+        { format: "png", quality: 1, result: "tmpfile", width: 1080 / ratio, height: 1350 / ratio },
       ],
     ]);
   }
+});
+
+it("asks Android for physical pixels, which is how view-shot reads the size there", async () => {
+  const view = { current: null };
+  state.android = true;
+  state.ratio = 2.625;
+  state.captured = [];
+  await shareImage(view, "Vegas weekend");
+  expect(state.captured).toEqual([
+    [view, { format: "png", quality: 1, result: "tmpfile", width: 1080, height: 1350 }],
+  ]);
 });
 
 it("shares the PNG and deletes it once sharing finishes", async () => {

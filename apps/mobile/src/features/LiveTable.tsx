@@ -239,12 +239,14 @@ export function ActionSlot<A extends SlotAction = TableAction>({
   onAction,
   who,
   felt = false,
+  menuLabel = "Table actions",
 }: {
   actions: ReadonlyArray<A>;
   onAction: (action: A) => void;
   /** Whose session this is, when it isn't yours: "Priya". */
   who?: string | undefined;
   felt?: boolean;
+  menuLabel?: string;
 }) {
   const label = (action: A) =>
     action === "edit" && who ? `Edit ${who}'s session` : actionLabels[action];
@@ -266,7 +268,7 @@ export function ActionSlot<A extends SlotAction = TableAction>({
 
   return (
     <ActionMenu
-      label="Table actions"
+      label={menuLabel}
       felt={felt}
       vertical={Platform.OS === "android"}
       actions={actions.map((action) => ({

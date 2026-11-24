@@ -109,7 +109,7 @@ export function TripCard({ model }: { model: TripCardModel }) {
 
 function RunningLine({ line, net }: { line: ReadonlyArray<number>; net: number }) {
   const [color, zero] = useCSSVariable([
-    `--color-felt-${net < 0 ? "loss" : "win"}`,
+    net === 0 ? "--color-felt-ink" : `--color-felt-${net < 0 ? "loss" : "win"}`,
     "--color-felt-ink",
   ]).map(String);
 

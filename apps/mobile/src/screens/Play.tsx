@@ -329,7 +329,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
 
   const actions: ReadonlyArray<SlotAction> = live
     ? tableActions(table?.role ?? "participant", { playing: true, closed: false, empty: false })
-    : own && visit.finalResult !== null
+    : canDelete && visit.finalResult !== null
       ? ["edit", "share_card"]
       : ["edit"];
 
@@ -1140,7 +1140,13 @@ function VisitHeader({
     <View className="flex-row items-center justify-between gap-3">
       <BackButton label={backLabel} felt={live} />
       {live ? <LiveClock since={since} /> : <View className="flex-1" />}
-      <ActionSlot felt={live} actions={actions} onAction={onAction} who={who} />
+      <ActionSlot
+        felt={live}
+        actions={actions}
+        onAction={onAction}
+        who={who}
+        menuLabel={live ? undefined : "Session actions"}
+      />
     </View>
   );
 }

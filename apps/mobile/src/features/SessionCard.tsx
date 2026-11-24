@@ -14,9 +14,9 @@ export function SessionCard({ model }: { model: SessionCardModel }) {
     <CardFrame>
       <View className="gap-1">
         <Text numberOfLines={2} className="type-headline text-felt-ink">
-          {model.venue ?? "Session"}
+          {model.venue ?? model.game}
         </Text>
-        <Text className="type-heading text-felt-soft">{model.game}</Text>
+        {model.venue ? <Text className="type-heading text-felt-soft">{model.game}</Text> : null}
       </View>
       {amounts ? (
         <View className="gap-1">
@@ -57,7 +57,7 @@ export function SessionCard({ model }: { model: SessionCardModel }) {
               {amounts.hourly === null ? (
                 <Text className="type-number text-felt-soft">–</Text>
               ) : (
-                <Text className="type-number text-felt-soft">
+                <Text numberOfLines={1} adjustsFontSizeToFit className="type-number text-felt-soft">
                   <Money
                     amount={amounts.hourly}
                     currency={currency}

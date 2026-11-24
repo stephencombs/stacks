@@ -1,6 +1,6 @@
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { PixelRatio, Share } from "react-native";
+import { PixelRatio, Platform, Share } from "react-native";
 import { captureRef } from "react-native-view-shot";
 
 export const shareLink = async (url: string, message: string) => {
@@ -24,8 +24,7 @@ export const shareCsv = async (filename: string, csv: string) => {
   await Share.share({ title: filename, message: csv, url: file.uri });
 };
 
-/** A share card is 1080×1350 physical pixels, for Stories and Messages. */
-const CARD_IMAGE = { width: 1080, height: 1350 } as const;
+const CARD_PIXELS = { width: 1080, height: 1350 } as const;
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -41,14 +40,15 @@ export const shareImage = async (view: Parameters<typeof captureRef>[0], title: 
 
   await nextFrame();
   await nextFrame();
-  const ratio = PixelRatio.get();
+  // WARNING: view-shot reads width and height as physical pixels on Android but points on iOS.
+  const ratio = Platform.OS === "android" ? 1 : PixelRatio.get();
 
   const uri = await captureRef(view, {
     format: "png",
     quality: 1,
     result: "tmpfile",
-    width: CARD_IMAGE.width / ratio,
-    height: CARD_IMAGE.height / ratio,
+    width: CARD_PIXELS.width / ratio,
+    height: CARD_PIXELS.height / ratio,
   });
 
   try {
