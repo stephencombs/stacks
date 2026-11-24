@@ -21,7 +21,13 @@ public class ContactPickerModule: Module {
           return
         }
 
-        guard let presenter = self.appContext?.utilities?.currentViewController() else {
+        // UIKit silently refuses to present over a busy or detached controller, and then neither
+        // delegate method runs, so activePick would never clear.
+        guard let presenter = self.appContext?.utilities?.currentViewController(),
+          presenter.viewIfLoaded?.window != nil,
+          presenter.presentedViewController == nil,
+          !presenter.isBeingDismissed
+        else {
           promise.reject("ERR_NO_VIEW_CONTROLLER", "There is no screen to show Contacts on.")
           return
         }

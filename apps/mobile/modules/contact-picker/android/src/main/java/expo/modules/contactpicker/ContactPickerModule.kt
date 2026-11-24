@@ -7,6 +7,8 @@ import android.provider.ContactsContract
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.activityresult.AppContextActivityResultContract
 import expo.modules.kotlin.activityresult.AppContextActivityResultLauncher
+import expo.modules.kotlin.exception.CodedException
+import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.Serializable
@@ -47,7 +49,7 @@ class ContactPickerModule : Module() {
     }
 
     AsyncFunction("pickContact") Coroutine { ->
-      if (picking) return@Coroutine null
+      if (picking) throw CodedException("ERR_PICK_IN_PROGRESS", "A contact is already being picked.", null)
       picking = true
       try {
         launcher.launch(PickRequest()).getOrThrow()

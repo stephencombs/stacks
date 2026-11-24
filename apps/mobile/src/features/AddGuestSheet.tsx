@@ -61,7 +61,11 @@ export function AddGuestSheet({
         label="Name"
         testID="guest-name"
         value={name}
-        onChangeText={setName}
+        onChangeText={(next) => {
+          setName(next);
+
+          if (nameError && next.trim()) setNameError(null);
+        }}
         maxLength={60}
         autoFocus
         error={nameError}

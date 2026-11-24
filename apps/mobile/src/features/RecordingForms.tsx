@@ -1709,8 +1709,8 @@ export function AddPlayerSheet({
                 <Text className="flex-1 type-footnote text-loss">{nameError}</Text>
               </View>
             ) : null}
-            <ChooseFromContacts onName={pickName} onError={setNameError} />
           </View>
+          <ChooseFromContacts onName={pickName} onError={setNameError} />
           <View className="gap-1.5">
             <View
               className={cn(
@@ -1789,7 +1789,11 @@ export function AddPlayerSheet({
               maxLength={60}
               autoComplete="off"
               error={nameError}
-              onChangeText={setName}
+              onChangeText={(next) => {
+                setName(next);
+
+                if (nameError && next.trim()) setNameError(null);
+              }}
             />
           ) : null}
           {choice === NEW_PLAYER ? (
