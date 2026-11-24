@@ -28,7 +28,7 @@ const APPLE_URL = "https://appleid.apple.com";
 
 const base64Url = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64url");
 
-const jsonPart = (value: object) => base64Url(new TextEncoder().encode(JSON.stringify(value)));
+const jsonPart = (json: string) => base64Url(new TextEncoder().encode(json));
 
 const TokenResponse = Schema.Struct({ refresh_token: Schema.String });
 
@@ -44,13 +44,15 @@ export const clientSecret = Effect.fn("AppleSignIn.clientSecret")(function* (
 ) {
   const issuedAt = Math.floor(DateTime.toEpochMillis(yield* DateTime.now) / 1000);
 
-  const body = `${jsonPart({ alg: "ES256", kid: keyId })}.${jsonPart({
-    iss: teamId,
-    iat: issuedAt,
-    exp: issuedAt + 300,
-    aud: APPLE_URL,
-    sub: clientId,
-  })}`;
+  const body = `${jsonPart(JSON.stringify({ alg: "ES256", kid: keyId }))}.${jsonPart(
+    JSON.stringify({
+      iss: teamId,
+      iat: issuedAt,
+      exp: issuedAt + 300,
+      aud: APPLE_URL,
+      sub: clientId,
+    }),
+  )}`;
 
   const pem = privateKey.replaceAll("\\n", "\n").replaceAll(/-----[A-Z ]+-----|\s/g, "");
 

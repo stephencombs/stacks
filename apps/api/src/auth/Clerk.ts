@@ -54,6 +54,7 @@ export const makeVerify = Effect.gen(function* () {
     const userId = yield* UserId.makeEffect(claims.sub).pipe(
       Effect.mapError(() => new Unauthorized()),
     );
+
     yield* AccountFence.rejectInRequest(userId);
 
     return CurrentUser.of({

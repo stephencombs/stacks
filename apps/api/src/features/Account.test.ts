@@ -1,4 +1,5 @@
 import { expect, it } from "@effect/vitest";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -24,6 +25,8 @@ import {
   type RecordingIdentity,
 } from "@stacks/contracts/recordingCommands";
 
+import * as Clerk from "../auth/Clerk.ts";
+import { clerkJwtKey, sessionToken } from "../testing/clerk.test-utils.ts";
 import {
   catalogVenue,
   groupWith,
@@ -48,6 +51,7 @@ import {
   uuid,
 } from "../testing/recording.test-utils.ts";
 import { TestApi } from "../testing/TestApi.test-utils.ts";
+import type { Selector } from "../realtime/Selector.ts";
 import * as Access from "./Access.ts";
 import * as Account from "./Account.ts";
 import * as AccountFence from "./AccountFence.ts";
@@ -135,11 +139,6 @@ const mentions = Effect.fn("test.mentions")(function* (...needles: ReadonlyArray
   return found;
 });
 
-/**
- * Alice owns a group with Bob and has a table in its trip: she and Bob played at it, she stood
- * up during an absence and sat down again, and Bob can record for everyone. She also owns a group
- * of her own with a table, and has a stake, an open balance and a voided entry in the shared one.
- */
 const scene = Effect.fn("test.scene")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const api = yield* TestApi;
@@ -313,6 +312,7 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
         recordingActorId: string | null;
         createdBy: string | null;
       }>`select user_id, recording_actor_id, created_by from players where id = ${s.aliceMe.playerId}`;
+
       expect(personal).toEqual({
         userId: null,
         recordingActorId: null,
@@ -326,6 +326,7 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
             where id in (${s.apart.tableId}, ${s.inSolo.tableId})) as tables,
           (select count(*)::int from users where id = ${s.aliceId}) as users
       `;
+
       expect(gone).toEqual({ groups: 0, tables: 0, users: 0 });
 
       const [kept] = yield* sql<{ shared: number; detached: number; trip: string | null }>`
@@ -334,11 +335,13 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
           (select count(*)::int from tables where id = ${s.first.tableId}) as detached,
           (select trip_id from tables where id = ${s.bobTable.tableId}) as trip
       `;
+
       expect(kept).toEqual({ shared: 1, detached: 1, trip: null });
 
       const audit = yield* sql<{ createdBy: string }>`
         select distinct created_by from entries where group_id = ${s.group.group.id}
       `;
+
       expect(audit).toEqual([{ createdBy: "deleted-account" }]);
     }),
   );
@@ -349,9 +352,11 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
       yield* s.alice.account.delete({ payload: {} });
 
       const anonymous = yield* (yield* TestApi).asActor(null);
+
       const link = yield* Effect.flip(
         anonymous.publicRecording.shared({ params: { token: s.token } }),
       );
+
       expect(link._tag).toBe("NotFound");
 
       const view = yield* s.bob.recording.table({ params: { tableId: s.first.tableId } });
@@ -401,6 +406,7 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
       const upgrade = yield* s.api.upgrade(`group:${s.group.group.id}`, {
         token: s.aliceId,
       });
+
       expect(upgrade.status).toBe(401);
 
       const recreated = yield* Effect.flip(
@@ -412,11 +418,37 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
           }),
         ),
       );
+
       expect(recreated._tag).toBe("Unauthorized");
+
       const [row] = yield* sql<{ count: number }>`
         select count(*)::int as count from users where id = ${s.aliceId}
       `;
+
       expect(row!.count).toBe(0);
+    }),
+  );
+
+  it.effect("turns away a deleted account's Clerk session through the real verification", () =>
+    Effect.gen(function* () {
+      const s = yield* scene();
+
+      const verify = yield* Clerk.makeVerify.pipe(
+        Effect.provide(
+          ConfigProvider.layer(ConfigProvider.fromUnknown({ CLERK_JWT_KEY: clerkJwtKey })),
+        ),
+      );
+
+      const scope = `group:${s.group.group.id}`;
+      const token = sessionToken(s.aliceId, 300);
+      expect((yield* s.api.upgrade(scope, { token }, verify)).status).toBe(200);
+
+      yield* s.alice.account.delete({ payload: {} });
+
+      expect((yield* s.api.upgrade(scope, { token }, verify)).status).toBe(401);
+      expect(
+        (yield* s.api.upgrade(scope, { token: sessionToken(s.aliceId, 300) }, verify)).status,
+      ).toBe(401);
     }),
   );
 
@@ -448,9 +480,11 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
       ]);
 
       yield* alice.account.delete({ payload: {} });
+
       const roles = yield* sql<{ userId: string; role: string }>`
         select user_id, role from memberships where group_id = ${group.group.id}
       `;
+
       expect(Object.fromEntries(roles.map((row) => [row.userId, row.role]))).toEqual({
         [bea1!.userId!]: "member",
         [cal1!.userId!]: "member",
@@ -474,9 +508,11 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
       `;
 
       yield* alice.account.delete({ payload: {} });
+
       const [owner] = yield* sql<{ userId: string }>`
         select user_id from memberships where group_id = ${group.group.id} and role = 'owner'
       `;
+
       expect(owner!.userId).toBe(cal1!.userId);
     }),
   );
@@ -511,6 +547,7 @@ it.layer(TestApi.layer)("what deleting an account shows and tells", (it) => {
   it.effect("previews the solo groups, ownership moves, open balances, stakes and Apple", () =>
     Effect.gen(function* () {
       const s = yield* scene();
+
       const before = (yield* s.alice.groups.list()).find(
         (item) => item.group.id === s.group.group.id,
       )!;
@@ -557,7 +594,11 @@ it.layer(TestApi.layer)("what deleting an account shows and tells", (it) => {
         expect.arrayContaining([groupScope(s.group.group.id), tableScope(s.first.tableId)]),
       );
 
-      const closeOf = (scope: string, selector: object, code = ScopeCloseCode.revoked) => ({
+      const closeOf = (
+        scope: string,
+        selector: Selector,
+        code: Realtime.Close["code"] = ScopeCloseCode.revoked,
+      ) => ({
         scope,
         selector,
         code,
@@ -732,6 +773,7 @@ it.layer(TestApi.layer)("deleting an account with legacy history", (it) => {
         scope: [group.group.id],
         dryRun: false,
       });
+
       expect(report).toMatchObject({ tables: 1, visits: 2, entries: 5 });
 
       const params = { tableId: TableId.make(imported) };
@@ -752,6 +794,7 @@ it.layer(TestApi.layer)("deleting an account with legacy history", (it) => {
         scope: [second.group.id],
         dryRun: false,
       });
+
       expect(fresh).toMatchObject({ identities: 0, tables: 1, visits: 2, entries: 5 });
       expect(
         tableEntries(yield* bob.recording.table({ params: { tableId: TableId.make(later) } })),
@@ -760,6 +803,7 @@ it.layer(TestApi.layer)("deleting an account with legacy history", (it) => {
       const [audit] = yield* sql<{ count: number }>`
         select count(*)::int as count from players where user_id = 'deleted-account'
       `;
+
       expect(audit!.count).toBe(0);
     }),
   );
@@ -785,6 +829,7 @@ it.layer(TestApi.layer)("deleting an account with legacy history", (it) => {
           (select count(*)::int from personal_visits where table_id = ${imported}) as visits,
           (select count(*)::int from groups where id = ${group.group.id}) as groups
       `;
+
       expect(rows).toEqual({ tables: 0, visits: 0, groups: 0 });
     }),
   );
@@ -867,11 +912,13 @@ it.layer(TestApi.layer)("account deletion rules", (it) => {
           return yield* Effect.fail("rolled back" as const);
         }),
       );
+
       expect(yield* Effect.flip(guarded)).toBe("rolled back");
 
       const [row] = yield* sql<{ count: number }>`
         select count(*)::int as count from entries where group_id = ${group.group.id}
       `;
+
       expect(row!.count).toBe(1);
     }),
   );

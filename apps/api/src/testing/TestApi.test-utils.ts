@@ -57,14 +57,22 @@ const verifyTest: Upgrade.Upgrade["verify"] = (credential) =>
     ? Effect.fail(new Unauthorized())
     : Effect.as(AccountFence.rejectInRequest(testUser(credential).userId), testUser(credential));
 
-/** What Clerk and Apple were asked, and whether they answer. */
-const outside = {
+interface Outside {
+  clerkDown: boolean;
+  appleDown: boolean;
+  clerkAttempts: number;
+  readonly clerkDeleted: Array<string>;
+  readonly appleLinked: Set<string>;
+  readonly appleRevoked: Array<string>;
+}
+
+const outside: Outside = {
   clerkDown: false,
   appleDown: false,
   clerkAttempts: 0,
-  clerkDeleted: [] as Array<string>,
-  appleLinked: new Set<string>(),
-  appleRevoked: [] as Array<string>,
+  clerkDeleted: [],
+  appleLinked: new Set(),
+  appleRevoked: [],
 };
 
 const testClerk = ClerkAdmin.of({

@@ -16,9 +16,9 @@ export const hashOf = (userId: string) =>
     Effect.map((hash) => Buffer.from(hash).toString("hex")),
   );
 
-/** Whether the account was deleted, so nothing it signed may touch the API again. */
-export const isFenced = Effect.fn("AccountFence.isFenced")(function* (userId: string) {
+const isFenced = Effect.fn("AccountFence.isFenced")(function* (userId: string) {
   const sql = yield* SqlClient.SqlClient;
+
   const rows =
     yield* sql`select 1 from account_deletions where user_id_hash = ${yield* hashOf(userId)}`;
 

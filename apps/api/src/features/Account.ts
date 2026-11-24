@@ -88,6 +88,7 @@ export const preview = Effect.fn("Account.preview")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const { userId } = yield* CurrentUser;
   const { solo, staying, handovers } = yield* plan(userId);
+
   const named = (row: { readonly groupId: GroupId; readonly name: string }) => ({
     id: row.groupId,
     name: row.name,
@@ -154,10 +155,6 @@ const PinRow = Schema.Struct({
 
 const AbsenceRow = Schema.Struct({ groupId: GroupId, leftAt: Timestamp, returnedAt: Timestamp });
 
-/**
- * The group player each of the user's visits counts for, set before the user is cleared from
- * their players, since the table view works it out from `user_id` otherwise.
- */
 const pinVisits = Effect.fn("Account.pinVisits")(function* (userId: string) {
   const sql = yield* SqlClient.SqlClient;
 
@@ -231,10 +228,6 @@ const deleteSoloGroups = Effect.fn("Account.deleteSoloGroups")(function* (
     });
 });
 
-/**
- * Tables they started: one nobody else played at, and that no group's trip counts, is theirs to
- * delete. The rest stay for the people who played, with the share link revoked.
- */
 const releaseTables = Effect.fn("Account.releaseTables")(function* (
   mine: ReadonlyArray<PlayerId>,
   soloGroups: ReadonlyArray<GroupId>,
@@ -490,6 +483,7 @@ export const remove = Effect.fn("Account.remove")(function* (
 /** Finishes the Clerk deletion of accounts whose request couldn't. Run on a schedule. */
 export const retryClerkDeletions = Effect.fn("Account.retryClerkDeletions")(function* () {
   const sql = yield* SqlClient.SqlClient;
+
   const jobs = yield* sql<{ userIdHash: string; userId: string }>`
     select user_id_hash, user_id from account_deletions
     where clerk_deleted_at is null and user_id is not null
