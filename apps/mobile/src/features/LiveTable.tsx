@@ -212,36 +212,41 @@ export function TableSeats({
   );
 }
 
-const actionLabels: Record<TableAction, string> = {
+/** What the slot can offer: a table action, or sharing a finished session as a card. */
+export type SlotAction = TableAction | "share_card";
+
+const actionLabels: Record<SlotAction, string> = {
   edit: "Edit my session",
   add_player: "Add player",
   share: "Share table",
   settings: "Table settings",
   delete_table: "Delete table",
+  share_card: "Share card",
 };
 
-const actionIcons: Record<TableAction, IconName> = {
+const actionIcons: Record<SlotAction, IconName> = {
   edit: "edit",
   add_player: "add-person",
   share: "share",
   settings: "settings",
   delete_table: "trash",
+  share_card: "share",
 };
 
 /** The top-right slot: nothing, the one thing you can do, or a menu of several. */
-export function ActionSlot({
+export function ActionSlot<A extends SlotAction = TableAction>({
   actions,
   onAction,
   who,
   felt = false,
 }: {
-  actions: ReadonlyArray<TableAction>;
-  onAction: (action: TableAction) => void;
+  actions: ReadonlyArray<A>;
+  onAction: (action: A) => void;
   /** Whose session this is, when it isn't yours: "Priya". */
   who?: string | undefined;
   felt?: boolean;
 }) {
-  const label = (action: TableAction) =>
+  const label = (action: A) =>
     action === "edit" && who ? `Edit ${who}'s session` : actionLabels[action];
 
   const [only] = actions;

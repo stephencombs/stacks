@@ -1,10 +1,11 @@
 import Svg, { Path } from "react-native-svg";
 import { useCSSVariable, useUniwind } from "uniwind";
 
-export function BrandWordmark({ width = 128 }: { width?: number }) {
+/** `felt` sets the wordmark in felt ink, for a card pinned to the dark felt in either theme. */
+export function BrandWordmark({ width = 128, felt = false }: { width?: number; felt?: boolean }) {
   const { theme } = useUniwind();
-  const ink = String(useCSSVariable("--color-ink"));
-  const wordmarkInk = theme === "dark" ? ink : "#0b152d";
+  const [ink, feltInk] = useCSSVariable(["--color-ink", "--color-felt-ink"]).map(String);
+  const wordmarkInk = felt ? feltInk : theme === "dark" ? ink : "#0b152d";
 
   return (
     <Svg
