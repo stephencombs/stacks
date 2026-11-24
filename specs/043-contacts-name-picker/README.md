@@ -124,9 +124,10 @@ doesn't wait for this.
     26pt, with no stripes. It falls back to initials when loading fails.
   - Race-chart endpoints stay initials.
   - Your own rows use your Clerk avatar (`UserAvatar`) when you have one.
-- **Open decision: iOS tables.** iOS live and shared table rows show no `Chip` today
-  (`SharedTable.tsx:75`, `LiveTable.tsx:163`), so a linked photo wouldn't show there. Decide whether
-  to add one for parity with Android.
+- **iOS tables get chips.** iOS live and shared table rows show no `Chip` today
+  (`SharedTable.tsx:75`, `:269`, `LiveTable.tsx:163`). Show them on iOS as on Android, so photos
+  appear at the table. When the table belongs to a group, colour by `chipOf` rather than row
+  position (`(index % 8) + 1`), so a player keeps one colour everywhere. Check the rows in the native app.
 
 ### Phase 2 tests
 
