@@ -1381,7 +1381,7 @@ it.layer(TestApi.layer)("membership changes decided under the group lock", (it) 
   );
 });
 
-it.layer(TestApi.layer)("rejoining a group that lost its owner", (it) => {
+it.layer(TestApi.layer)("rejoining a group", (it) => {
   it.effect("makes a former member who rejoins through an open invite the owner", () =>
     Effect.gen(function* () {
       const { alice, bob } = yield* users("alice", "bob");
@@ -1451,6 +1451,65 @@ it.layer(TestApi.layer)("rejoining a group that lost its owner", (it) => {
       const later = yield* carol.guests.claim({ params: { code: code(boId, detail) } });
       expect(later.role).toBe("member");
       expect(yield* activeOwners(group.group.id)).toHaveLength(1);
+    }),
+  );
+
+  it.effect("returns a former owner as a member once someone else owns the group", () =>
+    Effect.gen(function* () {
+      const { alice, dee } = yield* users("alice", "dee");
+      const group = yield* groupWith(alice);
+      const gusId = ids.player();
+      const boId = ids.player();
+
+      yield* alice.guests.add({
+        params: { groupId: group.group.id },
+        payload: { id: gusId, displayName: "Gus" },
+      });
+
+      const detail = yield* alice.guests.add({
+        params: { groupId: group.group.id },
+        payload: { id: boId, displayName: "Bo" },
+      });
+
+      const code = (id: PlayerId) => detail.players.find((player) => player.id === id)!.claimCode!;
+
+      yield* alice.groups.leave({ params: { groupId: group.group.id } });
+
+      const first = yield* dee.guests.claim({ params: { code: code(gusId) } });
+      expect(first.role).toBe("owner");
+
+      const back = yield* alice.guests.claim({ params: { code: code(boId) } });
+      expect(back.role).toBe("member");
+      expect(yield* activeOwners(group.group.id)).toHaveLength(1);
+    }),
+  );
+
+  it.effect("returns a removed admin as a member", () =>
+    Effect.gen(function* () {
+      const { alice, bob } = yield* users("alice", "bob");
+      const group = yield* groupWith(alice, bob);
+      const bobPlayer = group.players.find((player) => player.id !== group.myPlayerId)!;
+      const gusId = ids.player();
+
+      yield* alice.groups.setRole({
+        params: { groupId: group.group.id, userId: bobPlayer.userId! },
+        payload: { role: "admin" },
+      });
+
+      const detail = yield* alice.guests.add({
+        params: { groupId: group.group.id },
+        payload: { id: gusId, displayName: "Gus" },
+      });
+
+      yield* alice.groups.removeMember({
+        params: { groupId: group.group.id, userId: bobPlayer.userId! },
+      });
+
+      const back = yield* bob.guests.claim({
+        params: { code: detail.players.find((player) => player.id === gusId)!.claimCode! },
+      });
+
+      expect(back.role).toBe("member");
     }),
   );
 });
