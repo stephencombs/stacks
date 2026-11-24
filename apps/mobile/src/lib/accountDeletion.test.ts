@@ -31,20 +31,9 @@ vi.mock("expo-file-system", () => {
   }
 
   class Directory {
-    constructor(
-      readonly directory: string,
-      readonly name?: string,
-    ) {}
-    get exists() {
-      return disk.has(`${this.name}/`);
-    }
-    delete() {
-      disk.delete(`${this.name}/`);
-    }
+    constructor(readonly directory: string) {}
     list() {
-      return [...disk.keys()].flatMap((name) =>
-        name.endsWith("/") ? [] : [new File("documents", name)],
-      );
+      return [...disk.keys()].map((name) => new File("documents", name));
     }
   }
 
@@ -62,6 +51,8 @@ vi.mock("react-native", () => ({ Platform: { OS: "ios" }, AppState: {} }));
 vi.mock("./config", () => ({ apiUrl: "http://api", clerkPublishableKey: "pk_test" }));
 
 vi.mock("./origin", () => ({ installOrigin: "origin" }));
+
+vi.mock("./contactPhotos", () => ({ clearContactPhotos: () => void calls.push("photos") }));
 
 vi.mock("./liveSessionAdapter", () => ({ endLiveSurface: async () => void calls.push("live") }));
 
@@ -95,7 +86,6 @@ const stock = () => {
     "stats-user_alice-g1.json",
     "stats-user_alice-g2.json",
     "stats-user_bob-g1.json",
-    "contact-photos/",
   ])
     disk.set(name, "kept");
 };
@@ -127,7 +117,7 @@ it("sets the marker, then ends the live surface, closes and wipes the ledger, th
 
   await device.continueAccountWipe();
 
-  expect(calls).toEqual(["live", "close", "database", "secure:color-up-actor"]);
+  expect(calls).toEqual(["live", "close", "database", "secure:color-up-actor", "photos"]);
   expect([...disk.keys()].sort()).toEqual([
     "account-wipe.json",
     "last-trip-user_bob",
@@ -148,7 +138,14 @@ it("finishes at the next launch when the app was killed before the wipe ran", as
   await nextLaunch.continueAccountWipe();
   await nextLaunch.finishAccountWipe();
 
-  expect(calls).toEqual(["live", "close", "database", "secure:color-up-actor", "sign out"]);
+  expect(calls).toEqual([
+    "live",
+    "close",
+    "database",
+    "secure:color-up-actor",
+    "photos",
+    "sign out",
+  ]);
   expect(disk.has("outbox-user_alice.json")).toBe(false);
   expect(disk.has("account-wipe.json")).toBe(false);
 });

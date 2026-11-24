@@ -1,12 +1,13 @@
 import { makeDeviceWipe, type WipeMarker } from "@stacks/client-runtime/accountDeletion";
 import { makeAccountApi, settle } from "@stacks/client-runtime/api";
 import * as AppleAuthentication from "expo-apple-authentication";
-import { Directory, File, Paths } from "expo-file-system";
+import { File, Paths } from "expo-file-system";
 import { useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 
 import { forgetActorKey } from "./actorKeys";
 import { apiUrl, clerkPublishableKey } from "./config";
+import { clearContactPhotos } from "./contactPhotos";
 import { endLiveSurface } from "./liveSessionAdapter";
 import { installOrigin } from "./origin";
 import { deleteOutbox } from "./outbox";
@@ -49,11 +50,7 @@ const deviceWipe = makeDeviceWipe({
       deleteOutbox(userId);
       deleteTripFiles(userId);
     },
-    () => {
-      const photos = new Directory(Paths.document, "contact-photos");
-
-      if (photos.exists) photos.delete();
-    },
+    clearContactPhotos,
   ],
 });
 
