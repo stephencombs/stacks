@@ -18,7 +18,7 @@ import { cn } from "../components/ui/cn";
 import { useGo } from "../lib/go";
 import { usePreferences } from "../lib/preferences";
 import { useGroupStats } from "../lib/stacks";
-import { Chip } from "./Chip";
+import { PlayerChip } from "./PlayerChip";
 import { Race } from "./Race";
 import {
   AndroidStatsEmpty,
@@ -284,7 +284,8 @@ function ShownStats({
           <List>
             {view.awards.map((award) => (
               <Row key={award.key} className={android ? "py-2.5" : undefined}>
-                <Chip
+                <PlayerChip
+                  playerId={award.playerId}
                   chip={award.chip}
                   name={android ? award.name.slice(0, 1) : award.name}
                   size={28}
@@ -370,7 +371,8 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
               >
                 {row.rank ?? "–"}
               </Text>
-              <Chip
+              <PlayerChip
+                playerId={row.playerId}
                 chip={row.chip}
                 name={android ? row.name.slice(0, 1) : row.name}
                 size={android ? 30 : 28}
@@ -488,7 +490,13 @@ function StatSheet({
       {android ? (
         <View className="gap-4">
           <View className="flex-row items-center justify-center gap-2">
-            <Chip chip={row.chip} name={row.name.slice(0, 1)} size={23} ring />
+            <PlayerChip
+              playerId={row.playerId}
+              chip={row.chip}
+              name={row.name.slice(0, 1)}
+              size={23}
+              ring
+            />
             <Text className="type-footnote text-muted">
               {groupName} · {title}
             </Text>

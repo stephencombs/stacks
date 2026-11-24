@@ -4,6 +4,8 @@ import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
+import type { PickedContact } from "../../modules/contact-picker/src";
+
 const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
 
 type GuestRequest = {
@@ -14,12 +16,17 @@ type GuestRequest = {
 const mocks = vi.hoisted(() => {
   const guests: GuestRequest[] = [];
   const recordings: RecordingInput[] = [];
+  const linked: Array<readonly [string, string]> = [];
+  const discarded: string[] = [];
 
   return {
     os: { current: "ios" },
-    pick: { current: () => Promise.resolve<string | null>(null) },
+    pick: { current: () => Promise.resolve<PickedContact | null>(null) },
     guests,
     recordings,
+    linked,
+    discarded,
+    unavailable: { count: 0 },
   };
 });
 
@@ -43,6 +50,13 @@ vi.mock("react-native", () => ({
     </button>
   ),
   ActivityIndicator: () => <span role="progressbar" aria-label="Saving" />,
+  Image: ({
+    accessibilityLabel,
+    source,
+  }: {
+    accessibilityLabel?: string;
+    source: { uri: string };
+  }) => <img aria-label={accessibilityLabel} src={source.uri} alt="" />,
   Switch: () => null,
   Text: Container,
   TextInput: ({
@@ -65,7 +79,19 @@ vi.mock("react-native", () => ({
 
 vi.mock("uniwind", () => ({ useCSSVariable: () => "#999999" }));
 
-vi.mock("../../modules/contact-picker/src", () => ({ pickContact: () => mocks.pick.current() }));
+vi.mock("../lib/contactPhotos", () => ({
+  linkContactPhoto: (playerId: string, uri: string) => mocks.linked.push([playerId, uri] as const),
+  discardContactPick: (uri: string) => mocks.discarded.push(uri),
+  markContactPhotosUnavailable: () => mocks.unavailable.count++,
+  removeContactPhoto: () => {},
+  useContactPhoto: () => null,
+  useContactPhotosAvailable: () => true,
+}));
+
+vi.mock("../../modules/contact-picker/src", async (original) => ({
+  ...(await original<typeof import("../../modules/contact-picker/src")>()),
+  pickContact: () => mocks.pick.current(),
+}));
 
 vi.mock("@stacks/client-runtime/recordingReact", async (original) => ({
   ...(await original<typeof import("@stacks/client-runtime/recordingReact")>()),
@@ -76,7 +102,9 @@ vi.mock("@stacks/client-runtime/recordingReact", async (original) => ({
     submit: (command: RecordingInput) => {
       mocks.recordings.push(command);
 
-      return Promise.resolve(null);
+      return Promise.resolve({
+        command: { type: "join_table", visitId: "visit-1", playerId: "new-player" },
+      });
     },
   }),
 }));
@@ -146,16 +174,21 @@ vi.mock("../components/ui/Sheet", () => ({
     title,
     footer,
     children,
+    onClose,
   }: {
     open: boolean;
     title: string;
     footer?: ReactNode;
     children?: ReactNode;
+    onClose?: () => void;
   }) =>
     open ? (
       <section aria-label={title}>
         {children}
         {footer}
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
       </section>
     ) : null,
 }));
@@ -229,6 +262,11 @@ const mount = async (name: (typeof surfaceNames)[number]) => {
     ),
   );
 
+  const click = (label: string) =>
+    act(async () =>
+      [...host.querySelectorAll("button")].find((button) => button.textContent === label)!.click(),
+    );
+
   const submit = () =>
     host.querySelector<HTMLButtonElement>('[data-testid="sheet-submit"]') ??
     [...host.querySelectorAll("button")].find((button) => button.textContent === "Add guest")!;
@@ -237,12 +275,10 @@ const mount = async (name: (typeof surfaceNames)[number]) => {
     emptyError: guest ? "Enter their name." : "Enter the player's name.",
     nameValue: () => host.querySelector<HTMLInputElement>('input[aria-label="Name"]')!.value,
     typeName: (text: string) => act(async () => typeInto(host, "Name", text)),
-    chooseFromContacts: () =>
-      act(async () =>
-        [...host.querySelectorAll("button")]
-          .find((button) => button.textContent === "Choose from Contacts")!
-          .click(),
-      ),
+    chooseFromContacts: () => click("Choose from Contacts"),
+    removePhoto: () => click("Remove photo"),
+    close: () => click("Close"),
+    hasPreview: () => host.querySelector('img[aria-label="Contact photo"]') !== null,
     submit: async () => {
       if (!guest) await act(async () => typeInto(host, buyInLabel, "20"));
       await act(async () => submit().click());
@@ -257,11 +293,14 @@ afterEach(() => {
   mocks.pick.current = () => Promise.resolve(null);
   mocks.guests.length = 0;
   mocks.recordings.length = 0;
+  mocks.linked.length = 0;
+  mocks.discarded.length = 0;
+  mocks.unavailable.count = 0;
   vi.unstubAllGlobals();
 });
 
 it.each(surfaceNames)("%s: a pick fills the name and clears its error", async (name) => {
-  mocks.pick.current = () => Promise.resolve("  Ada Lovelace ");
+  mocks.pick.current = () => Promise.resolve({ name: "  Ada Lovelace ", photo: "none" as const });
   const view = await mount(name);
 
   try {
@@ -296,7 +335,7 @@ it.each(surfaceNames)("%s: cancelling leaves the name and its error alone", asyn
 });
 
 it.each(surfaceNames)("%s: a contact with no usable name fills nothing", async (name) => {
-  mocks.pick.current = () => Promise.resolve("   ");
+  mocks.pick.current = () => Promise.resolve({ name: "   ", photo: "none" as const });
   const view = await mount(name);
 
   try {
@@ -323,7 +362,7 @@ it.each(surfaceNames)("%s: a failure shows an error and keeps what was typed", a
 });
 
 it.each(surfaceNames)("%s: only the display name comes from the contact", async (name) => {
-  mocks.pick.current = () => Promise.resolve("Ada Lovelace");
+  mocks.pick.current = () => Promise.resolve({ name: "Ada Lovelace", photo: "none" as const });
   const view = await mount(name);
 
   try {
@@ -338,6 +377,111 @@ it.each(surfaceNames)("%s: only the display name comes from the contact", async 
           }
         : { type: "join_table", tableId, displayName: "Ada Lovelace", buyIn: 2000 },
     );
+  } finally {
+    await view.unmount();
+  }
+});
+
+const withPhoto = { name: "Ada Lovelace", photo: { uri: "file:///cache/contact-picks/ada.jpg" } };
+
+it.each(surfaceNames)("%s: a picked photo previews and can be dropped", async (name) => {
+  mocks.pick.current = () => Promise.resolve(withPhoto);
+  const view = await mount(name);
+
+  try {
+    await view.chooseFromContacts();
+    expect(view.hasPreview()).toBe(true);
+    expect(view.shows("Only on this phone.")).toBe(true);
+
+    await view.removePhoto();
+    expect(view.hasPreview()).toBe(false);
+    expect(mocks.discarded).toEqual([withPhoto.photo.uri]);
+    expect(view.nameValue()).toBe("Ada Lovelace");
+
+    await view.submit();
+    expect(mocks.linked).toEqual([]);
+  } finally {
+    await view.unmount();
+  }
+});
+
+it.each(surfaceNames)("%s: the photo is saved under the new player's ID", async (name) => {
+  mocks.pick.current = () => Promise.resolve(withPhoto);
+  const view = await mount(name);
+
+  try {
+    await view.chooseFromContacts();
+    await view.submit();
+
+    const request = view.requested();
+    const id = request && "payload" in request ? request.payload.id : "new-player";
+
+    expect(mocks.linked).toEqual([[id, withPhoto.photo.uri]]);
+  } finally {
+    await view.unmount();
+  }
+});
+
+it.each(surfaceNames)("%s: closing the sheet deletes the picked photo", async (name) => {
+  mocks.pick.current = () => Promise.resolve(withPhoto);
+  const view = await mount(name);
+
+  try {
+    await view.chooseFromContacts();
+    await view.close();
+
+    expect(mocks.discarded).toEqual([withPhoto.photo.uri]);
+    expect(mocks.linked).toEqual([]);
+  } finally {
+    await view.unmount();
+  }
+});
+
+it.each(surfaceNames)("%s: picking again replaces the first photo", async (name) => {
+  const second = { name: "Ada Lovelace", photo: { uri: "file:///cache/contact-picks/two.jpg" } };
+  const view = await mount(name);
+
+  try {
+    mocks.pick.current = () => Promise.resolve(withPhoto);
+    await view.chooseFromContacts();
+    mocks.pick.current = () => Promise.resolve(second);
+    await view.chooseFromContacts();
+    await view.submit();
+
+    expect(mocks.discarded).toEqual([withPhoto.photo.uri]);
+    expect(mocks.linked.map(([, uri]) => uri)).toEqual([second.photo.uri]);
+  } finally {
+    await view.unmount();
+  }
+});
+
+it.each(surfaceNames)("%s: a contact without a photo says so and links nothing", async (name) => {
+  mocks.pick.current = () => Promise.resolve({ name: "Ada Lovelace", photo: "none" as const });
+  const view = await mount(name);
+
+  try {
+    await view.chooseFromContacts();
+    expect(view.shows("This contact has no photo")).toBe(true);
+    expect(view.hasPreview()).toBe(false);
+
+    await view.submit();
+    expect(mocks.linked).toEqual([]);
+  } finally {
+    await view.unmount();
+  }
+});
+
+it.each(surfaceNames)("%s: a photo the phone won't share still fills the name", async (name) => {
+  mocks.pick.current = () =>
+    Promise.resolve({ name: "Ada Lovelace", photo: "unavailable" as const });
+
+  const view = await mount(name);
+
+  try {
+    await view.chooseFromContacts();
+    expect(view.nameValue()).toBe("Ada Lovelace");
+    expect(view.shows("no photo")).toBe(false);
+    expect(mocks.unavailable.count).toBe(1);
   } finally {
     await view.unmount();
   }

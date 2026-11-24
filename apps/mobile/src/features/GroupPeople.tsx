@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/expo";
-import { InviteId, UserId, type GroupDetail, type Player } from "@stacks/contracts";
+import { InviteId, type GroupDetail, type Player } from "@stacks/contracts";
 import {
   distinctPlayerNames,
   formatDay,
@@ -23,7 +23,9 @@ import { inviteUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { AddGuestSheet } from "./AddGuestSheet";
-import { Chip } from "./Chip";
+import { ContactPhotoControls } from "./ContactPhoto";
+import { playerActions } from "./playerActions";
+import { PlayerChip } from "./PlayerChip";
 import { InviteLinkSkeleton } from "./ScreenSkeletons";
 
 const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
@@ -31,8 +33,7 @@ const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 /** Everyone in the group: members and their roles, guests, invite links, and who left. */
 export function GroupPeople({ detail }: { detail: GroupDetail }) {
   const [action, setAction] = useState<"invite" | "guest" | null>(null);
-  const [managing, setManaging] = useState<Player | null>(null);
-  const [copyError, setCopyError] = useState(false);
+  const [opened, setOpened] = useState<Player | null>(null);
   const android = Platform.OS === "android";
   const { userId } = useAuth();
   const members = detail.players.filter((player) => player.role !== null);
@@ -43,23 +44,15 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
     [...members, ...guests, ...former].map((player) => [player.id, player.displayName]),
   );
 
-  const canManage = (player: Player) =>
-    player.userId !== null &&
-    player.userId !== userId &&
-    player.role !== "owner" &&
-    (detail.role === "owner" || (detail.role === "admin" && player.role === "member"));
+  const open = (player: Player) =>
+    player.id === detail.myPlayerId
+      ? {}
+      : { onPress: () => setOpened(player), accessibilityHint: "Opens their details" };
 
   const memberRows = members.map((player) => (
-    <Row
-      key={player.id}
-      {...(canManage(player)
-        ? {
-            onPress: () => setManaging(player),
-            accessibilityHint: "Change their role or remove them",
-          }
-        : {})}
-    >
-      <Chip
+    <Row key={player.id} {...open(player)}>
+      <PlayerChip
+        playerId={player.id}
         chip={chipOf(detail, player.id)}
         name={player.displayName}
         size={android ? 36 : 26}
@@ -82,14 +75,15 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
   ));
 
   const guestRows = guests.map((player) => (
-    <Row key={player.id} className="flex-wrap">
-      <Chip
+    <Row key={player.id} {...open(player)}>
+      <PlayerChip
+        playerId={player.id}
         chip={chipOf(detail, player.id)}
         name={player.displayName}
         size={android ? 36 : 26}
         ring={android}
       />
-      <View className={android ? "min-w-0 flex-1 basis-24" : "flex-1 basis-32"}>
+      <View className="min-w-0 flex-1">
         <Text className={android ? "type-heading font-bold text-ink" : "text-base text-ink"}>
           {names.get(player.id)}
         </Text>
@@ -99,29 +93,6 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
           </Text>
         ) : null}
       </View>
-      {player.claimCode ? (
-        <Button
-          label={android ? "Copy link" : "Send claim link"}
-          size="sm"
-          className="ml-auto"
-          icon={android ? <Icon name="link" color="ink" size={16} /> : undefined}
-          onPress={() => {
-            if (!player.claimCode) return;
-
-            const url = inviteUrl("claim", player.claimCode);
-
-            if (android) {
-              setCopyError(false);
-              void setStringAsync(url).then(
-                (copied) => setCopyError(!copied),
-                () => setCopyError(true),
-              );
-            } else {
-              void shareLink(url, `Claim your Color Up history in ${detail.group.name}:`);
-            }
-          }}
-        />
-      ) : null}
     </Row>
   ));
 
@@ -146,7 +117,6 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
             {memberRows}
             {guestRows}
           </List>
-          {copyError ? <FormError>The claim link couldn’t be copied. Try again.</FormError> : null}
         </View>
       ) : (
         <>
@@ -195,8 +165,13 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
         </View>
       ) : null}
       <AddGuestSheet detail={detail} open={action === "guest"} onClose={() => setAction(null)} />
-      {managing ? (
-        <ManageMemberSheet detail={detail} player={managing} onClose={() => setManaging(null)} />
+      {opened ? (
+        <PlayerSheet
+          detail={detail}
+          player={opened}
+          viewer={{ role: detail.role, userId }}
+          onClose={() => setOpened(null)}
+        />
       ) : null}
     </>
   );
@@ -285,22 +260,30 @@ function InviteSection({ detail }: { detail: GroupDetail }) {
   );
 }
 
-function ManageMemberSheet({
+function PlayerSheet({
   detail,
   player,
+  viewer,
   onClose,
 }: {
   detail: GroupDetail;
   player: Player;
+  viewer: Parameters<typeof playerActions>[0];
   onClose: () => void;
 }) {
   const stacks = useStacks();
   const setRole = useAction(stacks.Client.mutation("groups", "setRole"));
   const remove = useAction(stacks.Client.mutation("groups", "removeMember"));
-  const params = { groupId: detail.group.id, userId: UserId.make(player.userId!) };
-  const [confirming, setConfirming] = useState(false);
+  const actions = playerActions(viewer, player);
 
-  if (confirming) {
+  const params =
+    player.userId === null ? null : { groupId: detail.group.id, userId: player.userId };
+
+  const [confirming, setConfirming] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const android = Platform.OS === "android";
+
+  if (confirming && params) {
     return (
       <Sheet
         open
@@ -329,13 +312,43 @@ function ManageMemberSheet({
     );
   }
 
+  const claim = () => {
+    if (!player.claimCode) return;
+
+    const url = inviteUrl("claim", player.claimCode);
+
+    if (android) {
+      setCopyError(false);
+      void setStringAsync(url).then(
+        (copied) => setCopyError(!copied),
+        () => setCopyError(true),
+      );
+    } else {
+      void shareLink(url, `Claim your Color Up history in ${detail.group.name}:`);
+    }
+  };
+
   return (
     <Sheet open onClose={onClose} title={player.displayName}>
-      {detail.role === "owner" ? (
+      <ContactPhotoControls
+        playerId={player.id}
+        chip={chipOf(detail, player.id)}
+        name={player.displayName}
+      />
+      {actions.claimLink ? (
+        <Button
+          label={android ? "Copy claim link" : "Send claim link"}
+          icon={android ? <Icon name="link" color="ink" size={16} /> : undefined}
+          onPress={claim}
+        />
+      ) : null}
+      {copyError ? <FormError>The claim link couldn’t be copied. Try again.</FormError> : null}
+      {actions.changeRole ? (
         <Button
           label={player.role === "admin" ? "Make a member" : "Make an admin"}
           pending={setRole.pending}
           onPress={() =>
+            params &&
             void setRole
               .run({ params, payload: { role: player.role === "admin" ? "member" : "admin" } })
               .then((saved) => {
@@ -344,8 +357,12 @@ function ManageMemberSheet({
           }
         />
       ) : null}
-      <Button label="Remove from group" variant="danger" onPress={() => setConfirming(true)} />
-      <Text className="text-sm text-muted">Their history stays in the group's ledger.</Text>
+      {actions.manage ? (
+        <>
+          <Button label="Remove from group" variant="danger" onPress={() => setConfirming(true)} />
+          <Text className="text-sm text-muted">Their history stays in the group's ledger.</Text>
+        </>
+      ) : null}
       {setRole.error ? <FormError>{setRole.error}</FormError> : null}
     </Sheet>
   );

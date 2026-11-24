@@ -35,7 +35,7 @@ import { useGo } from "../lib/go";
 import { HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
 import { useScope } from "../lib/scope";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
-import { Chip } from "./Chip";
+import { PlayerChip } from "./PlayerChip";
 import { Skeleton } from "../components/ui/Surface";
 
 /** The group's trips: the ones going now with their leaders, then past trips. Each opens its sessions. */
@@ -200,7 +200,12 @@ function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
       {top.map((s) => (
         <View key={s.playerId} className="flex-row items-center gap-2">
           <Text className="tabular-nums text-sm text-ink">{s.rank}</Text>
-          <Chip chip={chipOf(detail, s.playerId)} name={names.get(s.playerId) ?? ""} size={22} />
+          <PlayerChip
+            playerId={s.playerId}
+            chip={chipOf(detail, s.playerId)}
+            name={names.get(s.playerId) ?? ""}
+            size={22}
+          />
           <Text
             accessibilityLabel={prefs.privacyMode ? HIDDEN_AMOUNT_LABEL : undefined}
             className={`tabular-nums text-sm ${
