@@ -112,7 +112,14 @@ export function StatsHero({ view }: { view: StatsSummary }) {
           </Text>
         ) : null}
       </View>
-      {view.chart ? <RunningChart chart={view.chart} /> : <View className="h-5" />}
+      {view.chart ? (
+        <RunningChart
+          key={view.chart.points.map((point) => `${point.day}:${point.total}`).join("|")}
+          chart={view.chart}
+        />
+      ) : (
+        <View className="h-5" />
+      )}
       <View className="flex-row border-t border-line">
         <Tile label="Per hour">
           {view.hourlyResult === null ? (
@@ -160,10 +167,9 @@ function RunningChart({ chart }: { chart: NonNullable<StatsSummary["chart"]> }) 
   ]).map(String);
 
   const [width, setWidth] = useState(0);
-  const [picked, setInspect] = useState<number | null>(null);
+  const [inspect, setInspect] = useState<number | null>(null);
   const { points } = chart;
   const last = points.length - 1;
-  const inspect = picked !== null && picked <= last ? picked : null;
   const plot = runningLine(points, { width: Math.max(width, 2 * PAD.x), height }, PAD);
   const nearest = (x: number) => plot.nearest(x);
   const finish = points[last]!.total;

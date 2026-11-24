@@ -391,10 +391,7 @@ export function ByGame({
           >
             <View className={cn("size-2 rounded-full", chipColor[row.chip])} />
             <View className="min-w-0 flex-1 gap-0.5">
-              <Text
-                numberOfLines={android ? 2 : 1}
-                className={cn("text-ink", android ? "text-sm font-semibold" : "type-heading")}
-              >
+              <Text numberOfLines={android ? 2 : 1} className="type-heading text-ink">
                 {row.label}
               </Text>
               <Text numberOfLines={1} className="type-footnote text-muted">
@@ -407,7 +404,9 @@ export function ByGame({
               currency={currency}
               tone="result"
               fit={android}
-              className="min-w-18 text-right font-semibold"
+              className={
+                android ? "min-w-18 text-right type-number" : "min-w-18 text-right font-semibold"
+              }
             />
           </Row>
         ))}

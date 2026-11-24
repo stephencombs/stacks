@@ -156,7 +156,11 @@ const percent = new Intl.NumberFormat("en-US", {
 
 /** A return on buy-ins, "+55%" or "-30%", or "–" for someone who never put money in. */
 export const returnLabel = (value: number | null) =>
-  value === null ? "–" : percent.format(value).replace("−", "-");
+  value === null
+    ? "–"
+    : Math.round(value * 100) === 0
+      ? "0%"
+      : percent.format(value).replace("−", "-");
 
 /** A night's or a trip's record: "4W · 3L · 1 even", leaving out what's zero. */
 export const recordLine = (wins: number, losses: number, even: number) =>
