@@ -56,6 +56,7 @@ import { useRecordingState } from "../lib/recording";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
 import { Chip } from "./Chip";
+import { ChooseFromContacts } from "./ChooseFromContacts";
 import { CasinoPickerSheet } from "./VenuePicker";
 import { AmountFeedback } from "./AmountFeedback";
 import { applyAmountKey } from "./amountKey";
@@ -1625,6 +1626,11 @@ export function AddPlayerSheet({
 
   const typed = parseRecordingAmount(amount.text, 1);
 
+  const pickName = (picked: string) => {
+    setName(picked);
+    setNameError(null);
+  };
+
   const submitSaved = async (playerId: PlayerId, label: string) => {
     const value = amount.read();
 
@@ -1704,6 +1710,7 @@ export function AddPlayerSheet({
               </View>
             ) : null}
           </View>
+          <ChooseFromContacts onName={pickName} onError={setNameError} />
           <View className="gap-1.5">
             <View
               className={cn(
@@ -1782,8 +1789,15 @@ export function AddPlayerSheet({
               maxLength={60}
               autoComplete="off"
               error={nameError}
-              onChangeText={setName}
+              onChangeText={(next) => {
+                setName(next);
+
+                if (nameError && next.trim()) setNameError(null);
+              }}
             />
+          ) : null}
+          {choice === NEW_PLAYER ? (
+            <ChooseFromContacts onName={pickName} onError={setNameError} />
           ) : null}
           <TypedAmount label="Buy-in" amount={amount} />
         </>
