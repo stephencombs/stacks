@@ -7,6 +7,10 @@ it.each(["t", "invite", "join", "claim"])("reads %s's token from the fragment", 
   expect(linkAddress(`${kind}#abc`)).toBe(`${kind}/abc`);
 });
 
+it("ignores query parameters that apps add before the fragment", () => {
+  expect(linkAddress("/t?fbclid=x&utm_source=y#abc")).toBe("t/abc");
+});
+
 it("leaves scheme paths and other addresses alone", () => {
   expect(linkAddress("t/abc")).toBe("t/abc");
   expect(linkAddress("/invite/abc")).toBe("/invite/abc");
