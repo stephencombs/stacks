@@ -60,10 +60,7 @@ function Tile({
       accessible
       className={
         large
-          ? cn(
-              "flex-row items-center justify-between gap-3 px-4 py-3",
-              divided && "border-t border-line",
-            )
+          ? cn("gap-0.5 px-4 py-3", divided && "border-t border-line")
           : cn("flex-1 gap-0.5 px-4 py-3", divided && "border-l border-line")
       }
     >
@@ -556,7 +553,7 @@ export function PeriodSection({ bars }: { bars: NonNullable<StatsSummary["bars"]
                 {bar.year ? (
                   <Text
                     numberOfLines={1}
-                    maxFontSizeMultiplier={1.2}
+                    maxFontSizeMultiplier={1}
                     className="text-[10px] leading-[12px] text-faint"
                   >
                     {bar.year}
@@ -610,6 +607,7 @@ export function RecordsSection({
   onOpen: (visitId: VisitId) => void;
 }) {
   const prefs = usePreferences();
+  const large = useLargeText();
 
   return (
     <View className="gap-2">
@@ -624,16 +622,27 @@ export function RecordsSection({
           >
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="type-heading text-ink">{record.label}</Text>
-              <Text numberOfLines={1} className="type-footnote text-muted">
+              <Text numberOfLines={large ? undefined : 1} className="type-footnote text-muted">
                 {record.meta}
               </Text>
+              {large ? (
+                <Money
+                  amount={record.result}
+                  currency={currency}
+                  tone="result"
+                  fit
+                  className="type-number"
+                />
+              ) : null}
             </View>
-            <Money
-              amount={record.result}
-              currency={currency}
-              tone="result"
-              className="type-number"
-            />
+            {large ? null : (
+              <Money
+                amount={record.result}
+                currency={currency}
+                tone="result"
+                className="type-number"
+              />
+            )}
             <Icon name="chevron-right" color="faint" size={18} />
           </Row>
         ))}
