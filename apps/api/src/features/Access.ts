@@ -41,6 +41,15 @@ export const membership = Effect.fn("Access.membership")(function* (groupId: Gro
   return row;
 });
 
+/**
+ * Serializes whoever changes who is in a group, or who owns it: leaving, removal, a role, a
+ * join, a claim, and an account's deletion. Take it before locking anything else in the group.
+ */
+export const lockGroup = Effect.fn("Access.lockGroup")(function* (groupId: GroupId) {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`select id from groups where id = ${groupId} for update`;
+});
+
 export const requireAdmin = (member: Membership) =>
   member.role === "member" ? Effect.fail(new Forbidden({ reason: "admins_only" })) : Effect.void;
 

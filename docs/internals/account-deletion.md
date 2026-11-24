@@ -8,7 +8,8 @@ balances and stakes come out the same. `Account.remove` does it in one transacti
 
 - **The audit user.** Every `created_by`, `voided_by` and `closed_by` that named the account moves to
   the `users` row `deleted-account`. It can't sign in: a `UserId` is a Clerk subject.
-- **The audit actor.** `personal_entries.created_by`, `voided_by`, `personal_operations.actor_id`,
+- **The audit actor.** It has its own kind, `audit`, which no identity can be established as, no
+  player bound to, and nothing can change or delete (triggers). `personal_entries.created_by`, `voided_by`, `personal_operations.actor_id`,
   the actor ids inside `personal_operations.command`, and `players.created_by_actor` move to one
   unbound `recording_actors` row. Replaying a table never meets an actor that was deleted.
 - **A detached table player.** The account's personal player keeps its name, visits and entries but
@@ -22,13 +23,27 @@ balances and stakes come out the same. `Account.remove` does it in one transacti
 
 - `entries_append_only` stays on. It lets a statement through only when `stacks.account_deletion` is
   `on` for the transaction, which only `Account.remove` sets. Never disable the trigger instead.
+- A group is deleted only if no one else was ever in it (`memberships` rows, active or left): a
+  former member's entries and stakes live there. Whether the deleted account was still a member
+  doesn't matter. A group kept with no active member to inherit it stays as it is, with no owner and
+  its guests, reachable by no one; nothing restores a former member without their say.
+- Deleting, leaving, removal, roles, joins and claims all lock the group row first
+  (`Access.lockGroup`), so the successor `Account.remove` picks can't leave while it promotes them.
+  A promotion that touches no row fails the transaction, which retries.
 - A table is deleted only if nobody else played at it **and** no surviving group's trip counts it.
   A table that only the deleted account played, in a trip with friends, is part of their results.
 - The fence is `account_deletions`. Authentication rejects a token whose subject hash is in it, so a
-  deleted person's other devices get a 401 and wipe themselves. It means a repeated `POST` can't
-  reach the endpoint either: a client that gets a 401 after asking to delete should treat the
-  account as deleted. The fence row stays for good because it holds a hash, not an identity.
-  `user_id` is kept on it only until Clerk confirms the deletion, which is what the cron retries.
+  deleted person's other devices get a 401 and wipe themselves. `POST /account/delete` alone uses
+  `AccountAuthentication`, which verifies the token but skips the fence, so a lost response is
+  recovered by asking again: the answer is the job's state, `pending` or `complete`, and nothing is
+  repeated. The fence row stays for good because it holds a hash, not an identity. `user_id` is kept
+  on it only until Clerk confirms the deletion.
+- The cron claims due jobs with a lease (`for update skip locked`), so overlapping runs take
+  different jobs, and a job that fails waits `2^attempts` minutes (to six hours). Each Clerk call is
+  cut off after ten seconds.
+- A write that was in flight when the fence committed is stopped inside its own transaction:
+  recording commands and share links take the shared fence lock and read the recorder's bindings
+  `for share`, so a recorder resolved before the deletion can't write after it.
 - `Access.ensureUser` is the one write that can recreate a user. It takes the user's advisory lock
   (`Account.remove` holds it exclusively) and refuses a fenced user. Other writes name the user in a
   foreign key, so one that loses the race fails instead of landing.

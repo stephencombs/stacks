@@ -97,6 +97,7 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
 
   const groupId = yield* Realtime.transaction(
     Effect.gen(function* () {
+      yield* Access.lockGroup((yield* findClaim(code)).groupId);
       const guest = yield* findClaim(code, true);
 
       if (guest.alreadyMember) return yield* new Conflict({ reason: "claim_already_member" });

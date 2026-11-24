@@ -15,6 +15,7 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as SqlClient from "effect/sql/SqlClient";
 import {
+  AccountAuthentication,
   Authentication,
   CurrentUser,
   Recorder,
@@ -52,15 +53,19 @@ const testUser = (credential: Redacted.Redacted) => {
   return { userId, displayName: userId.replace(/^user_/, ""), avatarUrl: null };
 };
 
-const verifyTest: Upgrade.Upgrade["verify"] = (credential) =>
+const verifyTestToken: Upgrade.Upgrade["verify"] = (credential) =>
   Redacted.value(credential) === ""
     ? Effect.fail(new Unauthorized())
-    : Effect.as(AccountFence.rejectInRequest(testUser(credential).userId), testUser(credential));
+    : Effect.succeed(testUser(credential));
+
+const verifyTest: Upgrade.Upgrade["verify"] = (credential) =>
+  Effect.tap(verifyTestToken(credential), (user) => AccountFence.rejectInRequest(user.userId));
 
 interface Outside {
   clerkDown: boolean;
   appleDown: boolean;
   clerkAttempts: number;
+  readonly clerkFailing: Set<string>;
   readonly clerkDeleted: Array<string>;
   readonly appleLinked: Set<string>;
   readonly appleRevoked: Array<string>;
@@ -70,6 +75,7 @@ const outside: Outside = {
   clerkDown: false,
   appleDown: false,
   clerkAttempts: 0,
+  clerkFailing: new Set(),
   clerkDeleted: [],
   appleLinked: new Set(),
   appleRevoked: [],
@@ -80,7 +86,7 @@ const testClerk = ClerkAdmin.of({
     Effect.suspend(() => {
       outside.clerkAttempts += 1;
 
-      return outside.clerkDown
+      return outside.clerkDown || outside.clerkFailing.has(userId)
         ? Effect.fail(new ClerkUnavailable({ status: 503 }))
         : Effect.sync(() => void outside.clerkDeleted.push(userId));
     }),
@@ -105,6 +111,12 @@ const layerTestAuthentication = Layer.mergeAll(
   Layer.succeed(Authentication, {
     bearer: (httpEffect, { credential }) =>
       Effect.flatMap(verifyTest(credential), (user) =>
+        Effect.provideService(httpEffect, CurrentUser, user),
+      ),
+  }),
+  Layer.succeed(AccountAuthentication, {
+    bearer: (httpEffect, { credential }) =>
+      Effect.flatMap(verifyTestToken(credential), (user) =>
         Effect.provideService(httpEffect, CurrentUser, user),
       ),
   }),

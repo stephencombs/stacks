@@ -34,7 +34,7 @@ const layerOutside = Layer.mergeAll(ClerkAdmin.layer, AppleSignIn.layer).pipe(
 
 const { handler } = HttpRouter.toWebHandler(
   Layer.mergeAll(Api.layer, HttpRouter.cors()).pipe(
-    Layer.provide([Clerk.layer, Clerk.layerRecording, layerWorkerPlatform]),
+    Layer.provide([Clerk.layer, Clerk.layerAccount, Clerk.layerRecording, layerWorkerPlatform]),
   ),
 );
 

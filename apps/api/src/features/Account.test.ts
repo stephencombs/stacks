@@ -9,6 +9,8 @@ import {
   EntryId,
   groupScope,
   PlayerId,
+  Recorder,
+  RecorderOf,
   ScopeCloseCode,
   StakeId,
   TableId,
@@ -43,13 +45,17 @@ import {
   voidHistoricalEntry,
 } from "../testing/legacySessions.test-utils.ts";
 import {
+  account,
   at,
+  device,
   finish,
   recorderCommand,
+  signedIn,
   sitDown,
   start,
   uuid,
 } from "../testing/recording.test-utils.ts";
+import { TableRow } from "../db/rows.ts";
 import { TestApi } from "../testing/TestApi.test-utils.ts";
 import type { Selector } from "../realtime/Selector.ts";
 import * as Access from "./Access.ts";
@@ -58,7 +64,7 @@ import * as AccountFence from "./AccountFence.ts";
 import { DELETED_ACTOR } from "./AccountFence.ts";
 import * as LegacyMigration from "./LegacyMigration.ts";
 import * as Realtime from "./Realtime.ts";
-import { digest } from "./Recording.ts";
+import * as Recording from "./Recording.ts";
 
 type Client = Effect.Success<ReturnType<TestApi["Service"]["as"]>>;
 
@@ -346,6 +352,42 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
     }),
   );
 
+  it.effect(
+    "replays a native table's commands after the deletion, and lets the recorder go on",
+    () =>
+      Effect.gen(function* () {
+        const s = yield* staleAccount();
+
+        const { player } = yield* s.bob.join(s.token, {
+          id: PlayerId.make(uuid()),
+          displayName: "Bob again",
+        });
+
+        const sits = sitDown(s.bob.identity, s.opened.tableId, player.id, 5);
+        const finishes = finishAt(s.bob.identity, sits.visitId, 40, 18000);
+        expect(yield* s.bob.push(sits, finishes)).toEqual(["accepted", "accepted"]);
+
+        const before = yield* s.bob.client.recording.table({
+          params: { tableId: s.opened.tableId },
+        });
+
+        yield* s.alice.client.account.delete({ payload: {} });
+
+        expect(yield* s.bob.push(sits, finishes)).toEqual(["accepted", "accepted"]);
+
+        const after = yield* s.bob.client.recording.table({
+          params: { tableId: s.opened.tableId },
+        });
+
+        expect(after.visits).toEqual(before.visits);
+
+        const history = yield* s.bob.client.recording.history();
+        const replayed = history.commands.map((command) => command.operationId);
+        expect(replayed).toContain(sits.operationId);
+        expect(yield* s.bob.push(sits)).toEqual(["accepted"]);
+      }),
+  );
+
   it.effect("lets the recorder go on recording, with the share link revoked", () =>
     Effect.gen(function* () {
       const s = yield* scene();
@@ -399,9 +441,7 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
 
       expect((yield* Effect.flip(s.alice.groups.list()))._tag).toBe("Unauthorized");
       expect((yield* Effect.flip(s.alice.recording.history()))._tag).toBe("Unauthorized");
-      expect((yield* Effect.flip(s.alice.account.delete({ payload: {} })))._tag).toBe(
-        "Unauthorized",
-      );
+      expect(yield* s.alice.account.delete({ payload: {} })).toEqual({ status: "complete" });
 
       const upgrade = yield* s.api.upgrade(`group:${s.group.group.id}`, {
         token: s.aliceId,
@@ -611,7 +651,7 @@ it.layer(TestApi.layer)("what deleting an account shows and tells", (it) => {
           closeOf(tableScope(s.first.tableId), { kind: "actor", actorId: s.aliceMe.actorId }),
           closeOf(tableScope(s.first.tableId), {
             kind: "share",
-            shareHash: yield* digest(s.token),
+            shareHash: yield* Recording.digest(s.token),
           }),
           closeOf(tableScope(s.apart.tableId), { kind: "all" }, ScopeCloseCode.tableDeleted),
         ]),
@@ -641,6 +681,11 @@ it.layer(TestApi.layer)("finishing a deletion", (it) => {
       expect((yield* jobOf(s.aliceId))?.clerkDeleted).toBe(false);
       expect(s.api.outside.clerkDeleted).not.toContain(s.aliceId);
 
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`
+        update account_deletions set next_attempt_at = now()
+        where user_id_hash = ${yield* AccountFence.hashOf(s.aliceId)}
+      `;
       yield* s.api.retryClerkDeletions;
       expect(yield* jobOf(s.aliceId)).toEqual({
         userId: null,
@@ -758,7 +803,7 @@ const tableEntries = (view: {
 }) => (view.entries ?? []).map(({ id }) => id).toSorted();
 
 it.layer(TestApi.layer)("deleting an account with legacy history", (it) => {
-  it.effect("keeps an imported table, and imports again as before", () =>
+  it.effect("keeps an imported table, and importing it again changes nothing", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       const { alice, bob } = yield* users("alice", "bob");
@@ -835,6 +880,428 @@ it.layer(TestApi.layer)("deleting an account with legacy history", (it) => {
   );
 });
 
+const groupsHolding = Effect.fn("test.groupsHolding")(function* (
+  ...groupIds: ReadonlyArray<GroupId>
+) {
+  const sql = yield* SqlClient.SqlClient;
+
+  return yield* sql<{ id: string }>`select id from groups where id in ${sql.in(groupIds)}`;
+});
+
+it.layer(TestApi.layer)("whose records a group holds", (it) => {
+  it.effect("keeps a group a former member played in, even with no one left to inherit it", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const { alice, bob } = yield* users("alice", "bob");
+      const group = yield* groupWith(alice, bob);
+      const bobPlayer = group.players.find((player) => player.id !== group.myPlayerId)!.id;
+      yield* owe(alice, group, bobPlayer, group.myPlayerId, 4000);
+      yield* bob.groups.leave({ params: { groupId: group.group.id } });
+
+      expect((yield* alice.account.deletionPreview()).soloGroups).toEqual([]);
+      yield* alice.account.delete({ payload: {} });
+
+      expect(yield* groupsHolding(group.group.id)).toHaveLength(1);
+
+      const [rows] = yield* sql<{ entries: number; guests: number; owners: number }>`
+        select (select count(*)::int from entries where group_id = ${group.group.id}) as entries,
+          (select count(*)::int from players
+            where group_id = ${group.group.id} and user_id is null and claim_code is not null) as guests,
+          (select count(*)::int from memberships
+            where group_id = ${group.group.id} and role = 'owner' and left_at is null) as owners
+      `;
+
+      expect(rows).toEqual({ entries: 1, guests: 1, owners: 0 });
+    }),
+  );
+
+  it.effect("deletes a private group the account had already left", () =>
+    Effect.gen(function* () {
+      const { alice } = yield* users("alice");
+      const group = yield* groupWith(alice);
+      yield* alice.groups.leave({ params: { groupId: group.group.id } });
+
+      yield* alice.account.delete({ payload: {} });
+
+      expect(yield* groupsHolding(group.group.id)).toEqual([]);
+    }),
+  );
+
+  it.effect("leaves exactly one owner when the owner and the successor delete together", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+
+      const trios = yield* Effect.forEach([1, 2, 3, 4, 5, 6], () =>
+        Effect.gen(function* () {
+          const { alice, bob, carol } = yield* users("alice", "bob", "carol");
+          const group = yield* groupWith(alice, bob, carol);
+
+          const [bobPlayer, carolPlayer] = group.players.filter(
+            (player) => player.id !== group.myPlayerId,
+          );
+
+          yield* alice.groups.setRole({
+            params: { groupId: group.group.id, userId: bobPlayer!.userId! },
+            payload: { role: "admin" },
+          });
+
+          return { alice, bob, groupId: group.group.id, carolId: carolPlayer!.userId! };
+        }),
+      );
+
+      yield* Effect.forEach(
+        trios,
+        (trio) =>
+          Effect.all(
+            [trio.alice.account.delete({ payload: {} }), trio.bob.account.delete({ payload: {} })],
+            {
+              concurrency: "unbounded",
+            },
+          ),
+        { concurrency: "unbounded" },
+      );
+
+      for (const trio of trios) {
+        const owners = yield* sql<{ userId: string }>`
+          select user_id from memberships where group_id = ${trio.groupId} and role = 'owner'
+        `;
+
+        expect(owners).toEqual([{ userId: trio.carolId }]);
+      }
+    }),
+  );
+});
+
+it.layer(TestApi.layer)("the reserved audit actor", (it) => {
+  it.effect("can never be recorded as, registered, bound or removed", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const api = yield* TestApi;
+      const reserved = ActorId.make(DELETED_ACTOR);
+
+      const impostor = yield* signedIn(`impostor_${uuid().slice(0, 8)}`, {
+        playerId: PlayerId.make(uuid()),
+        actorId: reserved,
+      });
+
+      const establishing = yield* Effect.flip(impostor.push(start(impostor.identity)));
+      expect(establishing).toMatchObject({ reason: "recording_identity" });
+
+      const anonymous = yield* api.asActor(null);
+
+      const registering = yield* Effect.flip(
+        anonymous.publicRecording.registerActor({
+          payload: { actorId: reserved, secret: "0".repeat(64) },
+        }),
+      );
+
+      expect(registering).toMatchObject({ reason: "actor_taken" });
+
+      const player = PlayerId.make(uuid());
+      yield* sql`insert into players (id, display_name, created_by_actor) values (${player}, 'P', ${uuid()})`;
+      const binding = sql`insert into player_actors (player_id, actor_id) values (${player}, ${DELETED_ACTOR})`;
+      expect((yield* Effect.flip(binding))._tag).toBe("SqlError");
+
+      const removing = sql`delete from recording_actors where id = ${DELETED_ACTOR}`;
+      expect((yield* Effect.flip(removing))._tag).toBe("SqlError");
+
+      const [row] = yield* sql<{
+        kind: string;
+      }>`select kind from recording_actors where id = ${DELETED_ACTOR}`;
+
+      expect(row).toEqual({ kind: "audit" });
+    }),
+  );
+
+  it.effect("rejects a table player with no owner at all", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+
+      const bare = sql`
+        insert into players (id, group_id, display_name, user_id, created_by, created_by_actor,
+          recording_actor_id)
+        values (${uuid()}, null, 'Nobody', null, null, null, null)
+      `;
+
+      expect((yield* Effect.flip(bare))._tag).toBe("SqlError");
+    }),
+  );
+});
+
+const linkedPhone = Effect.fn("test.linkedPhone")(function* (
+  alice: Effect.Success<ReturnType<typeof account>>,
+) {
+  const phone = yield* device();
+  const table = start(phone.identity);
+  expect(yield* phone.push(table)).toEqual(["accepted"]);
+  const { token } = yield* phone.client.recording.share({ params: { tableId: table.tableId } });
+  const friend = yield* account("friend");
+  yield* friend.join(token);
+
+  yield* alice.client.claim.claimActor({
+    payload: {
+      actorId: phone.credential.actorId,
+      secret: phone.credential.secret,
+      link: true,
+    },
+  });
+
+  return { phone, table };
+});
+
+const staleAccount = Effect.fn("test.staleAccount")(function* () {
+  const api = yield* TestApi;
+  const alice = yield* account("alice");
+
+  const user = {
+    userId: UserId.make(`user_${alice.handle}`),
+    displayName: "Alice",
+    avatarUrl: null,
+  };
+
+  const opened = start(alice.identity);
+  expect(yield* alice.push(opened)).toEqual(["accepted"]);
+  const { token } = yield* alice.client.recording.share({ params: { tableId: opened.tableId } });
+  const bob = yield* account("bob");
+  yield* bob.join(token);
+  const asAccount = RecorderOf.Account({ user });
+
+  const established = yield* Recording.establish(alice.identity).pipe(
+    Effect.provideService(Recorder, asAccount),
+  );
+
+  return { api, alice, bob, user, opened, token, asAccount, established };
+});
+
+it.layer(TestApi.layer)("writes in flight when an account is deleted", (it) => {
+  it.effect("refuses commands from a recorder resolved before the deletion", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const s = yield* staleAccount();
+      yield* s.alice.client.account.delete({ payload: {} });
+
+      const later = start(s.alice.identity);
+
+      const pushing = yield* Effect.flip(
+        Recording.pushEstablished(s.established, [later]).pipe(
+          Effect.provideService(Recorder, s.asAccount),
+          Effect.provideService(Realtime.Realtime, Realtime.makeRealtime()),
+        ),
+      );
+
+      expect(pushing._tag).toBe("Unauthorized");
+
+      const [rows] = yield* sql<{ tables: number; operations: number }>`
+        select (select count(*)::int from tables where id = ${later.tableId}) as tables,
+          (select count(*)::int from personal_operations
+            where actor_id = ${s.alice.identity.actorId}) as operations
+      `;
+
+      expect(rows).toEqual({ tables: 0, operations: 0 });
+    }),
+  );
+
+  it.effect("refuses a linked device whose binding the deletion removed", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const s = yield* staleAccount();
+      const { phone, table } = yield* linkedPhone(s.alice);
+
+      const asDevice = RecorderOf.Actor({
+        actorId: phone.credential.actorId,
+        secret: phone.credential.secret,
+      });
+
+      const established = yield* Recording.establish(phone.identity).pipe(
+        Effect.provideService(Recorder, asDevice),
+      );
+
+      expect(established.actorPlayers).toContain(phone.identity.playerId);
+      yield* s.alice.client.account.delete({ payload: {} });
+
+      const results = yield* Recording.pushEstablished(established, [
+        finishAt(phone.identity, table.visitId, 50, 100),
+      ]).pipe(
+        Effect.provideService(Recorder, asDevice),
+        Effect.provideService(Realtime.Realtime, Realtime.makeRealtime()),
+      );
+
+      expect(results.results.map((result) => result.status)).toEqual(["rejected"]);
+
+      const [row] = yield* sql<{ finishedAt: Date | null }>`
+        select finished_at from personal_visits where id = ${table.visitId}
+      `;
+
+      expect(row!.finishedAt).toBeNull();
+    }),
+  );
+
+  it.effect("cannot restore a share link the deletion revoked", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const s = yield* staleAccount();
+
+      const [table] = yield* sql`select * from tables where id = ${s.opened.tableId}`.pipe(
+        Effect.flatMap(Access.decodeRows(TableRow)),
+      );
+
+      yield* s.alice.client.account.delete({ payload: {} });
+
+      const restoring = yield* Effect.exit(
+        Recording.shareRow({ ...table!, starterPlayerId: table!.starterPlayerId! }).pipe(
+          Effect.provideService(Recorder, s.asAccount),
+          Effect.provideService(Realtime.Realtime, Realtime.makeRealtime()),
+        ),
+      );
+
+      expect(restoring._tag).toBe("Failure");
+
+      const [row] = yield* sql<{ shareTokenHash: string | null }>`
+        select share_token_hash from tables where id = ${s.opened.tableId}
+      `;
+
+      expect(row!.shareTokenHash).toBeNull();
+    }),
+  );
+});
+
+it.layer(TestApi.layer)("what a deletion reaches on other devices", (it) => {
+  it.effect("closes the table sockets of every device linked to the account's players", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const s = yield* staleAccount();
+      const { phone, table } = yield* linkedPhone(s.alice);
+
+      const closes = yield* api.closes(s.alice.client.account.delete({ payload: {} }));
+
+      expect(closes).toEqual(
+        expect.arrayContaining([
+          {
+            scope: tableScope(table.tableId),
+            selector: { kind: "actor", actorId: phone.identity.actorId },
+            code: ScopeCloseCode.revoked,
+          },
+          {
+            scope: tableScope(s.opened.tableId),
+            selector: { kind: "actor", actorId: s.alice.identity.actorId },
+            code: ScopeCloseCode.revoked,
+          },
+        ]),
+      );
+    }),
+  );
+
+  it.effect("rewrites only the actor field of a command, never a note that holds the same id", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const s = yield* staleAccount();
+      const note = s.alice.identity.actorId;
+
+      const withNote = RecordingCommand.make({
+        type: "add",
+        operationId: RecordingOperationId.make(uuid()),
+        actorId: s.alice.identity.actorId,
+        preparedAt: at(10),
+        visitId: s.opened.visitId,
+        expectedRevision: 0,
+        entryId: EntryId.make(uuid()),
+        kind: "buy_in",
+        amount: usd(5000),
+        occurredAt: at(10),
+        note,
+      });
+
+      expect(yield* s.alice.push(withNote)).toEqual(["accepted"]);
+
+      yield* s.alice.client.account.delete({ payload: {} });
+
+      const [command] = yield* sql<{ actorId: string; note: string }>`
+        select command ->> 'actorId' as actor_id, command ->> 'note' as note
+        from personal_operations where id = ${withNote.operationId}
+      `;
+
+      expect(command).toEqual({ actorId: DELETED_ACTOR, note });
+    }),
+  );
+});
+
+it.layer(TestApi.layer)("asking again after a deletion", (it) => {
+  it.effect("answers a repeated request over HTTP with the job's state, and nothing else", () =>
+    Effect.gen(function* () {
+      const s = yield* scene();
+
+      expect(yield* s.api.whileClerkDown(s.alice.account.delete({ payload: {} }))).toEqual({
+        status: "pending",
+      });
+      expect(yield* s.alice.account.delete({ payload: {} })).toEqual({ status: "pending" });
+      expect((yield* Effect.flip(s.alice.account.deletionPreview()))._tag).toBe("Unauthorized");
+
+      yield* s.api.retryClerkDeletions;
+      expect(yield* s.alice.account.delete({ payload: {} })).toEqual({ status: "complete" });
+      expect((yield* Effect.flip(s.alice.groups.list()))._tag).toBe("Unauthorized");
+    }),
+  );
+});
+
+const stuckJob = Effect.fn("test.stuckJob")(function* (
+  userId: string,
+  requestedMinutesAgo: number,
+) {
+  const sql = yield* SqlClient.SqlClient;
+
+  yield* sql`
+    insert into account_deletions (user_id_hash, user_id, requested_at, next_attempt_at)
+    values (${yield* AccountFence.hashOf(userId)}, ${userId},
+      now() - ${requestedMinutesAgo} * interval '1 minute',
+      now() - ${requestedMinutesAgo} * interval '1 minute')
+  `;
+});
+
+it.layer(TestApi.layer)("retrying Clerk deletions", (it) => {
+  it.effect("moves past jobs that keep failing, so a healthy one behind them finishes", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const run = uuid().slice(0, 8);
+      const failing = Array.from({ length: 26 }, (_, index) => `user_stuck_${run}_${index}`);
+      const healthy = `user_healthy_${run}`;
+
+      for (const [index, userId] of failing.entries()) {
+        api.outside.clerkFailing.add(userId);
+        yield* stuckJob(userId, 1000 - index);
+      }
+
+      yield* stuckJob(healthy, 10);
+
+      yield* api.retryClerkDeletions;
+      expect(api.outside.clerkDeleted).not.toContain(healthy);
+
+      yield* api.retryClerkDeletions;
+      expect(api.outside.clerkDeleted).toContain(healthy);
+      expect(yield* jobOf(healthy)).toMatchObject({ clerkDeleted: true });
+      expect((yield* jobOf(failing[0]!))?.clerkDeleted).toBe(false);
+    }),
+  );
+
+  it.effect("lets two overlapping runs each take different jobs, once", () =>
+    Effect.gen(function* () {
+      const api = yield* TestApi;
+      const run = uuid().slice(0, 8);
+      const users = Array.from({ length: 8 }, (_, index) => `user_overlap_${run}_${index}`);
+
+      for (const [index, userId] of users.entries()) yield* stuckJob(userId, 2000 - index);
+
+      yield* Effect.all([api.retryClerkDeletions, api.retryClerkDeletions], {
+        concurrency: "unbounded",
+      });
+
+      for (const userId of users) {
+        expect(api.outside.clerkDeleted.filter((deleted) => deleted === userId)).toHaveLength(1);
+        expect(yield* jobOf(userId)).toMatchObject({ clerkDeleted: true });
+      }
+    }),
+  );
+});
+
 const FOREIGN_KEYS = {
   "entries.counterparty_id -> players": "players stay, or the group's entries go with it",
   "entries.created_by -> users": "moved to the audit user",
@@ -874,11 +1341,13 @@ const FOREIGN_KEYS = {
 } as const;
 
 it.layer(TestApi.layer)("account deletion rules", (it) => {
-  it.effect("handles every foreign key that points at a user, a player or a recording actor", () =>
-    Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
+  it.effect(
+    "lists every foreign key to a user, a player or a recording actor, so a new one is noticed",
+    () =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
 
-      const keys = yield* sql<{ rule: string }>`
+        const keys = yield* sql<{ rule: string }>`
         select distinct c.conrelid::regclass::text || '.' || a.attname || ' -> '
           || c.confrelid::regclass::text as rule
         from pg_constraint c
@@ -887,8 +1356,10 @@ it.layer(TestApi.layer)("account deletion rules", (it) => {
           and c.confrelid in ('users'::regclass, 'players'::regclass, 'recording_actors'::regclass)
       `;
 
-      expect(keys.map((key) => key.rule).toSorted()).toEqual(Object.keys(FOREIGN_KEYS).toSorted());
-    }),
+        expect(keys.map((key) => key.rule).toSorted()).toEqual(
+          Object.keys(FOREIGN_KEYS).toSorted(),
+        );
+      }),
   );
 
   it.effect("keeps the append-only trigger on outside a deletion", () =>

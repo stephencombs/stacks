@@ -48,7 +48,10 @@ export const layer = Layer.effect(
             HttpClientRequest.bearerToken(Redacted.value(key)),
           ),
         )
-        .pipe(Effect.mapError(() => new ClerkUnavailable({ status: null })));
+        .pipe(
+          Effect.timeout("10 seconds"),
+          Effect.mapError(() => new ClerkUnavailable({ status: null })),
+        );
     });
 
     return ClerkAdmin.of({

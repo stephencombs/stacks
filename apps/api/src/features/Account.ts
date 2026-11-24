@@ -1,4 +1,6 @@
+import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import {
@@ -29,13 +31,17 @@ import * as Views from "./Views.ts";
 
 const Timestamp = Schema.DateTimeUtcFromDate;
 
+class SuccessorGone extends Data.TaggedError("SuccessorGone")<{ readonly groupId: GroupId }> {}
+
 const MembershipPlanRow = Schema.Struct({
   groupId: GroupId,
   name: Schema.String,
   currency: CurrencyCode,
   role: MemberRole,
+  active: Schema.Boolean,
   playerId: PlayerId,
-  others: Schema.Int,
+  othersEver: Schema.Int,
+  othersActive: Schema.Int,
   otherOwners: Schema.Int,
 });
 
@@ -49,23 +55,28 @@ const plan = Effect.fn("Account.plan")(function* (userId: string) {
   const sql = yield* SqlClient.SqlClient;
 
   const memberships = yield* sql`
-    select m.group_id, g.name, g.currency, m.role, p.id as player_id,
+    select m.group_id, g.name, g.currency, m.role, m.left_at is null as active, p.id as player_id,
       (select count(*)::int from memberships o
-        where o.group_id = m.group_id and o.user_id <> m.user_id and o.left_at is null) as others,
+        where o.group_id = m.group_id and o.user_id <> m.user_id) as others_ever,
+      (select count(*)::int from memberships o
+        where o.group_id = m.group_id and o.user_id <> m.user_id and o.left_at is null)
+        as others_active,
       (select count(*)::int from memberships o
         where o.group_id = m.group_id and o.user_id <> m.user_id and o.left_at is null
           and o.role = 'owner') as other_owners
     from memberships m
     join groups g on g.id = m.group_id
     join players p on p.group_id = m.group_id and p.user_id = m.user_id
-    where m.user_id = ${userId} and m.left_at is null
+    where m.user_id = ${userId}
     order by g.created_at, g.id
   `.pipe(Effect.flatMap(Access.decodeRows(MembershipPlanRow)));
 
-  const staying = memberships.filter((row) => row.others > 0);
+  const staying = memberships.filter((row) => row.othersEver > 0);
 
   const handovers = yield* Effect.forEach(
-    staying.filter((row) => row.role === "owner" && row.otherOwners === 0),
+    staying.filter(
+      (row) => row.active && row.role === "owner" && row.otherOwners === 0 && row.othersActive > 0,
+    ),
     (row) =>
       sql`
         select m.user_id, p.id as player_id, p.display_name
@@ -80,7 +91,7 @@ const plan = Effect.fn("Account.plan")(function* (userId: string) {
       ),
   );
 
-  return { solo: memberships.filter((row) => row.others === 0), staying, handovers };
+  return { solo: memberships.filter((row) => row.othersEver === 0), staying, handovers };
 });
 
 /** What deleting the account will do, for the person to read before they confirm. */
@@ -292,11 +303,15 @@ const passOwnership = Effect.fn("Account.passOwnership")(function* (
 ) {
   const sql = yield* SqlClient.SqlClient;
 
-  for (const { group, successor } of handovers)
-    yield* sql`
+  for (const { group, successor } of handovers) {
+    const promoted = yield* sql`
       update memberships set role = 'owner'
-      where group_id = ${group.groupId} and user_id = ${successor.userId}
+      where group_id = ${group.groupId} and user_id = ${successor.userId} and left_at is null
+      returning user_id
     `;
+
+    if (promoted.length === 0) return yield* new SuccessorGone({ groupId: group.groupId });
+  }
 });
 
 const detachRecording = Effect.fn("Account.detachRecording")(function* (
@@ -306,6 +321,14 @@ const detachRecording = Effect.fn("Account.detachRecording")(function* (
   const sql = yield* SqlClient.SqlClient;
   const actor = mine.find((player) => player.actorId !== null)?.actorId ?? null;
   const tablePlayers = mine.flatMap((player) => (player.groupId === null ? [player.id] : []));
+
+  const held =
+    mine.length === 0
+      ? []
+      : yield* sql<{ playerId: PlayerId; actorId: string }>`
+          select player_id, actor_id from player_actors
+          where player_id in ${sql.in(mine.map(({ id }) => id))}
+        `;
 
   if (mine.length > 0) {
     yield* sql`delete from player_invites where player_id in ${sql.in(mine.map(({ id }) => id))}`;
@@ -325,8 +348,8 @@ const detachRecording = Effect.fn("Account.detachRecording")(function* (
     yield* sql`update personal_operations set actor_id = ${DELETED_ACTOR} where actor_id = ${actor}`;
     yield* sql`
       update personal_operations
-      set command = replace(command::text, ${actor}, ${DELETED_ACTOR})::jsonb
-      where command::text like ${`%${actor}%`}
+      set command = jsonb_set(command, '{actorId}', to_jsonb(${DELETED_ACTOR}::text))
+      where command ->> 'actorId' = ${actor}
     `;
     yield* sql`update personal_entries set created_by = ${DELETED_ACTOR} where created_by = ${actor}`;
     yield* sql`update personal_entries set voided_by = ${DELETED_ACTOR} where voided_by = ${actor}`;
@@ -335,8 +358,16 @@ const detachRecording = Effect.fn("Account.detachRecording")(function* (
 
   yield* sql`update players set user_id = null where user_id = ${userId} and group_id is null`;
 
-  for (const player of tablePlayers)
-    yield* Recording.bindingsRevoked(player, actor === null ? [] : [actor]);
+  for (const player of tablePlayers) {
+    const actors = held.flatMap((binding) =>
+      binding.playerId === player ? [binding.actorId] : [],
+    );
+
+    yield* Recording.bindingsRevoked(
+      player,
+      Array.from(new Set(actor === null ? actors : [...actors, actor])),
+    );
+  }
 });
 
 const moveAudit = Effect.fn("Account.moveAudit")(function* (userId: string) {
@@ -358,6 +389,11 @@ const moveAudit = Effect.fn("Account.moveAudit")(function* (userId: string) {
 const cleanup = Effect.fn("Account.cleanup")(function* (userId: string) {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`select set_config('stacks.account_deletion', 'on', true)`;
+  yield* sql`
+    select id from groups
+    where id in (select group_id from memberships where user_id = ${userId})
+    order by id for update
+  `;
   const { solo, handovers } = yield* plan(userId);
   const soloGroups = solo.map((row) => row.groupId);
 
@@ -450,6 +486,9 @@ export const remove = Effect.fn("Account.remove")(function* (
 
       return null;
     }),
+  ).pipe(
+    Effect.retry({ times: 2, while: (error) => Predicate.isTagged(error, "SuccessorGone") }),
+    Effect.catchTag("SuccessorGone", Effect.die),
   );
 
   if (finished !== null) return { status: finished ? "complete" : "pending" } as const;
@@ -480,21 +519,40 @@ export const remove = Effect.fn("Account.remove")(function* (
   );
 });
 
-/** Finishes the Clerk deletion of accounts whose request couldn't. Run on a schedule. */
+/**
+ * Finishes the Clerk deletion of accounts whose request couldn't. Run on a schedule. A run takes
+ * up to 25 due jobs with a lease, so overlapping runs take different ones, and a job that fails
+ * waits longer each time, so it never keeps newer jobs from their turn.
+ */
 export const retryClerkDeletions = Effect.fn("Account.retryClerkDeletions")(function* () {
   const sql = yield* SqlClient.SqlClient;
 
   const jobs = yield* sql<{ userIdHash: string; userId: string }>`
-    select user_id_hash, user_id from account_deletions
-    where clerk_deleted_at is null and user_id is not null
-    order by requested_at limit 25
+    update account_deletions set next_attempt_at = now() + interval '10 minutes'
+    where user_id_hash in (
+      select user_id_hash from account_deletions
+      where clerk_deleted_at is null and user_id is not null and next_attempt_at <= now()
+      order by next_attempt_at, requested_at
+      limit 25 for update skip locked
+    )
+    returning user_id_hash, user_id
   `;
 
-  const results = yield* Effect.forEach(jobs, (job) =>
-    finishClerk(job.userId, job.userIdHash).pipe(
-      Effect.as(true),
-      Effect.catchTag("ClerkUnavailable", () => Effect.succeed(false)),
-    ),
+  const results = yield* Effect.forEach(
+    jobs,
+    (job) =>
+      finishClerk(job.userId, job.userIdHash).pipe(
+        Effect.as(true),
+        Effect.catchTag("ClerkUnavailable", () =>
+          sql`
+            update account_deletions
+            set attempts = attempts + 1,
+              next_attempt_at = now() + least(power(2, attempts) * interval '1 minute', interval '6 hours')
+            where user_id_hash = ${job.userIdHash}
+          `.pipe(Effect.as(false)),
+        ),
+      ),
+    { concurrency: 5 },
   );
 
   return { retried: jobs.length, completed: results.filter(Boolean).length };

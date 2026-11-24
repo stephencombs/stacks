@@ -6,7 +6,7 @@ import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
 import * as OpenApi from "effect/http-api/OpenApi";
 
 import { AccountDeletionPreview, AccountDeletionResult, DeleteAccountRequest } from "./account.ts";
-import { Authentication, RecordingAuthentication } from "./auth.ts";
+import { AccountAuthentication, Authentication, RecordingAuthentication } from "./auth.ts";
 import { Conflict, Forbidden, InvalidRequest, NotFound, Unauthorized } from "./errors.ts";
 import {
   ActorId,
@@ -707,19 +707,20 @@ const AccountGroup = HttpApiGroup.make("account")
     HttpApiEndpoint.get("deletionPreview", "/account/deletion-preview", {
       success: AccountDeletionPreview,
       error: Unauthorized,
-    }),
+    }).middleware(Authentication),
   )
   .add(
     HttpApiEndpoint.post("delete", "/account/delete", {
       payload: DeleteAccountRequest,
       success: AccountDeletionResult,
       error: Unauthorized,
-    }).annotate(
-      OpenApi.Summary,
-      "Deletes the account and keeps its players in shared groups as claimable guests",
-    ),
-  )
-  .middleware(Authentication);
+    })
+      .middleware(AccountAuthentication)
+      .annotate(
+        OpenApi.Summary,
+        "Deletes the account and keeps its players in shared groups as claimable guests; asking again returns the deletion's state",
+      ),
+  );
 
 export class StacksApi extends HttpApi.make("stacks")
   .add(HealthGroup)

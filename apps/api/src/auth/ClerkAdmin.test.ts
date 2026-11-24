@@ -1,5 +1,7 @@
 import { expect, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Fiber from "effect/Fiber";
+import * as TestClock from "effect/testing/TestClock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as HttpClient from "effect/http/HttpClient";
@@ -131,5 +133,35 @@ it.effect("sees whether Apple is linked", () =>
     expect(
       (yield* Effect.flip(run(clerkAnswering(500), (admin) => admin.appleLinked("u"))))._tag,
     ).toBe("ClerkUnavailable");
+  }),
+);
+
+it.effect("gives up on a Clerk that never answers, so the job can wait its turn", () =>
+  Effect.gen(function* () {
+    const silent = ClerkAdmin.layer.pipe(
+      Layer.provide(
+        Layer.succeed(
+          HttpClient.HttpClient,
+          HttpClient.make(() => Effect.never),
+        ),
+      ),
+      Layer.provide(
+        ConfigProvider.layer(ConfigProvider.fromUnknown({ CLERK_SECRET_KEY: "sk_test_secret" })),
+      ),
+    );
+
+    const deleting = yield* Effect.forkChild(
+      Effect.flip(
+        Effect.gen(function* () {
+          yield* (yield* ClerkAdmin.ClerkAdmin).deleteUser("user_a");
+        }).pipe(Effect.provide(silent)),
+      ),
+    );
+
+    yield* TestClock.adjust("11 seconds");
+    const failed = yield* Fiber.join(deleting);
+
+    expect(failed).toBeInstanceOf(ClerkAdmin.ClerkUnavailable);
+    expect(failed).toMatchObject({ status: null });
   }),
 );

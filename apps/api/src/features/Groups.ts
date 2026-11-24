@@ -239,6 +239,7 @@ const depart = (groupId: GroupId, userId: UserId) =>
   Realtime.transaction(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
+      yield* Access.lockGroup(groupId);
 
       const gone = yield* sql`
         update memberships set left_at = now()
@@ -299,13 +300,19 @@ export const setRole = Effect.fn("Groups.setRole")(function* (
   yield* Access.requireOwner(yield* Access.membership(groupId));
 
   if (targetUserId === userId) return yield* new Conflict({ reason: "last_owner" });
-  yield* activeMember(groupId, targetUserId);
 
-  const changed = yield* sql`
-    update memberships set role = ${request.role}
-    where group_id = ${groupId} and user_id = ${targetUserId} and role <> ${request.role}
-    returning user_id
-  `;
+  const changed = yield* sql.withTransaction(
+    Effect.gen(function* () {
+      yield* Access.lockGroup(groupId);
+      yield* activeMember(groupId, targetUserId);
+
+      return yield* sql`
+        update memberships set role = ${request.role}
+        where group_id = ${groupId} and user_id = ${targetUserId} and role <> ${request.role}
+        returning user_id
+      `;
+    }),
+  );
 
   if (changed.length > 0) yield* Realtime.changed(groupScope(groupId));
 

@@ -6,6 +6,7 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import {
+  AccountAuthentication,
   Authentication,
   CurrentUser,
   Recorder,
@@ -30,7 +31,7 @@ const claimText = (decoded: Option.Option<string>) =>
 /** Native session tokens do not name a browser origin. */
 export const isNativeSession = (azp: string | undefined) => azp === undefined;
 
-export const makeVerify = Effect.gen(function* () {
+const makeVerifyToken = Effect.gen(function* () {
   const secretKey = yield* Config.option(Config.Redacted("CLERK_SECRET_KEY"));
   const jwtKey = yield* Config.option(Config.String("CLERK_JWT_KEY"));
 
@@ -55,8 +56,6 @@ export const makeVerify = Effect.gen(function* () {
       Effect.mapError(() => new Unauthorized()),
     );
 
-    yield* AccountFence.rejectInRequest(userId);
-
     return CurrentUser.of({
       userId,
       displayName:
@@ -65,6 +64,28 @@ export const makeVerify = Effect.gen(function* () {
     });
   });
 });
+
+/** Verifies a token and refuses an account that was deleted. */
+export const makeVerify = Effect.map(makeVerifyToken, (verify) =>
+  Effect.fn("Authentication.verifyLive")(function* (credential: Redacted.Redacted) {
+    const user = yield* verify(credential);
+    yield* AccountFence.rejectInRequest(user.userId);
+
+    return user;
+  }),
+);
+
+export const layerAccount = Layer.effect(
+  AccountAuthentication,
+  Effect.map(makeVerifyToken, (verify) =>
+    AccountAuthentication.of({
+      bearer: (httpEffect, { credential }) =>
+        Effect.flatMap(verify(credential), (user) =>
+          Effect.provideService(httpEffect, CurrentUser, user),
+        ),
+    }),
+  ),
+);
 
 export const layer = Layer.effect(
   Authentication,

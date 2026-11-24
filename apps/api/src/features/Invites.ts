@@ -167,6 +167,7 @@ export const accept = Effect.fn("Invites.accept")(function* (
 
   const groupId = yield* Realtime.transaction(
     Effect.gen(function* () {
+      yield* Access.lockGroup((yield* findByCode(code)).groupId);
       const invite = yield* findByCode(code, true);
 
       const [existing] = yield* sql`
