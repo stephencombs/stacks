@@ -141,7 +141,7 @@ export const claim = Effect.fn("Guests.claim")(function* (code: string) {
         insert into memberships (group_id, user_id, role)
         values (${guest.groupId}, ${userId}, ${role})
         on conflict (group_id, user_id) do update
-          set left_at = null, role = case when ${role} = 'owner' then 'owner' else memberships.role end
+          set left_at = null, role = ${role}, joined_at = now()
           where memberships.left_at is not null
       `;
       yield* Realtime.changed(groupScope(guest.groupId));

@@ -131,6 +131,7 @@ export const layer = Layer.effect(
           code: authorizationCode,
           grant_type: "authorization_code",
         })).json.pipe(
+          Effect.timeout("10 seconds"),
           Effect.flatMap(Schema.decodeUnknownEffect(TokenResponse)),
           Effect.mapError(() => new AppleRevokeFailed({ step: "token" })),
         );

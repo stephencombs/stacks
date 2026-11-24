@@ -404,6 +404,12 @@ const lockInOrder = Effect.fn("Account.lockInOrder")(function* (
   const bindings =
     actor === null ? sql`false` : sql`actor_id = ${actor} or invited_by_actor = ${actor}`;
 
+  if (mine.length > 0)
+    yield* sql`
+      select id from players where id in ${sql.in(mine.map(({ id }) => id))}
+      order by id for no key update
+    `;
+
   yield* sql`
     select 1 from player_actors where ${players} or ${bindings} order by player_id, actor_id for update
   `;

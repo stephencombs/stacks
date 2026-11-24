@@ -33,9 +33,9 @@ balances and stakes come out the same. `Account.remove` does it in one transacti
   (`Access.lockGroup`) and read who is in the group only after it, so the successor
   `Account.remove` picks can't leave while it promotes them. A promotion that touches no row fails
   the transaction, which retries. An owner's role is never changed through `setRole`.
-- Locks are taken in one order, the order recording commands use: the group, `player_actors` rows,
-  the account's tables, then memberships. `Account.remove` takes all of them up front, so it can't
-  deadlock with a push.
+- Locks are taken in one order, the order recording commands and player invites use: the group,
+  the account's players, `player_actors` rows, the account's tables, then memberships.
+  `Account.remove` takes all of them up front, so it can't deadlock with a push or a revoke.
 - A table is deleted only if nobody else played at it **and** no surviving group's trip counts it.
   A table that only the deleted account played, in a trip with friends, is part of their results.
 - The fence is `account_deletions`. Authentication rejects a token whose subject hash is in it, so a
