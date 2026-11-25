@@ -403,7 +403,7 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
             <Icon name="trip" color="chip-orange" size={18} />
           </View>
         ) : firstPlayer ? (
-          <ActivityChip groupId={item.group.id} player={firstPlayer} />
+          <ActivityAvatar groupId={item.group.id} player={firstPlayer} />
         ) : null}
         <View className="flex-1 gap-0.5">
           <Text numberOfLines={2} className="type-callout font-semibold text-ink">
@@ -512,7 +512,7 @@ function ActivityLiveDuration({ startedAt }: { startedAt: DateTime.Utc }) {
   return <Text className="font-semibold text-live">live {formatDuration(startedAt, now)}</Text>;
 }
 
-function ActivityChip({
+function ActivityAvatar({
   groupId,
   player,
 }: {

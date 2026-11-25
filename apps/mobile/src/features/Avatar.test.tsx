@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
 type Styled = { style?: object; children?: ReactNode };
 
 vi.mock("react-native", () => ({
+  Text: ({ children }: Styled) => <span data-initials>{children}</span>,
   View: ({ style, children }: Styled) => <div data-style={JSON.stringify(style)}>{children}</div>,
   Image: ({ source, onError }: { source: { uri: string }; onError?: () => void }) => {
     mocks.fail.current = () => onError?.();
@@ -33,10 +34,6 @@ vi.mock("react-native-svg", () => {
 });
 
 vi.mock("lucide-react-native/icons/user", () => ({ default: () => <i data-silhouette /> }));
-
-vi.mock("../components/ui/Text", () => ({
-  Text: ({ children }: Styled) => <span data-initials>{children}</span>,
-}));
 
 vi.mock("uniwind", () => ({
   useCSSVariable: (names: string[]) => {
@@ -96,6 +93,41 @@ it("falls back to the default avatar when a photo won't load", async () => {
   }
 });
 
+it("tries each photo in order before the default avatar", async () => {
+  const { Avatar } = await import("./Avatar");
+
+  const view = await render(
+    <Avatar
+      name="Ada"
+      playerId="p1"
+      image={["file:///photos/gone.jpg", "https://img/clerk.png"]}
+    />,
+  );
+
+  try {
+    expect(view.image()?.getAttribute("src")).toBe("file:///photos/gone.jpg");
+    await act(async () => mocks.fail.current());
+    expect(view.image()?.getAttribute("src")).toBe("https://img/clerk.png");
+    await act(async () => mocks.fail.current());
+    expect(view.image()).toBeNull();
+    expect(view.initials()).not.toBeNull();
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("skips empty photos", async () => {
+  const { Avatar } = await import("./Avatar");
+  const view = await render(<Avatar name="Ada" playerId="p1" image={[null, undefined, ""]} />);
+
+  try {
+    expect(view.image()).toBeNull();
+    expect(view.initials()).not.toBeNull();
+  } finally {
+    await view.unmount();
+  }
+});
+
 it("draws the default avatar with no photo", async () => {
   const { Avatar } = await import("./Avatar");
   const view = await render(<Avatar name="Ada" playerId="p1" image={null} />);
@@ -122,6 +154,25 @@ it("draws iOS's grey monogram with up to two initials", async () => {
     ]);
   } finally {
     await view.unmount();
+  }
+});
+
+it("shows one initial in a monogram below 28pt", async () => {
+  const { AvatarFace } = await import("./AvatarFace.ios");
+  const small = await render(<AvatarFace name="Ada Lovelace" playerId="p1" size={22} />);
+
+  try {
+    expect(small.initials()).toBe("A");
+  } finally {
+    await small.unmount();
+  }
+
+  const large = await render(<AvatarFace name="Ada Lovelace" playerId="p1" size={28} />);
+
+  try {
+    expect(large.initials()).toBe("AL");
+  } finally {
+    await large.unmount();
   }
 });
 

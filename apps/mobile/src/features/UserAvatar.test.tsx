@@ -2,6 +2,10 @@ import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vite-plus/test";
 
+type Account =
+  | { readonly available: false }
+  | { readonly available: true; readonly userId: string | null };
+
 const renderAvatar = async (
   user: {
     readonly hasImage?: boolean;
@@ -10,17 +14,27 @@ const renderAvatar = async (
     readonly fullName?: string | null;
   } | null,
   props: { contactPhoto?: string | null } = {},
+  account: Account = { available: true, userId: "user_1" },
 ) => {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   let triggerError: (() => void) | undefined;
 
-  vi.doMock("@clerk/expo", () => ({ useUser: () => ({ user }) }));
+  vi.doMock("@clerk/expo", () => ({
+    useUser: () => {
+      if (!account.available) throw new Error("useUser needs a ClerkProvider");
+
+      return { user };
+    },
+  }));
+
+  vi.doMock("../lib/account", () => ({ useAccount: () => account }));
   vi.doMock("./AvatarFace", () => ({
-    AvatarFace: ({ name, size }: { name: string; size: number }) => (
-      <span data-face={name} data-size={size} />
+    AvatarFace: ({ name, playerId, size }: { name: string; playerId: string; size: number }) => (
+      <span data-face={name} data-key={playerId} data-size={size} />
     ),
   }));
+
   vi.doMock("react-native", () => ({
     View: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Image: ({ source, onError }: { source: { readonly uri: string }; onError?: () => void }) => {
@@ -38,6 +52,7 @@ const renderAvatar = async (
   return {
     container,
     face: () => container.querySelector("[data-face]")?.getAttribute("data-face") ?? null,
+    key: () => container.querySelector("[data-face]")?.getAttribute("data-key") ?? null,
     triggerError: () => act(async () => triggerError?.()),
     unmount: () => act(async () => root.unmount()),
   };
@@ -80,7 +95,7 @@ it("uses their own name instead of the word You when Clerk has no uploaded photo
   }
 });
 
-it("prefers a photo linked on this phone to the Clerk photo", async () => {
+it("prefers a photo linked on this phone, and falls back to the Clerk photo when it won't load", async () => {
   const view = await renderAvatar(
     { hasImage: true, imageUrl: "https://img.clerk.com/avatar.png", fullName: "Stephen Combs" },
     { contactPhoto: "file:///photos/me.jpg" },
@@ -88,16 +103,36 @@ it("prefers a photo linked on this phone to the Clerk photo", async () => {
 
   try {
     expect(view.container.querySelector("img")?.getAttribute("src")).toBe("file:///photos/me.jpg");
+
+    await view.triggerError();
+    expect(view.container.querySelector("img")?.getAttribute("src")).toBe(
+      "https://img.clerk.com/avatar.png",
+    );
+
+    await view.triggerError();
+    expect(view.container.querySelector("img")).toBeNull();
+    expect(view.face()).toBe("Stephen Combs");
   } finally {
     await view.unmount();
   }
 });
 
-it("keeps the name it was given when signed out", async () => {
-  const view = await renderAvatar(null);
+it("keys their Android tile by their Clerk user ID, the same everywhere", async () => {
+  const view = await renderAvatar({ hasImage: false, fullName: "Stephen Combs" });
+
+  try {
+    expect(view.key()).toBe("user_1");
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("keeps the name it was given, without touching Clerk, when the build has no Clerk", async () => {
+  const view = await renderAvatar(null, {}, { available: false });
 
   try {
     expect(view.face()).toBe("You");
+    expect(view.key()).toBe("you");
   } finally {
     await view.unmount();
   }

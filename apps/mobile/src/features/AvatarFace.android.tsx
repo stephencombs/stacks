@@ -1,9 +1,7 @@
 import { avatarToneOf, initialsOf } from "@stacks/client-runtime/avatar";
 import User from "lucide-react-native/icons/user";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { useCSSVariable } from "uniwind";
-
-import { Text } from "../components/ui/Text";
 
 /** Android Contacts' letter tile: one initial on a tonal color a player's ID picks. */
 export function AvatarFace({

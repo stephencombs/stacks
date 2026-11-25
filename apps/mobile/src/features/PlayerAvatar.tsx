@@ -26,7 +26,7 @@ export function PlayerAvatar({
   const photo = useContactPhoto(playerId);
 
   return you ? (
-    <UserAvatar size={size} fallbackName={name} playerId={playerId} contactPhoto={photo} />
+    <UserAvatar size={size} fallbackName={name} contactPhoto={photo} />
   ) : (
     <Avatar name={name} playerId={playerId} image={photo} size={size} />
   );

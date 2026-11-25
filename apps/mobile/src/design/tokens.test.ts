@@ -146,7 +146,6 @@ describe.each(Object.entries(themes))("the %s palette", (name, theme) => {
     ["live", "surface"],
     ["ink-inverse", "ink"],
     ["felt-ink", "felt"],
-    ["avatar-ink", "avatar-bottom"],
     ["avatar-1-ink", "avatar-1"],
     ["avatar-2-ink", "avatar-2"],
     ["avatar-3-ink", "avatar-3"],

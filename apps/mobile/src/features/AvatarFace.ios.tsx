@@ -1,10 +1,10 @@
 import { initialsOf } from "@stacks/client-runtime/avatar";
 import User from "lucide-react-native/icons/user";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 
-import { Text } from "../components/ui/Text";
+const TWO_LETTERS_FROM = 28;
 
 /** iOS Contacts' monogram: a soft grey vertical gradient with white initials, up to two. */
 export function AvatarFace({ name, size }: { name: string; size: number; playerId: string }) {
@@ -14,7 +14,7 @@ export function AvatarFace({ name, size }: { name: string; size: number; playerI
     "--color-avatar-ink",
   ]);
 
-  const initials = initialsOf(name, 2);
+  const initials = initialsOf(name, size < TWO_LETTERS_FROM ? 1 : 2);
 
   return (
     <View
@@ -39,7 +39,7 @@ export function AvatarFace({ name, size }: { name: string; size: number; playerI
           maxFontSizeMultiplier={1}
           style={{
             color: String(ink),
-            fontSize: size * (initials.length > 1 ? 0.38 : 0.44),
+            fontSize: size * (Array.from(initials).length > 1 ? 0.38 : 0.44),
             fontWeight: "600",
           }}
         >

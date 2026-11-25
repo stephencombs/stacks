@@ -7,8 +7,8 @@ export interface AvatarProps {
   readonly name: string;
   /** What picks a letter tile's color on Android; it never changes for a player. */
   readonly playerId: string;
-  /** A photo to show. A photo that won't load goes back to the default avatar. */
-  readonly image?: string | null | undefined;
+  /** Photos to try in order. One that won't load, or none, falls back to the default avatar. */
+  readonly image?: string | null | ReadonlyArray<string | null | undefined> | undefined;
   readonly size?: number;
 }
 
@@ -18,18 +18,24 @@ export interface AvatarProps {
  * Android. It's decoration beside a name, so assistive tech skips it.
  */
 export function Avatar({ image, ...face }: AvatarProps) {
-  return image ? (
-    <Photo key={image} image={image} {...face} />
+  const sources = [image].flat().filter((source) => !!source);
+
+  return sources.length > 0 ? (
+    <Photo key={sources.join("\n")} sources={sources} {...face} />
   ) : (
     <AvatarFace {...face} size={face.size ?? 32} />
   );
 }
 
-function Photo({ image, ...face }: AvatarProps & { image: string }) {
-  const [failed, setFailed] = useState(false);
+function Photo({
+  sources,
+  ...face
+}: Omit<AvatarProps, "image"> & { sources: ReadonlyArray<string | null | undefined> }) {
+  const [failed, setFailed] = useState(0);
   const size = face.size ?? 32;
+  const uri = sources[failed];
 
-  if (failed) return <AvatarFace {...face} size={size} />;
+  if (!uri) return <AvatarFace {...face} size={size} />;
 
   return (
     <View
@@ -39,10 +45,11 @@ function Photo({ image, ...face }: AvatarProps & { image: string }) {
       className="overflow-hidden bg-fill"
     >
       <Image
-        source={{ uri: image }}
+        key={uri}
+        source={{ uri }}
         style={{ width: size, height: size }}
         resizeMode="cover"
-        onError={() => setFailed(true)}
+        onError={() => setFailed(failed + 1)}
       />
     </View>
   );

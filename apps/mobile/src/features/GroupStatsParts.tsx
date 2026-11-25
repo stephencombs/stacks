@@ -198,10 +198,10 @@ export function InsightRow({
 type Chart = NonNullable<Extract<GroupStatsView, { kind: "stats" }>["hero"]["chart"]>;
 
 const PLOT = 132;
-const CHIP = 20;
+const LEADER_AVATAR = 20;
 const GAP = 4;
 const TAP = 44;
-const CHIPS_FROM = 24;
+const AVATARS_FROM = 24;
 
 /**
  * The group's result by trip, or by night once a trip is picked: a rounded-cap bar for each, up
@@ -232,13 +232,13 @@ export function ResultBars({
   const { bars } = chart;
   const column = width / bars.length;
   const tappable = column >= TAP;
-  const showChips = column >= CHIPS_FROM;
+  const showAvatars = column >= AVATARS_FROM;
   const barWidth = Math.min(22, Math.max(6, column * 0.5));
 
   const above = bars.some((bar) => bar.status === "up" || bar.status === "even");
   const below = bars.some((bar) => bar.status === "down");
-  const top = above && showChips ? CHIP + GAP : GAP;
-  const bottom = below && showChips ? CHIP + GAP : GAP;
+  const top = above && showAvatars ? LEADER_AVATAR + GAP : GAP;
+  const bottom = below && showAvatars ? LEADER_AVATAR + GAP : GAP;
   const inner = PLOT - top - bottom;
 
   const track = barTrack(
@@ -298,14 +298,16 @@ export function ResultBars({
                 );
               })}
             </Svg>
-            {showChips
+            {showAvatars
               ? bars.map((bar, index) => {
                   if (bar.leader === null || bar.status === "none") return null;
                   const length = bar.status === "even" ? 0 : track.extent(bar.result) * inner;
-                  const x = index * column + column / 2 - CHIP / 2;
+                  const x = index * column + column / 2 - LEADER_AVATAR / 2;
 
                   const y =
-                    bar.status === "down" ? zero + length + GAP : zero - length - GAP - CHIP;
+                    bar.status === "down"
+                      ? zero + length + GAP
+                      : zero - length - GAP - LEADER_AVATAR;
 
                   return (
                     <View
@@ -316,7 +318,7 @@ export function ResultBars({
                       <PlayerAvatar
                         playerId={bar.leader.playerId}
                         name={bar.leader.name}
-                        size={CHIP}
+                        size={LEADER_AVATAR}
                         you={bar.leader.you}
                       />
                     </View>

@@ -75,12 +75,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
 
   const guestRows = guests.map((player) => (
     <Row key={player.id} {...open(player)}>
-      <PlayerAvatar
-        playerId={player.id}
-        name={player.displayName}
-        size={android ? 36 : 26}
-        you={player.id === detail.myPlayerId}
-      />
+      <PlayerAvatar playerId={player.id} name={player.displayName} size={android ? 36 : 26} />
       <View className="min-w-0 flex-1">
         <Text className={android ? "type-heading font-bold text-ink" : "text-base text-ink"}>
           {names.get(player.id)}
