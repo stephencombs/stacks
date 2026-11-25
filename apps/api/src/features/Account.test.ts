@@ -125,7 +125,17 @@ const standings = (detail: TripDetail) => ({
 const userIdOf = (group: TestGroup, playerId: PlayerId) =>
   group.players.find((player) => player.id === playerId)!.userId!;
 
-const mentions = Effect.fn("test.mentions")(function* (...needles: ReadonlyArray<string>) {
+const writesStart = Effect.fn("test.writesStart")(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const [row] = yield* sql<{ xid: number }>`select (txid_current() % 4294967296)::float8 as xid`;
+
+  return row!.xid;
+});
+
+const mentions = Effect.fn("test.mentions")(function* (
+  since: number,
+  ...needles: ReadonlyArray<string>
+) {
   const sql = yield* SqlClient.SqlClient;
 
   const tables = yield* sql<{ name: string }>`
@@ -138,7 +148,8 @@ const mentions = Effect.fn("test.mentions")(function* (...needles: ReadonlyArray
   for (const { name } of tables)
     for (const needle of needles) {
       const [row] = yield* sql<{ count: number }>`
-        select count(*)::int as count from ${sql(name)} t where t::text like ${`%${needle}%`}
+        select count(*)::int as count from ${sql(name)} t
+        where case when t.xmin::text::bigint >= ${since} then t::text like ${`%${needle}%`} end
       `;
 
       if (row!.count > 0) found.push(`${name}: ${needle}`);
@@ -295,19 +306,20 @@ it.layer(TestApi.layer)("deleting an account", (it) => {
   it.effect("keeps what friends recorded and makes the person a claimable guest", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
+      const since = yield* writesStart();
       const s = yield* scene();
       const before = yield* standingsOf(s.bob, s.group.group.id, s.group.tripId, s.side.id);
       const owner = (yield* s.bob.groups.get({ params: { groupId: s.group.group.id } })).role;
       expect(owner).toBe("member");
       expect(before.trip.tables).toHaveLength(2);
-      expect((yield* mentions(s.aliceId, s.aliceMe.actorId)).length).toBeGreaterThan(0);
+      expect((yield* mentions(since, s.aliceId, s.aliceMe.actorId)).length).toBeGreaterThan(0);
 
       expect(yield* s.alice.account.delete({ payload: {} })).toEqual({ status: "complete" });
 
       expect(yield* standingsOf(s.bob, s.group.group.id, s.group.tripId, s.side.id)).toEqual(
         before,
       );
-      expect(yield* mentions(s.aliceId, s.aliceMe.actorId)).toEqual([]);
+      expect(yield* mentions(since, s.aliceId, s.aliceMe.actorId)).toEqual([]);
 
       const detail = yield* s.bob.groups.get({ params: { groupId: s.group.group.id } });
       expect(detail.role).toBe("owner");
@@ -1254,6 +1266,15 @@ it.layer(TestApi.layer)("asking again after a deletion", (it) => {
   );
 });
 
+const clearDueJobs = Effect.fn("test.clearDueJobs")(function* () {
+  const sql = yield* SqlClient.SqlClient;
+
+  yield* sql`
+    update account_deletions set next_attempt_at = now() + interval '1 hour'
+    where clerk_deleted_at is null and next_attempt_at <= now()
+  `;
+});
+
 const stuckJob = Effect.fn("test.stuckJob")(function* (userId: string, order: number) {
   const sql = yield* SqlClient.SqlClient;
 
@@ -1269,6 +1290,7 @@ it.layer(TestApi.layer)("retrying Clerk deletions", (it) => {
   it.effect("moves past jobs that keep failing, so a healthy one behind them finishes", () =>
     Effect.gen(function* () {
       const api = yield* TestApi;
+      yield* clearDueJobs();
       const run = uuid().slice(0, 8);
       const failing = Array.from({ length: 26 }, (_, index) => `user_stuck_${run}_${index}`);
       const healthy = `user_healthy_${run}`;
@@ -1293,6 +1315,7 @@ it.layer(TestApi.layer)("retrying Clerk deletions", (it) => {
   it.effect("lets two overlapping runs each take different jobs, once", () =>
     Effect.gen(function* () {
       const api = yield* TestApi;
+      yield* clearDueJobs();
       const run = uuid().slice(0, 8);
       const users = Array.from({ length: 8 }, (_, index) => `user_overlap_${run}_${index}`);
 
@@ -1590,6 +1613,7 @@ it.layer(TestApi.layer)("a Clerk job that has failed many times", (it) => {
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       const api = yield* TestApi;
+      yield* clearDueJobs();
       const run = uuid().slice(0, 8);
       const worn = `user_worn_${run}`;
       const fresh = `user_fresh_${run}`;
