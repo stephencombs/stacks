@@ -27,17 +27,19 @@ const eventText = (event: RecordingEvent) =>
 
 /**
  * A visit's entries and events, newest first, with voided ones last. A row opens that entry, where
- * it can be corrected or voided.
+ * it can be corrected or voided. Inside a sheet already titled for it, `heading` is turned off.
  */
 export function History({
   visit,
   own = true,
   who = "Their",
+  heading = true,
   onInspect,
 }: {
   visit: RecordingVisitView;
   own?: boolean;
   who?: string;
+  heading?: boolean;
   onInspect: (entryId: EntryId) => void;
 }) {
   const state = useRecordingState();
@@ -58,9 +60,13 @@ export function History({
 
   return (
     <View className="gap-2">
-      <SectionHeading count={lines.length === 1 ? "1 entry" : `${lines.length} entries`}>
-        {Platform.OS === "android" ? (own ? "Your history" : `${who}'s history`) : "History"}
-      </SectionHeading>
+      {heading ? (
+        <SectionHeading
+          count={visit.entries.length === 1 ? "1 entry" : `${visit.entries.length} entries`}
+        >
+          {Platform.OS === "android" ? (own ? "Your history" : `${who}'s history`) : "History"}
+        </SectionHeading>
+      ) : null}
       <List>
         {lines.map((line) => {
           if (line.type === "event")
@@ -142,6 +148,7 @@ export function EntryInspector({
   visit,
   entry,
   back = false,
+  depth,
   onClose,
   onShow,
   onCorrect,
@@ -150,6 +157,7 @@ export function EntryInspector({
   visit: RecordingVisitView;
   entry: PlayEntry;
   back?: boolean;
+  depth?: number;
   onClose: () => void;
   onShow: (entryId: EntryId) => void;
   onCorrect: () => void;
@@ -163,6 +171,7 @@ export function EntryInspector({
     <Sheet
       open
       back={back}
+      depth={depth}
       onClose={onClose}
       title={historyEntryName(visit, entry)}
       {...(voided ? { description: "Voided. It no longer counts toward this session." } : {})}

@@ -22,25 +22,12 @@ public class ContactPickerModule: Module {
           return
         }
 
-        // UIKit silently refuses to present over a busy or detached controller, and then neither
-        // delegate method runs, so activePick would never clear.
-        guard let presenter = self.appContext?.utilities?.currentViewController(),
-          presenter.viewIfLoaded?.window != nil,
-          presenter.presentedViewController == nil,
-          !presenter.isBeingDismissed
-        else {
-          promise.reject("ERR_NO_VIEW_CONTROLLER", "There is no screen to show Contacts on.")
-          return
-        }
-
         let delegate = PickDelegate { [weak self] picked in
           self?.activePick = nil
           promise.resolve(picked)
         }
-        let picker = CNContactPickerViewController()
-        picker.delegate = delegate
         self.activePick = delegate
-        presenter.present(picker, animated: true)
+        self.presentPicker(delegate, promise: promise, retries: ContactPickerModule.presentRetries)
       }
     }
 
@@ -57,6 +44,35 @@ public class ContactPickerModule: Module {
       } catch {
         return false
       }
+    }
+  }
+
+  private static let presentRetries = 5
+
+  // UIKit silently refuses to present over a busy or detached controller, and then neither
+  // delegate method runs, so activePick would never clear. A native menu's action can arrive
+  // while the menu is still dismissing, so a busy screen is retried briefly before giving up.
+  private func presentPicker(_ delegate: PickDelegate, promise: Promise, retries: Int) {
+    if let presenter = appContext?.utilities?.currentViewController(),
+      presenter.viewIfLoaded?.window != nil,
+      presenter.presentedViewController == nil,
+      !presenter.isBeingDismissed,
+      !presenter.isBeingPresented
+    {
+      let picker = CNContactPickerViewController()
+      picker.delegate = delegate
+      presenter.present(picker, animated: true)
+      return
+    }
+
+    guard retries > 0 else {
+      activePick = nil
+      promise.reject("ERR_NO_VIEW_CONTROLLER", "There is no screen to show Contacts on.")
+      return
+    }
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+      self?.presentPicker(delegate, promise: promise, retries: retries - 1)
     }
   }
 }

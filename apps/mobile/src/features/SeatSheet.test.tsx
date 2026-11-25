@@ -83,6 +83,7 @@ const setup = async () => {
     Sheet: ({
       title,
       back,
+      depth,
       hideHeader,
       footer,
       onClose,
@@ -90,6 +91,7 @@ const setup = async () => {
     }: {
       title: string;
       back?: boolean;
+      depth?: number;
       hideHeader?: boolean;
       footer?: ReactNode;
       onClose: () => void;
@@ -98,6 +100,7 @@ const setup = async () => {
       <section
         data-title={title}
         data-back={String(!!back)}
+        data-depth={String(depth ?? (back ? 1 : 0))}
         data-hide-header={String(!!hideHeader)}
       >
         {hideHeader ? null : <button onClick={onClose}>{back ? "Back" : "Close"}</button>}
@@ -108,6 +111,7 @@ const setup = async () => {
   }));
   vi.doMock("../components/ui/Surface", () => ({
     List: Container,
+    Card: Container,
     SectionHeading: ({ children, count }: { children?: ReactNode; count?: string }) => (
       <h2>
         {children} {count}
@@ -249,14 +253,14 @@ it("shows a playing player's name, status and buy-in, with rebuy and cash out", 
 
     expect(view.element.textContent).toContain("Bea");
     expect(view.element.textContent).toContain(
-      `Playing · since ${formatTime(view.guest.startedAt)} · 2 buy-ins`,
+      `Playing since ${formatTime(view.guest.startedAt)} · 2 buy-ins`,
     );
     expect(view.element.textContent).toContain("Rebuy");
     expect(view.amount()).toBe("150000");
-    expect(view.sheet()!.dataset.hideHeader).toBe("true");
+    expect(view.sheet()!.dataset.hideHeader).toBe("false");
     expect(view.labels()).toEqual([
+      "Close",
       "Photo",
-      "Close Bea",
       "+ $100",
       "+ $200",
       "Other",
@@ -264,6 +268,22 @@ it("shows a playing player's name, status and buy-in, with rebuy and cash out", 
       "History2 entries",
     ]);
     expect(view.element.textContent).not.toContain("Undo cash-out");
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("supplies its own close button on Android, where the sheet has no header", async () => {
+  platform.os = "android";
+  const view = await setup();
+
+  try {
+    await view.render();
+    expect(view.sheet()!.dataset.hideHeader).toBe("true");
+    expect(view.labels()[0]).toBe("Photo");
+    expect(view.labels()).toContain("Close Bea");
+    await view.press("Close Bea");
+    expect(view.closed).toHaveBeenCalledTimes(1);
   } finally {
     await view.unmount();
   }
@@ -350,12 +370,13 @@ it("opens their history in place as a back step, with every entry and the way ba
 
     expect(view.sheet()!.dataset.title).toBe("Bea's history");
     expect(view.sheet()!.dataset.back).toBe("true");
-    expect(view.element.textContent).toContain("2 entries");
+    expect(view.sheet()!.dataset.depth).toBe("1");
+    expect(view.element.querySelector("h2")).toBeNull();
     expect(view.labels().filter((label) => label?.startsWith("Buy-in"))).toHaveLength(1);
     expect(view.labels().filter((label) => label?.startsWith("Rebuy"))).toHaveLength(1);
 
     await view.press("Back");
-    expect(view.sheet()!.dataset.hideHeader).toBe("true");
+    expect(view.sheet()!.dataset.depth).toBe("0");
     expect(view.labels()).toContain("Cash out");
   } finally {
     await view.unmount();
@@ -368,7 +389,7 @@ it("lists the final cash-out and the finish in the history of a finished player"
   try {
     await view.finish();
     await view.render();
-    await view.press("History3 entries");
+    await view.press("History2 entries");
     expect(view.labels().some((label) => label?.startsWith("Final cash-out"))).toBe(true);
     expect(view.element.textContent).toContain("Finished playing");
   } finally {
@@ -387,6 +408,7 @@ it("opens an entry from the history, and voiding it records and reports it", asy
 
     expect(view.sheet()!.dataset.title).toBe("Rebuy");
     expect(view.sheet()!.dataset.back).toBe("true");
+    expect(view.sheet()!.dataset.depth).toBe("2");
     expect(view.labels()).toContain("Correct amount");
 
     await view.press("Void entry");

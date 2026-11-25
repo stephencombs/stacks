@@ -711,7 +711,11 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
         />
       ) : open?.type === "history" ? (
         <Sheet open back title={own ? "Your history" : `${name}'s history`} onClose={close}>
-          <History visit={visit} onInspect={(entryId) => setOpen({ type: "inspect", entryId })} />
+          <History
+            visit={visit}
+            heading={false}
+            onInspect={(entryId) => setOpen({ type: "inspect", entryId })}
+          />
         </Sheet>
       ) : null}
       {sharing && visit.finalResult !== null ? (

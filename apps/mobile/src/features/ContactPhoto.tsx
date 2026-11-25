@@ -193,13 +193,19 @@ export function ContactPhotoMenu({
       : [{ id: "remove", title: "Remove photo", attributes: { destructive: true } }]),
   ];
 
+  const hint = photo.available
+    ? photo.uri === null
+      ? "Opens a menu to choose a photo from Contacts"
+      : "Opens a menu to change or remove it"
+    : "Opens a menu to remove it";
+
   const face = <PlayerAvatar playerId={playerId} name={name} size={size} />;
 
   if (actions.length === 0) return face;
 
   return (
     <MenuView
-      title="Only on this phone"
+      title="Photo stays on this phone"
       actions={actions}
       shouldOpenOnLongPress={false}
       onPressAction={({ nativeEvent }) => {
@@ -211,7 +217,7 @@ export function ContactPhotoMenu({
         accessible
         accessibilityRole="button"
         accessibilityLabel={`Photo for ${name}`}
-        accessibilityHint="Opens a menu to change or remove it"
+        accessibilityHint={hint}
         accessibilityState={{ disabled: photo.busy }}
         style={{ width: size, height: size }}
       >

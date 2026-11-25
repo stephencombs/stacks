@@ -107,6 +107,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.doMock("../components/Money", () => ({ Money: () => null }));
   vi.doMock("../components/ui/Field", () => ({ FormError: Container }));
   vi.doMock("../components/ui/Surface", () => ({
+    Card: Container,
     EmptyState: Container,
     List: Container,
     Row: ({ children, onPress }: { children?: ReactNode; onPress?: () => void }) =>

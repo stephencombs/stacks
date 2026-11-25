@@ -11,7 +11,6 @@ import {
 } from "@stacks/client-runtime/recordingReact";
 import {
   elapsedClock,
-  historyLines,
   LIVE_REBUY_AMOUNTS,
   RECORDING_CURRENCY,
   type RecordingTableView,
@@ -26,7 +25,7 @@ import {
 import { formatTime, shortName } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
 import type * as DateTime from "effect/DateTime";
-import { use, useState } from "react";
+import { useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { Text } from "../components/ui/Text";
 
@@ -39,8 +38,7 @@ import { FormError } from "../components/ui/Field";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
-import { List, Row } from "../components/ui/Surface";
-import { InSheet } from "../components/ui/sheetContext";
+import { Card, List, Row } from "../components/ui/Surface";
 import { formatDisplayMoney, HIDDEN_AMOUNT, usePreferences } from "../lib/preferences";
 import {
   AddPlayerSheet,
@@ -393,7 +391,6 @@ export function SeatSheet({
   onSeated: (visitId: VisitId, name: string) => void;
 }) {
   const { visit } = useRecordingVisit(seat.visitId);
-  const inSheet = use(InSheet);
   const prefs = usePreferences();
   const quick = useRecordingSubmit();
   const photo = useContactPhotoLink(seat.playerId);
@@ -468,11 +465,10 @@ export function SeatSheet({
 
   if (step.type === "history")
     return (
-      <Sheet open back title={`${name}'s history`} onClose={to("menu")}>
+      <Sheet open back depth={1} title={`${name}'s history`} onClose={to("menu")}>
         <History
           visit={visit}
-          own={false}
-          who={name}
+          heading={false}
           onInspect={(entryId) => setStep({ type: "inspect", entryId })}
         />
       </Sheet>
@@ -490,6 +486,7 @@ export function SeatSheet({
           visit={visit}
           entry={entry}
           back
+          depth={2}
           onClose={to("history")}
           onShow={(next) => setStep({ type: "inspect", entryId: next })}
           onCorrect={() => setStep({ type: "correct", entryId })}
@@ -503,6 +500,7 @@ export function SeatSheet({
           visit={visit}
           entry={entry}
           back
+          depth={3}
           onClose={() => setStep({ type: "inspect", entryId })}
           onSaved={(next) =>
             onRecorded({ visitId: seat.visitId, entryId: next, text: "Correction saved." })
@@ -515,6 +513,7 @@ export function SeatSheet({
         visit={visit}
         entry={entry}
         back
+        depth={3}
         onClose={() => setStep({ type: "inspect", entryId })}
         onVoided={() =>
           onRecorded({ visitId: seat.visitId, text: "Entry voided. It stays in the history." })
@@ -542,27 +541,28 @@ export function SeatSheet({
 
   const finishedAt = visit.visit.finishedAt;
   const playing = finishedAt === null;
-  const lines = plural(historyLines(visit).length, "entry", "entries");
+  const entries = plural(visit.entries.length, "entry", "entries");
 
   const buyIns = visit.entries.filter(
     (entry) => entry.kind === "buy_in" && entry.voidedAt === null,
   ).length;
 
-  const status =
-    finishedAt === null
-      ? [
-          "Playing",
-          `since ${formatTime(visit.visit.startedAt)}`,
-          plural(buyIns, "buy-in", "buy-ins"),
-        ].join(" · ")
-      : `Cashed out at ${formatTime(finishedAt)}`;
+  const status = playing
+    ? `Playing since ${formatTime(visit.visit.startedAt)} · ${plural(buyIns, "buy-in", "buy-ins")}`
+    : `Cashed out at ${formatTime(finishedAt)}`;
 
   const playingAgain = table.seats.some(
     (item) => item.playerId === seat.playerId && item.playing && item.visitId !== seat.visitId,
   );
 
   return (
-    <Sheet open hideHeader busy={quick.pending} title={name} onClose={onClose}>
+    <Sheet
+      open
+      hideHeader={Platform.OS === "android"}
+      busy={quick.pending}
+      title={name}
+      onClose={onClose}
+    >
       <View className="flex-row items-center gap-4">
         <ContactPhotoMenu
           playerId={seat.playerId}
@@ -576,15 +576,17 @@ export function SeatSheet({
           </Text>
           <Text className="type-footnote text-muted">{status}</Text>
         </View>
-        <IconButton
-          accessibilityLabel={`Close ${name}`}
-          disabled={quick.pending}
-          icon={<Icon name="close" color="ink" size={16} />}
-          onPress={onClose}
-        />
+        {Platform.OS === "android" ? (
+          <IconButton
+            accessibilityLabel={`Close ${name}`}
+            disabled={quick.pending}
+            icon={<Icon name="close" color="ink" size={16} />}
+            onPress={onClose}
+          />
+        ) : null}
       </View>
       {photo.message ? <Text className="type-footnote text-muted">{photo.message}</Text> : null}
-      <View className={cn("gap-4 rounded-[22px] p-4", inSheet ? "bg-raised" : "bg-surface")}>
+      <Card className="gap-4">
         <View className="gap-1">
           <Text className="type-footnote text-muted">{playing ? "Bought in" : "Result"}</Text>
           <Money
@@ -616,7 +618,7 @@ export function SeatSheet({
             </View>
           </View>
         )}
-      </View>
+      </Card>
       {playing ? (
         <View className="gap-3">
           <View className="gap-2">
@@ -696,11 +698,11 @@ export function SeatSheet({
       <List>
         <Row
           onPress={to("history")}
-          accessibilityLabel={`${name}'s history, ${lines}`}
+          accessibilityLabel={`${name}'s history, ${entries}`}
           accessibilityHint="Shows their buy-ins and cash-outs"
         >
           <Text className="flex-1 type-body text-ink">History</Text>
-          <Text className="type-callout text-muted">{lines}</Text>
+          <Text className="type-callout text-muted">{entries}</Text>
           <Icon name="chevron-right" color="muted" size={18} />
         </Row>
       </List>

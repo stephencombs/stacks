@@ -55,9 +55,11 @@ export function Sheet({
   busy?: boolean;
   /** Shows a back chevron/arrow instead of Close when stacked onto another sheet. */
   back?: boolean;
+  /** How many steps deep this sheet is, for iOS's slide direction. Android has no slide. */
+  depth?: number | undefined;
   /** Opens at a fixed full height instead of resizing as dynamic content loads. */
   large?: boolean;
-  /** Hides the title and close bar, for a sheet that supplies its own close control. */
+  /** Android only: hides the title and close bar, for a sheet that supplies its own close control. iOS always draws its native header. */
   hideHeader?: boolean;
   /** Floats the footer over the scroll content on iOS. */
   floatingFooter?: boolean;

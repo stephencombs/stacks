@@ -269,7 +269,7 @@ it("opens a menu from the avatar to choose a photo from Contacts, and says it st
 
   try {
     expect(view.labels()).toEqual(["Choose from Contacts"]);
-    expect(view.text()).toContain("Only on this phone");
+    expect(view.text()).toContain("Photo stays on this phone");
     await view.press("Choose from Contacts");
     expect(mocks.linked).toEqual([[player, "file:///cache/contact-picks/a.jpg"]]);
   } finally {

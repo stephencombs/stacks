@@ -39,6 +39,7 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   const formSheetTransitions: boolean[] = [];
+  const slideStarts: number[] = [];
   let latestFormSheet: FormSheetSnapshot | null = null;
   let latestHeader: HeaderConfigSnapshot | null = null;
   let reportContentSize: ((width: number, height: number) => void) | undefined;
@@ -54,6 +55,9 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
   vi.doMock("react-native", () => ({
     Animated: {
       Value: class {
+        constructor(start: number) {
+          slideStarts.push(start);
+        }
         setValue() {}
         stopAnimation() {}
       },
@@ -148,6 +152,7 @@ const setupSheetTest = async (themeMode: "light" | "dark" = "light") => {
     Switch,
     nativeSwitch,
     formSheetTransitions,
+    slideStarts,
     getLatestFormSheet: () => latestFormSheet,
     getLatestHeader: () => latestHeader,
     measureContent: (height: number) => reportContentSize?.(390, height),
@@ -311,6 +316,37 @@ it("keeps the FormSheet open across same-tick child sheet swaps and shows a back
 
   await act(async () => getLatestHeader()?.headerRightBarButtonItems?.[0]?.onPress?.());
   expect(getLatestFormSheet()?.isOpen).toBe(false);
+  await act(async () => root.unmount());
+});
+
+it("slides forward into a deeper step and backward out of it, even between two back steps", async () => {
+  const { Sheet, SheetHost, slideStarts } = await setupSheetTest();
+  const steps = ["a", "b", "c", "b", "a"] as const;
+  const depths = { a: 0, b: 1, c: 2 };
+
+  function Walk() {
+    const [index, setIndex] = useState(0);
+    const step = steps[index]!;
+    const depth = depths[step];
+
+    return (
+      <SheetHost>
+        <Sheet key={step} open back={depth > 0} depth={depth} title={step} onClose={() => {}}>
+          <button onClick={() => setIndex(index + 1)}>Next</button>
+        </Sheet>
+      </SheetHost>
+    );
+  }
+
+  const container = document.createElement("div");
+  const root = createRoot(container);
+
+  await act(async () => root.render(<Walk />));
+  expect(slideStarts).toEqual([]);
+
+  for (let i = 0; i < 4; i++) await act(async () => container.querySelector("button")!.click());
+
+  expect(slideStarts).toEqual([28, 28, -28, -28]);
   await act(async () => root.unmount());
 });
 
