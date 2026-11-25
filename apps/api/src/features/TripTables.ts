@@ -163,6 +163,7 @@ export const load = Effect.fn("TripTables.load")(function* (
         const pin = visitById.get(visit.id)?.groupPlayerId ?? null;
 
         if (pin !== null && groupOfPinned.get(pin) === row.groupId) return pin;
+
         return memberAt(visit.playerId, visit.startedAt);
       },
       (counterpartyId, visit) => memberAt(counterpartyId, visit.startedAt),
