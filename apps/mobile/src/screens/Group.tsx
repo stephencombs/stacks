@@ -1,6 +1,6 @@
 import type { StaticScreenProps } from "@react-navigation/native";
 import { groupScope, type GroupDetail, type GroupId } from "@stacks/contracts";
-import { isAdmin, isFormerMember, isGuest } from "@stacks/client-runtime/format";
+import { isFormerMember } from "@stacks/client-runtime/format";
 import { useCallback } from "react";
 import { Platform, View } from "react-native";
 import { Text } from "../components/ui/Text";
@@ -8,7 +8,8 @@ import { Text } from "../components/ui/Text";
 import { Button, IconButton } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
 import { Screen } from "../components/ui/Screen";
-import { PageTitle, SettingsGroup, SettingsRow } from "../components/ui/Surface";
+import { PageTitle } from "../components/ui/Surface";
+import { Toolbar } from "../components/ui/Toolbar";
 import { GroupPeople } from "../features/GroupPeople";
 import { GroupSkeleton } from "../features/ScreenSkeletons";
 import { TripsSection } from "../features/Trips";
@@ -19,8 +20,6 @@ import { Loaded, useStacks } from "../lib/stacks";
 
 type Props = StaticScreenProps<{ groupId?: string } | undefined>;
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
 /** The group in scope: its trips, its people, its settings, and a way into its stats. */
 export function GroupScreen({ route }: Props) {
   const stacks = useStacks();
@@ -29,6 +28,7 @@ export function GroupScreen({ route }: Props) {
   return (
     <Screen
       live={Platform.OS !== "android"}
+      headerActions={false}
       contentClassName={Platform.OS === "android" ? "gap-3 pt-1" : undefined}
     >
       <ScopeLoaded skeleton={<GroupSkeleton />}>
@@ -48,52 +48,30 @@ function GroupHub({ detail }: { detail: GroupDetail }) {
   const go = useGo();
   const groupId = detail.group.id;
   const people = detail.players.filter((player) => !isFormerMember(player));
-  const guests = people.filter(isGuest).length;
-  const members = people.length - guests;
-  const android = Platform.OS === "android";
   const headerRight = useCallback(() => <GroupActions groupId={groupId} />, [groupId]);
 
   return (
     <>
+      <Toolbar placement="right">
+        <Toolbar.Button label="Stats" separateBackground onPress={() => go.stats({ groupId })} />
+        <Toolbar.Button
+          icon="gearshape"
+          accessibilityLabel="Group settings"
+          separateBackground
+          onPress={() => go.settings(groupId)}
+        />
+      </Toolbar>
       <View className="gap-3">
-        <PageTitle
-          inContent={android}
-          headerRight={android ? headerRight : undefined}
-          context={
-            android
-              ? undefined
-              : `${plural(members, "member")}${guests ? ` · ${plural(guests, "guest")}` : ""} · plays in ${detail.group.currency}`
-          }
-        >
+        <PageTitle inContent headerRight={Platform.OS === "android" ? headerRight : undefined}>
           {detail.group.name}
         </PageTitle>
-        {android ? (
-          <View className="flex-row gap-6">
-            <GroupCount label="People" count={people.length} />
-            <GroupCount label="Trips" count={detail.trips.length} />
-          </View>
-        ) : (
-          <Button
-            label="Stats"
-            variant="secondary"
-            className="self-start"
-            onPress={() => go.stats({ groupId })}
-          />
-        )}
+        <View className="flex-row gap-6">
+          <GroupCount label="People" count={people.length} />
+          <GroupCount label="Trips" count={detail.trips.length} />
+        </View>
       </View>
       <TripsSection detail={detail} />
       <GroupPeople detail={detail} />
-      {android ? null : (
-        <SettingsGroup title="Settings">
-          <SettingsRow
-            icon={<Icon name="settings" color="ink" size={16} />}
-            title="Group settings"
-            subtitle={isAdmin(detail) ? "Name, ledger, leaving" : "The ledger, leaving"}
-            accessibilityHint="Opens the group's settings"
-            onPress={() => go.settings(groupId)}
-          />
-        </SettingsGroup>
-      )}
     </>
   );
 }

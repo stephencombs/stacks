@@ -40,6 +40,7 @@ export function Screen({
   fab,
   contentClassName,
   onOpenGroups,
+  headerActions = true,
 }: {
   children: Content;
   shows?: ShowsTable;
@@ -49,9 +50,11 @@ export function Screen({
   fab?: ReactNode;
   contentClassName?: string;
   onOpenGroups?: () => void;
+  /** False when the screen fills the iOS navigation bar itself. */
+  headerActions?: boolean;
 }) {
   const footer = renderFooter;
-  const header = useNativeHeaderActions({ onOpenGroups });
+  const header = useNativeHeaderActions({ onOpenGroups, disabled: !headerActions });
   const foot = useScreenFoot({ footer: !!footer, fab: !!fab, footerGap: 12 });
 
   // WARNING: iOS 26 finds the header edge blur's scroll view through each screen's first children, so the header (its You sheet stays mounted once opened) must render after the ScrollView.

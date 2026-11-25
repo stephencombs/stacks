@@ -72,6 +72,65 @@ export const add = Effect.fn("Guests.add")(function* (
   return yield* Views.groupDetail(member);
 });
 
+/**
+ * Owners and admins remove guests. A guest with no history is deleted; one with history stays in
+ * the ledger as a former player and their claim link stops working. Every table that records play
+ * references players, so a delete refused by a constraint means the guest has history.
+ */
+export const remove = Effect.fn("Guests.remove")(function* (groupId: GroupId, playerId: PlayerId) {
+  const sql = yield* SqlClient.SqlClient;
+
+  const member = yield* Realtime.transaction(
+    Effect.gen(function* () {
+      yield* Access.lockGroup(groupId);
+      const member = yield* Access.membership(groupId);
+      yield* Access.requireAdmin(member);
+
+      const guest = yield* sql`
+        select id from players
+        where id = ${playerId} and group_id = ${groupId} and user_id is null and claim_code is not null
+      `;
+
+      if (guest.length === 0) return yield* new NotFound({ resource: "player" });
+
+      yield* sql`delete from players where id = ${playerId}`.pipe(
+        sql.withTransaction,
+        Effect.catchReason(
+          "SqlError",
+          "ConstraintError",
+          () => sql`update players set claim_code = null where id = ${playerId}`,
+        ),
+      );
+      yield* Realtime.changed(groupScope(groupId));
+
+      return member;
+    }),
+  );
+
+  return yield* Views.groupDetail(member);
+});
+
+/** Brings back a removed guest who still has history, with a new claim link. */
+export const restore = Effect.fn("Guests.restore")(function* (
+  groupId: GroupId,
+  playerId: PlayerId,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const member = yield* Access.membership(groupId);
+  yield* Access.requireAdmin(member);
+
+  const restored = yield* sql`
+    update players set claim_code = ${Access.randomCode()}
+    where id = ${playerId} and group_id = ${groupId} and user_id is null and claim_code is null
+    returning id
+  `;
+
+  if (restored.length === 0) return yield* new NotFound({ resource: "player" });
+  yield* Realtime.changed(groupScope(groupId));
+
+  return yield* Views.groupDetail(member);
+});
+
 export const previewClaim = Effect.fn("Guests.previewClaim")(function* (code: string) {
   const claim = yield* findClaim(code);
 

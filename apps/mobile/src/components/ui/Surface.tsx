@@ -1,7 +1,14 @@
 import { NavigationContext, NavigationRouteContext } from "@react-navigation/native";
 import * as Predicate from "effect/Predicate";
 import { use, useCallback, useLayoutEffect, type ReactNode } from "react";
-import { Platform, Pressable, View, type AccessibilityState } from "react-native";
+import {
+  Platform,
+  Pressable,
+  View,
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
+  type AccessibilityState,
+} from "react-native";
 import { Text } from "./Text";
 
 import { cn } from "./cn";
@@ -61,6 +68,8 @@ export function Row({
   accessibilityLabel,
   accessibilityHint,
   accessibilityState,
+  accessibilityActions,
+  onAccessibilityAction,
   className,
 }: {
   children: ReactNode;
@@ -69,6 +78,8 @@ export function Row({
   accessibilityLabel?: string;
   accessibilityHint?: string;
   accessibilityState?: AccessibilityState;
+  accessibilityActions?: ReadonlyArray<AccessibilityActionInfo>;
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
   className?: string;
 }) {
   const classes = cn("flex-row items-center gap-3 border-t border-line px-4 py-3.5", className);
@@ -79,6 +90,8 @@ export function Row({
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       accessibilityState={accessibilityState}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       onPress={onPress}
       className={cn(classes, "active:bg-fill")}
     >

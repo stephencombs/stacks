@@ -128,4 +128,92 @@ it.layer(TestApi.layer)("guests", (it) => {
       });
     }),
   );
+
+  it.effect("deletes a guest with no history when an owner or admin removes them", () =>
+    Effect.gen(function* () {
+      const { alex, ada } = yield* users("alex", "ada");
+      const group = yield* groupWith(alex, ada);
+      const groupId = group.group.id;
+      yield* alex.groups.setRole({
+        params: { groupId, userId: group.players[1]!.userId! },
+        payload: { role: "admin" },
+      });
+
+      for (const remover of [alex, ada]) {
+        const guestId = ids.player();
+        yield* remover.guests.add({
+          params: { groupId },
+          payload: { id: guestId, displayName: "Jo" },
+        });
+
+        const after = yield* remover.guests.remove({ params: { groupId, playerId: guestId } });
+        expect(after.players.some((player) => player.id === guestId)).toBe(false);
+      }
+    }),
+  );
+
+  it.effect("keeps a removed guest's history, kills their claim link, and can add them back", () =>
+    Effect.gen(function* () {
+      const { alex, gus } = yield* users("alex", "gus");
+      const group = yield* groupWith(alex);
+      const groupId = group.group.id;
+      const guestId = ids.player();
+
+      const withGuest = yield* alex.guests.add({
+        params: { groupId },
+        payload: { id: guestId, displayName: "Jonah" },
+      });
+
+      const code = withGuest.players.find((player) => player.id === guestId)!.claimCode!;
+      yield* owe(alex, group, guestId, group.myPlayerId, 2500);
+
+      const removed = yield* alex.guests.remove({ params: { groupId, playerId: guestId } });
+      expect(removed.players.find((player) => player.id === guestId)).toMatchObject({
+        userId: null,
+        role: null,
+        claimCode: null,
+      });
+      expect((yield* alex.trips.get({ params: { tripId: group.tripId } })).balances).toContainEqual(
+        { playerId: guestId, amount: -2500 },
+      );
+      expect((yield* Effect.flip(gus.guests.previewClaim({ params: { code } })))._tag).toBe(
+        "NotFound",
+      );
+
+      const restored = yield* alex.guests.restore({ params: { groupId, playerId: guestId } });
+      const newCode = restored.players.find((player) => player.id === guestId)!.claimCode;
+      expect(newCode).not.toBeNull();
+      expect(newCode).not.toBe(code);
+      expect(yield* gus.guests.previewClaim({ params: { code: newCode! } })).toMatchObject({
+        playerId: guestId,
+      });
+    }),
+  );
+
+  it.effect("lets only owners and admins remove guests, and never members through this", () =>
+    Effect.gen(function* () {
+      const { alex, gus } = yield* users("alex", "gus");
+      const group = yield* groupWith(alex, gus);
+      const groupId = group.group.id;
+      const guestId = ids.player();
+      yield* gus.guests.add({ params: { groupId }, payload: { id: guestId, displayName: "Jo" } });
+
+      for (const refused of [
+        yield* Effect.flip(gus.guests.remove({ params: { groupId, playerId: guestId } })),
+        yield* Effect.flip(gus.guests.restore({ params: { groupId, playerId: guestId } })),
+      ]) {
+        expect(refused._tag).toBe("Forbidden");
+        expect(refused).toMatchObject({ reason: "admins_only" });
+      }
+
+      expect(
+        (yield* Effect.flip(
+          alex.guests.remove({ params: { groupId, playerId: group.players[1]!.id } }),
+        ))._tag,
+      ).toBe("NotFound");
+      expect(
+        (yield* Effect.flip(alex.guests.restore({ params: { groupId, playerId: guestId } })))._tag,
+      ).toBe("NotFound");
+    }),
+  );
 });

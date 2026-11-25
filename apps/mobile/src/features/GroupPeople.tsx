@@ -8,7 +8,7 @@ import {
 } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { setStringAsync } from "expo-clipboard";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Platform, View } from "react-native";
 import { Text } from "../components/ui/Text";
 
@@ -17,7 +17,9 @@ import { Button } from "../components/ui/Button";
 import { FormError } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
-import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
+import { useToast } from "../components/ui/Toast";
+import { List, Row, SectionHeading } from "../components/ui/Surface";
+import { SwipeRow, type SwipeAction } from "../components/ui/SwipeRow";
 import { inviteUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
@@ -33,9 +35,14 @@ const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
 export function GroupPeople({ detail }: { detail: GroupDetail }) {
   const [action, setAction] = useState<"invite" | "guest" | null>(null);
   const [openedId, setOpenedId] = useState<Player["id"] | null>(null);
+  const [removing, setRemoving] = useState(false);
   const opened = detail.players.find((player) => player.id === openedId);
-  const android = Platform.OS === "android";
   const { userId } = useAuth();
+  const viewer = { role: detail.role, userId };
+  const stacks = useStacks();
+  const toast = useToast();
+  const setRole = useAction(stacks.Client.mutation("groups", "setRole"));
+  const addBack = useAction(stacks.Client.mutation("guests", "restore"));
   const members = detail.players.filter((player) => player.role !== null);
   const guests = detail.players.filter(isGuest);
   const former = detail.players.filter(isFormerMember);
@@ -44,129 +51,150 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
     [...members, ...guests, ...former].map((player) => [player.id, player.displayName]),
   );
 
-  const open = (player: Player) =>
-    player.id === detail.myPlayerId
-      ? {}
-      : { onPress: () => setOpenedId(player.id), accessibilityHint: "Opens their details" };
+  const open = (player: Player, remove = false) => {
+    setRemoving(remove);
+    setOpenedId(player.id);
+  };
 
-  const memberRows = members.map((player) => (
-    <Row key={player.id} {...open(player)}>
+  const swipes = (player: Player) => {
+    const can = playerActions(viewer, player);
+    const groupId = detail.group.id;
+    const leading: SwipeAction[] = [];
+
+    if (can.changeRole && player.userId !== null) {
+      const role = player.role === "admin" ? "member" : "admin";
+      const params = { groupId, userId: player.userId };
+
+      leading.push({
+        label: role === "admin" ? "Make admin" : "Make member",
+        icon: "person",
+        onPress: () =>
+          void setRole.attempt({ params, payload: { role } }).then(({ error }) => {
+            if (error) toast({ message: error });
+          }),
+      });
+    }
+
+    if (can.addBack)
+      leading.push({
+        label: "Add back",
+        icon: "add-person",
+        onPress: () =>
+          void addBack.attempt({ params: { groupId, playerId: player.id } }).then(({ error }) => {
+            if (error) toast({ message: error });
+          }),
+      });
+
+    const trailing: SwipeAction[] =
+      can.manage || can.removeGuest
+        ? [{ label: "Remove", icon: "trash", destructive: true, onPress: () => open(player, true) }]
+        : [];
+
+    return { leading, trailing };
+  };
+
+  const row = (player: Player, detailLine: string, trailing?: ReactNode) => (
+    <SwipeRow
+      key={player.id}
+      {...(player.id === detail.myPlayerId
+        ? {}
+        : {
+            ...swipes(player),
+            onPress: () => open(player),
+            accessibilityHint: "Opens their details",
+          })}
+    >
       <PlayerAvatar
         playerId={player.id}
         name={player.displayName}
-        size={android ? 36 : 26}
+        size={36}
         you={player.id === detail.myPlayerId}
       />
       <View className="min-w-0 flex-1">
-        <Text
-          numberOfLines={android ? 2 : 1}
-          className={android ? "type-heading font-bold text-ink" : "text-base text-ink"}
-        >
+        <Text numberOfLines={2} className="type-heading font-bold text-ink">
           {names.get(player.id)}
-          {player.id === detail.myPlayerId ? <Text className="text-muted"> · you</Text> : null}
+          {player.id === detail.myPlayerId ? <Text className="text-ink"> · you</Text> : null}
         </Text>
-        {android && player.role ? (
-          <Text className="type-footnote text-muted">{roleNames[player.role]}</Text>
-        ) : null}
+        <Text className="type-footnote text-muted">{detailLine}</Text>
       </View>
-      {!android && player.role ? <Tag>{roleNames[player.role]}</Tag> : null}
-    </Row>
-  ));
-
-  const guestRows = guests.map((player) => (
-    <Row key={player.id} {...open(player)}>
-      <PlayerAvatar playerId={player.id} name={player.displayName} size={android ? 36 : 26} />
-      <View className="min-w-0 flex-1">
-        <Text className={android ? "type-heading font-bold text-ink" : "text-base text-ink"}>
-          {names.get(player.id)}
-        </Text>
-        {android ? (
-          <Text className="type-footnote text-muted">
-            {player.claimCode ? "Guest · hasn’t claimed their history" : "Guest"}
-          </Text>
-        ) : null}
-      </View>
-    </Row>
-  ));
+      {trailing}
+    </SwipeRow>
+  );
 
   return (
     <>
-      {android ? (
+      <View className="gap-2">
+        <SectionHeading
+          action={
+            <Button
+              label="Invite"
+              size="sm"
+              variant="link"
+              className="px-1"
+              onPress={() => setAction("invite")}
+            />
+          }
+        >
+          People
+        </SectionHeading>
+        <List>
+          {members.map((player) => row(player, roleNames[player.role!]))}
+          {guests.map((player) =>
+            row(
+              player,
+              "Guest · hasn’t claimed their history",
+              <CopyClaimLink code={player.claimCode!} />,
+            ),
+          )}
+        </List>
+      </View>
+      {former.length > 0 ? (
         <View className="gap-2">
-          <SectionHeading
-            action={
-              <Button
-                label="Invite"
-                size="sm"
-                variant="link"
-                className="px-1"
-                onPress={() => setAction("invite")}
-              />
-            }
-          >
-            People
-          </SectionHeading>
+          <SectionHeading>Former members</SectionHeading>
           <List>
-            {memberRows}
-            {guestRows}
-          </List>
-        </View>
-      ) : (
-        <>
-          <View className="gap-2">
-            <SectionHeading>Members</SectionHeading>
-            <List>{memberRows}</List>
-          </View>
-          <View className="gap-2">
-            <SectionHeading
-              action={
-                <Button
-                  label="Add a guest"
-                  size="sm"
-                  variant="ghost"
-                  onPress={() => setAction("guest")}
-                />
-              }
-            >
-              Guests
-            </SectionHeading>
-            {guests.length === 0 ? (
-              <Text className="text-sm text-muted">
-                Add friends who aren't on Color Up yet. Send them their claim link when they sign up
-                and their history becomes theirs.
-              </Text>
-            ) : (
-              <List>{guestRows}</List>
+            {former.map((player) =>
+              row(player, player.userId === null ? "Removed guest" : "Left the group"),
             )}
-          </View>
-          <InviteSection detail={detail} />
-        </>
-      )}
+          </List>
+          <Text className="px-1 text-sm text-muted">Their history stays in the ledger.</Text>
+        </View>
+      ) : null}
       {action === "invite" ? (
         <Sheet open title="Invite" onClose={() => setAction(null)}>
           <Button label="Add a guest" onPress={() => setAction("guest")} />
           <InviteSection detail={detail} />
         </Sheet>
       ) : null}
-      {former.length > 0 ? (
-        <View className="gap-2">
-          <SectionHeading>Former members</SectionHeading>
-          <Text className="text-sm text-muted">
-            {former.map((player) => names.get(player.id)).join(", ")}. Their history stays in the
-            ledger.
-          </Text>
-        </View>
-      ) : null}
       <AddGuestSheet detail={detail} open={action === "guest"} onClose={() => setAction(null)} />
       {opened ? (
         <PlayerSheet
           detail={detail}
           player={opened}
-          viewer={{ role: detail.role, userId }}
+          viewer={viewer}
+          removing={removing}
           onClose={() => setOpenedId(null)}
         />
       ) : null}
     </>
+  );
+}
+
+function CopyClaimLink({ code }: { code: string }) {
+  const toast = useToast();
+
+  return (
+    <Button
+      label="Copy link"
+      size="sm"
+      icon={Platform.OS === "android" ? <Icon name="link" color="ink" size={16} /> : undefined}
+      onPress={() =>
+        void setStringAsync(inviteUrl("claim", code)).then(
+          (copied) =>
+            toast({ message: copied ? "Claim link copied" : "The claim link couldn’t be copied" }),
+          () => toast({ message: "The claim link couldn’t be copied" }),
+        )
+      }
+    />
   );
 }
 
@@ -257,32 +285,50 @@ function PlayerSheet({
   detail,
   player,
   viewer,
+  removing,
   onClose,
 }: {
   detail: GroupDetail;
   player: Player;
   viewer: Parameters<typeof playerActions>[0];
+  removing: boolean;
   onClose: () => void;
 }) {
   const stacks = useStacks();
   const setRole = useAction(stacks.Client.mutation("groups", "setRole"));
-  const remove = useAction(stacks.Client.mutation("groups", "removeMember"));
+  const removeMember = useAction(stacks.Client.mutation("groups", "removeMember"));
+  const removeGuest = useAction(stacks.Client.mutation("guests", "remove"));
+  const addBack = useAction(stacks.Client.mutation("guests", "restore"));
   const actions = playerActions(viewer, player);
 
-  const params =
+  const memberParams =
     player.userId === null ? null : { groupId: detail.group.id, userId: player.userId };
 
-  const [confirming, setConfirming] = useState(false);
+  const guestParams = { groupId: detail.group.id, playerId: player.id };
+  const [confirming, setConfirming] = useState(removing);
   const [copyError, setCopyError] = useState(false);
   const android = Platform.OS === "android";
 
-  if (confirming && params) {
+  if (confirming) {
+    const remove = actions.removeGuest ? removeGuest : removeMember;
+
+    const run = () =>
+      actions.removeGuest
+        ? removeGuest.run({ params: guestParams })
+        : memberParams
+          ? removeMember.run({ params: memberParams })
+          : Promise.resolve(null);
+
     return (
       <Sheet
         open
         onClose={onClose}
         title={`Remove ${player.displayName}?`}
-        description="They lose access to the group. Their history stays in the ledger, and you can invite them back."
+        description={
+          actions.removeGuest
+            ? "Their claim link stops working. If they’ve played, their history stays in the ledger and you can add them back."
+            : "They lose access to the group. Their history stays in the ledger, and you can invite them back."
+        }
         footer={
           <>
             <Button
@@ -291,12 +337,15 @@ function PlayerSheet({
               size="lg"
               pending={remove.pending}
               onPress={() =>
-                void remove.run({ params }).then((saved) => {
+                void run().then((saved) => {
                   if (saved) onClose();
                 })
               }
             />
-            <Button label="Keep them" onPress={() => setConfirming(false)} />
+            <Button
+              label="Keep them"
+              onPress={() => (removing ? onClose() : setConfirming(false))}
+            />
           </>
         }
       >
@@ -332,27 +381,44 @@ function PlayerSheet({
         />
       ) : null}
       {copyError ? <FormError>The claim link couldn’t be copied. Try again.</FormError> : null}
-      {actions.changeRole ? (
+      {actions.changeRole && memberParams ? (
         <Button
           label={player.role === "admin" ? "Make a member" : "Make an admin"}
           pending={setRole.pending}
           onPress={() =>
-            params &&
             void setRole
-              .run({ params, payload: { role: player.role === "admin" ? "member" : "admin" } })
+              .run({
+                params: memberParams,
+                payload: { role: player.role === "admin" ? "member" : "admin" },
+              })
               .then((saved) => {
                 if (saved) onClose();
               })
           }
         />
       ) : null}
-      {actions.manage ? (
+      {actions.addBack ? (
+        <>
+          <Button
+            label="Add back to group"
+            pending={addBack.pending}
+            onPress={() =>
+              void addBack.run({ params: guestParams }).then((saved) => {
+                if (saved) onClose();
+              })
+            }
+          />
+          <Text className="text-sm text-muted">They get a new claim link.</Text>
+        </>
+      ) : null}
+      {actions.manage || actions.removeGuest ? (
         <>
           <Button label="Remove from group" variant="danger" onPress={() => setConfirming(true)} />
           <Text className="text-sm text-muted">Their history stays in the group's ledger.</Text>
         </>
       ) : null}
       {setRole.error ? <FormError>{setRole.error}</FormError> : null}
+      {addBack.error ? <FormError>{addBack.error}</FormError> : null}
     </Sheet>
   );
 }

@@ -45,6 +45,8 @@ Give each `TextField` a visible label. A field-specific error goes in `error`. A
 
 `Surface` is a solid card on the page: `surface` fill, no border, the card shadow. A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the hairline dividers, and `Row` the padding. A pressable `Row` takes `onPress`.
 
+A row with quick actions is a `SwipeRow`, as in Messages: `trailing` actions show behind a swipe left, `leading` ones behind a swipe right. The destructive action goes trailing, in `chip-red`; the others go in `chip-blue`. A swipe only shortens a path, so each action must also be reachable from the row's sheet. Removing someone still asks first. VoiceOver and TalkBack offer the same actions on the row.
+
 A row runs avatar, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` text, not display type.
 
 Mobile has a few more card parts beside `Surface`: `ProportionalBarRow` for a breakdown (a dot or avatar, the name, the amount, a thin bar scaled to its share and a muted footnote), `QuotaCard` for a backing stake's pace, and `SettingsGroup` with `SettingsRow` for grouped settings under a `type-section` header. Reach for these before drawing a card by hand.

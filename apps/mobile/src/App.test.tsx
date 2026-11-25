@@ -66,6 +66,7 @@ async function load({
     SafeAreaProvider,
     initialWindowMetrics: metrics,
   }));
+  vi.doMock("react-native-gesture-handler", () => ({ GestureHandlerRootView: Container }));
   vi.doMock("@clerk/expo", () => ({
     ClerkProvider: ({ children }: { children: ReactNode }) =>
       createElement("div", { "data-clerk": "mounted" }, children),

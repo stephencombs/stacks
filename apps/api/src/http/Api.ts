@@ -57,6 +57,8 @@ const invites = HttpApiBuilder.group(StacksApi, "invites", (handlers) =>
 const guests = HttpApiBuilder.group(StacksApi, "guests", (handlers) =>
   handlers
     .handle("add", ({ params, payload }) => serve(Guests.add(params.groupId, payload)))
+    .handle("remove", ({ params }) => serve(Guests.remove(params.groupId, params.playerId)))
+    .handle("restore", ({ params }) => serve(Guests.restore(params.groupId, params.playerId)))
     .handle("previewClaim", ({ params }) => serve(Guests.previewClaim(params.code)))
     .handle("claim", ({ params }) => serve(Guests.claim(params.code))),
 );

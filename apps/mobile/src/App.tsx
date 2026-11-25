@@ -18,6 +18,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { Platform, View, useWindowDimensions } from "react-native";
 import { Text } from "./components/ui/Text";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 
@@ -404,24 +405,26 @@ export default function App() {
   if (loadingFonts) return null;
 
   return (
-    <SafeAreaProvider
-      initialMetrics={
-        initialWindowMetrics ?? {
-          frame: { x: 0, y: 0, width, height },
-          insets: { top: 0, right: 0, bottom: 0, left: 0 },
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider
+        initialMetrics={
+          initialWindowMetrics ?? {
+            frame: { x: 0, y: 0, width, height },
+            insets: { top: 0, right: 0, bottom: 0, left: 0 },
+          }
         }
-      }
-    >
-      <AccountProvider>
-        <StatusBar style={theme === "light" ? "dark" : "light"} />
-        <WipeGate>
-          <RecordingProvider store={recordingStore}>
-            <LiveSessionBridge />
-            <Root />
-            <ConfirmDialogHost />
-          </RecordingProvider>
-        </WipeGate>
-      </AccountProvider>
-    </SafeAreaProvider>
+      >
+        <AccountProvider>
+          <StatusBar style={theme === "light" ? "dark" : "light"} />
+          <WipeGate>
+            <RecordingProvider store={recordingStore}>
+              <LiveSessionBridge />
+              <Root />
+              <ConfirmDialogHost />
+            </RecordingProvider>
+          </WipeGate>
+        </AccountProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
