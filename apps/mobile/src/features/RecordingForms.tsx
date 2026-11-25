@@ -1428,11 +1428,13 @@ const kindName = (entry: PlayEntry) => (entry.kind === "buy_in" ? "buy-in" : "ca
 export function CorrectSheet({
   visit,
   entry,
+  back = false,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
   entry: PlayEntry;
+  back?: boolean;
   onClose: () => void;
   onSaved: Saved;
 }) {
@@ -1465,6 +1467,7 @@ export function CorrectSheet({
       title={`Correct ${kindName(entry)}`}
       description="The original stays in the history, voided, and this one replaces it."
       submitLabel="Save correction"
+      back={back}
       save={save}
       onClose={onClose}
       onSubmit={() => void submit()}
@@ -1489,11 +1492,13 @@ export function CorrectSheet({
 export function VoidSheet({
   visit,
   entry,
+  back = false,
   onClose,
   onVoided,
 }: {
   visit: RecordingVisitView;
   entry: PlayEntry;
+  back?: boolean;
   onClose: () => void;
   onVoided: () => void;
 }) {
@@ -1524,6 +1529,7 @@ export function VoidSheet({
       submitLabel="Void entry"
       submitVariant="danger"
       cancelLabel="Keep entry"
+      back={back}
       save={save}
       onClose={onClose}
       onSubmit={() => void submit()}

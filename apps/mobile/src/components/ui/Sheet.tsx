@@ -41,7 +41,7 @@ export function Sheet({
   busy = false,
   back = false,
   large = false,
-  hideHeader: _hideHeader = false,
+  hideHeader = false,
   floatingFooter: _floatingFooter = false,
   children,
 }: {
@@ -57,7 +57,7 @@ export function Sheet({
   back?: boolean;
   /** Opens at a fixed full height instead of resizing as dynamic content loads. */
   large?: boolean;
-  /** Hides the top header bar on iOS sheets that supply their own close control. */
+  /** Hides the title and close bar, for a sheet that supplies its own close control. */
   hideHeader?: boolean;
   /** Floats the footer over the scroll content on iOS. */
   floatingFooter?: boolean;
@@ -179,35 +179,37 @@ export function Sheet({
             <View className="items-center pt-3">
               <View className="h-1 w-8 rounded-full bg-fill-strong" />
             </View>
-            <View className="min-h-14 flex-row items-center px-4">
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={back ? "Back" : "Close"}
-                accessibilityState={{ disabled: busy }}
-                disabled={busy}
-                onPress={onClose}
-                hitSlop={8}
-                className="size-11 items-center justify-center"
-              >
-                <View className="size-9 items-center justify-center rounded-full bg-fill">
-                  {back ? (
-                    <View className="rotate-180">
-                      <Icon name="arrow-right" color="ink" size={18} />
-                    </View>
-                  ) : (
-                    <Icon name="close" color="ink" size={16} />
-                  )}
-                </View>
-              </Pressable>
-              <Text
-                accessibilityRole="header"
-                numberOfLines={1}
-                className="flex-1 text-center type-body font-semibold text-ink"
-              >
-                {title}
-              </Text>
-              <View className="w-11" />
-            </View>
+            {hideHeader ? null : (
+              <View className="min-h-14 flex-row items-center px-4">
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={back ? "Back" : "Close"}
+                  accessibilityState={{ disabled: busy }}
+                  disabled={busy}
+                  onPress={onClose}
+                  hitSlop={8}
+                  className="size-11 items-center justify-center"
+                >
+                  <View className="size-9 items-center justify-center rounded-full bg-fill">
+                    {back ? (
+                      <View className="rotate-180">
+                        <Icon name="arrow-right" color="ink" size={18} />
+                      </View>
+                    ) : (
+                      <Icon name="close" color="ink" size={16} />
+                    )}
+                  </View>
+                </Pressable>
+                <Text
+                  accessibilityRole="header"
+                  numberOfLines={1}
+                  className="flex-1 text-center type-body font-semibold text-ink"
+                >
+                  {title}
+                </Text>
+                <View className="w-11" />
+              </View>
+            )}
             <ScrollView
               ref={scroll}
               className="shrink"

@@ -6,7 +6,6 @@ import {
 } from "@react-navigation/native";
 import { formatDay, formatDuration, formatTime } from "@stacks/client-runtime/format";
 import type { RecordingInput } from "@stacks/client-runtime/recording";
-import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import { sessionCardModel } from "@stacks/client-runtime/shareCard";
 import { cashOutNote, liveTable, tableActions } from "@stacks/client-runtime/liveTable";
 import {
@@ -16,8 +15,6 @@ import {
   useServerTable,
 } from "@stacks/client-runtime/recordingReact";
 import {
-  historyEntryName,
-  historyLines,
   LIVE_REBUY_AMOUNTS,
   localDateText,
   localTimeText,
@@ -27,10 +24,9 @@ import {
   RECORDING_CURRENCY,
   UNDONE_REASON,
   visitTitle,
-  type RecordingEvent,
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
-import { MinorUnits, VisitId, type EntryId, type Game, type PlayEntry } from "@stacks/contracts";
+import { MinorUnits, VisitId, type EntryId, type Game } from "@stacks/contracts";
 import { ownPlayers } from "@stacks/shared/recording";
 import { formatMoney } from "@stacks/shared/money";
 import * as DateTime from "effect/DateTime";
@@ -47,7 +43,7 @@ import { Icon } from "../components/ui/Icon";
 import { FormError } from "../components/ui/Field";
 import { HeaderTitle } from "../components/ui/HeaderTitle";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, List, Row, SectionHeading, Skeleton } from "../components/ui/Surface";
+import { EmptyState, List, Row, Skeleton } from "../components/ui/Surface";
 import { animate, duration, ease } from "../components/ui/motion";
 import { cn } from "../components/ui/cn";
 import { confirmAction } from "../components/ui/confirmAction";
@@ -68,6 +64,7 @@ import {
   VoidSheet,
 } from "../features/RecordingForms";
 import { LiveSessionsBar } from "../features/LiveBar";
+import { EntryInspector, History } from "../features/VisitHistory";
 import { ShareCardSheet } from "../features/ShareCardSheet";
 import { TableSection } from "../features/SharedTable";
 import { TableTripSheet, TripRow, useTripPickable } from "../features/TableTrip";
@@ -711,10 +708,6 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           onClose={close}
           onRecorded={fromTable}
           onSeated={(_, name) => edited(`${name} is back at the table.`)}
-          onHistory={(next) => {
-            close();
-            navigation.dispatch(StackActions.push("Play", { visitId: next }));
-          }}
         />
       ) : open?.type === "history" ? (
         <Sheet open back title={own ? "Your history" : `${name}'s history`} onClose={close}>
@@ -1306,205 +1299,5 @@ function VisitHero({ visit, own }: { visit: RecordingVisitView; own: boolean }) 
         </View>
       </View>
     </View>
-  );
-}
-
-const eventText = (event: RecordingEvent) =>
-  event.type === "finished" ? "Finished playing" : `Reopened: ${event.reason}`;
-
-function History({
-  visit,
-  own = true,
-  who = "Their",
-  onInspect,
-}: {
-  visit: RecordingVisitView;
-  own?: boolean;
-  who?: string;
-  onInspect: (entryId: EntryId) => void;
-}) {
-  const state = useRecordingState();
-  const view = useServerTable(visit.visit.tableId);
-  const people = counterpartiesAt(state, visit.visit.tableId, visit.visit.playerId, view ?? null);
-
-  const paid = (item: PlayEntry) => {
-    if (item.counterpartyId === null) return null;
-
-    const name =
-      people.find((person) => person.id === item.counterpartyId)?.displayName ?? "someone";
-
-    return `${item.kind === "cash_out" ? "Paid to" : "Paid by"} ${name}`;
-  };
-
-  const prefs = usePreferences();
-  const lines = historyLines(visit);
-
-  return (
-    <View className="gap-2">
-      <SectionHeading count={lines.length === 1 ? "1 entry" : `${lines.length} entries`}>
-        {Platform.OS === "android" ? (own ? "Your history" : `${who}'s history`) : "History"}
-      </SectionHeading>
-      <List>
-        {lines.map((line) => {
-          if (line.type === "event")
-            return (
-              <Row key={`${line.event.type}-${DateTime.toEpochMillis(line.at)}`}>
-                <View className="min-w-0 flex-1 gap-0.5">
-                  <Text className="text-base font-medium text-ink">{eventText(line.event)}</Text>
-                  <Text className="text-sm text-muted">
-                    {line.event.type === "reopened"
-                      ? `${formatTime(line.at)} · Fixed an accidental finish`
-                      : formatTime(line.at)}
-                  </Text>
-                </View>
-              </Row>
-            );
-          const item = line.entry;
-          const voided = item.voidedAt !== null;
-          const name = historyEntryName(visit, item);
-
-          const shownName =
-            Platform.OS === "android" && name === "Final cash-out" ? "Cash-out" : name;
-
-          const time = formatTime(item.occurredAt);
-
-          return (
-            <Row
-              key={item.id}
-              onPress={() => onInspect(item.id)}
-              accessibilityLabel={`${shownName}, ${formatDisplayMoney(item.amount, RECORDING_CURRENCY, prefs, { forAccessibility: true })}, ${time}${voided ? ", voided" : ""}${item.replacesEntryId ? ", correction" : ""}`}
-              accessibilityHint="Shows the entry, where you can correct or void it"
-              className="min-h-14"
-            >
-              <View className={cn("min-w-0 flex-1 gap-0.5", voided && "opacity-50")}>
-                <Text
-                  className={cn(
-                    "text-base font-medium",
-                    voided ? "text-muted line-through" : "text-ink",
-                  )}
-                >
-                  {shownName}
-                </Text>
-                <Text className="text-sm text-muted">
-                  {[
-                    time,
-                    paid(item),
-                    voided ? "Voided" : null,
-                    item.replacesEntryId ? "Correction" : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
-              </View>
-              <Money
-                amount={item.amount}
-                currency={RECORDING_CURRENCY}
-                className={
-                  voided ? "type-number text-muted line-through opacity-50" : "type-number"
-                }
-              />
-            </Row>
-          );
-        })}
-      </List>
-    </View>
-  );
-}
-
-function Detail({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <View className="flex-row gap-4 border-t border-line px-4 py-3">
-      <Text className="w-24 text-sm text-muted">{label}</Text>
-      <View className="min-w-0 flex-1">{children}</View>
-    </View>
-  );
-}
-
-function EntryInspector({
-  visit,
-  entry,
-  onClose,
-  onShow,
-  onCorrect,
-  onVoid,
-}: {
-  visit: RecordingVisitView;
-  entry: PlayEntry;
-  onClose: () => void;
-  onShow: (entryId: EntryId) => void;
-  onCorrect: () => void;
-  onVoid: () => void;
-}) {
-  const replacement = visit.replacedBy.get(entry.id);
-  const at = (value: DateTime.Utc) => `${formatDay(value)}, ${formatTime(value)}`;
-  const voided = entry.voidedAt !== null;
-
-  return (
-    <Sheet
-      open
-      onClose={onClose}
-      title={historyEntryName(visit, entry)}
-      {...(voided ? { description: "Voided. It no longer counts toward this session." } : {})}
-      footer={
-        voided ? undefined : (
-          <>
-            <Button label="Correct amount" size="lg" onPress={onCorrect} />
-            <Button label="Void entry" variant="danger" size="lg" onPress={onVoid} />
-          </>
-        )
-      }
-    >
-      <List>
-        <Detail label="Amount">
-          <Money
-            amount={entry.amount}
-            currency={RECORDING_CURRENCY}
-            className={cn("type-number", voided && "line-through")}
-          />
-        </Detail>
-        <Detail label="Time">
-          <Text selectable className="text-base text-ink">
-            {at(entry.occurredAt)}
-          </Text>
-        </Detail>
-        <Detail label="Recorded">
-          <Text className="text-base text-ink">By you on this device, {at(entry.createdAt)}</Text>
-        </Detail>
-        {entry.note ? (
-          <Detail label="Note">
-            <Text selectable className="text-base text-ink">
-              {entry.note}
-            </Text>
-          </Detail>
-        ) : null}
-        {entry.voidedAt ? (
-          <Detail label="Voided">
-            <Text selectable className="text-base text-ink">
-              {at(entry.voidedAt)} · {entry.voidReason}
-            </Text>
-          </Detail>
-        ) : null}
-        {entry.replacesEntryId ? (
-          <Detail label="Corrects">
-            <Button
-              label="View original"
-              size="sm"
-              className="self-start"
-              onPress={() => onShow(entry.replacesEntryId!)}
-            />
-          </Detail>
-        ) : null}
-        {replacement ? (
-          <Detail label="Replaced by">
-            <Button
-              label="View correction"
-              size="sm"
-              className="self-start"
-              onPress={() => onShow(replacement)}
-            />
-          </Detail>
-        ) : null}
-      </List>
-    </Sheet>
   );
 }

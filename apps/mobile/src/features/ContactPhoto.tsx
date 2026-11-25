@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Image, Platform, View } from "react-native";
 
 import { Button } from "../components/ui/Button";
+import { Icon } from "../components/ui/Icon";
+import { MenuView } from "../components/ui/MenuView";
 import { Text } from "../components/ui/Text";
 import {
   discardContactPick,
@@ -92,18 +94,17 @@ export function ContactPhotoPreview({ draft }: { draft: ContactPhotoDraft }) {
 }
 
 /**
- * Links a photo from Contacts to a player on this phone: Link, or Change and Remove. It asks for
- * nothing but the one contact the user picks, and never changes the player's name.
+ * Linking a player's photo from Contacts on this phone: whether it can be offered, the photo they
+ * have now, and the pick and remove actions. It asks for nothing but the one contact the user
+ * picks, and never changes the player's name.
  */
-export function ContactPhotoControls({ playerId, name }: { playerId: PlayerId; name: string }) {
+export function useContactPhotoLink(playerId: PlayerId) {
   const uri = useContactPhoto(playerId);
   const offered = useContactPhotosAvailable();
   // WARNING: Android's Contacts provider refuses photo reads without READ_CONTACTS (seen on a Pixel).
   const available = Platform.OS !== "android" && offered;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  if (!available && uri === null) return null;
 
   const link = async () => {
     setBusy(true);
@@ -126,25 +127,99 @@ export function ContactPhotoControls({ playerId, name }: { playerId: PlayerId; n
     }
   };
 
+  return {
+    uri,
+    available,
+    busy,
+    message,
+    link: () => void link(),
+    remove: () => removeContactPhoto(playerId),
+  };
+}
+
+export type ContactPhotoLink = ReturnType<typeof useContactPhotoLink>;
+
+/** Links a photo from Contacts to a player on this phone: Link, or Change and Remove. */
+export function ContactPhotoControls({ playerId, name }: { playerId: PlayerId; name: string }) {
+  const photo = useContactPhotoLink(playerId);
+
+  if (!photo.available && photo.uri === null) return null;
+
   return (
     <View className="gap-2">
       <View className="flex-row items-center gap-3">
         <PlayerAvatar playerId={playerId} name={name} size={44} />
         <View className="min-w-0 flex-1 flex-row flex-wrap gap-2">
-          {available ? (
+          {photo.available ? (
             <Button
-              label={uri === null ? "Link contact photo" : "Change"}
-              disabled={busy}
-              onPress={() => void link()}
+              label={photo.uri === null ? "Link contact photo" : "Change"}
+              disabled={photo.busy}
+              onPress={photo.link}
             />
           ) : null}
-          {uri === null ? null : (
-            <Button label="Remove" variant="ghost" onPress={() => removeContactPhoto(playerId)} />
+          {photo.uri === null ? null : (
+            <Button label="Remove" variant="ghost" onPress={photo.remove} />
           )}
         </View>
       </View>
-      {message ? <Text className="type-footnote text-muted">{message}</Text> : null}
+      {photo.message ? <Text className="type-footnote text-muted">{photo.message}</Text> : null}
       <Text className="type-footnote text-muted">Only on this phone.</Text>
     </View>
+  );
+}
+
+/**
+ * A player's avatar that opens the platform's menu for their photo: choose or change it from
+ * Contacts, or remove it. With nothing to offer, such as on Android with no photo, it is only the
+ * avatar. The menu's title says the photo stays on this phone.
+ */
+export function ContactPhotoMenu({
+  playerId,
+  name,
+  size,
+  photo,
+}: {
+  playerId: PlayerId;
+  name: string;
+  size: number;
+  photo: ContactPhotoLink;
+}) {
+  const actions = [
+    ...(photo.available
+      ? [{ id: "link", title: photo.uri === null ? "Choose from Contacts" : "Change photo" }]
+      : []),
+    ...(photo.uri === null
+      ? []
+      : [{ id: "remove", title: "Remove photo", attributes: { destructive: true } }]),
+  ];
+
+  const face = <PlayerAvatar playerId={playerId} name={name} size={size} />;
+
+  if (actions.length === 0) return face;
+
+  return (
+    <MenuView
+      title="Only on this phone"
+      actions={actions}
+      shouldOpenOnLongPress={false}
+      onPressAction={({ nativeEvent }) => {
+        if (nativeEvent.event === "link") photo.link();
+        else photo.remove();
+      }}
+    >
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={`Photo for ${name}`}
+        accessibilityHint="Opens a menu to change or remove it"
+        accessibilityState={{ disabled: photo.busy }}
+        style={{ width: size, height: size }}
+      >
+        {face}
+        <View className="absolute right-0 bottom-0 size-6 items-center justify-center rounded-full bg-ink">
+          <Icon name="edit" color="ink-inverse" size={12} />
+        </View>
+      </View>
+    </MenuView>
   );
 }
