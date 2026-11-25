@@ -87,6 +87,38 @@ export function LiveClock({ since }: { since: DateTime.Utc | null }) {
   );
 }
 
+export function LiveHero({
+  label,
+  amount,
+  title,
+  detail,
+  testID,
+}: {
+  label: string;
+  amount: MinorUnits;
+  title: string;
+  detail: string;
+  testID?: string;
+}) {
+  return (
+    <View className="gap-2.5 px-3 pt-16">
+      <Text accessibilityRole="header" className="type-label text-[13px] text-felt-ink">
+        {label}
+      </Text>
+      <Money
+        amount={amount}
+        currency={RECORDING_CURRENCY}
+        felt
+        fit
+        testID={testID}
+        className="text-[88px] leading-[92px] font-bold tracking-[-3px]"
+      />
+      <Text className="type-heading font-medium text-felt-ink">{title}</Text>
+      <Text className="type-footnote text-felt-soft">{detail}</Text>
+    </View>
+  );
+}
+
 /** What a write from the table did, for the screen's toast. */
 export type TableRecorded = {
   readonly visitId: VisitId;
@@ -105,15 +137,12 @@ export function TableSeats({
   table,
   current,
   felt = true,
-  count = true,
   onSeat,
   onSelf,
 }: {
   table: LiveTable;
   current?: VisitId;
   felt?: boolean;
-  /** Says how many are playing, unless the screen already does. */
-  count?: boolean;
   onSeat: (seat: TableSeat) => void;
   onSelf: (visitId: VisitId) => void;
 }) {
@@ -134,10 +163,8 @@ export function TableSeats({
           <Text accessibilityRole="header" className={cn("type-footnote font-medium", soft)}>
             At this table
           </Text>
-          {count ? (
-            <Text className={cn("type-footnote", soft)}>
-              {table.playing === 1 ? "1 playing" : `${table.playing} playing`}
-            </Text>
+          {felt ? (
+            <Text className="type-footnote text-felt-soft">{table.playing} playing</Text>
           ) : null}
         </View>
       )}

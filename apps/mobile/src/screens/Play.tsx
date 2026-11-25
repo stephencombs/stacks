@@ -52,12 +52,7 @@ import { animate, duration, ease } from "../components/ui/motion";
 import { cn } from "../components/ui/cn";
 import { confirmAction } from "../components/ui/confirmAction";
 import { PersonalScreen, SaveStatus } from "../features/Personal";
-import {
-  formatDisplayMoney,
-  HIDDEN_AMOUNT,
-  HIDDEN_AMOUNT_LABEL,
-  usePreferences,
-} from "../lib/preferences";
+import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { TableNotices } from "../lib/realtime";
 import { useRecordingState } from "../lib/recording";
 import {
@@ -81,6 +76,7 @@ import { withoutTable } from "../lib/tableRoutes";
 import {
   ActionSlot,
   LiveClock,
+  LiveHero,
   SeatSheet,
   TableActionSheet,
   TableSeats,
@@ -610,7 +606,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       />
       {live ? (
         <>
-          <LiveHero visit={visit} name={own ? undefined : player?.player.displayName} />
+          <LiveVisitHero visit={visit} name={own ? undefined : player?.player.displayName} />
           <View className="items-center">
             <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} felt />
           </View>
@@ -1233,58 +1229,21 @@ export function BackButton({ label, felt = false }: { label?: string; felt?: boo
   );
 }
 
-function LiveHero({ visit, name }: { visit: RecordingVisitView; name?: string | undefined }) {
+function LiveVisitHero({ visit, name }: { visit: RecordingVisitView; name?: string | undefined }) {
   const summary = sessionReadout(visit, visit.visit.startedAt);
 
-  return (
-    <View className="gap-2.5 px-3 pt-16">
-      <Text accessibilityRole="header" className="type-label text-[13px] text-felt-ink">
-        {name ? `${name} · Bought in` : "Bought in"}
-      </Text>
-      <BuyInFigure amount={visit.totals.buyIn} />
-      <Text className="type-heading font-medium text-felt-ink">
-        {[visitTitle(visit.table), visit.venue?.name].filter(Boolean).join(" · ")}
-      </Text>
-      <Text className="type-footnote text-felt-soft">
-        Started {formatTime(visit.visit.startedAt)} ·{" "}
-        {summary.corrected
-          ? "buy-in corrected"
-          : `${summary.buyIns} ${summary.buyIns === 1 ? "buy-in" : "buy-ins"}`}
-      </Text>
-    </View>
-  );
-}
-
-function BuyInFigure({ amount }: { amount: MinorUnits }) {
-  const { showCents, privacyMode } = usePreferences();
-
-  if (privacyMode) {
-    return (
-      <Text
-        testID="live-buy-in"
-        accessibilityLabel={HIDDEN_AMOUNT_LABEL}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        className="text-[88px] leading-[92px] font-bold tracking-[-3px] text-felt-soft tabular-nums"
-      >
-        {HIDDEN_AMOUNT}
-      </Text>
-    );
-  }
-
-  const text = formatMoney(amount, RECORDING_CURRENCY, {
-    trailingZeroDisplay: showCents ? "auto" : "stripIfInteger",
-  });
+  const buyIns = summary.corrected
+    ? "buy-in corrected"
+    : `${summary.buyIns} ${summary.buyIns === 1 ? "buy-in" : "buy-ins"}`;
 
   return (
-    <Text
+    <LiveHero
+      label={name ? `${name} · Bought in` : "Bought in"}
+      amount={visit.totals.buyIn}
+      title={[visitTitle(visit.table), visit.venue?.name].filter(Boolean).join(" · ")}
+      detail={`Started ${formatTime(visit.visit.startedAt)} · ${buyIns}`}
       testID="live-buy-in"
-      numberOfLines={1}
-      adjustsFontSizeToFit
-      className="text-[88px] leading-[92px] font-bold tracking-[-3px] text-felt-ink tabular-nums"
-    >
-      {text}
-    </Text>
+    />
   );
 }
 
