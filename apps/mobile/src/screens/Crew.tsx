@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/expo";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import {
   CurrencyCode,
   GroupId,
@@ -18,21 +18,21 @@ import {
   crewFeed,
   groupHappening,
   livePlayerIds,
-  nameList,
   pinnedTrip,
 } from "@stacks/client-runtime/crew";
 import {
-  formatDay,
-  formatDuration,
-  formatTime,
-  gameNames,
-  playerNames,
-} from "@stacks/client-runtime/format";
+  finishedStory,
+  liveStory,
+  relativeWhen,
+  storyText,
+  type StoryFace,
+} from "@stacks/client-runtime/crewStory";
+import { formatDay, formatDuration, playerNames } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { useRecordingClock } from "@stacks/client-runtime/recordingReact";
 import { closedPlays, localClock, tripDates, tripPlays } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
-import type * as DateTime from "effect/DateTime";
+import * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
 import { useCallback, useState, type ReactNode } from "react";
 import { Platform, Pressable, View } from "react-native";
@@ -58,7 +58,7 @@ import { PlayerAvatar } from "../features/PlayerAvatar";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
 import { useCrewScopes } from "../lib/crewScopes";
 import { useGo } from "../lib/go";
-import { usePreferences } from "../lib/preferences";
+import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { ScopeNotices } from "../lib/realtime";
 import { Loaded, TripLoaded, useAction, useStacks } from "../lib/stacks";
 
@@ -187,8 +187,32 @@ function CrewSkeleton() {
   );
 }
 
+type FeedClock = { readonly now: DateTime.Utc; readonly zone: DateTime.TimeZone };
+
+const CLOCK_MS = 60_000;
+
+function useFeedClock() {
+  const [clock, setClock] = useState<FeedClock>(() => ({
+    now: DateTime.nowUnsafe(),
+    zone: DateTime.zoneMakeLocal(),
+  }));
+
+  useFocusEffect(
+    useCallback(() => {
+      const refresh = () => setClock({ now: DateTime.nowUnsafe(), zone: DateTime.zoneMakeLocal() });
+      const timer = setInterval(refresh, CLOCK_MS);
+      refresh();
+
+      return () => clearInterval(timer);
+    }, []),
+  );
+
+  return clock;
+}
+
 function Feed({ groups }: { groups: ReadonlyArray<GroupListItem> }) {
   const pinned = pinnedTrip(groups);
+  const clock = useFeedClock();
 
   return (
     <>
@@ -202,7 +226,7 @@ function Feed({ groups }: { groups: ReadonlyArray<GroupListItem> }) {
       ) : null}
       <View className="gap-2">
         <SectionHeading>Activity</SectionHeading>
-        <ActivityPage groups={groups} />
+        <ActivityPage groups={groups} clock={clock} />
       </View>
     </>
   );
@@ -286,9 +310,11 @@ function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
 
 function ActivityPage({
   groups,
+  clock,
   cursor,
 }: {
   groups: ReadonlyArray<GroupListItem>;
+  clock: FeedClock;
   cursor?: string;
 }) {
   const stacks = useStacks();
@@ -300,7 +326,12 @@ function ActivityPage({
         const items = crewFeed(page.items, groups);
 
         const activity = items.map((item) => (
-          <ActivityRow key={activityKey(item)} item={item} me={myPlayer(groups, item)} />
+          <ActivityRow
+            key={activityKey(item)}
+            item={item}
+            me={myPlayer(groups, item)}
+            clock={clock}
+          />
         ));
 
         return (
@@ -313,7 +344,7 @@ function ActivityPage({
               </EmptyState>
             ) : null}
             {page.nextCursor === null ? null : older ? (
-              <ActivityPage groups={groups} cursor={page.nextCursor} />
+              <ActivityPage groups={groups} clock={clock} cursor={page.nextCursor} />
             ) : (
               <Button label="Show older" className="self-center" onPress={() => setOlder(true)} />
             )}
@@ -373,8 +404,40 @@ const activityKey = (item: CrewActivityItem) => {
   }
 };
 
-function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | undefined }) {
-  const { privacyMode } = usePreferences();
+const LEAD_SIZE = 40;
+
+function ActivityRow({
+  item,
+  me,
+  clock,
+}: {
+  item: CrewActivityItem;
+  me: PlayerId | undefined;
+  clock: FeedClock;
+}) {
+  switch (item.kind) {
+    case "session_finished":
+    case "table_finished":
+      return <FinishedPost item={item} me={me} clock={clock} />;
+    case "session_live":
+    case "table_live":
+      return <LivePost item={item} me={me} />;
+    case "trip_started":
+      return <TripStartedPost item={item} clock={clock} />;
+  }
+}
+
+function ActivityCard({
+  item,
+  lead,
+  label,
+  children,
+}: {
+  item: CrewActivityItem;
+  lead: ReactNode;
+  label?: string;
+  children: ReactNode;
+}) {
   const go = useGo();
   const navigation = useNavigation();
   const target = activityTarget(item);
@@ -387,161 +450,160 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
       Match.orElse(() => undefined),
     );
 
-  const hint = target.kind === "trip" ? "Opens the trip" : "Opens the session";
-  const finished = item.kind === "session_finished" || item.kind === "table_finished";
-
-  const firstPlayer =
-    item.kind === "trip_started" || (finished && item.players.length > 1)
-      ? undefined
-      : item.players[0];
-
-  const row = (title: string, meta: string, results?: ReactNode) => (
+  return (
     <List>
-      <Row accessibilityHint={hint} onPress={open} className="items-start gap-3 py-4">
-        {item.kind === "trip_started" ? (
-          <View className="size-8 items-center justify-center rounded-full bg-tint-orange">
-            <Icon name="trip" color="chip-orange" size={18} />
-          </View>
-        ) : firstPlayer ? (
-          <ActivityAvatar groupId={item.group.id} player={firstPlayer} />
-        ) : null}
-        <View className="flex-1 gap-0.5">
-          <Text numberOfLines={2} className="type-callout font-semibold text-ink">
-            {title}
-          </Text>
-          <Text className="type-footnote text-muted">{meta}</Text>
-          {results ? <View className="pt-1">{results}</View> : null}
-        </View>
+      <Row
+        accessibilityLabel={label}
+        accessibilityHint={target.kind === "trip" ? "Opens the trip" : "Opens the session"}
+        onPress={open}
+        className="items-start gap-3 py-4"
+      >
+        {lead}
+        <View className="min-w-0 flex-1 gap-1">{children}</View>
       </Row>
     </List>
   );
-
-  if (item.kind === "trip_started") {
-    return row(
-      item.group.name,
-      formatDay(item.startedAt),
-      <Text className="type-callout text-ink">Started {item.trip.name}</Text>,
-    );
-  }
-
-  const venue = item.venue?.name ?? "a table";
-
-  const game =
-    item.kind === "table_live" || item.kind === "table_finished"
-      ? item.game && gameNames[item.game]
-      : null;
-
-  if (item.kind === "session_live" || item.kind === "table_live") {
-    const players = nameList(item.players.map((player) => player.displayName));
-
-    return row(
-      players || venue,
-      `Now · ${item.trip.name}`,
-      <Text className="type-callout text-ink">
-        {game ? `Playing ${game.toLowerCase()} at ${venue}` : `Playing at ${venue}`}
-        {" · "}
-        <ActivityLiveDuration startedAt={item.startedAt} />
-      </Text>,
-    );
-  }
-
-  const results = item.players.toSorted((a, b) => b.net - a.net);
-
-  if (results.length === 1 && firstPlayer) {
-    const player = results[0]!;
-    const name = player.playerId === me ? "You" : player.displayName;
-
-    return row(
-      name,
-      `${formatDay(item.endedAt)} · ${item.trip.name}`,
-      <Text className="type-callout text-ink">
-        {privacyMode ? (
-          <Money amount={player.net} currency={item.group.currency} tone="result" />
-        ) : player.net === 0 ? (
-          "Broke even"
-        ) : (
-          <>
-            {player.net > 0 ? "Won " : "Lost "}
-            <Money
-              amount={MinorUnits.make(Math.abs(player.net))}
-              currency={item.group.currency}
-              className={player.net > 0 ? "font-bold text-win" : "font-bold text-loss"}
-            />
-          </>
-        )}
-        {game ? ` playing ${game.toLowerCase()} at ${venue}` : ` at ${venue}`}
-      </Text>,
-    );
-  }
-
-  const seenGuests = new Map<string, number>();
-
-  const playerKey = (playerId: (typeof results)[number]["playerId"], displayName: string) => {
-    if (playerId) return playerId;
-    const n = (seenGuests.get(displayName) ?? 0) + 1;
-    seenGuests.set(displayName, n);
-
-    return `guest-${displayName}-${n}`;
-  };
-
-  return row(
-    venue,
-    [game, item.trip.name, `${formatDay(item.endedAt)}, ${formatTime(item.endedAt)}`]
-      .filter(Boolean)
-      .join(" · "),
-    <View className="flex-row flex-wrap gap-x-3">
-      {results.slice(0, 4).map((player) => (
-        <Text
-          key={playerKey(player.playerId, player.displayName)}
-          className="type-footnote text-ink"
-        >
-          {player.playerId === me ? "You" : player.displayName}{" "}
-          <Money amount={player.net} currency={item.group.currency} tone="result" />
-        </Text>
-      ))}
-      {results.length > 4 ? (
-        <Text className="type-footnote text-muted">+{results.length - 4} more</Text>
-      ) : null}
-    </View>,
-  );
 }
 
-function ActivityLiveDuration({ startedAt }: { startedAt: DateTime.Utc }) {
-  const now = useRecordingClock();
-
-  return <Text className="font-semibold text-live">live {formatDuration(startedAt, now)}</Text>;
-}
-
-function ActivityAvatar({
-  groupId,
-  player,
-}: {
-  groupId: GroupId;
-  player: { playerId: PlayerId | null; displayName: string };
-}) {
-  const stacks = useStacks();
-
-  const neutral = (
-    <View className="size-8 items-center justify-center rounded-full bg-fill">
-      <Icon name="person" color="muted" size={18} />
+function Lead({ face }: { face: StoryFace | null }) {
+  return face ? (
+    <PlayerAvatar
+      playerId={face.playerId}
+      name={face.displayName}
+      size={LEAD_SIZE}
+      you={face.you}
+    />
+  ) : (
+    <View className="size-10 items-center justify-center rounded-full bg-fill">
+      <Icon name="person" color="muted" size={22} />
     </View>
   );
+}
 
-  const { playerId, displayName } = player;
+const headlineClass = "type-callout font-semibold text-ink";
+const metaClass = "type-footnote text-muted";
 
-  if (!playerId) return neutral;
+function FinishedPost({
+  item,
+  me,
+  clock,
+}: {
+  item: Extract<CrewActivityItem, { kind: "session_finished" | "table_finished" }>;
+  me: PlayerId | undefined;
+  clock: FeedClock;
+}) {
+  const prefs = usePreferences();
+  const { currency } = item.group;
+
+  const story = finishedStory(item.players, {
+    venue: item.venue?.name ?? null,
+    game: item.kind === "table_finished" ? item.game : null,
+    me,
+    hidden: prefs.privacyMode,
+  });
+
+  const meta = `${relativeWhen(item.endedAt, clock.now, clock.zone)} · ${item.trip.name}`;
+
+  const sentence = storyText(story, (amount) =>
+    formatDisplayMoney(MinorUnits.make(amount), currency, prefs, { forAccessibility: true }),
+  );
 
   return (
-    <Loaded query={stacks.group(groupId)} skeleton={neutral} renderError={() => neutral}>
-      {(detail) => (
-        <PlayerAvatar
-          playerId={playerId}
-          name={displayName}
-          size={32}
-          you={playerId === detail.myPlayerId}
-        />
-      )}
-    </Loaded>
+    <ActivityCard item={item} lead={<Lead face={story.lead} />} label={`${sentence}. ${meta}`}>
+      <Text numberOfLines={2} className={headlineClass}>
+        {story.headline.before}
+        {story.headline.amount ? (
+          <Money
+            amount={MinorUnits.make(story.headline.amount.value)}
+            currency={currency}
+            className={
+              story.headline.amount.tone === "win" ? "font-bold text-win" : "font-bold text-loss"
+            }
+          />
+        ) : null}
+        {story.headline.after}
+      </Text>
+      <Text numberOfLines={1} className={metaClass}>
+        {meta}
+      </Text>
+      {story.rest.length > 0 ? (
+        <Text className="pt-0.5 type-footnote text-ink">
+          {story.rest.map((result, index) => (
+            <Text key={result.playerId}>
+              {index > 0 ? " · " : ""}
+              {`${result.name} `}
+              <Money
+                amount={MinorUnits.make(result.net)}
+                currency={currency}
+                tone="result"
+                className="font-medium"
+              />
+            </Text>
+          ))}
+          {story.more > 0 ? <Text className="text-muted">{` · +${story.more} more`}</Text> : null}
+        </Text>
+      ) : null}
+    </ActivityCard>
+  );
+}
+
+function LivePost({
+  item,
+  me,
+}: {
+  item: Extract<CrewActivityItem, { kind: "session_live" | "table_live" }>;
+  me: PlayerId | undefined;
+}) {
+  const story = liveStory(item.players, {
+    venue: item.venue?.name ?? "a table",
+    game: item.kind === "table_live" ? item.game : null,
+    me,
+  });
+
+  return (
+    <ActivityCard item={item} lead={<Lead face={story.lead} />}>
+      <Text numberOfLines={2} className={headlineClass}>
+        {story.headline}
+      </Text>
+      <ActivityLiveMeta startedAt={item.startedAt} trip={item.trip.name} />
+    </ActivityCard>
+  );
+}
+
+function ActivityLiveMeta({ startedAt, trip }: { startedAt: DateTime.Utc; trip: string }) {
+  const now = useRecordingClock();
+
+  return (
+    <Text numberOfLines={1} className={metaClass}>
+      <Text className="font-semibold text-live">● Live {formatDuration(startedAt, now)}</Text>
+      {` · ${trip}`}
+    </Text>
+  );
+}
+
+function TripStartedPost({
+  item,
+  clock,
+}: {
+  item: Extract<CrewActivityItem, { kind: "trip_started" }>;
+  clock: FeedClock;
+}) {
+  return (
+    <ActivityCard
+      item={item}
+      lead={
+        <View className="size-10 items-center justify-center rounded-full bg-tint-orange">
+          <Icon name="trip" color="chip-orange" size={22} />
+        </View>
+      }
+    >
+      <Text numberOfLines={2} className={headlineClass}>
+        {item.trip.name} has started
+      </Text>
+      <Text numberOfLines={1} className={metaClass}>
+        {`${relativeWhen(item.startedAt, clock.now, clock.zone)} · ${item.group.name}`}
+      </Text>
+    </ActivityCard>
   );
 }
 
