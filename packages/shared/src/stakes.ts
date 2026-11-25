@@ -106,6 +106,39 @@ export const stakeOutcomes = (
   );
 };
 
+/**
+ * Each live stake as group stats show it. It's `final` once the stake or its trip has ended and no
+ * live session it covers can still move what's owed.
+ */
+export const stakeLines = (
+  stakes: Iterable<StakeTerms>,
+  outcomes: ReadonlyMap<StakeId, StakeOutcome>,
+  sessions: Iterable<Pick<Session, "tripId" | "startedAt" | "status">>,
+  endedTrips: ReadonlySet<TripId>,
+) => {
+  const running = Array.from(sessions).filter((session) => session.status === "live");
+
+  return Array.from(stakes).flatMap((stake) => {
+    const outcome = outcomes.get(stake.id);
+
+    if (!outcome || stake.voidedAt !== null) return [];
+
+    return [
+      {
+        stakeId: stake.id,
+        tripId: stake.tripId,
+        lenderId: stake.lenderId,
+        borrowerId: stake.borrowerId,
+        amount: stake.amount,
+        owed: outcome.owed,
+        final:
+          (stake.endedAt !== null || endedTrips.has(stake.tripId)) &&
+          !running.some((session) => covers(stake, session)),
+      },
+    ];
+  });
+};
+
 /** Balances with each live stake's borrower owing its lender what `stakeOutcomes` worked out. */
 export const withStakes = (
   current: ReadonlyMap<PlayerId, MinorUnits>,

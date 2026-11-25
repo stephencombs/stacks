@@ -28,6 +28,10 @@
       "types": "./src/map.ts",
       "import": "./src/map.ts"
     },
+    "./funding": {
+      "types": "./src/funding.ts",
+      "import": "./src/funding.ts"
+    },
     "./stakes": {
       "types": "./src/stakes.ts",
       "import": "./src/stakes.ts"

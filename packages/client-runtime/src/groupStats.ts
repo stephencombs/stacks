@@ -17,6 +17,10 @@ import {
   TRIPS_LIST_MIN,
   TRIPS_SHOWN,
   TRIP_BARS_MAX,
+  STAKES_SHOWN,
+  additionalBuyIns,
+  backingResults,
+  coveredBy,
   groupAwards,
   groupRecords,
   groupStats,
@@ -580,6 +584,35 @@ export const groupStatsView = (
       : []),
   ];
 
+  const reloads = stats.reloads === undefined ? null : additionalBuyIns(plays, stats.reloads);
+
+  const reloadRow = (() => {
+    if (reloads === null) return [];
+    const scoped = new Set(plays.map((play) => play.id));
+
+    const visits = stats.allVisits
+      ?.filter((item) => scoped.has(item.playId))
+      .reduce((sum, item) => sum + item.visits, 0);
+
+    return [
+      rowOf(
+        "reload",
+        [],
+        "With additional buy-ins",
+        [
+          `${reloads.finishedUp} of ${reloads.visits} visits with an additional buy-in finished up`,
+          reloads.most === null
+            ? ""
+            : ` · ${who(reloads.most.playerId).label} added the most (${reloads.most.additional})`,
+          visits === undefined || visits < reloads.visits
+            ? ""
+            : ` · ${reloads.visits} of ${visits} visits had one`,
+        ],
+        [money(reloads.result)],
+      ),
+    ];
+  })();
+
   const habits = late
     ? [
         rowOf(
@@ -597,6 +630,68 @@ export const groupStatsView = (
         ),
       ]
     : [];
+
+  const habitRows = [...reloadRow, ...habits];
+
+  const covered = stats.covered === undefined ? null : coveredBy(plays, stats.covered);
+
+  const stakeTrips =
+    filters.tripId !== undefined
+      ? new Set([filters.tripId])
+      : filters.year === undefined
+        ? null
+        : new Set(
+            groupStats(stats.plays, [], timeZone, { year: filters.year }).plays.map(
+              (play) => play.tripId,
+            ),
+          );
+
+  const stakeRows = (
+    stats.stakes === undefined ? [] : backingResults(stats.stakes, stakeTrips)
+  ).map((stake) => {
+    const lender = who(stake.lenderId);
+    const borrower = who(stake.borrowerId);
+
+    return rowOf(
+      stake.stakeId,
+      [lender, borrower],
+      `${lender.label} backed ${borrower.playerId === me ? "you" : borrower.label}`,
+      [
+        { amount: stake.amount, tone: "plain" },
+        ` on ${tripName(stake.tripId)}${stake.final ? "" : " · so far"}`,
+      ],
+      [money(stake.result)],
+    );
+  });
+
+  const backing =
+    covered === null && stakeRows.length === 0
+      ? null
+      : {
+          whole: slice !== null && stakeRows.length > 0,
+          covered:
+            covered === null
+              ? null
+              : {
+                  ...rowOf(
+                    "covered",
+                    [who(covered.payerId)],
+                    `${who(covered.payerId).label} covered the most`,
+                    [
+                      `${plural(covered.entries, "buy-in")} for ${plural(covered.friends, "friend")}`,
+                    ],
+                    [{ amount: covered.amount, tone: "plain" }],
+                  ),
+                  tripId: filters.tripId ?? null,
+                },
+          stakes:
+            stakeRows.length === 0
+              ? null
+              : {
+                  rows: stakeRows.slice(0, STAKES_SHOWN),
+                  all: stakeRows.length > STAKES_SHOWN ? stakeRows : null,
+                },
+        };
 
   const recordLine = (playerId: PlayerId, play: GroupPlay) =>
     [who(playerId).label, play.game === null ? null : gameName(play.game), shortDay(play.startedAt)]
@@ -680,7 +775,8 @@ export const groupStatsView = (
             chip: chipOf(detail, award.playerId),
             line: awardLine(award, currency, venueName, timeZone, { showCents, privacyMode }),
           })),
-    habits: habits.length === 0 ? null : habits,
+    habits: habitRows.length === 0 ? null : habitRows,
+    backing,
     records: recordRows.length === 0 ? null : recordRows,
     byGame:
       filters.game !== undefined || plays.length < BREAKDOWNS_MIN_PLAYS

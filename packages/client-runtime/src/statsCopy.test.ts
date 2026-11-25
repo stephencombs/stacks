@@ -118,6 +118,33 @@ describe("statsState", () => {
 });
 
 describe("makeStatsCopies", () => {
+  it("reads a copy saved before the funding fields, and keeps them once present", () => {
+    const kept = new Map<string, string>();
+
+    const copies = makeStatsCopies({
+      load: (id) => kept.get(id) ?? null,
+      save: (id, value) => (value === null ? kept.delete(id) : kept.set(id, value)),
+    });
+
+    copies.save(groupId, copy);
+    const older = JSON.parse(kept.get(groupId)!);
+    expect(Object.keys(older.stats)).toEqual(["plays", "venues"]);
+    kept.set(groupId, JSON.stringify(older));
+
+    const loaded = copies.load(groupId);
+    expect(loaded).toEqual(copy);
+    expect(loaded?.stats.reloads).toBeUndefined();
+    expect(loaded?.stats.stakes).toBeUndefined();
+
+    const funded: StatsCopy = {
+      ...copy,
+      stats: { plays: [], venues: [], reloads: [], allVisits: [], covered: [], stakes: [] },
+    };
+
+    copies.save(groupId, funded);
+    expect(copies.load(groupId)).toEqual(funded);
+  });
+
   it("keeps, reads and forgets a copy, indexes trips offline, and treats damaged data as none", () => {
     const kept = new Map<string, string>();
 

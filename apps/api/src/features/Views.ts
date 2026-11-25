@@ -167,7 +167,7 @@ export const sessionDetail = Effect.fn("Views.sessionDetail")(function* (session
   ) satisfies SessionDetail;
 });
 
-const groupStakes = Effect.fn("Views.groupStakes")(function* (groupId: GroupId) {
+export const groupStakes = Effect.fn("Views.groupStakes")(function* (groupId: GroupId) {
   const sql = yield* SqlClient.SqlClient;
 
   const stakes = yield* sql`
@@ -176,7 +176,7 @@ const groupStakes = Effect.fn("Views.groupStakes")(function* (groupId: GroupId) 
 
   const live = stakes.filter((stake) => stake.voidedAt === null);
 
-  if (live.length === 0) return { stakes, outcomes: stakeOutcomes([], [], []) };
+  if (live.length === 0) return { stakes, sessions: [], outcomes: stakeOutcomes([], [], []) };
 
   const [sessions, entries] = yield* Effect.all(
     [
@@ -192,7 +192,7 @@ const groupStakes = Effect.fn("Views.groupStakes")(function* (groupId: GroupId) 
     { concurrency: "unbounded" },
   );
 
-  return { stakes, outcomes: stakeOutcomes(live, sessions, entries) };
+  return { stakes, sessions, outcomes: stakeOutcomes(live, sessions, entries) };
 });
 
 /**

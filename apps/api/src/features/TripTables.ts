@@ -70,6 +70,11 @@ export const load = Effect.fn("TripTables.load")(function* (
         where p.id in (
           select player_id from personal_visits
           where table_id in ${sql.in(tableIds)} and deleted_at is null
+          union
+          select e.counterparty_id from personal_entries e
+          join personal_visits v on v.id = e.visit_id
+          where v.table_id in ${sql.in(tableIds)} and v.deleted_at is null
+            and e.voided_at is null and e.counterparty_id is not null
         )
       `.pipe(
         Effect.flatMap(
@@ -140,6 +145,17 @@ export const load = Effect.fn("TripTables.load")(function* (
     const visitById = new Map(own.map((visit) => [visit.id, visit]));
     const visitIds = new Set(own.map((visit) => visit.id));
 
+    const memberAt = (playerId: PlayerId, at: DateTime.Utc) => {
+      const userId = playerById.get(playerId)?.userId;
+      const account = `${row.groupId}:${userId}`;
+      const member = userId ? memberByAccount.get(account) : undefined;
+
+      if (!member) return null;
+      const absences = awayByAccount.get(account) ?? [];
+
+      return inGroupAt(at, { leftAt: member.leftAt, absences }) ? member.id : null;
+    };
+
     const table = groupTable(
       own,
       entries.filter((entry) => visitIds.has(entry.visitId)),
@@ -147,15 +163,10 @@ export const load = Effect.fn("TripTables.load")(function* (
         const pin = visitById.get(visit.id)?.groupPlayerId ?? null;
 
         if (pin !== null && groupOfPinned.get(pin) === row.groupId) return pin;
-        const userId = playerById.get(visit.playerId)?.userId;
-        const account = `${row.groupId}:${userId}`;
-        const member = userId ? memberByAccount.get(account) : undefined;
 
-        if (!member) return null;
-        const absences = awayByAccount.get(account) ?? [];
-
-        return inGroupAt(visit.startedAt, { leftAt: member.leftAt, absences }) ? member.id : null;
+        return memberAt(visit.playerId, visit.startedAt);
       },
+      (counterpartyId, visit) => memberAt(counterpartyId, visit.startedAt),
     );
 
     if (!table) return [];
@@ -190,6 +201,7 @@ export const load = Effect.fn("TripTables.load")(function* (
         })),
         myVisitId: mine?.id ?? null,
         memberMilliseconds: table.memberMilliseconds,
+        visits: table.visits,
       },
     ];
   });
