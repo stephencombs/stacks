@@ -18,21 +18,21 @@ import {
   crewFeed,
   groupHappening,
   livePlayerIds,
-  nameList,
   pinnedTrip,
 } from "@stacks/client-runtime/crew";
 import {
-  formatDay,
-  formatDuration,
-  formatTime,
-  gameNames,
-  playerNames,
-} from "@stacks/client-runtime/format";
+  finishedStory,
+  liveStory,
+  relativeWhen,
+  storyText,
+  type StoryFace,
+} from "@stacks/client-runtime/crewStory";
+import { formatDay, formatDuration, playerNames } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { useRecordingClock } from "@stacks/client-runtime/recordingReact";
 import { closedPlays, localClock, tripDates, tripPlays } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
-import type * as DateTime from "effect/DateTime";
+import * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
 import { useCallback, useState, type ReactNode } from "react";
 import { Platform, Pressable, View } from "react-native";
@@ -41,8 +41,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Money } from "../components/Money";
 import { Button, IconButton } from "../components/ui/Button";
+import { cn } from "../components/ui/cn";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
+import { LiveDot } from "../components/ui/LiveDot";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
 import {
@@ -54,11 +56,12 @@ import {
   Skeleton,
   Surface,
 } from "../components/ui/Surface";
+import { Avatar } from "../features/Avatar";
 import { PlayerAvatar } from "../features/PlayerAvatar";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
 import { useCrewScopes } from "../lib/crewScopes";
 import { useGo } from "../lib/go";
-import { usePreferences } from "../lib/preferences";
+import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { ScopeNotices } from "../lib/realtime";
 import { Loaded, TripLoaded, useAction, useStacks } from "../lib/stacks";
 
@@ -374,7 +377,32 @@ const activityKey = (item: CrewActivityItem) => {
 };
 
 function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | undefined }) {
-  const { privacyMode } = usePreferences();
+  switch (item.kind) {
+    case "session_finished":
+    case "table_finished":
+      return <FinishedPost item={item} me={me} />;
+    case "session_live":
+    case "table_live":
+      return <LivePost item={item} me={me} />;
+    case "trip_started":
+      return <TripStartedPost item={item} />;
+  }
+}
+
+const LEAD_SIZE = 40;
+const CHIP_SIZE = 22;
+
+function ActivityCard({
+  item,
+  lead,
+  label,
+  children,
+}: {
+  item: CrewActivityItem;
+  lead: ReactNode;
+  label?: string;
+  children: ReactNode;
+}) {
   const go = useGo();
   const navigation = useNavigation();
   const target = activityTarget(item);
@@ -387,161 +415,161 @@ function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | unde
       Match.orElse(() => undefined),
     );
 
-  const hint = target.kind === "trip" ? "Opens the trip" : "Opens the session";
-  const finished = item.kind === "session_finished" || item.kind === "table_finished";
-
-  const firstPlayer =
-    item.kind === "trip_started" || (finished && item.players.length > 1)
-      ? undefined
-      : item.players[0];
-
-  const row = (title: string, meta: string, results?: ReactNode) => (
+  return (
     <List>
-      <Row accessibilityHint={hint} onPress={open} className="items-start gap-3 py-4">
-        {item.kind === "trip_started" ? (
-          <View className="size-8 items-center justify-center rounded-full bg-tint-orange">
-            <Icon name="trip" color="chip-orange" size={18} />
-          </View>
-        ) : firstPlayer ? (
-          <ActivityAvatar groupId={item.group.id} player={firstPlayer} />
-        ) : null}
-        <View className="flex-1 gap-0.5">
-          <Text numberOfLines={2} className="type-callout font-semibold text-ink">
-            {title}
-          </Text>
-          <Text className="type-footnote text-muted">{meta}</Text>
-          {results ? <View className="pt-1">{results}</View> : null}
-        </View>
+      <Row
+        accessibilityLabel={label}
+        accessibilityHint={target.kind === "trip" ? "Opens the trip" : "Opens the session"}
+        onPress={open}
+        className="items-start gap-3 py-4"
+      >
+        {lead}
+        <View className="min-w-0 flex-1 gap-1">{children}</View>
       </Row>
     </List>
   );
+}
 
-  if (item.kind === "trip_started") {
-    return row(
-      item.group.name,
-      formatDay(item.startedAt),
-      <Text className="type-callout text-ink">Started {item.trip.name}</Text>,
-    );
-  }
-
-  const venue = item.venue?.name ?? "a table";
-
-  const game =
-    item.kind === "table_live" || item.kind === "table_finished"
-      ? item.game && gameNames[item.game]
-      : null;
-
-  if (item.kind === "session_live" || item.kind === "table_live") {
-    const players = nameList(item.players.map((player) => player.displayName));
-
-    return row(
-      players || venue,
-      `Now · ${item.trip.name}`,
-      <Text className="type-callout text-ink">
-        {game ? `Playing ${game.toLowerCase()} at ${venue}` : `Playing at ${venue}`}
-        {" · "}
-        <ActivityLiveDuration startedAt={item.startedAt} />
-      </Text>,
-    );
-  }
-
-  const results = item.players.toSorted((a, b) => b.net - a.net);
-
-  if (results.length === 1 && firstPlayer) {
-    const player = results[0]!;
-    const name = player.playerId === me ? "You" : player.displayName;
-
-    return row(
-      name,
-      `${formatDay(item.endedAt)} · ${item.trip.name}`,
-      <Text className="type-callout text-ink">
-        {privacyMode ? (
-          <Money amount={player.net} currency={item.group.currency} tone="result" />
-        ) : player.net === 0 ? (
-          "Broke even"
-        ) : (
-          <>
-            {player.net > 0 ? "Won " : "Lost "}
-            <Money
-              amount={MinorUnits.make(Math.abs(player.net))}
-              currency={item.group.currency}
-              className={player.net > 0 ? "font-bold text-win" : "font-bold text-loss"}
-            />
-          </>
-        )}
-        {game ? ` playing ${game.toLowerCase()} at ${venue}` : ` at ${venue}`}
-      </Text>,
-    );
-  }
-
-  const seenGuests = new Map<string, number>();
-
-  const playerKey = (playerId: (typeof results)[number]["playerId"], displayName: string) => {
-    if (playerId) return playerId;
-    const n = (seenGuests.get(displayName) ?? 0) + 1;
-    seenGuests.set(displayName, n);
-
-    return `guest-${displayName}-${n}`;
-  };
-
-  return row(
-    venue,
-    [game, item.trip.name, `${formatDay(item.endedAt)}, ${formatTime(item.endedAt)}`]
-      .filter(Boolean)
-      .join(" · "),
-    <View className="flex-row flex-wrap gap-x-3">
-      {results.slice(0, 4).map((player) => (
-        <Text
-          key={playerKey(player.playerId, player.displayName)}
-          className="type-footnote text-ink"
-        >
-          {player.playerId === me ? "You" : player.displayName}{" "}
-          <Money amount={player.net} currency={item.group.currency} tone="result" />
-        </Text>
-      ))}
-      {results.length > 4 ? (
-        <Text className="type-footnote text-muted">+{results.length - 4} more</Text>
-      ) : null}
-    </View>,
+function Face({ face, size }: { face: StoryFace; size: number }) {
+  return face.playerId ? (
+    <PlayerAvatar playerId={face.playerId} name={face.displayName} size={size} you={face.you} />
+  ) : (
+    <Avatar name={face.displayName} playerId={`guest:${face.displayName}`} size={size} />
   );
 }
 
-function ActivityLiveDuration({ startedAt }: { startedAt: DateTime.Utc }) {
-  const now = useRecordingClock();
-
-  return <Text className="font-semibold text-live">live {formatDuration(startedAt, now)}</Text>;
-}
-
-function ActivityAvatar({
-  groupId,
-  player,
-}: {
-  groupId: GroupId;
-  player: { playerId: PlayerId | null; displayName: string };
-}) {
-  const stacks = useStacks();
-
-  const neutral = (
-    <View className="size-8 items-center justify-center rounded-full bg-fill">
-      <Icon name="person" color="muted" size={18} />
+function Lead({ face }: { face: StoryFace | null }) {
+  return face ? (
+    <Face face={face} size={LEAD_SIZE} />
+  ) : (
+    <View className="size-10 items-center justify-center rounded-full bg-fill">
+      <Icon name="person" color="muted" size={22} />
     </View>
   );
+}
 
-  const { playerId, displayName } = player;
+const headlineClass = "type-callout font-semibold text-ink";
+const metaClass = "type-footnote text-muted";
 
-  if (!playerId) return neutral;
+function FinishedPost({
+  item,
+  me,
+}: {
+  item: Extract<CrewActivityItem, { kind: "session_finished" | "table_finished" }>;
+  me: PlayerId | undefined;
+}) {
+  const prefs = usePreferences();
+  const { currency } = item.group;
+
+  const story = finishedStory(item.players, {
+    venue: item.venue?.name ?? "a table",
+    me,
+    hidden: prefs.privacyMode,
+  });
+
+  const meta = `${relativeWhen(item.endedAt, DateTime.nowUnsafe())} · ${item.trip.name}`;
+
+  const sentence = storyText(story, (amount) =>
+    formatDisplayMoney(MinorUnits.make(amount), currency, prefs, { forAccessibility: true }),
+  );
 
   return (
-    <Loaded query={stacks.group(groupId)} skeleton={neutral} renderError={() => neutral}>
-      {(detail) => (
-        <PlayerAvatar
-          playerId={playerId}
-          name={displayName}
-          size={32}
-          you={playerId === detail.myPlayerId}
-        />
-      )}
-    </Loaded>
+    <ActivityCard item={item} lead={<Lead face={story.lead} />} label={`${sentence}. ${meta}`}>
+      <Text numberOfLines={2} className={headlineClass}>
+        {story.headline.before}
+        {story.headline.amount ? (
+          <Money
+            amount={MinorUnits.make(story.headline.amount.value)}
+            currency={currency}
+            className={
+              story.headline.amount.tone === "win" ? "font-bold text-win" : "font-bold text-loss"
+            }
+          />
+        ) : null}
+        {story.headline.after}
+      </Text>
+      <Text numberOfLines={1} className={metaClass}>
+        {meta}
+      </Text>
+      {story.rest.length > 0 ? (
+        <View className="flex-row flex-wrap items-center gap-1.5 pt-1.5">
+          {story.rest.map((result) => (
+            <View
+              key={result.key}
+              className="flex-row items-center gap-1.5 rounded-full bg-fill py-0.5 pr-2.5 pl-0.5"
+            >
+              <Face face={result} size={CHIP_SIZE} />
+              <Money
+                amount={MinorUnits.make(result.net)}
+                currency={currency}
+                tone="result"
+                className="type-footnote font-medium"
+              />
+            </View>
+          ))}
+          {story.more > 0 ? (
+            <Text className="px-1 type-footnote font-medium text-muted">+{story.more}</Text>
+          ) : null}
+        </View>
+      ) : null}
+    </ActivityCard>
+  );
+}
+
+function LivePost({
+  item,
+  me,
+}: {
+  item: Extract<CrewActivityItem, { kind: "session_live" | "table_live" }>;
+  me: PlayerId | undefined;
+}) {
+  const story = liveStory(item.players, {
+    venue: item.venue?.name ?? "a table",
+    game: item.kind === "table_live" ? item.game : null,
+    me,
+  });
+
+  return (
+    <ActivityCard item={item} lead={<Lead face={story.lead} />}>
+      <Text numberOfLines={2} className={headlineClass}>
+        {story.headline}
+      </Text>
+      <View className="flex-row items-center gap-1">
+        <LiveDot />
+        <ActivityLiveMeta startedAt={item.startedAt} trip={item.trip.name} />
+      </View>
+    </ActivityCard>
+  );
+}
+
+function ActivityLiveMeta({ startedAt, trip }: { startedAt: DateTime.Utc; trip: string }) {
+  const now = useRecordingClock();
+
+  return (
+    <Text numberOfLines={1} className={cn("shrink", metaClass)}>
+      <Text className="font-semibold text-live">Live {formatDuration(startedAt, now)}</Text>
+      {` · ${trip}`}
+    </Text>
+  );
+}
+
+function TripStartedPost({ item }: { item: Extract<CrewActivityItem, { kind: "trip_started" }> }) {
+  return (
+    <ActivityCard
+      item={item}
+      lead={
+        <View className="size-10 items-center justify-center rounded-full bg-tint-orange">
+          <Icon name="trip" color="chip-orange" size={22} />
+        </View>
+      }
+    >
+      <Text numberOfLines={2} className={headlineClass}>
+        {item.trip.name} has started
+      </Text>
+      <Text numberOfLines={1} className={metaClass}>
+        {`${relativeWhen(item.startedAt, DateTime.nowUnsafe())} · ${item.group.name}`}
+      </Text>
+    </ActivityCard>
   );
 }
 

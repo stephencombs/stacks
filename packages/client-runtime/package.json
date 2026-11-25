@@ -28,6 +28,10 @@
       "types": "./src/crew.ts",
       "import": "./src/crew.ts"
     },
+    "./crewStory": {
+      "types": "./src/crewStory.ts",
+      "import": "./src/crewStory.ts"
+    },
     "./errors": {
       "types": "./src/errors.ts",
       "import": "./src/errors.ts"

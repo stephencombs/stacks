@@ -61,6 +61,10 @@ A trip or a finished session of yours becomes a 4:5 image for the share sheet. B
 
 The sheet shows the mounted card, and **Share** captures that same view when pressed, at 1080×1350 physical pixels whatever the screen density (the capture size is in logical pixels, so it is `1080 / PixelRatio`). Nothing is captured ahead of time, so hiding amounts can't be followed by sharing an older image. The card is laid out at 360×450 and scaled down in the sheet by an ancestor, never by the captured view.
 
+## Crew activity posts
+
+Each Crew activity item is a post in its own `List` card, not a log row. A person leads: a 40pt `PlayerAvatar` of the standout, then a `type-callout` headline that names them ("Bruce won $90,000 at Fontainebleau", "You won …"), a `type-footnote` line with when and the trip ("2h ago · Vegas 2027"), and, for a finished table, a wrapping row of pills, each a 22pt face with its result in `Money tone="result"`, ending in "+N" past four. The words come from `@stacks/client-runtime/crewStory`, which only says what the numbers support: no one standing out gets a neutral disc, not a face, and even results get one quiet line. Privacy mode swaps the headline for "Bruce, You and Nick played at Fontainebleau" with no pills, so no direction leaks. A live post is "Bruce, Nick and 2 others are playing at Caesars Palace" with a `LiveDot` and "Live 1h 18m". Times are relative (`relativeWhen`); a post has no confetti, emoji or gradient.
+
 ## Hero cards: TripHero, BalanceHero
 
 A place can open on one hero card: the figure that place exists to show, big enough to read across a table. A trip has `TripHero` (your trip total, your running line, win rate, best session, your place). A live session opens on `SeatHero`, above its table map and `TableStats` tiles, so Rebuy and Cash out sit on a phone's first screen: your seat's buy-in, or how you finished, with both one tap away. Your own live session is never a card on a page: the LiveBar holds it.
