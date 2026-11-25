@@ -1,6 +1,11 @@
-import { groupStatsView, type GroupStatsView as View_ } from "@stacks/client-runtime/groupStats";
+import {
+  groupStatsView,
+  type GroupStatsView as View_,
+  type Line,
+  type Who,
+} from "@stacks/client-runtime/groupStats";
 import { savedLine } from "@stacks/client-runtime/statsCopy";
-import { finishedSessions, type StatsFilters } from "@stacks/client-runtime/stats";
+import type { StatsFilters } from "@stacks/client-runtime/stats";
 import { ordinal } from "@stacks/client-runtime/trip";
 import type { CurrencyCode, GroupId, PlayerId, TripId } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
@@ -11,15 +16,19 @@ import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
 import { Button } from "../components/ui/Button";
+import { Choice } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
-import { EmptyState, List, Row, Skeleton } from "../components/ui/Surface";
+import { EmptyState, List, Row } from "../components/ui/Surface";
 import { cn } from "../components/ui/cn";
 import { useGo } from "../lib/go";
-import { usePreferences } from "../lib/preferences";
+import { HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
+import { useLargeText } from "../lib/useLargeText";
 import { useGroupStats } from "../lib/stacks";
+import { InsightRow, LineText, ResultBars } from "./GroupStatsParts";
+import { Dash, ReturnFigure, Tile } from "./PersonalStats";
 import { PlayerChip } from "./PlayerChip";
-import { Race } from "./Race";
+import { GroupStatsSkeleton } from "./ScreenSkeletons";
 import {
   AndroidStatsEmpty,
   ByCasino,
@@ -37,9 +46,12 @@ type Shown = Extract<View_, { kind: "stats" }>;
 
 type Standing = Shown["standings"][number];
 
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
 /**
- * A group's stats in Stats: standings first, then everyone's running result, a trip's awards, and
- * the group's result by game and casino. Offline it shows the last copy and when it was saved.
+ * A group's stats in Stats: its result by trip, the standings, what the crew did together, its
+ * trips, habits and records, and the result by game and casino. Offline it shows the last copy and
+ * when it was saved.
  */
 export function GroupStatsView({
   groupId,
@@ -80,15 +92,7 @@ export function GroupStatsView({
   if (state.kind === "loading")
     return (
       <StatsContent filters={android ? groupChip : undefined}>
-        <View className="gap-6">
-          {android ? null : (
-            <View className="flex-row gap-2">
-              <Skeleton className="h-11 w-32 rounded-full" />
-              <Skeleton className="h-11 w-28 rounded-full" />
-            </View>
-          )}
-          <Skeleton className="h-72 w-full rounded-2xl" />
-        </View>
+        <GroupStatsSkeleton chips={!android} />
       </StatsContent>
     );
 
@@ -157,7 +161,11 @@ export function GroupStatsView({
         )
       ) : null}
       {android && tripRange ? (
-        <Text className="px-1 type-footnote text-muted">{tripRange} · Whole trip</Text>
+        <Text className="px-1 type-footnote text-muted">
+          {filters.game === undefined && filters.venueId === undefined
+            ? `${tripRange} · Whole trip`
+            : tripRange}
+        </Text>
       ) : null}
       {Match.value(view).pipe(
         Match.when({ kind: "empty" }, () =>
@@ -254,29 +262,21 @@ function ShownStats({
   const android = Platform.OS === "android";
   const [open, setOpen] = useState<PlayerId | null>(null);
   const selected = view.standings.find((row) => row.playerId === open);
-  const racers = view.standings.filter((row) => row.rank !== null);
-  const leader = racers.some((row) => row.playerId === me) ? me : racers[0]?.playerId;
 
   return (
     <>
+      <Hero view={view} onFilter={onFilter} />
       <Standings view={view} onOpen={(row) => setOpen(row.playerId)} />
-      {view.sessions > 1 && leader !== undefined ? (
-        <View className="gap-2">
-          <StatsHeading count={android ? "By finished session" : undefined}>
-            Running result
-          </StatsHeading>
-          <Race
-            sessions={view.race.sessions}
-            players={racers}
-            currency={view.currency}
-            picked={leader}
-            marks={view.race.marks}
-            where={(session) => session.where}
-            latest={view.title}
-            stats={android}
-            you={me}
-          />
-        </View>
+      {view.together ? (
+        <InsightSection title="Together" rows={view.together} currency={view.currency} />
+      ) : null}
+      {view.tripList ? (
+        <Trips
+          list={view.tripList}
+          title={view.title}
+          currency={view.currency}
+          onFilter={onFilter}
+        />
       ) : null}
       {view.awards && view.awards.length > 0 ? (
         <View className="gap-2">
@@ -300,6 +300,12 @@ function ShownStats({
           </List>
         </View>
       ) : null}
+      {view.habits ? (
+        <InsightSection title="Habits" rows={view.habits} currency={view.currency} />
+      ) : null}
+      {view.records ? (
+        <InsightSection title="Records" rows={view.records} currency={view.currency} />
+      ) : null}
       {view.byGame ? (
         <ByGame rows={view.byGame} currency={view.currency} onFilter={onFilter} />
       ) : null}
@@ -307,7 +313,7 @@ function ShownStats({
         <ByCasino
           rows={view.byCasino}
           currency={view.currency}
-          line={`${view.title} · ${finishedSessions(view.sessions)}`}
+          line={`${view.title} · ${view.sessions} ${view.sessions === 1 ? "table" : "tables"}`}
           onFilter={onFilter}
         />
       ) : null}
@@ -325,18 +331,99 @@ function ShownStats({
   );
 }
 
+function Hero({ view, onFilter }: { view: Shown; onFilter: (filters: StatsFilters) => void }) {
+  const { hero } = view;
+  const large = useLargeText();
+
+  return (
+    <View className="overflow-hidden rounded-[22px] bg-surface">
+      <View className="px-5 pt-5">
+        <View className={large ? "gap-1" : "flex-row items-baseline justify-between gap-3"}>
+          <Text
+            accessibilityRole="header"
+            className={cn("type-label text-muted", !large && "min-w-0 flex-1")}
+          >
+            {hero.kicker}
+          </Text>
+          <Text className={cn("type-footnote text-muted", !large && "shrink-0")}>
+            {`${hero.players} ${hero.players === 1 ? "player" : "players"} · ${hero.tables} ${hero.tables === 1 ? "table" : "tables"}`}
+          </Text>
+        </View>
+        <Money
+          amount={hero.result}
+          currency={view.currency}
+          tone="result"
+          fit
+          className="mt-1.5 type-hero"
+        />
+        {hero.up ? (
+          <Text className="mt-1 type-footnote text-muted">
+            {`Up on ${hero.up.up} of ${hero.up.of} finished ${hero.up.of === 1 ? "trip" : "trips"}`}
+          </Text>
+        ) : null}
+      </View>
+      {hero.chart ? (
+        <ResultBars chart={hero.chart} currency={view.currency} onOpen={onFilter} />
+      ) : (
+        <View className="h-5" />
+      )}
+      <View className={cn("border-t border-line", !large && "flex-row")}>
+        <Tile label="Your place">
+          {hero.place ? (
+            <Text numberOfLines={1} className="type-number text-ink">
+              {hero.place.label}
+              <Text className="type-footnote text-muted">{` of ${hero.place.of}`}</Text>
+            </Text>
+          ) : (
+            <Dash />
+          )}
+        </Tile>
+        <Tile label="Your result" divided>
+          {hero.yours === null ? (
+            <Dash />
+          ) : (
+            <Money
+              amount={hero.yours}
+              currency={view.currency}
+              tone="result"
+              fit
+              className="type-number"
+            />
+          )}
+        </Tile>
+        <Tile label="Return" divided>
+          <ReturnFigure figure={hero.returnRate} />
+        </Tile>
+      </View>
+    </View>
+  );
+}
+
+const modes = [
+  { value: "result", label: "Result" },
+  { value: "return", label: "Return" },
+] as const;
+
 function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => void }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
+  const large = useLargeText();
+  const [picked, setPicked] = useState<(typeof modes)[number]["value"]>("result");
+  const mode = view.byReturn === null ? "result" : picked;
+  const rows = mode === "return" && view.byReturn ? view.byReturn : view.standings;
 
   return (
     <View className="gap-2">
-      <StatsHeading count={android ? finishedSessions(view.sessions) : view.title}>
+      <StatsHeading count={android ? plural(view.sessions, "table") : view.title}>
         Standings
       </StatsHeading>
+      {view.byReturn ? (
+        <Choice label="Rank by" labelHidden options={modes} value={mode} onChange={setPicked} />
+      ) : null}
       <List>
-        {view.standings.map((row) => {
+        {rows.map((row) => {
           const count = row.sheet.sessions;
+          const rate = row.rate;
 
           const meta = android
             ? [
@@ -347,81 +434,205 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
                 .join(" · ")
             : row.meta;
 
+          const figure =
+            mode === "return"
+              ? prefs.privacyMode
+                ? HIDDEN_AMOUNT_LABEL
+                : rate === null || rate.tone === "none"
+                  ? "Not available"
+                  : rate.label
+              : signed(row.result, view.currency, prefs, true);
+
           return (
             <Row
               key={row.playerId}
               onPress={() => onOpen(row)}
-              accessibilityLabel={`${row.rank === null ? "Unranked" : `Rank ${row.rank}`}, ${row.name}${row.you ? ", you" : ""}, ${meta}, ${signed(row.result, view.currency, prefs, true)}`}
+              accessibilityLabel={`${row.rank === null ? "Unranked" : `Rank ${row.rank}`}, ${row.name}${row.you ? ", you" : ""}, ${meta}, ${figure}`}
               accessibilityHint="Shows their stats"
               className={cn(
                 android
                   ? "relative min-h-14 gap-2 px-4 py-2.5"
                   : row.you && "border-l-[3px] border-l-ink",
+                large && "flex-col items-stretch gap-2",
               )}
             >
               {android && row.you ? (
                 <View className="absolute inset-y-2.5 left-0 w-[3px] rounded-full bg-ink" />
               ) : null}
-              <Text
-                className={cn(
-                  "text-center tabular-nums text-muted",
-                  android ? "min-w-4 text-sm" : "min-w-6 text-base",
-                )}
-              >
-                {row.rank ?? "–"}
-              </Text>
-              <PlayerChip
-                playerId={row.playerId}
-                chip={row.chip}
-                name={android ? row.name.slice(0, 1) : row.name}
-                size={android ? 30 : 28}
-                ring={android}
-              />
-              <View className="min-w-0 flex-1 gap-0.5">
+              <View className={cn("min-w-0 flex-row items-center gap-3", !large && "flex-1")}>
                 <Text
-                  numberOfLines={android ? 2 : 1}
-                  className={cn("text-ink", android ? "text-sm font-semibold" : "type-heading")}
+                  className={cn(
+                    "text-center tabular-nums text-muted",
+                    android ? "min-w-4 text-sm" : "min-w-6 text-base",
+                  )}
                 >
-                  {row.name}
-                  {row.you ? (
-                    <Text className="font-normal text-muted">{android ? " · You" : " · you"}</Text>
-                  ) : null}
+                  {row.rank ?? "–"}
                 </Text>
-                <Text numberOfLines={1} className="type-footnote text-muted">
-                  {meta}
-                </Text>
+                <PlayerChip
+                  playerId={row.playerId}
+                  chip={row.chip}
+                  name={android ? row.name.slice(0, 1) : row.name}
+                  size={android ? 30 : 28}
+                  ring={android}
+                />
+                <View className="min-w-0 flex-1 gap-0.5">
+                  <Text
+                    numberOfLines={large ? undefined : android ? 2 : 1}
+                    className={cn("text-ink", android ? "text-sm font-semibold" : "type-heading")}
+                  >
+                    {row.name}
+                    {row.you ? (
+                      <Text className="font-normal text-muted">
+                        {android ? " · You" : " · you"}
+                      </Text>
+                    ) : null}
+                  </Text>
+                  <Text numberOfLines={large ? undefined : 1} className="type-footnote text-muted">
+                    {meta}
+                  </Text>
+                </View>
+                {large ? <Icon name="chevron-right" color="faint" size={16} /> : null}
               </View>
-              <Money
-                amount={row.result}
-                currency={view.currency}
-                tone="result"
-                fit={android}
-                className={android ? "font-semibold" : "type-number"}
-              />
-              {android ? <Icon name="chevron-right" color="faint" size={16} /> : null}
+              {mode === "return" ? (
+                rate && rate.tone !== "none" ? (
+                  <ReturnFigure figure={rate} />
+                ) : (
+                  <Dash />
+                )
+              ) : (
+                <Money
+                  amount={row.result}
+                  currency={view.currency}
+                  tone="result"
+                  fit={android || large}
+                  className={android ? "font-semibold" : "type-number"}
+                />
+              )}
+              {large ? null : <Icon name="chevron-right" color="faint" size={16} />}
             </Row>
           );
         })}
-        <Row className={android ? "py-3" : undefined}>
-          <View className="min-w-0 flex-1 gap-0.5">
-            <Text className={android ? "text-sm text-muted" : "type-heading text-ink"}>
-              Group result
-            </Text>
-            {android ? null : (
-              <Text className="type-footnote text-muted">
-                {`${view.sessions} ${view.sessions === 1 ? "session" : "sessions"}`}
-              </Text>
-            )}
-          </View>
-          <Money
-            amount={view.total}
-            currency={view.currency}
-            tone="result"
-            className="type-number"
-          />
-        </Row>
       </List>
+      {view.footnote && mode === "result" ? (
+        <LineText
+          line={view.footnote}
+          currency={view.currency}
+          className="px-1 type-footnote text-muted"
+        />
+      ) : null}
       {android ? <Text className="mt-2 px-1 type-footnote text-muted">{provenance}</Text> : null}
+    </View>
+  );
+}
+
+function InsightSection({
+  title,
+  rows,
+  currency,
+}: {
+  title: string;
+  rows: ReadonlyArray<{
+    readonly key: string;
+    readonly people: ReadonlyArray<Who>;
+    readonly title: string;
+    readonly line: Line;
+    readonly trailing: Line | null;
+  }>;
+  currency: CurrencyCode;
+}) {
+  return (
+    <View className="gap-2">
+      <StatsHeading>{title}</StatsHeading>
+      <List>
+        {rows.map((row) => (
+          <InsightRow
+            key={row.key}
+            people={row.people}
+            title={row.title}
+            line={row.line}
+            trailing={row.trailing}
+            currency={currency}
+          />
+        ))}
+      </List>
+    </View>
+  );
+}
+
+type TripList = NonNullable<Shown["tripList"]>;
+
+function TripRows({
+  rows,
+  currency,
+  onOpen,
+}: {
+  rows: TripList["rows"];
+  currency: CurrencyCode;
+  onOpen: (filters: StatsFilters) => void;
+}) {
+  return rows.map((row) => (
+    <InsightRow
+      key={row.key}
+      people={row.leaders}
+      title={row.name}
+      line={row.line}
+      trailing={[{ amount: row.result, tone: "result" }]}
+      currency={currency}
+      hint="Shows only this trip"
+      onPress={() => onOpen(row.filters)}
+    />
+  ));
+}
+
+function Trips({
+  list,
+  title,
+  currency,
+  onFilter,
+}: {
+  list: TripList;
+  title: string;
+  currency: CurrencyCode;
+  onFilter: (filters: StatsFilters) => void;
+}) {
+  const [all, setAll] = useState(false);
+  const android = Platform.OS === "android";
+
+  return (
+    <View className="gap-2">
+      <StatsHeading {...(list.wins ? { count: list.wins } : {})}>Trips</StatsHeading>
+      <List>
+        <TripRows rows={list.rows} currency={currency} onOpen={onFilter} />
+        {list.all ? (
+          <Row
+            onPress={() => setAll(true)}
+            accessibilityLabel={`All ${list.all.length} trips`}
+            accessibilityHint="Lists every trip"
+          >
+            <Text className="flex-1 type-body text-ink">{`All ${list.all.length} trips`}</Text>
+            <Icon name="chevron-right" color="faint" size={16} />
+          </Row>
+        ) : null}
+      </List>
+      {all && list.all ? (
+        <Sheet
+          open
+          title="Trips"
+          description={android ? undefined : `${title} · ${list.all.length} trips`}
+          onClose={() => setAll(false)}
+        >
+          <List>
+            <TripRows
+              rows={list.all}
+              currency={currency}
+              onOpen={(filters) => {
+                setAll(false);
+                onFilter(filters);
+              }}
+            />
+          </List>
+        </Sheet>
+      ) : null}
     </View>
   );
 }

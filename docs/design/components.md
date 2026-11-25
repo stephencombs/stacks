@@ -67,17 +67,16 @@ A place can open on one hero card: the figure that place exists to show, big eno
 
 One hero per screen, at the top of what it's about. Don't add a hero to a page that has no single figure.
 
-Hero cards are **glow-free** `rounded-[22px] bg-surface p-4` cards with no border (`emil-unslop-design`: no decorative radial `Glow` blobs behind the figure). An uppercase `type-label text-muted` kicker (`RESULT · ALL TIME`, `TRIP TOTAL`) sits over the `type-hero` `Money` figure (`money-hero`, 44px), followed by a `type-footnote text-muted` subtitle (`Across 14 sessions`), the clean chart (`rx={4}` rounded-cap vertical session bars or running `RaceChart` lines), bottom-corner date range labels (`Oct 11` … `Nov 9`), and an inline color-dot legend along the bottom edge. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`. Its words come from `@stacks/client-runtime/trip` (`tripLines`, `balanceHeadline`, `raceHeadline`).
+Hero cards are **glow-free** `rounded-[22px] bg-surface p-4` cards with no border (`emil-unslop-design`: no decorative radial `Glow` blobs behind the figure). An uppercase `type-label text-muted` kicker (`RESULT · ALL TIME`, `TRIP TOTAL`) sits over the `type-hero` `Money` figure (`money-hero`, 44px), followed by a `type-footnote text-muted` subtitle (`Across 14 sessions`), the clean chart (`rx={4}` rounded-cap vertical bars, or a running line), bottom-corner date range labels (`Oct 11` … `Nov 9`), and an inline color-dot legend along the bottom edge. Color stays on the figure and the chart: labels and tiles are `muted` and `ink`. Its words come from `@stacks/client-runtime/trip` (`tripLines`).
 
 ## Charts
 
-Every chart that compares players draws the same way: lines start at break-even, a dashed `line-strong` rule; the line you're following is `ink`, 3px with a halo on its current point; everyone else is `muted` at 45%; each line ends on a dot and the player's initial, spread apart with `spreadLabels` so none overlap. No chip colors on lines: the chip next to a name is identity, the ink line is focus. Scales come from `@stacks/client-runtime/chart` and draw with `react-native-svg`.
+A chart draws only what has a shape: a running line, or results by month, night or trip. Everything else in Stats is a figure or a sentence. Charts start at break-even, a dashed zero line, take their scales from `@stacks/client-runtime/chart` and draw with `react-native-svg` and plain views.
 
-Players at very different stakes would flatten each other, so:
-
-- **A race fits the people near you.** Pass `lineScale` a `focus` from `around(index, count)`. A line far outside that range pins to the edge, and its initial gets an arrow (`J ↓`) from `clipped`.
-- **A race can compare stakes fairly.** The running result in Stats has a Money / % of buy-in switch; `raceLines` gives either measure from `@stacks/shared/stats`, and `returnLabel` words a return.
+- **A chart has a summary and a path.** The chart is one `image` with a plain-language summary, and every amount in it goes through the privacy-aware formatter. What it lets you open is also a 44pt row or column.
+- **Privacy mode makes a chart neutral.** Bars are `fill-strong`, with no win or loss color and no printed value.
 - **Results by month or night are bars around break-even.** `PeriodSection` draws rounded-cap vertical bars on a dashed zero line. The best and worst are solid and the rest 35%; a month that was played and broke even is a muted dot, and one that wasn't played is only its `faint` label. Every bar has an accessible label with its exact signed amount, "even" or "no play". In privacy mode every bar is `fill-strong`.
+- **Result by trip is the same bar with the trip's leader at its end.** `ResultBars` (`GroupStatsParts.tsx`) draws one rounded-cap bar for each trip with play in scope, oldest to newest, the latest eight, around a dashed zero. A 20px `Chip` for the trip's leader sits at the end of its bar, and is left out when two or more players share the lead. A trip that broke even is a muted marker, not a bar. With a trip picked it becomes By night, with the same leaders and ties. A column opens its trip only when it's 44pt wide or more, and the Trips list is the path to every trip. Its chips are decoration, hidden from assistive tech, and the summary names each trip with its Result and leader.
 - **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
 
 ## Navigation: PlaceTabs and LiveBar
@@ -122,7 +121,9 @@ Every amount goes through `Money`, the hero figures included, except the compact
 
 A player's identity: `chip` comes from `chipOf(group, playerId)`. Pair it with the player's name. Use `28×28px` (`rounded-lg` monogram/color badge) in mobile feed and breakdown rows, and smaller in dense lists and awards.
 
-Use `PlayerChip` for a person, so a photo linked to them on this phone shows in a 2px ring in their chip color (1.5px under 26pt) and fails back to their initial. At a table, `TableChip` does the same with a color from `tableChipOf(playerId)`, because a table has no group to number its players: 32pt on iOS, a 36pt ring on Android. A venue's chip, a race-chart endpoint and a share card use plain `Chip` and never get a photo.
+Use `PlayerChip` for a person, so a photo linked to them on this phone shows in a 2px ring in their chip color (1.5px under 26pt) and fails back to their initial. At a table, `TableChip` does the same with a color from `tableChipOf(playerId)`, because a table has no group to number its players: 32pt on iOS, a 36pt ring on Android. A venue's chip, a trip chart's leader and a share card use plain `Chip` and never get a photo.
+
+The **pair chip** (`PairChip`) overlaps two players' chips, the second ringed in the surface color. It stands for two players together: the pair who've shared the most tables, or the two who tied for a trip. Three or more tied show their count in a neutral disc instead, and the chart shows no chip, so a tie never picks one player.
 
 ## Page actions
 

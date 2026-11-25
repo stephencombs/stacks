@@ -1,29 +1,59 @@
-import type {
-  CurrencyCode,
-  GroupDetail,
-  GroupId,
-  GroupStats,
+import {
   MinorUnits,
-  PlayerId,
-  TripId,
-  VenueId,
+  type CurrencyCode,
+  type GroupDetail,
+  type GroupId,
+  type GroupStats,
+  type PlayerId,
+  type TripId,
+  type VenueId,
 } from "@stacks/contracts";
-import { groupAwards, groupStats, type AwardKey, type GroupAward } from "@stacks/shared/stats";
-import { tripNights, type TripClock } from "@stacks/shared/trips";
+import {
+  AWARDS_MIN_PLAYS,
+  BREAKDOWNS_MIN_PLAYS,
+  LEADER_MIN_PLAYERS,
+  RETURN_SWITCH_MIN_PLAYERS,
+  TOGETHER_MIN_PLAYS,
+  TRIPS_LIST_MIN,
+  TRIPS_SHOWN,
+  TRIP_BARS_MAX,
+  groupAwards,
+  groupRecords,
+  groupStats,
+  lateNight,
+  nightResults,
+  returnStandings,
+  sharedVsSolo,
+  sweeps,
+  tablemates,
+  tripResults,
+  tripWins,
+  type AwardKey,
+  type BarResult,
+  type GroupAward,
+  type GroupPlay,
+  type TripResult,
+} from "@stacks/shared/stats";
+import type { TripClock } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
+import * as Predicate from "effect/Predicate";
 
 import { formatTime, playerNames } from "./format.ts";
 import {
+  axisLabelled,
   filterChips,
   formatHours,
   gameChip,
   gameName,
+  nightAxisLabel,
+  nightName,
   noMatch,
   played,
+  returnFigure,
   statsTrips,
   type StatsFilters,
 } from "./stats.ts";
-import { boardMoney, chipOf, localClock } from "./trip.ts";
+import { boardMoney, chipOf, localClock, ordinal } from "./trip.ts";
 
 /** The Group chip: Just me, or one of your groups. */
 export const groupChip = (
@@ -46,6 +76,25 @@ export const awardTitles: Record<AwardKey, string> = {
   hopper: "Casino hopper",
   night_owl: "Night owl",
 };
+
+/**
+ * A sentence with amounts in it. A screen draws each amount through `Money` and reads the whole
+ * line aloud through the privacy-aware formatter, so no amount is ever printed as plain text.
+ */
+export type Line = ReadonlyArray<
+  string | { readonly amount: MinorUnits; readonly tone: "result" | "plain" }
+>;
+
+export const lineText = (line: Line, money: (part: Exclude<Line[number], string>) => string) =>
+  line.map((part) => (Predicate.isString(part) ? part : money(part))).join("");
+
+/** A player as a chip and a name: `name` is the monogram's, `label` is how a sentence says it. */
+export interface Who {
+  readonly playerId: PlayerId;
+  readonly name: string;
+  readonly label: string;
+  readonly chip: number;
+}
 
 const awardLine = (
   award: GroupAward,
@@ -71,11 +120,17 @@ const awardLine = (
 const winRate = (wins: number, sessions: number) =>
   sessions === 0 ? "—" : `${Math.round((wins * 100) / sessions)}%`;
 
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+const joinNames = (labels: ReadonlyArray<string>) =>
+  labels.length <= 2 ? labels.join(" and ") : `${labels.length} players`;
+
 /**
  * A group's stats as Stats shows them: the filter chips, then why there's nothing to show, or the
- * standings with each member's stat sheet, everyone's running result, a picked trip's awards, and
- * the group's result by game and casino. Counts current members and guests, who list last and
- * unranked until they play, and anyone else who played.
+ * hero (the group's result, by trip or by night), standings, what the crew did together, trips,
+ * habits, records and the result by game and casino. Every section that has a floor is null below
+ * it. Counts current members and guests, who list last and unranked until they play, and anyone
+ * else who played.
  */
 export const groupStatsView = (
   stats: GroupStats,
@@ -95,6 +150,7 @@ export const groupStatsView = (
 ) => {
   const currency = detail.group.currency;
   const names = playerNames(detail);
+  const me = detail.myPlayerId;
   const venues = new Map(stats.venues.map((venue) => [venue.id, venue]));
 
   const venueName = (id: VenueId | null) =>
@@ -139,35 +195,21 @@ export const groupStatsView = (
         ? "All time"
         : String(filters.year);
 
-  const race = computed.plays.map((play) => ({
-    session: { id: play.id, startedAt: play.startedAt },
-    tripId: play.tripId,
-    venue: play.venueId === null ? null : { id: play.venueId, name: venueName(play.venueId) },
-    results: play.results,
-  }));
+  const plays = computed.plays;
 
-  const nights =
-    filters.tripId === undefined
-      ? []
-      : tripNights(race, clock).map((night) => ({
-          first: night.sessions[0]!.session.id,
-          label: `Day ${night.number}`,
-          ids: new Set(night.sessions.map((s) => s.session.id)),
-        }));
+  const who = (playerId: PlayerId) => {
+    const name = names.get(playerId) ?? "Someone";
 
-  const marks =
-    filters.tripId === undefined
-      ? race.flatMap((session, index) =>
-          index === 0 || race[index - 1]!.tripId !== session.tripId
-            ? [{ index, label: tripName(session.tripId) }]
-            : [],
-        )
-      : nights.map((night) => ({
-          index: race.findIndex((s) => s.session.id === night.first),
-          label: night.label,
-        }));
+    return {
+      playerId,
+      name,
+      label: playerId === me ? "You" : name,
+      chip: chipOf(detail, playerId),
+    } satisfies Who;
+  };
 
-  const meta = (sessions: number) => `${sessions} ${sessions === 1 ? "session" : "sessions"}`;
+  const shortDay = (at: DateTime.Utc) =>
+    DateTime.format(DateTime.setZone(at, timeZone), { month: "short", day: "numeric" });
 
   const guests = new Set(
     detail.players.filter((player) => player.userId === null).map((p) => p.id),
@@ -175,7 +217,7 @@ export const groupStatsView = (
 
   const bests = new Map<PlayerId, { result: MinorUnits; line: string }>();
 
-  for (const play of computed.plays) {
+  for (const play of plays) {
     for (const { playerId, net } of play.results) {
       const best = bests.get(playerId);
 
@@ -193,46 +235,444 @@ export const groupStatsView = (
     }
   }
 
+  const returns = returnStandings(plays);
+
+  const rates = new Map(
+    returns.map((entry) => [entry.playerId, returnFigure(entry.result, entry.buyIn)]),
+  );
+
+  const standings = computed.standings.map((row) => ({
+    playerId: row.playerId,
+    rank: row.rank,
+    name: names.get(row.playerId) ?? "Someone",
+    you: row.playerId === me,
+    chip: chipOf(detail, row.playerId),
+    guest: guests.has(row.playerId),
+    best: bests.get(row.playerId),
+    meta: row.sessions === 0 ? "No sessions" : played(row.sessions, row.hours),
+    result: row.result,
+    rate: rates.get(row.playerId) ?? null,
+    sheet: {
+      result: row.result,
+      sessions: row.sessions,
+      hours: formatHours(row.hours),
+      hourlyResult: row.hourlyResult,
+      winRate: winRate(row.wins, row.sessions),
+      winRateLine: `${row.wins} of ${row.sessions}`,
+    },
+  }));
+
+  const ranked = standings.filter((row) => row.rank !== null);
+  const mine = standings.find((row) => row.playerId === me);
+  const myRank = mine?.rank ?? null;
+
+  const aheadRank =
+    myRank === null ? 0 : Math.max(0, ...ranked.map((row) => row.rank!).filter((r) => r < myRank));
+
+  const ahead = ranked.filter((row) => row.rank === aheadRank);
+
+  const footnote: Line | null =
+    mine === undefined || myRank === null
+      ? null
+      : myRank === 1
+        ? [
+            ranked.filter((row) => row.rank === 1).length > 1
+              ? "You're tied for first"
+              : "You're in front",
+          ]
+        : [
+            `You're ${ordinal(myRank)}, `,
+            { amount: MinorUnits.make(ahead[0]!.result - mine.result), tone: "plain" },
+            ` behind ${joinNames(ahead.map((row) => row.name))}`,
+          ];
+
+  const buyIns = plays.reduce(
+    (sum, play) => sum + play.results.reduce((n, result) => n + result.buyIn, 0),
+    0,
+  );
+
+  const byReturn =
+    returns.length < RETURN_SWITCH_MIN_PLAYERS
+      ? null
+      : [
+          ...returns.map((entry) => {
+            const rank: number | null = entry.rank;
+
+            return {
+              ...standings.find((row) => row.playerId === entry.playerId)!,
+              rank,
+            };
+          }),
+          ...standings
+            .filter((row) => !returns.some((entry) => entry.playerId === row.playerId))
+            .map((row) => ({ ...row, rank: null })),
+        ];
+
+  const slice =
+    filters.game === undefined && filters.venueId === undefined
+      ? null
+      : [
+          filters.game === undefined ? null : gameName(filters.game),
+          filters.venueId === undefined ? null : venueName(filters.venueId),
+        ]
+          .filter((part) => part !== null)
+          .join(" at ");
+
+  const leadWords = (
+    bar: BarResult,
+    { final, night }: { readonly final: boolean; readonly night: boolean },
+  ) => {
+    if (bar.leaders.length === 0) return null;
+    const leaders = bar.leaders.map(who);
+    const name = joinNames(leaders.map((leader) => leader.label));
+    const tied = leaders.length > 1;
+
+    return {
+      leaders,
+      text: tied
+        ? `${final ? "" : "Leading so far: "}${name} tied`
+        : !final
+          ? `Leading so far: ${name}`
+          : slice !== null
+            ? `Top in ${slice}: ${name}`
+            : night
+              ? `${name} led`
+              : bar.leaderResult > 0
+                ? `${name} won`
+                : `Highest result: ${name}`,
+      amount: tied ? null : bar.leaderResult,
+    };
+  };
+
+  const money = (amount: MinorUnits) => ({ amount, tone: "result" }) satisfies Line[number];
+
+  const allTrips = tripResults(plays, detail.trips);
+
+  const tripOrder = (a: TripResult, b: TripResult) =>
+    DateTime.toEpochMillis(b.startedAt) - DateTime.toEpochMillis(a.startedAt);
+
+  const barFrom = (bar: BarResult, label: string, name: string, final: boolean, night: boolean) => {
+    const lead = leadWords(bar, { final, night });
+
+    return {
+      key: bar.key,
+      label,
+      name,
+      result: bar.result,
+      status: !bar.played
+        ? ("none" as const)
+        : bar.result > 0
+          ? ("up" as const)
+          : bar.result < 0
+            ? ("down" as const)
+            : ("even" as const),
+      leader: lead && lead.leaders.length === 1 ? lead.leaders[0]! : null,
+      spoken: (bar.played
+        ? [`${name}, `, money(bar.result), lead ? `. ${lead.text}.` : "."]
+        : [`${name}, no play.`]) satisfies Line,
+    };
+  };
+
+  const chart = (() => {
+    if (filters.tripId !== undefined) {
+      const nights = nightResults(plays, timeZone);
+
+      if (nights === null) return null;
+      const labelled = axisLabelled(nights.length);
+
+      const bars = nights.map((night, index) => ({
+        ...barFrom(
+          night,
+          labelled(index) ? nightAxisLabel(night.key, nights.length) : "",
+          nightName(night.key),
+          true,
+          true,
+        ),
+        year: null,
+        filters: null,
+      }));
+
+      return { by: "night" as const, title: "By night", bars, earlier: 0 };
+    }
+
+    if (allTrips.length < 2) return null;
+    const shown = allTrips.slice(-TRIP_BARS_MAX);
+
+    const bars = shown.map((trip, index) => {
+      const start = DateTime.toParts(DateTime.setZone(trip.startedAt, timeZone));
+
+      return {
+        ...barFrom(
+          trip,
+          DateTime.format(DateTime.setZone(trip.startedAt, timeZone), { month: "short" }),
+          tripName(trip.tripId),
+          trip.ended,
+          false,
+        ),
+        year:
+          filters.year === undefined && (index === 0 || start.month === 1)
+            ? String(start.year)
+            : null,
+        filters: { ...filters, tripId: trip.tripId, year: undefined } satisfies StatsFilters,
+      };
+    });
+
+    return {
+      by: "trip" as const,
+      title: "Result by trip",
+      bars,
+      earlier: allTrips.length - shown.length,
+    };
+  })();
+
+  const finishedTrips = allTrips.filter((trip) => trip.ended);
+
+  const hero = {
+    kicker: `Group result · ${period}`,
+    players: ranked.length,
+    tables: plays.length,
+    result: computed.result,
+    up:
+      filters.tripId !== undefined || finishedTrips.length === 0
+        ? null
+        : {
+            up: finishedTrips.filter((trip) => trip.result > 0).length,
+            of: finishedTrips.length,
+          },
+    chart,
+    place:
+      myRank === null
+        ? null
+        : {
+            label: `${ranked.filter((row) => row.rank === myRank).length > 1 ? "=" : ""}${ordinal(myRank)}`,
+            of: ranked.length,
+          },
+    yours: myRank === null ? null : mine!.result,
+    returnRate: returnFigure(computed.result, buyIns),
+  };
+
+  const tripRows = (list: ReadonlyArray<TripResult>) =>
+    list.map((trip) => {
+      const lead = leadWords(trip, { final: trip.ended, night: false })!;
+
+      return {
+        key: trip.tripId,
+        name: tripName(trip.tripId),
+        leaders: lead.leaders,
+        line: [
+          lead.text,
+          ...(lead.amount === null ? [] : [" ", money(lead.amount)]),
+          ` · ${plural(trip.tables, "table")}`,
+        ] satisfies Line,
+        result: trip.result,
+        filters: { ...filters, tripId: trip.tripId, year: undefined } satisfies StatsFilters,
+      };
+    });
+
+  const listed = allTrips.filter((trip) => trip.players >= LEADER_MIN_PLAYERS);
+
+  const rows = tripRows([
+    ...listed.filter((trip) => !trip.ended).toSorted(tripOrder),
+    ...listed.filter((trip) => trip.ended).toSorted(tripOrder),
+  ]);
+
+  const wins = tripWins(allTrips);
+
+  const tripList =
+    filters.tripId !== undefined || rows.length < TRIPS_LIST_MIN
+      ? null
+      : {
+          wins: wins.leader
+            ? `${who(wins.leader.playerId).label} ${slice === null ? "won" : "led"} ${wins.leader.wins} of ${wins.ended}`
+            : null,
+          rows: rows.slice(0, TRIPS_SHOWN),
+          all: rows.length > TRIPS_SHOWN ? rows : null,
+        };
+
+  const mates = tablemates(plays, me);
+  const sweep = sweeps(plays);
+  const split = sharedVsSolo(plays);
+  const late = lateNight(plays, clock);
+  const records = groupRecords(plays);
+
+  const rowOf = (
+    key: string,
+    people: ReadonlyArray<Who>,
+    title: string,
+    line: Line,
+    trailing: Line | null = null,
+  ) => ({ key, people, title, line, trailing });
+
+  const ordered = (ids: readonly [PlayerId, PlayerId]) =>
+    (ids[1] === me ? [ids[1], ids[0]] : ids).map(who);
+
+  const together = [
+    ...(mates.pair
+      ? (() => {
+          const [first, second] = ordered(mates.pair.playerIds);
+
+          return [
+            rowOf(
+              "pair",
+              [first!, second!],
+              `${first!.label} and ${second!.label}`,
+              [`${mates.pair.tables} tables together`],
+              [money(mates.pair.result)],
+            ),
+          ];
+        })()
+      : []),
+    ...(mates.withWithout
+      ? (() => {
+          const friend = who(mates.withWithout.friend);
+
+          return [
+            rowOf("with", [friend], `At tables with ${friend.label}`, [
+              "You averaged ",
+              money(mates.withWithout.withAverage),
+              ` with ${friend.label} (${mates.withWithout.withCount}), `,
+              money(mates.withWithout.withoutAverage),
+              ` without (${mates.withWithout.withoutCount})`,
+            ]),
+          ];
+        })()
+      : []),
+    ...(mates.headToHead
+      ? (() => {
+          const friend = who(mates.headToHead.friend);
+
+          return [
+            rowOf("versus", [friend], `You vs ${friend.label}`, [
+              `Finished higher: you ${mates.headToHead.ahead}, ${friend.label} ${mates.headToHead.behind}, ${mates.headToHead.tied} tied.`,
+            ]),
+          ];
+        })()
+      : []),
+    ...(sweep
+      ? [
+          rowOf(
+            "sweep",
+            [],
+            "Everyone finished up",
+            [
+              `${plural(sweep.count, "table")} · ${sweep.count > 1 ? "best: " : ""}${[
+                sweep.play.game === null ? null : gameName(sweep.play.game),
+                sweep.play.venueId === null ? null : venueName(sweep.play.venueId),
+                shortDay(sweep.play.startedAt),
+              ]
+                .filter((part) => part !== null)
+                .join(" · ")}`,
+            ],
+            [money(sweep.result)],
+          ),
+        ]
+      : []),
+    ...(split
+      ? [
+          rowOf("split", [], "Shared tables vs solo", [
+            "Averaged ",
+            money(split.shared.average),
+            ` an appearance at shared tables (${split.shared.plays}), `,
+            money(split.solo.average),
+            ` with one recorded group player (${split.solo.plays})`,
+          ]),
+        ]
+      : []),
+  ];
+
+  const habits = late
+    ? [
+        rowOf(
+          "late",
+          [],
+          "After midnight",
+          [
+            "Averaged ",
+            money(late.late.average),
+            ` an appearance after midnight (${late.late.appearances}), `,
+            money(late.other.average),
+            ` at other start times (${late.other.appearances})`,
+          ],
+          [money(late.late.result)],
+        ),
+      ]
+    : [];
+
+  const recordLine = (playerId: PlayerId, play: GroupPlay) =>
+    [who(playerId).label, play.game === null ? null : gameName(play.game), shortDay(play.startedAt)]
+      .filter((part) => part !== null)
+      .join(" · ");
+
+  const recordRows = records
+    ? [
+        ...(records.win
+          ? [
+              rowOf(
+                "win",
+                [who(records.win.playerId)],
+                "Biggest win",
+                [recordLine(records.win.playerId, records.win.play)],
+                [money(MinorUnits.make(records.win.value))],
+              ),
+            ]
+          : []),
+        ...(records.loss
+          ? [
+              rowOf(
+                "loss",
+                [who(records.loss.playerId)],
+                "Biggest loss",
+                [recordLine(records.loss.playerId, records.loss.play)],
+                [money(MinorUnits.make(records.loss.value))],
+              ),
+            ]
+          : []),
+        ...(records.longest
+          ? [
+              rowOf(
+                "longest",
+                [who(records.longest.playerId)],
+                "Most time at one table",
+                [recordLine(records.longest.playerId, records.longest.play)],
+                [formatHours(records.longest.value / 3_600_000)],
+              ),
+            ]
+          : []),
+        ...(records.hourly
+          ? [
+              rowOf(
+                "hourly",
+                [who(records.hourly.playerId)],
+                "Best per hour",
+                [
+                  `${who(records.hourly.playerId).label} · ${formatHours(records.hourly.milliseconds / 3_600_000)} played`,
+                ],
+                [money(MinorUnits.make(records.hourly.value)), "/hr"],
+              ),
+            ]
+          : []),
+      ]
+    : [];
+
+  const tables = (count: number, appearances: number) =>
+    `${plural(count, "table")} · ${plural(appearances, "appearance")}`;
+
   return {
     ...head,
     kind: "stats" as const,
     title: period,
     currency,
-    standings: computed.standings.map((row) => ({
-      playerId: row.playerId,
-      rank: row.rank,
-      name: names.get(row.playerId) ?? "Someone",
-      you: row.playerId === detail.myPlayerId,
-      chip: chipOf(detail, row.playerId),
-      guest: guests.has(row.playerId),
-      best: bests.get(row.playerId),
-      meta: row.sessions === 0 ? "No sessions" : played(row.sessions, row.hours),
-      result: row.result,
-      sheet: {
-        result: row.result,
-        sessions: row.sessions,
-        hours: formatHours(row.hours),
-        hourlyResult: row.hourlyResult,
-        winRate: winRate(row.wins, row.sessions),
-        winRateLine: `${row.wins} of ${row.sessions}`,
-      },
-    })),
-    total: computed.result,
-    sessions: computed.plays.length,
-    race: {
-      sessions: race.map((session) => ({
-        ...session,
-        where:
-          filters.tripId === undefined
-            ? tripName(session.tripId)
-            : (nights.find((night) => night.ids.has(session.session.id))?.label ?? ""),
-      })),
-      marks,
-    },
+    sessions: plays.length,
+    hero,
+    standings,
+    byReturn,
+    footnote,
+    together: plays.length < TOGETHER_MIN_PLAYS || together.length === 0 ? null : together,
+    tripList,
     awards:
-      filters.tripId === undefined
+      filters.tripId === undefined || plays.length < AWARDS_MIN_PLAYS
         ? null
-        : groupAwards(computed.plays, clock).map((award) => ({
+        : groupAwards(plays, clock).map((award) => ({
             key: award.key,
             title: awardTitles[award.key],
             playerId: award.playerId,
@@ -240,26 +680,28 @@ export const groupStatsView = (
             chip: chipOf(detail, award.playerId),
             line: awardLine(award, currency, venueName, timeZone, { showCents, privacyMode }),
           })),
+    habits: habits.length === 0 ? null : habits,
+    records: recordRows.length === 0 ? null : recordRows,
     byGame:
-      filters.game !== undefined
+      filters.game !== undefined || plays.length < BREAKDOWNS_MIN_PLAYS
         ? null
         : computed.byGame.map((row) => ({
             key: row.game ?? "none",
             label: gameName(row.game),
-            meta: meta(row.sessions),
+            meta: tables(row.sessions, row.appearances),
             chip: gameChip(row.game),
             result: row.result,
             filters: { ...filters, game: row.game },
           })),
     byCasino:
-      filters.venueId !== undefined
+      filters.venueId !== undefined || plays.length < BREAKDOWNS_MIN_PLAYS
         ? null
         : computed.byCasino
             .toSorted((a, b) => b.sessions - a.sessions)
             .map((row) => ({
               key: row.venueId ?? "none",
               label: venueName(row.venueId),
-              meta: meta(row.sessions),
+              meta: tables(row.sessions, row.appearances),
               result: row.result,
               filters: { ...filters, venueId: row.venueId },
             })),

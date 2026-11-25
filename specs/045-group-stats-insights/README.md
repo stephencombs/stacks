@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-24
 tags:
   - stats
@@ -7,7 +7,10 @@ tags:
   - design
 parent: 043-stats-redesign
 created_at: 2026-11-24T03:30:28.451991600Z
-updated_at: 2026-11-24T03:30:28.451991600Z
+updated_at: 2026-11-24T16:20:07.873172300Z
+transitions:
+  - status: in-progress
+    at: 2026-11-24T16:20:07.873172300Z
 ---
 
 # Group stats: result by trip, and what the crew did together

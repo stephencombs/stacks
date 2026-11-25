@@ -326,6 +326,14 @@ const dateOfKey = (key: string) => {
   return new Date(Date.UTC(year, month - 1, day));
 };
 
+/** A night as a bar names it, for a screen reader: "Friday, Nov 6". */
+export const nightName = (key: string) =>
+  `${weekdayLong.format(dateOfKey(key))}, ${nightDate.format(dateOfKey(key))}`;
+
+/** A night as a bar labels it: the weekday for a short trip, the date past a week. */
+export const nightAxisLabel = (key: string, count: number) =>
+  count > 7 ? String(dateOfKey(key).getUTCDate()) : weekdayShort.format(dateOfKey(key));
+
 const weekdayName = (index: number) => weekdayLong.format(new Date(Date.UTC(2023, 0, 1 + index)));
 
 const lengthName = (index: number) => {
@@ -492,17 +500,12 @@ export const personalStatsView = (
           ? ""
           : by === "month"
             ? monthShort.format(date)
-            : rows.length > 7
-              ? String(date.getUTCDate())
-              : weekdayShort.format(date),
+            : nightAxisLabel(row.key, rows.length),
         year:
           by === "month" && filters.year === undefined && (index === 0 || date.getUTCMonth() === 0)
             ? String(date.getUTCFullYear())
             : null,
-        name:
-          by === "month"
-            ? monthLong.format(date)
-            : `${weekdayLong.format(date)}, ${nightDate.format(date)}`,
+        name: by === "month" ? monthLong.format(date) : nightName(row.key),
         result: row.result,
         status: status(row),
         emphasis:

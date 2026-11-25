@@ -36,7 +36,7 @@ export type StatsSummary = Extract<PersonalStatsView, { kind: "stats" }>;
 
 const currency = RECORDING_CURRENCY;
 
-function Dash() {
+export function Dash() {
   return (
     <Text accessibilityLabel="Not available" className="type-number text-faint">
       –
@@ -44,7 +44,7 @@ function Dash() {
   );
 }
 
-function Tile({
+export function Tile({
   label,
   divided = false,
   children,
@@ -70,7 +70,7 @@ function Tile({
   );
 }
 
-function ReturnFigure({ figure }: { figure: StatsSummary["returnRate"] }) {
+export function ReturnFigure({ figure }: { figure: StatsSummary["returnRate"] }) {
   const { privacyMode } = usePreferences();
 
   if (figure.tone === "none") return <Dash />;

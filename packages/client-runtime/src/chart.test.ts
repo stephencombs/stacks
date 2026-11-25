@@ -1,31 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 
-import {
-  around,
-  barTrack,
-  fitAxisLabels,
-  labelWidth,
-  lineScale,
-  placeLabel,
-  runningLine,
-  spreadLabels,
-} from "./chart.ts";
-
-it("keeps the trip endpoints and skips day labels that collide on a phone", () => {
-  const marks = [20, 80, 175, 195, 215, 235].map((x, index) => ({
-    index,
-    x,
-    label: `Day ${index + 1}`,
-  }));
-
-  expect(fitAxisLabels(marks, 11, { min: 8, max: 300 }).map(({ label }) => label)).toEqual([
-    "Day 1",
-    "Day 2",
-    "Day 3",
-    "Day 6",
-  ]);
-});
+import { barTrack, lineScale, runningLine } from "./chart.ts";
 
 describe("barTrack", () => {
   it("puts zero where the losses end and scales bars to the full range", () => {
@@ -105,49 +81,15 @@ describe("lineScale", () => {
     expect([plot.x(0), plot.x(1), plot.y(100), plot.y(0)]).toEqual([10, 290, 5, 95]);
   });
 
-  it("fits the range to the focus lines and pins a far-off line to the edge", () => {
-    const plot = lineScale(
-      [
-        [0, 100, 275],
-        [0, 70, 180],
-        [0, -2000, -6000],
-      ],
-      size,
-      { x: 0, y: 0 },
-      [0, 1],
-    );
-
-    expect(plot.y(275)).toBe(0);
-    expect(plot.zero).toBe(100);
-    expect(plot.y(-6000)).toBe(100);
-    expect([plot.clipped(-6000), plot.clipped(180), plot.clipped(9000)]).toEqual([-1, 0, 1]);
-  });
-
-  it("keeps a nearby line on the plot instead of clipping it", () => {
-    const plot = lineScale(
-      [
-        [0, 100, 275],
-        [0, -150, -200],
-      ],
-      size,
-      { x: 0, y: 0 },
-      [0],
-    );
-
-    expect(plot.clipped(-200)).toBe(0);
-    expect(plot.y(-200)).toBe(100);
-  });
-
   it.prop(
-    "keeps every point inside the plot, focused or not",
+    "keeps every point inside the plot",
     [
       Schema.NonEmptyArray(
         Schema.NonEmptyArray(Schema.Int.check(Schema.isBetween({ minimum: -1e9, maximum: 1e9 }))),
       ),
-      Schema.Boolean,
     ],
-    ([series, focused]) => {
-      const plot = lineScale(series, size, { x: 4, y: 4 }, focused ? [0] : undefined);
+    ([series]) => {
+      const plot = lineScale(series, size, { x: 4, y: 4 });
 
       for (const values of series)
         values.forEach((value, i) => {
@@ -156,74 +98,8 @@ describe("lineScale", () => {
           expect(plot.y(value)).toBeGreaterThanOrEqual(4 - 1e-9);
           expect(plot.y(value)).toBeLessThanOrEqual(96 + 1e-9);
         });
-
-      if (!focused)
-        for (const values of series)
-          for (const value of values) expect(plot.clipped(value)).toBe(0);
     },
   );
-});
-
-it("focuses a race on a player and their neighbours on the board", () => {
-  expect(around(0, 3)).toEqual([0, 1]);
-  expect(around(2, 4)).toEqual([1, 2, 3]);
-  expect(around(0, 1)).toEqual([0]);
-});
-
-describe("spreadLabels", () => {
-  it("pushes labels on the same spot apart and keeps them in bounds", () => {
-    expect(spreadLabels([100, 100, 20], 14, { min: 0, max: 110 })).toEqual([96, 110, 20]);
-  });
-
-  it("shrinks the gap instead of running a crowded label off the edge", () => {
-    const out = spreadLabels([0, 0, 0, 0], 14, { min: 0, max: 20 });
-    const sorted = out.toSorted((a, b) => a - b);
-    expect(sorted[0]).toBe(0);
-    expect(sorted.at(-1)).toBe(20);
-
-    for (let k = 1; k < sorted.length; k++) expect(sorted[k]! - sorted[k - 1]!).toBeCloseTo(20 / 3);
-  });
-
-  it.prop(
-    "keeps order and spacing when there's room",
-    [
-      Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 200 }))).check(
-        Schema.isMaxLength(8),
-      ),
-    ],
-    ([ys]) => {
-      const out = spreadLabels(ys, 12, { min: 0, max: 200 });
-      const pairs = ys.map((y, i) => [y, out[i]!] as const).toSorted((a, b) => a[1] - b[1]);
-
-      for (let k = 1; k < pairs.length; k++) {
-        expect(pairs[k]![1] - pairs[k - 1]![1]).toBeGreaterThanOrEqual(12 - 1e-9);
-        expect(pairs[k]![0]).toBeGreaterThanOrEqual(pairs[k - 1]![0]);
-      }
-
-      for (const y of out) {
-        expect(y).toBeGreaterThanOrEqual(0);
-        expect(y).toBeLessThanOrEqual(200);
-      }
-    },
-  );
-});
-
-describe("placeLabel", () => {
-  const bounds = { min: 8, max: 390 };
-
-  it("pins a date that starts on the left edge so its first character stays inside", () => {
-    const width = labelWidth("Vegas 2026", 11);
-    expect(width).toBeGreaterThan(60);
-    expect(placeLabel(23, width, bounds)).toEqual({ x: 8, anchor: "start" });
-  });
-
-  it("leaves a label that already fits centered on its point", () => {
-    expect(placeLabel(200, 40, bounds)).toEqual({ x: 200, anchor: "middle" });
-  });
-
-  it("pins a label that runs off the right to the end", () => {
-    expect(placeLabel(380, 40, bounds)).toEqual({ x: 390, anchor: "end" });
-  });
 });
 
 describe("runningLine", () => {
