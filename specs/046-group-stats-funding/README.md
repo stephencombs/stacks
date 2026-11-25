@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-24
 tags:
   - stats
@@ -9,10 +9,13 @@ depends_on:
   - 045-group-stats-insights
 parent: 043-stats-redesign
 created_at: 2026-11-24T03:30:29.100455400Z
-updated_at: 2026-11-24T17:15:49.056612300Z
+updated_at: 2026-11-25T02:56:07.322839600Z
+completed_at: 2026-11-25T02:56:07.322839600Z
 transitions:
   - status: in-progress
     at: 2026-11-24T17:15:49.056612300Z
+  - status: complete
+    at: 2026-11-25T02:56:07.322839600Z
 ---
 
 # Group stats: additional buy-ins, covered buy-ins and backing

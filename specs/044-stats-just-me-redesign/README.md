@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-11-24
 tags:
   - stats
@@ -7,10 +7,13 @@ tags:
   - design
 parent: 043-stats-redesign
 created_at: 2026-11-24T03:30:27.810630600Z
-updated_at: 2026-11-24T03:48:36.604517700Z
+updated_at: 2026-11-25T02:56:05.807880600Z
+completed_at: 2026-11-25T02:56:05.807880600Z
 transitions:
   - status: in-progress
     at: 2026-11-24T03:48:36.604517700Z
+  - status: complete
+    at: 2026-11-25T02:56:05.807880600Z
 ---
 
 # Stats: Just me redesign

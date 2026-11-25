@@ -1,5 +1,5 @@
 ---
-status: planned
+status: complete
 created: 2026-11-24
 priority: medium
 tags:
@@ -10,7 +10,11 @@ tags:
 depends_on:
   - "011"
 created_at: 2026-11-24T03:30:27.095525300Z
-updated_at: 2026-11-24T03:30:27.095525300Z
+updated_at: 2026-11-25T02:56:05.051641600Z
+completed_at: 2026-11-25T02:56:05.051641600Z
+transitions:
+  - status: complete
+    at: 2026-11-25T02:56:05.051641600Z
 ---
 
 # Stats redesign: say it in words, chart only what has a shape
