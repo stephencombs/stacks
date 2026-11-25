@@ -3,7 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { GroupDetail, TripDetail } from "@stacks/contracts";
 import { isAdmin } from "@stacks/client-runtime/format";
 import { tripCardModel } from "@stacks/client-runtime/shareCard";
-import { chipOf, closedPlays, localClock, tripDates } from "@stacks/client-runtime/trip";
+import { closedPlays, localClock, tripDates } from "@stacks/client-runtime/trip";
 import { useEffect, useState } from "react";
 import { Alert, Platform, View } from "react-native";
 
@@ -106,7 +106,6 @@ export function TripOptionsButton({ trip, group }: { trip: TripDetail; group: Gr
               me: group.myPlayerId,
               closed: finished,
               players: group.players,
-              chip: (playerId) => chipOf(group, playerId),
               clock: localClock,
               hidden,
             })

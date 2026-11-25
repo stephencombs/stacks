@@ -45,25 +45,21 @@
       --color-glass: oklch(0.986 0.003 286.4 / 0.78);
       --color-scrim: oklch(0.179 0.006 285.8 / 0.32);
       --color-focus: oklch(0.563 0.182 260.6);
-
-      /* Player chips, in joining order, for the server's chip numbers 1 to 8. Not in tokens.json. */
-      --color-chip-1: oklch(0.5 0.19 10);
-      --color-chip-1-ink: oklch(0.98 0 0);
-      --color-chip-2: oklch(0.5 0.15 255);
-      --color-chip-2-ink: oklch(0.98 0 0);
-      --color-chip-3: oklch(0.55 0.095 190);
-      --color-chip-3-ink: oklch(0.98 0 0);
-      --color-chip-4: oklch(0.34 0.01 260);
-      --color-chip-4-ink: oklch(0.98 0 0);
-      --color-chip-5: oklch(0.5 0.17 305);
-      --color-chip-5-ink: oklch(0.98 0 0);
-      --color-chip-6: oklch(0.7 0.16 58);
-      --color-chip-6-ink: oklch(0.2 0.02 58);
-      --color-chip-7: oklch(0.68 0.15 350);
-      --color-chip-7-ink: oklch(0.2 0.02 350);
-      --color-chip-8: oklch(0.85 0.14 95);
-      --color-chip-8-ink: oklch(0.25 0.03 95);
-      --color-chip-edge: oklch(0.97 0.01 90);
+      --color-avatar-1: oklch(0.9 0.045 25);
+      --color-avatar-1-ink: oklch(0.32 0.05 25);
+      --color-avatar-2: oklch(0.9 0.045 65);
+      --color-avatar-2-ink: oklch(0.32 0.05 65);
+      --color-avatar-3: oklch(0.9 0.045 150);
+      --color-avatar-3-ink: oklch(0.32 0.05 150);
+      --color-avatar-4: oklch(0.9 0.045 200);
+      --color-avatar-4-ink: oklch(0.32 0.05 200);
+      --color-avatar-5: oklch(0.9 0.045 255);
+      --color-avatar-5-ink: oklch(0.32 0.05 255);
+      --color-avatar-6: oklch(0.9 0.045 305);
+      --color-avatar-6-ink: oklch(0.32 0.05 305);
+      --color-avatar-top: oklch(0.74 0.012 262);
+      --color-avatar-bottom: oklch(0.6 0.012 262);
+      --color-avatar-ink: oklch(1 0 0);
     }
     @variant dark {
       --color-canvas: oklch(0 0 0);
@@ -100,25 +96,21 @@
       --color-glass: oklch(0.262 0.007 285.9 / 0.78);
       --color-scrim: oklch(0 0 0 / 0.56);
       --color-focus: oklch(0.677 0.17 262.2);
-
-      /* Player chips, in joining order, for the server's chip numbers 1 to 8. Not in tokens.json. */
-      --color-chip-1: oklch(0.5 0.19 10);
-      --color-chip-1-ink: oklch(0.98 0 0);
-      --color-chip-2: oklch(0.5 0.15 255);
-      --color-chip-2-ink: oklch(0.98 0 0);
-      --color-chip-3: oklch(0.55 0.095 190);
-      --color-chip-3-ink: oklch(0.98 0 0);
-      --color-chip-4: oklch(0.34 0.01 260);
-      --color-chip-4-ink: oklch(0.98 0 0);
-      --color-chip-5: oklch(0.5 0.17 305);
-      --color-chip-5-ink: oklch(0.98 0 0);
-      --color-chip-6: oklch(0.7 0.16 58);
-      --color-chip-6-ink: oklch(0.2 0.02 58);
-      --color-chip-7: oklch(0.68 0.15 350);
-      --color-chip-7-ink: oklch(0.2 0.02 350);
-      --color-chip-8: oklch(0.85 0.14 95);
-      --color-chip-8-ink: oklch(0.25 0.03 95);
-      --color-chip-edge: oklch(0.97 0.01 90);
+      --color-avatar-1: oklch(0.36 0.055 25);
+      --color-avatar-1-ink: oklch(0.9 0.04 25);
+      --color-avatar-2: oklch(0.36 0.055 65);
+      --color-avatar-2-ink: oklch(0.9 0.04 65);
+      --color-avatar-3: oklch(0.36 0.055 150);
+      --color-avatar-3-ink: oklch(0.9 0.04 150);
+      --color-avatar-4: oklch(0.36 0.055 200);
+      --color-avatar-4-ink: oklch(0.9 0.04 200);
+      --color-avatar-5: oklch(0.36 0.055 255);
+      --color-avatar-5-ink: oklch(0.9 0.04 255);
+      --color-avatar-6: oklch(0.36 0.055 305);
+      --color-avatar-6-ink: oklch(0.9 0.04 305);
+      --color-avatar-top: oklch(0.64 0.012 262);
+      --color-avatar-bottom: oklch(0.48 0.012 262);
+      --color-avatar-ink: oklch(1 0 0);
     }
   }
 }

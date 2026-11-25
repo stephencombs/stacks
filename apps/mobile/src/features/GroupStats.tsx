@@ -27,7 +27,7 @@ import { useLargeText } from "../lib/useLargeText";
 import { useGroupStats } from "../lib/stacks";
 import { InsightRow, LineText, ResultBars } from "./GroupStatsParts";
 import { Dash, ReturnFigure, Tile } from "./PersonalStats";
-import { PlayerChip } from "./PlayerChip";
+import { PlayerAvatar } from "./PlayerAvatar";
 import { GroupStatsSkeleton } from "./ScreenSkeletons";
 import {
   AndroidStatsEmpty,
@@ -284,12 +284,11 @@ function ShownStats({
           <List>
             {view.awards.map((award) => (
               <Row key={award.key} className={android ? "py-2.5" : undefined}>
-                <PlayerChip
+                <PlayerAvatar
                   playerId={award.playerId}
-                  chip={award.chip}
-                  name={android ? award.name.slice(0, 1) : award.name}
+                  name={award.name}
                   size={28}
-                  ring={android}
+                  you={award.you}
                 />
                 <View className="min-w-0 flex-1 gap-0.5">
                   <Text className="type-heading text-ink">{award.title}</Text>
@@ -469,12 +468,11 @@ function Standings({ view, onOpen }: { view: Shown; onOpen: (row: Standing) => v
                 >
                   {row.rank ?? "–"}
                 </Text>
-                <PlayerChip
+                <PlayerAvatar
                   playerId={row.playerId}
-                  chip={row.chip}
-                  name={android ? row.name.slice(0, 1) : row.name}
+                  name={row.name}
                   size={android ? 30 : 28}
-                  ring={android}
+                  you={row.you}
                 />
                 <View className="min-w-0 flex-1 gap-0.5">
                   <Text
@@ -764,13 +762,7 @@ function StatSheet({
       {android ? (
         <View className="gap-4">
           <View className="flex-row items-center justify-center gap-2">
-            <PlayerChip
-              playerId={row.playerId}
-              chip={row.chip}
-              name={row.name.slice(0, 1)}
-              size={23}
-              ring
-            />
+            <PlayerAvatar playerId={row.playerId} name={row.name} size={23} you={row.you} />
             <Text className="type-footnote text-muted">
               {groupName} · {title}
             </Text>

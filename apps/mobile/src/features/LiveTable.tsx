@@ -23,7 +23,6 @@ import {
   type VisitId,
 } from "@stacks/contracts";
 import { shortName } from "@stacks/client-runtime/format";
-import { tableChipOf } from "@stacks/client-runtime/trip";
 import { formatMoney } from "@stacks/shared/money";
 import type * as DateTime from "effect/DateTime";
 import { use, useState } from "react";
@@ -49,7 +48,7 @@ import {
   SitDownSheet,
 } from "./RecordingForms";
 import { ContactPhotoControls } from "./ContactPhoto";
-import { TableChip } from "./PlayerChip";
+import { PlayerAvatar, TABLE_AVATAR_SIZE } from "./PlayerAvatar";
 import { ShareSheet, TableSettingsSheet } from "./SharedTable";
 
 const money = (amount: number, showCents = false) =>
@@ -189,7 +188,12 @@ export function TableSeats({
 
           const body = (
             <>
-              <TableChip playerId={seat.playerId} name={seat.name} />
+              <PlayerAvatar
+                playerId={seat.playerId}
+                name={seat.name}
+                size={TABLE_AVATAR_SIZE}
+                you={seat.isSelf}
+              />
               <View className="min-w-0 flex-1 gap-0.5">
                 <Text numberOfLines={1} className={cn("type-body font-medium", ink)}>
                   {seat.name}
@@ -567,11 +571,7 @@ export function SeatSheet({
         </View>
       )}
       {quick.error ? <FormError>{quick.error}</FormError> : null}
-      <ContactPhotoControls
-        playerId={seat.playerId}
-        chip={tableChipOf(seat.playerId)}
-        name={seat.name}
-      />
+      <ContactPhotoControls playerId={seat.playerId} name={seat.name} />
       <Button
         label={`${shortName(seat.name)}'s history`}
         variant="ghost"

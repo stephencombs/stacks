@@ -7,7 +7,6 @@ import {
   isGuest,
 } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
-import { chipOf } from "@stacks/client-runtime/trip";
 import { setStringAsync } from "expo-clipboard";
 import { useState } from "react";
 import { Platform, View } from "react-native";
@@ -25,7 +24,7 @@ import { Loaded, useAction, useStacks } from "../lib/stacks";
 import { AddGuestSheet } from "./AddGuestSheet";
 import { ContactPhotoControls } from "./ContactPhoto";
 import { playerActions } from "./playerActions";
-import { PlayerChip } from "./PlayerChip";
+import { PlayerAvatar } from "./PlayerAvatar";
 import { InviteLinkSkeleton } from "./ScreenSkeletons";
 
 const roleNames = { owner: "Owner", admin: "Admin", member: "Member" } as const;
@@ -52,12 +51,11 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
 
   const memberRows = members.map((player) => (
     <Row key={player.id} {...open(player)}>
-      <PlayerChip
+      <PlayerAvatar
         playerId={player.id}
-        chip={chipOf(detail, player.id)}
         name={player.displayName}
         size={android ? 36 : 26}
-        ring={android}
+        you={player.id === detail.myPlayerId}
       />
       <View className="min-w-0 flex-1">
         <Text
@@ -77,13 +75,7 @@ export function GroupPeople({ detail }: { detail: GroupDetail }) {
 
   const guestRows = guests.map((player) => (
     <Row key={player.id} {...open(player)}>
-      <PlayerChip
-        playerId={player.id}
-        chip={chipOf(detail, player.id)}
-        name={player.displayName}
-        size={android ? 36 : 26}
-        ring={android}
-      />
+      <PlayerAvatar playerId={player.id} name={player.displayName} size={android ? 36 : 26} />
       <View className="min-w-0 flex-1">
         <Text className={android ? "type-heading font-bold text-ink" : "text-base text-ink"}>
           {names.get(player.id)}
@@ -331,11 +323,7 @@ function PlayerSheet({
 
   return (
     <Sheet open onClose={onClose} title={player.displayName}>
-      <ContactPhotoControls
-        playerId={player.id}
-        chip={chipOf(detail, player.id)}
-        name={player.displayName}
-      />
+      <ContactPhotoControls playerId={player.id} name={player.displayName} />
       {actions.claimLink ? (
         <Button
           label={android ? "Copy claim link" : "Send claim link"}

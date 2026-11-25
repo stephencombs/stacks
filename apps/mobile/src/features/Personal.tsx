@@ -382,7 +382,7 @@ export function PersonalYouButton() {
         ) : (
           <ControlSurface>
             {account.available && account.isSignedIn ? (
-              <UserAvatar size={32} ring={false} />
+              <UserAvatar size={32} />
             ) : (
               <Icon name="person" color="ink" size={20} />
             )}

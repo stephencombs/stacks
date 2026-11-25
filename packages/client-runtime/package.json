@@ -12,6 +12,10 @@
       "types": "./src/api.ts",
       "import": "./src/api.ts"
     },
+    "./avatar": {
+      "types": "./src/avatar.ts",
+      "import": "./src/avatar.ts"
+    },
     "./chart": {
       "types": "./src/chart.ts",
       "import": "./src/chart.ts"

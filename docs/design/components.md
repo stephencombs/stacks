@@ -1,6 +1,6 @@
 # Components
 
-Parts live in `apps/mobile/src/components/ui`; `Money` sits one level up and `Chip` in `features`. Check here before writing a new `<Pressable>`.
+Parts live in `apps/mobile/src/components/ui`; `Money` sits one level up and `Avatar` in `features`. Check here before writing a new `<Pressable>`.
 
 ## Button
 
@@ -45,19 +45,19 @@ Give each `TextField` a visible label. A field-specific error goes in `error`. A
 
 `Surface` is a solid card on the page: `surface` fill, no border, the card shadow. A list of rows is `List` with a `Row` for each, on both clients: `List` draws the card and the hairline dividers, and `Row` the padding. A pressable `Row` takes `onPress`.
 
-A row runs chip, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` text, not display type.
+A row runs avatar, then the text in a `min-w-0 flex-1` column, then the amount at the end. A player's name in a row is plain `font-medium` text, not display type.
 
-Mobile has a few more card parts beside `Surface`: `ProportionalBarRow` for a breakdown (a dot or chip, the name, the amount, a thin bar scaled to its share and a muted footnote), `QuotaCard` for a backing stake's pace, and `SettingsGroup` with `SettingsRow` for grouped settings under a `type-section` header. Reach for these before drawing a card by hand.
+Mobile has a few more card parts beside `Surface`: `ProportionalBarRow` for a breakdown (a dot or avatar, the name, the amount, a thin bar scaled to its share and a muted footnote), `QuotaCard` for a backing stake's pace, and `SettingsGroup` with `SettingsRow` for grouped settings under a `type-section` header. Reach for these before drawing a card by hand.
 
 Don't put a `Surface` inside a `Surface`. A card on a card is `bg-raised`.
 
 ## Share cards: TripCard, SessionCard
 
-A trip or a finished session of yours becomes a 4:5 image for the share sheet. Both cards take a model from `@stacks/client-runtime/shareCard` and draw nothing it doesn't hold, never fetching and never reading preferences. The felt is pinned to the dark theme with `ScopedTheme` and read through the felt tokens, so a card looks the same from either app theme; its figures use `felt-win` and `felt-loss`, which pass AA on it. The Color Up wordmark (`<BrandWordmark felt />`) sits small at the bottom, with no glow or gradient. Players are initials on a `Chip`, never contact photos.
+A trip or a finished session of yours becomes a 4:5 image for the share sheet. Both cards take a model from `@stacks/client-runtime/shareCard` and draw nothing it doesn't hold, never fetching and never reading preferences. The felt is pinned to the dark theme with `ScopedTheme` and read through the felt tokens, so a card looks the same from either app theme; its figures use `felt-win` and `felt-loss`, which pass AA on it. The Color Up wordmark (`<BrandWordmark felt />`) sits small at the bottom, with no glow or gradient. Players are a plain `Avatar` with initials, never contact photos.
 
 `TripCard` shows the name, dates and venues, up to 8 standings (you are always one, the rest are "+N more"), then your result, place, sessions and nights, and your running line. `SessionCard` shows venue, game, date, duration, result, buy-in, cash-out and hourly, with no curve.
 
-**Hidden is a different card, not a masked one.** `hidden` is privacy mode or the sheet's **Hide amounts**. The model then holds no amounts, so the card has no figure, no `••••`, no line or axis and no win or loss color: ranks, names and chips remain, and for a session the venue, game, date and duration. `Money` takes `hidden` for this, and it defaults to privacy mode elsewhere.
+**Hidden is a different card, not a masked one.** `hidden` is privacy mode or the sheet's **Hide amounts**. The model then holds no amounts, so the card has no figure, no `••••`, no line or axis and no win or loss color: ranks, names and avatars remain, and for a session the venue, game, date and duration. `Money` takes `hidden` for this, and it defaults to privacy mode elsewhere.
 
 The sheet shows the mounted card, and **Share** captures that same view when pressed, at 1080×1350 physical pixels whatever the screen density (the capture size is in logical pixels, so it is `1080 / PixelRatio`). Nothing is captured ahead of time, so hiding amounts can't be followed by sharing an older image. The card is laid out at 360×450 and scaled down in the sheet by an ancestor, never by the captured view.
 
@@ -76,7 +76,7 @@ A chart draws only what has a shape: a running line, or results by month, night 
 - **A chart has a summary and a path.** The chart is one `image` with a plain-language summary, and every amount in it goes through the privacy-aware formatter. What it lets you open is also a 44pt row or column.
 - **Privacy mode makes a chart neutral.** Bars are `fill-strong`, with no win or loss color and no printed value.
 - **Results by month or night are bars around break-even.** `PeriodSection` draws rounded-cap vertical bars on a dashed zero line. The best and worst are solid and the rest 35%; a month that was played and broke even is a muted dot, and one that wasn't played is only its `faint` label. Every bar has an accessible label with its exact signed amount, "even" or "no play". In privacy mode every bar is `fill-strong`.
-- **Result by trip is the same bar with the trip's leader at its end.** `ResultBars` (`GroupStatsParts.tsx`) draws one rounded-cap bar for each trip with play in scope, oldest to newest, the latest eight, around a dashed zero. A 20px `Chip` for the trip's leader sits at the end of its bar, and is left out when two or more players share the lead. A trip that broke even is a muted marker, not a bar. With a trip picked it becomes By night, with the same leaders and ties. A column opens its trip only when it's 44pt wide or more, and the Trips list is the path to every trip. Its chips are decoration, hidden from assistive tech, and the summary names each trip with its Result and leader.
+- **Result by trip is the same bar with the trip's leader at its end.** `ResultBars` (`GroupStatsParts.tsx`) draws one rounded-cap bar for each trip with play in scope, oldest to newest, the latest eight, around a dashed zero. A 20px `PlayerAvatar` for the trip's leader sits at the end of its bar, and is left out when two or more players share the lead. A trip that broke even is a muted marker, not a bar. With a trip picked it becomes By night, with the same leaders and ties. A column opens its trip only when it's 44pt wide or more, and the Trips list is the path to every trip. Its avatars are decoration, hidden from assistive tech, and the summary names each trip with its Result and leader.
 - **Bars beside their amount compress.** `barTrack(values, { compress: true, minimum: 0.06 })` draws lengths by square root with a floor, so $60 shows next to $18,500. Only do this where the exact amount is printed beside the bar.
 
 ## Navigation: PlaceTabs and LiveBar
@@ -117,13 +117,17 @@ Every amount goes through `Money`, the hero figures included, except the compact
 <Text className="text-win">${result.net / 100}</Text>
 ```
 
-## Chip
+## Avatar
 
-A player's identity: `chip` comes from `chipOf(group, playerId)`. Pair it with the player's name. Use `28×28px` (`rounded-lg` monogram/color badge) in mobile feed and breakdown rows, and smaller in dense lists and awards.
+A person is drawn the way the phone's Contacts app draws them, never as a casino chip. Pair it with the player's name, and keep it decoration: it's hidden from assistive tech, and the name beside it is the label. Use 28pt in feed and breakdown rows, and smaller in dense lists and awards.
 
-Use `PlayerChip` for a person, so a photo linked to them on this phone shows in a 2px ring in their chip color (1.5px under 26pt) and fails back to their initial. At a table, `TableChip` does the same with a color from `tableChipOf(playerId)`, because a table has no group to number its players: 32pt on iOS, a 36pt ring on Android. A venue's chip, a trip chart's leader and a share card use plain `Chip` and never get a photo.
+`PlayerAvatar` is the part for a person. It shows the photo linked to them on this phone when there is one, and a photo that won't load goes back to the default. `you` marks the signed-in user's own player, who tries their linked photo, then their Clerk profile photo, then the default avatar with their own initials, never "Y". Their Android tile color comes from their Clerk user ID, so it matches in the You button and in every group. Without Clerk in a build, `you` keeps the name it was given. A table passes `TABLE_AVATAR_SIZE`: 32pt on iOS, 36pt on Android. `Avatar` is the same face with no lookup; a share card uses it, so a contact photo never leaves the phone in a shared image. `UserAvatar` is the You button's, where there's no player.
 
-The **pair chip** (`PairChip`) overlaps two players' chips, the second ringed in the surface color. It stands for two players together: the pair who've shared the most tables, or the two who tied for a trip. Three or more tied show their count in a neutral disc instead, and the chart shows no chip, so a tie never picks one player.
+With no photo, each platform draws its own default, split in `AvatarFace.ios.tsx` and `AvatarFace.android.tsx`. iOS is a **monogram**: a circle with a soft grey vertical gradient (`avatar-top` to `avatar-bottom`) and white initials, the first letters of the first and last name, or just the first below 28pt. Android is a **letter tile**: a circle in one of six tonal colors (`avatar-1` to `avatar-6`, each with its `-ink`) that `avatarToneOf(playerId)` picks, with one initial, so a player keeps their color. Initials are set in the system font, not Allo, so they look like the phone's own Contacts. A name with no letter or number, such as an emoji, draws a person silhouette. `initialsOf` (`@stacks/client-runtime/avatar`) decides the letters.
+
+The **pair avatar** (`PairAvatar`) overlaps two players' avatars, the second ringed in the surface color. It stands for two players together: the pair who've shared the most tables, or the two who tied for a trip. Three or more tied show their count in a neutral disc instead, and the chart shows no avatar, so a tie never picks one player.
+
+A venue or game is never an avatar. It's a disc or bar in its game color (`chip-red` to `chip-grey`).
 
 ## Page actions
 

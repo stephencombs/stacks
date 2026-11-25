@@ -212,7 +212,7 @@ vi.mock("../components/Money", () => ({ Money: () => null }));
 
 vi.mock("./AmountKeypad", () => ({ AmountKeypad: () => null }));
 
-vi.mock("./Chip", () => ({ Chip: () => null }));
+vi.mock("./PlayerAvatar", () => ({ PlayerAvatar: () => null, TABLE_AVATAR_SIZE: 32 }));
 
 vi.mock("./VenuePicker", () => ({ CasinoPickerSheet: () => null }));
 

@@ -36,7 +36,7 @@ What color is this text?
 - `win` means up. Never use it for "success" or "saved"; a saved state needs no color. A result chip sits on `win-tint` or `loss-tint`.
 - `loss` is also the destructive color. Show a loss with a minus sign, never by color alone.
 - `chip-red` through `chip-grey` are the game colors (and denominations): craps, poker, roulette, blackjack, baccarat, slots, other. `chip-green` is roulette, never a result. `tint-*` are grounds for soft pills paired with their chip color.
-- `--color-chip-1` to `-8` belong to a player, the same in both themes. Read them through `chipOf`, and never use them for anything else.
+- `avatar-top`, `avatar-bottom` and `avatar-ink` draw iOS's default avatar, and `avatar-1` to `avatar-6` with their `-ink` draw Android's. Only an avatar uses them.
 - Disabled text is `text-muted`, filled buttons use `bg-fill`, outlined and ghost buttons stay transparent. Never an opacity.
 
 ## Brand

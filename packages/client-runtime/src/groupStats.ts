@@ -57,7 +57,7 @@ import {
   statsTrips,
   type StatsFilters,
 } from "./stats.ts";
-import { boardMoney, chipOf, localClock, ordinal } from "./trip.ts";
+import { boardMoney, localClock, ordinal } from "./trip.ts";
 
 /** The Group chip: Just me, or one of your groups. */
 export const groupChip = (
@@ -92,12 +92,12 @@ export type Line = ReadonlyArray<
 export const lineText = (line: Line, money: (part: Exclude<Line[number], string>) => string) =>
   line.map((part) => (Predicate.isString(part) ? part : money(part))).join("");
 
-/** A player as a chip and a name: `name` is the monogram's, `label` is how a sentence says it. */
+/** A player as an avatar and a name: `name` is the avatar's, `label` is how a sentence says it. */
 export interface Who {
   readonly playerId: PlayerId;
   readonly name: string;
   readonly label: string;
-  readonly chip: number;
+  readonly you: boolean;
 }
 
 const awardLine = (
@@ -208,7 +208,7 @@ export const groupStatsView = (
       playerId,
       name,
       label: playerId === me ? "You" : name,
-      chip: chipOf(detail, playerId),
+      you: playerId === me,
     } satisfies Who;
   };
 
@@ -250,7 +250,6 @@ export const groupStatsView = (
     rank: row.rank,
     name: names.get(row.playerId) ?? "Someone",
     you: row.playerId === me,
-    chip: chipOf(detail, row.playerId),
     guest: guests.has(row.playerId),
     best: bests.get(row.playerId),
     meta: row.sessions === 0 ? "No sessions" : played(row.sessions, row.hours),
@@ -772,7 +771,7 @@ export const groupStatsView = (
             title: awardTitles[award.key],
             playerId: award.playerId,
             name: names.get(award.playerId) ?? "Someone",
-            chip: chipOf(detail, award.playerId),
+            you: award.playerId === me,
             line: awardLine(award, currency, venueName, timeZone, { showCents, privacyMode }),
           })),
     habits: habitRows.length === 0 ? null : habitRows,

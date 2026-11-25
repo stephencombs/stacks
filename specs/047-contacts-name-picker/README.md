@@ -22,7 +22,7 @@ transitions:
 Every new person is typed by hand today, either as a group guest (`features/AddGuestSheet.tsx`)
 or as "Someone new" in `AddPlayerSheet` (`features/RecordingForms.tsx`). Most of these people are
 already in the user's address book. Phase 1 lets the user pick a contact to fill in the name, with
-no contacts permission. Phase 2 puts the friend's photo on their chip on this phone, the way
+no contacts permission. Phase 2 puts the friend's photo on their avatar on this phone, the way
 Flighty puts faces on friends.
 
 ## Phase 1: the name
@@ -71,9 +71,9 @@ Flighty puts faces on friends.
 - [ ] Device, on a fresh install on iOS and Android: picking fills the name with no permission
       prompt, and the merged Android manifest has neither `READ_CONTACTS` nor `WRITE_CONTACTS`.
 
-## Phase 2: photos on this phone, and chips at iOS tables
+## Phase 2: photos on this phone, and avatars at iOS tables
 
-Phase 1 ships first and doesn't wait for this. The iOS table chips can ship on their own, before
+Phase 1 ships first and doesn't wait for this. The iOS table avatars can ship on their own, before
 the photos.
 
 ### Model
@@ -98,7 +98,7 @@ the photos.
     applied first, and saved as JPEG with EXIF stripped. Each is about 10–20 KB, and the random
     file name defeats image caching on change.
   - `contact-photos/index.json` maps player ID to `photoId`. It is read into a store at startup
-    the way `lib/preferences.ts` does, so a `Chip` never flickers.
+    the way `lib/preferences.ts` does, so an avatar never flickers.
   - The picker writes temporary files to `Paths.cache`. They are deleted on save or cancel, and
     swept at startup.
 - **Lifecycle.**
@@ -127,22 +127,18 @@ the photos.
 
 ### UI
 
-- **Chip.** `Chip` takes an explicit `photoUri`, and a `PlayerChip` wrapper looks one up by player
-  ID. Venue chips (`SessionList.tsx:199`) use `Chip` directly and never get a photo.
-  - With a photo, it draws the photo inside a 2px ring in the player's chip colour, 1.5px below
-    26pt, with no stripes. It falls back to initials when loading fails.
-  - Check the ring's contrast on `surface` and on `felt-deep`, in light and dark.
-  - Race-chart endpoints stay initials.
-- **Player chips to switch to `PlayerChip`:** `GroupPeople`, `Crew.tsx:250`, `:536`, `:628`,
-  `Trips.tsx:203`, `GroupStats.tsx:287`, `:491`, `RecordingForms.tsx:1748`, and the table rows
-  below. `SessionList.tsx:114` (`play.others`) has no player ID and stays initials.
-- **iOS tables get chips.** In `features/SharedTable.tsx:75` and `:269`, and `LiveTable.tsx:163`,
-  only Android draws a `Chip` today. Draw it on iOS too, at 32pt without a ring, and check it in
-  the native app.
-  - Table views have no group mapping, so a table's colour comes from a stable hash of the player
-    ID instead of row position (`(index % 8) + 1`). That way one player keeps the same colour at
-    every table.
-  - `screens/SharedTable.tsx` (the `/t/:token` preview) stays without chips.
+- **Avatar.** `Avatar` takes the photos to try and draws the platform's Contacts-style default
+  when there are none or one won't load: iOS's grey monogram, or Android's letter tile. A
+  `PlayerAvatar` wrapper looks a photo up by player ID. A venue or game is never an avatar: it's
+  a disc or bar in its game colour, with no photo.
+  - A share card uses the plain `Avatar` with initials, so a photo never leaves the phone.
+  - Race-chart endpoints use `PlayerAvatar`.
+- **Player avatars use `PlayerAvatar`:** `GroupPeople`, `Crew.tsx`, `Trips.tsx`, `GroupStats.tsx`,
+  `RecordingForms.tsx`, and the table rows below. `SessionList.tsx` (`play.others`) has no player ID
+  and has no avatar.
+- **iOS tables get avatars.** `features/SharedTable.tsx` and `LiveTable.tsx` draw the avatar on
+  both platforms, at 32pt on iOS and 36pt on Android, and are checked in the native app.
+  - `screens/SharedTable.tsx` (the `/t/:token` preview) stays without avatars.
 - **On add.** In `AddGuestSheet` and `AddPlayerSheet`, a picked photo previews beside the Name
   field, with a way to drop it. It is saved under the new player's ID on submit
   (`AddGuestSheet`'s `id`, or the receipt's `command.playerId`).
@@ -161,7 +157,7 @@ the photos.
 
 - [x] Unit: the index (link, change and remove), the temporary-file sweep, and that sign-out keeps
       photos while account deletion wipes them.
-- [x] Component: `PlayerChip` falls back to initials, and a venue chip never shows a photo.
+- [x] Component: `Avatar` falls back to the platform default, and a share card never shows a photo.
 - [ ] Device: iOS shows a photo with no permission prompt. On Android, a Pixel and a Samsung each
       show either a photo or no photo controls. Photos aren't in an iCloud backup or an Android
       cloud backup.
@@ -180,6 +176,6 @@ the photos.
 - [ ] On iOS and Android, a user adds a group guest and a new table player from Contacts with no
       permission prompt, seen in the native app.
 - [ ] Neither platform's build declares a contacts permission.
-- [ ] Phase 2: a linked photo shows on that player's chips on this phone only, and iOS table rows
-      show chips.
+- [ ] Phase 2: a linked photo shows on that player's avatars on this phone only, and iOS table rows
+      show avatars.
 - [ ] `pnpm fmt`, `pnpm lint`, `pnpm knip`, `pnpm typecheck`, `pnpm test` pass.

@@ -22,7 +22,7 @@ import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { useAccount } from "../lib/account";
 import { inviteUrl } from "../lib/config";
 import { shareLink } from "../lib/share";
-import { TableChip } from "./PlayerChip";
+import { PlayerAvatar, TABLE_AVATAR_SIZE } from "./PlayerAvatar";
 import { AddPlayerSheet } from "./RecordingForms";
 
 const players = (count: number, closed: boolean) =>
@@ -72,9 +72,11 @@ export function TableSection({
             onPress={() => onOpen(item.visit.id)}
             accessibilityHint="Opens their session"
           >
-            <TableChip
+            <PlayerAvatar
               playerId={item.player.id}
               name={names.get(item.player.id) ?? item.player.displayName}
+              size={TABLE_AVATAR_SIZE}
+              you={item.isSelf}
             />
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="font-medium text-ink">{names.get(item.player.id)}</Text>
@@ -262,9 +264,11 @@ function JoinedTableSection({
               ? { onPress: () => onOpen(item.visit.id), accessibilityHint: "Opens your session" }
               : {})}
           >
-            <TableChip
+            <PlayerAvatar
               playerId={item.visit.playerId}
               name={labels.get(item.visit.playerId) ?? item.name}
+              size={TABLE_AVATAR_SIZE}
+              you={item.mine}
             />
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="font-medium text-ink">{labels.get(item.visit.playerId)}</Text>

@@ -220,7 +220,7 @@ vi.mock("./AmountKeypad", () => ({
   ),
 }));
 
-vi.mock("./Chip", () => ({ Chip: () => null }));
+vi.mock("./PlayerAvatar", () => ({ PlayerAvatar: () => null, TABLE_AVATAR_SIZE: 32 }));
 
 vi.mock("./TableTrip", () => ({
   TripPickerSheet: () => null,
