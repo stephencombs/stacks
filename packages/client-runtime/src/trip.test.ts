@@ -23,6 +23,7 @@ import {
   returnLabel,
   scopeTrips,
   streakLine,
+  tableChipOf,
   tripInScope,
   tripLines,
   tripNames,
@@ -336,4 +337,17 @@ it("puts the trip already in scope first, then the newest still going, then the 
   expect(tripInScope([], null)).toBeUndefined();
 
   expect(scopeTrips(trips)).toEqual([going, ended, older]);
+});
+
+it("gives a table player the same chip color every time, from their ID alone", () => {
+  const ids = Array.from({ length: 64 }, (_, n) =>
+    PlayerId.make(`0192e7a0-0000-7000-8000-${String(n).padStart(12, "0")}`),
+  );
+
+  const colors = ids.map(tableChipOf);
+
+  expect(colors).toEqual(ids.map(tableChipOf));
+  expect(colors.every((color) => Number.isInteger(color) && color >= 1 && color <= 8)).toBe(true);
+  expect(new Set(colors).size).toBe(8);
+  expect(colors.slice(0, 6)).toEqual([4, 1, 2, 7, 8, 5]);
 });

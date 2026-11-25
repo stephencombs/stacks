@@ -4,13 +4,18 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Etag from "effect/http/Etag";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpPlatform from "effect/http/HttpPlatform";
 import * as HttpRouter from "effect/http/HttpRouter";
 
+import * as AppleSignIn from "./auth/AppleSignIn.ts";
 import * as Clerk from "./auth/Clerk.ts";
+import * as ClerkAdmin from "./auth/ClerkAdmin.ts";
 import * as Database from "./db/Database.ts";
+import * as Account from "./features/Account.ts";
 import * as Realtime from "./features/Realtime.ts";
 import * as Api from "./http/Api.ts";
+import * as Links from "./links/Links.ts";
 import { ScopeChannel } from "./realtime/ScopeChannel.ts";
 import * as Upgrade from "./realtime/Upgrade.ts";
 
@@ -23,15 +28,20 @@ const layerWorkerPlatform = Layer.mergeAll(
   Etag.layerWeak,
 );
 
+const layerOutside = Layer.mergeAll(ClerkAdmin.layer, AppleSignIn.layer).pipe(
+  Layer.provide(FetchHttpClient.layer),
+);
+
 const { handler } = HttpRouter.toWebHandler(
   Layer.mergeAll(Api.layer, HttpRouter.cors()).pipe(
-    Layer.provide([Clerk.layer, Clerk.layerRecording, layerWorkerPlatform]),
+    Layer.provide([Clerk.layer, Clerk.layerAccount, Clerk.layerRecording, layerWorkerPlatform]),
   ),
 );
 
 interface Env {
   readonly HYPERDRIVE: Hyperdrive;
   readonly SCOPE_CHANNEL: DurableObjectNamespace<ScopeChannel>;
+  readonly LINK_SITES?: ReadonlyArray<Links.LinkSite>;
 }
 
 const handleRequest = (request: Request, env: Env, ctx: ExecutionContext) =>
@@ -46,6 +56,7 @@ const handleRequest = (request: Request, env: Env, ctx: ExecutionContext) =>
     (realtime) =>
       Effect.gen(function* () {
         const database = yield* Layer.build(Database.layer(env.HYPERDRIVE.connectionString));
+        const outside = yield* Layer.build(layerOutside);
 
         if (Upgrade.isUpgradePath(request.url)) {
           return yield* Upgrade.upgrade(request, {
@@ -55,7 +66,10 @@ const handleRequest = (request: Request, env: Env, ctx: ExecutionContext) =>
         }
 
         return yield* Effect.promise(() =>
-          handler(request, Context.add(database, Realtime.Realtime, realtime)),
+          handler(
+            request,
+            Context.add(Context.merge(database, outside), Realtime.Realtime, realtime),
+          ),
         );
       }).pipe(Effect.scoped),
   ).pipe(
@@ -67,6 +81,21 @@ const handleRequest = (request: Request, env: Env, ctx: ExecutionContext) =>
     ),
   );
 
+const retryClerkDeletions = (env: Env) =>
+  Effect.gen(function* () {
+    const database = yield* Layer.build(Database.layer(env.HYPERDRIVE.connectionString));
+
+    return yield* Account.retryClerkDeletions().pipe(Effect.provide(database));
+  }).pipe(
+    Effect.provide(ClerkAdmin.layer.pipe(Layer.provide(FetchHttpClient.layer))),
+    Effect.scoped,
+    Effect.tap((report) => Effect.logInfo("Retried Clerk deletions", report)),
+    Effect.catchCause((cause) => Effect.logError("Retrying Clerk deletions failed", cause)),
+  );
+
 export default {
-  fetch: (request, env, ctx) => Effect.runPromise(handleRequest(request, env, ctx)),
+  fetch: async (request, env, ctx) =>
+    Links.respond(request, env.LINK_SITES) ??
+    (await Effect.runPromise(handleRequest(request, env, ctx))),
+  scheduled: (_controller, env, ctx) => ctx.waitUntil(Effect.runPromise(retryClerkDeletions(env))),
 } satisfies ExportedHandler<Env>;

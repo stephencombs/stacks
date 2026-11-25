@@ -180,6 +180,7 @@ export const PersonalVisitRow = Schema.Struct({
   startedAt: Timestamp,
   finishedAt: Schema.NullOr(Timestamp),
   revision: Schema.Int,
+  groupPlayerId: Schema.NullOr(PlayerId),
 });
 
 export const PersonalEntryRow = Schema.Struct({

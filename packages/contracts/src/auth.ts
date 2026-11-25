@@ -25,6 +25,18 @@ export class Authentication extends HttpApiMiddleware.Service<
 }) {}
 
 /**
+ * Verifies the Clerk session token like `Authentication`, but lets through an account that was
+ * deleted, so a repeated deletion request can read what became of the first.
+ */
+export class AccountAuthentication extends HttpApiMiddleware.Service<
+  AccountAuthentication,
+  { provides: CurrentUser }
+>()("@stacks/contracts/AccountAuthentication", {
+  error: Unauthorized,
+  security: { bearer: HttpApiSecurity.bearer },
+}) {}
+
+/**
  * Who is recording: a signed-in account, or a device actor that sent
  * `Authorization: Actor <actorId>.<secret>`. The service checks an actor's secret against the
  * database and answers 401 when it doesn't match.
@@ -46,5 +58,5 @@ export class RecordingAuthentication extends HttpApiMiddleware.Service<
   { provides: Recorder }
 >()("@stacks/contracts/RecordingAuthentication", {
   error: Unauthorized,
-  security: { bearer: HttpApiSecurity.bearer, actor: HttpApiSecurity.http({ scheme: "Actor" }) },
+  security: { actor: HttpApiSecurity.http({ scheme: "Actor" }), bearer: HttpApiSecurity.bearer },
 }) {}

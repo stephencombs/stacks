@@ -55,7 +55,7 @@ export const load = Effect.fn("TripTables.load")(function* (
     new Set(tables.flatMap((table) => (table.venueId === null ? [] : [table.venueId]))),
   );
 
-  const [visits, entries, players, members, absences, venues] = yield* Effect.all(
+  const [visits, entries, players, members, absences, venues, pinned] = yield* Effect.all(
     [
       sql`
         select * from personal_visits where table_id in ${sql.in(tableIds)} and deleted_at is null
@@ -118,6 +118,13 @@ export const load = Effect.fn("TripTables.load")(function* (
         : sql`select ${venueColumns(sql)} from venues v where v.id in ${sql.in(venueIds)}`.pipe(
             Effect.flatMap(decodeRows(VenueRow)),
           ),
+      sql`
+        select p.id, p.group_id from players p
+        where p.id in (
+          select group_player_id from personal_visits
+          where table_id in ${sql.in(tableIds)} and group_player_id is not null
+        )
+      `.pipe(Effect.flatMap(decodeRows(Schema.Struct({ id: PlayerId, groupId: GroupId })))),
     ],
     { concurrency: "unbounded" },
   );
@@ -126,15 +133,20 @@ export const load = Effect.fn("TripTables.load")(function* (
   const memberByAccount = new Map(members.map((m) => [`${m.groupId}:${m.userId}`, m]));
   const awayByAccount = Map.groupBy(absences, (a) => `${a.groupId}:${a.userId}`);
   const venueById = new Map<VenueId, (typeof venues)[number]>(venues.map((v) => [v.id, v]));
+  const groupOfPinned = new Map(pinned.map((player) => [player.id, player.groupId]));
 
   const loaded = tables.flatMap((row) => {
     const own = visits.filter((visit) => visit.tableId === row.id);
+    const visitById = new Map(own.map((visit) => [visit.id, visit]));
     const visitIds = new Set(own.map((visit) => visit.id));
 
     const table = groupTable(
       own,
       entries.filter((entry) => visitIds.has(entry.visitId)),
       (visit) => {
+        const pin = visitById.get(visit.id)?.groupPlayerId ?? null;
+
+        if (pin !== null && groupOfPinned.get(pin) === row.groupId) return pin;
         const userId = playerById.get(visit.playerId)?.userId;
         const account = `${row.groupId}:${userId}`;
         const member = userId ? memberByAccount.get(account) : undefined;

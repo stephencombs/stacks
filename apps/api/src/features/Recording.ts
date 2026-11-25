@@ -57,6 +57,7 @@ import {
   TableRow,
 } from "../db/rows.ts";
 import * as Access from "./Access.ts";
+import * as AccountFence from "./AccountFence.ts";
 import * as Realtime from "./Realtime.ts";
 import * as Venues from "./Venues.ts";
 
@@ -745,6 +746,27 @@ const atTable = (ledger: RecordingLedger, command: RecordingCommand) => {
   );
 };
 
+// WARNING: without the shared fence lock and `for share`, a recorder resolved before a deletion writes after it.
+const stillBound = Effect.fn("Recording.stillBound")(function* (
+  self: Identity,
+  actorPlayers: ReadonlyArray<PlayerId>,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const recorder = yield* Recorder;
+
+  if (Predicate.isTagged(recorder, "Account")) {
+    yield* AccountFence.lockShared(recorder.user.userId);
+    yield* AccountFence.reject(recorder.user.userId);
+  }
+
+  const bound = yield* sql<{ playerId: PlayerId }>`
+    select player_id from player_actors
+    where actor_id = ${self.actorId} and revoked_at is null for share
+  `;
+
+  return actorPlayers.filter((player) => bound.some((row) => row.playerId === player));
+});
+
 const applyOne = Effect.fn("Recording.applyOne")(function* (
   self: Identity,
   actorPlayers: ReadonlyArray<PlayerId>,
@@ -769,8 +791,10 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
   });
 
   const apply = Effect.gen(function* () {
+    const bound = yield* stillBound(self, actorPlayers);
+
     if (yield* replayed) return;
-    const before = yield* loadLedger(self, actorPlayers, command);
+    const before = yield* loadLedger(self, bound, command);
 
     if (yield* replayed) return;
     const created = createdEntryIds(command);
@@ -784,7 +808,7 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
     if (!atTable(before, command)) return yield* new Rejected(notAtTable);
 
     const after = yield* Effect.try({
-      try: () => applyRecordingCommand(before, command, actorPlayers),
+      try: () => applyRecordingCommand(before, command, bound),
       catch: (error) => error,
     }).pipe(
       Effect.catch((error) =>
@@ -949,15 +973,21 @@ export const establish = Effect.fn("Recording.establish")(function* (
   return { self, actorPlayers: established.actorPlayers };
 });
 
-/** Applies commands in order with the same rules the device used. */
-export const push = Effect.fn("Recording.push")(function* (request: PushRecordingRequest) {
-  const { self, actorPlayers } = yield* establish(request.identity);
-
-  const results = yield* Effect.forEach(request.commands, (command) =>
-    applyOne(self, actorPlayers, command),
+/** Applies commands in order for a recorder `establish` resolved, rechecking it for each. */
+export const pushEstablished = Effect.fn("Recording.pushEstablished")(function* (
+  established: { readonly self: Identity; readonly actorPlayers: ReadonlyArray<PlayerId> },
+  commands: PushRecordingRequest["commands"],
+) {
+  const results = yield* Effect.forEach(commands, (command) =>
+    applyOne(established.self, established.actorPlayers, command),
   );
 
   return { results };
+});
+
+/** Applies commands in order with the same rules the device used. */
+export const push = Effect.fn("Recording.push")(function* (request: PushRecordingRequest) {
+  return yield* pushEstablished(yield* establish(request.identity), request.commands);
 });
 
 export const history = Effect.fn("Recording.history")(function* () {
@@ -1208,15 +1238,31 @@ const linkClosed = Effect.fn("Recording.linkClosed")(function* (
 
 /** A new read-only link. Only its hash is kept, so an earlier link stops working. */
 export const share = Effect.fn("Recording.share")(function* (tableId: TableId) {
+  return yield* shareRow(yield* startedTable(tableId));
+});
+
+/**
+ * Writes the new link under the table's lock, after checking the recorder still starts the table:
+ * an account deleted meanwhile has had its links revoked, and must not get one back.
+ */
+export const shareRow = Effect.fn("Recording.shareRow")(function* (
+  row: Effect.Success<ReturnType<typeof startedTable>>,
+) {
   const sql = yield* SqlClient.SqlClient;
-  const row = yield* startedTable(tableId);
+  const recorder = yield* Recorder;
   const token = randomToken();
 
   const hash = yield* digest(token);
 
   yield* Realtime.transaction(
     Effect.gen(function* () {
+      if (Predicate.isTagged(recorder, "Account")) {
+        yield* AccountFence.lockShared(recorder.user.userId);
+        yield* AccountFence.reject(recorder.user.userId);
+      }
+
       const before = yield* lockedLink(row.id);
+      yield* startedTable(row.id);
 
       yield* sql`update tables set share_token_hash = ${hash} where id = ${row.id}`;
       yield* Realtime.changed(tableScope(row.id));

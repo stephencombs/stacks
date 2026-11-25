@@ -124,6 +124,21 @@ export const chipOf = (detail: GroupDetail, playerId: PlayerId) => {
   return ((index === -1 ? 0 : index) % 8) + 1;
 };
 
+/**
+ * A table has no group to number its players by, so a player's chip color comes from their ID:
+ * the same player keeps the same color at every table.
+ */
+export const tableChipOf = (playerId: PlayerId) => {
+  let hash = 0x811c9dc5;
+
+  for (let i = 0; i < playerId.length; i++) {
+    hash ^= playerId.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+
+  return (hash % 8) + 1;
+};
+
 /** A run of results in words, once it's at least two long: "3 wins in a row". */
 export const streakLine = (streak: { readonly length: number; readonly winning: boolean }) =>
   streak.length < 2 ? null : `${streak.length} ${streak.winning ? "wins" : "losses"} in a row`;

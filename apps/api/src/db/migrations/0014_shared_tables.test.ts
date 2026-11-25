@@ -7,6 +7,7 @@ import * as Migrator from "effect/sql/Migrator";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as Database from "../Database.ts";
+import { DELETED_ACTOR } from "../../features/AccountFence.ts";
 import { records } from "./index.ts";
 
 const TEST_DATABASE_URL =
@@ -204,9 +205,9 @@ it.layer(Layer.mergeAll(Database.layer(TEST_DATABASE_URL), NodeServices.layer))(
           expect(yield* sql`select actor_id from personal_operations`).toEqual([
             { actorId: seeded.actor },
           ]);
-          expect(yield* sql`select id, kind from recording_actors`).toEqual([
-            { id: seeded.actor, kind: "account" },
-          ]);
+          expect(
+            yield* sql`select id, kind from recording_actors where id <> ${DELETED_ACTOR}`,
+          ).toEqual([{ id: seeded.actor, kind: "account" }]);
         }).pipe(Effect.provide(context));
       }),
     );

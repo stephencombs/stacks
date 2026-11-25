@@ -6,6 +6,8 @@ import { Button } from "../components/ui/Button";
 import { FormError, TextField } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
 import { useAction, useStacks } from "../lib/stacks";
+import { useContactPhotoDraft } from "./ContactPhoto";
+import { ChooseFromContacts } from "./ChooseFromContacts";
 
 export function AddGuestSheet({
   detail,
@@ -22,6 +24,12 @@ export function AddGuestSheet({
   const add = useAction(stacks.Client.mutation("guests", "add"));
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+  const photo = useContactPhotoDraft();
+
+  const close = () => {
+    photo.drop();
+    onClose();
+  };
 
   const submit = async () => {
     if (!name.trim()) return setNameError("Enter their name.");
@@ -34,6 +42,7 @@ export function AddGuestSheet({
         payload: { id, displayName: name.trim() },
       })
     ) {
+      photo.commit(id);
       onAdded?.(id);
       setName("");
       onClose();
@@ -43,7 +52,7 @@ export function AddGuestSheet({
   return (
     <Sheet
       open={open}
-      onClose={onClose}
+      onClose={close}
       title="Add a guest"
       description="For a friend who isn't on Color Up yet. They can claim their history when they sign up."
       footer={
@@ -60,10 +69,22 @@ export function AddGuestSheet({
         label="Name"
         testID="guest-name"
         value={name}
-        onChangeText={setName}
+        onChangeText={(next) => {
+          setName(next);
+
+          if (nameError && next.trim()) setNameError(null);
+        }}
         maxLength={60}
         autoFocus
         error={nameError}
+      />
+      <ChooseFromContacts
+        onName={(picked) => {
+          setName(picked);
+          setNameError(null);
+        }}
+        onError={setNameError}
+        photo={photo}
       />
       {add.error ? <FormError>{add.error}</FormError> : null}
     </Sheet>

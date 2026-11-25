@@ -6,7 +6,7 @@ import { expect, it, vi } from "vite-plus/test";
 const scrollTo = vi.fn();
 const selectionAsync = vi.fn();
 
-it("steps through the pitch without a vertical scroll, then opens the account screen", async () => {
+const mount = async (apple: boolean) => {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.doMock("expo-haptics", () => ({
@@ -24,8 +24,13 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
     OnboardingChart: ({ page }: { page: number }) => createElement("div", { "data-chart": page }),
   }));
   vi.doMock("./SignInButton", () => ({
-    SignInButton: ({ label }: { label: string }) =>
-      createElement("button", { type: "button" }, label),
+    SignInButton: ({ label, variant }: { label: string; variant: string }) =>
+      createElement("button", { type: "button", "data-variant": variant }, label),
+  }));
+  vi.doMock("./AppleSignInButton", () => ({
+    useAppleSignInAvailable: () => apple,
+    AppleSignInButton: () =>
+      apple ? createElement("button", { type: "button" }, "Continue with Apple") : null,
   }));
 
   function View({
@@ -133,6 +138,12 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
 
   const step = (label: string) => container.querySelector(`[data-label="${label}"]`);
 
+  return { Landing, container, root, button, step };
+};
+
+it("steps through the pitch without a vertical scroll, then opens the account screen", async () => {
+  const { Landing, container, root, button, step } = await mount(false);
+
   try {
     await act(async () => root.render(createElement(Landing)));
     expect(container.querySelector("[data-horizontal='true']")).not.toBeNull();
@@ -172,12 +183,29 @@ it("steps through the pitch without a vertical scroll, then opens the account sc
     expect(step("Start a group.")?.getAttribute("data-hidden")).toBe("false");
     expect(button("Create an account").closest("[data-hidden='true']")).toBeNull();
     expect(button("Sign in").textContent).toBe("Sign in");
+    expect(button("Create an account").getAttribute("data-variant")).toBe("primary");
+    expect(container.textContent).not.toContain("Continue with Apple");
     expect(container.textContent).toContain("Color Up never moves money.");
 
     await act(async () => button("Back").click());
     expect(step("Start a group.")?.getAttribute("data-hidden")).toBe("true");
     expect(step("Watch the board.")?.getAttribute("data-hidden")).toBe("false");
     expect(button("Skip").textContent).toBe("Skip");
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it("keeps one primary action when the Apple button shows", async () => {
+  const { Landing, container, root, button } = await mount(true);
+
+  try {
+    await act(async () => root.render(createElement(Landing, { invited: true })));
+    expect(container.textContent).toContain("Continue with Apple");
+    expect(button("Create an account").getAttribute("data-variant")).toBe("secondary");
+    expect(button("Sign in").getAttribute("data-variant")).toBe("secondary");
+    expect(container.querySelectorAll("[data-variant='primary']")).toHaveLength(0);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

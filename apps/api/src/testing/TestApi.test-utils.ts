@@ -15,6 +15,7 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as SqlClient from "effect/sql/SqlClient";
 import {
+  AccountAuthentication,
   Authentication,
   CurrentUser,
   Recorder,
@@ -30,10 +31,14 @@ import {
   type ScopeNotice,
 } from "@stacks/contracts";
 
+import { AppleRevokeFailed, AppleSignIn } from "../auth/AppleSignIn.ts";
 import { parseActor } from "../auth/Clerk.ts";
+import { ClerkAdmin, ClerkUnavailable } from "../auth/ClerkAdmin.ts";
 
 import * as Database from "../db/Database.ts";
 import { migrations } from "../db/migrations/index.ts";
+import * as Account from "../features/Account.ts";
+import * as AccountFence from "../features/AccountFence.ts";
 import * as Realtime from "../features/Realtime.ts";
 import * as Api from "../http/Api.ts";
 import { readTags } from "../realtime/Selector.ts";
@@ -48,10 +53,59 @@ const testUser = (credential: Redacted.Redacted) => {
   return { userId, displayName: userId.replace(/^user_/, ""), avatarUrl: null };
 };
 
-const verifyTest: Upgrade.Upgrade["verify"] = (credential) =>
+const verifyTestToken: Upgrade.Upgrade["verify"] = (credential) =>
   Redacted.value(credential) === ""
     ? Effect.fail(new Unauthorized())
     : Effect.succeed(testUser(credential));
+
+const verifyTest: Upgrade.Upgrade["verify"] = (credential) =>
+  Effect.tap(verifyTestToken(credential), (user) => AccountFence.rejectInRequest(user.userId));
+
+interface Outside {
+  clerkDown: boolean;
+  appleDown: boolean;
+  readonly clerkAttempts: Map<string, number>;
+  readonly clerkFailing: Set<string>;
+  readonly clerkDeleted: Array<string>;
+  readonly appleLinked: Set<string>;
+  readonly appleRevoked: Array<string>;
+}
+
+const outside: Outside = {
+  clerkDown: false,
+  appleDown: false,
+  clerkAttempts: new Map(),
+  clerkFailing: new Set(),
+  clerkDeleted: [],
+  appleLinked: new Set(),
+  appleRevoked: [],
+};
+
+const testClerk = ClerkAdmin.of({
+  deleteUser: (userId) =>
+    Effect.suspend(() => {
+      outside.clerkAttempts.set(userId, (outside.clerkAttempts.get(userId) ?? 0) + 1);
+
+      return outside.clerkDown || outside.clerkFailing.has(userId)
+        ? Effect.fail(new ClerkUnavailable({ status: 503 }))
+        : Effect.sync(() => void outside.clerkDeleted.push(userId));
+    }),
+  appleLinked: (userId) => Effect.sync(() => outside.appleLinked.has(userId)),
+});
+
+const testApple = AppleSignIn.of({
+  revoke: (code) =>
+    Effect.suspend(() =>
+      outside.appleDown
+        ? Effect.fail(new AppleRevokeFailed({ step: "token" }))
+        : Effect.sync(() => void outside.appleRevoked.push(code)),
+    ),
+});
+
+const layerTestOutside = Layer.mergeAll(
+  Layer.succeed(ClerkAdmin, testClerk),
+  Layer.succeed(AppleSignIn, testApple),
+);
 
 const layerTestAuthentication = Layer.mergeAll(
   Layer.succeed(Authentication, {
@@ -60,15 +114,17 @@ const layerTestAuthentication = Layer.mergeAll(
         Effect.provideService(httpEffect, CurrentUser, user),
       ),
   }),
+  Layer.succeed(AccountAuthentication, {
+    bearer: (httpEffect, { credential }) =>
+      Effect.flatMap(verifyTestToken(credential), (user) =>
+        Effect.provideService(httpEffect, CurrentUser, user),
+      ),
+  }),
   Layer.succeed(RecordingAuthentication, {
     bearer: (httpEffect, { credential }) =>
-      Redacted.value(credential) === ""
-        ? Effect.fail(new Unauthorized())
-        : Effect.provideService(
-            httpEffect,
-            Recorder,
-            RecorderOf.Account({ user: testUser(credential) }),
-          ),
+      Effect.flatMap(verifyTest(credential), (user) =>
+        Effect.provideService(httpEffect, Recorder, RecorderOf.Account({ user })),
+      ),
     actor: (httpEffect, { credential }) =>
       Effect.flatMap(parseActor(credential), (actor) =>
         Effect.provideService(httpEffect, Recorder, RecorderOf.Actor(actor)),
@@ -101,6 +157,7 @@ const upgradeHeaders = (request: {
 const makeTestApi = Effect.gen(function* () {
   yield* PgMigrator.run({ loader: migrations });
   const database = yield* Effect.context<SqlClient.SqlClient>();
+  const requestContext = Context.merge(database, yield* Layer.build(layerTestOutside));
 
   const { handler, dispose } = HttpRouter.toWebHandler(
     Api.layer.pipe(Layer.provide([layerTestAuthentication, layerPlatform])),
@@ -130,7 +187,9 @@ const makeTestApi = Effect.gen(function* () {
 
     return Effect.runPromise(
       Realtime.withRealtime(dispatch, Realtime.originOf(request.headers), (realtime) =>
-        Effect.promise(() => handler(request, Context.add(database, Realtime.Realtime, realtime))),
+        Effect.promise(() =>
+          handler(request, Context.add(requestContext, Realtime.Realtime, realtime)),
+        ),
       ),
     );
   };
@@ -237,9 +296,38 @@ const makeTestApi = Effect.gen(function* () {
       Effect.provideService(FetchHttpClient.Fetch, fetch),
     );
 
+  const whileClerkDown = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => void (outside.clerkDown = true)),
+      () => effect,
+      () => Effect.sync(() => void (outside.clerkDown = false)),
+    );
+
+  const whileAppleDown = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => void (outside.appleDown = true)),
+      () => effect,
+      () => Effect.sync(() => void (outside.appleDown = false)),
+    );
+
+  const withOutside = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(
+      Effect.provideService(ClerkAdmin, testClerk),
+      Effect.provideService(AppleSignIn, testApple),
+    );
+
+  const retryClerkDeletions = withOutside(Account.retryClerkDeletions()).pipe(
+    Effect.provide(database),
+  );
+
   return {
     as,
     asActor,
+    outside,
+    withOutside,
+    whileClerkDown,
+    whileAppleDown,
+    retryClerkDeletions,
     notified,
     noticed,
     closes,

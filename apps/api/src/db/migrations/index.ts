@@ -24,6 +24,8 @@ import tableTrip from "./0021_table_trip.ts";
 import tableDeleted from "./0022_table_deleted.ts";
 import membershipAbsences from "./0023_membership_absences.ts";
 import tableGameName from "./0024_table_game_name.ts";
+import accountDeletion from "./0025_account_deletion.ts";
+import accountDeletionHardening from "./0026_account_deletion_hardening.ts";
 
 export const records = {
   "0001_init": init,
@@ -50,6 +52,8 @@ export const records = {
   "0022_table_deleted": tableDeleted,
   "0023_membership_absences": membershipAbsences,
   "0024_table_game_name": tableGameName,
+  "0025_account_deletion": accountDeletion,
+  "0026_account_deletion_hardening": accountDeletionHardening,
 };
 
 export const migrations = Migrator.fromRecord(records);

@@ -3,7 +3,15 @@ import { beforeEach, expect, it, vi } from "vite-plus/test";
 const state = vi.hoisted(() => ({
   written: new Map<string, string>(),
   available: true,
-  shareAsync: vi.fn<(...args: ReadonlyArray<unknown>) => Promise<void>>(async () => {}),
+  ratio: 3,
+  android: false,
+  captured: new Array<ReadonlyArray<unknown>>(),
+  deleted: new Array<string>(),
+  gone: false,
+  shareFails: false,
+  shareAsync: vi.fn<(...args: ReadonlyArray<unknown>) => Promise<void>>(async () => {
+    if (state.shareFails) throw new Error("no app");
+  }),
   rnShare: vi.fn<(...args: ReadonlyArray<unknown>) => Promise<void>>(async () => {}),
 }));
 
@@ -13,9 +21,15 @@ vi.mock("expo-file-system", () => ({
     readonly uri: string;
     constructor(
       readonly dir: string,
-      readonly name: string,
+      readonly name?: string,
     ) {
-      this.uri = `${dir}/${name}`;
+      this.uri = name === undefined ? dir : `${dir}/${name}`;
+    }
+    get exists() {
+      return !state.gone;
+    }
+    delete() {
+      state.deleted.push(this.uri);
     }
     async write(content: string) {
       state.written.set(this.uri, content);
@@ -29,16 +43,42 @@ vi.mock("expo-sharing", () => ({
 }));
 
 vi.mock("react-native", () => ({
+  PixelRatio: { get: () => state.ratio },
+  Platform: {
+    get OS() {
+      return state.android ? "android" : "ios";
+    },
+  },
   Share: {
     share: (...args: ReadonlyArray<unknown>) => state.rnShare(...args),
   },
 }));
 
-import { shareCsv } from "./share";
+vi.mock("react-native-view-shot", () => ({
+  captureRef: async (...args: ReadonlyArray<unknown>) => {
+    state.captured.push(args);
+
+    return "file:///cache/ReactNative/card.png";
+  },
+}));
+
+vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+  callback();
+
+  return 0;
+});
+
+import { shareCsv, shareImage, shareLink } from "./share";
 
 beforeEach(() => {
   state.written.clear();
   state.available = true;
+  state.ratio = 3;
+  state.android = false;
+  state.captured = [];
+  state.deleted = [];
+  state.gone = false;
+  state.shareFails = false;
   state.shareAsync.mockClear();
   state.rnShare.mockClear();
 });
@@ -63,4 +103,77 @@ it("falls back to React Native Share when native file sharing is unavailable", a
     message: "a,b\n",
     url: "file:///cache/sessions.csv",
   });
+});
+
+it("shares a link on iOS as a url, so the share sheet treats it as one", async () => {
+  await shareLink("https://colorup.test/t#abc", "Follow our table on Color Up:");
+  expect(state.rnShare).toHaveBeenCalledWith({
+    url: "https://colorup.test/t#abc",
+    message: "Follow our table on Color Up:",
+  });
+});
+
+it("shares a link on Android inside the message, which is all it reads", async () => {
+  state.android = true;
+  await shareLink("https://colorup.test/t#abc", "Follow our table on Color Up:");
+  expect(state.rnShare).toHaveBeenCalledWith({
+    message: "Follow our table on Color Up: https://colorup.test/t#abc",
+  });
+});
+
+it("asks iOS for points, so the capture is 1080 by 1350 physical pixels on any density", async () => {
+  const view = { current: null };
+
+  for (const ratio of [2, 3]) {
+    state.ratio = ratio;
+    state.captured = [];
+    await shareImage(view, "Vegas weekend");
+    expect(state.captured).toEqual([
+      [
+        view,
+        { format: "png", quality: 1, result: "tmpfile", width: 1080 / ratio, height: 1350 / ratio },
+      ],
+    ]);
+  }
+});
+
+it("asks Android for physical pixels, which is how view-shot reads the size there", async () => {
+  const view = { current: null };
+  state.android = true;
+  state.ratio = 2.625;
+  state.captured = [];
+  await shareImage(view, "Vegas weekend");
+  expect(state.captured).toEqual([
+    [view, { format: "png", quality: 1, result: "tmpfile", width: 1080, height: 1350 }],
+  ]);
+});
+
+it("shares the PNG and deletes it once sharing finishes", async () => {
+  await shareImage({ current: null }, "Vegas weekend");
+  expect(state.shareAsync).toHaveBeenCalledWith("file:///cache/ReactNative/card.png", {
+    mimeType: "image/png",
+    UTI: "public.png",
+    dialogTitle: "Vegas weekend",
+  });
+  expect(state.deleted).toEqual(["file:///cache/ReactNative/card.png"]);
+});
+
+it("deletes the PNG when the share sheet fails, and lets the error through", async () => {
+  state.shareFails = true;
+  await expect(shareImage({ current: null }, "Vegas weekend")).rejects.toThrow("no app");
+  expect(state.deleted).toEqual(["file:///cache/ReactNative/card.png"]);
+});
+
+it("captures nothing when the device can't share", async () => {
+  state.available = false;
+  await expect(shareImage({ current: null }, "Vegas weekend")).rejects.toThrow(
+    "Sharing isn't available on this device.",
+  );
+  expect(state.captured).toEqual([]);
+});
+
+it("doesn't delete a PNG the share sheet already took", async () => {
+  state.gone = true;
+  await shareImage({ current: null }, "Vegas weekend");
+  expect(state.deleted).toEqual([]);
 });

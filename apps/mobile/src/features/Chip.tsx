@@ -1,22 +1,75 @@
+import { useState } from "react";
 import Svg, { Circle, G, Rect } from "react-native-svg";
-import { View } from "react-native";
+import { Image, View } from "react-native";
 import { Text } from "../components/ui/Text";
 import { useCSSVariable } from "uniwind";
 
 const STRIPES = [0, 60, 120, 180, 240, 300];
 
-/** A player's casino chip: striped edge, solid face, their initial. `chip` is 1 to 8. */
-export function Chip({
-  chip,
-  name,
-  size = 32,
-  ring = false,
-}: {
+export type ChipProps = {
   chip: number;
   name: string;
   size?: number;
   ring?: boolean;
-}) {
+};
+
+/**
+ * A player's casino chip: striped edge, solid face, their initial. `chip` is 1 to 8. A
+ * `photoUri` swaps the face for the photo inside a ring in the chip's color, and a photo that
+ * won't load goes back to the initial. Only `PlayerChip` looks a photo up; a venue's chip never has one.
+ */
+export function Chip({ photoUri, ...props }: ChipProps & { photoUri?: string | null | undefined }) {
+  return photoUri ? (
+    <PhotoChip key={photoUri} photoUri={photoUri} {...props} />
+  ) : (
+    <InitialChip {...props} />
+  );
+}
+
+function PhotoChip({ photoUri, ...props }: ChipProps & { photoUri: string }) {
+  const [failed, setFailed] = useState(false);
+  const [face, edge] = useCSSVariable([`--color-chip-${props.chip}`, "--color-fill-strong"]);
+  const size = props.size ?? 32;
+  const border = size < 26 ? 1.5 : 2;
+
+  if (failed) return <InitialChip {...props} />;
+
+  const inner = size - 2;
+
+  return (
+    <View
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: 1,
+        borderColor: String(edge),
+      }}
+    >
+      <View
+        style={{
+          width: inner,
+          height: inner,
+          borderRadius: inner / 2,
+          borderWidth: border,
+          borderColor: String(face),
+        }}
+        className="overflow-hidden bg-fill"
+      >
+        <Image
+          source={{ uri: photoUri }}
+          style={{ width: inner - border * 2, height: inner - border * 2 }}
+          resizeMode="cover"
+          onError={() => setFailed(true)}
+        />
+      </View>
+    </View>
+  );
+}
+
+function InitialChip({ chip, name, size = 32, ring = false }: ChipProps) {
   const [face, ink, edge, border] = useCSSVariable([
     `--color-chip-${chip}`,
     `--color-chip-${chip}-ink`,
