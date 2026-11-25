@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./accountDeletion": {
+      "types": "./src/accountDeletion.ts",
+      "import": "./src/accountDeletion.ts"
+    },
     "./api": {
       "types": "./src/api.ts",
       "import": "./src/api.ts"

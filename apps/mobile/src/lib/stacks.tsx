@@ -1,5 +1,4 @@
 import type { GroupDetail, GroupId, TripDetail, TripId } from "@stacks/contracts";
-import { getClerkInstance } from "@clerk/expo";
 import { useAtomValue } from "@effect/atom-react";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
@@ -29,12 +28,14 @@ import { AppState } from "react-native";
 import { FormError } from "../components/ui/Field";
 import { Skeleton } from "../components/ui/Surface";
 import { useAccount } from "./account";
+import { onAccountDeleted } from "./accountDeletion";
 import { actorKeys } from "./actorKeys";
-import { apiUrl, clerkPublishableKey } from "./config";
+import { apiUrl } from "./config";
 import { markStartup } from "./diagnostics";
 import { outboxStorage, wakeOutbox } from "./outbox";
 import { installOrigin } from "./origin";
 import { rootHubFor } from "./scopeHub";
+import { sessionToken } from "./sessionToken";
 import { captureTestEvent } from "./telemetry";
 import { lastTripStorage, statsCopyStorage } from "./tripStorage";
 
@@ -65,9 +66,9 @@ export function SignedInProvider({ children }: { children: ReactNode }) {
 
 const api = {
   baseUrl: apiUrl,
-  getToken: async () =>
-    (await getClerkInstance({ publishableKey: clerkPublishableKey }).session?.getToken()) ?? null,
+  getToken: () => sessionToken(),
   origin: installOrigin,
+  onAccountDeleted,
 };
 
 const bearer = async () => {

@@ -35,7 +35,8 @@ async function load({
   key = "test",
   auth: initialAuth = SIGNED_OUT,
   metrics = null,
-}: { key?: string; auth?: Auth; metrics?: Metrics } = {}) {
+  wipe = null,
+}: { key?: string; auth?: Auth; metrics?: Metrics; wipe?: object | null } = {}) {
   let auth = initialAuth;
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -104,6 +105,13 @@ async function load({
   }));
   vi.doMock("./lib/theme", () => ({ useTheme: () => "system" }));
   vi.doMock("./lib/actorKeys", () => ({ actorKeys: {} }));
+  vi.doMock("./lib/accountDeletion", () => ({
+    useAccountWipe: () => wipe,
+    onAccountDeleted: () => {},
+  }));
+  vi.doMock("./features/AccountWipeScreen", () => ({
+    AccountWipeScreen: () => createElement("section", null, "Clearing this phone"),
+  }));
   vi.doMock("./lib/origin", () => ({ installOrigin: "install-test" }));
   vi.doMock("./lib/scopeHub", () => ({
     rootHubFor: () => ({ watch: () => () => {}, dispose: () => {} }),
@@ -372,6 +380,14 @@ it.each([
   expect(app.markStartup).toHaveBeenCalledWith("initial_url_timeout");
   onReady();
   expect(app.markStartup).toHaveBeenCalledWith("navigation_ready");
+});
+
+it("replaces the whole app with the wipe screen while a deleted account is cleared", async () => {
+  const app = await load({ auth: SIGNED_IN, wipe: { stage: "waiting" } });
+  const host = await app.render(createElement(app.App));
+
+  expect(host.textContent).toBe("Clearing this phone");
+  expect(app.navigation).not.toHaveBeenCalled();
 });
 
 it("keeps every address: your play in the first tab, groups in Crew, invites above the tabs", async () => {

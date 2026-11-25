@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   android: false,
   captured: new Array<ReadonlyArray<unknown>>(),
   deleted: new Array<string>(),
+  cache: new Array<string>(),
   gone: false,
   shareFails: false,
   shareAsync: vi.fn<(...args: ReadonlyArray<unknown>) => Promise<void>>(async () => {
@@ -15,9 +16,8 @@ const state = vi.hoisted(() => ({
   rnShare: vi.fn<(...args: ReadonlyArray<unknown>) => Promise<void>>(async () => {}),
 }));
 
-vi.mock("expo-file-system", () => ({
-  Paths: { cache: "file:///cache" },
-  File: class {
+vi.mock("expo-file-system", () => {
+  class File {
     readonly uri: string;
     constructor(
       readonly dir: string,
@@ -34,8 +34,17 @@ vi.mock("expo-file-system", () => ({
     async write(content: string) {
       state.written.set(this.uri, content);
     }
-  },
-}));
+  }
+
+  class Directory {
+    constructor(readonly dir: string) {}
+    list() {
+      return state.cache.map((name) => new File(this.dir, name));
+    }
+  }
+
+  return { Paths: { cache: "file:///cache" }, File, Directory };
+});
 
 vi.mock("expo-sharing", () => ({
   isAvailableAsync: async () => state.available,
@@ -68,7 +77,7 @@ vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
   return 0;
 });
 
-import { shareCsv, shareImage, shareLink } from "./share";
+import { deleteSharedCsvFiles, shareCsv, shareImage, shareLink } from "./share";
 
 beforeEach(() => {
   state.written.clear();
@@ -77,6 +86,7 @@ beforeEach(() => {
   state.android = false;
   state.captured = [];
   state.deleted = [];
+  state.cache = [];
   state.gone = false;
   state.shareFails = false;
   state.shareAsync.mockClear();
@@ -176,4 +186,20 @@ it("doesn't delete a PNG the share sheet already took", async () => {
   state.gone = true;
   await shareImage({ current: null }, "Vegas weekend");
   expect(state.deleted).toEqual([]);
+});
+
+it("deletes the CSV exports left in cache, and nothing else there", () => {
+  state.cache = [
+    "color-up-sessions-2026-11-24.csv",
+    "color-up-sessions-2026-11-25.csv",
+    "other.csv",
+    "card.png",
+  ];
+
+  deleteSharedCsvFiles();
+
+  expect(state.deleted).toEqual([
+    "file:///cache/color-up-sessions-2026-11-24.csv",
+    "file:///cache/color-up-sessions-2026-11-25.csv",
+  ]);
 });

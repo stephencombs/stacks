@@ -186,9 +186,9 @@ player goes back to being a guest, and keeps the name and ledger rows.
   - Errors are typed.
 - [x] **Server.** `Account.ts` with `Account.preview` and `Account.delete`, thin handlers, the
       fence in both auth layers, the cron retry, the Apple revoke, and the after-commit realtime.
-- [ ] **Mobile: You.** On both platforms, Sign out and Delete account sit together in an account
+- [x] **Mobile: You.** On both platforms, Sign out and Delete account sit together in an account
       `SettingsGroup`. On Android they move out of the sheet footer.
-- [ ] **Mobile: the confirmation sheet.** It loads the preview and handles loading, offline and
+- [x] **Mobile: the confirmation sheet.** It loads the preview and handles loading, offline and
       error states. It says:
   - what is deleted, including play recorded only on this phone,
   - what friends keep: your name and play in shared groups, as a guest,
@@ -224,8 +224,8 @@ player goes back to being a guest, and keeps the name and ledger rows.
 - [x] Ownership moves to an admin first, then a member.
 - [x] Each of these is safe: a lost response, a failed Clerk call that the cron later finishes, a
       stale token used after deletion (rejected), a duplicate request, and Clerk's "not found".
-- [ ] The device wipe is safe to repeat, and resumes after the app is killed partway.
-- [ ] Component: the sheet's states, and the Apple-cancelled path that shows manual removal steps.
+- [x] The device wipe is safe to repeat, and resumes after the app is killed partway.
+- [x] Component: the sheet's states, and the Apple-cancelled path that shows manual removal steps.
 
 ## Non-goals
 

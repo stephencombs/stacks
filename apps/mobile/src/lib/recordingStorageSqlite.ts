@@ -1,4 +1,4 @@
-import { openDatabaseAsync } from "expo-sqlite";
+import { deleteDatabaseAsync, openDatabaseAsync } from "expo-sqlite";
 import {
   decodeRecordingStorageDocument,
   RecordingStorageConflict,
@@ -9,6 +9,8 @@ import {
   type RecordingStorageChange,
 } from "@stacks/client-runtime/recordingStorage";
 
+const DATABASE = "color-up-recording.db";
+
 const listeners = new Map<string, Set<(change: RecordingStorageChange) => void>>();
 
 export const openSQLiteRecordingStorage: (namespace: string) => Promise<RecordingStorage> = async (
@@ -16,7 +18,7 @@ export const openSQLiteRecordingStorage: (namespace: string) => Promise<Recordin
 ) => {
   validateRecordingNamespace(namespace);
 
-  const database = await openDatabaseAsync("color-up-recording.db", {
+  const database = await openDatabaseAsync(DATABASE, {
     useNewConnection: true,
   }).catch((error) => {
     throw new RecordingStorageError("open", error);
@@ -156,4 +158,17 @@ export const openSQLiteRecordingStorage: (namespace: string) => Promise<Recordin
       return closing;
     },
   };
+};
+
+/**
+ * Deletes the device ledger's file. The store must be closed first. A file that's already gone
+ * counts as deleted, so a wipe can run again.
+ */
+export const deleteRecordingDatabase = async () => {
+  try {
+    await deleteDatabaseAsync(DATABASE);
+  } catch (error) {
+    // WARNING: iOS reports a missing file only in the message, under the same code as real failures.
+    if (!(error instanceof Error && /not found/i.test(error.message))) throw error;
+  }
 };

@@ -24,6 +24,7 @@ import { useCSSVariable, useUniwind } from "uniwind";
 import { Button } from "./components/ui/Button";
 import { ConfirmDialogHost } from "./components/ui/ConfirmDialogHost";
 import { TabBarHeight } from "./components/ui/tabBar";
+import { AccountWipeScreen } from "./features/AccountWipeScreen";
 import { Landing } from "./features/Landing";
 import { PersonalYouButton, PlayBrand } from "./features/Personal";
 import {
@@ -35,6 +36,7 @@ import {
 } from "./features/PlaceTabs";
 import { YouButton } from "./features/You";
 import { AccountProvider, useAccount } from "./lib/account";
+import { useAccountWipe } from "./lib/accountDeletion";
 import { appLinkPrefixes } from "./lib/config";
 import { markStartup, reportStartupError } from "./lib/diagnostics";
 import { useAppFonts } from "./lib/fonts";
@@ -387,6 +389,12 @@ function SignedOut({ invited }: { invited: boolean }) {
   return <Landing invited={invited} onRecord={() => navigation.dispatch(toPlay())} />;
 }
 
+function WipeGate({ children }: { children: ReactNode }) {
+  const wipe = useAccountWipe();
+
+  return wipe ? <AccountWipeScreen wipe={wipe} /> : children;
+}
+
 export default function App() {
   const loadingFonts = useAppFonts();
   useLayoutEffect(() => markStartup("root_committed"), []);
@@ -404,14 +412,16 @@ export default function App() {
         }
       }
     >
-      <RecordingProvider store={recordingStore}>
-        <LiveSessionBridge />
-        <AccountProvider>
-          <StatusBar style={theme === "light" ? "dark" : "light"} />
-          <Root />
-          <ConfirmDialogHost />
-        </AccountProvider>
-      </RecordingProvider>
+      <AccountProvider>
+        <StatusBar style={theme === "light" ? "dark" : "light"} />
+        <WipeGate>
+          <RecordingProvider store={recordingStore}>
+            <LiveSessionBridge />
+            <Root />
+            <ConfirmDialogHost />
+          </RecordingProvider>
+        </WipeGate>
+      </AccountProvider>
     </SafeAreaProvider>
   );
 }

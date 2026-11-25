@@ -69,3 +69,26 @@ A foreign key that points at `users`, `players` or `recording_actors` needs a de
 such key from `pg_constraint` and fails on one it doesn't know. A column that holds a user or actor id
 without a foreign key (`personal_entries.created_by`) needs the same care and has no test to remind
 you.
+
+## On the phone
+
+Deleting from You asks the API first, then hands the phone to a wipe. `AccountWipeScreen` replaces
+the whole app while it runs, which is what stops sync and realtime: nothing is mounted to keep
+writing. The wipe ends the Live Activity or Live Update, closes the recording store and deletes
+its database, forgets the device actor, removes the account's outbox, last trip and stats copies,
+then signs out of Clerk. _Done_ reloads the app signed out, on Play.
+
+- **The marker comes first.** `account-wipe.json` is written before any step and removed only after
+  sign-out, so an app killed partway finishes at the next launch, from the same screen. Every
+  step must succeed when what it removes is already gone. A new file or key kept per user needs a
+  step in `lib/accountDeletion.ts`.
+- **Only the reason wipes.** The fence answers a deleted account with `Unauthorized` carrying
+  `reason: "account_deleted"`, and a request that sees it starts a wipe at once. A bare 401, such as
+  a token the API can't verify, never wipes: it takes the normal signed-out path, so a bad deploy
+  can't cost anyone the play that exists only on their phone. A device whose Clerk token can't
+  refresh any more never reaches the fence, so it never sees the reason. Once Clerk deletes the
+  user, `sessionToken` sees Clerk refuse the refresh with a 401 or 404, signs that device out, and
+  keeps its local files.
+- **Apple.** The code comes from `expo-apple-authentication` on iOS just before the request. A
+  cancelled sheet, or Android, doesn't stop the deletion; the wipe screen then shows how to remove
+  Color Up from the Apple Account by hand.

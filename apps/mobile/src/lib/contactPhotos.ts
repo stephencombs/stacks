@@ -81,6 +81,7 @@ export const createContactPhotoStore = (files: ContactPhotoFiles, photoId = newI
     discard: (tempUri: string) => files.discard(tempUri),
     clear: () => {
       files.wipe();
+      files.sweepTemporary();
       index = {};
       emit();
     },

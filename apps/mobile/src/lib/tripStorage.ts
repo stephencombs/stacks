@@ -1,6 +1,6 @@
 import type { StatsCopyStorage } from "@stacks/client-runtime/statsCopy";
 import type { LastTripStorage } from "@stacks/client-runtime/trip";
-import { File, Paths } from "expo-file-system";
+import { Directory, File, Paths } from "expo-file-system";
 
 export const lastTripStorage: (userId: string) => LastTripStorage = (userId) => {
   const key = `last-trip-${userId}`;
@@ -34,4 +34,15 @@ export const statsCopyStorage: (userId: string) => StatsCopyStorage = (userId) =
       else if (kept.exists) kept.delete();
     },
   };
+};
+
+/** Drops a person's last trip and every group's stats copy the phone kept for them. */
+export const deleteTripFiles = (userId: string) => {
+  const lastTrip = new File(Paths.document, `last-trip-${userId}`);
+
+  if (lastTrip.exists) lastTrip.delete();
+
+  for (const entry of new Directory(Paths.document).list()) {
+    if (entry instanceof File && entry.name.startsWith(`stats-${userId}-`)) entry.delete();
+  }
 };

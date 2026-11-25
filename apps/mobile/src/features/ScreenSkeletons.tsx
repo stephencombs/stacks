@@ -350,3 +350,19 @@ export function InviteScreenSkeleton() {
     </SkeletonScreen>
   );
 }
+
+/** The deletion sheet's groups while what deleting changes loads: what goes, what stays, what carries over. */
+export function DeleteAccountSkeleton() {
+  return (
+    <SkeletonScreen label="Loading what deleting your account changes">
+      {[4, 1, 2].map((rows) => (
+        <View key={rows} className="gap-2">
+          <View className="min-h-7 justify-center px-1">
+            <SkeletonText size="sm" className="w-28" />
+          </View>
+          <RowsSkeleton rows={rows} meta={false} trailing={false} />
+        </View>
+      ))}
+    </SkeletonScreen>
+  );
+}

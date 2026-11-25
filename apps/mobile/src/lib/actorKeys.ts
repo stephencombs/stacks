@@ -16,3 +16,6 @@ export const actorKeys: ActorKeyStorage = {
   },
   save: (credential) => SecureStore.setItemAsync(KEY, JSON.stringify(credential)),
 };
+
+/** Forgets the device actor, so nothing here can record as it again. */
+export const forgetActorKey = () => SecureStore.deleteItemAsync(KEY);
