@@ -134,14 +134,13 @@ Web stacks fixed parts on four steps of Tailwind's scale. Anything else in a pag
 
 Motion says what just happened. If it doesn't, cut it. The values live in `@stacks/client-runtime/motion`; the app animates with them through React Native's `Animated`. Don't add an animation library.
 
-| What        | Enter  | Exit  | Easing                                                    |
-| ----------- | ------ | ----- | --------------------------------------------------------- |
-| Menu        | 200ms  | 150ms | in on `ease-enter`, out on `ease-exit`                    |
-| Sheet       | 340ms  | 240ms | in on `ease-enter`, out on `ease-exit`; its scrim matches |
-| Toast       | 250ms  | 160ms | in on `ease-enter`, out on `ease-exit`                    |
-| Number roll | 220ms  | none  | `ease-enter`                                              |
-| Press       | 100ms  | 150ms | scale to 0.96 on `ease-press`, back on `ease-enter`       |
-| Live pulse  | 1800ms | none  | the live dot's ring swells and fades, on a loop           |
+| What        | Enter | Exit  | Easing                                                    |
+| ----------- | ----- | ----- | --------------------------------------------------------- |
+| Menu        | 200ms | 150ms | in on `ease-enter`, out on `ease-exit`                    |
+| Sheet       | 340ms | 240ms | in on `ease-enter`, out on `ease-exit`; its scrim matches |
+| Toast       | 250ms | 160ms | in on `ease-enter`, out on `ease-exit`                    |
+| Number roll | 220ms | none  | `ease-enter`                                              |
+| Press       | 100ms | 150ms | scale to 0.96 on `ease-press`, back on `ease-enter`       |
 
 - `ease-enter` is `cubic-bezier(0.32, 0.72, 0, 1)`: a fast start that reads as an instant answer. `ease-exit` accelerates away. An exit is always faster than its enter.
 - animate with `animate()` and press with `PressableScale`; `Button` and `IconButton` already do.

@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/expo";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import {
   CurrencyCode,
   GroupId,
@@ -41,10 +41,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Money } from "../components/Money";
 import { Button, IconButton } from "../components/ui/Button";
-import { cn } from "../components/ui/cn";
 import { Choice, FormError, TextField } from "../components/ui/Field";
 import { Icon } from "../components/ui/Icon";
-import { LiveDot } from "../components/ui/LiveDot";
 import { Screen } from "../components/ui/Screen";
 import { Sheet } from "../components/ui/Sheet";
 import {
@@ -56,7 +54,6 @@ import {
   Skeleton,
   Surface,
 } from "../components/ui/Surface";
-import { Avatar } from "../features/Avatar";
 import { PlayerAvatar } from "../features/PlayerAvatar";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
 import { useCrewScopes } from "../lib/crewScopes";
@@ -190,8 +187,32 @@ function CrewSkeleton() {
   );
 }
 
+type FeedClock = { readonly now: DateTime.Utc; readonly zone: DateTime.TimeZone };
+
+const CLOCK_MS = 60_000;
+
+function useFeedClock() {
+  const [clock, setClock] = useState<FeedClock>(() => ({
+    now: DateTime.nowUnsafe(),
+    zone: DateTime.zoneMakeLocal(),
+  }));
+
+  useFocusEffect(
+    useCallback(() => {
+      const refresh = () => setClock({ now: DateTime.nowUnsafe(), zone: DateTime.zoneMakeLocal() });
+      const timer = setInterval(refresh, CLOCK_MS);
+      refresh();
+
+      return () => clearInterval(timer);
+    }, []),
+  );
+
+  return clock;
+}
+
 function Feed({ groups }: { groups: ReadonlyArray<GroupListItem> }) {
   const pinned = pinnedTrip(groups);
+  const clock = useFeedClock();
 
   return (
     <>
@@ -205,7 +226,7 @@ function Feed({ groups }: { groups: ReadonlyArray<GroupListItem> }) {
       ) : null}
       <View className="gap-2">
         <SectionHeading>Activity</SectionHeading>
-        <ActivityPage groups={groups} />
+        <ActivityPage groups={groups} clock={clock} />
       </View>
     </>
   );
@@ -289,9 +310,11 @@ function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
 
 function ActivityPage({
   groups,
+  clock,
   cursor,
 }: {
   groups: ReadonlyArray<GroupListItem>;
+  clock: FeedClock;
   cursor?: string;
 }) {
   const stacks = useStacks();
@@ -303,7 +326,12 @@ function ActivityPage({
         const items = crewFeed(page.items, groups);
 
         const activity = items.map((item) => (
-          <ActivityRow key={activityKey(item)} item={item} me={myPlayer(groups, item)} />
+          <ActivityRow
+            key={activityKey(item)}
+            item={item}
+            me={myPlayer(groups, item)}
+            clock={clock}
+          />
         ));
 
         return (
@@ -316,7 +344,7 @@ function ActivityPage({
               </EmptyState>
             ) : null}
             {page.nextCursor === null ? null : older ? (
-              <ActivityPage groups={groups} cursor={page.nextCursor} />
+              <ActivityPage groups={groups} clock={clock} cursor={page.nextCursor} />
             ) : (
               <Button label="Show older" className="self-center" onPress={() => setOlder(true)} />
             )}
@@ -376,21 +404,28 @@ const activityKey = (item: CrewActivityItem) => {
   }
 };
 
-function ActivityRow({ item, me }: { item: CrewActivityItem; me: PlayerId | undefined }) {
+const LEAD_SIZE = 40;
+
+function ActivityRow({
+  item,
+  me,
+  clock,
+}: {
+  item: CrewActivityItem;
+  me: PlayerId | undefined;
+  clock: FeedClock;
+}) {
   switch (item.kind) {
     case "session_finished":
     case "table_finished":
-      return <FinishedPost item={item} me={me} />;
+      return <FinishedPost item={item} me={me} clock={clock} />;
     case "session_live":
     case "table_live":
       return <LivePost item={item} me={me} />;
     case "trip_started":
-      return <TripStartedPost item={item} />;
+      return <TripStartedPost item={item} clock={clock} />;
   }
 }
-
-const LEAD_SIZE = 40;
-const CHIP_SIZE = 22;
 
 function ActivityCard({
   item,
@@ -430,17 +465,14 @@ function ActivityCard({
   );
 }
 
-function Face({ face, size }: { face: StoryFace; size: number }) {
-  return face.playerId ? (
-    <PlayerAvatar playerId={face.playerId} name={face.displayName} size={size} you={face.you} />
-  ) : (
-    <Avatar name={face.displayName} playerId={`guest:${face.displayName}`} size={size} />
-  );
-}
-
 function Lead({ face }: { face: StoryFace | null }) {
   return face ? (
-    <Face face={face} size={LEAD_SIZE} />
+    <PlayerAvatar
+      playerId={face.playerId}
+      name={face.displayName}
+      size={LEAD_SIZE}
+      you={face.you}
+    />
   ) : (
     <View className="size-10 items-center justify-center rounded-full bg-fill">
       <Icon name="person" color="muted" size={22} />
@@ -454,20 +486,23 @@ const metaClass = "type-footnote text-muted";
 function FinishedPost({
   item,
   me,
+  clock,
 }: {
   item: Extract<CrewActivityItem, { kind: "session_finished" | "table_finished" }>;
   me: PlayerId | undefined;
+  clock: FeedClock;
 }) {
   const prefs = usePreferences();
   const { currency } = item.group;
 
   const story = finishedStory(item.players, {
-    venue: item.venue?.name ?? "a table",
+    venue: item.venue?.name ?? null,
+    game: item.kind === "table_finished" ? item.game : null,
     me,
     hidden: prefs.privacyMode,
   });
 
-  const meta = `${relativeWhen(item.endedAt, DateTime.nowUnsafe())} · ${item.trip.name}`;
+  const meta = `${relativeWhen(item.endedAt, clock.now, clock.zone)} · ${item.trip.name}`;
 
   const sentence = storyText(story, (amount) =>
     formatDisplayMoney(MinorUnits.make(amount), currency, prefs, { forAccessibility: true }),
@@ -492,25 +527,21 @@ function FinishedPost({
         {meta}
       </Text>
       {story.rest.length > 0 ? (
-        <View className="flex-row flex-wrap items-center gap-1.5 pt-1.5">
-          {story.rest.map((result) => (
-            <View
-              key={result.key}
-              className="flex-row items-center gap-1.5 rounded-full bg-fill py-0.5 pr-2.5 pl-0.5"
-            >
-              <Face face={result} size={CHIP_SIZE} />
+        <Text className="pt-0.5 type-footnote text-ink">
+          {story.rest.map((result, index) => (
+            <Text key={result.playerId}>
+              {index > 0 ? " · " : ""}
+              {`${result.name} `}
               <Money
                 amount={MinorUnits.make(result.net)}
                 currency={currency}
                 tone="result"
-                className="type-footnote font-medium"
+                className="font-medium"
               />
-            </View>
+            </Text>
           ))}
-          {story.more > 0 ? (
-            <Text className="px-1 type-footnote font-medium text-muted">+{story.more}</Text>
-          ) : null}
-        </View>
+          {story.more > 0 ? <Text className="text-muted">{` · +${story.more} more`}</Text> : null}
+        </Text>
       ) : null}
     </ActivityCard>
   );
@@ -534,10 +565,7 @@ function LivePost({
       <Text numberOfLines={2} className={headlineClass}>
         {story.headline}
       </Text>
-      <View className="flex-row items-center gap-1">
-        <LiveDot />
-        <ActivityLiveMeta startedAt={item.startedAt} trip={item.trip.name} />
-      </View>
+      <ActivityLiveMeta startedAt={item.startedAt} trip={item.trip.name} />
     </ActivityCard>
   );
 }
@@ -546,14 +574,20 @@ function ActivityLiveMeta({ startedAt, trip }: { startedAt: DateTime.Utc; trip: 
   const now = useRecordingClock();
 
   return (
-    <Text numberOfLines={1} className={cn("shrink", metaClass)}>
-      <Text className="font-semibold text-live">Live {formatDuration(startedAt, now)}</Text>
+    <Text numberOfLines={1} className={metaClass}>
+      <Text className="font-semibold text-live">● Live {formatDuration(startedAt, now)}</Text>
       {` · ${trip}`}
     </Text>
   );
 }
 
-function TripStartedPost({ item }: { item: Extract<CrewActivityItem, { kind: "trip_started" }> }) {
+function TripStartedPost({
+  item,
+  clock,
+}: {
+  item: Extract<CrewActivityItem, { kind: "trip_started" }>;
+  clock: FeedClock;
+}) {
   return (
     <ActivityCard
       item={item}
@@ -567,7 +601,7 @@ function TripStartedPost({ item }: { item: Extract<CrewActivityItem, { kind: "tr
         {item.trip.name} has started
       </Text>
       <Text numberOfLines={1} className={metaClass}>
-        {`${relativeWhen(item.startedAt, DateTime.nowUnsafe())} · ${item.group.name}`}
+        {`${relativeWhen(item.startedAt, clock.now, clock.zone)} · ${item.group.name}`}
       </Text>
     </ActivityCard>
   );

@@ -16,7 +16,6 @@ export const duration = {
   toastOut: 160,
   pressDown: 100,
   pressUp: 150,
-  pulse: 1800,
 } as const;
 
 /** How far a pressed control shrinks. */

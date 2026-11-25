@@ -27,7 +27,6 @@ it("keeps the shared timings and press scale", () => {
     toastOut: 160,
     pressDown: 100,
     pressUp: 150,
-    pulse: 1800,
   });
   expect(pressScale).toBe(0.96);
 });
