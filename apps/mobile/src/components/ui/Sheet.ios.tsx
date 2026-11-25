@@ -560,7 +560,7 @@ function NativeFormSheet({
                       {
                         type: "button",
                         icon: { type: "sfSymbol", name: "xmark" },
-                        accessibilityLabel: `Close ${title}`,
+                        accessibilityLabel: title ? `Close ${title}` : "Close",
                         identifier: `sheet-close-${slotKey}`,
                         disabled: busy,
                         onPress: onHeaderPress,

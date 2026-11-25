@@ -560,7 +560,7 @@ export function SeatSheet({
       open
       hideHeader={Platform.OS === "android"}
       busy={quick.pending}
-      title={name}
+      title={Platform.OS === "ios" ? "" : name}
       onClose={onClose}
     >
       <View className="flex-row items-center gap-4">
