@@ -54,13 +54,13 @@ export function Screen({
   const header = useNativeHeaderActions({ onOpenGroups });
   const foot = useScreenFoot({ footer: !!footer, fab: !!fab, footerGap: 12 });
 
+  // WARNING: iOS 26 finds the header edge blur's scroll view through each screen's first children, so the header (its You sheet stays mounted once opened) must render after the ScrollView.
   return (
     <SheetHost>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1 bg-canvas"
       >
-        {header}
         <FeltStatusBar felt={false} />
         <ToastHost {...(foot.above === undefined ? {} : { above: foot.above })}>
           <ScrollView
@@ -84,6 +84,7 @@ export function Screen({
             </PinnedFooter>
           ) : null}
         </ToastHost>
+        {header}
         {live ? (
           <LiveBar
             onHeightChange={foot.onLiveBarHeight}

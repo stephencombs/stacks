@@ -35,7 +35,6 @@ export function SettingsLayout({ groupName, currency, sections }: SettingsLayout
 
   return (
     <View className="flex-1 bg-canvas">
-      {header}
       <Host
         style={{ flex: 1, paddingBottom: bar }}
         colorScheme={theme === "dark" ? "dark" : "light"}
@@ -92,6 +91,7 @@ export function SettingsLayout({ groupName, currency, sections }: SettingsLayout
           ) : null}
         </FieldGroup>
       </Host>
+      {header}
       <LiveBar bottom={bar} onHeightChange={setLiveBarHeight} />
     </View>
   );
