@@ -93,6 +93,7 @@ const setupTableScreen = async ({
   vi.doMock("../features/LiveTable", () => ({
     ActionSlot: () => null,
     LiveClock: () => null,
+    LiveHero: () => null,
     SeatSheet: () => null,
     TableActionSheet: () => null,
     TableSeats: () => null,

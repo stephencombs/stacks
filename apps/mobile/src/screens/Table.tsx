@@ -32,6 +32,7 @@ import { LiveSessionsBar } from "../features/LiveBar";
 import {
   ActionSlot,
   LiveClock,
+  LiveHero,
   SeatSheet,
   TableActionSheet,
   TableSeats,
@@ -175,8 +176,8 @@ function Table({ tableId }: { tableId: TableId }) {
   });
 
   const venue = state.venues.find((item) => item.id === table.table.venueId);
-  const soft = view.closed ? "text-muted" : "text-felt-soft";
-  const ink = view.closed ? "text-ink" : "text-felt-ink";
+  const title = [tableTitle(table.table), venue?.name].filter(Boolean).join(" · ");
+  const started = view.startedAt ? `Started ${formatTime(view.startedAt)}` : null;
 
   return (
     <PersonalScreen
@@ -241,14 +242,14 @@ function Table({ tableId }: { tableId: TableId }) {
           {table.you.playing ? (
             <Button
               label="Back to your session"
-              variant={Platform.OS === "android" && !view.closed ? "feltPrimary" : "primary"}
+              variant={view.closed ? "primary" : "feltPrimary"}
               size="lg"
               onPress={() => toVisit(table.you.playing!)}
             />
           ) : view.closed ? null : (
             <Button
               label="Sit down and play"
-              variant={Platform.OS === "android" ? "felt" : "primary"}
+              variant="feltPrimary"
               size="lg"
               onPress={() => setOpen({ type: "sit" })}
             />
@@ -278,48 +279,33 @@ function Table({ tableId }: { tableId: TableId }) {
           }
         />
       </View>
-      {Platform.OS === "android" && !view.closed ? (
-        <View className="gap-2.5 px-3 pt-10">
-          <Text accessibilityRole="header" className="type-label text-[13px] text-felt-ink">
-            In play at the table
-          </Text>
-          <Money
-            amount={view.inPlay}
-            currency={RECORDING_CURRENCY}
-            felt
-            fit
-            className="text-[76px] leading-[84px] font-bold tracking-[-2.5px]"
-          />
-          <Text className="type-heading font-medium text-felt-ink">
-            {[tableTitle(table.table), venue?.name].filter(Boolean).join(" · ")}
-          </Text>
-          <Text className="type-footnote text-felt-soft">
-            {view.seats.length === 0
+      {!view.closed ? (
+        <LiveHero
+          label="In play at the table"
+          amount={view.inPlay}
+          title={title}
+          detail={
+            view.seats.length === 0
               ? "Nobody's playing yet"
-              : `${view.startedAt ? `Started ${formatTime(view.startedAt)} · ` : ""}${view.playing} playing`}
-          </Text>
-        </View>
+              : [started, Platform.OS === "android" ? `${view.playing} playing` : null]
+                  .filter(Boolean)
+                  .join(" · ")
+          }
+        />
       ) : (
         <View className="items-center gap-3 pt-12">
-          <Text accessibilityRole="header" className={cn("type-body font-medium", soft)}>
+          <Text accessibilityRole="header" className="type-body font-medium text-muted">
             In play at the table
           </Text>
           <Money
             amount={view.inPlay}
             currency={RECORDING_CURRENCY}
-            felt={!view.closed}
             fit
             className="w-full text-center text-7xl leading-[88px]"
           />
-          <Text className={cn("mt-3 text-center type-headline", ink)}>
-            {[tableTitle(table.table), venue?.name].filter(Boolean).join(" · ")}
-          </Text>
-          <Text className={cn("text-center type-footnote", soft)}>
-            {view.seats.length === 0
-              ? "Nobody's playing yet"
-              : view.closed
-                ? "Everyone has cashed out"
-                : `${view.playing} playing`}
+          <Text className="mt-3 text-center type-headline text-ink">{title}</Text>
+          <Text className="text-center type-footnote text-muted">
+            {view.seats.length === 0 ? "Nobody's playing yet" : "Everyone has cashed out"}
           </Text>
         </View>
       )}
@@ -337,7 +323,6 @@ function Table({ tableId }: { tableId: TableId }) {
         <TableSeats
           table={view}
           felt={!view.closed}
-          count={false}
           onSeat={(seat) => setOpen({ type: "seat", seat })}
           onSelf={toVisit}
         />
