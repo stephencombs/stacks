@@ -87,7 +87,8 @@ then signs out of Clerk. _Done_ reloads the app signed out, on Play.
   a token the API can't verify, never wipes: it takes the normal signed-out path, so a bad deploy
   can't cost anyone the play that exists only on their phone. A device whose Clerk token can't
   refresh any more never reaches the fence, so it never sees the reason. Once Clerk deletes the
-  user, that device just signs out and keeps its local files.
+  user, `sessionToken` sees Clerk refuse the refresh with a 401 or 404, signs that device out, and
+  keeps its local files.
 - **Apple.** The code comes from `expo-apple-authentication` on iOS just before the request. A
   cancelled sheet, or Android, doesn't stop the deletion; the wipe screen then shows how to remove
   Color Up from the Apple Account by hand.

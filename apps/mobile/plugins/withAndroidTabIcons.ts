@@ -14,8 +14,8 @@ const withAndroidTabIcons: ConfigPlugin = (config) =>
       const drawable = join(config.modRequest.platformProjectRoot, "app/src/main/res/drawable");
       mkdirSync(drawable, { recursive: true });
 
-      for (const file of readdirSync(source))
-        copyFileSync(join(source, file), join(drawable, file));
+      for (const file of readdirSync(source, { withFileTypes: true }))
+        if (file.isFile()) copyFileSync(join(source, file.name), join(drawable, file.name));
 
       return config;
     },
