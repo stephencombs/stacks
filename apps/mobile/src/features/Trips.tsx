@@ -7,18 +7,11 @@ import {
   type TripDetail,
 } from "@stacks/contracts";
 import { newId } from "@stacks/client-runtime/ids";
-import { playerNames } from "@stacks/client-runtime/format";
-import {
-  boardMoney,
-  closedPlays,
-  localClock,
-  tripDates,
-  tripPlays,
-} from "@stacks/client-runtime/trip";
-import { playerTrip, tripStandings } from "@stacks/shared/trips";
+import { closedPlays, tripDates, tripPlays } from "@stacks/client-runtime/trip";
+import { playerTrip } from "@stacks/shared/trips";
 import * as DateTime from "effect/DateTime";
 import { useState } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { View } from "react-native";
 import { Text } from "../components/ui/Text";
 
 import { Money } from "../components/Money";
@@ -31,18 +24,12 @@ import { Icon } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
 import { EmptyState, List, Row, SectionHeading } from "../components/ui/Surface";
 import { useGo } from "../lib/go";
-import { HIDDEN_AMOUNT_LABEL, usePreferences } from "../lib/preferences";
 import { useScope } from "../lib/scope";
 import { Loaded, useAction, useStacks } from "../lib/stacks";
-import { PlayerAvatar } from "./PlayerAvatar";
-import { Skeleton } from "../components/ui/Surface";
 
-/** The group's trips: the ones going now with their leaders, then past trips. Each opens its sessions. */
+/** The group's trips: the ones going now, then past trips. Each opens its sessions. */
 export function TripsSection({ detail }: { detail: GroupDetail }) {
-  const go = useGo();
-  const stacks = useStacks();
   const [starting, setStarting] = useState(false);
-  const android = Platform.OS === "android";
   const going = detail.trips.filter((trip) => trip.endedAt === null);
   const past = detail.trips.filter((trip) => trip.endedAt !== null);
 
@@ -53,9 +40,9 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
           detail.trips.length === 0 ? undefined : (
             <Button
               label="New trip"
-              className={android ? "px-1" : undefined}
+              className="px-1"
               size="sm"
-              variant={android ? "link" : "ghost"}
+              variant="link"
               onPress={() => setStarting(true)}
             />
           )
@@ -64,54 +51,10 @@ export function TripsSection({ detail }: { detail: GroupDetail }) {
         Trips
       </SectionHeading>
       {detail.trips.length === 0 ? <NoTrips onStart={() => setStarting(true)} /> : null}
-      {android && detail.trips.length > 0 ? (
+      {detail.trips.length > 0 ? (
         <List>
           {[...going, ...past].map((trip) => (
             <TripRow key={trip.id} trip={trip} detail={detail} />
-          ))}
-        </List>
-      ) : null}
-      {android
-        ? null
-        : going.map((trip) => (
-            <Pressable
-              key={trip.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${trip.name}, going`}
-              onPress={() => go.trip(trip.id)}
-              className="gap-3 rounded-xl bg-surface p-4 active:opacity-90"
-            >
-              <View className="gap-1">
-                <Text className="text-lg font-semibold text-ink">{trip.name}</Text>
-                <Text className="text-sm text-muted">Going · {tripDates(trip)}</Text>
-              </View>
-              <Loaded
-                query={stacks.trip(trip.id)}
-                skeleton={
-                  <View
-                    accessibilityElementsHidden
-                    className="h-[22px] flex-row items-center gap-4"
-                  >
-                    <Skeleton className="h-3 w-24" />
-                    <Skeleton className="h-3 w-20" />
-                    <Skeleton className="h-3 w-24" />
-                  </View>
-                }
-              >
-                {(detailed) => <Leaders detail={detail} trip={detailed} />}
-              </Loaded>
-            </Pressable>
-          ))}
-      {!android && past.length > 0 ? (
-        <List>
-          {past.map((trip) => (
-            <Row key={trip.id} accessibilityHint="Opens the trip" onPress={() => go.trip(trip.id)}>
-              <Text numberOfLines={1} className="flex-1 text-base font-medium text-ink">
-                {trip.name}
-              </Text>
-              <Text className="text-sm text-muted">{tripDates(trip)}</Text>
-              <Icon name="chevron-right" color="faint" size={18} />
-            </Row>
           ))}
         </List>
       ) : null}
@@ -180,48 +123,6 @@ function NoTrips({ onStart }: { onStart: () => void }) {
       Every session is part of a trip, like a weekend in Vegas or this month's home games. Start
       one, and its sessions get their own leaderboard and awards.
     </EmptyState>
-  );
-}
-
-function Leaders({ detail, trip }: { detail: GroupDetail; trip: TripDetail }) {
-  const prefs = usePreferences();
-  const names = playerNames(detail);
-  const closed = closedPlays(trip);
-  const top = tripStandings(closed, localClock).slice(0, 3);
-
-  if (top.length === 0)
-    return (
-      <Text className="text-sm text-muted">Standings start when the first table finishes.</Text>
-    );
-
-  return (
-    <View className="flex-row flex-wrap gap-x-4 gap-y-2">
-      {top.map((s) => (
-        <View key={s.playerId} className="flex-row items-center gap-2">
-          <Text className="tabular-nums text-sm text-ink">{s.rank}</Text>
-          <PlayerAvatar
-            playerId={s.playerId}
-            name={names.get(s.playerId) ?? ""}
-            size={22}
-            you={s.playerId === detail.myPlayerId}
-          />
-          <Text
-            accessibilityLabel={prefs.privacyMode ? HIDDEN_AMOUNT_LABEL : undefined}
-            className={`tabular-nums text-sm ${
-              prefs.privacyMode
-                ? "text-muted"
-                : s.net > 0
-                  ? "text-win"
-                  : s.net < 0
-                    ? "text-loss"
-                    : "text-muted"
-            }`}
-          >
-            {boardMoney(s.net, detail.group.currency, true, prefs)}
-          </Text>
-        </View>
-      ))}
-    </View>
   );
 }
 

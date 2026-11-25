@@ -29,6 +29,8 @@ it("lets an owner change roles and remove admins and members, but never another 
     manage: true,
     claimLink: false,
     changeRole: true,
+    removeGuest: false,
+    addBack: false,
   });
   expect(playerActions(as("owner"), member("member")).changeRole).toBe(true);
   expect(playerActions(as("owner"), member("owner")).manage).toBe(false);
@@ -39,6 +41,8 @@ it("lets an admin remove members only, and never change a role", () => {
     manage: true,
     claimLink: false,
     changeRole: false,
+    removeGuest: false,
+    addBack: false,
   });
   expect(playerActions(as("admin"), member("admin")).manage).toBe(false);
   expect(playerActions(as("admin"), member("owner")).manage).toBe(false);
@@ -50,6 +54,8 @@ it("gives a plain member nothing to manage, for every role", () => {
       manage: false,
       claimLink: false,
       changeRole: false,
+      removeGuest: false,
+      addBack: false,
     });
 });
 
@@ -57,9 +63,23 @@ it("never manages yourself, and never manages a guest as an account", () => {
   expect(playerActions(as("owner"), member("member", viewerId)).manage).toBe(false);
 
   for (const role of ["owner", "admin", "member"] as const)
-    expect(playerActions(as(role), guest)).toEqual({
+    expect(playerActions(as(role), guest)).toMatchObject({
       manage: false,
       claimLink: true,
       changeRole: false,
     });
+});
+
+it("lets owners and admins remove a guest, and add back one removed with history", () => {
+  const removed: Player = { ...guest, claimCode: null };
+  const former = { ...member("member"), role: null } satisfies Player;
+
+  for (const role of ["owner", "admin"] as const) {
+    expect(playerActions(as(role), guest)).toMatchObject({ removeGuest: true, addBack: false });
+    expect(playerActions(as(role), removed)).toMatchObject({ removeGuest: false, addBack: true });
+    expect(playerActions(as(role), former)).toMatchObject({ removeGuest: false, addBack: false });
+  }
+
+  expect(playerActions(as("member"), guest).removeGuest).toBe(false);
+  expect(playerActions(as("member"), removed).addBack).toBe(false);
 });

@@ -9,7 +9,8 @@
       "ignoreDependencies": ["cloudflare"]
     },
     "apps/mobile": {
-      "entry": ["plugins/*.ts"]
+      "entry": ["plugins/*.ts"],
+      "ignoreDependencies": ["react-native-reanimated"]
     }
   }
 }

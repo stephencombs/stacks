@@ -334,6 +334,20 @@ const GuestsGroup = HttpApiGroup.make("guests")
     }),
   )
   .add(
+    HttpApiEndpoint.post("remove", "/groups/:groupId/guests/:playerId/remove", {
+      params: Schema.Struct({ groupId: GroupId, playerId: PlayerId }),
+      success: GroupDetail,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("restore", "/groups/:groupId/guests/:playerId/restore", {
+      params: Schema.Struct({ groupId: GroupId, playerId: PlayerId }),
+      success: GroupDetail,
+      error: [Forbidden, NotFound],
+    }),
+  )
+  .add(
     HttpApiEndpoint.get("previewClaim", "/claims/:code", {
       params: Schema.Struct({ code: Schema.String }),
       success: ClaimPreview,
