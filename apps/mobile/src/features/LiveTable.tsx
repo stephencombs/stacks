@@ -22,10 +22,10 @@ import {
   type TableId,
   type VisitId,
 } from "@stacks/contracts";
-import { shortName } from "@stacks/client-runtime/format";
+import { formatTime, shortName } from "@stacks/client-runtime/format";
 import { formatMoney } from "@stacks/shared/money";
 import type * as DateTime from "effect/DateTime";
-import { use, useState } from "react";
+import { useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { Text } from "../components/ui/Text";
 
@@ -38,18 +38,21 @@ import { FormError } from "../components/ui/Field";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { Icon, type IconName } from "../components/ui/Icon";
 import { Sheet } from "../components/ui/Sheet";
-import { InSheet } from "../components/ui/sheetContext";
+import { Card, List, Row } from "../components/ui/Surface";
 import { formatDisplayMoney, HIDDEN_AMOUNT, usePreferences } from "../lib/preferences";
 import {
   AddPlayerSheet,
   CashOutSheet,
+  CorrectSheet,
   RebuySheet,
   ReopenSheet,
   SitDownSheet,
+  VoidSheet,
 } from "./RecordingForms";
-import { ContactPhotoControls } from "./ContactPhoto";
-import { PlayerAvatar, TABLE_AVATAR_SIZE } from "./PlayerAvatar";
+import { ContactPhotoMenu, useContactPhotoLink } from "./ContactPhoto";
+import { PLAYER_SHEET_AVATAR_SIZE, PlayerAvatar, TABLE_AVATAR_SIZE } from "./PlayerAvatar";
 import { ShareSheet, TableSettingsSheet } from "./SharedTable";
+import { EntryInspector, History } from "./VisitHistory";
 
 const money = (amount: number, showCents = false) =>
   formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY, {
@@ -363,11 +366,16 @@ export function useDeleteTable(tableId: TableId, onDeleted: () => void) {
   };
 }
 
-type SeatStep = "menu" | "rebuy" | "cash_out" | "reopen" | "return";
+type SeatStep =
+  | { readonly type: "menu" | "rebuy" | "cash_out" | "reopen" | "return" | "history" }
+  | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId };
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 /**
- * Another player's sheet, for whoever records for everyone here: a rebuy or cash-out while they
- * play, or, once they've cashed out, undoing it or sitting them back down.
+ * Another player's sheet, for whoever records for everyone here: who they are and what they've
+ * put in, then a rebuy or cash-out while they play, or, once they've cashed out, undoing it or
+ * sitting them back down. Their history opens in place, where an entry can be corrected or voided.
  */
 export function SeatSheet({
   seat,
@@ -375,35 +383,34 @@ export function SeatSheet({
   onClose,
   onRecorded,
   onSeated,
-  onHistory,
 }: {
   seat: TableSeat;
   table: LiveTable;
   onClose: () => void;
   onRecorded: (recorded: TableRecorded) => void;
   onSeated: (visitId: VisitId, name: string) => void;
-  onHistory: (visitId: VisitId) => void;
 }) {
   const { visit } = useRecordingVisit(seat.visitId);
-  const inSheet = use(InSheet);
   const prefs = usePreferences();
   const quick = useRecordingSubmit();
-  const [step, setStep] = useState<SeatStep>("menu");
+  const photo = useContactPhotoLink(seat.playerId);
+  const [step, setStep] = useState<SeatStep>({ type: "menu" });
 
   if (!visit) return null;
 
   const shown = (amount: number) =>
     formatDisplayMoney(MinorUnits.make(amount), RECORDING_CURRENCY, prefs);
 
-  const back = () => setStep("menu");
+  const to = (type: "menu" | "history") => () => setStep({ type });
+  const name = shortName(seat.name);
 
-  if (step === "rebuy")
+  if (step.type === "rebuy")
     return (
       <RebuySheet
         visit={visit}
         who={seat.name}
         back
-        onClose={back}
+        onClose={to("menu")}
         onSaved={(entryId, input) =>
           onRecorded({
             visitId: seat.visitId,
@@ -415,14 +422,14 @@ export function SeatSheet({
       />
     );
 
-  if (step === "cash_out")
+  if (step.type === "cash_out")
     return (
       <CashOutSheet
         visit={visit}
         who={seat.name}
         note={cashOutNote(table.seats, seat.visitId)}
         back
-        onClose={back}
+        onClose={to("menu")}
         onSaved={(entryId, input) =>
           onRecorded({
             visitId: seat.visitId,
@@ -433,28 +440,87 @@ export function SeatSheet({
       />
     );
 
-  if (step === "reopen")
+  if (step.type === "reopen")
     return (
       <ReopenSheet
         visit={visit}
         back
-        onClose={back}
+        onClose={to("menu")}
         onReopened={() =>
           onRecorded({ visitId: seat.visitId, text: `${seat.name} is playing again.` })
         }
       />
     );
 
-  if (step === "return")
+  if (step.type === "return")
     return (
       <SitDownSheet
         tableId={visit.visit.tableId}
         player={PlayerIdentity.make({ id: seat.playerId, displayName: seat.name })}
         back
-        onClose={back}
+        onClose={to("menu")}
         onSeated={(next) => onSeated(next, seat.name)}
       />
     );
+
+  if (step.type === "history")
+    return (
+      <Sheet open back depth={1} title={`${name}'s history`} onClose={to("menu")}>
+        <History
+          visit={visit}
+          heading={false}
+          onInspect={(entryId) => setStep({ type: "inspect", entryId })}
+        />
+      </Sheet>
+    );
+
+  if ("entryId" in step) {
+    const { entryId } = step;
+    const entry = visit.entries.find((item) => item.id === entryId);
+
+    if (!entry) return null;
+
+    if (step.type === "inspect")
+      return (
+        <EntryInspector
+          visit={visit}
+          entry={entry}
+          back
+          depth={2}
+          onClose={to("history")}
+          onShow={(next) => setStep({ type: "inspect", entryId: next })}
+          onCorrect={() => setStep({ type: "correct", entryId })}
+          onVoid={() => setStep({ type: "void", entryId })}
+        />
+      );
+
+    if (step.type === "correct")
+      return (
+        <CorrectSheet
+          visit={visit}
+          entry={entry}
+          back
+          depth={3}
+          onClose={() => setStep({ type: "inspect", entryId })}
+          onSaved={(next) =>
+            onRecorded({ visitId: seat.visitId, entryId: next, text: "Correction saved." })
+          }
+        />
+      );
+
+    return (
+      <VoidSheet
+        visit={visit}
+        entry={entry}
+        back
+        depth={3}
+        onClose={() => setStep({ type: "inspect", entryId })}
+        onVoided={() =>
+          onRecorded({ visitId: seat.visitId, text: "Entry voided. It stays in the history." })
+        }
+      />
+    );
+  }
 
   const rebuy = async (amount: number) => {
     const receipt = await quick.submit({
@@ -473,6 +539,18 @@ export function SeatSheet({
       });
   };
 
+  const finishedAt = visit.visit.finishedAt;
+  const playing = finishedAt === null;
+  const entries = plural(visit.entries.length, "entry", "entries");
+
+  const buyIns = visit.entries.filter(
+    (entry) => entry.kind === "buy_in" && entry.voidedAt === null,
+  ).length;
+
+  const status = playing
+    ? `Playing since ${formatTime(visit.visit.startedAt)} · ${plural(buyIns, "buy-in", "buy-ins")}`
+    : `Cashed out at ${formatTime(finishedAt)}`;
+
   const playingAgain = table.seats.some(
     (item) => item.playerId === seat.playerId && item.playing && item.visitId !== seat.visitId,
   );
@@ -480,67 +558,113 @@ export function SeatSheet({
   return (
     <Sheet
       open
+      hideHeader={Platform.OS === "android"}
       busy={quick.pending}
-      title={shortName(seat.name)}
-      description={seat.status}
+      title={Platform.OS === "ios" ? "" : name}
       onClose={onClose}
     >
-      <View
-        className={cn(
-          "flex-row items-baseline justify-between gap-3 rounded-xl p-4",
-          inSheet ? "bg-raised" : "bg-surface",
-        )}
-      >
-        <Text className="type-footnote text-muted">{seat.playing ? "Bought in" : "Result"}</Text>
-        <Money
-          amount={seat.amount}
-          currency={RECORDING_CURRENCY}
-          tone={seat.playing ? "plain" : "result"}
-          className="type-title"
+      <View className="flex-row items-center gap-4">
+        <ContactPhotoMenu
+          playerId={seat.playerId}
+          name={seat.name}
+          size={PLAYER_SHEET_AVATAR_SIZE}
+          photo={photo}
         />
+        <View className="min-w-0 flex-1 gap-0.5">
+          <Text accessibilityRole="header" numberOfLines={1} className="type-title text-ink">
+            {seat.name}
+          </Text>
+          <Text className="type-footnote text-muted">{status}</Text>
+        </View>
+        {Platform.OS === "android" ? (
+          <IconButton
+            accessibilityLabel={`Close ${name}`}
+            disabled={quick.pending}
+            icon={<Icon name="close" color="ink" size={16} />}
+            onPress={onClose}
+          />
+        ) : null}
       </View>
-      {seat.playing ? (
-        <>
-          <View
-            className="flex-row gap-2"
-            accessibilityRole="toolbar"
-            accessibilityLabel={`Rebuy for ${seat.name}`}
-          >
-            {LIVE_REBUY_AMOUNTS.map((preset) => (
+      {photo.message ? <Text className="type-footnote text-muted">{photo.message}</Text> : null}
+      <Card className="gap-4">
+        <View className="gap-1">
+          <Text className="type-footnote text-muted">{playing ? "Bought in" : "Result"}</Text>
+          <Money
+            amount={playing ? visit.totals.buyIn : (visit.finalResult ?? seat.amount)}
+            currency={RECORDING_CURRENCY}
+            tone={playing ? "plain" : "result"}
+            fit
+            testID="seat-amount"
+            className="type-hero"
+          />
+        </View>
+        {playing ? null : (
+          <View className="flex-row gap-4">
+            <View className="flex-1 gap-1">
+              <Text className="type-footnote text-muted">Bought in</Text>
+              <Money
+                amount={visit.totals.buyIn}
+                currency={RECORDING_CURRENCY}
+                className="type-number"
+              />
+            </View>
+            <View className="flex-1 gap-1">
+              <Text className="type-footnote text-muted">Cashed out</Text>
+              <Money
+                amount={visit.totals.cashOut}
+                currency={RECORDING_CURRENCY}
+                className="type-number"
+              />
+            </View>
+          </View>
+        )}
+      </Card>
+      {playing ? (
+        <View className="gap-3">
+          <View className="gap-2">
+            <Text className="type-footnote text-muted">Rebuy</Text>
+            <View
+              className="flex-row gap-2"
+              accessibilityRole="toolbar"
+              accessibilityLabel={`Rebuy for ${seat.name}`}
+            >
+              {LIVE_REBUY_AMOUNTS.map((preset) => (
+                <Button
+                  key={preset}
+                  label={`+ ${money(preset, prefs.showCents)}`}
+                  size="lg"
+                  haptic
+                  disabled={quick.pending}
+                  className="min-w-0 flex-1"
+                  onPress={() => void rebuy(preset)}
+                />
+              ))}
               <Button
-                key={preset}
-                label={`+ ${money(preset, prefs.showCents)}`}
+                label="Other"
                 size="lg"
-                haptic
                 disabled={quick.pending}
                 className="min-w-0 flex-1"
-                onPress={() => void rebuy(preset)}
+                onPress={() => setStep({ type: "rebuy" })}
               />
-            ))}
-            <Button
-              label="Other"
-              size="lg"
-              disabled={quick.pending}
-              className="min-w-0 flex-1"
-              onPress={() => setStep("rebuy")}
-            />
+            </View>
           </View>
           <Button
-            label={`Cash out ${shortName(seat.name)}`}
+            label="Cash out"
+            accessibilityLabel={`Cash out ${seat.name}`}
             variant="primary"
             size="lg"
             haptic
             disabled={quick.pending}
-            onPress={() => setStep("cash_out")}
+            onPress={() => setStep({ type: "cash_out" })}
           />
-        </>
+        </View>
       ) : Platform.OS === "android" ? (
         <View className="flex-row gap-2">
           <Button
             label="Undo cash-out"
             size="lg"
             className="flex-1"
-            onPress={() => setStep("reopen")}
+            onPress={() => setStep({ type: "reopen" })}
           />
           {playingAgain ? null : (
             <Button
@@ -548,7 +672,7 @@ export function SeatSheet({
               variant="primary"
               size="lg"
               className="flex-1"
-              onPress={() => setStep("return")}
+              onPress={() => setStep({ type: "return" })}
             />
           )}
         </View>
@@ -559,24 +683,29 @@ export function SeatSheet({
               label="Back at the table"
               variant="primary"
               size="lg"
-              onPress={() => setStep("return")}
+              onPress={() => setStep({ type: "return" })}
             />
           )}
           <Button
             label="Undo cash-out"
             variant="secondary"
             size="lg"
-            onPress={() => setStep("reopen")}
+            onPress={() => setStep({ type: "reopen" })}
           />
         </View>
       )}
       {quick.error ? <FormError>{quick.error}</FormError> : null}
-      <ContactPhotoControls playerId={seat.playerId} name={seat.name} />
-      <Button
-        label={`${shortName(seat.name)}'s history`}
-        variant="ghost"
-        onPress={() => onHistory(seat.visitId)}
-      />
+      <List>
+        <Row
+          onPress={to("history")}
+          accessibilityLabel={`${name}'s history, ${entries}`}
+          accessibilityHint="Shows their buy-ins and cash-outs"
+        >
+          <Text className="flex-1 type-body text-ink">History</Text>
+          <Text className="type-callout text-muted">{entries}</Text>
+          <Icon name="chevron-right" color="muted" size={18} />
+        </Row>
+      </List>
     </Sheet>
   );
 }

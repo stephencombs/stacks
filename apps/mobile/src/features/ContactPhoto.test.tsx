@@ -54,6 +54,36 @@ vi.mock("../components/ui/Button", () => ({
 
 vi.mock("./PlayerAvatar", () => ({ PlayerAvatar: () => <i data-chip /> }));
 
+vi.mock("../components/ui/Icon", () => ({ Icon: () => null }));
+
+vi.mock("../components/ui/MenuView", () => ({
+  MenuView: ({
+    title,
+    actions,
+    onPressAction,
+    children,
+  }: {
+    title?: string;
+    actions: ReadonlyArray<{ id?: string; title: string }>;
+    onPressAction?: (event: { nativeEvent: { event: string } }) => void;
+    children?: ReactNode;
+  }) => (
+    <div>
+      <h1>{title}</h1>
+      {children}
+      {actions.map((action) => (
+        <button
+          key={action.id}
+          type="button"
+          onClick={() => onPressAction?.({ nativeEvent: { event: action.id ?? action.title } })}
+        >
+          {action.title}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
 vi.mock("../../modules/contact-picker/src", async (original) => ({
   ...(await original<typeof import("../../modules/contact-picker/src")>()),
   pickContact: () => mocks.pick.current(),
@@ -73,14 +103,29 @@ vi.mock("../lib/contactPhotos", () => ({
 
 const player = PlayerId.make("0192e7a0-0000-7000-8000-000000000001");
 
-const mount = async () => {
-  const { ContactPhotoControls } = await import("./ContactPhoto");
+const mount = async (menu = false) => {
+  const { ContactPhotoControls, ContactPhotoMenu, useContactPhotoLink } =
+    await import("./ContactPhoto");
+
+  const PhotoMenu = () => {
+    const photo = useContactPhotoLink(player);
+
+    return (
+      <>
+        <ContactPhotoMenu playerId={player} name="Ada" size={64} photo={photo} />
+        {photo.message ? <p>{photo.message}</p> : null}
+      </>
+    );
+  };
+
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const host = document.createElement("div");
   const root = createRoot(host);
 
   const render = () =>
-    act(async () => root.render(<ContactPhotoControls playerId={player} name="Ada" />));
+    act(async () =>
+      root.render(menu ? <PhotoMenu /> : <ContactPhotoControls playerId={player} name="Ada" />),
+    );
 
   await render();
 
@@ -212,6 +257,65 @@ it("shows a try-again message when Contacts won't open", async () => {
     await view.press("Link contact photo");
     expect(view.text()).toContain("Couldn't open Contacts");
   } finally {
+    await view.unmount();
+  }
+});
+
+it("opens a menu from the avatar to choose a photo from Contacts, and says it stays on this phone", async () => {
+  mocks.pick.current = () =>
+    Promise.resolve({ name: "Someone Else", photo: { uri: "file:///cache/contact-picks/a.jpg" } });
+
+  const view = await mount(true);
+
+  try {
+    expect(view.labels()).toEqual(["Choose from Contacts"]);
+    expect(view.text()).toContain("Photo stays on this phone");
+    await view.press("Choose from Contacts");
+    expect(mocks.linked).toEqual([[player, "file:///cache/contact-picks/a.jpg"]]);
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("offers Change photo and Remove photo once one is linked, and Remove photo drops it", async () => {
+  mocks.photo.current = "file:///photos/a.jpg";
+  const view = await mount(true);
+
+  try {
+    expect(view.labels()).toEqual(["Change photo", "Remove photo"]);
+    await view.press("Remove photo");
+    expect(mocks.removed).toEqual([player]);
+    expect(mocks.linked).toEqual([]);
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("says in place when the picked contact has no photo", async () => {
+  mocks.pick.current = () => Promise.resolve({ name: "Ada", photo: "none" });
+  const view = await mount(true);
+
+  try {
+    await view.press("Choose from Contacts");
+    expect(view.text()).toContain("This contact has no photo");
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("is only the avatar on Android with no photo, and offers just Remove photo with one", async () => {
+  mocks.os.current = "android";
+  const view = await mount(true);
+
+  try {
+    expect(view.labels()).toEqual([]);
+    expect(view.text()).toBe("");
+
+    mocks.photo.current = "file:///photos/a.jpg";
+    await view.render();
+    expect(view.labels()).toEqual(["Remove photo"]);
+  } finally {
+    mocks.os.current = "ios";
     await view.unmount();
   }
 });

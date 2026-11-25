@@ -8,6 +8,9 @@ import { UserAvatar } from "./UserAvatar";
 /** A player's avatar at a table, 36pt on Android and 32pt on iOS. */
 export const TABLE_AVATAR_SIZE = Platform.OS === "android" ? 36 : 32;
 
+/** A player's avatar at the head of their own sheet. */
+export const PLAYER_SHEET_AVATAR_SIZE = 64;
+
 /**
  * A player's avatar, with the photo linked to them on this phone when there is one. `you` marks
  * the signed-in user's own player, who falls back to their profile photo and their own initials.

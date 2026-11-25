@@ -99,6 +99,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.doMock("../features/PlayerAvatar", () => ({
     PlayerAvatar: () => null,
     TABLE_AVATAR_SIZE: 32,
+    PLAYER_SHEET_AVATAR_SIZE: 64,
   }));
   vi.doMock("../features/ShareCardSheet", () => ({
     ShareCardSheet: ({ title }: { title: string }) => <div>Card preview for {title}</div>,
@@ -106,6 +107,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   vi.doMock("../components/Money", () => ({ Money: () => null }));
   vi.doMock("../components/ui/Field", () => ({ FormError: Container }));
   vi.doMock("../components/ui/Surface", () => ({
+    Card: Container,
     EmptyState: Container,
     List: Container,
     Row: ({ children, onPress }: { children?: ReactNode; onPress?: () => void }) =>

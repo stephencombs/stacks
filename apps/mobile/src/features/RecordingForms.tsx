@@ -281,6 +281,7 @@ function RecordingSheet({
   cancelLabel,
   secondaryAction,
   back = false,
+  depth,
   keypad,
   keypadInFooter = Platform.OS === "android",
   save,
@@ -295,6 +296,7 @@ function RecordingSheet({
   cancelLabel?: string;
   secondaryAction?: { readonly label: string; readonly onPress: () => void };
   back?: boolean;
+  depth?: number | undefined;
   keypad?: ReactNode;
   keypadInFooter?: boolean;
   save: { readonly pending: boolean; readonly error: string | null };
@@ -307,6 +309,7 @@ function RecordingSheet({
       open
       busy={save.pending}
       back={back}
+      depth={depth}
       onClose={onClose}
       title={title}
       {...(description ? { description } : {})}
@@ -1428,11 +1431,15 @@ const kindName = (entry: PlayEntry) => (entry.kind === "buy_in" ? "buy-in" : "ca
 export function CorrectSheet({
   visit,
   entry,
+  back = false,
+  depth,
   onClose,
   onSaved,
 }: {
   visit: RecordingVisitView;
   entry: PlayEntry;
+  back?: boolean;
+  depth?: number;
   onClose: () => void;
   onSaved: Saved;
 }) {
@@ -1465,6 +1472,8 @@ export function CorrectSheet({
       title={`Correct ${kindName(entry)}`}
       description="The original stays in the history, voided, and this one replaces it."
       submitLabel="Save correction"
+      back={back}
+      depth={depth}
       save={save}
       onClose={onClose}
       onSubmit={() => void submit()}
@@ -1489,11 +1498,15 @@ export function CorrectSheet({
 export function VoidSheet({
   visit,
   entry,
+  back = false,
+  depth,
   onClose,
   onVoided,
 }: {
   visit: RecordingVisitView;
   entry: PlayEntry;
+  back?: boolean;
+  depth?: number;
   onClose: () => void;
   onVoided: () => void;
 }) {
@@ -1524,6 +1537,8 @@ export function VoidSheet({
       submitLabel="Void entry"
       submitVariant="danger"
       cancelLabel="Keep entry"
+      back={back}
+      depth={depth}
       save={save}
       onClose={onClose}
       onSubmit={() => void submit()}

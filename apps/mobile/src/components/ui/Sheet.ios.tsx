@@ -42,8 +42,9 @@ type SheetProps = {
   footer?: ReactNode | undefined;
   busy?: boolean;
   back?: boolean;
+  /** How many steps deep this sheet is. Moving to a shallower one slides back. Defaults to 1 with `back`, else 0. */
+  depth?: number | undefined;
   large?: boolean;
-  hideHeader?: boolean;
   floatingFooter?: boolean;
   children?: ReactNode | undefined;
 };
@@ -76,8 +77,8 @@ export function Sheet({
   footer,
   busy = false,
   back = false,
+  depth,
   large = false,
-  hideHeader = false,
   floatingFooter = false,
   children,
 }: SheetProps) {
@@ -94,8 +95,8 @@ export function Sheet({
         footer={footer}
         busy={busy}
         back={back}
+        depth={depth}
         large={large}
-        hideHeader={hideHeader}
         floatingFooter={floatingFooter}
       >
         {children}
@@ -113,7 +114,6 @@ export function Sheet({
       busy={busy}
       back={back}
       large={large}
-      hideHeader={hideHeader}
       floatingFooter={floatingFooter}
     >
       {children}
@@ -130,8 +130,8 @@ function PortaledSheet({
   footer,
   busy = false,
   back = false,
+  depth = back ? 1 : 0,
   large = false,
-  hideHeader = false,
   floatingFooter = false,
   children,
 }: SheetProps & { store: SheetStore }) {
@@ -151,8 +151,8 @@ function PortaledSheet({
       footer,
       busy,
       back,
+      depth,
       large,
-      hideHeader,
       floatingFooter,
       onClose,
       children,
@@ -166,8 +166,8 @@ function PortaledSheet({
     footer,
     busy,
     back,
+    depth,
     large,
-    hideHeader,
     floatingFooter,
     onClose,
     children,
@@ -187,7 +187,6 @@ function StandaloneSheet({
   busy = false,
   back = false,
   large = false,
-  hideHeader = false,
   floatingFooter = false,
   children,
 }: SheetProps) {
@@ -215,7 +214,6 @@ function StandaloneSheet({
       busy={busy}
       back={back}
       large={large}
-      hideHeader={hideHeader}
       floatingFooter={floatingFooter}
       onHeaderPress={close}
       onDismiss={dismissed}
@@ -241,8 +239,12 @@ function SheetPortal({ store }: { store: SheetStore }) {
 
     if (presentation) {
       if (presentation.slot.id === slot.id) direction = presentation.direction;
-      else if (slot.back) direction = 1;
-      else if (presentation.slot.back) direction = -1;
+      else if (
+        slot.depth > presentation.slot.depth ||
+        (slot.depth === presentation.slot.depth && slot.back)
+      )
+        direction = 1;
+      else if (slot.depth < presentation.slot.depth) direction = -1;
     }
 
     setPresentation({ slot, direction });
@@ -275,7 +277,6 @@ function SheetPortal({ store }: { store: SheetStore }) {
       busy={presented.busy}
       back={presented.back}
       large={presented.large}
-      hideHeader={presented.hideHeader}
       floatingFooter={presented.floatingFooter}
       onHeaderPress={() => {
         if (slot && !slot.busy) slot.onClose();
@@ -323,7 +324,6 @@ function NativeFormSheet({
   busy,
   back,
   large,
-  hideHeader,
   floatingFooter,
   onHeaderPress,
   onDismiss,
@@ -338,7 +338,6 @@ function NativeFormSheet({
   busy: boolean;
   back: boolean;
   large: boolean;
-  hideHeader: boolean;
   floatingFooter: boolean;
   onHeaderPress: () => void;
   onDismiss: () => void;
@@ -474,7 +473,7 @@ function NativeFormSheet({
                     keyboardDismissMode="interactive"
                     contentContainerClassName={cn(
                       "gap-5 px-4",
-                      hideHeader ? "pt-6" : "pt-4",
+                      "pt-4",
                       floatingFooter ? "pb-24" : "pb-4",
                     )}
                     onContentSizeChange={
@@ -531,7 +530,6 @@ function NativeFormSheet({
               </View>
             </InSheet>
             <ScreenStackHeaderConfig
-              hidden={hideHeader}
               backgroundColor={sheetBg}
               translucent={false}
               color={ink}
@@ -562,7 +560,7 @@ function NativeFormSheet({
                       {
                         type: "button",
                         icon: { type: "sfSymbol", name: "xmark" },
-                        accessibilityLabel: `Close ${title}`,
+                        accessibilityLabel: title ? `Close ${title}` : "Close",
                         identifier: `sheet-close-${slotKey}`,
                         disabled: busy,
                         onPress: onHeaderPress,

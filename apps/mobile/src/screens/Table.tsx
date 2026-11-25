@@ -361,10 +361,6 @@ function Table({ tableId }: { tableId: TableId }) {
             onSeated={(_, name) =>
               recorded({ visitId: sheet.seat.visitId, text: `${name} is back at the table.` })
             }
-            onHistory={(visitId) => {
-              close();
-              toVisit(visitId);
-            }}
           />
         )),
         Match.orElse(() => null),
