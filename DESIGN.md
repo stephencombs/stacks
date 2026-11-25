@@ -10,7 +10,7 @@ The source of truth is [`docs/design/tokens.json`](docs/design/tokens.json): eve
 
 ## Rules that apply everywhere
 
-1. **Tokens only.** No hex, `rgb()`, `oklch()` or Tailwind palette colors (`text-red-500`) in components. The exceptions are the drawn casino art in `TableMap` and `Chip`, and the primary `Button`'s edge and hover. A raw color breaks in one of the two themes.
+1. **Tokens only.** No hex, `rgb()`, `oklch()` or Tailwind palette colors (`text-red-500`) in components. The exceptions are the drawn casino art in `TableMap`, and the primary `Button`'s edge and hover. A raw color breaks in one of the two themes.
 2. **A shared part owns its look.** Pass a `variant`, `size` or `tone`, and only layout classes (margin, width, flex). An unlisted variant is a bug, not an option. Add it to the part or don't use it.
 3. **One `primary` per view.** It's the ink pill. Two means the screen has no next step.
 4. **Money goes through `Money`.** Never format an amount by hand. The exceptions are `boardMoney`, the compact readout on boards, and `formatMoney` where a component can't go: aria labels, string `label` props and table art. Results use `tone="result"`, which adds the sign, so a result still reads correctly without color.

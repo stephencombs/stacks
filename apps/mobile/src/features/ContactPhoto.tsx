@@ -13,7 +13,7 @@ import {
   useContactPhotosAvailable,
 } from "../lib/contactPhotos";
 import { photoUri, pickContact, type ContactPhoto } from "../../modules/contact-picker/src";
-import { PlayerChip } from "./PlayerChip";
+import { PlayerAvatar } from "./PlayerAvatar";
 
 const NO_PHOTO = "This contact has no photo.";
 
@@ -95,15 +95,7 @@ export function ContactPhotoPreview({ draft }: { draft: ContactPhotoDraft }) {
  * Links a photo from Contacts to a player on this phone: Link, or Change and Remove. It asks for
  * nothing but the one contact the user picks, and never changes the player's name.
  */
-export function ContactPhotoControls({
-  playerId,
-  chip,
-  name,
-}: {
-  playerId: PlayerId;
-  chip: number;
-  name: string;
-}) {
+export function ContactPhotoControls({ playerId, name }: { playerId: PlayerId; name: string }) {
   const uri = useContactPhoto(playerId);
   const offered = useContactPhotosAvailable();
   // WARNING: Android's Contacts provider refuses photo reads without READ_CONTACTS (seen on a Pixel).
@@ -137,7 +129,7 @@ export function ContactPhotoControls({
   return (
     <View className="gap-2">
       <View className="flex-row items-center gap-3">
-        <PlayerChip playerId={playerId} chip={chip} name={name} size={44} />
+        <PlayerAvatar playerId={playerId} name={name} size={44} />
         <View className="min-w-0 flex-1 flex-row flex-wrap gap-2">
           {available ? (
             <Button

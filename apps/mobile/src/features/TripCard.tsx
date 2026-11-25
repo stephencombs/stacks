@@ -8,7 +8,7 @@ import { useCSSVariable } from "uniwind";
 import { Money } from "../components/Money";
 import { Text } from "../components/ui/Text";
 import { cn } from "../components/ui/cn";
-import { Chip } from "./Chip";
+import { Avatar } from "./Avatar";
 import { CardFrame } from "./ShareCardFrame";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -40,7 +40,7 @@ export function TripCard({ model }: { model: TripCardModel }) {
             )}
           >
             <Text className="w-5 type-footnote text-felt-soft tabular-nums">{row.rank}</Text>
-            <Chip chip={row.chip} name={row.name} size={22} />
+            <Avatar name={row.name} playerId={row.playerId} size={22} />
             <Text
               numberOfLines={1}
               className={cn(

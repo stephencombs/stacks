@@ -147,7 +147,10 @@ async function load(
       ),
     Skeleton: () => <span>Loading your play</span>,
   }));
-  vi.doMock("../features/Chip", () => ({ Chip: () => null }));
+  vi.doMock("../features/PlayerAvatar", () => ({
+    PlayerAvatar: () => null,
+    TABLE_AVATAR_SIZE: 32,
+  }));
   vi.doMock("../lib/go", () => ({ useGo: () => ({ trip: vi.fn(), group: vi.fn() }) }));
   vi.doMock("../features/GroupStats", async () => {
     if (groupState) return vi.importActual("../features/GroupStats");

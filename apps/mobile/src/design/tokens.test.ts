@@ -52,8 +52,6 @@ const variable = (token: string) => {
   }
 };
 
-const playerChip = /^--color-chip-(\d(-ink)?|edge)$/;
-
 const linearRgb = (color: string) => {
   const channels = color.match(/[\d.]+/g);
 
@@ -128,9 +126,9 @@ describe.each(Object.entries(themes))("the %s palette", (name, theme) => {
     },
   );
 
-  it("has no color outside the tokens but the player chips", () => {
+  it("has no color outside the tokens", () => {
     const known = new Set(tokens.color.tokens.map((token) => variable(token.name)));
-    expect(Object.keys(theme).filter((v) => !known.has(v) && !playerChip.test(v))).toEqual([]);
+    expect(Object.keys(theme).filter((v) => !known.has(v))).toEqual([]);
   });
 
   it.each([
@@ -148,6 +146,13 @@ describe.each(Object.entries(themes))("the %s palette", (name, theme) => {
     ["live", "surface"],
     ["ink-inverse", "ink"],
     ["felt-ink", "felt"],
+    ["avatar-ink", "avatar-bottom"],
+    ["avatar-1-ink", "avatar-1"],
+    ["avatar-2-ink", "avatar-2"],
+    ["avatar-3-ink", "avatar-3"],
+    ["avatar-4-ink", "avatar-4"],
+    ["avatar-5-ink", "avatar-5"],
+    ["avatar-6-ink", "avatar-6"],
   ])("%s on %s passes AA", (fg, bg) => {
     expect(contrast(theme[`--color-${fg}`]!, theme[`--color-${bg}`]!)).toBeGreaterThanOrEqual(4.5);
   });

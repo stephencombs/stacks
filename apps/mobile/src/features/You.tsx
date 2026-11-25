@@ -62,7 +62,7 @@ export function YouButton() {
           <UserAvatar size={32} fallbackName={name} />
         ) : (
           <ControlSurface>
-            <UserAvatar size={32} fallbackName={name} ring={false} />
+            <UserAvatar size={32} fallbackName={name} />
           </ControlSurface>
         )}
       </PressableScale>
@@ -303,7 +303,7 @@ function Profile({ fallbackName }: { fallbackName: string }) {
 
   return (
     <>
-      <UserAvatar size={46} fallbackName={displayName} ring={false} />
+      <UserAvatar size={46} fallbackName={displayName} />
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className="text-lg font-semibold text-ink">
           {displayName}

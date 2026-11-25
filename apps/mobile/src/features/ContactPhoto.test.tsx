@@ -52,7 +52,7 @@ vi.mock("../components/ui/Button", () => ({
   ),
 }));
 
-vi.mock("./PlayerChip", () => ({ PlayerChip: () => <i data-chip /> }));
+vi.mock("./PlayerAvatar", () => ({ PlayerAvatar: () => <i data-chip /> }));
 
 vi.mock("../../modules/contact-picker/src", async (original) => ({
   ...(await original<typeof import("../../modules/contact-picker/src")>()),
@@ -80,7 +80,7 @@ const mount = async () => {
   const root = createRoot(host);
 
   const render = () =>
-    act(async () => root.render(<ContactPhotoControls playerId={player} chip={2} name="Ada" />));
+    act(async () => root.render(<ContactPhotoControls playerId={player} name="Ada" />));
 
   await render();
 

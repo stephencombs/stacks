@@ -55,7 +55,7 @@ import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { useRecordingState } from "../lib/recording";
 import { GlassSurface } from "../components/ui/GlassSurface";
 import { AmountKeypad } from "./AmountKeypad";
-import { TableChip } from "./PlayerChip";
+import { PlayerAvatar, TABLE_AVATAR_SIZE } from "./PlayerAvatar";
 import { useContactPhotoDraft } from "./ContactPhoto";
 import { ChooseFromContacts } from "./ChooseFromContacts";
 import { CasinoPickerSheet } from "./VenuePicker";
@@ -1760,7 +1760,7 @@ export function AddPlayerSheet({
 
                   return (
                     <Row key={player.id}>
-                      <TableChip playerId={player.id} name={label} />
+                      <PlayerAvatar playerId={player.id} name={label} size={TABLE_AVATAR_SIZE} />
                       <Text numberOfLines={1} className="min-w-0 flex-1 type-body text-ink">
                         {label}
                       </Text>

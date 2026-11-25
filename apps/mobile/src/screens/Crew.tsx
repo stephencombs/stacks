@@ -30,7 +30,7 @@ import {
 } from "@stacks/client-runtime/format";
 import { newId } from "@stacks/client-runtime/ids";
 import { useRecordingClock } from "@stacks/client-runtime/recordingReact";
-import { chipOf, closedPlays, localClock, tripDates, tripPlays } from "@stacks/client-runtime/trip";
+import { closedPlays, localClock, tripDates, tripPlays } from "@stacks/client-runtime/trip";
 import { tripStandings } from "@stacks/shared/trips";
 import type * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
@@ -54,7 +54,7 @@ import {
   Skeleton,
   Surface,
 } from "../components/ui/Surface";
-import { PlayerChip } from "../features/PlayerChip";
+import { PlayerAvatar } from "../features/PlayerAvatar";
 import { RowsSkeleton } from "../features/ScreenSkeletons";
 import { useCrewScopes } from "../lib/crewScopes";
 import { useGo } from "../lib/go";
@@ -247,12 +247,11 @@ function PinnedTrip({ trip, group }: { trip: TripDetail; group: GroupDetail }) {
               className="min-h-11 flex-row items-center gap-3 px-4 py-1.5"
             >
               <Text className="w-4 type-footnote text-muted">{standing.rank}</Text>
-              <PlayerChip
+              <PlayerAvatar
                 playerId={standing.playerId}
-                chip={chipOf(group, standing.playerId)}
                 name={names.get(standing.playerId) ?? ""}
                 size={26}
-                ring
+                you={standing.playerId === group.myPlayerId}
               />
               <Text numberOfLines={1} className="min-w-0 flex-1 text-base font-semibold text-ink">
                 {names.get(standing.playerId) ?? "Someone"}
@@ -535,12 +534,11 @@ function ActivityChip({
   return (
     <Loaded query={stacks.group(groupId)} skeleton={neutral} renderError={() => neutral}>
       {(detail) => (
-        <PlayerChip
+        <PlayerAvatar
           playerId={playerId}
-          chip={chipOf(detail, playerId)}
           name={displayName}
           size={32}
-          ring
+          you={playerId === detail.myPlayerId}
         />
       )}
     </Loaded>
@@ -634,12 +632,11 @@ function GroupRow({ item }: { item: GroupListItem }) {
             <View className="flex-row">
               {people.slice(0, 3).map((player, index) => (
                 <View key={player.id} className={index ? "-ml-1.5" : undefined}>
-                  <PlayerChip
+                  <PlayerAvatar
                     playerId={player.id}
-                    chip={chipOf(detail, player.id)}
                     name={player.displayName}
                     size={26}
-                    ring
+                    you={player.id === detail.myPlayerId}
                   />
                 </View>
               ))}

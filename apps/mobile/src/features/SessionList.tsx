@@ -10,7 +10,7 @@ import {
   playerNames,
   venueLabel,
 } from "@stacks/client-runtime/format";
-import { chipOf, type TripPlay } from "@stacks/client-runtime/trip";
+import type { TripPlay } from "@stacks/client-runtime/trip";
 import { gameChip } from "@stacks/client-runtime/stats";
 import { useRecordingClock } from "@stacks/client-runtime/recordingReact";
 import type * as DateTime from "effect/DateTime";
@@ -23,8 +23,7 @@ import { Icon } from "../components/ui/Icon";
 import { cn } from "../components/ui/cn";
 import { Sheet } from "../components/ui/Sheet";
 import { Badge, List, Row } from "../components/ui/Surface";
-import { Chip } from "./Chip";
-import { PlayerChip } from "./PlayerChip";
+import { PlayerAvatar } from "./PlayerAvatar";
 import { chipColor } from "./chipColor";
 
 function TableSummarySheet({
@@ -77,11 +76,11 @@ function TableSummarySheet({
 
             return (
               <Row key={playerId}>
-                <PlayerChip
+                <PlayerAvatar
                   playerId={playerId}
-                  chip={chipOf(detail, playerId)}
                   name={name}
                   size={28}
+                  you={playerId === detail.myPlayerId}
                 />
                 <View className="flex-1 gap-0.5">
                   <Text numberOfLines={1} className="type-heading text-ink">
@@ -202,7 +201,12 @@ export function SessionList({
               {android ? (
                 <View className={cn("w-1 self-stretch rounded-full", chipColor[gameChip(game)])} />
               ) : (
-                <Chip chip={chipOf(detail, detail.myPlayerId)} name={venue} size={28} />
+                <View
+                  className={cn(
+                    "size-7 rounded-full border-[3px] border-line",
+                    chipColor[gameChip(game)],
+                  )}
+                />
               )}
               <View className="flex-1 gap-0.5">
                 <View className="flex-row items-center gap-2">

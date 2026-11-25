@@ -31,7 +31,6 @@ export interface TripCardModel {
     readonly playerId: PlayerId;
     readonly rank: number;
     readonly name: string;
-    readonly chip: number;
     readonly isYou: boolean;
     readonly net: MinorUnits | null;
   }>;
@@ -81,7 +80,6 @@ export const tripCardModel = ({
   me,
   closed,
   players,
-  chip,
   clock,
   hidden,
 }: {
@@ -93,7 +91,6 @@ export const tripCardModel = ({
   /** Finished sessions and tables only. */
   readonly closed: ReadonlyArray<TripSession>;
   readonly players: ReadonlyArray<{ readonly id: PlayerId; readonly displayName: string }>;
-  readonly chip: (playerId: PlayerId) => number;
   readonly clock: TripClock;
   readonly hidden: boolean;
 }) => {
@@ -110,7 +107,6 @@ export const tripCardModel = ({
     playerId: standing.playerId,
     rank: standing.rank,
     name: players.find((player) => player.id === standing.playerId)?.displayName ?? "Player",
-    chip: chip(standing.playerId),
     isYou: standing.playerId === me,
     net: hidden ? null : MinorUnits.make(standing.net),
   }));

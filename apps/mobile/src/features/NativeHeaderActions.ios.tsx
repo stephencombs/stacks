@@ -55,11 +55,7 @@ export function useNativeHeaderActions({
 }
 
 function YouAvatar({ signedIn, onPress }: { signedIn: boolean; onPress: () => void }) {
-  const face = signedIn ? (
-    <UserAvatar size={32} ring={false} />
-  ) : (
-    <Icon name="person" color="ink" size={20} />
-  );
+  const face = signedIn ? <UserAvatar size={32} /> : <Icon name="person" color="ink" size={20} />;
 
   return (
     <PressableScale

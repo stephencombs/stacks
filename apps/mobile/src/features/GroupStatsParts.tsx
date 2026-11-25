@@ -22,8 +22,7 @@ import { InSheet } from "../components/ui/sheetContext";
 import { formatDisplayMoney, usePreferences } from "../lib/preferences";
 import { useLargeText } from "../lib/useLargeText";
 
-import { Chip } from "./Chip";
-import { PlayerChip } from "./PlayerChip";
+import { PlayerAvatar } from "./PlayerAvatar";
 import { signed } from "./StatsParts";
 
 const useSpoken = (currency: CurrencyCode) => {
@@ -76,7 +75,7 @@ export function LineText({
   );
 }
 
-function PairChip({ first, second, size = 28 }: { first: Who; second: Who; size?: number }) {
+function PairAvatar({ first, second, size = 28 }: { first: Who; second: Who; size?: number }) {
   const inSheet = use(InSheet);
 
   return (
@@ -85,11 +84,11 @@ function PairChip({ first, second, size = 28 }: { first: Who; second: Who; size?
       importantForAccessibility="no-hide-descendants"
       className="flex-row items-center"
     >
-      <PlayerChip playerId={first.playerId} chip={first.chip} name={first.name} size={size} />
+      <PlayerAvatar playerId={first.playerId} name={first.name} size={size} you={first.you} />
       <View
         className={cn("-ml-3 rounded-full border-2", inSheet ? "border-raised" : "border-surface")}
       >
-        <PlayerChip playerId={second.playerId} chip={second.chip} name={second.name} size={size} />
+        <PlayerAvatar playerId={second.playerId} name={second.name} size={size} you={second.you} />
       </View>
     </View>
   );
@@ -101,10 +100,10 @@ function Leaders({ people }: { people: ReadonlyArray<Who> }) {
 
   if (people.length === 1)
     return (
-      <PlayerChip playerId={first!.playerId} chip={first!.chip} name={first!.name} size={28} />
+      <PlayerAvatar playerId={first!.playerId} name={first!.name} size={28} you={first!.you} />
     );
 
-  if (people.length === 2) return <PairChip first={first!} second={second!} />;
+  if (people.length === 2) return <PairAvatar first={first!} second={second!} />;
 
   return (
     <View
@@ -314,7 +313,12 @@ export function ResultBars({
                       pointerEvents="none"
                       style={{ position: "absolute", left: x, top: y }}
                     >
-                      <Chip chip={bar.leader.chip} name={bar.leader.name} size={CHIP} />
+                      <PlayerAvatar
+                        playerId={bar.leader.playerId}
+                        name={bar.leader.name}
+                        size={CHIP}
+                        you={bar.leader.you}
+                      />
                     </View>
                   );
                 })

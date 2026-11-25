@@ -28,7 +28,7 @@ Settings use native grouped form sections on iOS. A row that opens a page or edi
 
 ## Material and identity
 
-Glass belongs to floating navigation, header actions and scope pills. GlassSurface uses native iOS material when available and a palette surface elsewhere. Android doesn't imitate glass: floating parts are solid Material surfaces. Keep ledger cards solid, and retain Color Up's gold primary action, chip identities and money typography. Let the OS choose the shape and selection treatment of native controls.
+Glass belongs to floating navigation, header actions and scope pills. GlassSurface uses native iOS material when available and a palette surface elsewhere. Android doesn't imitate glass: floating parts are solid Material surfaces. Keep ledger cards solid, and retain Color Up's gold primary action and money typography. Let the OS choose the shape and selection treatment of native controls.
 
 Keep app theme and native control appearance in sync. Verify Dynamic Type, VoiceOver, Reduce Transparency, keyboard dismissal, nested sheets and safe-area behavior on devices. A successful JavaScript export does not verify native layout or gestures.
 

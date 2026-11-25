@@ -44,7 +44,7 @@ const render = async (model: TripCardModel | SessionCardModel) => {
     ScopedTheme: ({ children }: { children?: ReactNode }) => <>{children}</>,
     useCSSVariable: (names: ReadonlyArray<string>) => names.map(() => "#fff"),
   }));
-  vi.doMock("./Chip", () => ({ Chip: ({ name }: { name: string }) => <i data-chip={name} /> }));
+  vi.doMock("./Avatar", () => ({ Avatar: ({ name }: { name: string }) => <i data-chip={name} /> }));
   vi.doMock("../components/BrandWordmark", () => ({ BrandWordmark: tag("b") }));
   vi.doMock("../lib/preferences", async (importOriginal) => ({
     ...(await importOriginal<typeof import("../lib/preferences")>()),
@@ -89,7 +89,6 @@ const trip = (hidden: boolean) =>
     me: player(10),
     closed: sessions,
     players: crowd.map((id) => ({ id: player(id), displayName: `Player ${id}` })),
-    chip: (id) => Number(id.slice(-2)),
     clock: localClock,
     hidden,
   });

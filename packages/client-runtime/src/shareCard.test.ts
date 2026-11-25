@@ -50,7 +50,6 @@ const trip = (me: number, hidden: boolean, closed: ReadonlyArray<TripSession> = 
     me: player(me),
     closed,
     players,
-    chip: (id) => (crowd.indexOf(Number(id.slice(-2))) % 8) + 1,
     clock: localClock,
     hidden,
   });

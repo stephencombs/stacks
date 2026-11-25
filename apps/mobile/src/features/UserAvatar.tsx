@@ -1,45 +1,31 @@
 import { useUser } from "@clerk/expo";
-import { useState } from "react";
-import { Image, Platform, View } from "react-native";
 
-import { Chip } from "./Chip";
+import { Avatar } from "./Avatar";
 
-/** The signed-in user's profile photo when Clerk has one, falling back to their Color Up chip. */
+/**
+ * The signed-in user's avatar: a photo linked on this phone, else their Clerk profile photo, else
+ * the default avatar with their own initials. `playerId` keeps their Android tile one color in a group.
+ */
 export function UserAvatar({
   size = 32,
   fallbackName = "You",
-  ring = Platform.OS === "android",
+  playerId = "you",
+  contactPhoto = null,
 }: {
   size?: number;
   fallbackName?: string;
-  ring?: boolean;
+  playerId?: string;
+  contactPhoto?: string | null;
 }) {
   const { user } = useUser();
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const imageUrl = user?.hasImage && user.imageUrl ? user.imageUrl : null;
+  const profile = user?.hasImage && user.imageUrl ? user.imageUrl : null;
 
-  const name =
-    Platform.OS === "android"
-      ? (user?.fullName ?? user?.firstName ?? fallbackName)
-      : (user?.firstName ?? user?.fullName ?? fallbackName);
-
-  if (imageUrl && failedUrl !== imageUrl) {
-    return (
-      <View
-        accessible={false}
-        importantForAccessibility="no-hide-descendants"
-        style={{ width: size, height: size, borderRadius: size / 2 }}
-        className="overflow-hidden border border-line/50 bg-fill"
-      >
-        <Image
-          source={{ uri: imageUrl }}
-          style={{ width: size, height: size }}
-          resizeMode="cover"
-          onError={() => setFailedUrl(imageUrl)}
-        />
-      </View>
-    );
-  }
-
-  return <Chip chip={Platform.OS === "android" ? 5 : 1} name={name} size={size} ring={ring} />;
+  return (
+    <Avatar
+      name={user?.fullName ?? user?.firstName ?? fallbackName}
+      playerId={playerId}
+      image={contactPhoto ?? profile}
+      size={size}
+    />
+  );
 }
