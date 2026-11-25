@@ -6,6 +6,8 @@ import { SessionId, VenueId, type PlayerId } from "@stacks/contracts";
 import { ALEX, BEA, CAL, DEE, money } from "./testing/ledgerArbitrary.ts";
 import {
   inPlay,
+  nextNightKey,
+  nightKey,
   playerTrip,
   tonightBoard,
   tripFeed,
@@ -434,5 +436,38 @@ describe("playerTrip", () => {
     expect(trip.line).toHaveLength(nets.length + 1);
     expect(trip.low).toBe(Math.min(...trip.line));
     expect(trip.won).toBe(nets.filter((n) => n > 0).length);
+  });
+});
+
+describe("nightKey", () => {
+  const la = DateTime.zoneMakeNamedUnsafe("America/Los_Angeles");
+
+  const key = (iso: string, zone = DateTime.zoneMakeNamedUnsafe("UTC")) =>
+    nightKey(DateTime.makeUnsafe(iso), zone);
+
+  it("names the night by the local date it began, ending at 06:00", () => {
+    expect(key("2026-11-06T20:00:00Z")).toBe("2026-11-06");
+    expect(key("2026-11-07T01:00:00Z")).toBe("2026-11-06");
+    expect(key("2026-11-07T05:59:59Z")).toBe("2026-11-06");
+    expect(key("2026-11-07T06:00:00Z")).toBe("2026-11-07");
+  });
+
+  it("reads the clock in the viewer's zone", () => {
+    expect(key("2026-11-07T13:59:00Z", la)).toBe("2026-11-06");
+    expect(key("2026-11-07T14:00:00Z", la)).toBe("2026-11-07");
+  });
+
+  it("crosses a year end", () => {
+    expect(key("2027-01-01T03:00:00Z")).toBe("2026-12-31");
+  });
+});
+
+describe("nextNightKey", () => {
+  it("counts days through month, year and leap-year ends", () => {
+    expect(nextNightKey("2026-11-06")).toBe("2026-11-07");
+    expect(nextNightKey("2026-11-30")).toBe("2026-12-01");
+    expect(nextNightKey("2026-12-31")).toBe("2027-01-01");
+    expect(nextNightKey("2027-02-28")).toBe("2027-03-01");
+    expect(nextNightKey("2028-02-28")).toBe("2028-02-29");
   });
 });

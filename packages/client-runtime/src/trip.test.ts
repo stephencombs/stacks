@@ -311,7 +311,14 @@ it("says how far a trip climbed from its low, and how often it won", () => {
 });
 
 it("words a return on buy-ins with its sign", () => {
-  expect([0.55, -0.3, 0, 0.004, null].map(returnLabel)).toEqual(["+55%", "-30%", "0%", "0%", "–"]);
+  expect([0.55, -0.3, 0, 0.004, -0.004, null].map(returnLabel)).toEqual([
+    "+55%",
+    "-30%",
+    "0%",
+    "0%",
+    "0%",
+    "–",
+  ]);
 });
 
 it("puts the trip already in scope first, then the newest still going, then the newest", () => {

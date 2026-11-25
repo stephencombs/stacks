@@ -5,13 +5,14 @@ import type {
   Table,
   TripId,
   VenueId,
+  VisitId,
   VisitSummary,
 } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
 import { checkedMinorUnits } from "./exactMoney.ts";
 import { sessionRuns } from "./results.ts";
-import type { TripClock } from "./trips.ts";
+import { nextNightKey, nightKey, type TripClock } from "./trips.ts";
 
 /** A closed session as stats see it, oldest first. */
 export interface StatsSession {
@@ -72,7 +73,7 @@ export const raceLines = (
     return { playerId, values, line: [0, ...values.map((value) => value ?? 0)] };
   });
 
-type PersonalStatsSession = Pick<VisitSummary, "visit" | "finalResult"> & {
+type PersonalStatsSession = Pick<VisitSummary, "visit" | "totals" | "finalResult"> & {
   readonly table: Pick<Table, "game" | "venueId" | "tripId">;
 };
 
@@ -84,19 +85,85 @@ export type PersonalStatsFilters = {
   readonly tripId?: TripId | undefined;
 };
 
+/** A pattern sentence needs this many sessions behind its bucket. */
+export const PATTERN_MIN_SESSIONS = 5;
+
+/** A pattern sentence compares, so it needs this many buckets over the floor. */
+export const PATTERN_MIN_BUCKETS = 2;
+
+/** The month chart shows from this many played months in its window. */
+export const MONTH_CHART_MIN_MONTHS = 3;
+
+/** The night chart shows from this many played nights. */
+export const NIGHT_CHART_MIN_NIGHTS = 2;
+
+/** All time shows this many months, ending at the latest one played. */
+export const TRAILING_MONTHS = 12;
+
+/** Where one length of session ends and the next begins. */
+export const LENGTH_EDGES_HOURS = [1, 2, 3] as const;
+
+const WEEKDAYS = 7;
+const HOUR_MS = 3_600_000n;
+const LENGTH_EDGES_MS = LENGTH_EDGES_HOURS.map((edge) => BigInt(edge) * HOUR_MS);
+
 const compareKey = (a: string | null, b: string | null) =>
   a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1;
 
 const hours = (milliseconds: bigint) => Number((milliseconds + 18_000n) / 36_000n) / 100;
 
-const hourlyResult = (result: number, milliseconds: bigint) => {
-  if (milliseconds === 0n) return checkedMinorUnits(0n);
-  const numerator = BigInt(result) * 3_600_000n;
+const roundedQuotient = (numerator: bigint, denominator: bigint) => {
   const magnitude = numerator < 0n ? -numerator : numerator;
-  const rounded = (magnitude * 2n + milliseconds) / (milliseconds * 2n);
+  const rounded = (magnitude * 2n + denominator) / (denominator * 2n);
 
   return checkedMinorUnits(numerator < 0n ? -rounded : rounded);
 };
+
+const hourlyResult = (result: number, milliseconds: bigint) =>
+  milliseconds === 0n ? null : roundedQuotient(BigInt(result) * HOUR_MS, milliseconds);
+
+/** One bar of a by-month or by-night chart. An unplayed one is a gap, not a break-even. */
+export interface PeriodResult {
+  /** "2026-03" for a month, "2026-11-06" for a night. */
+  readonly key: string;
+  readonly sessions: number;
+  readonly result: MinorUnits;
+  readonly played: boolean;
+}
+
+/** Sessions that fell on one weekday, or in one length of session, and what they averaged. */
+export interface PatternBucket {
+  /** 0 for Sunday to 6; or 0 up through `LENGTH_EDGES_HOURS.length` for lengths. */
+  readonly index: number;
+  readonly sessions: number;
+  readonly result: MinorUnits;
+  /** Null with no sessions. */
+  readonly average: MinorUnits | null;
+}
+
+/**
+ * The bucket with the highest average, whatever its sign, once enough of them have the sessions
+ * to compare. Null when too few qualify, and on a tie at the top: two buckets that print the same
+ * average have no leader.
+ */
+export const leadingBucket = (buckets: ReadonlyArray<PatternBucket>) => {
+  const eligible = buckets.filter((bucket) => bucket.sessions >= PATTERN_MIN_SESSIONS);
+
+  if (eligible.length < PATTERN_MIN_BUCKETS) return null;
+  const top = Math.max(...eligible.map((bucket) => bucket.average!));
+  const leaders = eligible.filter((bucket) => bucket.average === top);
+
+  return leaders.length === 1 ? leaders[0]! : null;
+};
+
+/** A finished session singled out as a record. */
+export interface PersonalRecord {
+  readonly sessionId: VisitId;
+  readonly result: MinorUnits;
+  readonly game: Game | null;
+  readonly venueId: VenueId | null;
+  readonly finishedAt: DateTime.Utc;
+}
 
 /**
  * Personal visits from the recording view; live visits never count. An omitted year means
@@ -104,30 +171,40 @@ const hourlyResult = (result: number, milliseconds: bigint) => {
  * shows the whole trip, so it overrides the year.
  * Options come from all finished visits, so filtering never hides the current selection.
  * Hours round the summed elapsed time to two decimals; hourly result uses unrounded time.
+ *
+ * Months come from the finish, as the year filter does; weekdays and nights from the start. A
+ * year's months run to `now`'s month, or to December for a past year; all time shows the
+ * trailing months ending at the latest one played. A trip shows its nights instead. A record
+ * tied with an earlier one goes to the later session.
  */
 export const personalStats = (
   sessions: ReadonlyArray<PersonalStatsSession>,
   timeZone: DateTime.TimeZone,
   filters: PersonalStatsFilters = {},
+  now: DateTime.Utc = DateTime.nowUnsafe(),
 ) => {
-  const finished = sessions.flatMap(({ visit, table, finalResult }) =>
+  const finished = sessions.flatMap(({ visit, table, finalResult, totals }) =>
     visit.deletedAt !== undefined || visit.finishedAt === null || finalResult === null
       ? []
       : [
           {
             sessionId: visit.id,
+            startedAt: visit.startedAt,
             finishedAt: visit.finishedAt,
             year: DateTime.toParts(DateTime.setZone(visit.finishedAt, timeZone)).year,
             milliseconds:
               BigInt(DateTime.toEpochMillis(visit.finishedAt)) -
               BigInt(DateTime.toEpochMillis(visit.startedAt)),
             result: finalResult,
+            totals,
             game: table.game,
             venueId: table.venueId,
             tripId: table.tripId,
           },
         ],
   );
+
+  type Finished = (typeof finished)[number];
 
   const filtered = finished
     .filter(
@@ -144,7 +221,7 @@ export const personalStats = (
         compareKey(a.sessionId, b.sessionId),
     );
 
-  const measure = (items: typeof filtered) => {
+  const measure = (items: ReadonlyArray<Finished>) => {
     let result = 0n;
     let milliseconds = 0n;
 
@@ -164,8 +241,8 @@ export const personalStats = (
   const { milliseconds, ...summary } = measure(filtered);
   const runs = sessionRuns(filtered.map((item) => item.result));
 
-  const breakdown = <K extends string | null>(key: (session: (typeof filtered)[number]) => K) => {
-    const groups = new Map<K, typeof filtered>();
+  const breakdown = <K extends string | null>(key: (session: Finished) => K) => {
+    const groups = new Map<K, Array<Finished>>();
 
     for (const session of filtered) {
       const groupKey = key(session);
@@ -185,7 +262,126 @@ export const personalStats = (
       );
   };
 
-  let total = 0n;
+  const total = (items: ReadonlyArray<Finished>, pick: (session: Finished) => number) =>
+    checkedMinorUnits(items.reduce((sum, session) => sum + BigInt(pick(session)), 0n));
+
+  const side = (items: ReadonlyArray<Finished>) => ({
+    sessions: items.length,
+    result: total(items, (session) => session.result),
+  });
+
+  let running = 0n;
+  let low = 0n;
+
+  const runningResult = filtered.map(({ sessionId, finishedAt, result }) => {
+    running += BigInt(result);
+    low = running < low ? running : low;
+
+    return { sessionId, finishedAt, result, total: checkedMinorUnits(running) };
+  });
+
+  const buckets = (count: number, pick: (session: Finished) => number) => {
+    const sheets = Array.from({ length: count }, () => ({ sessions: 0, result: 0n }));
+
+    for (const session of filtered) {
+      const sheet = sheets[pick(session)]!;
+      sheet.sessions += 1;
+      sheet.result += BigInt(session.result);
+    }
+
+    return sheets.map((sheet, index) => ({
+      index,
+      sessions: sheet.sessions,
+      result: checkedMinorUnits(sheet.result),
+      average: sheet.sessions === 0 ? null : roundedQuotient(sheet.result, BigInt(sheet.sessions)),
+    }));
+  };
+
+  const record = (
+    outranks: (a: number, b: number) => boolean,
+    qualifies: (result: number) => boolean,
+  ) => {
+    let best: Finished | null = null;
+
+    for (const session of filtered)
+      if (!best || !outranks(best.result, session.result)) best = session;
+
+    return best === null || !qualifies(best.result)
+      ? null
+      : {
+          sessionId: best.sessionId,
+          result: best.result,
+          game: best.game,
+          venueId: best.venueId,
+          finishedAt: best.finishedAt,
+        };
+  };
+
+  const periods = () => {
+    const sheets = new Map<string, { sessions: number; result: bigint }>();
+
+    const add = (key: string, result: number) => {
+      const sheet = sheets.get(key) ?? { sessions: 0, result: 0n };
+      sheet.sessions += 1;
+      sheet.result += BigInt(result);
+      sheets.set(key, sheet);
+    };
+
+    const row = (key: string) => {
+      const sheet = sheets.get(key);
+
+      return {
+        key,
+        sessions: sheet?.sessions ?? 0,
+        result: checkedMinorUnits(sheet?.result ?? 0n),
+        played: sheet !== undefined,
+      };
+    };
+
+    if (filters.tripId !== undefined) {
+      for (const session of filtered) add(nightKey(session.startedAt, timeZone), session.result);
+      const keys = [...sheets.keys()].toSorted();
+
+      if (keys.length < NIGHT_CHART_MIN_NIGHTS) return null;
+      const rows: Array<PeriodResult> = [];
+
+      for (let key = keys[0]!; key <= keys.at(-1)!; key = nextNightKey(key)) rows.push(row(key));
+
+      return { by: "night" as const, rows };
+    }
+
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const indexOf = (key: string) => Number(key.slice(0, 4)) * 12 + Number(key.slice(5)) - 1;
+    const keyOf = (index: number) => `${Math.floor(index / 12)}-${pad((index % 12) + 1)}`;
+
+    for (const session of filtered) {
+      const { year, month } = DateTime.toParts(DateTime.setZone(session.finishedAt, timeZone));
+      add(`${year}-${pad(month)}`, session.result);
+    }
+
+    if (sheets.size < MONTH_CHART_MIN_MONTHS) return null;
+    const latest = Math.max(...[...sheets.keys()].map(indexOf));
+    const present = DateTime.toParts(DateTime.setZone(now, timeZone));
+
+    const [first, last] =
+      filters.year === undefined
+        ? [latest - TRAILING_MONTHS + 1, latest]
+        : [
+            filters.year * 12,
+            Math.max(
+              latest,
+              filters.year === present.year
+                ? present.year * 12 + present.month - 1
+                : filters.year * 12 + 11,
+            ),
+          ];
+
+    const rows = Array.from({ length: last - first + 1 }, (_, i) => row(keyOf(first + i)));
+
+    return rows.filter((r) => r.played).length < MONTH_CHART_MIN_MONTHS
+      ? null
+      : { by: "month" as const, rows };
+  };
 
   return {
     summary: {
@@ -193,11 +389,35 @@ export const personalStats = (
       hourlyResult: hourlyResult(summary.result, milliseconds),
       winRate: { wins: runs.wins, sessions: runs.sessions },
     },
-    runningResult: filtered.map(({ sessionId, finishedAt, result }) => {
-      total += BigInt(result);
-
-      return { sessionId, finishedAt, result, total: checkedMinorUnits(total) };
-    }),
+    money: {
+      won: side(filtered.filter((session) => session.result > 0)),
+      lost: side(filtered.filter((session) => session.result < 0)),
+      even: filtered.filter((session) => session.result === 0).length,
+      buyIn: total(filtered, (session) => session.totals.buyIn),
+      cashOut: total(filtered, (session) => session.totals.cashOut),
+      adjustment: total(filtered, (session) => session.totals.adjustment),
+    },
+    climb: low < 0n && running > low ? checkedMinorUnits(running - low) : null,
+    runningResult,
+    periods: periods(),
+    weekdays: buckets(
+      WEEKDAYS,
+      (session) => DateTime.toParts(DateTime.setZone(session.startedAt, timeZone)).weekDay,
+    ),
+    lengths: buckets(
+      LENGTH_EDGES_MS.length + 1,
+      (session) => LENGTH_EDGES_MS.filter((edge) => session.milliseconds >= edge).length,
+    ),
+    records: {
+      win: record(
+        (a, b) => a > b,
+        (result) => result > 0,
+      ),
+      loss: record(
+        (a, b) => a < b,
+        (result) => result < 0,
+      ),
+    },
     byGame: breakdown((session) => session.game).map(({ key, ...row }) => ({ game: key, ...row })),
     byCasino: breakdown((session) => session.venueId).map(({ key, ...row }) => ({
       venueId: key,
@@ -311,7 +531,8 @@ export const groupStats = <P extends GroupPlay>(
     result: checkedMinorUnits(sheet.result),
     sessions: sheet.sessions,
     hours: hours(sheet.milliseconds),
-    hourlyResult: hourlyResult(checkedMinorUnits(sheet.result), sheet.milliseconds),
+    hourlyResult:
+      hourlyResult(checkedMinorUnits(sheet.result), sheet.milliseconds) ?? checkedMinorUnits(0n),
     wins: sheet.wins,
   }));
 

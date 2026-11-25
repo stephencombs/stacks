@@ -23,6 +23,7 @@ import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading } from "../components/ui/Surface";
 import { useScreenFoot } from "../components/ui/tabBar";
 import { cn } from "../components/ui/cn";
+import { useLargeText } from "../lib/useLargeText";
 import { formatDisplayMoney, usePreferences, type DevicePreferences } from "../lib/preferences";
 
 import { FeltStatusBar } from "./FeltStatusBar";
@@ -100,9 +101,16 @@ export function StatsHeading({
   count?: string;
   action?: ReactNode;
 }) {
+  const large = useLargeText();
+
   return Platform.OS === "android" ? (
-    <View className="min-h-5 flex-row items-center justify-between gap-2 px-1">
-      <Text accessibilityRole="header" className="flex-1 type-label text-muted">
+    <View
+      className={cn(
+        "min-h-5 flex-row items-center justify-between gap-2 px-1",
+        large && "flex-wrap",
+      )}
+    >
+      <Text accessibilityRole="header" className={cn("type-label text-muted", !large && "flex-1")}>
         {children.toUpperCase()}
       </Text>
       {count ? <Text className="type-footnote text-muted">{count}</Text> : null}
@@ -350,9 +358,14 @@ type GameRow = {
   readonly meta: string;
   readonly chip: GameChip;
   readonly result: MinorUnits;
-  readonly share: number;
   readonly filters: StatsFilters;
 };
+
+const resultTrack = (rows: ReadonlyArray<{ readonly result: number }>) =>
+  barTrack(
+    rows.map((row) => row.result),
+    { compress: true, minimum: 0.06 },
+  );
 
 /** Results by game, each row narrowing the page to that game. */
 export function ByGame({
@@ -366,7 +379,7 @@ export function ByGame({
 }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
-  const track = barTrack(rows.map((row) => row.result));
+  const track = resultTrack(rows);
 
   return (
     <View className="gap-2">
@@ -377,46 +390,21 @@ export function ByGame({
       </StatsHeading>
       <List>
         {rows.map((row) => (
-          <Row
+          <ResultRow
             key={row.key}
             onPress={() => onFilter(row.filters)}
             accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result, currency, prefs, true)}`}
             accessibilityHint={`Shows only ${row.label}`}
             className={android ? "gap-2 px-4 py-2.5" : undefined}
-          >
-            <View className={cn("size-2 rounded-full", chipColor[row.chip])} />
-            <View className="min-w-0 flex-1 gap-0.5">
-              <Text
-                numberOfLines={android ? 2 : 1}
-                className={cn("text-ink", android ? "text-sm font-semibold" : "type-heading")}
-              >
-                {row.label}
-              </Text>
-              <Text numberOfLines={1} className="type-footnote text-muted">
-                {row.meta}
-              </Text>
-            </View>
-            {android ? (
-              <View className="h-1.5 w-15 overflow-hidden rounded-full bg-fill">
-                <View
-                  className={cn(
-                    "h-full rounded-full",
-                    prefs.privacyMode ? "bg-fill-strong" : row.result < 0 ? "bg-loss" : "bg-win",
-                  )}
-                  style={{ width: `${row.share * 100}%` }}
-                />
-              </View>
-            ) : (
-              <ResultBar result={row.result} track={track} hidden={prefs.privacyMode} />
-            )}
-            <Money
-              amount={row.result}
-              currency={currency}
-              tone="result"
-              fit={android}
-              className="min-w-18 text-right font-semibold"
-            />
-          </Row>
+            leading={<View className={cn("size-2 rounded-full", chipColor[row.chip])} />}
+            label={row.label}
+            labelLines={android ? 2 : 1}
+            meta={row.meta}
+            metaLines={1}
+            result={row.result}
+            currency={currency}
+            track={track}
+          />
         ))}
       </List>
     </View>
@@ -436,7 +424,6 @@ export function ByCasino({
   rows,
   currency,
   line,
-  group = false,
   liveCasino,
   onFilter,
 }: {
@@ -444,14 +431,13 @@ export function ByCasino({
   currency: CurrencyCode;
   /** What See all covers: "All time · 12 finished sessions". */
   line: string;
-  group?: boolean;
   liveCasino?: string | undefined;
   onFilter: (filters: StatsFilters) => void;
 }) {
   const [all, setAll] = useState(false);
   const android = Platform.OS === "android";
-  const limit = android ? (group ? 4 : 3) : TOP_CASINOS;
-  const more = rows.length > limit;
+  const large = useLargeText();
+  const more = rows.length > TOP_CASINOS;
 
   return (
     <View className="gap-2">
@@ -469,7 +455,7 @@ export function ByCasino({
       >
         By casino
       </StatsHeading>
-      <CasinoRows rows={rows.slice(0, limit)} currency={currency} onFilter={onFilter} />
+      <CasinoRows rows={rows.slice(0, TOP_CASINOS)} currency={currency} onFilter={onFilter} />
       {all ? (
         <Sheet
           open
@@ -479,7 +465,13 @@ export function ByCasino({
         >
           <View className="gap-2">
             {android ? <Text className="mb-2 type-footnote text-muted">{line}</Text> : null}
-            <View className={cn("flex-row justify-between", android ? "px-1" : "px-4")}>
+            <View
+              className={cn(
+                "flex-row justify-between",
+                android ? "px-1" : "px-4",
+                large && "flex-wrap gap-x-3",
+              )}
+            >
               <Text className={cn("text-muted", android ? "type-label" : "type-footnote")}>
                 {android ? "MOST PLAYED FIRST" : "Most played first"}
               </Text>
@@ -517,37 +509,115 @@ function CasinoRows({
 }) {
   const prefs = usePreferences();
   const android = Platform.OS === "android";
-  const track = barTrack(rows.map((row) => row.result));
+  const track = resultTrack(rows);
 
   return (
     <List className={inSheet ? "bg-fill" : undefined}>
       {rows.map((row) => (
-        <Row
+        <ResultRow
           key={row.key}
           onPress={() => onFilter(row.filters)}
           accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result, currency, prefs, true)}`}
           accessibilityHint="Shows only this casino"
           className={android ? "gap-2.5 py-2.5" : undefined}
-        >
-          <View className="min-w-0 flex-1 gap-0.5">
-            <Text numberOfLines={1} className="type-heading text-ink">
-              {row.label}
-            </Text>
-            <Text className="type-footnote text-muted">{row.meta}</Text>
-          </View>
-          {!android ? (
-            <ResultBar result={row.result} track={track} hidden={prefs.privacyMode} />
-          ) : null}
-          <Money
-            amount={row.result}
-            currency={currency}
-            tone="result"
-            className={android ? "type-number" : "min-w-18 text-right font-semibold"}
-          />
-          {android ? <Icon name="chevron-right" color="faint" size={16} /> : null}
-        </Row>
+          label={row.label}
+          labelLines={1}
+          meta={row.meta}
+          result={row.result}
+          currency={currency}
+          track={track}
+          trailing={android ? <Icon name="chevron-right" color="faint" size={16} /> : null}
+        />
       ))}
     </List>
+  );
+}
+
+function ResultRow({
+  onPress,
+  accessibilityLabel,
+  accessibilityHint,
+  className,
+  leading,
+  trailing,
+  label,
+  labelLines,
+  meta,
+  metaLines,
+  result,
+  currency,
+  track,
+}: {
+  onPress: () => void;
+  accessibilityLabel: string;
+  accessibilityHint: string;
+  className: string | undefined;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  label: string;
+  labelLines: number;
+  meta: string;
+  metaLines?: number;
+  result: MinorUnits;
+  currency: CurrencyCode;
+  track: ReturnType<typeof barTrack>;
+}) {
+  const { privacyMode } = usePreferences();
+  const android = Platform.OS === "android";
+  const large = useLargeText();
+
+  const text = (
+    <View className="min-w-0 flex-1 gap-0.5">
+      <Text numberOfLines={large ? undefined : labelLines} className="type-heading text-ink">
+        {label}
+      </Text>
+      <Text numberOfLines={large ? undefined : metaLines} className="type-footnote text-muted">
+        {meta}
+      </Text>
+    </View>
+  );
+
+  const bar = <ResultBar result={result} track={track} hidden={privacyMode} large={large} />;
+
+  const amount = (
+    <Money
+      amount={result}
+      currency={currency}
+      tone="result"
+      fit={android || large}
+      className={android ? "min-w-18 text-right type-number" : "min-w-18 text-right font-semibold"}
+    />
+  );
+
+  return (
+    <Row
+      onPress={onPress}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      className={cn(className, large && "flex-col items-stretch gap-2")}
+    >
+      {large ? (
+        <>
+          <View className="flex-row items-center gap-2.5">
+            {leading}
+            {text}
+            {trailing}
+          </View>
+          <View className="flex-row items-center gap-3">
+            {bar}
+            {amount}
+          </View>
+        </>
+      ) : (
+        <>
+          {leading}
+          {text}
+          {bar}
+          {amount}
+          {trailing}
+        </>
+      )}
+    </Row>
   );
 }
 
@@ -555,10 +625,12 @@ function ResultBar({
   result,
   track,
   hidden,
+  large,
 }: {
   result: number;
   track: ReturnType<typeof barTrack>;
   hidden: boolean;
+  large: boolean;
 }) {
   const [rule, win, loss] = useCSSVariable([
     "--color-fill-strong",
@@ -574,7 +646,11 @@ function ResultBar({
   const shoulder = end - sign * radius;
 
   return (
-    <View className="w-[26%] max-w-25" accessibilityElementsHidden importantForAccessibility="no">
+    <View
+      className={large ? "min-w-0 flex-1" : "w-[26%] max-w-25"}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+    >
       <Svg width="100%" height={16} viewBox="0 0 100 16">
         <Line
           x1={zero}

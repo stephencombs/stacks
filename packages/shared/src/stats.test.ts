@@ -7,6 +7,7 @@ import { ALEX, BEA, CAL, RandomLedger, toEntries } from "./testing/ledgerArbitra
 import { visit } from "./testing/recording.ts";
 import { playerResults } from "./results.ts";
 import {
+  leadingBucket,
   personalStats,
   raceLines,
   runningReturns,
@@ -100,6 +101,12 @@ const missingCasino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c3");
 const vegasTrip = TripId.make("0192e7a0-0000-7000-8000-0000000000d1");
 const renoTrip = TripId.make("0192e7a0-0000-7000-8000-0000000000d2");
 
+const zeroTotals = (adjustment: number) => ({
+  buyIn: MinorUnits.make(0),
+  cashOut: MinorUnits.make(0),
+  adjustment: MinorUnits.make(adjustment),
+});
+
 const personalSession = (
   id: number,
   result: number,
@@ -109,6 +116,7 @@ const personalSession = (
     game?: typeof Game.Type | null;
     venueId?: VenueId | null;
     tripId?: TripId | null;
+    totals?: { buyIn: MinorUnits; cashOut: MinorUnits; adjustment: MinorUnits };
   } = {},
 ) => ({
   visit: {
@@ -120,6 +128,7 @@ const personalSession = (
         ? null
         : DateTime.makeUnsafe(fields.finishedAt ?? "2026-11-06T21:00:00Z"),
   },
+  totals: fields.totals ?? zeroTotals(result),
   finalResult: fields.finishedAt === null ? null : MinorUnits.make(result),
   table: {
     game: fields.game === undefined ? ("blackjack" as const) : fields.game,
@@ -183,7 +192,7 @@ describe("personalStats", () => {
         result: 0,
         sessions: 0,
         hours: 0,
-        hourlyResult: 0,
+        hourlyResult: null,
         winRate: { wins: 0, sessions: 0 },
       });
       expect(stats.runningResult).toEqual([]);
@@ -336,7 +345,7 @@ describe("personalStats", () => {
     expect(tiny.summary.hourlyResult).toBe(3_600_000);
   });
 
-  it("rounds hourly halves away from zero and returns zero for zero elapsed time", () => {
+  it("rounds hourly halves away from zero and has no hourly result without elapsed time", () => {
     for (const [result, expected] of [
       [1, 1],
       [-1, -1],
@@ -354,7 +363,7 @@ describe("personalStats", () => {
       result: 10,
       sessions: 1,
       hours: 0,
-      hourlyResult: 0,
+      hourlyResult: null,
       winRate: { wins: 1, sessions: 1 },
     });
   });
@@ -376,8 +385,8 @@ describe("personalStats", () => {
 
   it("preserves safe-integer money and rejects overflowing totals, chart points and rates", () => {
     const max = Number.MAX_SAFE_INTEGER;
-    const sessions = [personalSession(1, max), personalSession(2, -max), personalSession(3, 2)];
-    expect(personalStats(sessions, zone).summary.result).toBe(2);
+    const sessions = [personalSession(1, max), personalSession(2, -max)];
+    expect(personalStats(sessions, zone).summary.result).toBe(0);
     expect(personalStats([sessions[0]!], zone).summary.hourlyResult).toBe(max);
     expect(() => personalStats([personalSession(1, max), personalSession(2, 1)], zone)).toThrow(
       RangeError,
@@ -494,4 +503,535 @@ it("excludes deleted visits even when passed unfiltered results", () => {
       DateTime.zoneMakeNamedUnsafe("UTC"),
     ),
   ).toEqual(personalStats([kept], DateTime.zoneMakeNamedUnsafe("UTC")));
+});
+
+describe("personalStats for Just me", () => {
+  const utc = DateTime.zoneMakeNamedUnsafe("UTC");
+  const NOW = DateTime.makeUnsafe("2026-11-23T12:00:00Z");
+
+  const played = (
+    id: number,
+    result: number,
+    start: string,
+    fields: Parameters<typeof personalSession>[2] = {},
+    minutes = 60,
+  ) =>
+    personalSession(id, result, {
+      ...fields,
+      startedAt: start,
+      finishedAt: DateTime.formatIso(DateTime.add(DateTime.makeUnsafe(start), { minutes })),
+    });
+
+  const stats = (
+    sessions: ReadonlyArray<ReturnType<typeof personalSession>>,
+    filters: Parameters<typeof personalStats>[2] = {},
+  ) => personalStats(sessions, utc, filters, NOW);
+
+  const totals = (buyIn: number, cashOut: number, adjustment = 0) => ({
+    buyIn: MinorUnits.make(buyIn),
+    cashOut: MinorUnits.make(cashOut),
+    adjustment: MinorUnits.make(adjustment),
+  });
+
+  const months = (result: ReturnType<typeof stats>) =>
+    result.periods?.rows.map((row) => [row.key, row.played ? row.result : null]);
+
+  describe("one session", () => {
+    const one = stats([played(1, 4500, "2026-11-06T20:00:00Z")]);
+
+    it("has no charts, no patterns and no climb", () => {
+      expect(one.periods).toBeNull();
+      expect(one.climb).toBeNull();
+      expect(leadingBucket(one.weekdays)).toBeNull();
+      expect(leadingBucket(one.lengths)).toBeNull();
+    });
+
+    it("has only the record that matches its sign", () => {
+      expect(one.records.win).toMatchObject({ result: 4500 });
+      expect(one.records.loss).toBeNull();
+      const lost = stats([played(1, -4500, "2026-11-06T20:00:00Z")]);
+      expect(lost.records.win).toBeNull();
+      expect(lost.records.loss).toMatchObject({ result: -4500 });
+    });
+
+    it("has neither record when it broke even", () => {
+      const even = stats([played(1, 0, "2026-11-06T20:00:00Z")]);
+      expect(even.records).toEqual({ win: null, loss: null });
+      expect(even.money.even).toBe(1);
+    });
+  });
+
+  describe("climb", () => {
+    it("measures from the lowest point below zero to where the result stands", () => {
+      const result = stats([
+        played(1, -300, "2026-11-01T20:00:00Z"),
+        played(2, -200, "2026-11-02T20:00:00Z"),
+        played(3, 400, "2026-11-03T20:00:00Z"),
+      ]);
+
+      expect(result.summary.result).toBe(-100);
+      expect(result.climb).toBe(400);
+    });
+
+    it("counts a climb that finished below zero, and one that finished above it", () => {
+      expect(
+        stats([played(1, -500, "2026-11-01T20:00:00Z"), played(2, 100, "2026-11-02T20:00:00Z")])
+          .climb,
+      ).toBe(100);
+      expect(
+        stats([played(1, -100, "2026-11-01T20:00:00Z"), played(2, 900, "2026-11-02T20:00:00Z")])
+          .climb,
+      ).toBe(900);
+    });
+
+    it("is null when every session won", () => {
+      const wins = stats([
+        played(1, 100, "2026-11-01T20:00:00Z"),
+        played(2, 50, "2026-11-02T20:00:00Z"),
+        played(3, 300, "2026-11-03T20:00:00Z"),
+      ]);
+
+      expect(wins.climb).toBeNull();
+      expect(wins.records.loss).toBeNull();
+      expect(wins.money.lost).toEqual({ sessions: 0, result: 0 });
+      expect(wins.money.won).toEqual({ sessions: 3, result: 450 });
+    });
+
+    it("is null when every session lost, since the result ends at its low", () => {
+      const losses = stats([
+        played(1, -100, "2026-11-01T20:00:00Z"),
+        played(2, -50, "2026-11-02T20:00:00Z"),
+      ]);
+
+      expect(losses.climb).toBeNull();
+      expect(losses.records.win).toBeNull();
+      expect(losses.records.loss).toMatchObject({ result: -100 });
+      expect(losses.money.won).toEqual({ sessions: 0, result: 0 });
+    });
+
+    it("is null when the latest session set a new low", () => {
+      expect(
+        stats([
+          played(1, -100, "2026-11-01T20:00:00Z"),
+          played(2, 80, "2026-11-02T20:00:00Z"),
+          played(3, -200, "2026-11-03T20:00:00Z"),
+        ]).climb,
+      ).toBeNull();
+    });
+  });
+
+  describe("money", () => {
+    it("splits won, lost and even, and sums buy-ins, cash-outs and adjustments", () => {
+      const result = stats([
+        played(1, 300, "2026-11-01T20:00:00Z", { totals: totals(1000, 1300) }),
+        played(2, -400, "2026-11-02T20:00:00Z", { totals: totals(1000, 600) }),
+        played(3, 0, "2026-11-03T20:00:00Z", { totals: totals(500, 500) }),
+        played(4, 150, "2026-11-04T20:00:00Z", { totals: totals(1000, 1100, 50) }),
+      ]);
+
+      expect(result.money).toEqual({
+        won: { sessions: 2, result: 450 },
+        lost: { sessions: 1, result: -400 },
+        even: 1,
+        buyIn: 3500,
+        cashOut: 3500,
+        adjustment: 50,
+      });
+      expect(result.summary.result).toBe(50);
+      expect(result.money.cashOut + result.money.adjustment - result.money.buyIn).toBe(
+        result.summary.result,
+      );
+    });
+
+    it("keeps a non-zero adjustment apart from buy-ins and cash-outs", () => {
+      const result = stats([
+        played(1, -250, "2026-11-01T20:00:00Z", { totals: totals(1000, 750) }),
+        played(2, 75, "2026-11-02T20:00:00Z", { totals: totals(500, 500, 75) }),
+      ]);
+
+      expect(result.money.adjustment).toBe(75);
+      expect(result.money.buyIn).toBe(1500);
+      expect(result.money.cashOut).toBe(1250);
+      expect(result.summary.result).toBe(-175);
+    });
+
+    it("sums to zero buy-ins when nothing was bought in", () => {
+      const result = stats([played(1, 600, "2026-11-01T20:00:00Z", { totals: totals(0, 600) })]);
+
+      expect(result.money.buyIn).toBe(0);
+      expect(result.summary.result).toBe(600);
+    });
+
+    it("leaves live and deleted visits out of every sum", () => {
+      const live = personalSession(2, 0, {
+        startedAt: "2026-11-02T20:00:00Z",
+        finishedAt: null,
+      });
+
+      const dead = played(3, 900, "2026-11-03T20:00:00Z");
+
+      const result = stats([
+        played(1, 100, "2026-11-01T20:00:00Z"),
+        live,
+        { ...dead, visit: { ...dead.visit, deletedAt: NOW } },
+      ]);
+
+      expect(result.summary.sessions).toBe(1);
+      expect(result.money.won).toEqual({ sessions: 1, result: 100 });
+    });
+  });
+
+  describe("time", () => {
+    it("has no hourly result for zero elapsed time, but keeps the result", () => {
+      const instant = personalSession(1, 700, {
+        startedAt: "2026-11-06T20:00:00Z",
+        finishedAt: "2026-11-06T20:00:00Z",
+      });
+
+      const result = stats([instant]);
+      expect(result.summary).toMatchObject({ result: 700, hours: 0, hourlyResult: null });
+      expect(result.money.won).toEqual({ sessions: 1, result: 700 });
+    });
+
+    it("has an hourly result once any time has elapsed", () => {
+      expect(stats([played(1, 700, "2026-11-06T20:00:00Z", {}, 30)]).summary.hourlyResult).toBe(
+        1400,
+      );
+    });
+  });
+
+  describe("by month", () => {
+    const two = [
+      played(1, 100, "2026-09-05T20:00:00Z"),
+      played(2, -50, "2026-10-05T20:00:00Z"),
+      played(3, 70, "2026-10-09T20:00:00Z"),
+    ];
+
+    it("is hidden at 2 played months and shown at exactly 3", () => {
+      expect(stats(two).periods).toBeNull();
+      const three = stats([...two, played(4, 25, "2026-11-05T20:00:00Z")]);
+      expect(three.periods?.by).toBe("month");
+      expect(three.periods?.rows.filter((row) => row.played)).toHaveLength(3);
+    });
+
+    it("shows all time as the trailing 12 months ending at the latest one played", () => {
+      const result = stats([
+        played(1, 100, "2025-02-05T20:00:00Z"),
+        played(2, 200, "2025-04-05T20:00:00Z"),
+        played(3, -300, "2025-12-05T20:00:00Z"),
+        played(4, 40, "2026-03-05T20:00:00Z"),
+        played(5, -60, "2026-06-05T20:00:00Z"),
+      ]);
+
+      expect(months(result)).toEqual([
+        ["2025-07", null],
+        ["2025-08", null],
+        ["2025-09", null],
+        ["2025-10", null],
+        ["2025-11", null],
+        ["2025-12", -300],
+        ["2026-01", null],
+        ["2026-02", null],
+        ["2026-03", 40],
+        ["2026-04", null],
+        ["2026-05", null],
+        ["2026-06", -60],
+      ]);
+    });
+
+    it("counts only the played months inside the trailing window toward the floor", () => {
+      expect(
+        stats([
+          played(1, 100, "2024-01-05T20:00:00Z"),
+          played(2, 100, "2024-02-05T20:00:00Z"),
+          played(3, 100, "2024-03-05T20:00:00Z"),
+          played(4, 100, "2026-06-05T20:00:00Z"),
+        ]).periods,
+      ).toBeNull();
+    });
+
+    it("runs a past year from January to December", () => {
+      const result = stats(
+        [
+          played(1, 100, "2025-03-05T20:00:00Z"),
+          played(2, 100, "2025-05-05T20:00:00Z"),
+          played(3, 100, "2025-06-05T20:00:00Z"),
+        ],
+        { year: 2025 },
+      );
+
+      expect(result.periods?.rows.map((row) => row.key)).toEqual(
+        Array.from({ length: 12 }, (_, i) => `2025-${String(i + 1).padStart(2, "0")}`),
+      );
+    });
+
+    it("runs the current year from January to the current month", () => {
+      const result = stats(
+        [
+          played(1, 100, "2026-03-05T20:00:00Z"),
+          played(2, 100, "2026-05-05T20:00:00Z"),
+          played(3, 100, "2026-06-05T20:00:00Z"),
+        ],
+        { year: 2026 },
+      );
+
+      expect(result.periods?.rows.map((row) => row.key)).toEqual(
+        Array.from({ length: 11 }, (_, i) => `2026-${String(i + 1).padStart(2, "0")}`),
+      );
+    });
+
+    it("tells a played month that broke even from one that wasn't played", () => {
+      const result = stats(
+        [
+          played(1, 100, "2026-01-05T20:00:00Z"),
+          played(2, 100, "2026-02-05T20:00:00Z"),
+          played(3, -100, "2026-02-09T20:00:00Z"),
+          played(4, 20, "2026-04-05T20:00:00Z"),
+        ],
+        { year: 2026 },
+      );
+
+      const [, feb, mar] = result.periods!.rows;
+      expect(feb).toEqual({ key: "2026-02", sessions: 2, result: 0, played: true });
+      expect(mar).toEqual({ key: "2026-03", sessions: 0, result: 0, played: false });
+    });
+
+    it("puts a session in the month it finished, as the year filter does", () => {
+      const result = stats(
+        [
+          played(1, 100, "2026-01-31T23:30:00Z"),
+          played(2, 100, "2026-02-14T20:00:00Z"),
+          played(3, 100, "2026-03-14T20:00:00Z"),
+          played(4, 100, "2026-04-14T20:00:00Z"),
+        ],
+        { year: 2026 },
+      );
+
+      expect(result.periods?.rows.slice(0, 3).map((row) => [row.key, row.sessions])).toEqual([
+        ["2026-01", 0],
+        ["2026-02", 2],
+        ["2026-03", 1],
+      ]);
+    });
+  });
+
+  describe("by night", () => {
+    const trip = { tripId: vegasTrip };
+
+    const nights = (sessions: ReadonlyArray<ReturnType<typeof personalSession>>) =>
+      stats(sessions, { tripId: vegasTrip }).periods;
+
+    it("replaces months with a trip's nights, split at 06:00", () => {
+      const result = nights([
+        played(1, 100, "2026-11-06T20:00:00Z", trip),
+        played(2, -40, "2026-11-07T01:00:00Z", trip),
+        played(3, 70, "2026-11-07T05:59:00Z", trip),
+        played(4, 10, "2026-11-07T06:00:00Z", trip),
+      ]);
+
+      expect(result?.by).toBe("night");
+      expect(result?.rows).toEqual([
+        { key: "2026-11-06", sessions: 3, result: 130, played: true },
+        { key: "2026-11-07", sessions: 1, result: 10, played: true },
+      ]);
+    });
+
+    it("is shown at exactly 2 nights and hidden at 1", () => {
+      expect(
+        nights([
+          played(1, 100, "2026-11-06T20:00:00Z", trip),
+          played(2, 100, "2026-11-06T22:00:00Z", trip),
+        ]),
+      ).toBeNull();
+      expect(
+        nights([
+          played(1, 100, "2026-11-06T20:00:00Z", trip),
+          played(2, 100, "2026-11-07T20:00:00Z", trip),
+        ])?.rows,
+      ).toHaveLength(2);
+    });
+
+    it("keeps a night nobody played as a gap, across a month end", () => {
+      const result = nights([
+        played(1, 100, "2026-10-30T20:00:00Z", trip),
+        played(2, -100, "2026-11-02T20:00:00Z", trip),
+      ]);
+
+      expect(result?.rows.map((row) => [row.key, row.played])).toEqual([
+        ["2026-10-30", true],
+        ["2026-10-31", false],
+        ["2026-11-01", false],
+        ["2026-11-02", true],
+      ]);
+      expect(result?.rows[1]).toMatchObject({ result: 0, sessions: 0 });
+    });
+
+    it("breaks the night in the viewer's zone", () => {
+      const la = personalStats(
+        [
+          played(1, 100, "2026-11-07T03:00:00Z", trip),
+          played(2, 100, "2026-11-08T03:00:00Z", trip),
+        ],
+        zone,
+        { tripId: vegasTrip },
+        NOW,
+      );
+
+      expect(la.periods?.rows.map((row) => row.key)).toEqual(["2026-11-06", "2026-11-07"]);
+    });
+  });
+
+  describe("patterns", () => {
+    const weekly = (count: number, result: number, start: string, id: number, minutes = 60) =>
+      Array.from({ length: count }, (_, i) =>
+        played(
+          id + i,
+          result,
+          DateTime.formatIso(DateTime.add(DateTime.makeUnsafe(start), { days: 7 * i })),
+          {},
+          minutes,
+        ),
+      );
+
+    it("buckets by the weekday a session started, in the viewer's zone", () => {
+      const sessions = [
+        played(1, 100, "2026-11-06T02:00:00Z"),
+        played(2, 300, "2026-11-06T20:00:00Z"),
+      ];
+
+      expect(stats(sessions).weekdays[5]).toMatchObject({ sessions: 2, result: 400, average: 200 });
+      expect(personalStats(sessions, zone, {}, NOW).weekdays[4]).toMatchObject({
+        sessions: 1,
+        result: 100,
+      });
+    });
+
+    it("splits lengths at 1, 2 and 3 hours, a session on an edge falling in the longer one", () => {
+      const minutes = [59, 60, 119, 120, 179, 180, 600];
+
+      const result = stats(
+        minutes.map((m, i) => played(i + 1, m, `2026-11-0${i + 1}T08:00:00Z`, {}, m)),
+      );
+
+      expect(result.lengths.map((bucket) => bucket.sessions)).toEqual([1, 2, 2, 2]);
+      expect(result.lengths.map((bucket) => bucket.result)).toEqual([
+        59,
+        60 + 119,
+        120 + 179,
+        180 + 600,
+      ]);
+    });
+
+    it("averages with halves rounded away from zero", () => {
+      const positive = stats([
+        played(1, 1, "2026-11-06T20:00:00Z"),
+        played(2, 2, "2026-11-13T20:00:00Z"),
+      ]);
+
+      expect(positive.weekdays[5]?.average).toBe(2);
+
+      const negative = stats([
+        played(1, -1, "2026-11-06T20:00:00Z"),
+        played(2, -2, "2026-11-13T20:00:00Z"),
+      ]);
+
+      expect(negative.weekdays[5]?.average).toBe(-2);
+    });
+
+    it("leaves a weekday nobody played with no average", () => {
+      expect(stats([played(1, 100, "2026-11-06T20:00:00Z")]).weekdays[0]).toEqual({
+        index: 0,
+        sessions: 0,
+        result: 0,
+        average: null,
+      });
+    });
+
+    it("names the highest average, whatever its sign", () => {
+      const friday = weekly(5, -20, "2026-11-06T20:00:00Z", 1);
+      const saturday = weekly(5, -90, "2026-11-07T20:00:00Z", 20);
+
+      expect(leadingBucket(stats([...friday, ...saturday]).weekdays)).toMatchObject({
+        index: 5,
+        sessions: 5,
+        average: -20,
+      });
+    });
+
+    it("needs 5 sessions in a bucket and 2 buckets over that floor", () => {
+      const friday = weekly(5, 40, "2026-11-06T20:00:00Z", 1);
+      const saturday = weekly(4, 90, "2026-11-07T20:00:00Z", 20);
+      expect(leadingBucket(stats([...friday, ...saturday]).weekdays)).toBeNull();
+      const sunday = weekly(5, 10, "2026-11-01T20:00:00Z", 40);
+
+      expect(leadingBucket(stats([...friday, ...saturday, ...sunday]).weekdays)).toMatchObject({
+        index: 5,
+        average: 40,
+      });
+    });
+
+    it("hides a sentence when two buckets tie for the highest average", () => {
+      const friday = weekly(5, 50, "2026-11-06T20:00:00Z", 1);
+      const saturday = weekly(6, 50, "2026-11-07T20:00:00Z", 20);
+      const sunday = weekly(5, 10, "2026-11-01T20:00:00Z", 40);
+
+      expect(leadingBucket(stats([...friday, ...saturday, ...sunday]).weekdays)).toBeNull();
+    });
+
+    it("names a clear leader even when the buckets below it tie", () => {
+      const friday = weekly(5, 80, "2026-11-06T20:00:00Z", 1);
+      const saturday = weekly(5, 10, "2026-11-07T20:00:00Z", 20);
+      const sunday = weekly(5, 10, "2026-11-01T20:00:00Z", 40);
+
+      expect(leadingBucket(stats([...friday, ...saturday, ...sunday]).weekdays)).toMatchObject({
+        index: 5,
+      });
+    });
+
+    it("compares lengths the same way", () => {
+      const short = weekly(5, -30, "2026-11-06T20:00:00Z", 1, 30);
+      const long = weekly(5, 120, "2026-11-07T20:00:00Z", 20, 200);
+
+      expect(leadingBucket(stats([...short, ...long]).lengths)).toMatchObject({
+        index: 3,
+        average: 120,
+      });
+    });
+  });
+
+  describe("records", () => {
+    it("picks the biggest win and the biggest loss", () => {
+      const result = stats([
+        played(1, 100, "2026-11-01T20:00:00Z", { game: "slots", venueId: otherCasino }),
+        played(2, 900, "2026-11-02T20:00:00Z"),
+        played(3, -50, "2026-11-03T20:00:00Z"),
+        played(4, -700, "2026-11-04T20:00:00Z", { game: null, venueId: null }),
+      ]);
+
+      expect(result.records.win).toMatchObject({ result: 900, game: "blackjack", venueId: casino });
+      expect(result.records.loss).toMatchObject({ result: -700, game: null, venueId: null });
+      expect(result.records.win?.sessionId).toBe(result.runningResult[1]?.sessionId);
+    });
+
+    it("gives a tied record to the later session", () => {
+      const result = stats([
+        played(1, 500, "2026-11-01T20:00:00Z"),
+        played(2, 500, "2026-11-02T20:00:00Z"),
+        played(3, -500, "2026-11-03T20:00:00Z"),
+        played(4, -500, "2026-11-04T20:00:00Z"),
+      ]);
+
+      expect(result.records.win?.sessionId).toBe(result.runningResult[1]?.sessionId);
+      expect(result.records.loss?.sessionId).toBe(result.runningResult[3]?.sessionId);
+    });
+
+    it("follows the filters", () => {
+      const sessions = [
+        played(1, 900, "2026-11-02T20:00:00Z", { game: "slots" }),
+        played(2, 100, "2026-11-03T20:00:00Z"),
+      ];
+
+      expect(stats(sessions, { game: "blackjack" }).records.win).toMatchObject({ result: 100 });
+    });
+  });
 });

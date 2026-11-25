@@ -29,7 +29,7 @@ export function FilterChip<Value extends string>(props: FilterChipProps<Value>) 
       }}
       shouldOpenOnLongPress={false}
     >
-      <View accessibilityRole="button" accessibilityLabel={`${props.name}: ${label}`}>
+      <View accessible accessibilityRole="button" accessibilityLabel={`${props.name}: ${label}`}>
         {face}
       </View>
     </MenuView>

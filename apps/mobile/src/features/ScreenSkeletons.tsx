@@ -134,6 +134,55 @@ export function SessionsSkeleton() {
   );
 }
 
+/**
+ * Your stats loading: the hero with its chart and three tiles, the money card, a chart card, and
+ * the breakdown rows. iOS draws its filter chips in the page, so it waits with them too.
+ */
+export function StatsSkeleton({ chips = false }: { chips?: boolean }) {
+  return (
+    <SkeletonScreen label="Loading stats">
+      {chips ? (
+        <View className="flex-row gap-2">
+          <Skeleton className="h-11 w-24 rounded-full" />
+          <Skeleton className="h-11 w-28 rounded-full" />
+        </View>
+      ) : null}
+      <HeroSkeleton />
+      <SectionSkeleton>
+        <View className="overflow-hidden rounded-xl bg-surface">
+          <View className="flex-row px-4 py-3">
+            {["w-20", "w-24"].map((width) => (
+              <View key={width} className="flex-1 gap-0.5">
+                <SkeletonText size="sm" className="w-10" />
+                <SkeletonText size="title" className={width} />
+                <SkeletonText size="sm" className="w-16" />
+              </View>
+            ))}
+          </View>
+          {keys(2).map((key) => (
+            <View
+              key={key}
+              className="flex-row items-center justify-between border-t border-line px-4 py-3.5"
+            >
+              <SkeletonText className="w-24" />
+              <SkeletonText className="w-16" />
+            </View>
+          ))}
+        </View>
+      </SectionSkeleton>
+      <SectionSkeleton>
+        <View className="gap-3 rounded-xl bg-surface p-4">
+          <SkeletonText className="w-56" />
+          <Skeleton className="h-[92px] w-full" />
+        </View>
+      </SectionSkeleton>
+      <SectionSkeleton>
+        <RowsSkeleton rows={3} chip />
+      </SectionSkeleton>
+    </SkeletonScreen>
+  );
+}
+
 /** The group loading: its name and who's in it, its trips, its people, its settings. */
 export function GroupSkeleton() {
   return (

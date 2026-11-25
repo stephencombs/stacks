@@ -5,7 +5,14 @@ import * as DateTime from "effect/DateTime";
 import { makeRecordingStore, type RecordingInput, type RecordingStore } from "./recording.ts";
 import type { RecordingStorageDocument } from "./recordingStorage.ts";
 import { recordingHome } from "./recordingView.ts";
-import { formatHours, personalStatsView, sessionShare, type StatsFilters } from "./stats.ts";
+import {
+  axisLabelled,
+  formatHours,
+  personalStatsView,
+  returnFigure,
+  sessionShare,
+  type StatsFilters,
+} from "./stats.ts";
 
 const zone = DateTime.zoneMakeNamedUnsafe("America/Los_Angeles");
 const wynn = VenueId.make("0192e7a0-0000-7000-8000-0000000000d1");
@@ -65,8 +72,10 @@ const played = async (sessions: ReadonlyArray<Played>, live = false) => {
   return [...home.active, ...home.finished];
 };
 
+const NOW = DateTime.makeUnsafe("2026-11-23T12:00:00Z");
+
 const view = (visits: Awaited<ReturnType<typeof played>>, filters: StatsFilters = {}) =>
-  personalStatsView(visits, filters, { timeZone: zone });
+  personalStatsView(visits, filters, { timeZone: zone, now: NOW });
 
 const week: ReadonlyArray<Played> = [
   { day: "2025-03-01", hours: 2, buyIn: 30_000, cashOut: 50_000, game: "blackjack", venueId: wynn },
@@ -207,7 +216,8 @@ describe("personalStatsView", () => {
     const stats = view(visits, { year: 2025 });
 
     if (stats.kind !== "stats") throw new Error(stats.kind);
-    expect(stats.list![0]!.meta).toContain("Dec 31, 2025");
+    expect(stats.chart).toBeNull();
+    expect(stats.records[0]!.meta).toBe("Session · Dec 31, 2025");
 
     const chart = view(
       await played(
@@ -235,7 +245,6 @@ describe("personalStatsView", () => {
 
     if (stats.kind !== "stats") throw new Error(stats.kind);
     expect(stats.hours).toBe("0m");
-    expect(stats.list![0]!.meta).toMatch(/ · 0m$/);
     expect(stats.byGame![0]!.meta).toBe("1 session · 0m");
     expect(stats.byCasino![0]!.meta).toBe("1 session · 0m");
   });
@@ -289,21 +298,19 @@ describe("personalStatsView", () => {
     expect(stats.hours).toBe("8h");
     expect(stats.hourlyResult).toBe(-3_438);
     expect(stats.winRate).toBe("40%");
-    expect(stats.winRateLine).toBe("2 of 5");
     expect(stats.chart?.points.map((point) => point.total)).toEqual([
       20_000, 20_000, -20_000, -17_500, -27_500,
     ]);
-    expect(stats.list).toBeNull();
   });
 
   it("breaks results down by game, and by casino played most then best", async () => {
     const stats = view(await played(week));
 
     if (stats.kind !== "stats") throw new Error(stats.kind);
-    expect(stats.byGame?.map((row) => [row.label, row.result, row.share, row.chip])).toEqual([
-      ["Baccarat", 2_500, 2_500 / 30_000, "purple"],
-      ["Craps", 0, 0, "red"],
-      ["Blackjack", -30_000, 1, "black"],
+    expect(stats.byGame?.map((row) => [row.label, row.result, row.chip])).toEqual([
+      ["Baccarat", 2_500, "purple"],
+      ["Craps", 0, "red"],
+      ["Blackjack", -30_000, "black"],
     ]);
     expect(stats.byGame?.[2]?.meta).toBe("3 sessions · 6h");
     expect(stats.byCasino?.map((row) => [row.key, row.meta, row.result])).toEqual([
@@ -326,8 +333,8 @@ describe("personalStatsView", () => {
     expect(stats.title).toBe("Result · 2026");
     expect(stats.result).toBe(-40_000 + 2_500 - 10_000);
     expect(stats.chart?.points).toHaveLength(3);
-    expect(stats.chart?.androidAxis).toEqual({ from: "Jan", to: "Dec" });
-    expect(stats.list).toHaveLength(3);
+    expect(stats.chart?.from).toBe("Jan 10");
+    expect(stats.chart?.to).toBe("Feb 1");
     expect(stats.chips.map((chip) => [chip.label, chip.applied])).toEqual([
       ["2026", true],
       ["All games", false],
@@ -354,17 +361,17 @@ describe("personalStatsView", () => {
     expect(atWynn.chips[0]!.label).toBe("Casino");
   });
 
-  it("lists a few sessions instead of drawing a line through them", async () => {
-    const stats = view(await played(week), { venueId: wynn });
+  it("draws no line through a single session", async () => {
+    const stats = view(await played(week), { venueId: aria });
 
     if (stats.kind !== "stats") throw new Error(stats.kind);
     expect(stats.chart).toBeNull();
-    expect(stats.list?.map((row) => [row.title, row.result, row.chip])).toEqual([
-      ["Blackjack", -10_000, "black"],
-      ["Craps", 0, "red"],
-      ["Blackjack", 20_000, "black"],
+    expect(stats.bars).toBeNull();
+    expect(stats.patterns).toEqual([]);
+    expect(stats.climb).toBeNull();
+    expect(stats.records.map((row) => [row.key, row.label, row.result])).toEqual([
+      ["loss", "Biggest loss", -40_000],
     ]);
-    expect(stats.list?.[1]?.meta).toMatch(/2025 · 1h 30m$/);
   });
 
   it("says what matched nothing", async () => {
@@ -409,5 +416,364 @@ describe("personalStatsView", () => {
           expect(stats.result).toBe(matching.reduce((sum, item) => sum + item.finalResult!, 0));
           expect(stats.sessions).toBe(matching.length);
         }
+  });
+});
+
+describe("returnFigure", () => {
+  it("words the return and colors it by the figure it prints", () => {
+    expect(returnFigure(5_500, 10_000)).toEqual({ label: "+55%", tone: "win" });
+    expect(returnFigure(-3_000, 10_000)).toEqual({ label: "-30%", tone: "loss" });
+    expect(returnFigure(0, 10_000)).toEqual({ label: "0%", tone: "even" });
+  });
+
+  it("stays muted when it rounds to nothing", () => {
+    expect(returnFigure(40, 10_000)).toEqual({ label: "0%", tone: "even" });
+    expect(returnFigure(-40, 10_000)).toEqual({ label: "0%", tone: "even" });
+  });
+
+  it("has nothing to measure against with no buy-ins", () => {
+    expect(returnFigure(2_500, 0)).toEqual({ label: "–", tone: "none" });
+    expect(returnFigure(0, 0)).toEqual({ label: "–", tone: "none" });
+  });
+});
+
+describe("the Just me figures", () => {
+  const stats = async (sessions: ReadonlyArray<Played>, filters: StatsFilters = {}) => {
+    const result = view(await played(sessions), filters);
+
+    if (result.kind !== "stats") throw new Error(result.kind);
+
+    return result;
+  };
+
+  it("scopes the hero, and says the sessions and time behind it", async () => {
+    const all = await stats(week);
+    expect(all.title).toBe("Result · all time");
+    expect(all.played).toBe("5 sessions · 8h");
+    expect(all.returnRate).toEqual({ label: "-23%", tone: "loss" });
+    expect((await stats(week, { year: 2026 })).title).toBe("Result · 2026");
+  });
+
+  it("has no per-hour figure when no time elapsed, but keeps the result", async () => {
+    const result = await stats([{ day: "2026-01-10", hours: 0, buyIn: 10_000, cashOut: 15_000 }]);
+    expect(result.result).toBe(5_000);
+    expect(result.hourlyResult).toBeNull();
+    expect(result.winRate).toBe("100%");
+  });
+
+  it("measures the climb from the low", async () => {
+    const result = await stats([
+      { day: "2026-01-10", hours: 1, buyIn: 10_000, cashOut: 5_000 },
+      { day: "2026-01-11", hours: 1, buyIn: 10_000, cashOut: 18_000 },
+    ]);
+
+    expect(result.result).toBe(3_000);
+    expect(result.climb).toBe(8_000);
+  });
+
+  it("draws the line from two sessions, between the first and last dates", async () => {
+    const result = await stats(week, { year: 2025 });
+    expect(result.chart?.points).toHaveLength(2);
+    expect([result.chart?.from, result.chart?.to]).toEqual(["Mar 1", "Mar 2"]);
+    expect([result.chart?.low, result.chart?.high]).toEqual([0, 20_000]);
+  });
+
+  it("splits the money, and leaves out an adjustment of zero", async () => {
+    const { money } = await stats(week);
+    expect(money).toEqual({
+      won: { sessions: 2, result: 22_500 },
+      lost: { sessions: 2, result: -50_000 },
+      even: 1,
+      buyIn: 120_000,
+      cashOut: 92_500,
+      adjustment: null,
+    });
+  });
+
+  describe("by month", () => {
+    const months: ReadonlyArray<Played> = [
+      { day: "2026-01-10", hours: 1, buyIn: 10_000, cashOut: 14_000 },
+      { day: "2026-02-10", hours: 1, buyIn: 10_000, cashOut: 4_000 },
+      { day: "2026-03-10", hours: 1, buyIn: 10_000, cashOut: 22_000 },
+      { day: "2026-03-12", hours: 1, buyIn: 10_000, cashOut: 10_000 },
+      { day: "2026-05-10", hours: 1, buyIn: 10_000, cashOut: 10_000 },
+    ];
+
+    it("names the best and worst month, and marks only those bars", async () => {
+      const { bars } = await stats(months, { year: 2026 });
+
+      expect(bars?.title).toBe("By month");
+      expect(bars?.count).toBe("2 up · 1 down");
+      expect(bars?.sentences).toEqual([
+        { key: "best", before: "March was your best month at", amount: 12_000 },
+        { key: "worst", before: "February was your worst at", amount: -6_000 },
+      ]);
+      expect(bars?.bars.filter((bar) => bar.emphasis).map((bar) => bar.name)).toEqual([
+        "February",
+        "March",
+      ]);
+    });
+
+    it("tells won, lost, even and unplayed apart, through to the current month", async () => {
+      const { bars } = await stats(months, { year: 2026 });
+
+      expect(bars?.bars.map((bar) => bar.status)).toEqual([
+        "up",
+        "down",
+        "up",
+        "none",
+        "even",
+        "none",
+        "none",
+        "none",
+        "none",
+        "none",
+        "none",
+      ]);
+      expect(bars?.summary).toBe(
+        "Result by month, January to November: 2 up, 1 down, 1 even, 7 with no play.",
+      );
+    });
+
+    it("puts the year on the first label and at a January in all time only", async () => {
+      const older: ReadonlyArray<Played> = [
+        { day: "2025-11-10", hours: 1, buyIn: 10_000, cashOut: 14_000 },
+        { day: "2025-12-10", hours: 1, buyIn: 10_000, cashOut: 4_000 },
+        { day: "2026-01-10", hours: 1, buyIn: 10_000, cashOut: 22_000 },
+      ];
+
+      const { bars } = await stats(older);
+      expect(bars?.bars.map((bar) => [bar.label, bar.year]).slice(0, 4)).toEqual([
+        ["Feb", "2025"],
+        ["Mar", null],
+        ["Apr", null],
+        ["May", null],
+      ]);
+      expect(bars?.bars.find((bar) => bar.label === "Jan")?.year).toBe("2026");
+      expect((await stats(older, { year: 2026 })).bars).toBeNull();
+      expect((await stats([...older, ...months], { year: 2026 })).bars?.bars[0]?.year).toBeNull();
+    });
+
+    it("leaves a sentence out when the best month lost, and when two months tie", async () => {
+      const losing = await stats(
+        [
+          { day: "2026-01-10", hours: 1, buyIn: 10_000, cashOut: 9_000 },
+          { day: "2026-02-10", hours: 1, buyIn: 10_000, cashOut: 5_000 },
+          { day: "2026-03-10", hours: 1, buyIn: 10_000, cashOut: 8_000 },
+        ],
+        { year: 2026 },
+      );
+
+      expect(losing.bars?.sentences).toEqual([
+        { key: "worst", before: "February was your worst at", amount: -5_000 },
+      ]);
+
+      const tied = await stats(
+        [
+          { day: "2026-01-10", hours: 1, buyIn: 10_000, cashOut: 14_000 },
+          { day: "2026-02-10", hours: 1, buyIn: 10_000, cashOut: 14_000 },
+          { day: "2026-03-10", hours: 1, buyIn: 10_000, cashOut: 11_000 },
+        ],
+        { year: 2026 },
+      );
+
+      expect(tied.bars?.sentences).toEqual([]);
+      expect(tied.bars?.bars.filter((bar) => bar.emphasis)).toHaveLength(2);
+    });
+
+    it("is hidden below 3 played months", async () => {
+      expect((await stats(months.slice(0, 2), { year: 2026 })).bars).toBeNull();
+    });
+  });
+
+  describe("by night", () => {
+    const vegas = TripId.make("0192e7a0-0000-7000-8000-0000000000e1");
+
+    const night = async (sessions: ReadonlyArray<Played>) => {
+      const visits = (await played(sessions)).map((item) => ({
+        ...item,
+        table: { ...item.table, tripId: vegas },
+      }));
+
+      const result = view(visits, { tripId: vegas });
+
+      if (result.kind !== "stats") throw new Error(result.kind);
+
+      return result;
+    };
+
+    it("becomes By night for a trip, one bar per night with the gap kept", async () => {
+      const { bars } = await night([
+        { day: "2026-11-05", hours: 1, buyIn: 10_000, cashOut: 14_000 },
+        { day: "2026-11-07", hours: 1, buyIn: 10_000, cashOut: 4_000 },
+      ]);
+
+      expect(bars?.title).toBe("By night");
+      expect(bars?.bars.map((bar) => [bar.label, bar.name, bar.status])).toEqual([
+        ["Thu", "Thursday, Nov 5", "up"],
+        ["Fri", "Friday, Nov 6", "none"],
+        ["Sat", "Saturday, Nov 7", "down"],
+      ]);
+      expect(bars?.sentences.map((sentence) => sentence.before)).toEqual([
+        "Thursday, Nov 5 was your best night at",
+        "Saturday, Nov 7 was your worst at",
+      ]);
+      expect(bars?.summary).toBe(
+        "Result by night, Thursday, Nov 5 to Saturday, Nov 7: 1 up, 1 down, 1 with no play.",
+      );
+    });
+  });
+
+  describe("axis labels", () => {
+    const shown = (count: number) =>
+      Array.from({ length: count }, (_, index) => index).filter(axisLabelled(count));
+
+    it("labels every column up to 18", () => {
+      expect(shown(18)).toHaveLength(18);
+    });
+
+    it("thins to every other column, keeping the first and the last", () => {
+      expect(shown(19)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
+      expect(shown(20)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 19]);
+    });
+
+    it("thins further for a longer run, and never labels two neighbours", () => {
+      for (const count of [37, 40, 55, 90]) {
+        const picked = shown(count);
+
+        expect(picked[0]).toBe(0);
+        expect(picked.at(-1)).toBe(count - 1);
+        expect(picked.length).toBeLessThanOrEqual(18);
+        expect(picked.every((index, i) => i === 0 || index - picked[i - 1]! >= 2)).toBe(true);
+      }
+    });
+
+    it("keeps every night's full name on a long trip", async () => {
+      const vegas = TripId.make("0192e7a0-0000-7000-8000-0000000000e2");
+
+      const visits = (
+        await played(
+          Array.from({ length: 21 }, (_, i) => ({
+            day: `2026-06-${String(i + 1).padStart(2, "0")}`,
+            hours: 1,
+            buyIn: 10_000,
+            cashOut: 12_000,
+          })),
+        )
+      ).map((item) => ({ ...item, table: { ...item.table, tripId: vegas } }));
+
+      const result = view(visits, { tripId: vegas });
+
+      if (result.kind !== "stats") throw new Error(result.kind);
+
+      const { bars } = result.bars!;
+
+      expect(bars.map((bar) => bar.label).filter(Boolean)).toEqual([
+        "1",
+        "3",
+        "5",
+        "7",
+        "9",
+        "11",
+        "13",
+        "15",
+        "17",
+        "19",
+        "21",
+      ]);
+      expect(bars.every((bar) => bar.name.length > 0)).toBe(true);
+    });
+  });
+
+  describe("patterns", () => {
+    const weekly = (count: number, from: string, cashOut: number, hours = 1) =>
+      Array.from({ length: count }, (_, i) => ({
+        day: DateTime.formatIso(DateTime.add(DateTime.makeUnsafe(from), { days: 7 * i })).slice(
+          0,
+          10,
+        ),
+        hours,
+        buyIn: 10_000,
+        cashOut,
+      }));
+
+    it("names the weekday with the highest average, across how many sessions", async () => {
+      const { patterns } = await stats([
+        ...weekly(5, "2026-01-02", 16_000),
+        ...weekly(5, "2026-01-03", 8_000),
+      ]);
+
+      expect(patterns).toEqual([
+        {
+          key: "Fridays",
+          before: "Fridays averaged",
+          amount: 6_000,
+          after: " a session, across 5.",
+        },
+      ]);
+    });
+
+    it("names the length with the highest average, whatever its sign", async () => {
+      const { patterns } = await stats([
+        ...weekly(5, "2026-01-02", 9_000, 0.5),
+        ...weekly(5, "2026-03-13", 3_000, 4),
+      ]);
+
+      expect(patterns.map((pattern) => [pattern.before, pattern.amount, pattern.after])).toEqual([
+        ["Under 1h sessions averaged", -1_000, ", across 5."],
+      ]);
+    });
+
+    it("says nothing when two buckets tie, or when too few have the sessions", async () => {
+      expect(
+        (await stats([...weekly(5, "2026-01-02", 16_000), ...weekly(5, "2026-01-03", 16_000)]))
+          .patterns,
+      ).toEqual([]);
+      expect(
+        (await stats([...weekly(5, "2026-01-02", 16_000), ...weekly(4, "2026-01-03", 8_000)]))
+          .patterns,
+      ).toEqual([]);
+    });
+  });
+
+  describe("records", () => {
+    it("names the game, casino and date, and opens the session", async () => {
+      const visits = (await played(week)).map((item) => ({
+        ...item,
+        venue:
+          item.table.venueId === wynn
+            ? {
+                id: wynn,
+                name: "Wynn",
+                kind: "casino" as const,
+                city: null,
+                region: null,
+                country: "US",
+                lat: 0,
+                lng: 0,
+              }
+            : null,
+      }));
+
+      const result = view(visits);
+
+      if (result.kind !== "stats") throw new Error(result.kind);
+
+      expect(result.records.map((row) => [row.label, row.meta, row.result])).toEqual([
+        ["Biggest win", "Blackjack · Wynn · Mar 1, 2025", 20_000],
+        ["Biggest loss", "Blackjack · Casino · Jan 10, 2026", -40_000],
+      ]);
+      expect(result.records[0]?.visitId).toBe(
+        visits.find((item) => item.finalResult === 20_000)?.visit.id,
+      );
+    });
+
+    it("leaves the casino out when none was set", async () => {
+      const result = await stats([
+        { day: "2026-01-10", hours: 1, buyIn: 10_000, cashOut: 20_000, game: "craps" },
+      ]);
+
+      expect(result.records[0]?.meta).toBe("Craps · Jan 10, 2026");
+    });
   });
 });

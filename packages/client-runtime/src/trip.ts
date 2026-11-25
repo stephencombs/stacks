@@ -15,7 +15,14 @@ import {
   type TripTable,
 } from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
-import type { PlayerTrip, TripClock, TripNight, TripSession } from "@stacks/shared/trips";
+import {
+  NIGHT_ENDS_HOUR,
+  nightKey,
+  type PlayerTrip,
+  type TripClock,
+  type TripNight,
+  type TripSession,
+} from "@stacks/shared/trips";
 
 /**
  * One thing played on a trip: an older group session, or a table recorded from Play. Both read as
@@ -66,25 +73,18 @@ export const closedPlays = (trip: Pick<TripDetail, "sessions" | "tables">) =>
 
 const HOUR = 3_600_000;
 
-const NIGHT_ENDS = 6;
-
-const pad = (n: number) => String(n).padStart(2, "0");
 const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
 const shortDate = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 
 /** The trip board's clock in the viewer's own time zone. */
 export const localClock: TripClock = {
-  night: (at) => {
-    const date = new Date(DateTime.toEpochMillis(at) - NIGHT_ENDS * HOUR);
-
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  },
+  night: (at) => nightKey(at, DateTime.zoneMakeLocal()),
   hour: (at) => new Date(DateTime.toEpochMillis(at)).getHours(),
 };
 
 export const nightWeekday = (night: TripNight<TripSession>) => {
   const first = night.sessions[0]!;
-  const date = new Date(DateTime.toEpochMillis(first.session.startedAt) - NIGHT_ENDS * HOUR);
+  const date = new Date(DateTime.toEpochMillis(first.session.startedAt) - NIGHT_ENDS_HOUR * HOUR);
 
   return weekday.format(date);
 };
@@ -171,7 +171,11 @@ const percent = new Intl.NumberFormat("en-US", {
 
 /** A return on buy-ins, "+55%" or "-30%", or "–" for someone who never put money in. */
 export const returnLabel = (value: number | null) =>
-  value === null ? "–" : percent.format(value).replace("−", "-");
+  value === null
+    ? "–"
+    : Math.round(value * 100) === 0
+      ? "0%"
+      : percent.format(value).replace("−", "-");
 
 /** A night's or a trip's record: "4W · 3L · 1 even", leaving out what's zero. */
 export const recordLine = (wins: number, losses: number, even: number) =>

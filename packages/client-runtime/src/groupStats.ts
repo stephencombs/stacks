@@ -167,7 +167,6 @@ export const groupStatsView = (
           label: night.label,
         }));
 
-  const biggest = Math.max(...computed.byGame.map((row) => Math.abs(row.result)));
   const meta = (sessions: number) => `${sessions} ${sessions === 1 ? "session" : "sessions"}`;
 
   const guests = new Set(
@@ -250,7 +249,6 @@ export const groupStatsView = (
             meta: meta(row.sessions),
             chip: gameChip(row.game),
             result: row.result,
-            share: biggest === 0 ? 0 : Math.abs(row.result) / biggest,
             filters: { ...filters, game: row.game },
           })),
     byCasino:
