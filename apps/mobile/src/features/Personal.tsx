@@ -83,13 +83,13 @@ export function PersonalScreen({
     paddingRight: Math.max(16, insets.right),
   };
 
+  // WARNING: iOS 26 finds the header edge blur's scroll view through each screen's first children, so the header (its You sheet stays mounted once opened) must render after the ScrollView.
   return (
     <SheetHost>
       <View
         className={felt ? "flex-1 bg-felt" : "flex-1 bg-canvas"}
         style={session ? { paddingTop: insets.top } : undefined}
       >
-        {header}
         <FeltStatusBar felt={felt} />
         <ScrollView
           ref={scroll}
@@ -141,6 +141,7 @@ export function PersonalScreen({
         >
           {children}
         </ScrollView>
+        {header}
         {fab ? (
           <FloatingAction right={sides.paddingRight} bottom={foot.fabBottom}>
             {fab}
