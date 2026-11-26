@@ -1,5 +1,7 @@
+import type { LiveTable as LiveTableModel } from "@stacks/client-runtime/liveTable";
 import { makeRecordingStore } from "@stacks/client-runtime/recording";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
+import { formatSeatLabel, recordingTable } from "@stacks/client-runtime/recordingView";
 import { TableId } from "@stacks/contracts";
 import * as Option from "effect/Option";
 import { act, type ReactNode } from "react";
@@ -140,6 +142,8 @@ const setupTableScreen = async ({
       </div>
     ),
   }));
+  let lastTableProps: LiveTableModel | null = null;
+
   vi.doMock("../features/LiveBar", () => ({ LiveSessionsBar: () => null }));
   vi.doMock("../features/LiveTable", () => ({
     ActionSlot: () => null,
@@ -147,7 +151,22 @@ const setupTableScreen = async ({
     LiveHero: () => null,
     SeatSheet: () => null,
     TableActionSheet: () => null,
-    TableSeats: () => null,
+    TableSeats: ({ table }: { table: LiveTableModel }) => {
+      lastTableProps = table;
+
+      return (
+        <div>
+          {table.seats.map((seat) => (
+            <div key={seat.visitId}>
+              {seat.name}
+              {seat.seatNumber !== null && table.tableSeats !== null
+                ? ` · ${formatSeatLabel(seat.seatNumber, table.tableSeats)}`
+                : ""}
+            </div>
+          ))}
+        </div>
+      );
+    },
     useDeleteTable: () => ({ error: null, confirm: () => {} }),
   }));
   vi.doMock("../features/Personal", () => ({ PersonalScreen: Container }));
@@ -161,8 +180,6 @@ const setupTableScreen = async ({
   vi.doMock("../lib/stacks", () => ({ StacksProvider: Container }));
   vi.doMock("./Play", () => ({ BackButton: Container, RecordingToast: Container }));
   vi.doMock("./Session", () => ({ ImportedSession: Container }));
-
-  const { recordingTable } = await import("@stacks/client-runtime/recordingView");
 
   vi.doMock("@stacks/client-runtime/recordingReact", () => ({
     useRecordingSubmit: () => ({
@@ -191,7 +208,7 @@ const setupTableScreen = async ({
     root.render(<TableScreen route={{ params: { tableId } }} />);
   });
 
-  return { container, root, setOptionsCalls, navigateCalls };
+  return { container, root, setOptionsCalls, navigateCalls, getLastTable: () => lastTableProps };
 };
 
 it("keeps the header and shows a recovery action for invalid and unknown table IDs", async () => {
@@ -243,7 +260,7 @@ it("hides the native header only when a recorded table is loaded and restores it
   }
 });
 
-it("renders the blackjack tabletop arc and updates table size with the size control", async () => {
+it("omits the table map and seat count on live Table and shows each player's seat on their row", async () => {
   const store = await openStore();
 
   try {
@@ -259,23 +276,15 @@ it("renders the blackjack tabletop arc and updates table size with the size cont
     await store.execute(store.prepare({ type: "set_seat", tableId, visitId: beaVisitId, seat: 1 }));
 
     const screen = await setupTableScreen({ store, tableId });
-    expect(screen.container.textContent).toContain("5 seats");
+    expect(screen.container.textContent).not.toContain("5 seats");
     expect(
       screen.container.querySelector('[aria-label="Seat 1, first base, occupied by Bea"]'),
-    ).not.toBeNull();
+    ).toBeNull();
+    expect(screen.container.textContent).toContain("Bea · Seat 1 · First base");
 
-    const sizeButton = [...screen.container.querySelectorAll("button")].find(
-      (b) => b.textContent === "5 seats",
-    );
-
-    await act(async () => sizeButton!.click());
-
-    const sevenButton = [...screen.container.querySelectorAll("button")].find(
-      (b) => b.textContent === "7 seats",
-    );
-
-    await act(async () => sevenButton!.click());
-    expect(store.getSnapshot().state!.tables[0]!.tableSeats).toBe(7);
+    const passedTable = screen.getLastTable();
+    expect(passedTable?.tableSeats).toBe(5);
+    expect(passedTable?.seats[0]?.seatNumber).toBe(1);
     await act(async () => screen.root.unmount());
   } finally {
     await store.close();

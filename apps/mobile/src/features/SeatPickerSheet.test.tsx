@@ -58,8 +58,16 @@ const setup = async () => {
 
   vi.doMock("react-native-svg", () => ({
     default: Container,
+    Circle: Container,
+    Defs: Container,
+    Ellipse: Container,
+    G: Container,
     Line: Container,
+    LinearGradient: Container,
     Path: Container,
+    RadialGradient: Container,
+    Rect: Container,
+    Stop: Container,
     Text: Container,
   }));
 

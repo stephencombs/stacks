@@ -88,8 +88,16 @@ vi.mock("uniwind", () => ({ useCSSVariable: () => "#999999" }));
 
 vi.mock("react-native-svg", () => ({
   default: () => null,
+  Circle: () => null,
+  Defs: () => null,
+  Ellipse: () => null,
+  G: () => null,
   Line: () => null,
+  LinearGradient: () => null,
   Path: () => null,
+  RadialGradient: () => null,
+  Rect: () => null,
+  Stop: () => null,
   Text: () => null,
 }));
 

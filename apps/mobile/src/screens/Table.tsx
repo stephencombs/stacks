@@ -28,7 +28,6 @@ import { Button } from "../components/ui/Button";
 import { cn } from "../components/ui/cn";
 import { FormError } from "../components/ui/Field";
 import { EmptyState } from "../components/ui/Surface";
-import { BlackjackTableArc } from "../features/BlackjackTableArc";
 import { LiveSessionsBar } from "../features/LiveBar";
 import {
   ActionSlot,
@@ -42,7 +41,6 @@ import {
 } from "../features/LiveTable";
 import { PersonalScreen } from "../features/Personal";
 import { SitDownSheet } from "../features/RecordingForms";
-import { liveOccupants, TableSizeSheet } from "../features/SeatPickerSheet";
 import { useAccount } from "../lib/account";
 import { TableNotices } from "../lib/realtime";
 import { useRecordingState } from "../lib/recording";
@@ -106,7 +104,7 @@ function HideNativeHeader() {
 }
 
 type Open =
-  | { readonly type: "sit" | "size" }
+  | { readonly type: "sit" }
   | { readonly type: "action"; readonly action: Exclude<TableAction, "edit" | "delete_table"> }
   | { readonly type: "seat"; readonly seat: TableSeat };
 
@@ -316,7 +314,6 @@ function Table({ tableId }: { tableId: TableId }) {
           label="In play at the table"
           amount={view.inPlay}
           title={title}
-          compact={view.tableSeats !== null}
           detail={
             view.seats.length === 0
               ? "Nobody's playing yet"
@@ -342,39 +339,6 @@ function Table({ tableId }: { tableId: TableId }) {
           </Text>
         </View>
       )}
-      {!view.closed && view.tableSeats !== null ? (
-        <View className="gap-2">
-          {table.role !== "participant" ? (
-            <View className="items-end">
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Table size: ${view.tableSeats} seats. Change`}
-                onPress={() => setOpen({ type: "size" })}
-                className="min-h-11 flex-row items-center rounded-full border border-felt-ink/25 bg-felt-deep px-3.5 py-1.5 active:opacity-80"
-              >
-                <Text className="type-footnote font-semibold text-felt-ink">
-                  {`${view.tableSeats} seats`}
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <BlackjackTableArc
-            seats={view.tableSeats}
-            surface="felt"
-            compact
-            occupants={liveOccupants(view)}
-            disabled={quick.pending}
-            onSelectSpot={(picked) => {
-              const found = view.seats.find((seat) => seat.playing && seat.seatNumber === picked);
-
-              if (!found) return;
-
-              if (found.recordable) setOpen({ type: "seat", seat: found });
-              else if (found.isSelf) toVisit(found.visitId);
-            }}
-          />
-        </View>
-      ) : null}
       {view.seats.length === 0 ? (
         <View className="rounded-2xl bg-felt-deep px-4 py-3">
           <Text className="type-footnote text-felt-soft">
@@ -429,21 +393,6 @@ function Table({ tableId }: { tableId: TableId }) {
             }
           />
         )),
-        Match.when({ type: "size" }, () =>
-          view.tableSeats === null ? null : (
-            <TableSizeSheet
-              tableId={tableId}
-              tableSeats={view.tableSeats}
-              occupants={liveOccupants(view)}
-              onClose={close}
-              onSaved={(count) => {
-                close();
-                setSaved(null);
-                setNotice(`Table set to ${count} seats.`);
-              }}
-            />
-          ),
-        ),
         Match.orElse(() => null),
       )}
     </PersonalScreen>

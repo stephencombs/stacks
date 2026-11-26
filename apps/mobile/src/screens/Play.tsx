@@ -73,7 +73,6 @@ import {
   VoidSeatingSheet,
   VoidSheet,
 } from "../features/RecordingForms";
-import { BlackjackTableArc } from "../features/BlackjackTableArc";
 import { LiveSessionsBar } from "../features/LiveBar";
 import { liveOccupants, SeatPickerSheet } from "../features/SeatPickerSheet";
 import { EntryInspector, History, SeatingInspector } from "../features/VisitHistory";
@@ -336,27 +335,6 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       setSaved({
         key: `undone-seat-${seatingId}`,
         text: "Seat change undone.",
-      });
-    }
-  };
-
-  const pickLiveSeat = async (picked: number, totalSeats: number) => {
-    const receipt = await quick.submit({
-      type: "set_seat",
-      tableId: visit.visit.tableId,
-      visitId,
-      seat: picked,
-    });
-
-    if (receipt?.command.type === "set_seat") {
-      setNotice(null);
-      setSaved({
-        key: receipt.command.seatingId,
-        seatingId: receipt.command.seatingId,
-        tableId: visit.visit.tableId,
-        visitId,
-        text: `Sat at ${formatSeatLabel(picked, totalSeats)}.`,
-        undo: true,
       });
     }
   };
@@ -672,14 +650,10 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       />
       {live ? (
         <>
-          <LiveVisitHero
-            visit={visit}
-            name={own ? undefined : player?.player.displayName}
-            compact={Boolean(shared && seats && seats.tableSeats !== null)}
-          />
+          <LiveVisitHero visit={visit} name={own ? undefined : player?.player.displayName} />
           <View className="items-center gap-2">
             <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} felt />
-            {seats && !shared && seats.tableSeats !== null ? (
+            {seats && seats.tableSeats !== null ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={
@@ -698,42 +672,6 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
               </Pressable>
             ) : null}
           </View>
-          {seats && shared && seats.tableSeats !== null ? (
-            <BlackjackTableArc
-              seats={seats.tableSeats}
-              surface="felt"
-              compact
-              selectedSeat={visit.currentSeat}
-              occupants={liveOccupants(seats)}
-              disabled={quick.pending}
-              onSelectSpot={(picked) => {
-                const occupant = seats.seats.find(
-                  (item) => item.playing && item.seatNumber === picked,
-                );
-
-                if (!occupant) {
-                  void pickLiveSeat(picked, seats.tableSeats!);
-
-                  return;
-                }
-
-                if (occupant.visitId === visitId) {
-                  setOpen({ type: "seat" });
-
-                  return;
-                }
-
-                if (occupant.recordable) {
-                  setOpen({ type: "player_seat", seat: occupant });
-
-                  return;
-                }
-
-                if (occupant.isSelf)
-                  navigation.dispatch(StackActions.push("Play", { visitId: occupant.visitId }));
-              }}
-            />
-          ) : null}
           {seats && shared ? (
             <TableSeats
               table={seats}
@@ -1447,15 +1385,7 @@ export function BackButton({ label, felt = false }: { label?: string; felt?: boo
   );
 }
 
-function LiveVisitHero({
-  visit,
-  name,
-  compact = false,
-}: {
-  visit: RecordingVisitView;
-  name?: string | undefined;
-  compact?: boolean;
-}) {
+function LiveVisitHero({ visit, name }: { visit: RecordingVisitView; name?: string | undefined }) {
   const summary = sessionReadout(visit, visit.visit.startedAt);
 
   const buyIns = summary.corrected
@@ -1468,7 +1398,6 @@ function LiveVisitHero({
       amount={visit.totals.buyIn}
       title={[visitTitle(visit.table), visit.venue?.name].filter(Boolean).join(" · ")}
       detail={`Started ${formatTime(visit.visit.startedAt)} · ${buyIns}`}
-      compact={compact}
       testID="live-buy-in"
     />
   );

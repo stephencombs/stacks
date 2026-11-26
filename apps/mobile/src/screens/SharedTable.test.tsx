@@ -454,7 +454,7 @@ it("redeems a player invite to Home and shows Conflict errors clearly", async ()
   }
 });
 
-it("renders a read-only blackjack arc and seat labels for seated viewers", async () => {
+it("omits the blackjack table map and shows seat labels on seated viewers' rows", async () => {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
 
@@ -619,9 +619,8 @@ it("renders a read-only blackjack arc and seat labels for seated viewers", async
       await Promise.resolve();
     });
 
-    expect(
-      element.querySelector('[aria-label="Seat 1, first base, occupied by Alex"]'),
-    ).not.toBeNull();
+    expect(element.querySelector('[aria-label="Seat 1, first base, occupied by Alex"]')).toBeNull();
+    expect(element.textContent).not.toContain("DEALER");
     expect(element.textContent).toContain("Seat 1 · First base · Playing");
   } finally {
     await act(async () => root.unmount());

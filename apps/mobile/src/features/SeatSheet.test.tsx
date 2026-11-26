@@ -72,8 +72,16 @@ const setup = async (game: "poker_cash" | "blackjack" = "poker_cash") => {
 
   vi.doMock("react-native-svg", () => ({
     default: Container,
+    Circle: Container,
+    Defs: Container,
+    Ellipse: Container,
+    G: Container,
     Line: Container,
+    LinearGradient: Container,
     Path: Container,
+    RadialGradient: Container,
+    Rect: Container,
+    Stop: Container,
     Text: Container,
   }));
   vi.doMock("uniwind", () => ({ useCSSVariable: () => [] }));

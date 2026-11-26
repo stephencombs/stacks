@@ -98,18 +98,16 @@ export function LiveHero({
   amount,
   title,
   detail,
-  compact = false,
   testID,
 }: {
   label: string;
   amount: MinorUnits;
   title: string;
   detail: string;
-  compact?: boolean;
   testID?: string;
 }) {
   return (
-    <View className={cn("gap-2.5 px-3", compact ? "pt-6" : "pt-16")}>
+    <View className="gap-2.5 px-3 pt-16">
       <Text accessibilityRole="header" className="type-label text-[13px] text-felt-ink">
         {label}
       </Text>

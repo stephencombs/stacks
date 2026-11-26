@@ -69,8 +69,16 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   }));
   vi.doMock("react-native-svg", () => ({
     default: Container,
+    Circle: Container,
+    Defs: Container,
+    Ellipse: Container,
+    G: Container,
     Line: Container,
+    LinearGradient: Container,
     Path: Container,
+    RadialGradient: Container,
+    Rect: Container,
+    Stop: Container,
     Text: Container,
   }));
   vi.doMock("uniwind", () => ({ useCSSVariable: () => [] }));
@@ -353,8 +361,16 @@ it("handles solo and shared blackjack seats, undo toast, edit Seat row on iOS/An
     }));
     vi.doMock("react-native-svg", () => ({
       default: Container,
+      Circle: Container,
+      Defs: Container,
+      Ellipse: Container,
+      G: Container,
       Line: Container,
+      LinearGradient: Container,
       Path: Container,
+      RadialGradient: Container,
+      Rect: Container,
+      Stop: Container,
       Text: Container,
     }));
     vi.doMock("uniwind", () => ({ useCSSVariable: () => [] }));
@@ -519,7 +535,17 @@ it("handles solo and shared blackjack seats, undo toast, edit Seat row on iOS/An
           buyIn: 10000,
         }),
       );
+
+      const beaVisitId = store.getSnapshot().state!.visits.find((v) => v.id !== visit.id)!.id;
+
+      await store.execute(
+        store.prepare({ type: "set_seat", tableId: visit.tableId, visitId: beaVisitId, seat: 1 }),
+      );
       await act(async () => {});
+      expect(element.querySelector('[aria-label="Seat 5, open"]')).toBeNull();
+      expect(element.textContent).toContain("Seat 1 · First base");
+
+      await click("+ Pick seat", true);
       await click("Seat 3, open");
       expect(element.textContent).toContain("Sat at Seat 3.");
 

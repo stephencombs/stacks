@@ -35,7 +35,6 @@ import {
   Skeleton,
   Tag,
 } from "../components/ui/Surface";
-import { BlackjackTableArc, type ArcOccupant } from "../features/BlackjackTableArc";
 import { PersonalScreen } from "../features/Personal";
 import { JoinSheet, SitDownSheet } from "../features/RecordingForms";
 import { apiUrl } from "../lib/config";
@@ -130,22 +129,6 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
 
   for (const [seatNumber, visitId] of occupied) liveSeatByVisit.set(visitId, seatNumber);
 
-  const visitById = new Map(visits.map((item) => [item.visit.id, item]));
-  const occupants = new Map<number, ArcOccupant>();
-
-  for (const [seatNumber, visitId] of occupied) {
-    const item = visitById.get(visitId);
-
-    if (!item) continue;
-
-    occupants.set(seatNumber, {
-      playerId: item.visit.playerId,
-      name: names.get(item.visit.playerId) ?? "Player",
-      isSelf: item.visit.playerId === you?.id,
-      visitId: item.visit.id,
-    });
-  }
-
   const seatNoteFor = (visitId: VisitId, isLive: boolean) => {
     if (totalSeats === null) return null;
 
@@ -182,9 +165,6 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
       >
         {visitTitle(view.table)}
       </PageTitle>
-      {totalSeats !== null && occupants.size > 0 ? (
-        <BlackjackTableArc seats={totalSeats} surface="sheet" occupants={occupants} />
-      ) : null}
       <View className="gap-2">
         <SectionHeading
           action={local ? undefined : <Text className="text-sm text-muted">Read-only</Text>}
