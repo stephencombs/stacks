@@ -204,6 +204,7 @@ export const PersonalSeatingRow = Schema.Struct({
   id: SeatingId,
   visitId: VisitId,
   seat: Schema.NullOr(Seat),
+  seats: Schema.NullOr(Schema.Array(Seat)),
   occurredAt: Timestamp,
   createdBy: ActorId,
   createdAt: Timestamp,

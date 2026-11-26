@@ -123,7 +123,7 @@ describe("BlackjackTableArc", () => {
         <BlackjackTableArc
           seats={6}
           surface="felt"
-          selectedSeat={6}
+          selectedSeats={[6]}
           occupants={occupants}
           onSelectSpot={onSelect}
         />,
@@ -173,7 +173,7 @@ describe("BlackjackTableArc", () => {
         <BlackjackTableArc
           seats={7}
           surface="sheet"
-          selectedSeat={4}
+          selectedSeats={[4]}
           occupants={occupants}
           onSelectSpot={onSelect}
           disabled
@@ -199,6 +199,55 @@ describe("BlackjackTableArc", () => {
         Number.parseFloat(wrapper.style.left) + Number.parseFloat(wrapper.style.width),
       ).toBeLessThanOrEqual(328);
     }
+
+    await act(async () => {
+      root.render(
+        <BlackjackTableArc
+          seats={7}
+          surface="sheet"
+          selectedSeats={[6]}
+          occupants={occupants}
+          onSelectSpot={onSelect}
+          disabled
+        />,
+      );
+    });
+
+    const singleUnoccupiedCaptions = [...host.querySelectorAll("[data-lines='1']")];
+    expect(singleUnoccupiedCaptions.map((caption) => caption.textContent)).toEqual([
+      "Alexandria Wort…",
+      "You",
+    ]);
+
+    for (const caption of singleUnoccupiedCaptions) {
+      expect(caption.closest("button")).toBeNull();
+      const wrapper = caption.closest<HTMLElement>("[aria-hidden='true']")!;
+      expect(wrapper.parentElement).toBe(host.firstElementChild);
+      expect(Number.parseFloat(wrapper.style.left)).toBeGreaterThanOrEqual(0);
+      expect(
+        Number.parseFloat(wrapper.style.left) + Number.parseFloat(wrapper.style.width),
+      ).toBeLessThanOrEqual(328);
+    }
+
+    await act(async () => {
+      root.render(
+        <BlackjackTableArc
+          seats={6}
+          surface="sheet"
+          selectedSeats={[1, 2, 4]}
+          occupants={
+            new Map<number, ArcOccupant>([
+              [1, { playerId, name: "Priya", isSelf: true }],
+              [2, { playerId, name: "Priya", isSelf: true }],
+            ])
+          }
+          onSelectSpot={onSelect}
+        />,
+      );
+    });
+
+    const multiCaptions = [...host.querySelectorAll("[data-lines='1']")];
+    expect(multiCaptions.map((caption) => caption.textContent)).toEqual(["You", "You"]);
 
     await act(async () => root.unmount());
   });

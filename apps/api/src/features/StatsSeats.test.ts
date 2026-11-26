@@ -64,7 +64,7 @@ const setSeat = (
   who: RecordingIdentity,
   tableId: TableId,
   visitId: VisitId,
-  seat: number | null,
+  spot: number | null | Array<number>,
   minutes: number,
   options: {
     readonly seatingId?: SeatingId;
@@ -72,6 +72,8 @@ const setSeat = (
     readonly reason?: string;
   } = {},
 ) => {
+  const seat = Array.isArray(spot) ? null : spot;
+
   const fields: SetSeatFields = {
     type: "set_seat",
     ...common(who, minutes),
@@ -81,6 +83,8 @@ const setSeat = (
     seat,
     occurredAt: at(minutes),
   };
+
+  if (Array.isArray(spot)) fields.seats = spot;
 
   if (options.replacesSeatingId !== undefined) fields.replacesSeatingId = options.replacesSeatingId;
 
@@ -372,5 +376,42 @@ it.layer(TestApi.layer)("group stats seats", (it) => {
         );
         expect(stats.seats).toHaveLength(2);
       }),
+  );
+
+  it.effect("classifies simultaneous multi-spot blackjack visits as multiple in group stats", () =>
+    Effect.gen(function* () {
+      const { alex_multi_stat: alex, bea_multi_stat: bea } = yield* users(
+        "alex_multi_stat",
+        "bea_multi_stat",
+      );
+
+      const group = yield* groupWith(alex, bea);
+      const me = identity();
+
+      const table = start(me);
+      const multiSeat = setSeat(me, table.tableId, table.visitId, [1, 2], 3);
+
+      expect(
+        yield* push(
+          alex,
+          me,
+          table,
+          toTrip(me, table.tableId, group.tripId),
+          multiSeat,
+          cashOut(me, table.visitId, 0, 26000, 25),
+        ),
+      ).toEqual(["accepted", "accepted", "accepted", "accepted"]);
+
+      const stats = yield* statsOf(alex, group);
+      expect(stats.seats).toEqual([
+        {
+          playId: table.tableId,
+          playerId: group.myPlayerId,
+          seat: "multiple",
+          net: MinorUnits.make(6000),
+          milliseconds: 25 * 60_000,
+        },
+      ]);
+    }),
   );
 });

@@ -2,7 +2,7 @@ import { counterpartiesAt } from "@stacks/client-runtime/counterparties";
 import { formatDay, formatTime } from "@stacks/client-runtime/format";
 import { useServerTable } from "@stacks/client-runtime/recordingReact";
 import {
-  formatSeatLabel,
+  formatSeatsLabel,
   historyEntryName,
   historyLines,
   RECORDING_CURRENCY,
@@ -10,7 +10,7 @@ import {
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
 import type { EntryId, PlayEntry, SeatingId, VisitSeating } from "@stacks/contracts";
-import { seatCount, sortSeatings } from "@stacks/shared/seats";
+import { sameSeats, seatCount, seatingSeats, sortSeatings } from "@stacks/shared/seats";
 import * as DateTime from "effect/DateTime";
 import type { ReactNode } from "react";
 import { Platform, View } from "react-native";
@@ -63,25 +63,41 @@ export function History({
   const lines = historyLines(visit);
   const totalSeats = seatCount(visit.table);
   const seatingText = new Map<SeatingId, string>();
-  let previousSeat: number | null = null;
+  let previousSeats: ReadonlyArray<number> = [];
 
   for (const seating of sortSeatings(visit.seatings)) {
     const voided = seating.voidedAt !== null;
+    const spots = seatingSeats(seating);
 
-    if (seating.seat === null) {
-      seatingText.set(
-        seating.id,
-        previousSeat === null ? "Left seat" : `Left Seat ${previousSeat}`,
-      );
+    if (spots.length === 0) {
+      const prevLabel = formatSeatsLabel(previousSeats, null);
 
-      if (!voided) previousSeat = null;
+      seatingText.set(seating.id, prevLabel ? `Left ${prevLabel}` : "Left seat");
+
+      if (!voided) previousSeats = [];
       continue;
     }
 
-    const label = formatSeatLabel(seating.seat, totalSeats);
-    seatingText.set(seating.id, previousSeat === null ? `Sat at ${label}` : `Moved to ${label}`);
+    const label = formatSeatsLabel(spots, totalSeats)!;
 
-    if (!voided) previousSeat = seating.seat;
+    if (previousSeats.length === 0) {
+      seatingText.set(seating.id, `Sat at ${label}`);
+    } else if (sameSeats(spots, previousSeats)) {
+      seatingText.set(seating.id, `Sat at ${label}`);
+    } else {
+      const added = spots.filter((spot) => !previousSeats.includes(spot));
+      const removed = previousSeats.filter((spot) => !spots.includes(spot));
+
+      if (removed.length === 0 && added.length > 0) {
+        seatingText.set(seating.id, `Added ${formatSeatsLabel(added, totalSeats)} · Now ${label}`);
+      } else if (added.length === 0 && removed.length > 0) {
+        seatingText.set(seating.id, `Left ${formatSeatsLabel(removed, null)} · Now ${label}`);
+      } else {
+        seatingText.set(seating.id, `Moved to ${label}`);
+      }
+    }
+
+    if (!voided) previousSeats = spots;
   }
 
   const entryCount = visit.entries.length === 1 ? "1 entry" : `${visit.entries.length} entries`;
@@ -322,7 +338,7 @@ export function SeatingInspector({
   const at = (value: DateTime.Utc) => `${formatDay(value)}, ${formatTime(value)}`;
   const voided = seating.voidedAt !== null;
 
-  const title = seating.seat === null ? "Left seat" : formatSeatLabel(seating.seat, totalSeats);
+  const title = formatSeatsLabel(seatingSeats(seating), totalSeats) ?? "Left seat";
 
   return (
     <Sheet

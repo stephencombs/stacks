@@ -30,15 +30,15 @@ Adds the 2D vector blackjack tabletop arc (`BlackjackTableArc`) and instant seat
 
 - [ ] Build `BlackjackTableArc` (`apps/mobile/src/features/BlackjackTableArc.tsx`) with `react-native-svg` + plain `Pressable` seat nodes for seat selection:
   - High-fidelity 2D casino blackjack tabletop layout with dealer station, felt details, curved rail, and `5`, `6`, or `7` spots ordered **right-to-left** (`Seat 1` / `1st` on the right = dealer's left; `Seat N` / `3rd` on the left = dealer's right), framed cleanly for light and dark sheets (`DESIGN.md` rule 1 exempts drawn casino art).
-  - States: empty numbered spot, selected / your spot (highlighted ring + `"Selected"` pill), occupied by another player (`PlayerAvatar` + short name), disabled/pending while saving, and reduced-motion compliant.
+  - States: empty numbered spot, selected / your spot(s) via `selectedSeats` (highlighted ring + `"Selected"` pill when a single unoccupied spot is selected), occupied by another player (`PlayerAvatar` + short name) or by you on multiple spots, disabled/pending while saving, and reduced-motion compliant.
   - Every spot has a 44pt minimum hit target (`size-11` / `hitSlop`) and an accessible label from `seatLabel(n, totalSeats)` plus occupancy/selection state (`"Seat 1, first base, occupied by Priya"`).
 - [ ] Build `SeatPickerSheet` (`apps/mobile/src/features/SeatPickerSheet.tsx`) — keep distinct from existing `SeatSheet` in `LiveTable.tsx`:
-  - Renders `BlackjackTableArc`, optional `5 · 6 · 7 seats` segmented `Choice` when `canEditTable` (disabling or surfacing `FormError` if shrinking below a live occupied seat), and `"Leave seat"` / `"Remove seat"` action when seated.
-  - Follows `033`/`034` instant-selection pattern (no Save button): tapping an open seat immediately updates the form draft or submits `set_seat` (`busy` blocks dismissal while saving) and returns on success.
+  - Renders `BlackjackTableArc`, optional `5 · 6 · 7 seats` segmented `Choice` when `canEditTable` (disabling or surfacing `FormError` if shrinking below a live occupied seat), explicit primary confirm button (`Save Seat X`, `Save Seats 1 & 2`, `Use Seat X`, `Use Seats 1 & 2`, `Leave seat(s)`), and secondary `"Leave seat"` / `"Remove seat"` / `"Clear seat"` action when seated.
+  - Supports simultaneous multi-spot selection: tapping spots toggles them in the draft selection (`selectedSeats`), and pressing the primary button updates the form draft or submits `set_seat` (`busy` blocks dismissal while saving) and returns on success.
   - On finished visits:
-    - Unseated: picking a seat records `set_seat` at `visit.startedAt`.
-    - Single-seat: picking a different seat atomically replaces it (`replacesSeatingId`, reason `"Seat corrected"`), and `"Remove seat"` calls `void_seating`.
-    - Multi-seat: displays the seat path (e.g. `Seat 1 → Seat 3`) and points to visit History to void individual mistakes instead of silently rewriting multi-seat history.
+    - Unseated: picking one or more seats records `set_seat` at `visit.startedAt`.
+    - Single snapshot (one seat or simultaneous multi-spot): changing seats atomically replaces it (`replacesSeatingId`, reason `"Seat corrected"`), and removing seat(s) calls `void_seating`.
+    - Multi-snapshot history: displays the seat path and points to visit History to void individual mistakes instead of silently rewriting history.
 
 ### Recording forms (`apps/mobile/src/features/RecordingForms.tsx`)
 
@@ -51,7 +51,7 @@ Adds the 2D vector blackjack tabletop arc (`BlackjackTableArc`) and instant seat
 ### Live session, Table screen, Edit, and History
 
 - [ ] Live session (`apps/mobile/src/screens/Play.tsx`, `live === true`, blackjack tables):
-  - Show a compact tappable seat pill under `LiveHero` metadata (`Seat 3` / `Seat 1 · First base` or `+ Pick seat`) on both solo and shared live tables — no table map or total seat count is shown on the live felt; tapping opens `SeatPickerSheet`.
+  - Show a compact tappable seat pill under `LiveHero` metadata (`Seat 3`, `Seat 1 · First base`, `Seats 1 & 2`, or `+ Pick seat`) on both solo and shared live tables — no table map or total seat count is shown on the live felt; tapping opens `SeatPickerSheet`.
   - When shared, show `TableSeats` ("At this table") with each player's seat on their row. Tapping a recordable player's row opens their `SeatSheet`.
   - Saving a live seat pick, move, or stand-up shows a `RecordingToast` with **Undo** (`void_seating`, reason `"Undone"`), matching the rebuy undo pattern.
 - [ ] `TableSeats` and `SeatSheet` (`apps/mobile/src/features/LiveTable.tsx`):

@@ -3,6 +3,7 @@ import {
   EntryId,
   MinorUnits,
   PlayerId,
+  Seat,
   SeatingId,
   TableId,
   VisitId,
@@ -15,6 +16,7 @@ import {
   RecordingOperationId,
   type TableDetails,
 } from "@stacks/contracts/recordingCommands";
+import { canonicalSeatFields } from "@stacks/shared/seats";
 import { projectVisit } from "@stacks/shared/visits";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -121,7 +123,8 @@ export type RecordingInput =
       readonly type: "set_seat";
       readonly tableId?: TableId;
       readonly visitId: VisitId;
-      readonly seat: number | null;
+      readonly seat?: number | null;
+      readonly seats?: ReadonlyArray<number>;
       readonly occurredAt?: DateTime.Utc;
       readonly replacesSeatingId?: SeatingId;
       readonly reason?: string;
@@ -268,12 +271,21 @@ export const prepareRecordingCommand = (state: RecordingState, input: RecordingI
   if (!visit) throw new RecordingError("invalid", "Visit does not exist.");
 
   if (input.type === "set_seat") {
+    const spot = canonicalSeatFields(
+      input.seats !== undefined
+        ? input.seats
+        : input.seat === null || input.seat === undefined
+          ? []
+          : [input.seat],
+    );
+
     const command: typeof common & {
       type: "set_seat";
       tableId: NonNullable<typeof input.tableId>;
       visitId: typeof visit.id;
       seatingId: typeof SeatingId.Type;
-      seat: typeof input.seat;
+      seat: Seat | null;
+      seats?: ReadonlyArray<Seat>;
       occurredAt: NonNullable<typeof input.occurredAt>;
       replacesSeatingId?: NonNullable<typeof input.replacesSeatingId>;
       reason?: NonNullable<typeof input.reason>;
@@ -283,9 +295,11 @@ export const prepareRecordingCommand = (state: RecordingState, input: RecordingI
       tableId: input.tableId ?? visit.tableId,
       visitId: visit.id,
       seatingId: SeatingId.make(newId()),
-      seat: input.seat,
+      seat: spot.seat,
       occurredAt: input.occurredAt ?? preparedAt,
     };
+
+    if (spot.seats !== undefined) command.seats = spot.seats;
 
     if (input.replacesSeatingId !== undefined) command.replacesSeatingId = input.replacesSeatingId;
 
@@ -386,6 +400,9 @@ const freezeState = (state: RecordingState) => {
     Object.freeze(records);
   }
 
+  for (const seating of state.seatings)
+    if (seating.seats !== undefined) Object.freeze(seating.seats);
+
   for (const receipt of state.receipts) {
     if (receipt.command.type === "correct" && receipt.command.replacement)
       Object.freeze(receipt.command.replacement);
@@ -395,6 +412,9 @@ const freezeState = (state: RecordingState) => {
 
     if (receipt.command.type === "edit_visit" && receipt.command.table)
       Object.freeze(receipt.command.table);
+
+    if (receipt.command.type === "set_seat" && receipt.command.seats !== undefined)
+      Object.freeze(receipt.command.seats);
     Object.freeze(receipt.command);
   }
 
@@ -541,6 +561,8 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
     if (command.type === "correct" && command.replacement) Object.freeze(command.replacement);
 
     if (command.type === "edit_visit" && command.table) Object.freeze(command.table);
+
+    if (command.type === "set_seat" && command.seats !== undefined) Object.freeze(command.seats);
 
     return serialize(async () => {
       try {

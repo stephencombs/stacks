@@ -1,7 +1,7 @@
 import {
+  Seat,
   type Game,
   type PlayerId,
-  type Seat,
   type Seating,
   type Visit,
   type VisitId,
@@ -49,12 +49,43 @@ export const sortSeatings = <T extends Pick<VisitSeating, "id" | "occurredAt" | 
   seatings: ReadonlyArray<T>,
 ) => seatings.toSorted(byOrder);
 
-/** The seat a visit currently holds, or null if unseated or standing. */
-export const visitSeatNow = (
+/** Extracts the seats held by a seating row (0, 1, or ascending multi-spot). */
+export const seatingSeats = (row: {
+  readonly seat: number | null;
+  readonly seats?: ReadonlyArray<number> | null | undefined;
+}) => {
+  if (row.seats != null) return row.seats;
+
+  if (row.seat === null) return [];
+
+  return [row.seat];
+};
+
+/** Canonically encodes 0, 1, or 2+ seat numbers into `{ seat, seats? }`. */
+export const canonicalSeatFields = (seats: ReadonlyArray<number>) => {
+  const unique = [...new Set(seats)].toSorted((a, b) => a - b).map((seat) => Seat.make(seat));
+
+  if (unique.length === 0) return { seat: null };
+
+  if (unique.length === 1) return { seat: unique[0]! };
+
+  return { seat: null, seats: unique };
+};
+
+/** Whether two seat lists hold the exact same spots in the same order. */
+export const sameSeats = (a: ReadonlyArray<number>, b: ReadonlyArray<number>) =>
+  a.length === b.length && a.every((seat, index) => seat === b[index]);
+
+/** The seats a visit currently holds in ascending order, or `[]` if unseated or standing. */
+export const visitSeatsNow = (
   seatings: ReadonlyArray<
-    Pick<VisitSeating, "id" | "seat" | "occurredAt" | "createdAt" | "voidedAt">
+    Pick<VisitSeating, "id" | "seat" | "seats" | "occurredAt" | "createdAt" | "voidedAt">
   >,
-) => sortSeatings(seatings.filter((seating) => seating.voidedAt === null)).at(-1)?.seat ?? null;
+) => {
+  const latest = sortSeatings(seatings.filter((seating) => seating.voidedAt === null)).at(-1);
+
+  return latest ? seatingSeats(latest) : [];
+};
 
 /**
  * Currently occupied seats across live, non-deleted visits at a table. If reopened or restored
@@ -63,7 +94,10 @@ export const visitSeatNow = (
 export const tableLiveSeats = (
   visits: ReadonlyArray<Pick<Visit, "id" | "finishedAt" | "deletedAt">>,
   seatings: ReadonlyArray<
-    Pick<VisitSeating, "id" | "visitId" | "seat" | "occurredAt" | "createdAt" | "voidedAt">
+    Pick<
+      VisitSeating,
+      "id" | "visitId" | "seat" | "seats" | "occurredAt" | "createdAt" | "voidedAt"
+    >
   >,
 ) => {
   const live = new Set(
@@ -79,11 +113,12 @@ export const tableLiveSeats = (
 
   const active = Array.from(byVisit.values())
     .map((rows) => sortSeatings(rows).at(-1)!)
-    .filter((row) => row.seat !== null);
+    .filter((row) => seatingSeats(row).length > 0);
 
   const occupied = new Map<number, VisitId>();
 
-  for (const row of sortSeatings(active)) occupied.set(row.seat!, row.visitId);
+  for (const row of sortSeatings(active))
+    for (const seat of seatingSeats(row)) occupied.set(seat, row.visitId);
 
   return occupied;
 };
@@ -99,7 +134,7 @@ export type VisitSeatOutcome =
  */
 export const visitSeatOutcome = (
   seatings: ReadonlyArray<
-    Pick<VisitSeating, "id" | "seat" | "occurredAt" | "createdAt" | "voidedAt">
+    Pick<VisitSeating, "id" | "seat" | "seats" | "occurredAt" | "createdAt" | "voidedAt">
   >,
 ) => {
   const standing = sortSeatings(seatings.filter((seating) => seating.voidedAt === null));
@@ -109,11 +144,11 @@ export const visitSeatOutcome = (
   const distinct: Array<number> = [];
 
   for (const row of standing)
-    if (row.seat !== null && !distinct.includes(row.seat)) distinct.push(row.seat);
+    for (const seat of seatingSeats(row)) if (!distinct.includes(seat)) distinct.push(seat);
 
   if (distinct.length >= 2) return { kind: "multiple", seats: distinct } satisfies VisitSeatOutcome;
 
-  if (distinct.length === 0 || standing.at(-1)!.seat === null)
+  if (distinct.length === 0 || seatingSeats(standing.at(-1)!).length === 0)
     return { kind: "none" } satisfies VisitSeatOutcome;
 
   return { kind: "seat", seat: distinct[0]! } satisfies VisitSeatOutcome;

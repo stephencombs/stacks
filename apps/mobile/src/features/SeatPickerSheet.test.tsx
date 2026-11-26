@@ -179,7 +179,7 @@ it("picks a draft seat instantly, enforces occupied-seat shrink guard, and clear
         <RecordingProvider store={store}>
           <SeatPickerSheet
             mode="draft"
-            seat={1}
+            seats={[1]}
             tableSeats={6}
             canEditTable
             occupants={occupants}
@@ -199,11 +199,12 @@ it("picks a draft seat instantly, enforces occupied-seat shrink guard, and clear
     expect(onTableSeats).toHaveBeenCalledWith(7);
 
     await click("Seat 3, open");
-    expect(onSelect).toHaveBeenCalledWith(3);
+    await click("Use Seats 1 & 3");
+    expect(onSelect).toHaveBeenCalledWith([1, 3]);
     expect(onClose).toHaveBeenCalled();
 
-    await click("Clear seat");
-    expect(onSelect).toHaveBeenCalledWith(null);
+    await click("Clear seats");
+    expect(onSelect).toHaveBeenCalledWith([]);
   } finally {
     await act(async () => root.unmount());
     await store.close();
@@ -238,6 +239,7 @@ it("saves live set_seat and Leave seat with undo, and handles unseated/single/mu
 
     await renderVisit(liveVisitId);
     await click("Seat 1, first base, open");
+    await click("Save Seat 1");
     expect(onSaved).toHaveBeenLastCalledWith(
       expect.objectContaining({
         visitId: liveVisitId,
@@ -245,20 +247,29 @@ it("saves live set_seat and Leave seat with undo, and handles unseated/single/mu
         undo: true,
       }),
     );
-
-    await renderVisit(liveVisitId);
-    await click("Leave seat");
+    await click("Seat 2, open");
+    await click("Save Seats 1 & 2");
     expect(onSaved).toHaveBeenLastCalledWith(
       expect.objectContaining({
         visitId: liveVisitId,
-        text: "Left seat.",
+        text: "Playing Seats 1 & 2.",
+        undo: true,
+      }),
+    );
+
+    await renderVisit(liveVisitId);
+    await click("Leave seats");
+    expect(onSaved).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        visitId: liveVisitId,
+        text: "Left seats.",
         undo: true,
       }),
     );
 
     await store.execute(store.prepare({ type: "finish", visitId: liveVisitId, amount: 25000 }));
     await renderVisit(liveVisitId);
-    expect(element.textContent).toContain("Seat 1 → Left seat");
+    expect(element.textContent).toContain("Seat 1 → Seats 1 & 2 → Left seat");
     expect(element.textContent).toContain("Multiple seat changes were recorded");
     await click("Open history");
     expect(onOpenHistory).toHaveBeenCalled();
@@ -278,6 +289,7 @@ it("saves live set_seat and Leave seat with undo, and handles unseated/single/mu
     onSaved.mockClear();
     await renderVisit(finishedUnseatedId);
     await click("Seat 4, open");
+    await click("Save Seat 4");
     expect(onSaved).toHaveBeenLastCalledWith(
       expect.objectContaining({
         visitId: finishedUnseatedId,
@@ -292,10 +304,11 @@ it("saves live set_seat and Leave seat with undo, and handles unseated/single/mu
 
     await renderVisit(finishedUnseatedId);
     await click("Seat 2, open");
+    await click("Save Seats 2 & 4");
     expect(onSaved).toHaveBeenLastCalledWith(
       expect.objectContaining({
         visitId: finishedUnseatedId,
-        text: "Seat updated to Seat 2.",
+        text: "Seats updated to Seats 2 & 4.",
         undo: false,
       }),
     );
@@ -307,14 +320,17 @@ it("saves live set_seat and Leave seat with undo, and handles unseated/single/mu
     const voidedFirst = seatingsAfterReplace.find((s) => s.id === firstSeating.id);
     expect(voidedFirst?.voidedAt).not.toBeNull();
     expect(voidedFirst?.voidReason).toBe("Seat corrected");
-    expect(seatingsAfterReplace.find((s) => s.voidedAt === null)?.seat).toBe(2);
+
+    const activeSeating = seatingsAfterReplace.find((s) => s.voidedAt === null);
+    expect(activeSeating?.seat).toBeNull();
+    expect(activeSeating?.seats).toEqual([2, 4]);
 
     await renderVisit(finishedUnseatedId);
-    await click("Remove seat");
+    await click("Remove seats");
     expect(onSaved).toHaveBeenLastCalledWith(
       expect.objectContaining({
         visitId: finishedUnseatedId,
-        text: "Seat removed.",
+        text: "Seats removed.",
         undo: false,
       }),
     );

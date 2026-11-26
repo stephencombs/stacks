@@ -182,7 +182,9 @@ export const load = Effect.fn("TripTables.load")(function* (
         return memberAt(visit.playerId, visit.startedAt);
       },
       (counterpartyId, visit) => memberAt(counterpartyId, visit.startedAt),
-      seatings.filter((seating) => visitIds.has(seating.visitId)),
+      seatings
+        .filter((seating) => visitIds.has(seating.visitId))
+        .map(({ seats, ...rest }) => (seats === null ? rest : { ...rest, seats })),
     );
 
     if (!table) return [];

@@ -21,7 +21,7 @@ export type TableEntry = Pick<PlayEntry, "visitId" | "kind" | "amount" | "voided
 
 export type TableSeating = Pick<
   VisitSeating,
-  "id" | "visitId" | "seat" | "occurredAt" | "createdAt" | "voidedAt"
+  "id" | "visitId" | "seat" | "seats" | "occurredAt" | "createdAt" | "voidedAt"
 >;
 
 export type VisitSeatPlay = {

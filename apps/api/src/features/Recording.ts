@@ -233,7 +233,8 @@ const tableFields = (row: typeof TableRow.Type) => {
 const tableOf = (row: typeof TableRow.Type, starterPlayerId: PlayerId) =>
   Table.make({ ...tableFields(row), starterPlayerId });
 
-const seatingOf = (seating: typeof PersonalSeatingRow.Type) => VisitSeating.make(seating);
+const seatingOf = ({ seats, ...rest }: typeof PersonalSeatingRow.Type) =>
+  VisitSeating.make(seats === null ? rest : { ...rest, seats });
 
 const visitOf = (visit: typeof PersonalVisitRow.Type) => {
   const base = {
@@ -767,13 +768,15 @@ const save = Effect.fn("Recording.save")(function* (
     const previous = knownSeatings.get(seating.id);
 
     if (!previous) {
+      const seatsLiteral = seating.seats ? `{${seating.seats.join(",")}}` : null;
+
       yield* sql`
         insert into personal_seatings (
-          id, visit_id, seat, occurred_at, created_by, created_at,
+          id, visit_id, seat, seats, occurred_at, created_by, created_at,
           voided_at, voided_by, void_reason
         ) values (
-          ${seating.id}, ${seating.visitId}, ${seating.seat}, ${date(seating.occurredAt)},
-          ${seating.createdBy}, ${date(seating.createdAt)},
+          ${seating.id}, ${seating.visitId}, ${seating.seat}, ${seatsLiteral}::smallint[],
+          ${date(seating.occurredAt)}, ${seating.createdBy}, ${date(seating.createdAt)},
           ${seating.voidedAt ? date(seating.voidedAt) : null},
           ${seating.voidedBy}, ${seating.voidReason}
         )

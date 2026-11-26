@@ -1257,7 +1257,13 @@ describe("visit seatings and table sizes", () => {
     expect(loaded.tables[0]!.tableSeats).toBe(5);
     expect(loaded.seatings).toHaveLength(2);
     expect(loaded.seatings.every((row) => row.voidedAt !== null)).toBe(true);
-    expect(recordingVisit(loaded, id)!.currentSeat).toBeNull();
+    expect(recordingVisit(loaded, id)!.currentSeats).toEqual([]);
+
+    await save(store, { type: "set_seat", visitId: id, seats: [3, 1, 3], occurredAt: at(13) });
+    store = await reload(store, db);
+    const withMulti = store.getSnapshot().state!;
+    expect(recordingVisit(withMulti, id)!.currentSeats).toEqual([1, 3]);
+    expect(withMulti.seatings.at(-1)).toMatchObject({ seat: null, seats: [1, 3] });
     await store.close();
   });
 
@@ -1275,7 +1281,7 @@ describe("visit seatings and table sizes", () => {
     store = await open(db);
     expect(store.getSnapshot().status).toBe("saved");
     expect(store.getSnapshot().state!.seatings).toEqual([]);
-    expect(recordingVisit(store.getSnapshot().state!, visitId(store))!.currentSeat).toBeNull();
+    expect(recordingVisit(store.getSnapshot().state!, visitId(store))!.currentSeats).toEqual([]);
     await store.close();
   });
 

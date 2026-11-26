@@ -15,7 +15,14 @@ import {
 import { Game, Seat } from "./ledger.ts";
 import { MinorUnits } from "./money.ts";
 import { PlayerIdentity } from "./players.ts";
-import { PlayEntry, Table, Visit, VisitSeating, VisitSummary } from "./recording.ts";
+import {
+  PlayEntry,
+  seatsFieldIssue,
+  Table,
+  Visit,
+  VisitSeating,
+  VisitSummary,
+} from "./recording.ts";
 
 export const RecordingOperationId = Schema.String.check(Schema.isUUID()).pipe(
   Schema.brand("RecordingOperationId"),
@@ -162,10 +169,11 @@ export const RecordingCommand = Schema.Union([
     visitId: VisitId,
     seatingId: SeatingId,
     seat: Schema.NullOr(Seat),
+    seats: Schema.optionalKey(Schema.Array(Seat)),
     occurredAt: Schema.DateTimeUtc,
     replacesSeatingId: Schema.optionalKey(SeatingId),
     reason: Schema.optionalKey(Schema.NonEmptyString),
-  }),
+  }).check(Schema.makeFilter(seatsFieldIssue)),
   Schema.Struct({
     type: Schema.Literal("void_seating"),
     ...common,

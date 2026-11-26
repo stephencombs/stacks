@@ -2096,7 +2096,7 @@ it("keeps offline play when only set_seat conflicts, settles resized starts, and
   expect(visitView.visit.finishedAt).toEqual(at(15));
   expect(visitView.totals.buyIn).toBe(25000);
   expect(visitView.totals.cashOut).toBe(30000);
-  expect(visitView.currentSeat).toBeNull();
+  expect(visitView.currentSeats).toEqual([]);
   await store.close();
 });
 
@@ -2246,5 +2246,37 @@ it("remaps seatingId and replacesSeatingId when retrying a refused start chain, 
   });
 
   expect(foreignSynced.seatings.some((s) => s.id === selfSeatingId)).toBe(true);
+
+  const multiStore = await open();
+  await multiStore.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+
+  const multiStart = await save(multiStore, {
+    type: "start",
+    buyIn: 20000,
+    startedAt: at(10),
+    game: "blackjack",
+    tableSeats: 6,
+  });
+
+  if (multiStart.command.type !== "start") throw new Error("Expected start");
+
+  await save(multiStore, {
+    type: "set_seat",
+    visitId: multiStart.command.visitId,
+    seats: [2, 4],
+    occurredAt: at(11),
+  });
+
+  remote.refuse(multiStart.command.operationId);
+  await pushAll(multiStore, remote);
+  expect(state(multiStore).sync?.rejected).toHaveLength(2);
+
+  await multiStore.transform((s) => recordRejectedAgain(s, multiStart.command.operationId));
+  expect(state(multiStore).sync?.rejected).toEqual([]);
+  expect(state(multiStore).seatings.at(-1)).toMatchObject({ seat: null, seats: [2, 4] });
+  await pushAll(multiStore, remote);
+  expect(state(multiStore).sync?.rejected).toEqual([]);
+
+  await multiStore.close();
   await store.close();
 });

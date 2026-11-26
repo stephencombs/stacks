@@ -11,7 +11,7 @@ import {
 } from "@stacks/client-runtime/recordingReact";
 import {
   elapsedClock,
-  formatSeatLabel,
+  formatSeatsLabel,
   LIVE_REBUY_AMOUNTS,
   RECORDING_CURRENCY,
   type RecordingTableView,
@@ -198,12 +198,12 @@ export function TableSeats({
           const seatNote =
             table.tableSeats === null
               ? null
-              : seat.seatNumber !== null
-                ? formatSeatLabel(seat.seatNumber, table.tableSeats)
+              : seat.seatNumbers.length > 0
+                ? formatSeatsLabel(seat.seatNumbers, table.tableSeats)
                 : !seat.playing && seat.seatOutcome.kind !== "none"
                   ? seat.seatOutcome.kind === "multiple"
                     ? "Multiple seats"
-                    : formatSeatLabel(seat.seatOutcome.seat, table.tableSeats)
+                    : formatSeatsLabel([seat.seatOutcome.seat], table.tableSeats)
                   : null;
 
           const subtitle = seatNote ? `${seatNote} · ${status}` : status;
@@ -640,15 +640,12 @@ export function SeatSheet({
   const seatValue = (() => {
     if (table.tableSeats === null) return null;
 
-    if (seat.playing)
-      return seat.seatNumber !== null
-        ? formatSeatLabel(seat.seatNumber, table.tableSeats)
-        : "Not set";
+    if (seat.playing) return formatSeatsLabel(seat.seatNumbers, table.tableSeats) ?? "Not set";
 
     if (seat.seatOutcome.kind === "multiple") return "Multiple seats";
 
     if (seat.seatOutcome.kind === "seat")
-      return formatSeatLabel(seat.seatOutcome.seat, table.tableSeats);
+      return formatSeatsLabel([seat.seatOutcome.seat], table.tableSeats);
 
     return "Not set";
   })();

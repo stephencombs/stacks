@@ -3,8 +3,16 @@ import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
 import { Actor, PlayerIdentity } from "./players.ts";
-import { PlayEntry, Table, Visit, VisitRecording, VisitSummary } from "./recording.ts";
-import { ActorId, TableId, VisitId } from "./ids.ts";
+import {
+  PlayEntry,
+  Table,
+  Visit,
+  VisitRecording,
+  VisitSeating,
+  VisitSummary,
+} from "./recording.ts";
+import { RecordingCommand, RecordingOperationId } from "./recordingCommands.ts";
+import { ActorId, SeatingId, TableId, VisitId } from "./ids.ts";
 
 const ALEX = "0192e7a0-0000-7000-8000-000000000001";
 const BEA = "0192e7a0-0000-7000-8000-000000000002";
@@ -161,5 +169,51 @@ describe("native recording contracts", () => {
         finalResult: 100,
       }),
     ).toBe(false);
+  });
+
+  it("enforces canonical single-spot vs multi-spot encoding on VisitSeating and set_seat", () => {
+    const seatingId = "0192e7a0-0000-7000-8000-0000000000d1";
+    const opId = "0192e7a0-0000-7000-8000-0000000000f1";
+
+    const seatingBase = {
+      id: seatingId,
+      visitId: VISIT,
+      occurredAt: AT,
+      createdBy: ACTOR,
+      createdAt: AT,
+      voidedAt: null,
+      voidedBy: null,
+      voidReason: null,
+    };
+
+    const setSeatBase = {
+      type: "set_seat",
+      operationId: opId,
+      actorId: ACTOR,
+      preparedAt: AT,
+      tableId: TABLE,
+      visitId: VISIT,
+      seatingId,
+      occurredAt: AT,
+    };
+
+    expect(SeatingId.make(seatingId)).toBe(seatingId);
+    expect(RecordingOperationId.make(opId)).toBe(opId);
+
+    for (const spotFields of [{ seat: null }, { seat: 3 }, { seat: null, seats: [1, 2] }]) {
+      expect(accepts(VisitSeating, { ...seatingBase, ...spotFields })).toBe(true);
+      expect(accepts(RecordingCommand, { ...setSeatBase, ...spotFields })).toBe(true);
+    }
+
+    for (const badFields of [
+      { seat: 1, seats: [1, 2] },
+      { seat: null, seats: [] },
+      { seat: null, seats: [1] },
+      { seat: null, seats: [2, 1] },
+      { seat: null, seats: [2, 2] },
+    ]) {
+      expect(accepts(VisitSeating, { ...seatingBase, ...badFields })).toBe(false);
+      expect(accepts(RecordingCommand, { ...setSeatBase, ...badFields })).toBe(false);
+    }
   });
 });

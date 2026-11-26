@@ -83,16 +83,17 @@ type FeltColors = ReturnType<typeof useFeltColors>;
 function BlackjackTableArt({
   geometry,
   colors,
-  selectedSeat,
+  selectedSeats,
   occupants,
   disabled,
 }: {
   geometry: ReturnType<typeof blackjackArcGeometry>;
   colors: FeltColors;
-  selectedSeat: number | null;
+  selectedSeats: ReadonlyArray<number>;
   occupants: ReadonlyMap<number, ArcOccupant> | undefined;
   disabled: boolean;
 }) {
+  const selectedSet = new Set(selectedSeats);
   const { width, height, cx, cy, railY, positions } = geometry;
   const bettingLineRadius = geometry.outerRx - 28;
   const dealerTop = railY + 14;
@@ -146,7 +147,7 @@ function BlackjackTableArt({
           Dealer
         </SvgText>
         {positions.map(({ seat, x, y }) => {
-          const selected = seat === selectedSeat;
+          const selected = selectedSet.has(seat);
           const occupied = occupants?.has(seat);
 
           return (
@@ -209,10 +210,12 @@ function SeatCaption({
   );
 }
 
+const EMPTY_SEATS: ReadonlyArray<number> = [];
+
 export function BlackjackTableArc({
   seats,
   surface,
-  selectedSeat = null,
+  selectedSeats = EMPTY_SEATS,
   occupants,
   disabled = false,
   compact = false,
@@ -220,7 +223,7 @@ export function BlackjackTableArc({
 }: {
   seats: number;
   surface: "felt" | "sheet";
-  selectedSeat?: number | null | undefined;
+  selectedSeats?: ReadonlyArray<number> | undefined;
   occupants?: ReadonlyMap<number, ArcOccupant> | undefined;
   disabled?: boolean;
   compact?: boolean;
@@ -232,6 +235,7 @@ export function BlackjackTableArc({
   const colors = useFeltColors();
   const geometry = blackjackArcGeometry(seats, width, { compact, largeText });
   const captionHeight = largeText ? 24 : 20;
+  const selectedSet = new Set(selectedSeats);
 
   const spotSpacing = Math.max(
     HIT_TARGET,
@@ -271,13 +275,13 @@ export function BlackjackTableArc({
       <BlackjackTableArt
         geometry={geometry}
         colors={colors}
-        selectedSeat={selectedSeat}
+        selectedSeats={selectedSeats}
         occupants={occupants}
         disabled={disabled}
       />
 
       {spots.map(({ seat, x, y, nameLeft, nameWidth, occupant }) => {
-        const selected = seat === selectedSeat;
+        const selected = selectedSet.has(seat);
         const accessibilityLabel = seatAccessibilityLabel(seat, seats, occupant, selected);
 
         const style = {

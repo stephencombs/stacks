@@ -13,13 +13,13 @@ import {
   useSharedTable,
 } from "@stacks/client-runtime/recordingReact";
 import {
-  formatSeatLabel,
   RECORDING_CURRENCY,
+  tableVisitSeatNotes,
   visitTitle,
 } from "@stacks/client-runtime/recordingView";
 import type { VisitId } from "@stacks/contracts";
 import type { TableView } from "@stacks/contracts/recordingCommands";
-import { seatCount, sortSeatings, tableLiveSeats, visitSeatOutcome } from "@stacks/shared/seats";
+import { seatCount } from "@stacks/shared/seats";
 import { useCallback, useState } from "react";
 import { Platform, View } from "react-native";
 import { Text } from "../components/ui/Text";
@@ -117,37 +117,11 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
   const totalSeats = seatCount(view.table);
   const seatings = view.seatings ?? [];
 
-  const occupied =
-    totalSeats === null
-      ? new Map<number, VisitId>()
-      : tableLiveSeats(
-          visits.map((item) => item.visit),
-          seatings,
-        );
-
-  const liveSeatByVisit = new Map<VisitId, number>();
-
-  for (const [seatNumber, visitId] of occupied) liveSeatByVisit.set(visitId, seatNumber);
-
-  const seatNoteFor = (visitId: VisitId, isLive: boolean) => {
-    if (totalSeats === null) return null;
-
-    if (isLive) {
-      const seat = liveSeatByVisit.get(visitId);
-
-      return seat === undefined ? null : formatSeatLabel(seat, totalSeats);
-    }
-
-    const outcome = visitSeatOutcome(
-      sortSeatings(seatings.filter((seating) => seating.visitId === visitId)),
-    );
-
-    if (outcome.kind === "seat") return formatSeatLabel(outcome.seat, totalSeats);
-
-    if (outcome.kind === "multiple") return "Multiple seats";
-
-    return null;
-  };
+  const seatNotes = tableVisitSeatNotes(
+    visits.map((item) => item.visit),
+    seatings,
+    totalSeats,
+  );
 
   const openVisit = (visitId: VisitId) =>
     navigation.dispatch(StackActions.replace("Play", { visitId }));
@@ -177,7 +151,7 @@ function SharedTable({ view, token }: { view: TableView; token: string }) {
           <List>
             {visits.map((item) => {
               const isLive = item.finalResult === null;
-              const seatText = seatNoteFor(item.visit.id, isLive);
+              const seatText = seatNotes.get(item.visit.id) ?? null;
 
               const statusText = isLive
                 ? `Playing · in ${formatDisplayMoney(item.totals.buyIn, RECORDING_CURRENCY, prefs)}`

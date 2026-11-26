@@ -506,6 +506,7 @@ it("opens SeatPickerSheet from Bea's blackjack seat row and inspects seat histor
     await view.render();
     await view.pressStarting("Seat");
     await view.press("Seat 4, open");
+    await view.press("Save Seat 4");
 
     expect(view.recorded).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -515,8 +516,20 @@ it("opens SeatPickerSheet from Bea's blackjack seat row and inspects seat histor
       }),
     );
 
+    await view.press("Seat 2, open");
+    await view.press("Save Seats 2 & 4");
+
+    expect(view.recorded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visitId: view.guest.id,
+        text: "Bea is playing Seats 2 & 4.",
+        undo: true,
+      }),
+    );
+
     await view.press("Back");
     await view.pressStarting("History");
+    expect(view.sheet()!.textContent).toContain("Added Seat 2 · Now Seats 2 & 4");
     await view.pressStarting("Sat at Seat 4");
     expect(view.sheet()!.dataset.title).toBe("Seat 4");
     await view.press("Void seat record");

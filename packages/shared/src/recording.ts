@@ -23,9 +23,10 @@ import * as Schema from "effect/Schema";
 import {
   normalizeTableSeats,
   seatCount,
+  seatingSeats,
   tableLiveSeats,
   tableSizes,
-  visitSeatNow,
+  visitSeatsNow,
 } from "./seats.ts";
 
 export const RecordingReceipt = Schema.Struct({
@@ -238,6 +239,18 @@ const assertFitsLiveSeats = (
       );
 };
 
+const requireSeatsInRange = (
+  table: Pick<Table, "game" | "tableSeats">,
+  targetSeats: ReadonlyArray<number>,
+) => {
+  const totalSeats = seatCount(table);
+  requireValid(totalSeats !== null, "This game doesn't use numbered seats.");
+  requireValid(
+    targetSeats.every((seat) => seat >= 1 && seat <= totalSeats),
+    `Choose a seat from 1 to ${totalSeats}.`,
+  );
+};
+
 const applySeatingCommand = <S extends RecordingLedger>(
   state: S,
   tables: ReadonlyArray<Table>,
@@ -260,14 +273,9 @@ const applySeatingCommand = <S extends RecordingLedger>(
   let seatings = [...state.seatings];
 
   if (command.type === "set_seat") {
-    if (actorPlayers !== null) {
-      const totalSeats = seatCount(table);
-      requireValid(totalSeats !== null, "This game doesn't use numbered seats.");
-      requireValid(
-        command.seat === null || (command.seat >= 1 && command.seat <= totalSeats),
-        `Choose a seat from 1 to ${totalSeats}.`,
-      );
-    }
+    const targetSeats = seatingSeats(command);
+
+    if (actorPlayers !== null) requireSeatsInRange(table, targetSeats);
 
     requireValid(
       !seatings.some((item) => item.id === command.seatingId),
@@ -302,25 +310,30 @@ const applySeatingCommand = <S extends RecordingLedger>(
       );
     }
 
-    if (
-      visit.finishedAt === null &&
-      command.seat !== null &&
-      tableLiveSeats(otherVisits, seatings).has(command.seat)
-    )
-      throw new RecordingError("conflict", `Seat ${command.seat} is already taken.`);
+    if (visit.finishedAt === null && targetSeats.length > 0) {
+      const taken = tableLiveSeats(otherVisits, seatings);
+      const conflict = targetSeats.find((seat) => taken.has(seat));
+
+      if (conflict !== undefined)
+        throw new RecordingError("conflict", `Seat ${conflict} is already taken.`);
+    }
+
+    const baseSeating = {
+      id: command.seatingId,
+      visitId: visit.id,
+      seat: command.seat,
+      occurredAt: command.occurredAt,
+      createdBy: command.actorId,
+      createdAt: command.preparedAt,
+      voidedAt: null,
+      voidedBy: null,
+      voidReason: null,
+    };
 
     seatings.push(
-      VisitSeating.make({
-        id: command.seatingId,
-        visitId: visit.id,
-        seat: command.seat,
-        occurredAt: command.occurredAt,
-        createdBy: command.actorId,
-        createdAt: command.preparedAt,
-        voidedAt: null,
-        voidedBy: null,
-        voidReason: null,
-      }),
+      VisitSeating.make(
+        command.seats === undefined ? baseSeating : { ...baseSeating, seats: command.seats },
+      ),
     );
 
     return { ...state, seatings, receipts };
@@ -348,10 +361,15 @@ const applySeatingCommand = <S extends RecordingLedger>(
   );
 
   if (visit.finishedAt === null) {
-    const reverted = visitSeatNow(nextSeatings.filter((item) => item.visitId === visit.id));
+    const reverted = visitSeatsNow(nextSeatings.filter((item) => item.visitId === visit.id));
 
-    if (reverted !== null && tableLiveSeats(otherVisits, nextSeatings).has(reverted))
-      throw new RecordingError("conflict", `Seat ${reverted} is already taken.`);
+    if (actorPlayers !== null && reverted.length > 0) requireSeatsInRange(table, reverted);
+
+    const taken = tableLiveSeats(otherVisits, nextSeatings);
+    const conflict = reverted.find((seat) => taken.has(seat));
+
+    if (conflict !== undefined)
+      throw new RecordingError("conflict", `Seat ${conflict} is already taken.`);
   }
 
   return { ...state, seatings: nextSeatings, receipts };

@@ -926,29 +926,47 @@ describe("visit seat views, history lines, edit fields, and rejections", () => {
     });
 
     const viewAfterReplace = recordingVisit(store.getSnapshot().state!, firstVisitId)!;
-    expect(viewAfterReplace.currentSeat).toBe(5);
+    expect(viewAfterReplace.currentSeats).toEqual([5]);
     expect(viewAfterReplace.seatOutcome).toEqual({ kind: "seat", seat: 5 });
     expect(sessionEditFields(viewAfterReplace, true).find((f) => f.field === "seat")?.value).toBe(
       "Seat 5 · Third base",
     );
 
-    await save({ type: "set_seat", visitId: firstVisitId, seat: 3, occurredAt: at(12) });
+    await save({ type: "set_seat", visitId: firstVisitId, seats: [1, 3], occurredAt: at(12) });
+    const viewMultiLive = recordingVisit(store.getSnapshot().state!, firstVisitId)!;
+    expect(viewMultiLive.currentSeats).toEqual([1, 3]);
+    expect(sessionEditFields(viewMultiLive, true).find((f) => f.field === "seat")?.value).toBe(
+      "Seats 1 & 3",
+    );
+
+    await save({ type: "set_seat", visitId: firstVisitId, seats: [1, 3, 5], occurredAt: at(12) });
+    expect(
+      sessionEditFields(recordingVisit(store.getSnapshot().state!, firstVisitId)!, true).find(
+        (f) => f.field === "seat",
+      )?.value,
+    ).toBe("Seats 1, 3 & 5");
+
     await save({ type: "finish", visitId: firstVisitId, amount: 30000, finishedAt: at(14) });
 
     const finishedView = recordingVisit(store.getSnapshot().state!, firstVisitId)!;
-    expect(finishedView.seatOutcome).toEqual({ kind: "multiple", seats: [5, 3] });
+    expect(finishedView.seatOutcome).toEqual({ kind: "multiple", seats: [5, 1, 3] });
     expect(sessionEditFields(finishedView, true).find((f) => f.field === "seat")?.value).toBe(
       "Multiple seats",
     );
 
     const lines = historyLines(finishedView);
     const seatingLines = lines.filter((line) => line.type === "seating");
-    expect(seatingLines).toHaveLength(3);
-    expect(seatingLines.map((line) => line.seating.seat)).toEqual([3, 5, 1]);
-    expect(seatingLines[2]!.seating.voidedAt).not.toBeNull();
+    expect(seatingLines).toHaveLength(4);
+    expect(seatingLines.map((line) => line.seating.seats ?? line.seating.seat)).toEqual([
+      [1, 3, 5],
+      [1, 3],
+      5,
+      1,
+    ]);
+    expect(seatingLines[3]!.seating.voidedAt).not.toBeNull();
 
     const tableView = recordingTable(store.getSnapshot().state!, firstTableId)!;
-    expect(tableView.seatings).toHaveLength(3);
+    expect(tableView.seatings).toHaveLength(4);
 
     const poker = await save({
       type: "start",

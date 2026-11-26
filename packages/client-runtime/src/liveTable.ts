@@ -31,7 +31,7 @@ export type TableSeat = {
   readonly amount: MinorUnits;
   /** Whether this device records their buy-ins and cash-outs from the table. */
   readonly recordable: boolean;
-  readonly seatNumber: number | null;
+  readonly seatNumbers: ReadonlyArray<number>;
   readonly seatOutcome: VisitSeatOutcome;
 };
 
@@ -108,9 +108,13 @@ export const liveTable: (
           combinedSeatings,
         );
 
-  const liveSeatByVisit = new Map<VisitId, number>();
+  const liveSeatsByVisit = new Map<VisitId, Array<number>>();
 
-  for (const [seatNumber, visitId] of occupiedSeats) liveSeatByVisit.set(visitId, seatNumber);
+  for (const [seatNumber, visitId] of occupiedSeats) {
+    const list = liveSeatsByVisit.get(visitId) ?? [];
+    list.push(seatNumber);
+    liveSeatsByVisit.set(visitId, list);
+  }
 
   const seatingsByVisit = Map.groupBy(combinedSeatings, (seating) => seating.visitId);
 
@@ -136,7 +140,10 @@ export const liveTable: (
             : "Playing",
         amount: playing ? totals.buyIn : finalResult!,
         recordable: everyone && !isSelf,
-        seatNumber: playing && totalSeats !== null ? (liveSeatByVisit.get(visit.id) ?? null) : null,
+        seatNumbers:
+          playing && totalSeats !== null
+            ? (liveSeatsByVisit.get(visit.id)?.toSorted((a, b) => a - b) ?? [])
+            : [],
         seatOutcome:
           totalSeats === null
             ? ({ kind: "none" } as const)

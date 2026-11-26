@@ -71,7 +71,6 @@ This umbrella captures the product and architecture decisions shared across its 
 
 ## Non-goals
 
-- Multi-spot play (one player occupying two seats in one visit).
 - Seats for non-blackjack games (poker, baccarat) until a future change extends `tableSizes`.
 - Resurrecting or deleting the legacy 3D Blender `TableMap` assets (`packages/client-runtime/table-art/`, `tableArt.ts`, `table.ts` director, `tools/table-art/`).
 - Live Activity / Android Live Update seat badges or Share Card seat lines.
