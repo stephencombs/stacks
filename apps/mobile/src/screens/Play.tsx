@@ -862,7 +862,8 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           canEditTable={canEditTable}
           occupants={seats ? liveOccupants(seats) : undefined}
           who={own ? undefined : name}
-          back
+          back={open.from === "edit"}
+          depth={open.from === "edit" ? 1 : 0}
           onClose={close}
           onSaved={(picked) => {
             close();
@@ -1189,7 +1190,10 @@ function EditSessionSheet({
       >
         <List>
           {fields.map(({ field: type, label, value }) => (
-            <Row key={type} onPress={() => onOpen({ type })}>
+            <Row
+              key={type}
+              onPress={() => onOpen(type === "seat" ? { type: "seat", from: "edit" } : { type })}
+            >
               <Text className="flex-1 type-body text-ink">{label}</Text>
               <Text className="max-w-[60%] shrink type-callout text-muted">{value}</Text>
               <Icon name="chevron-right" color="muted" size={18} />
@@ -1236,7 +1240,7 @@ function EditSessionSheet({
           </Row>
         ) : null}
         {seatField ? (
-          <Row onPress={() => onOpen({ type: "seat" })}>
+          <Row onPress={() => onOpen({ type: "seat", from: "edit" })}>
             <Text className="flex-1 type-body text-ink">Seat</Text>
             <Text className="max-w-[60%] shrink type-callout text-muted">{seatField.value}</Text>
             <Icon name="chevron-right" color="muted" size={18} />
