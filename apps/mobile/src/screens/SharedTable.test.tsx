@@ -1,4 +1,12 @@
-import { Conflict, MinorUnits, PlayerId, TableId, VisitId } from "@stacks/contracts";
+import {
+  ActorId,
+  Conflict,
+  MinorUnits,
+  PlayerId,
+  SeatingId,
+  TableId,
+  VisitId,
+} from "@stacks/contracts";
 import type { TableView } from "@stacks/contracts/recordingCommands";
 import { makeRecordingStore } from "@stacks/client-runtime/recording";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
@@ -95,7 +103,13 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
     return joined;
   });
 
-  const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+  const Container = ({
+    children,
+    accessibilityLabel,
+  }: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+  }) => <div aria-label={accessibilityLabel}>{children}</div>;
 
   const Button = ({
     label,
@@ -123,11 +137,21 @@ it("lets a viewer join a shared table, buy in with returning=false, and replace 
   }));
   vi.doMock("react-native", () => ({
     Platform: { OS: "ios" },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
     Pressable: Container,
     Switch: () => null,
     Text: Container,
     View: Container,
   }));
+  vi.doMock("react-native-svg", () => ({
+    default: Container,
+    Line: Container,
+    Path: Container,
+    Text: Container,
+  }));
+  vi.doMock("uniwind", () => ({ useCSSVariable: () => [] }));
+  vi.doMock("../lib/useLargeText", () => ({ useLargeText: () => false }));
+  vi.doMock("../components/ui/motion", () => ({ useReducedMotion: () => false }));
   vi.doMock("../lib/config", () => ({ apiUrl: "https://api.example.com" }));
   vi.doMock("../lib/scopeHub", () => ({
     createHub: () => ({ watch: () => () => {}, dispose: () => {} }),
@@ -335,7 +359,13 @@ it("redeems a player invite to Home and shows Conflict errors clearly", async ()
   const redeemMock = vi.fn(async () => true);
   let mode: "ok" | "conflict" = "ok";
 
-  const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+  const Container = ({
+    children,
+    accessibilityLabel,
+  }: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+  }) => <div aria-label={accessibilityLabel}>{children}</div>;
 
   const Button = ({ label, onPress }: { label: string; onPress?: () => void }) => (
     <button onClick={onPress}>{label}</button>
@@ -419,6 +449,183 @@ it("redeems a player invite to Home and shows Conflict errors clearly", async ()
     expect(element.textContent).toContain("This invite has been used up. Ask for a new one.");
   } finally {
     await act(async () => root.unmount());
+    vi.resetModules();
+    vi.unstubAllGlobals();
+  }
+});
+
+it("renders a read-only blackjack arc and seat labels for seated viewers", async () => {
+  vi.resetModules();
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+
+  let documentState: RecordingStorageDocument = { revision: 0 };
+
+  const store = makeRecordingStore({
+    load: async () => documentState,
+    commit: async (revision, payload) => {
+      documentState = { revision: revision + 1, payload };
+
+      return documentState.revision;
+    },
+    subscribe: () => () => {},
+    close: async () => {},
+  });
+
+  await store.ready;
+
+  const tableId = TableId.make(crypto.randomUUID());
+  const starterId = PlayerId.make(crypto.randomUUID());
+  const starterVisitId = VisitId.make(crypto.randomUUID());
+  const seatingId = SeatingId.make(crypto.randomUUID());
+  const startedAt = DateTime.makeUnsafe("2026-11-15T19:00:00Z");
+
+  const sharedView: TableView = {
+    table: {
+      id: tableId,
+      tripId: null,
+      game: "blackjack",
+      tableSeats: 6,
+      venueId: null,
+      highLimit: false,
+      starterPlayerId: starterId,
+    },
+    players: [{ id: starterId, displayName: "Alex" }],
+    visits: [
+      {
+        visit: {
+          id: starterVisitId,
+          playerId: starterId,
+          tableId,
+          startedAt,
+          finishedAt: null,
+          revision: 1,
+        },
+        totals: {
+          buyIn: MinorUnits.make(20000),
+          cashOut: MinorUnits.make(0),
+          adjustment: MinorUnits.make(0),
+        },
+        finalResult: null,
+      },
+    ],
+    seatings: [
+      {
+        id: seatingId,
+        visitId: starterVisitId,
+        seat: 1,
+        occurredAt: startedAt,
+        createdBy: ActorId.make(crypto.randomUUID()),
+        createdAt: startedAt,
+        voidedAt: null,
+        voidedBy: null,
+        voidReason: null,
+      },
+    ],
+    viewerRole: "viewer",
+    viewerPlayerId: null,
+    recorders: [starterId],
+    appointable: [],
+    shared: true,
+  };
+
+  const Container = ({
+    children,
+    accessibilityLabel,
+  }: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+  }) => <div aria-label={accessibilityLabel}>{children}</div>;
+
+  vi.doMock("@react-navigation/native", () => ({
+    useIsFocused: () => true,
+    useNavigation: () => ({ navigate: vi.fn(), dispatch: vi.fn() }),
+    StackActions: { replace: vi.fn() },
+  }));
+  vi.doMock("react-native", () => ({
+    Platform: { OS: "ios" },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+    Pressable: Container,
+    Switch: () => null,
+    Text: Container,
+    View: Container,
+  }));
+  vi.doMock("react-native-svg", () => ({
+    default: Container,
+    Line: Container,
+    Path: Container,
+    Text: Container,
+  }));
+  vi.doMock("uniwind", () => ({ useCSSVariable: () => [] }));
+  vi.doMock("../lib/useLargeText", () => ({ useLargeText: () => false }));
+  vi.doMock("../components/ui/motion", () => ({ useReducedMotion: () => false }));
+  vi.doMock("../lib/config", () => ({ apiUrl: "https://api.example.com" }));
+  vi.doMock("../lib/scopeHub", () => ({
+    createHub: () => ({ watch: () => () => {}, dispose: () => {} }),
+  }));
+  vi.doMock("../lib/recording", () => ({
+    useRecordingState: () => store.getSnapshot().state,
+  }));
+  vi.doMock("@stacks/client-runtime/api", () => ({
+    fetchSharedTable: () => Effect.succeed(sharedView),
+    fetchInvitePreview: () => Effect.fail(new Error("unused")),
+    makeSharedWatchable: () => () => Effect.succeed(true),
+  }));
+  vi.doMock("@stacks/client-runtime/recordingReact", async () =>
+    vi.importActual("@stacks/client-runtime/recordingReact"),
+  );
+  vi.doMock("../components/ui/Button", () => ({
+    Button: ({ label }: { label: string }) => <button>{label}</button>,
+  }));
+  vi.doMock("../components/ui/Surface", () => ({
+    EmptyState: Container,
+    List: Container,
+    PageTitle: Container,
+    Row: Container,
+    SectionHeading: Container,
+    Skeleton: () => null,
+    Tag: Container,
+  }));
+  vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
+  vi.doMock("../components/ui/Field", () => ({ Choice: () => null, FormError: Container }));
+  vi.doMock("../components/ui/Sheet", () => ({ SheetHost: Container, Sheet: Container }));
+  vi.doMock("../components/ui/DateTimeField", () => ({ DateTimeField: () => null }));
+  vi.doMock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
+  vi.doMock("../features/PlayerAvatar", () => ({
+    PlayerAvatar: () => null,
+    TABLE_AVATAR_SIZE: 32,
+  }));
+  vi.doMock("../components/Money", () => ({ Money: () => null }));
+  vi.doMock("../features/Personal", () => ({
+    PersonalScreen: ({ children }: { children?: ReactNode }) => <main>{children}</main>,
+  }));
+  vi.doMock("../features/RecordingForms", () => ({
+    JoinSheet: () => null,
+    SitDownSheet: () => null,
+  }));
+
+  const { RecordingProvider } = await import("@stacks/client-runtime/recordingReact");
+  const { SharedTableScreen } = await import("./SharedTable");
+  const element = document.createElement("div");
+  const root = createRoot(element);
+
+  try {
+    await act(async () => {
+      root.render(
+        <RecordingProvider store={store}>
+          <SharedTableScreen route={{ params: { token: "bj-tok" } }} />
+        </RecordingProvider>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      element.querySelector('[aria-label="Seat 1, first base, occupied by Alex"]'),
+    ).not.toBeNull();
+    expect(element.textContent).toContain("Seat 1 · First base · Playing");
+  } finally {
+    await act(async () => root.unmount());
+    await store.close();
     vi.resetModules();
     vi.unstubAllGlobals();
   }

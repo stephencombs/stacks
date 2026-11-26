@@ -982,19 +982,20 @@ export const cashOutResultPreview = (visit: RecordingVisitView, text: string) =>
 
 export type SessionEditField = "buy_in" | "seat" | "start_time" | "game" | "venue";
 
-const formatSeatValue = (seat: number, totalSeats: number) =>
-  seat === 1
-    ? "Seat 1 · First base"
-    : seat === totalSeats
-      ? `Seat ${seat} · Third base`
-      : `Seat ${seat}`;
+export const formatSeatLabel = (seat: number, totalSeats: number | null) => {
+  if (seat === 1) return "Seat 1 · First base";
+
+  if (totalSeats !== null && seat === totalSeats) return `Seat ${seat} · Third base`;
+
+  return `Seat ${seat}`;
+};
 
 const seatFieldValue = (visit: RecordingVisitView, totalSeats: number) => {
   if (visit.visit.finishedAt === null)
-    return visit.currentSeat === null ? "Not set" : formatSeatValue(visit.currentSeat, totalSeats);
+    return visit.currentSeat === null ? "Not set" : formatSeatLabel(visit.currentSeat, totalSeats);
 
   return Match.value(visit.seatOutcome).pipe(
-    Match.when({ kind: "seat" }, ({ seat }) => formatSeatValue(seat, totalSeats)),
+    Match.when({ kind: "seat" }, ({ seat }) => formatSeatLabel(seat, totalSeats)),
     Match.when({ kind: "multiple" }, () => "Multiple seats"),
     Match.when({ kind: "none" }, () => "Not set"),
     Match.exhaustive,

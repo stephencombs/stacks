@@ -36,6 +36,7 @@ import {
   AndroidStatsEmpty,
   ByCasino,
   ByGame,
+  BySeat,
   Filters,
   StatsContent,
 } from "../features/StatsParts";
@@ -185,7 +186,11 @@ function StatsView({
                 item.group.id === next && item.trips.some((trip) => trip.id === filters.tripId),
             );
 
-          if (!keep) setFilters({ ...filters, tripId: undefined });
+          const tripId = keep ? filters.tripId : undefined;
+          const seat = next === null ? filters.seat : undefined;
+
+          if (tripId !== filters.tripId || seat !== filters.seat)
+            setFilters({ ...filters, tripId, seat });
         }}
       />
     );
@@ -441,6 +446,14 @@ function Breakdown({
       ) : null}
       {view.byGame ? (
         <ByGame rows={view.byGame} currency={RECORDING_CURRENCY} onFilter={onFilter} />
+      ) : null}
+      {view.bySeat ? (
+        <BySeat
+          rows={view.bySeat.rows}
+          count={view.bySeat.count}
+          currency={RECORDING_CURRENCY}
+          onFilter={onFilter}
+        />
       ) : null}
       {view.byCasino ? (
         <ByCasino

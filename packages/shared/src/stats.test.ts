@@ -1,12 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Game, MinorUnits, TripId, VenueId, VisitId } from "@stacks/contracts";
+import { Game, MinorUnits, SeatingId, TripId, VenueId, VisitId } from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
 import { ALEX, RandomLedger, toEntries } from "./testing/ledgerArbitrary.ts";
 import { visit } from "./testing/recording.ts";
 import { playerResults } from "./results.ts";
-import { leadingBucket, personalStats } from "./stats.ts";
+import { visitSeatOutcome } from "./seats.ts";
+import { leadingBucket, personalStats, type SeatBucket } from "./stats.ts";
 
 const zone = DateTime.zoneMakeNamedUnsafe("America/Los_Angeles");
 const casino = VenueId.make("0192e7a0-0000-7000-8000-0000000000c1");
@@ -30,6 +31,7 @@ const personalSession = (
     game?: typeof Game.Type | null;
     venueId?: VenueId | null;
     tripId?: TripId | null;
+    seatBucket?: SeatBucket | null;
     totals?: { buyIn: MinorUnits; cashOut: MinorUnits; adjustment: MinorUnits };
   } = {},
 ) => ({
@@ -49,6 +51,7 @@ const personalSession = (
     venueId: fields.venueId === undefined ? casino : fields.venueId,
     tripId: fields.tripId ?? null,
   },
+  seatBucket: fields.seatBucket,
 });
 
 describe("personalStats", () => {
@@ -76,6 +79,7 @@ describe("personalStats", () => {
     expect(stats.options).toEqual({
       years: [2026],
       games: ["blackjack"],
+      seats: [],
       venueIds: [casino],
       tripIds: [],
     });
@@ -172,6 +176,7 @@ describe("personalStats", () => {
     expect(filtered.options).toEqual({
       years: [2026, 2025],
       games: ["blackjack", "slots", null],
+      seats: [],
       venueIds: [casino, otherCasino, null],
       tripIds: [],
     });
@@ -946,6 +951,80 @@ describe("personalStats for Just me", () => {
       ];
 
       expect(stats(sessions, { game: "blackjack" }).records.win).toMatchObject({ result: 100 });
+    });
+  });
+
+  describe("seats", () => {
+    const seating = (seat: number | null, at: string, voidedAt: string | null = null) => ({
+      id: SeatingId.make("0192e7a0-0000-7000-8000-000000000999"),
+      seat,
+      occurredAt: DateTime.makeUnsafe(at),
+      createdAt: DateTime.makeUnsafe(at),
+      voidedAt: voidedAt ? DateTime.makeUnsafe(voidedAt) : null,
+    });
+
+    it("attributes single-seat, multiple-seat, stood-up and voided outcomes in spatial order", () => {
+      const satAndVoided = visitSeatOutcome([
+        seating(1, "2026-11-01T20:00:00Z"),
+        seating(5, "2026-11-01T20:30:00Z", "2026-11-01T20:35:00Z"),
+      ]);
+
+      const stoodUp = visitSeatOutcome([
+        seating(4, "2026-11-02T20:00:00Z"),
+        seating(null, "2026-11-02T20:30:00Z"),
+      ]);
+
+      const moved = visitSeatOutcome([
+        seating(1, "2026-11-03T20:00:00Z"),
+        seating(5, "2026-11-03T20:30:00Z"),
+      ]);
+
+      const sessions = [
+        { ...personalSession(1, -200, { seatBucket: 7 }), seatOutcome: satAndVoided },
+        personalSession(2, 100, { seatBucket: 5 }),
+        { ...personalSession(3, 400), seatOutcome: stoodUp },
+        { ...personalSession(4, 300), seatOutcome: moved },
+        personalSession(5, 50, { game: "craps", seatBucket: 2 }),
+        { ...personalSession(6, 250), seatOutcome: satAndVoided },
+      ];
+
+      const result = stats(sessions);
+      expect(result.bySeat.map((row) => [row.seat, row.sessions, row.result])).toEqual([
+        [1, 1, 250],
+        [5, 1, 100],
+        [7, 1, -200],
+        ["multiple", 1, 300],
+      ]);
+      expect(result.seatedBlackjackSessions).toBe(4);
+      expect(result.totalBlackjackSessions).toBe(5);
+      expect(result.options.seats).toEqual([1, 5, 7, "multiple", null]);
+      expect(stats(sessions, { seat: 1 }).summary.sessions).toBe(1);
+      expect(stats(sessions, { seat: "multiple" }).summary.result).toBe(300);
+      expect(stats(sessions, { seat: null }).summary.result).toBe(400);
+      expect(
+        stats([personalSession(5, 50, { game: "craps", seatBucket: 2 })], { seat: 2 }).summary
+          .sessions,
+      ).toBe(0);
+    });
+
+    it("never puts Multiple seats or unseated into seatBuckets, and follows floor/tie rules", () => {
+      const five = (idStart: number, result: number, seatBucket: SeatBucket | null) =>
+        Array.from({ length: 5 }, (_, i) => personalSession(idStart + i, result, { seatBucket }));
+
+      const singleVsMultiple = stats([...five(1, 100, 3), ...five(10, 500, "multiple")]);
+
+      expect(singleVsMultiple.seatBuckets.map((b) => b.index)).toEqual([3]);
+      expect(leadingBucket(singleVsMultiple.seatBuckets)).toBeNull();
+
+      const clear = stats([...five(1, 200, 3), ...five(10, 50, 1), ...five(20, 500, "multiple")]);
+      expect(leadingBucket(clear.seatBuckets)).toMatchObject({
+        index: 3,
+        average: 200,
+        sessions: 5,
+      });
+
+      const tied = stats([...five(1, 200, 3), ...five(10, 200, 1)]);
+      expect(leadingBucket(tied.seatBuckets)).toBeNull();
     });
   });
 });

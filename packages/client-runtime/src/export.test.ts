@@ -187,6 +187,7 @@ it("exports finished non-deleted sessions in chronological order with exact form
     "finished_at",
     "duration_minutes",
     "game",
+    "seat",
     "high_limit",
     "casino",
     "city",
@@ -204,6 +205,7 @@ it("exports finished non-deleted sessions in chronological order with exact form
     "2026-11-17T03:30:00.000Z",
     "150",
     "poker_cash",
+    "",
     "false",
     "",
     "",
@@ -221,6 +223,7 @@ it("exports finished non-deleted sessions in chronological order with exact form
     "2026-11-19T04:15:00.000Z",
     "135",
     "blackjack",
+    "",
     "true",
     '\'=Aria "Club"',
     "Las Vegas, NV",
@@ -231,6 +234,60 @@ it("exports finished non-deleted sessions in chronological order with exact form
     "-0.50",
     "-51.00",
     "USD",
+  ]);
+});
+
+it("exports single seat, multiple seats and blank for unseated or non-blackjack visits", () => {
+  const visits: ReadonlyArray<RecordedVisit> = [
+    {
+      ...makeVisit({
+        num: 1,
+        startedAt: "2026-11-17T01:00:00Z",
+        finishedAt: "2026-11-17T02:00:00Z",
+        buyIn: 10000,
+        cashOut: 15000,
+        game: "blackjack",
+      }),
+      seatOutcome: { kind: "seat", seat: 3 },
+    },
+    {
+      ...makeVisit({
+        num: 2,
+        startedAt: "2026-11-18T01:00:00Z",
+        finishedAt: "2026-11-18T02:00:00Z",
+        buyIn: 10000,
+        cashOut: 5000,
+        game: "blackjack",
+      }),
+      seatOutcome: { kind: "multiple", seats: [1, 4] },
+    },
+    makeVisit({
+      num: 3,
+      startedAt: "2026-11-19T01:00:00Z",
+      finishedAt: "2026-11-19T02:00:00Z",
+      buyIn: 10000,
+      cashOut: 10000,
+      game: "blackjack",
+    }),
+    {
+      ...makeVisit({
+        num: 4,
+        startedAt: "2026-11-20T01:00:00Z",
+        finishedAt: "2026-11-20T02:00:00Z",
+        buyIn: 10000,
+        cashOut: 12000,
+        game: "craps",
+      }),
+      seatOutcome: { kind: "seat", seat: 2 },
+    },
+  ];
+
+  const [, ...rows] = parseCsv(exportPersonalSessionsCsv(visits));
+  expect(rows.map((cols) => [cols[4], cols[5]])).toEqual([
+    ["blackjack", "3"],
+    ["blackjack", "multiple"],
+    ["blackjack", ""],
+    ["craps", ""],
   ]);
 });
 
@@ -308,16 +365,16 @@ it("keeps exported totals equal to personalStats across random histories", () =>
     const byVenue = new Map<string, bigint>();
 
     for (const cols of rows) {
-      const buyIn = Option.getOrThrow(parseMoney(cols[10]!, RECORDING_CURRENCY));
-      const cashOut = Option.getOrThrow(parseMoney(cols[11]!, RECORDING_CURRENCY));
-      const adj = Option.getOrThrow(parseMoney(cols[12]!, RECORDING_CURRENCY));
-      const result = Option.getOrThrow(parseMoney(cols[13]!, RECORDING_CURRENCY));
+      const buyIn = Option.getOrThrow(parseMoney(cols[11]!, RECORDING_CURRENCY));
+      const cashOut = Option.getOrThrow(parseMoney(cols[12]!, RECORDING_CURRENCY));
+      const adj = Option.getOrThrow(parseMoney(cols[13]!, RECORDING_CURRENCY));
+      const result = Option.getOrThrow(parseMoney(cols[14]!, RECORDING_CURRENCY));
       expect(BigInt(result)).toBe(BigInt(cashOut) + BigInt(adj) - BigInt(buyIn));
       csvResultSum += BigInt(result);
 
       const gameKey = cols[4] ?? "";
       byGame.set(gameKey, (byGame.get(gameKey) ?? 0n) + BigInt(result));
-      const venueKey = cols[6] ?? "";
+      const venueKey = cols[7] ?? "";
       byVenue.set(venueKey, (byVenue.get(venueKey) ?? 0n) + BigInt(result));
     }
 

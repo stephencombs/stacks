@@ -10,6 +10,7 @@ const COLUMNS = [
   "finished_at",
   "duration_minutes",
   "game",
+  "seat",
   "high_limit",
   "casino",
   "city",
@@ -21,6 +22,14 @@ const COLUMNS = [
   "result",
   "currency",
 ] as const;
+
+const seatColumn = ({ table, seatOutcome }: Pick<RecordedVisit, "table" | "seatOutcome">) => {
+  if (table.game !== "blackjack" || seatOutcome.kind === "none") return "";
+
+  if (seatOutcome.kind === "seat") return String(seatOutcome.seat);
+
+  return "multiple";
+};
 
 const csvCell = (value: string) =>
   /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
@@ -54,7 +63,7 @@ export const exportPersonalSessionsCsv = (
 
   const lines = [
     COLUMNS.join(","),
-    ...finished.map(({ visit, totals, finalResult, table, venue }) => {
+    ...finished.map(({ visit, totals, finalResult, table, venue, seatOutcome }) => {
       const durationMs =
         DateTime.toEpochMillis(visit.finishedAt!) - DateTime.toEpochMillis(visit.startedAt);
 
@@ -67,6 +76,7 @@ export const exportPersonalSessionsCsv = (
         DateTime.formatIso(visit.finishedAt!),
         String(durationMinutes),
         table.game ?? "",
+        seatColumn({ table, seatOutcome }),
         table.highLimit ? "true" : "false",
         csvText(venue?.name ?? ""),
         csvText(venue?.city ?? ""),

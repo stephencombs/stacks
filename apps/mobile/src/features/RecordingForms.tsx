@@ -7,8 +7,10 @@ import {
   type TableId,
   type TripId,
   type VisitId,
+  type VisitSeating,
 } from "@stacks/contracts";
 import { formatDay, gameNames, shortName, tellApart } from "@stacks/client-runtime/format";
+import { liveTable } from "@stacks/client-runtime/liveTable";
 import type {
   CachedVenue,
   RecordingInput,
@@ -26,6 +28,7 @@ import {
   buyInTotalLabel,
   buyInTotalPreview,
   cashOutResultPreview,
+  formatSeatLabel,
   localDateText,
   localTimeText,
   parsePastSessionTimes,
@@ -33,9 +36,11 @@ import {
   parseRecordingAmount,
   parseTimeNear,
   RECORDING_CURRENCY,
+  recordingTable,
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
 import { decimalSeparator, formatMoney } from "@stacks/shared/money";
+import { tableSizes } from "@stacks/shared/seats";
 import * as DateTime from "effect/DateTime";
 import { use, useState, type ReactNode } from "react";
 import { Platform, Pressable, TextInput, View } from "react-native";
@@ -61,6 +66,8 @@ import { ChooseFromContacts } from "./ChooseFromContacts";
 import { CasinoPickerSheet } from "./VenuePicker";
 import { AmountFeedback } from "./AmountFeedback";
 import { applyAmountKey } from "./amountKey";
+import type { ArcOccupant } from "./BlackjackTableArc";
+import { SeatPickerSheet } from "./SeatPickerSheet";
 import { TripPickerSheet, TripRow, useTripPickable } from "./TableTrip";
 
 const money = (amount: number, showCents = false) =>
@@ -466,10 +473,12 @@ function GameFields({
 function DetailsFields({
   venue,
   onVenue,
+  seatRow,
   ...gameProps
 }: Parameters<typeof GameFields>[0] & {
   venue?: CachedVenue | null;
   onVenue?: () => void;
+  seatRow?: ReactNode;
 }) {
   const inSheet = use(InSheet);
 
@@ -477,6 +486,11 @@ function DetailsFields({
     <View className="gap-1.5">
       <Text className="px-1 type-footnote font-medium text-muted">Details (optional)</Text>
       <GameFields {...gameProps} />
+      {seatRow ? (
+        <View className={cn("overflow-hidden rounded-xl", inSheet ? "bg-raised" : "bg-surface")}>
+          {seatRow}
+        </View>
+      ) : null}
       {onVenue ? (
         <View className={cn("overflow-hidden rounded-xl", inSheet ? "bg-raised" : "bg-surface")}>
           <Pressable
@@ -497,17 +511,40 @@ function DetailsFields({
   );
 }
 
+const USUAL_BJ_SEATS = tableSizes.blackjack?.usual ?? 5;
+
+const BJ_SIZE_OPTIONS = (tableSizes.blackjack?.sizes ?? [5, 6, 7]).map((n) => ({
+  value: String(n),
+  label: `${n} seats`,
+}));
+
+type DetailsPayload = {
+  game?: Game;
+  gameName?: string;
+  tableSeats?: number;
+  venueId?: CachedVenue["id"];
+  highLimit: boolean;
+};
+
 const details = (
   game: GameChoice,
   highLimit: boolean,
   venue: CachedVenue | null = null,
   gameName = "",
-) => ({
-  ...(game === "none" ? {} : { game }),
-  ...(game === "other" && gameName.trim() ? { gameName: gameName.trim() } : {}),
-  ...(venue ? { venueId: venue.id } : {}),
-  highLimit,
-});
+  tableSeats: number | null = null,
+) => {
+  const result: DetailsPayload = { highLimit };
+
+  if (game !== "none") result.game = game;
+
+  if (game === "other" && gameName.trim()) result.gameName = gameName.trim();
+
+  if (game === "blackjack" && tableSeats !== null) result.tableSeats = tableSeats;
+
+  if (venue) result.venueId = venue.id;
+
+  return result;
+};
 
 const startedVisit = (receipt: RecordingReceipt) =>
   "visitId" in receipt.command ? receipt.command.visitId : null;
@@ -537,9 +574,26 @@ export function StartSheet({
   const [pickingTrip, setPickingTrip] = useState(false);
   const [highLimit, setHighLimit] = useState(false);
   const [recordingOnly, setRecordingOnly] = useState(false);
+  const [seat, setSeat] = useState<number | null>(null);
+  const [tableSeats, setTableSeats] = useState<number | null>(null);
+  const [pickingSeat, setPickingSeat] = useState(false);
+  const effectiveSeats = tableSeats ?? USUAL_BJ_SEATS;
   const tripPickable = useTripPickable(tripId !== null);
   const alreadyPlaying = Boolean(home?.active.length);
   const watching = recordingOnly && !alreadyPlaying;
+
+  if (pickingSeat)
+    return (
+      <SeatPickerSheet
+        mode="draft"
+        seat={seat}
+        tableSeats={effectiveSeats}
+        canEditTable
+        onSelect={setSeat}
+        onTableSeats={setTableSeats}
+        onClose={() => setPickingSeat(false)}
+      />
+    );
 
   if (pickingVenue)
     return (
@@ -582,7 +636,7 @@ export function StartSheet({
 
         if (watching) {
           const receipt = await save.submit(
-            { type: "open_table", ...details(game, highLimit, venue, gameName) },
+            { type: "open_table", ...details(game, highLimit, venue, gameName, tableSeats) },
             venues,
           );
 
@@ -602,13 +656,24 @@ export function StartSheet({
           {
             type: "start",
             buyIn: amount,
-            ...details(game, highLimit, venue, gameName),
+            ...details(game, highLimit, venue, gameName, tableSeats),
           },
           venues,
         );
 
         if (tripId && receipt && "tableId" in receipt.command)
           await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
+
+        if (game === "blackjack" && seat !== null && receipt?.command.type === "start") {
+          await save.submit({
+            type: "set_seat",
+            tableId: receipt.command.tableId,
+            visitId: receipt.command.visitId,
+            seat,
+            occurredAt: receipt.command.startedAt,
+          });
+        }
+
         const visitId = receipt && startedVisit(receipt);
 
         if (visitId) onStarted(visitId);
@@ -644,10 +709,47 @@ export function StartSheet({
         gameName={gameName}
         highLimit={highLimit}
         venue={venue}
-        onGame={setGame}
+        onGame={(next) => {
+          setGame(next);
+
+          if (next !== "blackjack") {
+            setSeat(null);
+            setTableSeats(null);
+          }
+        }}
         onGameName={setGameName}
         onHighLimit={setHighLimit}
         onVenue={() => setPickingVenue(true)}
+        seatRow={
+          game === "blackjack" ? (
+            watching ? (
+              <View className="min-h-12 flex-row items-center justify-between gap-3 px-4 py-1.5">
+                <Text className="type-body text-ink">Table size</Text>
+                <Choice
+                  inline
+                  label="Table size"
+                  labelHidden
+                  options={BJ_SIZE_OPTIONS}
+                  value={String(effectiveSeats)}
+                  onChange={(next) => setTableSeats(Number(next))}
+                />
+              </View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Seat: ${seat === null ? "Not set" : formatSeatLabel(seat, effectiveSeats)}. Change`}
+                onPress={() => setPickingSeat(true)}
+                className="min-h-12 flex-row items-center gap-3 px-4 active:bg-fill"
+              >
+                <Text className="type-body text-ink">Seat</Text>
+                <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
+                  {seat === null ? "Not set" : formatSeatLabel(seat, effectiveSeats)}
+                </Text>
+                <Icon name="chevron-right" color="faint" size={16} />
+              </Pressable>
+            )
+          ) : null
+        }
       />
     </RecordingSheet>
   );
@@ -682,6 +784,10 @@ export function PastSessionSheet({
   const [venue, setVenue] = useState<CachedVenue | null>(() => prefs.defaultVenue);
   const [pickingVenue, setPickingVenue] = useState(false);
   const [highLimit, setHighLimit] = useState(false);
+  const [seat, setSeat] = useState<number | null>(null);
+  const [tableSeats, setTableSeats] = useState<number | null>(null);
+  const [pickingSeat, setPickingSeat] = useState(false);
+  const effectiveSeats = tableSeats ?? USUAL_BJ_SEATS;
   const inParsed = parseRecordingAmount(buyIn.text, 1);
   const outParsed = parseRecordingAmount(cashOut.text, 0);
 
@@ -707,6 +813,19 @@ export function PastSessionSheet({
       maximumDate={field === "date" ? now : undefined}
     />
   );
+
+  if (pickingSeat)
+    return (
+      <SeatPickerSheet
+        mode="draft"
+        seat={seat}
+        tableSeats={effectiveSeats}
+        canEditTable
+        onSelect={setSeat}
+        onTableSeats={setTableSeats}
+        onClose={() => setPickingSeat(false)}
+      />
+    );
 
   if (pickingVenue)
     return (
@@ -743,10 +862,20 @@ export function PastSessionSheet({
             cashOut: totalOut,
             startedAt: parsed.startedAt,
             finishedAt: parsed.finishedAt,
-            ...details(game, highLimit, venue, gameName),
+            ...details(game, highLimit, venue, gameName, tableSeats),
           },
           venue ? [venue] : [],
         );
+
+        if (game === "blackjack" && seat !== null && receipt?.command.type === "record_completed") {
+          await save.submit({
+            type: "set_seat",
+            tableId: receipt.command.tableId,
+            visitId: receipt.command.visitId,
+            seat,
+            occurredAt: parsed.startedAt,
+          });
+        }
 
         const visitId = receipt && startedVisit(receipt);
 
@@ -800,10 +929,33 @@ export function PastSessionSheet({
         gameName={gameName}
         highLimit={highLimit}
         venue={venue}
-        onGame={setGame}
+        onGame={(next) => {
+          setGame(next);
+
+          if (next !== "blackjack") {
+            setSeat(null);
+            setTableSeats(null);
+          }
+        }}
         onGameName={setGameName}
         onHighLimit={setHighLimit}
         onVenue={() => setPickingVenue(true)}
+        seatRow={
+          game === "blackjack" ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Seat: ${seat === null ? "Not set" : formatSeatLabel(seat, effectiveSeats)}. Change`}
+              onPress={() => setPickingSeat(true)}
+              className="min-h-12 flex-row items-center gap-3 px-4 active:bg-fill"
+            >
+              <Text className="type-body text-ink">Seat</Text>
+              <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
+                {seat === null ? "Not set" : formatSeatLabel(seat, effectiveSeats)}
+              </Text>
+              <Icon name="chevron-right" color="faint" size={16} />
+            </Pressable>
+          ) : null
+        }
       />
     </RecordingSheet>
   );
@@ -1554,6 +1706,70 @@ export function VoidSheet({
   );
 }
 
+/** Voids one mistaken or undone seat record with a reason, keeping it visible in History. */
+export function VoidSeatingSheet({
+  visit,
+  seating,
+  totalSeats = null,
+  back = false,
+  depth,
+  onClose,
+  onVoided,
+}: {
+  visit: RecordingVisitView;
+  seating: VisitSeating;
+  totalSeats?: number | null;
+  back?: boolean;
+  depth?: number;
+  onClose: () => void;
+  onVoided: () => void;
+}) {
+  const save = useRecordingSubmit();
+  const reason = useReason("Say why it's being voided.");
+
+  const submit = async () => {
+    const why = reason.read();
+
+    if (why === null) return;
+
+    const receipt = await save.submit({
+      type: "void_seating",
+      tableId: visit.visit.tableId,
+      visitId: visit.visit.id,
+      seatingId: seating.id,
+      reason: why,
+    });
+
+    if (receipt) onVoided();
+  };
+
+  const label =
+    seating.seat === null ? "Leaving your seat" : formatSeatLabel(seating.seat, totalSeats);
+
+  return (
+    <RecordingSheet
+      title="Void this seat record?"
+      description={`${label} stays in the history, crossed out, and stops counting toward seat records.`}
+      submitLabel="Void seat record"
+      submitVariant="danger"
+      cancelLabel="Keep record"
+      back={back}
+      depth={depth}
+      save={save}
+      onClose={onClose}
+      onSubmit={() => void submit()}
+    >
+      <ReasonField
+        label="Why"
+        value={reason.text}
+        error={reason.error}
+        onChange={reason.set}
+        onSubmit={() => void submit()}
+      />
+    </RecordingSheet>
+  );
+}
+
 export function ReopenSheet({
   visit,
   back = false,
@@ -1612,6 +1828,60 @@ export function ReopenSheet({
 
 const NEW_PLAYER = "new";
 
+function useTableDraftSeats(tableId: TableId) {
+  const state = useRecordingState();
+  const server = useServerTable(tableId);
+  const table = state ? recordingTable(state, tableId) : null;
+  const live = table ? liveTable(table, server) : null;
+  const totalSeats = live?.tableSeats ?? null;
+
+  const occupants = new Map<number, ArcOccupant>();
+
+  if (live) {
+    for (const item of live.seats) {
+      if (item.playing && item.seatNumber !== null) {
+        occupants.set(item.seatNumber, {
+          playerId: item.playerId,
+          name: item.name,
+          isSelf: item.isSelf,
+          visitId: item.visitId,
+        });
+      }
+    }
+  }
+
+  return { totalSeats, occupants };
+}
+
+function TableDraftSeatRow({
+  seat,
+  totalSeats,
+  onPress,
+}: {
+  seat: number | null;
+  totalSeats: number;
+  onPress: () => void;
+}) {
+  const inSheet = use(InSheet);
+
+  return (
+    <View className={cn("overflow-hidden rounded-xl", inSheet ? "bg-raised" : "bg-surface")}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Seat: ${seat === null ? "Not set" : formatSeatLabel(seat, totalSeats)}. Change`}
+        onPress={onPress}
+        className="min-h-12 flex-row items-center gap-3 px-4 active:bg-fill"
+      >
+        <Text className="type-body text-ink">Seat</Text>
+        <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
+          {seat === null ? "Not set" : formatSeatLabel(seat, totalSeats)}
+        </Text>
+        <Icon name="chevron-right" color="faint" size={16} />
+      </Pressable>
+    </View>
+  );
+}
+
 /**
  * Starts a visit at this table for another player: one saved on this device, or someone new by
  * name. A name never finds or merges anyone; a new name is always a new player.
@@ -1633,6 +1903,9 @@ export function AddPlayerSheet({
   const [choice, setChoice] = useState<string>(NEW_PLAYER);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+  const [seat, setSeat] = useState<number | null>(null);
+  const [pickingSeat, setPickingSeat] = useState(false);
+  const draftSeats = useTableDraftSeats(tableId);
   const photo = useContactPhotoDraft();
   const savedNames = tellApart(saved.map((player) => player.displayName));
 
@@ -1648,6 +1921,18 @@ export function AddPlayerSheet({
     setNameError(null);
   };
 
+  const seatIfPicked = async (receipt: RecordingReceipt | null | undefined) => {
+    if (seat === null || receipt?.command.type !== "join_table") return;
+
+    await save.submit({
+      type: "set_seat",
+      tableId,
+      visitId: receipt.command.visitId,
+      seat,
+      occurredAt: receipt.command.startedAt,
+    });
+  };
+
   const submitSaved = async (playerId: PlayerId, label: string) => {
     const value = amount.read();
 
@@ -1660,8 +1945,22 @@ export function AddPlayerSheet({
       buyIn: value,
     });
 
+    await seatIfPicked(receipt);
+
     if (receipt?.command.type === "join_table") onAdded(receipt.command.visitId, label);
   };
+
+  if (pickingSeat && draftSeats.totalSeats !== null)
+    return (
+      <SeatPickerSheet
+        mode="draft"
+        seat={seat}
+        tableSeats={draftSeats.totalSeats}
+        occupants={draftSeats.occupants}
+        onSelect={setSeat}
+        onClose={() => setPickingSeat(false)}
+      />
+    );
 
   return (
     <RecordingSheet
@@ -1697,6 +1996,7 @@ export function AddPlayerSheet({
 
         if (receipt?.command.type === "join_table") {
           if (isNew && receipt.command.playerId) photo.commit(receipt.command.playerId);
+          await seatIfPicked(receipt);
           onAdded(receipt.command.visitId, chosen);
         }
       }}
@@ -1764,6 +2064,13 @@ export function AddPlayerSheet({
               </View>
             ) : null}
           </View>
+          {draftSeats.totalSeats !== null ? (
+            <TableDraftSeatRow
+              seat={seat}
+              totalSeats={draftSeats.totalSeats}
+              onPress={() => setPickingSeat(true)}
+            />
+          ) : null}
           {saved.length > 0 ? (
             <View className="gap-2 pt-1">
               <Text className="px-1 type-label tracking-wider text-muted uppercase">
@@ -1823,6 +2130,13 @@ export function AddPlayerSheet({
             <ChooseFromContacts onName={pickName} onError={setNameError} photo={photo} />
           ) : null}
           <TypedAmount label="Buy-in" amount={amount} />
+          {draftSeats.totalSeats !== null ? (
+            <TableDraftSeatRow
+              seat={seat}
+              totalSeats={draftSeats.totalSeats}
+              onPress={() => setPickingSeat(true)}
+            />
+          ) : null}
         </>
       )}
     </RecordingSheet>
@@ -1850,6 +2164,22 @@ export function SitDownSheet({
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 1);
+  const [seat, setSeat] = useState<number | null>(null);
+  const [pickingSeat, setPickingSeat] = useState(false);
+  const draftSeats = useTableDraftSeats(tableId);
+
+  if (pickingSeat && draftSeats.totalSeats !== null)
+    return (
+      <SeatPickerSheet
+        mode="draft"
+        seat={seat}
+        tableSeats={draftSeats.totalSeats}
+        occupants={draftSeats.occupants}
+        back
+        onSelect={setSeat}
+        onClose={() => setPickingSeat(false)}
+      />
+    );
 
   return (
     <RecordingSheet
@@ -1877,10 +2207,29 @@ export function SitDownSheet({
           buyIn: value,
         });
 
-        if (receipt?.command.type === "join_table") onSeated(receipt.command.visitId);
+        if (receipt?.command.type === "join_table") {
+          if (seat !== null) {
+            await save.submit({
+              type: "set_seat",
+              tableId,
+              visitId: receipt.command.visitId,
+              seat,
+              occurredAt: receipt.command.startedAt,
+            });
+          }
+
+          onSeated(receipt.command.visitId);
+        }
       }}
     >
       <KeypadAmount label="Buy-in" amount={amount} />
+      {draftSeats.totalSeats !== null ? (
+        <TableDraftSeatRow
+          seat={seat}
+          totalSeats={draftSeats.totalSeats}
+          onPress={() => setPickingSeat(true)}
+        />
+      ) : null}
     </RecordingSheet>
   );
 }

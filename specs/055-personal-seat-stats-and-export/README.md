@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-25
 priority: medium
 tags:
@@ -11,10 +11,12 @@ depends_on:
   - "053"
 parent: "052"
 created_at: 2026-11-25T05:46:46.578709400Z
-updated_at: 2026-11-25T05:52:06.465023200Z
+updated_at: 2026-11-26T05:50:57.865779900Z
 transitions:
   - status: planned
     at: 2026-11-25T05:52:06.465023200Z
+  - status: in-progress
+    at: 2026-11-26T05:50:57.865779900Z
 ---
 
 # Seat selection: Just me blackjack seat stats and CSV export

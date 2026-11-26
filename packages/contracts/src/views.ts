@@ -13,7 +13,7 @@ import {
   VenueId,
   VisitId,
 } from "./ids.ts";
-import { Entry, Game, Seating, Session, Stake, Trip } from "./ledger.ts";
+import { Entry, Game, Seat, Seating, Session, Stake, Trip } from "./ledger.ts";
 import { CurrencyCode, MinorUnits } from "./money.ts";
 import { Table } from "./recording.ts";
 
@@ -319,6 +319,16 @@ export const ClaimPreview = Schema.Struct({
 
 export type ClaimPreview = typeof ClaimPreview.Type;
 
+export const GroupSeatPlay = Schema.Struct({
+  playId: Schema.Union([SessionId, TableId]),
+  playerId: PlayerId,
+  seat: Schema.Union([Seat, Schema.Literal("multiple")]),
+  net: MinorUnits,
+  milliseconds: Schema.Int,
+});
+
+export type GroupSeatPlay = typeof GroupSeatPlay.Type;
+
 /**
  * Every finished session and table in the group's trips, oldest first; live ones aren't settled
  * yet, and play recorded only on a device never counts. Only group members' play is in `results`.
@@ -401,6 +411,8 @@ export const GroupStats = Schema.Struct({
       }),
     ),
   ),
+  /** Finished blackjack seat outcomes per group member visit. Missing means the server didn't say. */
+  seats: Schema.optionalKey(Schema.Array(GroupSeatPlay)),
 });
 
 export type GroupStats = typeof GroupStats.Type;

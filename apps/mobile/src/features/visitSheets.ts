@@ -1,4 +1,4 @@
-import type { EntryId } from "@stacks/contracts";
+import type { EntryId, SeatingId } from "@stacks/contracts";
 import type { TableAction, TableSeat } from "@stacks/client-runtime/liveTable";
 
 export type OpenSheet =
@@ -12,16 +12,19 @@ export type OpenSheet =
         | "reopen"
         | "return"
         | "buy_in"
+        | "seat"
         | "start_time"
         | "game"
         | "venue";
     }
   | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId }
+  | { readonly type: "inspect_seating" | "void_seating"; readonly seatingId: SeatingId }
   | { readonly type: "action"; readonly action: Exclude<TableAction, "edit" | "delete_table"> }
-  | { readonly type: "seat"; readonly seat: TableSeat };
+  | { readonly type: "player_seat"; readonly seat: TableSeat };
 
 const editChildren: ReadonlySet<OpenSheet["type"]> = new Set([
   "buy_in",
+  "seat",
   "start_time",
   "game",
   "venue",

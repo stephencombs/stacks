@@ -1,8 +1,15 @@
-import { MinorUnits, type PlayEntry, type PlayerId, type Visit } from "@stacks/contracts";
+import {
+  MinorUnits,
+  type PlayEntry,
+  type PlayerId,
+  type Visit,
+  type VisitSeating,
+} from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
 import { type VisitFunding } from "./funding.ts";
 import { playerResults, type PlayerResult } from "./results.ts";
+import { seatBucketOf, visitSeatOutcome, type SeatBucket } from "./seats.ts";
 
 export type TableVisit = Pick<Visit, "id" | "playerId" | "startedAt" | "finishedAt"> & {
   readonly deletedAt?: DateTime.Utc | null | undefined;
@@ -10,6 +17,18 @@ export type TableVisit = Pick<Visit, "id" | "playerId" | "startedAt" | "finished
 
 export type TableEntry = Pick<PlayEntry, "visitId" | "kind" | "amount" | "voidedAt"> & {
   readonly counterpartyId?: PlayerId | null | undefined;
+};
+
+export type TableSeating = Pick<
+  VisitSeating,
+  "id" | "visitId" | "seat" | "occurredAt" | "createdAt" | "voidedAt"
+>;
+
+export type VisitSeatPlay = {
+  readonly playerId: PlayerId;
+  readonly seat: SeatBucket;
+  readonly net: MinorUnits;
+  readonly milliseconds: number;
 };
 
 export interface GroupTable {
@@ -37,6 +56,8 @@ export interface GroupTable {
   >;
   /** Each finished visit that counts for a member and has an entry, for funding stats. */
   readonly visits: ReadonlyArray<VisitFunding>;
+  /** Each finished member visit with a settled seat bucket, keeping return visits separate. */
+  readonly seatVisits: ReadonlyArray<VisitSeatPlay>;
 }
 
 const none = MinorUnits.make(0);
@@ -68,6 +89,7 @@ export const groupTable = (
   entries: Iterable<TableEntry>,
   memberOf: (visit: TableVisit) => PlayerId | null,
   payerOf: (counterpartyId: PlayerId, visit: TableVisit) => PlayerId | null = () => null,
+  seatings: Iterable<TableSeating> = [],
 ) => {
   const shown = Array.from(visits)
     .filter((visit) => (visit.deletedAt ?? null) === null)
@@ -91,6 +113,8 @@ export const groupTable = (
 
     return at && entry.voidedAt === null ? [{ ...entry, ...at }] : [];
   });
+
+  const seatingsByVisit = Map.groupBy(Array.from(seatings), (seating) => seating.visitId);
 
   const settled = (members: boolean) =>
     playerResults(
@@ -186,6 +210,30 @@ export const groupTable = (
               ? []
               : [{ payerId: payer, amount: entry.amount }];
           }),
+        },
+      ];
+    }),
+    seatVisits: shown.flatMap((visit) => {
+      const { member } = byVisit.get(visit.id)!;
+      const own = counted.filter((entry) => entry.visit.id === visit.id);
+
+      if (member === null || visit.finishedAt === null || own.length === 0) return [];
+
+      const seat = seatBucketOf(visitSeatOutcome(seatingsByVisit.get(visit.id) ?? []));
+
+      if (seat === null) return [];
+
+      return [
+        {
+          playerId: member,
+          seat,
+          net: MinorUnits.make(
+            own.reduce(
+              (sum, entry) => sum + (entry.kind === "buy_in" ? -entry.amount : entry.amount),
+              0,
+            ),
+          ),
+          milliseconds: Math.max(0, millis(visit.finishedAt) - millis(visit.startedAt)),
         },
       ];
     }),

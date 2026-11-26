@@ -86,6 +86,17 @@ vi.mock("react-native", () => ({
 
 vi.mock("uniwind", () => ({ useCSSVariable: () => "#999999" }));
 
+vi.mock("react-native-svg", () => ({
+  default: () => null,
+  Line: () => null,
+  Path: () => null,
+  Text: () => null,
+}));
+
+vi.mock("../lib/useLargeText", () => ({ useLargeText: () => false }));
+
+vi.mock("../components/ui/motion", () => ({ useReducedMotion: () => false }));
+
 vi.mock("expo-location", () => ({
   Accuracy: { Balanced: 3 },
   getForegroundPermissionsAsync: () => mocks.permission.current(),

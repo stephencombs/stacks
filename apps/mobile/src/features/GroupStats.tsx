@@ -33,6 +33,7 @@ import {
   AndroidStatsEmpty,
   ByCasino,
   ByGame,
+  BySeat,
   Figure,
   Filters,
   StatsContent,
@@ -308,6 +309,9 @@ function ShownStats({
       ) : null}
       {view.byGame ? (
         <ByGame rows={view.byGame} currency={view.currency} onFilter={onFilter} />
+      ) : null}
+      {view.bySeat ? (
+        <BySeat rows={view.bySeat.rows} count={view.bySeat.count} currency={view.currency} />
       ) : null}
       {view.byCasino ? (
         <ByCasino

@@ -9,7 +9,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test";
 
 const platform = vi.hoisted(() => ({ os: "ios" }));
 
-const openStore = async () => {
+const openStore = async (game: "poker_cash" | "blackjack" = "poker_cash") => {
   let documentState: RecordingStorageDocument = { revision: 0 };
 
   const store = makeRecordingStore({
@@ -24,7 +24,7 @@ const openStore = async () => {
   });
 
   await store.ready;
-  await store.execute(store.prepare({ type: "start", buyIn: 20000 }));
+  await store.execute(store.prepare({ type: "start", game, buyIn: 20000 }));
   const host = store.getSnapshot().state!.visits[0]!;
 
   await store.execute(
@@ -36,21 +36,49 @@ const openStore = async () => {
   return { store, host, guest };
 };
 
-const setup = async () => {
+const setup = async (game: "poker_cash" | "blackjack" = "poker_cash") => {
   vi.resetModules();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+
+  const Container = ({
+    children,
+    accessibilityLabel,
+  }: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+  }) => <div aria-label={accessibilityLabel}>{children}</div>;
 
   vi.doMock("react-native", () => ({
     Text: Container,
     View: Container,
-    Pressable: ({ children, onPress }: { children?: ReactNode; onPress?: () => void }) => (
-      <button onClick={onPress}>{children}</button>
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+    Pressable: ({
+      children,
+      accessibilityLabel,
+      onPress,
+    }: {
+      children?: ReactNode;
+      accessibilityLabel?: string;
+      onPress?: () => void;
+    }) => (
+      <button aria-label={accessibilityLabel} onClick={onPress}>
+        {children}
+      </button>
     ),
     get Platform() {
       return { OS: platform.os };
     },
   }));
+
+  vi.doMock("react-native-svg", () => ({
+    default: Container,
+    Line: Container,
+    Path: Container,
+    Text: Container,
+  }));
+  vi.doMock("uniwind", () => ({ useCSSVariable: () => [] }));
+  vi.doMock("../components/ui/motion", () => ({ useReducedMotion: () => false }));
+  vi.doMock("../lib/useLargeText", () => ({ useLargeText: () => false }));
 
   const Button = ({
     label,
@@ -71,7 +99,7 @@ const setup = async () => {
   vi.doMock("../components/ui/Button", () => ({ Button, IconButton: Button }));
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
   vi.doMock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
-  vi.doMock("../components/ui/Field", () => ({ FormError: Container }));
+  vi.doMock("../components/ui/Field", () => ({ Choice: () => null, FormError: Container }));
   vi.doMock("../components/ui/ActionMenu", () => ({ ActionMenu: () => null }));
   vi.doMock("../components/ui/confirmAction", () => ({ confirmAction: () => {} }));
   vi.doMock("../components/Money", () => ({
@@ -117,8 +145,22 @@ const setup = async () => {
         {children} {count}
       </h2>
     ),
-    Row: ({ children, onPress }: { children?: ReactNode; onPress?: () => void }) =>
-      onPress ? <button onClick={onPress}>{children}</button> : <div>{children}</div>,
+    Row: ({
+      children,
+      accessibilityLabel,
+      onPress,
+    }: {
+      children?: ReactNode;
+      accessibilityLabel?: string;
+      onPress?: () => void;
+    }) =>
+      onPress ? (
+        <button aria-label={accessibilityLabel} onClick={onPress}>
+          {children}
+        </button>
+      ) : (
+        <div aria-label={accessibilityLabel}>{children}</div>
+      ),
   }));
   vi.doMock("./PlayerAvatar", () => ({
     PlayerAvatar: () => null,
@@ -143,9 +185,12 @@ const setup = async () => {
     VoidSheet: ({ onVoided }: { onVoided: () => void }) => (
       <button onClick={onVoided}>Void this entry</button>
     ),
+    VoidSeatingSheet: ({ onVoided }: { onVoided: () => void }) => (
+      <button onClick={onVoided}>Void this seat</button>
+    ),
   }));
 
-  const { store, host, guest } = await openStore();
+  const { store, host, guest } = await openStore(game);
 
   vi.doMock("../lib/recording", () => ({
     useRecordingState: () => useSyncExternalStore(store.subscribe, store.getSnapshot).state,
@@ -189,7 +234,10 @@ const setup = async () => {
   }
 
   const button = (label: string) =>
-    [...element.querySelectorAll("button")].find((candidate) => candidate.textContent === label);
+    [...element.querySelectorAll("button")].find(
+      (candidate) =>
+        candidate.textContent === label || candidate.getAttribute("aria-label") === label,
+    );
 
   const press = async (label: string) => {
     const target = button(label);
@@ -437,6 +485,38 @@ it("reports a correction made from the history", async () => {
       visitId: view.guest.id,
       entryId: "corrected-entry",
       text: "Correction saved.",
+    });
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("opens SeatPickerSheet from Bea's blackjack seat row and inspects seat history", async () => {
+  const view = await setup("blackjack");
+
+  try {
+    await view.render();
+    await view.pressStarting("Seat");
+    await view.press("Seat 4, open");
+
+    expect(view.recorded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visitId: view.guest.id,
+        text: "Bea sat at Seat 4.",
+        undo: true,
+      }),
+    );
+
+    await view.press("Back");
+    await view.pressStarting("History");
+    await view.pressStarting("Sat at Seat 4");
+    expect(view.sheet()!.dataset.title).toBe("Seat 4");
+    await view.press("Void seat record");
+    await view.press("Void this seat");
+
+    expect(view.recorded).toHaveBeenCalledWith({
+      visitId: view.guest.id,
+      text: "Seat record voided. It stays in the history.",
     });
   } finally {
     await view.unmount();

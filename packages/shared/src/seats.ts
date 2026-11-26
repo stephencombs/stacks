@@ -1,4 +1,12 @@
-import type { Game, PlayerId, Seating, Visit, VisitId, VisitSeating } from "@stacks/contracts";
+import {
+  type Game,
+  type PlayerId,
+  type Seat,
+  type Seating,
+  type Visit,
+  type VisitId,
+  type VisitSeating,
+} from "@stacks/contracts";
 import * as DateTime from "effect/DateTime";
 
 /** The games played from numbered seats: the table sizes they come in, and the usual one. */
@@ -109,6 +117,18 @@ export const visitSeatOutcome = (
     return { kind: "none" } satisfies VisitSeatOutcome;
 
   return { kind: "seat", seat: distinct[0]! } satisfies VisitSeatOutcome;
+};
+
+/** How a finished blackjack visit counts in seat stats: one seat (`1..N`) or `"multiple"`. */
+export type SeatBucket = Seat | "multiple";
+
+/** Maps a visit's seat outcome to its stats bucket, or null when unseated. */
+export const seatBucketOf = (outcome: VisitSeatOutcome) => {
+  if (outcome.kind === "seat") return outcome.seat;
+
+  if (outcome.kind === "multiple") return "multiple" as const;
+
+  return null;
 };
 
 type Sat = Pick<Seating, "playerId" | "seat" | "occurredAt">;

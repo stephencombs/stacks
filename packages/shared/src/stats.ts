@@ -12,10 +12,15 @@ import * as DateTime from "effect/DateTime";
 
 import { checkedMinorUnits } from "./exactMoney.ts";
 import { sessionRuns } from "./results.ts";
+import { seatBucketOf, type SeatBucket, type VisitSeatOutcome } from "./seats.ts";
 import { NIGHT_ENDS_HOUR, nextNightKey, nightKey, type TripClock } from "./trips.ts";
+
+export type { SeatBucket } from "./seats.ts";
 
 type PersonalStatsSession = Pick<VisitSummary, "visit" | "totals" | "finalResult"> & {
   readonly table: Pick<Table, "game" | "venueId" | "tripId">;
+  readonly seatBucket?: SeatBucket | null | undefined;
+  readonly seatOutcome?: VisitSeatOutcome | undefined;
 };
 
 export type PersonalStatsFilters = {
@@ -24,6 +29,7 @@ export type PersonalStatsFilters = {
   readonly venueId?: Table["venueId"] | undefined;
   /** A whole trip, so it replaces the year. */
   readonly tripId?: TripId | undefined;
+  readonly seat?: SeatBucket | null | undefined;
 };
 
 /** A pattern sentence needs this many sessions behind its bucket. */
@@ -50,6 +56,26 @@ const LENGTH_EDGES_MS = LENGTH_EDGES_HOURS.map((edge) => BigInt(edge) * HOUR_MS)
 
 const compareKey = (a: string | null, b: string | null) =>
   a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1;
+
+const compareSeatBucket = (a: SeatBucket, b: SeatBucket) => {
+  if (a === b) return 0;
+
+  if (a === "multiple") return 1;
+
+  if (b === "multiple") return -1;
+
+  return a - b;
+};
+
+const compareSeatOption = (a: SeatBucket | null, b: SeatBucket | null) => {
+  if (a === b) return 0;
+
+  if (a === null) return 1;
+
+  if (b === null) return -1;
+
+  return compareSeatBucket(a, b);
+};
 
 const hours = (milliseconds: bigint) => Number((milliseconds + 18_000n) / 36_000n) / 100;
 
@@ -124,25 +150,36 @@ export const personalStats = (
   filters: PersonalStatsFilters = {},
   now: DateTime.Utc = DateTime.nowUnsafe(),
 ) => {
-  const finished = sessions.flatMap(({ visit, table, finalResult, totals }) =>
-    visit.deletedAt !== undefined || visit.finishedAt === null || finalResult === null
-      ? []
-      : [
-          {
-            sessionId: visit.id,
-            startedAt: visit.startedAt,
-            finishedAt: visit.finishedAt,
-            year: DateTime.toParts(DateTime.setZone(visit.finishedAt, timeZone)).year,
-            milliseconds:
-              BigInt(DateTime.toEpochMillis(visit.finishedAt)) -
-              BigInt(DateTime.toEpochMillis(visit.startedAt)),
-            result: finalResult,
-            totals,
-            game: table.game,
-            venueId: table.venueId,
-            tripId: table.tripId,
-          },
-        ],
+  const finished = sessions.flatMap(
+    ({ visit, table, finalResult, totals, seatBucket, seatOutcome }) => {
+      if (visit.deletedAt !== undefined || visit.finishedAt === null || finalResult === null)
+        return [];
+
+      const resolvedSeat =
+        seatBucket !== undefined
+          ? seatBucket
+          : seatOutcome !== undefined
+            ? seatBucketOf(seatOutcome)
+            : null;
+
+      return [
+        {
+          sessionId: visit.id,
+          startedAt: visit.startedAt,
+          finishedAt: visit.finishedAt,
+          year: DateTime.toParts(DateTime.setZone(visit.finishedAt, timeZone)).year,
+          milliseconds:
+            BigInt(DateTime.toEpochMillis(visit.finishedAt)) -
+            BigInt(DateTime.toEpochMillis(visit.startedAt)),
+          result: finalResult,
+          totals,
+          game: table.game,
+          venueId: table.venueId,
+          tripId: table.tripId,
+          seatBucket: table.game === "blackjack" ? resolvedSeat : null,
+        },
+      ];
+    },
   );
 
   type Finished = (typeof finished)[number];
@@ -154,7 +191,9 @@ export const personalStats = (
           ? filters.year === undefined || session.year === filters.year
           : session.tripId === filters.tripId) &&
         (filters.game === undefined || session.game === filters.game) &&
-        (filters.venueId === undefined || session.venueId === filters.venueId),
+        (filters.venueId === undefined || session.venueId === filters.venueId) &&
+        (filters.seat === undefined ||
+          (session.game === "blackjack" && session.seatBucket === filters.seat)),
     )
     .toSorted(
       (a, b) =>
@@ -324,6 +363,52 @@ export const personalStats = (
       : { by: "month" as const, rows };
   };
 
+  const blackjackFiltered = filtered.filter((session) => session.game === "blackjack");
+
+  const seatedBlackjack = blackjackFiltered.flatMap((session) =>
+    session.seatBucket === null ? [] : [{ ...session, seat: session.seatBucket }],
+  );
+
+  const bySeat = Array.from(
+    Map.groupBy(seatedBlackjack, (session) => session.seat),
+    ([seat, group]) => {
+      const { milliseconds: _milliseconds, ...row } = measure(group);
+
+      return { seat, ...row };
+    },
+  ).toSorted((a, b) => compareSeatBucket(a.seat, b.seat));
+
+  const singleSeatGroups = Map.groupBy(
+    seatedBlackjack.flatMap((session) =>
+      session.seat !== "multiple" ? [{ ...session, seatNumber: session.seat }] : [],
+    ),
+    (session) => session.seatNumber,
+  );
+
+  const seatBuckets = [...singleSeatGroups]
+    .toSorted(([a], [b]) => a - b)
+    .map(([seat, group]) => {
+      let result = 0n;
+
+      for (const session of group) result += BigInt(session.result);
+
+      return {
+        index: seat,
+        sessions: group.length,
+        result: checkedMinorUnits(result),
+        average: roundedQuotient(result, BigInt(group.length)),
+      } satisfies PatternBucket;
+    });
+
+  const blackjackFinished = finished.filter((session) => session.game === "blackjack");
+  const hasSeatedBlackjack = blackjackFinished.some((session) => session.seatBucket !== null);
+
+  const seatOptions = hasSeatedBlackjack
+    ? [...new Set(blackjackFinished.map((session) => session.seatBucket))].toSorted(
+        compareSeatOption,
+      )
+    : [];
+
   return {
     summary: {
       ...summary,
@@ -349,6 +434,7 @@ export const personalStats = (
       LENGTH_EDGES_MS.length + 1,
       (session) => LENGTH_EDGES_MS.filter((edge) => session.milliseconds >= edge).length,
     ),
+    seatBuckets,
     records: {
       win: record(
         (a, b) => a > b,
@@ -360,6 +446,9 @@ export const personalStats = (
       ),
     },
     byGame: breakdown((session) => session.game).map(({ key, ...row }) => ({ game: key, ...row })),
+    bySeat,
+    seatedBlackjackSessions: seatedBlackjack.length,
+    totalBlackjackSessions: blackjackFiltered.length,
     byCasino: breakdown((session) => session.venueId).map(({ key, ...row }) => ({
       venueId: key,
       ...row,
@@ -367,6 +456,7 @@ export const personalStats = (
     options: {
       years: [...new Set(finished.map((session) => session.year))].toSorted((a, b) => b - a),
       games: [...new Set(finished.map((session) => session.game))].toSorted(compareKey),
+      seats: seatOptions,
       venueIds: [...new Set(finished.map((session) => session.venueId))].toSorted(compareKey),
       tripIds: [
         ...new Set(
@@ -1196,3 +1286,49 @@ export const backingResults = (
       ...stake,
       result: checkedMinorUnits(BigInt(stake.owed) - BigInt(stake.amount)),
     }));
+
+/** One finished blackjack visit with a settled seat outcome, as `GroupStats.seats` carries it. */
+export interface GroupSeatPlay {
+  readonly playId: string;
+  readonly playerId: PlayerId;
+  readonly seat: SeatBucket;
+  readonly net: number;
+  readonly milliseconds: number;
+}
+
+/**
+ * Group blackjack results by seat across `plays`, ordered spatially (`1..N`, then `"multiple"`).
+ * Empty when fewer than `BREAKDOWNS_MIN_PLAYS` plays are in scope or fewer than
+ * `BREAKDOWNS_MIN_PLAYS` seated blackjack visits match.
+ */
+export const groupSeatBreakdown = (
+  plays: ReadonlyArray<Pick<GroupPlay, "id" | "game">>,
+  seats: ReadonlyArray<GroupSeatPlay>,
+) => {
+  if (plays.length < BREAKDOWNS_MIN_PLAYS) return [];
+
+  const scoped = new Set(plays.flatMap((play) => (play.game === "blackjack" ? [play.id] : [])));
+  const matched = seats.filter((row) => scoped.has(row.playId));
+
+  if (matched.length < BREAKDOWNS_MIN_PLAYS) return [];
+
+  return Array.from(
+    Map.groupBy(matched, (row) => row.seat),
+    ([seat, group]) => {
+      let result = 0n;
+      let milliseconds = 0n;
+
+      for (const row of group) {
+        result += BigInt(row.net);
+        milliseconds += BigInt(Math.max(0, row.milliseconds));
+      }
+
+      return {
+        seat,
+        sessions: group.length,
+        hours: hours(milliseconds),
+        result: checkedMinorUnits(result),
+      };
+    },
+  ).toSorted((a, b) => compareSeatBucket(a.seat, b.seat));
+};

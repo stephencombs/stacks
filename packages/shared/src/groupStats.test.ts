@@ -4,7 +4,7 @@ import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
 import { ALEX, BEA, CAL, DEE, money } from "./testing/ledgerArbitrary.ts";
-import { groupAwards, groupStats, type GroupPlay } from "./stats.ts";
+import { groupAwards, groupSeatBreakdown, groupStats, type GroupPlay } from "./stats.ts";
 import { tripStandings, type TripClock } from "./trips.ts";
 
 const zone = DateTime.zoneMakeNamedUnsafe("UTC");
@@ -428,5 +428,56 @@ describe("groupAwards", () => {
 
   it("hands nothing out before anyone has played", () => {
     expect(groupAwards([], clock)).toEqual([]);
+  });
+});
+
+describe("groupSeatBreakdown", () => {
+  it("groups matched blackjack plays spatially with 1..7 then multiple", () => {
+    const bj1 = play([
+      [ALEX, 500],
+      [BEA, -200],
+    ]);
+
+    const bj2 = play([
+      [ALEX, 300],
+      [CAL, -100],
+    ]);
+
+    const craps = play([[ALEX, 900]], { game: "craps" });
+
+    const rows = groupSeatBreakdown(
+      [bj1, bj2, craps],
+      [
+        { playId: bj1.id, playerId: ALEX, seat: "multiple", net: 500, milliseconds: 3_600_000 },
+        { playId: bj1.id, playerId: BEA, seat: 5, net: -200, milliseconds: 1_800_000 },
+        { playId: bj2.id, playerId: ALEX, seat: 1, net: 300, milliseconds: 3_600_000 },
+        { playId: bj2.id, playerId: CAL, seat: 5, net: -100, milliseconds: 1_800_000 },
+        { playId: craps.id, playerId: ALEX, seat: 1, net: 900, milliseconds: 3_600_000 },
+      ],
+    );
+
+    expect(rows).toEqual([
+      { seat: 1, sessions: 1, hours: 1, result: 300 },
+      { seat: 5, sessions: 2, hours: 1, result: -300 },
+      { seat: "multiple", sessions: 1, hours: 1, result: 500 },
+    ]);
+  });
+
+  it("hides below the breakdown minimum plays or matched seat visits", () => {
+    const only = play([[ALEX, 500]]);
+    const second = play([[BEA, -100]]);
+
+    expect(
+      groupSeatBreakdown(
+        [only],
+        [{ playId: only.id, playerId: ALEX, seat: 1, net: 500, milliseconds: 3_600_000 }],
+      ),
+    ).toEqual([]);
+    expect(
+      groupSeatBreakdown(
+        [only, second],
+        [{ playId: only.id, playerId: ALEX, seat: 1, net: 500, milliseconds: 3_600_000 }],
+      ),
+    ).toEqual([]);
   });
 });

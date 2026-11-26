@@ -16,7 +16,7 @@ import {
   tableTitle,
   UNDONE_REASON,
 } from "@stacks/client-runtime/recordingView";
-import { TableId, type EntryId, type VisitId } from "@stacks/contracts";
+import { TableId, type EntryId, type SeatingId, type VisitId } from "@stacks/contracts";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import { useLayoutEffect, useState } from "react";
@@ -28,6 +28,7 @@ import { Button } from "../components/ui/Button";
 import { cn } from "../components/ui/cn";
 import { FormError } from "../components/ui/Field";
 import { EmptyState } from "../components/ui/Surface";
+import { BlackjackTableArc } from "../features/BlackjackTableArc";
 import { LiveSessionsBar } from "../features/LiveBar";
 import {
   ActionSlot,
@@ -41,6 +42,7 @@ import {
 } from "../features/LiveTable";
 import { PersonalScreen } from "../features/Personal";
 import { SitDownSheet } from "../features/RecordingForms";
+import { liveOccupants, TableSizeSheet } from "../features/SeatPickerSheet";
 import { useAccount } from "../lib/account";
 import { TableNotices } from "../lib/realtime";
 import { useRecordingState } from "../lib/recording";
@@ -104,7 +106,7 @@ function HideNativeHeader() {
 }
 
 type Open =
-  | { readonly type: "sit" }
+  | { readonly type: "sit" | "size" }
   | { readonly type: "action"; readonly action: Exclude<TableAction, "edit" | "delete_table"> }
   | { readonly type: "seat"; readonly seat: TableSeat };
 
@@ -117,7 +119,7 @@ function Table({ tableId }: { tableId: TableId }) {
   const quick = useRecordingSubmit();
   const [open, setOpen] = useState<Open | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [saved, setSaved] = useState<(TableRecorded & { entryId: EntryId }) | null>(null);
+  const [saved, setSaved] = useState<(TableRecorded & { readonly key: string }) | null>(null);
 
   const deletion = useDeleteTable(tableId, () =>
     navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } }),
@@ -147,14 +149,44 @@ function Table({ tableId }: { tableId: TableId }) {
   const recorded = ({ entryId, ...rest }: TableRecorded) => {
     close();
 
-    if (entryId) setSaved({ entryId, ...rest });
+    if (entryId || rest.seatingId)
+      setSaved(entryId ? { key: entryId, entryId, ...rest } : { key: rest.seatingId!, ...rest });
     else {
       setSaved(null);
       setNotice(rest.text);
     }
   };
 
-  const undo = async ({ entryId, visitId }: { entryId: EntryId; visitId: VisitId }) => {
+  const undo = async ({
+    entryId,
+    seatingId,
+    tableId: undoTableId,
+    visitId,
+  }: {
+    entryId?: EntryId;
+    seatingId?: SeatingId;
+    tableId?: TableId;
+    visitId: VisitId;
+  }) => {
+    if (seatingId && undoTableId) {
+      const receipt = await quick.submit({
+        type: "void_seating",
+        tableId: undoTableId,
+        visitId,
+        seatingId,
+        reason: UNDONE_REASON,
+      });
+
+      if (receipt) {
+        setSaved(null);
+        setNotice("Seat change undone.");
+      }
+
+      return;
+    }
+
+    if (!entryId) return;
+
     const receipt = await quick.submit({
       type: "correct",
       visitId,
@@ -185,7 +217,7 @@ function Table({ tableId }: { tableId: TableId }) {
       felt={!view.closed}
       toast={
         saved ? (
-          <RecordingToast key={saved.entryId} felt={!view.closed} onDismiss={() => setSaved(null)}>
+          <RecordingToast key={saved.key} felt={!view.closed} onDismiss={() => setSaved(null)}>
             <Text
               className={cn(
                 "min-w-0 flex-1 text-sm",
@@ -284,6 +316,7 @@ function Table({ tableId }: { tableId: TableId }) {
           label="In play at the table"
           amount={view.inPlay}
           title={title}
+          compact={view.tableSeats !== null}
           detail={
             view.seats.length === 0
               ? "Nobody's playing yet"
@@ -309,6 +342,39 @@ function Table({ tableId }: { tableId: TableId }) {
           </Text>
         </View>
       )}
+      {!view.closed && view.tableSeats !== null ? (
+        <View className="gap-2">
+          {table.role !== "participant" ? (
+            <View className="items-end">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Table size: ${view.tableSeats} seats. Change`}
+                onPress={() => setOpen({ type: "size" })}
+                className="min-h-11 flex-row items-center rounded-full border border-felt-ink/25 bg-felt-deep px-3.5 py-1.5 active:opacity-80"
+              >
+                <Text className="type-footnote font-semibold text-felt-ink">
+                  {`${view.tableSeats} seats`}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+          <BlackjackTableArc
+            seats={view.tableSeats}
+            surface="felt"
+            compact
+            occupants={liveOccupants(view)}
+            disabled={quick.pending}
+            onSelectSpot={(picked) => {
+              const found = view.seats.find((seat) => seat.playing && seat.seatNumber === picked);
+
+              if (!found) return;
+
+              if (found.recordable) setOpen({ type: "seat", seat: found });
+              else if (found.isSelf) toVisit(found.visitId);
+            }}
+          />
+        </View>
+      ) : null}
       {view.seats.length === 0 ? (
         <View className="rounded-2xl bg-felt-deep px-4 py-3">
           <Text className="type-footnote text-felt-soft">
@@ -363,6 +429,21 @@ function Table({ tableId }: { tableId: TableId }) {
             }
           />
         )),
+        Match.when({ type: "size" }, () =>
+          view.tableSeats === null ? null : (
+            <TableSizeSheet
+              tableId={tableId}
+              tableSeats={view.tableSeats}
+              occupants={liveOccupants(view)}
+              onClose={close}
+              onSaved={(count) => {
+                close();
+                setSaved(null);
+                setNotice(`Table set to ${count} seats.`);
+              }}
+            />
+          ),
+        ),
         Match.orElse(() => null),
       )}
     </PersonalScreen>

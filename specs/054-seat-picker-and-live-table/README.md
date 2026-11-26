@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-25
 priority: medium
 tags:
@@ -10,10 +10,12 @@ depends_on:
   - "053"
 parent: "052"
 created_at: 2026-11-25T05:46:46.139612100Z
-updated_at: 2026-11-25T05:52:05.962591300Z
+updated_at: 2026-11-26T05:50:56.956553600Z
 transitions:
   - status: planned
     at: 2026-11-25T05:52:05.962591300Z
+  - status: in-progress
+    at: 2026-11-26T05:50:56.956553600Z
 ---
 
 # Seat selection: tabletop arc picker and live table flows

@@ -11,6 +11,7 @@ import {
 } from "@stacks/client-runtime/recordingReact";
 import {
   elapsedClock,
+  formatSeatLabel,
   LIVE_REBUY_AMOUNTS,
   RECORDING_CURRENCY,
   type RecordingTableView,
@@ -19,6 +20,7 @@ import {
   MinorUnits,
   PlayerIdentity,
   type EntryId,
+  type SeatingId,
   type TableId,
   type VisitId,
 } from "@stacks/contracts";
@@ -47,12 +49,14 @@ import {
   RebuySheet,
   ReopenSheet,
   SitDownSheet,
+  VoidSeatingSheet,
   VoidSheet,
 } from "./RecordingForms";
 import { ContactPhotoMenu, useContactPhotoLink } from "./ContactPhoto";
 import { PLAYER_SHEET_AVATAR_SIZE, PlayerAvatar, TABLE_AVATAR_SIZE } from "./PlayerAvatar";
+import { liveOccupants, SeatPickerSheet } from "./SeatPickerSheet";
 import { ShareSheet, TableSettingsSheet } from "./SharedTable";
-import { EntryInspector, History } from "./VisitHistory";
+import { EntryInspector, History, SeatingInspector } from "./VisitHistory";
 
 const money = (amount: number, showCents = false) =>
   formatMoney(MinorUnits.make(amount), RECORDING_CURRENCY, {
@@ -94,16 +98,18 @@ export function LiveHero({
   amount,
   title,
   detail,
+  compact = false,
   testID,
 }: {
   label: string;
   amount: MinorUnits;
   title: string;
   detail: string;
+  compact?: boolean;
   testID?: string;
 }) {
   return (
-    <View className="gap-2.5 px-3 pt-16">
+    <View className={cn("gap-2.5 px-3", compact ? "pt-6" : "pt-16")}>
       <Text accessibilityRole="header" className="type-label text-[13px] text-felt-ink">
         {label}
       </Text>
@@ -125,8 +131,10 @@ export function LiveHero({
 export type TableRecorded = {
   readonly visitId: VisitId;
   readonly entryId?: EntryId;
+  readonly seatingId?: SeatingId;
+  readonly tableId?: TableId;
   readonly text: string;
-  /** A rebuy, which the toast can undo. */
+  /** A rebuy or live seat change, which the toast can undo. */
   readonly undo?: boolean;
 };
 
@@ -189,6 +197,19 @@ export function TableSeats({
             ? seat.status.replace(/\$[0-9,.]+/, HIDDEN_AMOUNT)
             : seat.status;
 
+          const seatNote =
+            table.tableSeats === null
+              ? null
+              : seat.seatNumber !== null
+                ? formatSeatLabel(seat.seatNumber, table.tableSeats)
+                : !seat.playing && seat.seatOutcome.kind !== "none"
+                  ? seat.seatOutcome.kind === "multiple"
+                    ? "Multiple seats"
+                    : formatSeatLabel(seat.seatOutcome.seat, table.tableSeats)
+                  : null;
+
+          const subtitle = seatNote ? `${seatNote} · ${status}` : status;
+
           const body = (
             <>
               <PlayerAvatar
@@ -201,7 +222,7 @@ export function TableSeats({
                 <Text numberOfLines={1} className={cn("type-body font-medium", ink)}>
                   {seat.name}
                 </Text>
-                <Text className={cn("type-footnote", soft)}>{status}</Text>
+                <Text className={cn("type-footnote", soft)}>{subtitle}</Text>
               </View>
               <Money
                 amount={seat.amount}
@@ -228,7 +249,7 @@ export function TableSeats({
             <Pressable
               key={seat.visitId}
               accessibilityRole="button"
-              accessibilityLabel={`${seat.name}, ${status}`}
+              accessibilityLabel={`${seat.name}, ${subtitle}`}
               accessibilityHint={self ? "Opens your session" : "Records for them"}
               onPress={press}
               className={cn(row, felt ? "active:bg-felt" : "active:bg-fill")}
@@ -367,8 +388,9 @@ export function useDeleteTable(tableId: TableId, onDeleted: () => void) {
 }
 
 type SeatStep =
-  | { readonly type: "menu" | "rebuy" | "cash_out" | "reopen" | "return" | "history" }
-  | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId };
+  | { readonly type: "menu" | "rebuy" | "cash_out" | "reopen" | "return" | "history" | "seat" }
+  | { readonly type: "inspect" | "correct" | "void"; readonly entryId: EntryId }
+  | { readonly type: "inspect_seating" | "void_seating"; readonly seatingId: SeatingId };
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
@@ -463,6 +485,31 @@ export function SeatSheet({
       />
     );
 
+  if (step.type === "seat" && table.tableSeats !== null)
+    return (
+      <SeatPickerSheet
+        mode="visit"
+        visit={visit}
+        tableSeats={table.tableSeats}
+        canEditTable={false}
+        occupants={liveOccupants(table)}
+        who={name}
+        back
+        depth={1}
+        onClose={to("menu")}
+        onSaved={(saved) =>
+          onRecorded({
+            visitId: saved.visitId,
+            tableId: saved.tableId,
+            seatingId: saved.seatingId,
+            text: saved.text,
+            undo: saved.undo,
+          })
+        }
+        onOpenHistory={to("history")}
+      />
+    );
+
   if (step.type === "history")
     return (
       <Sheet open back depth={1} title={`${name}'s history`} onClose={to("menu")}>
@@ -470,9 +517,46 @@ export function SeatSheet({
           visit={visit}
           heading={false}
           onInspect={(entryId) => setStep({ type: "inspect", entryId })}
+          onInspectSeating={(seatingId) => setStep({ type: "inspect_seating", seatingId })}
         />
       </Sheet>
     );
+
+  if ("seatingId" in step) {
+    const { seatingId } = step;
+    const seating = visit.seatings.find((item) => item.id === seatingId);
+
+    if (!seating) return null;
+
+    if (step.type === "inspect_seating")
+      return (
+        <SeatingInspector
+          visit={visit}
+          seating={seating}
+          back
+          depth={2}
+          onClose={to("history")}
+          onVoid={() => setStep({ type: "void_seating", seatingId })}
+        />
+      );
+
+    return (
+      <VoidSeatingSheet
+        visit={visit}
+        seating={seating}
+        totalSeats={table.tableSeats}
+        back
+        depth={3}
+        onClose={() => setStep({ type: "inspect_seating", seatingId })}
+        onVoided={() =>
+          onRecorded({
+            visitId: seat.visitId,
+            text: "Seat record voided. It stays in the history.",
+          })
+        }
+      />
+    );
+  }
 
   if ("entryId" in step) {
     const { entryId } = step;
@@ -554,6 +638,22 @@ export function SeatSheet({
   const playingAgain = table.seats.some(
     (item) => item.playerId === seat.playerId && item.playing && item.visitId !== seat.visitId,
   );
+
+  const seatValue = (() => {
+    if (table.tableSeats === null) return null;
+
+    if (seat.playing)
+      return seat.seatNumber !== null
+        ? formatSeatLabel(seat.seatNumber, table.tableSeats)
+        : "Not set";
+
+    if (seat.seatOutcome.kind === "multiple") return "Multiple seats";
+
+    if (seat.seatOutcome.kind === "seat")
+      return formatSeatLabel(seat.seatOutcome.seat, table.tableSeats);
+
+    return "Not set";
+  })();
 
   return (
     <Sheet
@@ -696,6 +796,17 @@ export function SeatSheet({
       )}
       {quick.error ? <FormError>{quick.error}</FormError> : null}
       <List>
+        {seatValue !== null ? (
+          <Row
+            onPress={() => setStep({ type: "seat" })}
+            accessibilityLabel={`${name}'s seat, ${seatValue}`}
+            accessibilityHint="Sets or changes their seat"
+          >
+            <Text className="flex-1 type-body text-ink">Seat</Text>
+            <Text className="type-callout text-muted">{seatValue}</Text>
+            <Icon name="chevron-right" color="muted" size={18} />
+          </Row>
+        ) : null}
         <Row
           onPress={to("history")}
           accessibilityLabel={`${name}'s history, ${entries}`}
