@@ -1,8 +1,8 @@
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
-import { ActorId, EntryId, PlayerId, TableId, TripId, VenueId, VisitId } from "./ids.ts";
-import { Game } from "./ledger.ts";
+import { ActorId, EntryId, PlayerId, SeatingId, TableId, TripId, VenueId, VisitId } from "./ids.ts";
+import { Game, Seat } from "./ledger.ts";
 import { MinorUnits } from "./money.ts";
 
 export const Table = Schema.Struct({
@@ -10,6 +10,7 @@ export const Table = Schema.Struct({
   tripId: Schema.NullOr(TripId),
   game: Schema.NullOr(Game),
   gameName: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  tableSeats: Schema.optionalKey(Schema.NullOr(Seat)),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
   /** Whoever holds this player records and corrects for everyone at the table. */
@@ -39,22 +40,24 @@ export const Visit = Schema.Struct({
 
 export type Visit = typeof Visit.Type;
 
-const auditFields = {
+const seatingAuditFields = {
   createdBy: ActorId,
   createdAt: Schema.DateTimeUtc,
   voidedAt: Schema.NullOr(Schema.DateTimeUtc),
   voidedBy: Schema.NullOr(ActorId),
   voidReason: Schema.NullOr(Schema.String),
+};
+
+const auditFields = {
+  ...seatingAuditFields,
   replacesEntryId: Schema.NullOr(EntryId),
 };
 
-function auditIssue(fact: {
-  readonly id: EntryId;
+function baseAuditIssue(fact: {
   readonly createdAt: DateTime.Utc;
   readonly voidedAt: DateTime.Utc | null;
   readonly voidedBy: ActorId | null;
   readonly voidReason: string | null;
-  readonly replacesEntryId: EntryId | null;
 }) {
   if ((fact.voidedAt === null) !== (fact.voidedBy === null)) {
     return { path: ["voidedBy"], issue: "void time and actor must be recorded together" };
@@ -71,12 +74,37 @@ function auditIssue(fact: {
     return { path: ["voidedAt"], issue: "must not precede creation" };
   }
 
+  return undefined;
+}
+
+function auditIssue(fact: {
+  readonly id: EntryId;
+  readonly createdAt: DateTime.Utc;
+  readonly voidedAt: DateTime.Utc | null;
+  readonly voidedBy: ActorId | null;
+  readonly voidReason: string | null;
+  readonly replacesEntryId: EntryId | null;
+}) {
+  const audit = baseAuditIssue(fact);
+
+  if (audit) return audit;
+
   if (fact.replacesEntryId === fact.id) {
     return { path: ["replacesEntryId"], issue: "a replacement must have a new ID" };
   }
 
   return undefined;
 }
+
+export const VisitSeating = Schema.Struct({
+  id: SeatingId,
+  visitId: VisitId,
+  seat: Schema.NullOr(Seat),
+  occurredAt: Schema.DateTimeUtc,
+  ...seatingAuditFields,
+}).check(Schema.makeFilter(baseAuditIssue));
+
+export type VisitSeating = typeof VisitSeating.Type;
 
 export const PlayEntry = Schema.Struct({
   id: EntryId,

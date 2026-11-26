@@ -13,6 +13,7 @@ import {
   Recorder,
   RecorderOf,
   ScopeCloseCode,
+  SeatingId,
   StakeId,
   TableId,
   tableScope,
@@ -855,7 +856,7 @@ it.layer(TestApi.layer)("deleting an account with legacy history", (it) => {
 
       expect(
         yield* LegacyMigration.importLegacy({ scope: [group.group.id], dryRun: false }),
-      ).toEqual({ dryRun: false, identities: 0, tables: 0, visits: 0, entries: 0 });
+      ).toEqual({ dryRun: false, identities: 0, tables: 0, visits: 0, entries: 0, seatings: 0 });
 
       const fresh = yield* LegacyMigration.importLegacy({
         scope: [second.group.id],
@@ -1636,6 +1637,125 @@ it.layer(TestApi.layer)("a Clerk job that has failed many times", (it) => {
       expect(row!.minutes).toBeGreaterThan(300);
       expect(row!.minutes).toBeLessThanOrEqual(360);
     }),
+  );
+});
+
+it.layer(TestApi.layer)("deleting an account with seatings", (it) => {
+  it.effect(
+    "deletes solo seatings with their tables and anonymizes audit actors on surviving tables",
+    () =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const alice = yield* account("alice");
+        const solo = start(alice.identity);
+
+        const soloWithSize = RecordingCommand.make({
+          ...solo,
+          tableSeats: 6,
+        });
+
+        const soloSeat1Id = SeatingId.make(uuid());
+
+        const soloSeat1 = RecordingCommand.make({
+          type: "set_seat",
+          operationId: RecordingOperationId.make(uuid()),
+          actorId: alice.identity.actorId,
+          preparedAt: at(1),
+          tableId: solo.tableId,
+          visitId: solo.visitId,
+          seatingId: soloSeat1Id,
+          seat: 1,
+          occurredAt: at(1),
+        });
+
+        const soloSeat2 = RecordingCommand.make({
+          type: "set_seat",
+          operationId: RecordingOperationId.make(uuid()),
+          actorId: alice.identity.actorId,
+          preparedAt: at(2),
+          tableId: solo.tableId,
+          visitId: solo.visitId,
+          seatingId: SeatingId.make(uuid()),
+          seat: 2,
+          occurredAt: at(2),
+          replacesSeatingId: soloSeat1Id,
+          reason: "Moved",
+        });
+
+        expect(yield* alice.push(soloWithSize, soloSeat1, soloSeat2)).toEqual([
+          "accepted",
+          "accepted",
+          "accepted",
+        ]);
+
+        const bobDev = yield* device();
+        const shared = start(bobDev.identity);
+        expect(yield* bobDev.push(shared)).toEqual(["accepted"]);
+
+        const { token } = yield* bobDev.client.recording.share({
+          params: { tableId: shared.tableId },
+        });
+
+        const aliceJoined = yield* alice.join(token, {
+          id: PlayerId.make(uuid()),
+          displayName: "Alice",
+        });
+
+        const aliceSit = sitDown(alice.identity, shared.tableId, aliceJoined.player.id, 3);
+        const sharedSeatId = SeatingId.make(uuid());
+
+        const sharedSeat = RecordingCommand.make({
+          type: "set_seat",
+          operationId: RecordingOperationId.make(uuid()),
+          actorId: alice.identity.actorId,
+          preparedAt: at(4),
+          tableId: shared.tableId,
+          visitId: aliceSit.visitId,
+          seatingId: sharedSeatId,
+          seat: 4,
+          occurredAt: at(4),
+        });
+
+        const sharedVoid = RecordingCommand.make({
+          type: "void_seating",
+          operationId: RecordingOperationId.make(uuid()),
+          actorId: alice.identity.actorId,
+          preparedAt: at(5),
+          tableId: shared.tableId,
+          visitId: aliceSit.visitId,
+          seatingId: sharedSeatId,
+          reason: "Standing",
+        });
+
+        expect(yield* alice.push(aliceSit, sharedSeat, sharedVoid)).toEqual([
+          "accepted",
+          "accepted",
+          "accepted",
+        ]);
+
+        expect(yield* alice.client.account.delete({ payload: {} })).toEqual({ status: "complete" });
+
+        const [soloRows] = yield* sql<{ count: number }>`
+          select count(*)::int as count from personal_seatings where visit_id = ${solo.visitId}
+        `;
+
+        expect(soloRows!.count).toBe(0);
+
+        const [sharedRow] = yield* sql<{ createdBy: string; voidedBy: string | null }>`
+          select created_by, voided_by from personal_seatings where id = ${sharedSeatId}
+        `;
+
+        expect(sharedRow).toEqual({
+          createdBy: DELETED_ACTOR,
+          voidedBy: DELETED_ACTOR,
+        });
+
+        const tableView = yield* bobDev.client.recording.table({
+          params: { tableId: shared.tableId },
+        });
+
+        expect(tableView.seatings).toHaveLength(1);
+      }),
   );
 });
 

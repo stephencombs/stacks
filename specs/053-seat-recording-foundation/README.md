@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-25
 priority: medium
 tags:
@@ -10,10 +10,12 @@ tags:
   - client-runtime
 parent: "052"
 created_at: 2026-11-25T05:46:45.668388500Z
-updated_at: 2026-11-25T05:52:05.455267500Z
+updated_at: 2026-11-26T03:26:19.126413600Z
 transitions:
   - status: planned
     at: 2026-11-25T05:52:05.455267500Z
+  - status: in-progress
+    at: 2026-11-26T03:26:19.126413600Z
 ---
 
 # Seat selection: contracts, offline ledger, API sync, and migrations

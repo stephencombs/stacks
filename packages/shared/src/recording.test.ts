@@ -1,10 +1,21 @@
 import { expect, it } from "@effect/vitest";
-import { EntryId, MinorUnits, PlayerId, PlayerIdentity, TableId, VisitId } from "@stacks/contracts";
+import {
+  ActorId,
+  EntryId,
+  MinorUnits,
+  PlayerId,
+  PlayerIdentity,
+  SeatingId,
+  TableId,
+  Visit,
+  VisitId,
+} from "@stacks/contracts";
 import { RecordingCommand, RecordingOperationId } from "@stacks/contracts/recordingCommands";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
 import { applyRecordingCommand, ownPlayers, type RecordingLedger } from "./recording.ts";
+import { seatCount, tableLiveSeats, visitSeatNow } from "./seats.ts";
 import { ACTOR, BEA, visit } from "./testing/recording.ts";
 import { visitSummary } from "./visits.ts";
 
@@ -30,6 +41,7 @@ const initial: () => RecordingLedger = () => {
     tables: [],
     visits: [],
     entries: [],
+    seatings: [],
     receipts: [],
   };
 };
@@ -607,4 +619,616 @@ it("stores a trimmed custom game name only for Other and enforces the 60-charact
       }),
     ),
   ).toThrow("Keep the game name to 60 characters.");
+});
+
+it("normalizes tableSeats on table creation, supports set_table_seats permissions, and blocks shrinking under occupied seats", () => {
+  const bj = applyRecordingCommand(
+    initial(),
+    RecordingCommand.make({
+      ...common(),
+      type: "start",
+      tableId: visit.tableId,
+      visitId: visit.id,
+      playerId: visit.playerId,
+      buyInId: EntryId.make(uuid()),
+      buyIn: MinorUnits.make(20000),
+      startedAt: at(0),
+      game: "blackjack",
+      tableSeats: 7,
+      venueId: null,
+      highLimit: false,
+    }),
+  );
+
+  expect(bj.tables[0]?.tableSeats).toBe(7);
+  expect(seatCount(bj.tables[0]!)).toBe(7);
+
+  expect(() =>
+    applyRecordingCommand(
+      initial(),
+      RecordingCommand.make({
+        ...common(),
+        type: "open_table",
+        tableId: TableId.make(uuid()),
+        playerId: visit.playerId,
+        game: "blackjack",
+        tableSeats: 4,
+        venueId: null,
+        highLimit: false,
+      }),
+    ),
+  ).toThrow("Choose 5, 6, 7 seats for blackjack.");
+
+  const poker: RecordingLedger = applyRecordingCommand(
+    initial(),
+    RecordingCommand.make({
+      ...common(),
+      type: "record_completed",
+      tableId: TableId.make(uuid()),
+      visitId: VisitId.make(uuid()),
+      playerId: visit.playerId,
+      buyInId: EntryId.make(uuid()),
+      buyIn: MinorUnits.make(10000),
+      cashOutId: EntryId.make(uuid()),
+      cashOut: MinorUnits.make(15000),
+      startedAt: at(0),
+      finishedAt: at(10),
+      game: "poker_cash",
+      tableSeats: 6,
+      venueId: null,
+      highLimit: false,
+    }),
+  );
+
+  expect(poker.tables[0]?.tableSeats).toBeUndefined();
+
+  expect(() =>
+    applyRecordingCommand(
+      poker,
+      RecordingCommand.make({
+        ...common(),
+        type: "set_table_seats",
+        tableId: poker.tables[0]!.id,
+        tableSeats: 6,
+      }),
+    ),
+  ).toThrow("This game doesn't use numbered seats.");
+
+  const calId = PlayerId.make(uuid());
+  const beaVisitId = VisitId.make(uuid());
+  const calVisitId = VisitId.make(uuid());
+
+  const withBea = applyRecordingCommand(
+    applyRecordingCommand(
+      bj,
+      RecordingCommand.make({
+        ...common(),
+        type: "join_table",
+        tableId: visit.tableId,
+        visitId: beaVisitId,
+        playerId: BEA,
+        newPlayer: { id: BEA, displayName: "Bea" },
+        buyInId: EntryId.make(uuid()),
+        buyIn: MinorUnits.make(10000),
+        startedAt: at(2),
+      }),
+    ),
+    RecordingCommand.make({
+      ...common(),
+      type: "join_table",
+      tableId: visit.tableId,
+      visitId: calVisitId,
+      playerId: calId,
+      newPlayer: { id: calId, displayName: "Cal" },
+      buyInId: EntryId.make(uuid()),
+      buyIn: MinorUnits.make(10000),
+      startedAt: at(3),
+    }),
+  );
+
+  const beaActor = ActorId.make(uuid());
+  const calActor = ActorId.make(uuid());
+
+  const seated: RecordingLedger = applyRecordingCommand(
+    withBea,
+    RecordingCommand.make({
+      ...common(),
+      type: "set_seat",
+      tableId: visit.tableId,
+      visitId: beaVisitId,
+      seatingId: SeatingId.make(uuid()),
+      seat: 7,
+      occurredAt: at(4),
+    }),
+  );
+
+  const appointed: RecordingLedger = applyRecordingCommand(
+    seated,
+    RecordingCommand.make({
+      ...common(),
+      type: "appoint_recorder",
+      tableId: visit.tableId,
+      playerId: BEA,
+    }),
+  );
+
+  expect(() =>
+    applyRecordingCommand(
+      { ...appointed, actor: { id: calActor, userId: null } },
+      RecordingCommand.make({
+        ...common(),
+        actorId: calActor,
+        type: "set_table_seats",
+        tableId: visit.tableId,
+        tableSeats: 6,
+      }),
+      [calId],
+    ),
+  ).toThrow("Only whoever records for everyone at this table can change its size.");
+
+  expect(() =>
+    applyRecordingCommand(
+      { ...appointed, actor: { id: beaActor, userId: null } },
+      RecordingCommand.make({
+        ...common(),
+        actorId: beaActor,
+        type: "set_table_seats",
+        tableId: visit.tableId,
+        tableSeats: 5,
+      }),
+      [BEA],
+    ),
+  ).toThrow("Move anyone sitting past seat 5 before shrinking the table.");
+
+  const stood: RecordingLedger = applyRecordingCommand(
+    { ...appointed, actor: { id: beaActor, userId: null } },
+    RecordingCommand.make({
+      ...common(),
+      actorId: beaActor,
+      type: "set_seat",
+      tableId: visit.tableId,
+      visitId: beaVisitId,
+      seatingId: SeatingId.make(uuid()),
+      seat: null,
+      occurredAt: at(6),
+    }),
+    [BEA],
+  );
+
+  const shrunk: RecordingLedger = applyRecordingCommand(
+    stood,
+    RecordingCommand.make({
+      ...common(),
+      actorId: beaActor,
+      type: "set_table_seats",
+      tableId: visit.tableId,
+      tableSeats: 5,
+    }),
+    [BEA],
+  );
+
+  expect(shrunk.tables[0]?.tableSeats).toBe(5);
+});
+
+it("manages set_seat and void_seating without bumping visit.revision and checks permissions, bounds, and conflicts", () => {
+  const beaVisitId = VisitId.make(uuid());
+  const calId = PlayerId.make(uuid());
+  const calVisitId = VisitId.make(uuid());
+  const beaActor = ActorId.make(uuid());
+  const calActor = ActorId.make(uuid());
+
+  const table = applyRecordingCommand(
+    applyRecordingCommand(
+      applyRecordingCommand(
+        initial(),
+        RecordingCommand.make({
+          ...common(),
+          type: "start",
+          tableId: visit.tableId,
+          visitId: visit.id,
+          playerId: visit.playerId,
+          buyInId: EntryId.make(uuid()),
+          buyIn: MinorUnits.make(20000),
+          startedAt: at(5),
+          game: "blackjack",
+          venueId: null,
+          highLimit: false,
+        }),
+      ),
+      RecordingCommand.make({
+        ...common(),
+        type: "join_table",
+        tableId: visit.tableId,
+        visitId: beaVisitId,
+        playerId: BEA,
+        newPlayer: { id: BEA, displayName: "Bea" },
+        buyInId: EntryId.make(uuid()),
+        buyIn: MinorUnits.make(10000),
+        startedAt: at(5),
+      }),
+    ),
+    RecordingCommand.make({
+      ...common(),
+      type: "join_table",
+      tableId: visit.tableId,
+      visitId: calVisitId,
+      playerId: calId,
+      newPlayer: { id: calId, displayName: "Cal" },
+      buyInId: EntryId.make(uuid()),
+      buyIn: MinorUnits.make(10000),
+      startedAt: at(5),
+    }),
+  );
+
+  expect(() =>
+    applyRecordingCommand(
+      table,
+      RecordingCommand.make({
+        ...common(),
+        type: "set_seat",
+        tableId: visit.tableId,
+        visitId: visit.id,
+        seatingId: SeatingId.make(uuid()),
+        seat: 6,
+        occurredAt: at(6),
+      }),
+    ),
+  ).toThrow("Choose a seat from 1 to 5.");
+
+  expect(() =>
+    applyRecordingCommand(
+      table,
+      RecordingCommand.make({
+        ...common(),
+        type: "set_seat",
+        tableId: visit.tableId,
+        visitId: visit.id,
+        seatingId: SeatingId.make(uuid()),
+        seat: 2,
+        occurredAt: at(4),
+      }),
+    ),
+  ).toThrow("Seat time must stay within the session.");
+
+  const seat2Id = SeatingId.make(uuid());
+
+  const sat = applyRecordingCommand(
+    table,
+    RecordingCommand.make({
+      ...common(),
+      type: "set_seat",
+      tableId: visit.tableId,
+      visitId: visit.id,
+      seatingId: seat2Id,
+      seat: 2,
+      occurredAt: at(6),
+    }),
+  );
+
+  expect(sat.visits.find((v) => v.id === visit.id)!.revision).toBe(0);
+
+  const rebuyAfterSeat = applyRecordingCommand(
+    sat,
+    RecordingCommand.make({
+      ...common(),
+      type: "add",
+      visitId: visit.id,
+      expectedRevision: 0,
+      entryId: EntryId.make(uuid()),
+      kind: "buy_in",
+      amount: MinorUnits.make(5000),
+      occurredAt: at(7),
+      note: null,
+    }),
+  );
+
+  expect(rebuyAfterSeat.visits.find((v) => v.id === visit.id)!.revision).toBe(1);
+
+  const tableParticipants = [
+    { tableId: visit.tableId, playerId: BEA },
+    { tableId: visit.tableId, playerId: calId },
+  ];
+
+  expect(() =>
+    applyRecordingCommand(
+      { ...rebuyAfterSeat, actor: { id: calActor, userId: null }, participants: tableParticipants },
+      RecordingCommand.make({
+        ...common(),
+        actorId: calActor,
+        type: "set_seat",
+        tableId: visit.tableId,
+        visitId: beaVisitId,
+        seatingId: SeatingId.make(uuid()),
+        seat: 1,
+        occurredAt: at(8),
+      }),
+      [calId],
+    ),
+  ).toThrow("You can record only your own play at this table.");
+
+  expect(() =>
+    applyRecordingCommand(
+      { ...rebuyAfterSeat, actor: { id: beaActor, userId: null }, participants: tableParticipants },
+      RecordingCommand.make({
+        ...common(),
+        actorId: beaActor,
+        type: "set_seat",
+        tableId: visit.tableId,
+        visitId: beaVisitId,
+        seatingId: SeatingId.make(uuid()),
+        seat: 2,
+        occurredAt: at(8),
+      }),
+      [BEA],
+    ),
+  ).toThrow("Seat 2 is already taken.");
+
+  const seat4Id = SeatingId.make(uuid());
+
+  const replaced: RecordingLedger = applyRecordingCommand(
+    rebuyAfterSeat,
+    RecordingCommand.make({
+      ...common(),
+      preparedAt: at(31),
+      type: "set_seat",
+      tableId: visit.tableId,
+      visitId: visit.id,
+      seatingId: seat4Id,
+      seat: 4,
+      occurredAt: at(8),
+      replacesSeatingId: seat2Id,
+      reason: "Misread seat",
+    }),
+  );
+
+  expect(visitSeatNow(replaced.seatings.filter((s) => s.visitId === visit.id))).toBe(4);
+  expect(replaced.seatings.find((s) => s.id === seat2Id)?.voidedAt).toEqual(at(31));
+
+  const movedAlexTo3: RecordingLedger = applyRecordingCommand(
+    replaced,
+    RecordingCommand.make({
+      ...common(),
+      preparedAt: at(32),
+      type: "set_seat",
+      tableId: visit.tableId,
+      visitId: visit.id,
+      seatingId: SeatingId.make(uuid()),
+      seat: 3,
+      occurredAt: at(9),
+    }),
+  );
+
+  const movedBeaTo1: RecordingLedger = applyRecordingCommand(
+    movedAlexTo3,
+    RecordingCommand.make({
+      ...common(),
+      preparedAt: at(33),
+      type: "set_seat",
+      tableId: visit.tableId,
+      visitId: beaVisitId,
+      seatingId: SeatingId.make(uuid()),
+      seat: 1,
+      occurredAt: at(10),
+    }),
+  );
+
+  const beaTook4: RecordingLedger = applyRecordingCommand(
+    movedBeaTo1,
+    RecordingCommand.make({
+      ...common(),
+      preparedAt: at(34),
+      type: "set_seat",
+      tableId: visit.tableId,
+      visitId: beaVisitId,
+      seatingId: SeatingId.make(uuid()),
+      seat: 4,
+      occurredAt: at(11),
+    }),
+  );
+
+  const alexLastSeating = beaTook4.seatings.findLast(
+    (s) => s.visitId === visit.id && s.voidedAt === null,
+  )!;
+
+  expect(() =>
+    applyRecordingCommand(
+      beaTook4,
+      RecordingCommand.make({
+        ...common(),
+        preparedAt: at(35),
+        type: "void_seating",
+        tableId: visit.tableId,
+        visitId: visit.id,
+        seatingId: alexLastSeating.id,
+        reason: "Undo seat 3",
+      }),
+    ),
+  ).toThrow("Seat 4 is already taken.");
+});
+
+it("enforces start/finish bounds on seatings, clears tableSeats on game change, handles reopen overlaps, and replays safely on server", () => {
+  const beaVisitId = VisitId.make(uuid());
+
+  const bj: RecordingLedger = applyRecordingCommand(
+    applyRecordingCommand(
+      initial(),
+      RecordingCommand.make({
+        ...common(),
+        type: "start",
+        tableId: visit.tableId,
+        visitId: visit.id,
+        playerId: visit.playerId,
+        buyInId: EntryId.make(uuid()),
+        buyIn: MinorUnits.make(20000),
+        startedAt: at(5),
+        game: "blackjack",
+        tableSeats: 7,
+        venueId: null,
+        highLimit: false,
+      }),
+    ),
+    RecordingCommand.make({
+      ...common(),
+      type: "join_table",
+      tableId: visit.tableId,
+      visitId: beaVisitId,
+      playerId: BEA,
+      newPlayer: { id: BEA, displayName: "Bea" },
+      buyInId: EntryId.make(uuid()),
+      buyIn: MinorUnits.make(10000),
+      startedAt: at(2),
+    }),
+  );
+
+  const earlierStart: RecordingLedger = applyRecordingCommand(
+    bj,
+    RecordingCommand.make({
+      ...common(),
+      type: "edit_visit",
+      visitId: visit.id,
+      expectedRevision: 0,
+      startedAt: at(0),
+    }),
+  );
+
+  const alexSit = RecordingCommand.make({
+    ...common(),
+    preparedAt: at(3),
+    type: "set_seat",
+    tableId: visit.tableId,
+    visitId: visit.id,
+    seatingId: SeatingId.make(uuid()),
+    seat: 7,
+    occurredAt: at(3),
+  });
+
+  const withSit: RecordingLedger = applyRecordingCommand(earlierStart, alexSit);
+
+  expect(() =>
+    applyRecordingCommand(
+      withSit,
+      RecordingCommand.make({
+        ...common(),
+        type: "edit_visit",
+        visitId: visit.id,
+        expectedRevision: 1,
+        startedAt: at(4),
+      }),
+    ),
+  ).toThrow("The start time can't be after a recorded seat.");
+
+  const replacedSit: RecordingLedger = applyRecordingCommand(
+    withSit,
+    RecordingCommand.make({
+      ...common(),
+      preparedAt: at(6),
+      type: "set_seat",
+      tableId: visit.tableId,
+      visitId: visit.id,
+      seatingId: SeatingId.make(uuid()),
+      seat: 7,
+      occurredAt: at(6),
+      replacesSeatingId: withSit.seatings[0]!.id,
+      reason: "Moved later",
+    }),
+  );
+
+  const editedAfterVoid: RecordingLedger = applyRecordingCommand(
+    replacedSit,
+    RecordingCommand.make({
+      ...common(),
+      type: "edit_visit",
+      visitId: visit.id,
+      expectedRevision: 1,
+      startedAt: at(4),
+    }),
+  );
+
+  expect(() =>
+    applyRecordingCommand(
+      editedAfterVoid,
+      RecordingCommand.make({
+        ...common(),
+        type: "finish",
+        visitId: visit.id,
+        expectedRevision: 2,
+        entryId: EntryId.make(uuid()),
+        amount: MinorUnits.make(15000),
+        finishedAt: at(5),
+      }),
+    ),
+  ).toThrow("Finish time can't be before a recorded seat.");
+
+  const finished: RecordingLedger = applyRecordingCommand(
+    editedAfterVoid,
+    RecordingCommand.make({
+      ...common(),
+      type: "finish",
+      visitId: visit.id,
+      expectedRevision: 2,
+      entryId: EntryId.make(uuid()),
+      amount: MinorUnits.make(15000),
+      finishedAt: at(10),
+    }),
+  );
+
+  const shrunkToPoker: RecordingLedger = applyRecordingCommand(
+    finished,
+    RecordingCommand.make({
+      ...common(),
+      type: "edit_visit",
+      visitId: visit.id,
+      expectedRevision: 3,
+      table: { game: "poker_cash", venueId: null, highLimit: false },
+    }),
+  );
+
+  expect(shrunkToPoker.tables[0]?.tableSeats).toBeUndefined();
+
+  const beaOn7: RecordingLedger = applyRecordingCommand(
+    finished,
+    RecordingCommand.make({
+      ...common(),
+      preparedAt: at(12),
+      type: "set_seat",
+      tableId: visit.tableId,
+      visitId: beaVisitId,
+      seatingId: SeatingId.make(uuid()),
+      seat: 7,
+      occurredAt: at(12),
+    }),
+  );
+
+  const reopened = applyRecordingCommand(
+    beaOn7,
+    RecordingCommand.make({
+      ...common(),
+      preparedAt: at(35),
+      type: "reopen",
+      visitId: visit.id,
+      expectedRevision: 3,
+      reason: "Reopened",
+    }),
+  );
+
+  expect(tableLiveSeats(reopened.visits, reopened.seatings).get(7)).toBe(beaVisitId);
+
+  const foreignPokerTable = {
+    ...shrunkToPoker.tables[0]!,
+    starterPlayerId: BEA,
+  };
+
+  const replayVisit = Visit.make({
+    ...shrunkToPoker.visits[0]!,
+    startedAt: at(0),
+    finishedAt: at(10),
+  });
+
+  const replayed = applyRecordingCommand(
+    { ...initial(), tables: [foreignPokerTable], visits: [replayVisit] },
+    alexSit,
+    null,
+  );
+
+  expect(replayed.seatings).toHaveLength(1);
 });

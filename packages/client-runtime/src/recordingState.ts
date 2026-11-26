@@ -3,14 +3,17 @@ import {
   PlayEntry,
   PlayerId,
   PlayerIdentity,
+  SeatingId,
   Table,
   TableId,
   UserId,
   Venue,
   Visit,
+  VisitSeating,
   type EntryId,
 } from "@stacks/contracts";
 import {
+  isSeatingCommand,
   isTableCommand,
   RecordingCommand,
   RecordingOperationId,
@@ -25,6 +28,7 @@ import {
   RecordingReceipt,
   visitLiveEntryIds,
 } from "@stacks/shared/recording";
+import { normalizeTableSeats, tableSizes } from "@stacks/shared/seats";
 import { visitSummary } from "@stacks/shared/visits";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -97,6 +101,7 @@ export const RecordingState = Schema.Struct({
   tables: Schema.Array(Table),
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
+  seatings: Schema.Array(VisitSeating),
   receipts: Schema.Array(RecordingReceipt),
   sync: Schema.optionalKey(RecordingSync),
   /**
@@ -195,6 +200,7 @@ export const recordingBase = (state: RecordingState) => {
     ),
     visits: [],
     entries: [],
+    seatings: [],
     receipts: [],
   };
 };
@@ -210,6 +216,7 @@ const validateRecordingState = (state: RecordingState) => {
       unique(state.tables) &&
       unique(state.visits) &&
       unique(state.entries) &&
+      unique(state.seatings) &&
       unique(state.venues),
     "Duplicate record ID.",
   );
@@ -221,6 +228,7 @@ const validateRecordingState = (state: RecordingState) => {
   const tables = new Map(state.tables.map((table) => [table.id, table]));
   const visits = new Map(state.visits.map((visit) => [visit.id, visit]));
   const entries = new Map(state.entries.map((entry) => [entry.id, entry]));
+  const seatings = new Map(state.seatings.map((seating) => [seating.id, seating]));
   const participants = new Set(state.participants.map((item) => item.playerId));
   requireValid(
     new Set(state.participants.map((item) => `${item.tableId}:${item.playerId}`)).size ===
@@ -272,9 +280,22 @@ const validateRecordingState = (state: RecordingState) => {
     );
   }
 
+  for (const seating of state.seatings) {
+    const visit = visits.get(seating.visitId);
+    requireValid(visit !== undefined, "Foreign seating ownership.");
+    requireValid(
+      seating.voidedAt !== null ||
+        (ms(seating.occurredAt) >= ms(visit.startedAt) &&
+          (visit.finishedAt === null || ms(seating.occurredAt) <= ms(visit.finishedAt))),
+      "Seating outside visit times.",
+    );
+  }
+
   const operations = new Set<string>();
   const createdEntries = new Set<EntryId>();
   const voids = new Set<EntryId>();
+  const createdSeatings = new Set<SeatingId>();
+  const voidedSeatings = new Set<SeatingId>();
 
   const audits = new Map<
     EntryId,
@@ -286,6 +307,11 @@ const validateRecordingState = (state: RecordingState) => {
     }
   >();
 
+  const seatingAudits = new Map<
+    SeatingId,
+    { at: DateTime.Utc; by: RecordingCommand["actorId"]; reason: string }
+  >();
+
   const deleted = new Map<Visit["id"], DateTime.Utc>();
   const deletedEntries = new Map<Visit["id"], ReadonlySet<EntryId>>();
   const lifecycle = new Map<Visit["id"], { revision: number; finishedAt: DateTime.Utc | null }>();
@@ -295,6 +321,7 @@ const validateRecordingState = (state: RecordingState) => {
   const recorders = new Set<string>();
   const starts = new Map<Visit["id"], DateTime.Utc>();
   const details = new Map<Table["id"], TableDetails>();
+  const tableSeatsMap = new Map<Table["id"], number | null>();
   const trips = new Map<Table["id"], Table["tripId"]>();
   const deletedTables = new Map<Table["id"], DateTime.Utc>();
 
@@ -343,6 +370,7 @@ const validateRecordingState = (state: RecordingState) => {
       );
       createdTables.add(table.id);
       trips.set(table.id, null);
+      tableSeatsMap.set(table.id, normalizeTableSeats(command.game, command.tableSeats));
       details.set(
         table.id,
         command.gameName === undefined
@@ -372,6 +400,18 @@ const validateRecordingState = (state: RecordingState) => {
       if (command.type === "set_table_trip") {
         requireValid(tables.has(command.tableId), "Trip choice references a missing table.");
         trips.set(command.tableId, command.tripId);
+        continue;
+      }
+
+      if (command.type === "set_table_seats") {
+        const game =
+          details.get(command.tableId)?.game ?? tables.get(command.tableId)?.game ?? null;
+
+        requireValid(
+          game !== null && tableSizes[game] !== undefined,
+          "Table size command for non-seated game.",
+        );
+        tableSeatsMap.set(command.tableId, normalizeTableSeats(game, command.tableSeats));
         continue;
       }
 
@@ -436,6 +476,7 @@ const validateRecordingState = (state: RecordingState) => {
       createdTables.add(table.id);
       trips.set(table.id, null);
       starts.set(visit.id, command.startedAt);
+      tableSeatsMap.set(table.id, normalizeTableSeats(command.game, command.tableSeats));
       details.set(
         table.id,
         command.gameName === undefined
@@ -461,6 +502,63 @@ const validateRecordingState = (state: RecordingState) => {
         revision: 0,
         finishedAt: command.type === "start" ? null : command.finishedAt,
       });
+    } else if (isSeatingCommand(command)) {
+      requireValid(
+        visit.tableId === command.tableId && lifecycle.has(visit.id) && !deleted.has(visit.id),
+        "Invalid seating history.",
+      );
+
+      if (command.type === "set_seat") {
+        const seating = seatings.get(command.seatingId);
+        requireValid(
+          seating && !createdSeatings.has(command.seatingId),
+          "Seating receipt is missing or duplicated.",
+        );
+        requireValid(
+          seating.visitId === command.visitId &&
+            seating.seat === command.seat &&
+            ms(seating.occurredAt) === ms(command.occurredAt) &&
+            seating.createdBy === command.actorId &&
+            ms(seating.createdAt) === ms(command.preparedAt),
+          "Seating differs from its command receipt.",
+        );
+        createdSeatings.add(command.seatingId);
+
+        if (command.replacesSeatingId !== undefined) {
+          requireValid(command.reason !== undefined, "Seat replacement missing reason.");
+          const original = seatings.get(command.replacesSeatingId);
+          requireValid(
+            original &&
+              original.visitId === visit.id &&
+              createdSeatings.has(original.id) &&
+              !voidedSeatings.has(original.id),
+            "Invalid seating correction history.",
+          );
+          seatingAudits.set(original.id, {
+            at: command.preparedAt,
+            by: command.actorId,
+            reason: command.reason,
+          });
+          voidedSeatings.add(original.id);
+        }
+      } else {
+        const target = seatings.get(command.seatingId);
+        requireValid(
+          target &&
+            target.visitId === visit.id &&
+            createdSeatings.has(target.id) &&
+            !voidedSeatings.has(target.id),
+          "Invalid seating void history.",
+        );
+        seatingAudits.set(target.id, {
+          at: command.preparedAt,
+          by: command.actorId,
+          reason: command.reason,
+        });
+        voidedSeatings.add(target.id);
+      }
+
+      continue;
     } else {
       const previous = lifecycle.get(visit.id);
       requireValid(
@@ -530,7 +628,22 @@ const validateRecordingState = (state: RecordingState) => {
       } else if (command.type === "edit_visit") {
         if (command.startedAt !== undefined) starts.set(visit.id, command.startedAt);
 
-        if (command.table !== undefined) details.set(visit.tableId, command.table);
+        if (command.table !== undefined) {
+          details.set(visit.tableId, command.table);
+
+          const currentSeats = tableSeatsMap.has(visit.tableId)
+            ? tableSeatsMap.get(visit.tableId)!
+            : (tables.get(visit.tableId)?.tableSeats ?? null);
+
+          const nextRaw =
+            command.table.tableSeats !== undefined
+              ? command.table.tableSeats
+              : command.table.game !== null && tableSizes[command.table.game]
+                ? currentSeats
+                : null;
+
+          tableSeatsMap.set(visit.tableId, normalizeTableSeats(command.table.game, nextRaw));
+        }
       } else if (command.type === "reopen") {
         requireValid(previous.finishedAt !== null, "Receipt reopens a live visit.");
         previous.finishedAt = null;
@@ -582,6 +695,7 @@ const validateRecordingState = (state: RecordingState) => {
 
   requireValid(
     createdEntries.size === entries.size &&
+      createdSeatings.size === seatings.size &&
       new Set([...createdTables, ...joined]).size === tables.size &&
       lifecycle.size === visits.size,
     "Records have missing command receipts.",
@@ -600,6 +714,22 @@ const validateRecordingState = (state: RecordingState) => {
     requireValid(
       (entry.voidedAt !== null) === voids.has(entry.id),
       "Void has no correction receipt.",
+    );
+  }
+
+  for (const seating of state.seatings) {
+    const audit = seatingAudits.get(seating.id);
+    requireValid(
+      audit === undefined ||
+        (seating.voidedAt !== null &&
+          ms(seating.voidedAt) === ms(audit.at) &&
+          seating.voidedBy === audit.by &&
+          seating.voidReason === audit.reason),
+      "Seating void differs from its command receipt.",
+    );
+    requireValid(
+      (seating.voidedAt !== null) === voidedSeatings.has(seating.id),
+      "Seating void has no receipt.",
     );
   }
 
@@ -657,6 +787,12 @@ const validateRecordingState = (state: RecordingState) => {
       "Table differs from its receipts.",
     );
   }
+
+  for (const [tableId, expectedSeats] of tableSeatsMap)
+    requireValid(
+      (tables.get(tableId)?.tableSeats ?? null) === expectedSeats,
+      "Table seats differ from receipts.",
+    );
 
   requireValid(
     recorders.size === state.recorders.length &&
@@ -750,6 +886,7 @@ const withDefaults = (document: typeof Schema.Unknown.Encoded) => {
   return {
     participants: [],
     recorders: [],
+    seatings: [],
     venues: [],
     ...(Array.isArray(repayments) && repayments.length === 0 ? rest : fields.value),
   };

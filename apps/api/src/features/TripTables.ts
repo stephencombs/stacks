@@ -20,6 +20,10 @@ import { venueColumns } from "./Views.ts";
 
 const Timestamp = Schema.DateTimeUtcFromDate;
 
+type RecordedTableFields = {
+  -readonly [K in keyof Omit<Table, "deletedAt">]: Table[K];
+};
+
 /**
  * The tables in the given trips, as their groups see them. A deleted table is left out, and so is
  * one imported from an older group session, which already counts.
@@ -172,7 +176,7 @@ export const load = Effect.fn("TripTables.load")(function* (
     if (!table) return [];
     const mine = own.findLast((visit) => playerById.get(visit.playerId)?.userId === userId);
 
-    const recorded = {
+    const fields: RecordedTableFields = {
       id: row.id,
       tripId: row.tripId,
       game: row.game,
@@ -181,11 +185,13 @@ export const load = Effect.fn("TripTables.load")(function* (
       starterPlayerId: row.starterPlayerId,
     };
 
+    if (row.gameName !== null) fields.gameName = row.gameName;
+
+    if (row.tableSeats !== null) fields.tableSeats = row.tableSeats;
+
     return [
       {
-        table: Table.make(
-          row.gameName === null ? recorded : { ...recorded, gameName: row.gameName },
-        ),
+        table: Table.make(fields),
         venue: row.venueId === null ? null : (venueById.get(row.venueId) ?? null),
         startedAt: table.startedAt,
         endedAt: table.endedAt,

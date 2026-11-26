@@ -10,6 +10,7 @@ import {
   MinorUnits,
   PlayEntry,
   PlayerId,
+  SeatingId,
   StakeId,
   TableId,
   TripId,
@@ -22,6 +23,7 @@ import { playerResults } from "@stacks/shared/results";
 
 import { catalogVenue, groupWith, ids, usd, users } from "../testing/fixtures.test-utils.ts";
 import { TestApi } from "../testing/TestApi.test-utils.ts";
+import { DELETED_ACTOR } from "./AccountFence.ts";
 import * as LegacyMigration from "./LegacyMigration.ts";
 import {
   finishHistoricalSession,
@@ -245,6 +247,7 @@ const nothingNew = {
   tables: 0,
   visits: 0,
   entries: 0,
+  seatings: 0,
 };
 
 const startSession = Effect.fn("test.startSession")(function* (
@@ -332,6 +335,7 @@ it.layer(TestApi.layer)("legacy migration", (it) => {
         tables: 1,
         visits: 4,
         entries: 10,
+        seatings: 0,
       });
 
       const [untouched] = yield* sql<{ count: string }>`
@@ -549,6 +553,7 @@ it.layer(TestApi.layer)("legacy migration", (it) => {
         tables: 2,
         visits: 2,
         entries: 4,
+        seatings: 0,
       });
 
       for (const groupId of [usdGroup.group.id, otherUsd.group.id]) yield* expectFaithful(groupId);
@@ -656,5 +661,86 @@ it.layer(TestApi.layer)("legacy migration", (it) => {
         );
       }),
     { arbitrary: { runs: 8 }, timeout: 30_000 },
+  );
+
+  it.effect(
+    "imports legacy table_seats and seatings idempotently, including deleted creators",
+    () =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const { alex, bea } = yield* users("alex", "bea");
+        const group = yield* groupWith(alex, bea);
+        const [alexId, beaId] = [group.myPlayerId, group.players[1]!.id];
+        const cal = yield* addGuest(alex, group.group.id, "Cal");
+        const venue = yield* catalogVenue(alex);
+        const sessionId = ids.session();
+
+        yield* seedSession(group.tripId, {
+          id: sessionId,
+          venueId: venue.id,
+          game: "blackjack",
+          playerIds: [alexId, beaId, cal.id],
+          tableSeats: 7,
+          notes: null,
+        });
+
+        yield* entry(sessionId, "buy_in", alexId, 10000);
+        yield* entry(sessionId, "buy_in", beaId, 10000);
+
+        const alexSeatingId = SeatingId.make(crypto.randomUUID());
+        const deletedSeatingId = SeatingId.make(crypto.randomUUID());
+
+        yield* sql`
+        insert into seatings (id, session_id, group_id, player_id, seat, occurred_at, created_by)
+        select ${alexSeatingId}, s.id, s.group_id, ${alexId}, 7, s.started_at, s.created_by
+        from sessions s where s.id = ${sessionId}
+      `;
+
+        yield* sql`
+        insert into seatings (id, session_id, group_id, player_id, seat, occurred_at, created_by)
+        values (${deletedSeatingId}, ${sessionId}, ${group.group.id}, ${cal.id}, 3,
+          ${new Date(Date.UTC(2026, 9, 22, 20, 5))}, 'deleted-account')
+      `;
+
+        yield* finishHistoricalSession(sessionId, {
+          cashOuts: [
+            { id: ids.entry(), playerId: alexId, amount: usd(10000) },
+            { id: ids.entry(), playerId: beaId, amount: usd(10000) },
+          ],
+        });
+
+        const report = yield* LegacyMigration.importLegacy({
+          scope: scope(group.group.id),
+          dryRun: false,
+        });
+
+        expect(report).toMatchObject({ tables: 1, visits: 3, entries: 4, seatings: 2 });
+
+        const rows = yield* sql<{ id: string; seat: number | null; createdBy: string }>`
+        select id, seat, created_by from personal_seatings
+        where id in ${sql.in([alexSeatingId, deletedSeatingId])}
+        order by seat desc
+      `;
+
+        const [alexActor] = yield* sql<{ recordingActorId: string }>`
+        select own.recording_actor_id
+        from players p
+        join players own on own.user_id = p.user_id and own.group_id is null
+        where p.id = ${alexId}
+      `;
+
+        expect(rows).toEqual([
+          { id: alexSeatingId, seat: 7, createdBy: alexActor!.recordingActorId },
+          { id: deletedSeatingId, seat: 3, createdBy: DELETED_ACTOR },
+        ]);
+
+        const view = yield* alex.recording.table({ params: { tableId: TableId.make(sessionId) } });
+        expect(view.table.tableSeats).toBe(7);
+        expect(view.seatings).toHaveLength(2);
+
+        expect(
+          yield* LegacyMigration.importLegacy({ scope: scope(group.group.id), dryRun: false }),
+        ).toEqual(nothingNew);
+      }),
   );
 });

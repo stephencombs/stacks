@@ -6,6 +6,7 @@ import {
   MinorUnits,
   PlayerId,
   NotFound,
+  SeatingId,
   TableId,
   TripId,
   VisitId,
@@ -58,7 +59,14 @@ import {
   type ActorKeyStorage,
   type RecordingTransport,
 } from "./recordingSync.ts";
-import { claimLines, recordingHome, recordingSyncView, recordingTable } from "./recordingView.ts";
+import {
+  claimLines,
+  describeRecordingRejection,
+  recordingHome,
+  recordingSyncView,
+  recordingTable,
+  recordingVisit,
+} from "./recordingView.ts";
 
 const alex = UserId.make("user_alex");
 
@@ -117,6 +125,7 @@ const server = () => {
       tables: [],
       visits: [],
       entries: [],
+      seatings: [],
       receipts: [],
     };
 
@@ -172,6 +181,7 @@ const server = () => {
           players: [],
           visits: ledger.visits,
           entries: ledger.entries,
+          seatings: ledger.seatings,
         }
       : {
           identity: null,
@@ -181,6 +191,7 @@ const server = () => {
           players: [],
           visits: [],
           entries: [],
+          seatings: [],
         };
 
   return {
@@ -232,6 +243,7 @@ const otherDevice = (identity: RecordingIdentity) => {
     tables: [],
     visits: [],
     entries: [],
+    seatings: [],
     receipts: [],
     venues: [],
   };
@@ -2009,5 +2021,230 @@ it("retries a refused start with its table choices and joined players on the rep
   await pushAll(store, remote);
   expect(state(store).sync?.rejected).toEqual([]);
   expect(remote.history().tables[0]!.tripId).toBe(tripId);
+  await store.close();
+});
+
+it("keeps offline play when only set_seat conflicts, settles resized starts, and remaps retried seatings", async () => {
+  const store = await open();
+  const remote = server();
+  await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+
+  const opened = await save(store, {
+    type: "start",
+    buyIn: 20000,
+    startedAt: at(10),
+    game: "blackjack",
+    tableSeats: 5,
+  });
+
+  if (opened.command.type !== "start") throw new Error("Expected start");
+  const { tableId, visitId } = opened.command;
+
+  const joined = await save(store, {
+    type: "join_table",
+    tableId,
+    displayName: "Bea",
+    buyIn: 10000,
+    startedAt: at(10),
+  });
+
+  if (joined.command.type !== "join_table") throw new Error("Expected join_table");
+  const beaVisitId = joined.command.visitId;
+  await save(store, { type: "set_table_seats", tableId, tableSeats: 7 });
+  await pushAll(store, remote);
+  expect(state(store).sync?.rejected).toEqual([]);
+
+  const serverSeat3 = RecordingCommand.make({
+    type: "set_seat",
+    operationId: RecordingOperationId.make(crypto.randomUUID()),
+    actorId: remote.history().identity!.actorId,
+    preparedAt: at(11),
+    tableId,
+    visitId: beaVisitId,
+    seatingId: SeatingId.make(crypto.randomUUID()),
+    seat: 3,
+    occurredAt: at(11),
+  });
+
+  expect(
+    remote.push({
+      identity: remote.history().identity!,
+      commands: [serverSeat3],
+    }),
+  ).toEqual([{ operationId: serverSeat3.operationId, status: "accepted" }]);
+
+  const offlineSeat3 = await save(store, {
+    type: "set_seat",
+    visitId,
+    seat: 3,
+    occurredAt: at(12),
+  });
+
+  await save(store, { type: "add", visitId, kind: "buy_in", amount: 5000, occurredAt: at(13) });
+  await save(store, { type: "finish", visitId, amount: 30000, finishedAt: at(15) });
+  await pushAll(store, remote);
+
+  expect(state(store).sync?.rejected).toHaveLength(1);
+  const rejectedSeat = state(store).sync!.rejected[0]!;
+  expect(rejectedSeat.command.operationId).toBe(offlineSeat3.command.operationId);
+  expect(rejectedSeat.reason).toBe("conflict");
+  expect(describeRecordingRejection(rejectedSeat)).toBe(
+    "Your seat change didn't sync. Seat 3 is already taken. Your recorded play is saved.",
+  );
+
+  const visitView = recordingVisit(state(store), visitId)!;
+  expect(visitView.visit.finishedAt).toEqual(at(15));
+  expect(visitView.totals.buyIn).toBe(25000);
+  expect(visitView.totals.cashOut).toBe(30000);
+  expect(visitView.currentSeat).toBeNull();
+  await store.close();
+});
+
+it("remaps seatingId and replacesSeatingId when retrying a refused start chain, and tolerates resized foreign tables", async () => {
+  const store = await open();
+  const remote = server();
+  await store.transform((s) => mergeRecordingHistory(s, alex, remote.history()));
+
+  const opened = await save(store, {
+    type: "start",
+    buyIn: 20000,
+    startedAt: at(10),
+    game: "blackjack",
+  });
+
+  if (opened.command.type !== "start") throw new Error("Expected start");
+
+  const firstSeat = await save(store, {
+    type: "set_seat",
+    visitId: opened.command.visitId,
+    seat: 2,
+    occurredAt: at(11),
+  });
+
+  if (firstSeat.command.type !== "set_seat") throw new Error("Expected set_seat");
+
+  await save(store, {
+    type: "set_seat",
+    visitId: opened.command.visitId,
+    seat: 4,
+    occurredAt: at(12),
+    replacesSeatingId: firstSeat.command.seatingId,
+    reason: "Wrong seat",
+  });
+
+  remote.refuse(opened.command.operationId);
+  await pushAll(store, remote);
+  expect(state(store).sync?.rejected).toHaveLength(3);
+
+  await store.transform((s) => recordRejectedAgain(s, opened.command.operationId));
+  const retried = state(store);
+  expect(retried.sync?.rejected).toEqual([]);
+  expect(retried.seatings).toHaveLength(2);
+  expect(retried.seatings[0]!.id).not.toBe(firstSeat.command.seatingId);
+  expect(retried.seatings[1]!.seat).toBe(4);
+  expect(retried.seatings[0]!.voidedAt).not.toBeNull();
+
+  await pushAll(store, remote);
+  expect(state(store).sync?.rejected).toEqual([]);
+  expect(remote.history().seatings).toHaveLength(2);
+
+  const otherIdentity = {
+    playerId: PlayerId.make(crypto.randomUUID()),
+    actorId: ActorId.make(crypto.randomUUID()),
+  };
+
+  const otherTableId = TableId.make(crypto.randomUUID());
+  const otherVisitId = VisitId.make(crypto.randomUUID());
+
+  const otherStart = RecordingCommand.make({
+    type: "start",
+    operationId: RecordingOperationId.make(crypto.randomUUID()),
+    actorId: otherIdentity.actorId,
+    preparedAt: at(1),
+    tableId: otherTableId,
+    visitId: otherVisitId,
+    playerId: otherIdentity.playerId,
+    buyInId: EntryId.make(crypto.randomUUID()),
+    buyIn: MinorUnits.make(20000),
+    startedAt: at(1),
+    game: "blackjack",
+    tableSeats: 7,
+    venueId: null,
+    highLimit: false,
+  });
+
+  const selfId = state(store).self.id;
+  const selfActor = state(store).actor.id;
+  const selfVisitId = VisitId.make(crypto.randomUUID());
+  const selfSeatingId = SeatingId.make(crypto.randomUUID());
+
+  const selfJoin = RecordingCommand.make({
+    type: "join_table",
+    operationId: RecordingOperationId.make(crypto.randomUUID()),
+    actorId: selfActor,
+    preparedAt: at(2),
+    tableId: otherTableId,
+    visitId: selfVisitId,
+    playerId: selfId,
+    buyInId: EntryId.make(crypto.randomUUID()),
+    buyIn: MinorUnits.make(10000),
+    startedAt: at(2),
+  });
+
+  const selfSeat7 = RecordingCommand.make({
+    type: "set_seat",
+    operationId: RecordingOperationId.make(crypto.randomUUID()),
+    actorId: selfActor,
+    preparedAt: at(3),
+    tableId: otherTableId,
+    visitId: selfVisitId,
+    seatingId: selfSeatingId,
+    seat: 7,
+    occurredAt: at(3),
+  });
+
+  const starterSwitchedToPoker = RecordingCommand.make({
+    type: "edit_visit",
+    operationId: RecordingOperationId.make(crypto.randomUUID()),
+    actorId: otherIdentity.actorId,
+    preparedAt: at(4),
+    visitId: otherVisitId,
+    expectedRevision: 0,
+    table: { game: "poker_cash", venueId: null, highLimit: false },
+  });
+
+  const starterLedger = [
+    otherStart,
+    selfJoin,
+    selfSeat7,
+    starterSwitchedToPoker,
+  ].reduce<RecordingLedger>((ledger, command) => applyRecordingCommand(ledger, command, null), {
+    self: { id: otherIdentity.playerId, displayName: "Starter" },
+    actor: { id: otherIdentity.actorId, userId: null },
+    players: [
+      { id: otherIdentity.playerId, displayName: "Starter" },
+      { id: selfId, displayName: "You" },
+    ],
+    participants: [{ tableId: otherTableId, playerId: selfId }],
+    recorders: [],
+    tables: [],
+    visits: [],
+    entries: [],
+    seatings: [],
+    receipts: [],
+  });
+
+  const foreignSynced = mergeRecordingHistory(state(store), alex, {
+    identity: { playerId: selfId, actorId: selfActor },
+    commands: [selfJoin, selfSeat7],
+    tables: starterLedger.tables,
+    participants: [{ tableId: otherTableId, player: state(store).self }],
+    players: [],
+    visits: starterLedger.visits.filter((v) => v.playerId === selfId),
+    entries: starterLedger.entries.filter((e) => e.visitId === selfVisitId),
+    seatings: starterLedger.seatings.filter((s) => s.visitId === selfVisitId),
+  });
+
+  expect(foreignSynced.seatings.some((s) => s.id === selfSeatingId)).toBe(true);
   await store.close();
 });

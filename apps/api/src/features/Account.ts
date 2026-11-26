@@ -211,6 +211,10 @@ const deleteSoloGroups = Effect.fn("Account.deleteSoloGroups")(function* (
     delete from personal_entries
     where visit_id in (select id from personal_visits where legacy_session_id in ${sessions})
   `;
+  yield* sql`
+    delete from personal_seatings
+    where visit_id in (select id from personal_visits where legacy_session_id in ${sessions})
+  `;
   yield* sql`delete from personal_visits where legacy_session_id in ${sessions}`;
   yield* sql`delete from personal_operations where table_id in ${legacyTables}`;
   yield* sql`delete from tables where legacy_session_id in ${sessions}`;
@@ -271,6 +275,7 @@ const releaseTables = Effect.fn("Account.releaseTables")(function* (
     const tables = sql.in(doomed);
     const visits = sql`(select id from personal_visits where table_id in ${tables})`;
     yield* sql`delete from personal_entries where visit_id in ${visits}`;
+    yield* sql`delete from personal_seatings where visit_id in ${visits}`;
     yield* sql`delete from personal_visits where table_id in ${tables}`;
     yield* sql`delete from personal_operations where table_id in ${tables}`;
     yield* sql`delete from table_participants where table_id in ${tables}`;
@@ -353,6 +358,8 @@ const detachRecording = Effect.fn("Account.detachRecording")(function* (
     `;
     yield* sql`update personal_entries set created_by = ${DELETED_ACTOR} where created_by = ${actor}`;
     yield* sql`update personal_entries set voided_by = ${DELETED_ACTOR} where voided_by = ${actor}`;
+    yield* sql`update personal_seatings set created_by = ${DELETED_ACTOR} where created_by = ${actor}`;
+    yield* sql`update personal_seatings set voided_by = ${DELETED_ACTOR} where voided_by = ${actor}`;
     yield* sql`delete from recording_actors where id = ${actor}`;
   }
 

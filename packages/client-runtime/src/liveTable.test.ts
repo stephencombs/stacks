@@ -1,8 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
+  ActorId,
   MinorUnits,
   PlayerId,
   PlayerIdentity,
+  SeatingId,
+  VisitSeating,
   type TableView,
   type VisitId,
 } from "@stacks/contracts";
@@ -239,5 +242,126 @@ describe("tableActions", () => {
     expect(tableActions("participant", { playing: false, closed: false, empty: false })).toEqual(
       [],
     );
+  });
+});
+
+describe("liveTable seats", () => {
+  it("combines local and server seatings, uses server tableSeats for participants, and breaks reopen overlaps", async () => {
+    const store = await open();
+
+    const starter = await save(store, {
+      type: "start",
+      buyIn: 20000,
+      startedAt: at(20),
+      game: "blackjack",
+      tableSeats: 7,
+    });
+
+    const starterVisit = visitOf(starter);
+    const tableId = state(store).tables[0]!.id;
+
+    const bea = await save(store, {
+      type: "join_table",
+      tableId,
+      displayName: "Bea",
+      buyIn: 10000,
+      startedAt: at(20),
+    });
+
+    const beaVisit = visitOf(bea);
+
+    await save(store, { type: "set_seat", visitId: starterVisit, seat: 7, occurredAt: at(20, 5) });
+    await save(store, {
+      type: "finish",
+      visitId: starterVisit,
+      amount: 25000,
+      finishedAt: at(20, 10),
+    });
+    await save(store, { type: "set_seat", visitId: beaVisit, seat: 7, occurredAt: at(20, 15) });
+    await save(store, { type: "reopen", visitId: starterVisit, reason: "Back in" });
+
+    const table = liveTable(recordingTable(state(store), tableId)!, undefined);
+    expect(table.tableSeats).toBe(7);
+    expect([...table.occupiedSeats]).toEqual([[7, beaVisit]]);
+    expect(table.seats.find((s) => s.visitId === starterVisit)).toMatchObject({
+      seatNumber: null,
+      seatOutcome: { kind: "seat", seat: 7 },
+    });
+    expect(table.seats.find((s) => s.visitId === beaVisit)).toMatchObject({
+      seatNumber: 7,
+      seatOutcome: { kind: "seat", seat: 7 },
+    });
+
+    const carol = PlayerIdentity.make({
+      id: PlayerId.make("0192e7a0-0000-7000-8000-00000000ca01"),
+      displayName: "Carol",
+    });
+
+    const participantStore = await open();
+
+    const pStart = await save(participantStore, {
+      type: "start",
+      buyIn: 15000,
+      startedAt: at(20),
+      game: "blackjack",
+      tableSeats: 5,
+    });
+
+    const carolVisit = visitOf(pStart);
+    await save(participantStore, {
+      type: "set_seat",
+      visitId: carolVisit,
+      seat: 2,
+      occurredAt: at(20, 2),
+    });
+
+    const localTable = recordingTable(
+      state(participantStore),
+      state(participantStore).tables[0]!.id,
+    )!;
+
+    const joined = {
+      ...localTable,
+      role: "participant" as const,
+      table: { ...localTable.table, starterPlayerId: carol.id },
+    };
+
+    const remoteSeating = VisitSeating.make({
+      id: SeatingId.make(crypto.randomUUID()),
+      visitId: beaVisit,
+      seat: 6,
+      occurredAt: at(20, 5),
+      createdBy: ActorId.make(crypto.randomUUID()),
+      createdAt: at(20, 5),
+      voidedAt: null,
+      voidedBy: null,
+      voidReason: null,
+    });
+
+    const server: TableView = {
+      table: { ...localTable.table, tableSeats: 6 },
+      players: [carol],
+      visits: [
+        visitSummary(
+          state(store).visits.find((v) => v.id === beaVisit)!,
+          state(store).entries,
+        ),
+      ],
+      seatings: [remoteSeating],
+      viewerRole: "participant",
+      viewerPlayerId: localTable.you.player.id,
+      recorders: [],
+      appointable: [],
+      shared: false,
+    };
+
+    const combined = liveTable(joined, server);
+    expect(combined.tableSeats).toBe(6);
+    expect([...combined.occupiedSeats]).toEqual([
+      [2, carolVisit],
+      [6, beaVisit],
+    ]);
+    await participantStore.close();
+    await store.close();
   });
 });

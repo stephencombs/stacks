@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-25
 priority: medium
 tags:
@@ -9,10 +9,12 @@ tags:
   - api
   - stats
 created_at: 2026-11-25T05:46:30.125484900Z
-updated_at: 2026-11-25T05:52:04.926444900Z
+updated_at: 2026-11-26T03:26:18.681191Z
 transitions:
   - status: planned
     at: 2026-11-25T05:52:04.926444900Z
+  - status: in-progress
+    at: 2026-11-26T03:26:18.681191Z
 ---
 
 # Blackjack seat selection: model, tabletop picker, and stats

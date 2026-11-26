@@ -110,6 +110,9 @@ const makeVisit = ({
       tripId,
     },
     venue,
+    seatings: [],
+    currentSeat: null,
+    seatOutcome: { kind: "none" } as const,
   };
 };
 

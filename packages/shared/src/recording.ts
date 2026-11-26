@@ -4,15 +4,29 @@ import {
   PlayerIdentity,
   Table,
   Visit,
+  VisitSeating,
   type EntryId,
   type PlayerId,
   type TableId,
   type VisitId,
 } from "@stacks/contracts";
-import { isTableCommand, RecordingCommand } from "@stacks/contracts/recordingCommands";
+import {
+  isSeatingCommand,
+  isTableCommand,
+  RecordingCommand,
+  type SeatingCommand,
+} from "@stacks/contracts/recordingCommands";
 import * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
 import * as Schema from "effect/Schema";
+
+import {
+  normalizeTableSeats,
+  seatCount,
+  tableLiveSeats,
+  tableSizes,
+  visitSeatNow,
+} from "./seats.ts";
 
 export const RecordingReceipt = Schema.Struct({
   command: RecordingCommand,
@@ -44,6 +58,7 @@ export interface RecordingLedger {
   readonly tables: ReadonlyArray<Table>;
   readonly visits: ReadonlyArray<Visit>;
   readonly entries: ReadonlyArray<PlayEntry>;
+  readonly seatings: ReadonlyArray<VisitSeating>;
   readonly receipts: ReadonlyArray<RecordingReceipt>;
 }
 
@@ -153,6 +168,195 @@ export const normalizeGameName = (game: Table["game"], gameName: string | null |
   return trimmed;
 };
 
+const checkedTableSeats = (game: Table["game"], tableSeats: number | null | undefined) => {
+  try {
+    return normalizeTableSeats(game, tableSeats);
+  } catch (error) {
+    throw new RecordingError(
+      "invalid",
+      error instanceof Error ? error.message : "Invalid table seat count.",
+      error,
+    );
+  }
+};
+
+type MutableTableFields = { -readonly [K in keyof Table]: Table[K] };
+
+const makeTable = (input: {
+  readonly id: TableId;
+  readonly tripId: Table["tripId"];
+  readonly game: Table["game"];
+  readonly gameName?: string | null | undefined;
+  readonly tableSeats?: number | null | undefined;
+  readonly venueId: Table["venueId"];
+  readonly highLimit: boolean;
+  readonly starterPlayerId: PlayerId;
+  readonly deletedAt?: DateTime.Utc | undefined;
+}) => {
+  const gameName = normalizeGameName(input.game, input.gameName);
+  const tableSeats = checkedTableSeats(input.game, input.tableSeats);
+
+  const fields: MutableTableFields = {
+    id: input.id,
+    tripId: input.tripId,
+    game: input.game,
+    venueId: input.venueId,
+    highLimit: input.highLimit,
+    starterPlayerId: input.starterPlayerId,
+  };
+
+  if (gameName !== null) fields.gameName = gameName;
+
+  if (tableSeats !== null) fields.tableSeats = tableSeats;
+
+  if (input.deletedAt !== undefined) fields.deletedAt = input.deletedAt;
+
+  return Table.make(fields);
+};
+
+const assertFitsLiveSeats = (
+  tableId: TableId,
+  game: Table["game"],
+  tableSeats: number | null,
+  visits: ReadonlyArray<Visit>,
+  seatings: ReadonlyArray<VisitSeating>,
+) => {
+  const capacity = seatCount({ game, tableSeats });
+
+  if (capacity === null) return;
+
+  const occupied = tableLiveSeats(
+    visits.filter((visit) => visit.tableId === tableId),
+    seatings,
+  );
+
+  for (const seat of occupied.keys())
+    if (seat > capacity)
+      throw new RecordingError(
+        "invalid",
+        `Move anyone sitting past seat ${capacity} before shrinking the table.`,
+      );
+};
+
+const applySeatingCommand = <S extends RecordingLedger>(
+  state: S,
+  tables: ReadonlyArray<Table>,
+  visits: ReadonlyArray<Visit>,
+  receipts: ReadonlyArray<RecordingReceipt>,
+  actorPlayers: ReadonlyArray<PlayerId> | null,
+  forbid: (table: Pick<Table, "id" | "starterPlayerId">, playerId: PlayerId) => void,
+  command: SeatingCommand,
+) => {
+  const visit = visits.find((item) => item.id === command.visitId);
+  requireValid(visit, "Visit does not exist.");
+  const table = tables.find((item) => item.id === visit.tableId);
+  requireValid(table, "Table does not exist.");
+  requireValid(visit.tableId === command.tableId, "Visit does not belong to this table.");
+  forbid(table, visit.playerId);
+  requireValid(table.deletedAt === undefined, "This table was deleted.");
+  requireValid(visit.deletedAt === undefined, "Restore this session before changing its seat.");
+
+  const otherVisits = visits.filter((item) => item.tableId === table.id && item.id !== visit.id);
+  let seatings = [...state.seatings];
+
+  if (command.type === "set_seat") {
+    if (actorPlayers !== null) {
+      const totalSeats = seatCount(table);
+      requireValid(totalSeats !== null, "This game doesn't use numbered seats.");
+      requireValid(
+        command.seat === null || (command.seat >= 1 && command.seat <= totalSeats),
+        `Choose a seat from 1 to ${totalSeats}.`,
+      );
+    }
+
+    requireValid(
+      !seatings.some((item) => item.id === command.seatingId),
+      "Seating ID is already used.",
+    );
+    requireValid(
+      ms(command.occurredAt) >= ms(visit.startedAt) &&
+        (visit.finishedAt === null || ms(command.occurredAt) <= ms(visit.finishedAt)),
+      "Seat time must stay within the session.",
+    );
+
+    if (command.replacesSeatingId !== undefined) {
+      requireValid(command.reason !== undefined, "Give a reason when correcting a seat.");
+      const target = seatings.find((item) => item.id === command.replacesSeatingId);
+      requireValid(
+        target && target.visitId === visit.id && target.voidedAt === null,
+        "Correction target is missing or already voided.",
+      );
+      requireValid(
+        ms(command.preparedAt) >= ms(target.createdAt),
+        "Correction predates the original audit.",
+      );
+      seatings = seatings.map((item) =>
+        item.id === target.id
+          ? VisitSeating.make({
+              ...item,
+              voidedAt: command.preparedAt,
+              voidedBy: command.actorId,
+              voidReason: command.reason!,
+            })
+          : item,
+      );
+    }
+
+    if (
+      visit.finishedAt === null &&
+      command.seat !== null &&
+      tableLiveSeats(otherVisits, seatings).has(command.seat)
+    )
+      throw new RecordingError("conflict", `Seat ${command.seat} is already taken.`);
+
+    seatings.push(
+      VisitSeating.make({
+        id: command.seatingId,
+        visitId: visit.id,
+        seat: command.seat,
+        occurredAt: command.occurredAt,
+        createdBy: command.actorId,
+        createdAt: command.preparedAt,
+        voidedAt: null,
+        voidedBy: null,
+        voidReason: null,
+      }),
+    );
+
+    return { ...state, seatings, receipts };
+  }
+
+  const target = seatings.find((item) => item.id === command.seatingId);
+  requireValid(
+    target && target.visitId === visit.id && target.voidedAt === null,
+    "Correction target is missing or already voided.",
+  );
+  requireValid(
+    ms(command.preparedAt) >= ms(target.createdAt),
+    "Correction predates the original audit.",
+  );
+
+  const nextSeatings = seatings.map((item) =>
+    item.id === target.id
+      ? VisitSeating.make({
+          ...item,
+          voidedAt: command.preparedAt,
+          voidedBy: command.actorId,
+          voidReason: command.reason,
+        })
+      : item,
+  );
+
+  if (visit.finishedAt === null) {
+    const reverted = visitSeatNow(nextSeatings.filter((item) => item.visitId === visit.id));
+
+    if (reverted !== null && tableLiveSeats(otherVisits, nextSeatings).has(reverted))
+      throw new RecordingError("conflict", `Seat ${reverted} is already taken.`);
+  }
+
+  return { ...state, seatings: nextSeatings, receipts };
+};
+
 export const applyRecordingCommand = <S extends RecordingLedger>(
   state: S,
   command: RecordingCommand,
@@ -177,6 +381,32 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
     const table = state.tables.find((table) => table.id === command.tableId);
     requireValid(table, "Table does not exist.");
 
+    if (command.type === "set_table_seats") {
+      if (
+        actorPlayers !== null &&
+        !authorize(table, actorPlayers, table.starterPlayerId, state.participants, state.recorders)
+      )
+        throw new RecordingError(
+          "forbidden",
+          "Only whoever records for everyone at this table can change its size.",
+        );
+      requireValid(table.deletedAt === undefined, "This table was deleted.");
+      requireValid(
+        table.game !== null && tableSizes[table.game] !== undefined,
+        "This game doesn't use numbered seats.",
+      );
+      const nextSeats = checkedTableSeats(table.game, command.tableSeats);
+      assertFitsLiveSeats(table.id, table.game, nextSeats, state.visits, state.seatings);
+
+      const updated = makeTable({ ...table, tableSeats: nextSeats });
+
+      return {
+        ...state,
+        tables: state.tables.map((item) => (item.id === table.id ? updated : item)),
+        receipts,
+      };
+    }
+
     if (actorPlayers !== null && !actorPlayers.includes(table.starterPlayerId))
       throw new RecordingError("forbidden", "Only the player who started this table can do that.");
     requireValid(table.deletedAt === undefined, "This table was deleted.");
@@ -191,7 +421,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         ...state,
         tables: state.tables.map((item) =>
           item.id === table.id
-            ? Table.make({ ...table, tripId: null, deletedAt: command.preparedAt })
+            ? makeTable({ ...table, tripId: null, deletedAt: command.preparedAt })
             : item,
         ),
         receipts,
@@ -202,7 +432,7 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       return {
         ...state,
         tables: state.tables.map((item) =>
-          item.id === table.id ? Table.make({ ...table, tripId: command.tripId }) : item,
+          item.id === table.id ? makeTable({ ...table, tripId: command.tripId }) : item,
         ),
         receipts,
       };
@@ -238,34 +468,22 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
       "Start IDs are already used.",
     );
 
-    if (known) return { ...state, receipts };
-    const gameName = normalizeGameName(command.game, command.gameName);
+    const created = makeTable({
+      id: command.tableId,
+      tripId: null,
+      game: command.game,
+      gameName: command.gameName,
+      tableSeats: command.tableSeats,
+      venueId: command.venueId,
+      highLimit: command.highLimit,
+      starterPlayerId: command.playerId,
+    });
 
     return {
       ...state,
-      tables: [
-        ...state.tables,
-        Table.make(
-          gameName === null
-            ? {
-                id: command.tableId,
-                tripId: null,
-                game: command.game,
-                venueId: command.venueId,
-                highLimit: command.highLimit,
-                starterPlayerId: command.playerId,
-              }
-            : {
-                id: command.tableId,
-                tripId: null,
-                game: command.game,
-                gameName,
-                venueId: command.venueId,
-                highLimit: command.highLimit,
-                starterPlayerId: command.playerId,
-              },
-        ),
-      ],
+      tables: known
+        ? state.tables.map((table) => (table.id === command.tableId ? created : table))
+        : [...state.tables, created],
       receipts,
     };
   }
@@ -378,30 +596,22 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
         "Start IDs are already used.",
       );
 
-      if (!known) {
-        const gameName = normalizeGameName(command.game, command.gameName);
-        tables.push(
-          Table.make(
-            gameName === null
-              ? {
-                  id: command.tableId,
-                  tripId: null,
-                  game: command.game,
-                  venueId: command.venueId,
-                  highLimit: command.highLimit,
-                  starterPlayerId: command.playerId,
-                }
-              : {
-                  id: command.tableId,
-                  tripId: null,
-                  game: command.game,
-                  gameName,
-                  venueId: command.venueId,
-                  highLimit: command.highLimit,
-                  starterPlayerId: command.playerId,
-                },
-          ),
-        );
+      const created = makeTable({
+        id: command.tableId,
+        tripId: null,
+        game: command.game,
+        gameName: command.gameName,
+        tableSeats: command.tableSeats,
+        venueId: command.venueId,
+        highLimit: command.highLimit,
+        starterPlayerId: command.playerId,
+      });
+
+      if (known) {
+        const index = tables.findIndex((table) => table.id === command.tableId);
+        tables[index] = created;
+      } else {
+        tables.push(created);
       }
     }
 
@@ -428,6 +638,8 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
 
     if (command.type === "record_completed")
       append(command.cashOutId, command.visitId, "cash_out", command.cashOut, command.finishedAt);
+  } else if (isSeatingCommand(command)) {
+    return applySeatingCommand(state, tables, visits, receipts, actorPlayers, forbid, command);
   } else {
     const visit = visits.find((visit) => visit.id === command.visitId);
     requireValid(visit, "Visit does not exist.");
@@ -508,6 +720,15 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
           entries.every((entry) => entry.visitId !== visit.id || ms(entry.occurredAt) >= ms(start)),
           "The start time can't be after the first buy-in.",
         );
+        requireValid(
+          state.seatings.every(
+            (seating) =>
+              seating.visitId !== visit.id ||
+              seating.voidedAt !== null ||
+              ms(seating.occurredAt) >= ms(start),
+          ),
+          "The start time can't be after a recorded seat.",
+        );
         startedAt = start;
       }
 
@@ -526,18 +747,27 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
             "forbidden",
             "Only whoever records for everyone at this table can change its game or venue.",
           );
-        const gameName = normalizeGameName(command.table.game, command.table.gameName);
-        const { gameName: _previousGameName, ...rest } = table;
+
+        const nextRawSeats =
+          command.table.tableSeats !== undefined
+            ? command.table.tableSeats
+            : command.table.game !== null && tableSizes[command.table.game]
+              ? (table.tableSeats ?? null)
+              : null;
+
+        const nextSeats = checkedTableSeats(command.table.game, nextRawSeats);
+        assertFitsLiveSeats(table.id, command.table.game, nextSeats, visits, state.seatings);
+
         const index = tables.findIndex((item) => item.id === table.id);
 
-        const next = {
-          ...rest,
+        tables[index] = makeTable({
+          ...table,
           game: command.table.game,
+          gameName: command.table.gameName,
+          tableSeats: nextSeats,
           venueId: command.table.venueId,
           highLimit: command.table.highLimit,
-        };
-
-        tables[index] = Table.make(gameName === null ? next : { ...next, gameName });
+        });
       }
     } else if (command.type === "add" || command.type === "finish") {
       requireValid(
@@ -557,6 +787,15 @@ export const applyRecordingCommand = <S extends RecordingLedger>(
           command.counterpartyId ?? null,
         );
       else {
+        requireValid(
+          state.seatings.every(
+            (seating) =>
+              seating.visitId !== visit.id ||
+              seating.voidedAt !== null ||
+              ms(seating.occurredAt) <= ms(command.finishedAt),
+          ),
+          "Finish time can't be before a recorded seat.",
+        );
         finishedAt = command.finishedAt;
         append(
           command.entryId,
