@@ -57,16 +57,13 @@ vi.mock("react-native", () => ({
 vi.mock("react-native-svg", () => ({
   default: Container,
   Circle: Container,
-  Defs: Container,
-  Ellipse: Container,
   G: Container,
-  Line: Container,
-  LinearGradient: Container,
   Path: Container,
-  RadialGradient: Container,
-  Rect: Container,
-  Stop: Container,
   Text: Container,
+}));
+
+vi.mock("uniwind", () => ({
+  useCSSVariable: (names: ReadonlyArray<string>) => names.map((name) => `var(${name})`),
 }));
 
 vi.mock("./PlayerAvatar", () => ({
@@ -133,9 +130,8 @@ describe("BlackjackTableArc", () => {
       );
     });
 
-    expect(host.textContent).toContain("BLACKJACK PAYS 3 TO 2");
-    expect(host.textContent).toContain("DEALER MUST STAND ON 17");
-    expect(host.textContent).toContain("INSURANCE PAYS 2 TO 1");
+    expect(host.textContent).toContain("Dealer");
+    expect(host.textContent).not.toContain("PAYS");
 
     const buttons = [...host.querySelectorAll("button")];
     expect(buttons).toHaveLength(6);
@@ -158,7 +154,7 @@ describe("BlackjackTableArc", () => {
     await act(async () => root.unmount());
   });
 
-  it("keeps occupied and selected captions outside disabled hit targets at large text sizes", async () => {
+  it("keeps occupant captions outside disabled hit targets at large text sizes", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     dimensions.fontScale = 1.6;
     const onSelect = vi.fn();
@@ -192,11 +188,7 @@ describe("BlackjackTableArc", () => {
     expect(onSelect).not.toHaveBeenCalled();
 
     const captions = [...host.querySelectorAll("[data-lines='1']")];
-    expect(captions.map((caption) => caption.textContent)).toEqual([
-      "Alexandria Wort…",
-      "You",
-      "Selected",
-    ]);
+    expect(captions.map((caption) => caption.textContent)).toEqual(["Alexandria Wort…", "You"]);
 
     for (const caption of captions) {
       expect(caption.closest("button")).toBeNull();
