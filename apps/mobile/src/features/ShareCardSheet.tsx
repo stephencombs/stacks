@@ -9,6 +9,7 @@ import { Switch } from "../components/ui/Switch";
 import { Text } from "../components/ui/Text";
 import { usePreferences } from "../lib/preferences";
 import { shareImage } from "../lib/share";
+import { CardTilt } from "./CardTilt";
 import { SessionCard } from "./SessionCard";
 import { CARD_HEIGHT, CARD_WIDTH } from "./ShareCardFrame";
 import { TripCard } from "./TripCard";
@@ -68,16 +69,18 @@ export function ShareCardSheet({
       }
     >
       <View className="items-center">
-        <View
-          style={{ width: CARD_WIDTH * scale, height: CARD_HEIGHT * scale }}
-          className="overflow-hidden rounded-[22px]"
-        >
-          <View style={{ transform: [{ scale }], transformOrigin: "top left" }}>
-            <View ref={view} collapsable={false}>
-              {model.kind === "trip" ? <TripCard model={model} /> : <SessionCard model={model} />}
+        <CardTilt>
+          <View
+            style={{ width: CARD_WIDTH * scale, height: CARD_HEIGHT * scale }}
+            className="overflow-hidden rounded-[22px]"
+          >
+            <View style={{ transform: [{ scale }], transformOrigin: "top left" }}>
+              <View ref={view} collapsable={false}>
+                {model.kind === "trip" ? <TripCard model={model} /> : <SessionCard model={model} />}
+              </View>
             </View>
           </View>
-        </View>
+        </CardTilt>
       </View>
       <View className="min-h-11 flex-row items-center justify-between gap-3">
         <View className="min-w-0 flex-1">

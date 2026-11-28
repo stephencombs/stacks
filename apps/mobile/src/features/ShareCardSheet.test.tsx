@@ -83,6 +83,9 @@ const mounted = async ({
     TripCard: ({ model }: { model: CardModel }) => <div data-card={String(model.hidden)} />,
   }));
   vi.doMock("./SessionCard", () => ({ SessionCard: () => null }));
+  vi.doMock("./CardTilt", () => ({
+    CardTilt: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  }));
   vi.doMock("./ShareCardFrame", () => ({ CARD_WIDTH: 360, CARD_HEIGHT: 450 }));
 
   const { ShareCardSheet } = await import("./ShareCardSheet");
