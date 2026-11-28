@@ -3,6 +3,7 @@ import {
   EntryId,
   MinorUnits,
   PlayerId,
+  SeatingId,
   TableId,
   VisitId,
   type Game,
@@ -41,6 +42,7 @@ type StartInput = {
   readonly startedAt?: DateTime.Utc;
   readonly game?: Game;
   readonly gameName?: string | null;
+  readonly tableSeats?: number | null;
   readonly venueId?: VenueId;
   readonly highLimit?: boolean;
 };
@@ -48,10 +50,16 @@ type StartInput = {
 export type RecordingInput =
   | { readonly type: "set_table_trip"; readonly tableId: TableId; readonly tripId: TripId | null }
   | {
+      readonly type: "set_table_seats";
+      readonly tableId: TableId;
+      readonly tableSeats: number | null;
+    }
+  | {
       /** A table to record at without playing. */
       readonly type: "open_table";
       readonly game?: Game;
       readonly gameName?: string | null;
+      readonly tableSeats?: number | null;
       readonly venueId?: VenueId;
       readonly highLimit?: boolean;
     }
@@ -109,6 +117,22 @@ export type RecordingInput =
       readonly startedAt?: DateTime.Utc;
       readonly table?: TableDetails;
     }
+  | {
+      readonly type: "set_seat";
+      readonly tableId?: TableId;
+      readonly visitId: VisitId;
+      readonly seat: number | null;
+      readonly occurredAt?: DateTime.Utc;
+      readonly replacesSeatingId?: SeatingId;
+      readonly reason?: string;
+    }
+  | {
+      readonly type: "void_seating";
+      readonly tableId?: TableId;
+      readonly visitId: VisitId;
+      readonly seatingId: SeatingId;
+      readonly reason: string;
+    }
   | { readonly type: "appoint_recorder"; readonly tableId: TableId; readonly playerId: PlayerId }
   | { readonly type: "revoke_recorder"; readonly tableId: TableId; readonly playerId: PlayerId };
 
@@ -152,7 +176,14 @@ export const prepareRecordingCommand = (state: RecordingState, input: RecordingI
       highLimit: input.highLimit ?? false,
     };
 
-    const named = input.gameName === undefined ? start : { ...start, gameName: input.gameName };
+    const named: typeof start & {
+      gameName?: typeof input.gameName;
+      tableSeats?: typeof input.tableSeats;
+    } = { ...start };
+
+    if (input.gameName !== undefined) named.gameName = input.gameName;
+
+    if (input.tableSeats !== undefined) named.tableSeats = input.tableSeats;
 
     return RecordingCommand.make(
       input.type === "start"
@@ -206,12 +237,23 @@ export const prepareRecordingCommand = (state: RecordingState, input: RecordingI
       highLimit: input.highLimit ?? false,
     };
 
-    return RecordingCommand.make(
-      input.gameName === undefined ? opened : { ...opened, gameName: input.gameName },
-    );
+    const command: typeof opened & {
+      gameName?: typeof input.gameName;
+      tableSeats?: typeof input.tableSeats;
+    } = { ...opened };
+
+    if (input.gameName !== undefined) command.gameName = input.gameName;
+
+    if (input.tableSeats !== undefined) command.tableSeats = input.tableSeats;
+
+    return RecordingCommand.make(command);
   }
 
-  if (input.type === "set_table_trip" || input.type === "delete_table")
+  if (
+    input.type === "set_table_trip" ||
+    input.type === "set_table_seats" ||
+    input.type === "delete_table"
+  )
     return RecordingCommand.make({ ...common, ...input });
 
   if (input.type === "appoint_recorder" || input.type === "revoke_recorder")
@@ -224,6 +266,44 @@ export const prepareRecordingCommand = (state: RecordingState, input: RecordingI
   const visit = state.visits.find((visit) => visit.id === input.visitId);
 
   if (!visit) throw new RecordingError("invalid", "Visit does not exist.");
+
+  if (input.type === "set_seat") {
+    const command: typeof common & {
+      type: "set_seat";
+      tableId: NonNullable<typeof input.tableId>;
+      visitId: typeof visit.id;
+      seatingId: typeof SeatingId.Type;
+      seat: typeof input.seat;
+      occurredAt: NonNullable<typeof input.occurredAt>;
+      replacesSeatingId?: NonNullable<typeof input.replacesSeatingId>;
+      reason?: NonNullable<typeof input.reason>;
+    } = {
+      ...common,
+      type: "set_seat",
+      tableId: input.tableId ?? visit.tableId,
+      visitId: visit.id,
+      seatingId: SeatingId.make(newId()),
+      seat: input.seat,
+      occurredAt: input.occurredAt ?? preparedAt,
+    };
+
+    if (input.replacesSeatingId !== undefined) command.replacesSeatingId = input.replacesSeatingId;
+
+    if (input.reason !== undefined) command.reason = input.reason;
+
+    return RecordingCommand.make(command);
+  }
+
+  if (input.type === "void_seating")
+    return RecordingCommand.make({
+      ...common,
+      type: "void_seating",
+      tableId: input.tableId ?? visit.tableId,
+      visitId: visit.id,
+      seatingId: input.seatingId,
+      reason: input.reason,
+    });
+
   const existing = { ...common, visitId: visit.id, expectedRevision: visit.revision };
 
   switch (input.type) {
@@ -298,6 +378,7 @@ const freezeState = (state: RecordingState) => {
     state.tables,
     state.visits,
     state.entries,
+    state.seatings,
     state.receipts,
     state.venues,
   ]) {
@@ -377,6 +458,7 @@ export const makeRecordingStore = (storage: RecordingStorage) => {
         tables: [],
         visits: [],
         entries: [],
+        seatings: [],
         receipts: [],
         venues: [],
       };

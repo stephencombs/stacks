@@ -211,6 +211,7 @@ it.layer(TestApi.layer)("recording", (it) => {
         players: [],
         visits: [],
         entries: [],
+        seatings: [],
       });
 
       const borrowed = yield* bea.recording

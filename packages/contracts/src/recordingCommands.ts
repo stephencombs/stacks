@@ -5,16 +5,17 @@ import {
   EntryId,
   PlayerId,
   PlayerInviteId,
+  SeatingId,
   TableId,
   SessionId,
   TripId,
   VenueId,
   VisitId,
 } from "./ids.ts";
-import { Game } from "./ledger.ts";
+import { Game, Seat } from "./ledger.ts";
 import { MinorUnits } from "./money.ts";
 import { PlayerIdentity } from "./players.ts";
-import { PlayEntry, Table, Visit, VisitSummary } from "./recording.ts";
+import { PlayEntry, Table, Visit, VisitSeating, VisitSummary } from "./recording.ts";
 
 export const RecordingOperationId = Schema.String.check(Schema.isUUID()).pipe(
   Schema.brand("RecordingOperationId"),
@@ -48,6 +49,7 @@ const start = {
   ...visit,
   game: Schema.NullOr(Game),
   gameName: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  tableSeats: Schema.optionalKey(Schema.NullOr(Seat)),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
 };
@@ -69,6 +71,7 @@ export type RecordingReplacement = typeof RecordingReplacement.Type;
 export const TableDetails = Schema.Struct({
   game: Schema.NullOr(Game),
   gameName: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  tableSeats: Schema.optionalKey(Schema.NullOr(Seat)),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
 });
@@ -84,6 +87,7 @@ export const RecordingCommand = Schema.Union([
     playerId: PlayerId,
     game: Schema.NullOr(Game),
     gameName: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    tableSeats: Schema.optionalKey(Schema.NullOr(Seat)),
     venueId: Schema.NullOr(VenueId),
     highLimit: Schema.Boolean,
   }),
@@ -145,6 +149,31 @@ export const RecordingCommand = Schema.Union([
     tableId: TableId,
     tripId: Schema.NullOr(TripId),
   }),
+  Schema.Struct({
+    type: Schema.Literal("set_table_seats"),
+    ...common,
+    tableId: TableId,
+    tableSeats: Schema.NullOr(Seat),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("set_seat"),
+    ...common,
+    tableId: TableId,
+    visitId: VisitId,
+    seatingId: SeatingId,
+    seat: Schema.NullOr(Seat),
+    occurredAt: Schema.DateTimeUtc,
+    replacesSeatingId: Schema.optionalKey(SeatingId),
+    reason: Schema.optionalKey(Schema.NonEmptyString),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("void_seating"),
+    ...common,
+    tableId: TableId,
+    visitId: VisitId,
+    seatingId: SeatingId,
+    reason: Schema.NonEmptyString,
+  }),
   Schema.Struct({ type: Schema.Literal("appoint_recorder"), ...recorder }),
   Schema.Struct({ type: Schema.Literal("revoke_recorder"), ...recorder }),
   Schema.Struct({ type: Schema.Literal("delete_table"), ...common, tableId: TableId }),
@@ -155,8 +184,17 @@ export type RecordingCommand = typeof RecordingCommand.Type;
 /** Commands about a table that already exists, never one of its visits. */
 export type TableCommand = Extract<
   RecordingCommand,
-  { type: "appoint_recorder" | "revoke_recorder" | "set_table_trip" | "delete_table" }
+  {
+    type:
+      | "appoint_recorder"
+      | "revoke_recorder"
+      | "set_table_trip"
+      | "set_table_seats"
+      | "delete_table";
+  }
 >;
+
+export type SeatingCommand = Extract<RecordingCommand, { type: "set_seat" | "void_seating" }>;
 
 export type VisitCommand = Exclude<RecordingCommand, TableCommand | { type: "open_table" }>;
 
@@ -164,7 +202,11 @@ export const isTableCommand = (command: RecordingCommand): command is TableComma
   command.type === "appoint_recorder" ||
   command.type === "revoke_recorder" ||
   command.type === "set_table_trip" ||
+  command.type === "set_table_seats" ||
   command.type === "delete_table";
+
+export const isSeatingCommand = (command: RecordingCommand): command is SeatingCommand =>
+  command.type === "set_seat" || command.type === "void_seating";
 
 export const isVisitCommand = (command: RecordingCommand): command is VisitCommand =>
   !isTableCommand(command) && command.type !== "open_table";
@@ -261,6 +303,7 @@ export const RecordingHistory = Schema.Struct({
   players: Schema.Array(PlayerIdentity),
   visits: Schema.Array(Visit),
   entries: Schema.Array(PlayEntry),
+  seatings: Schema.optionalKey(Schema.Array(VisitSeating)),
 });
 
 export type RecordingHistory = typeof RecordingHistory.Type;
@@ -274,6 +317,7 @@ export type RecordingHistory = typeof RecordingHistory.Type;
 export const TableView = Schema.Struct({
   /** Whole-table facts for an active group member reading through the table's trip. */
   entries: Schema.optionalKey(Schema.Array(PlayEntry)),
+  seatings: Schema.optionalKey(Schema.Array(VisitSeating)),
   table: Schema.Struct({ ...Table.fields, starterPlayerId: Schema.NullOr(PlayerId) }),
   legacySessionId: Schema.optionalKey(SessionId),
   players: Schema.Array(PlayerIdentity),

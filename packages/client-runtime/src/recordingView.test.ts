@@ -37,6 +37,8 @@ import {
   recordingHome,
   recordingGroupingOf,
   recordingPeriods,
+  recordingSyncView,
+  recordingTable,
   recordingVisit,
   venueChoices,
   venuePlace,
@@ -743,9 +745,15 @@ describe("live session readouts", () => {
       await save(store, { type: "finish", visitId: id, amount: 35000, finishedAt: at(12) });
 
       const lines = historyLines(view());
-      expect(lines.map((line) => (line.type === "event" ? "finished" : line.entry.amount))).toEqual(
-        ["finished", 35000, 10000, 25000, 30000, 20000],
-      );
+      expect(
+        lines.map((line) => {
+          if (line.type === "event") return "finished";
+
+          if (line.type === "seating") return `seat:${line.seating.seat}`;
+
+          return line.entry.amount;
+        }),
+      ).toEqual(["finished", 35000, 10000, 25000, 30000, 20000]);
 
       const names = lines.flatMap((line) =>
         line.type === "entry"
@@ -854,4 +862,175 @@ it("offers only live trips in the recording currency, including when a mismatche
   expect(tripFieldValue(options, live.id)).toBe("Crew · Vegas");
   expect(tripFieldValue(options, ended.id)).toBe("Current trip");
   expect(tripFieldValue(tableTripOptions(groups, euro.id), euro.id)).toBe("Current trip");
+});
+
+describe("visit seat views, history lines, edit fields, and rejections", () => {
+  it("exposes seat fields, historyLines, sessionEditFields, rejection messages, and sync scoping", async () => {
+    let document: RecordingStorageDocument = { revision: 0 };
+
+    const store = makeRecordingStore({
+      load: async () => document,
+      commit: async (expected, payload) => {
+        document = { revision: expected + 1, payload };
+
+        return document.revision;
+      },
+      subscribe: () => () => undefined,
+      close: async () => undefined,
+    });
+
+    await store.ready;
+
+    const save = async (input: RecordingInput) => {
+      const command = store.prepare(input);
+      await store.execute(command);
+
+      return command;
+    };
+
+    const first = await save({
+      type: "start",
+      buyIn: 20000,
+      startedAt: at(10),
+      game: "blackjack",
+      tableSeats: 5,
+    });
+
+    if (first.type !== "start") throw new Error("Expected start");
+    const firstVisitId = first.visitId;
+    const firstTableId = first.tableId;
+
+    expect(
+      sessionEditFields(recordingVisit(store.getSnapshot().state!, firstVisitId)!, true).find(
+        (item) => item.field === "seat",
+      ),
+    ).toEqual({ field: "seat", label: "Seat", value: "Not set" });
+
+    const s1 = await save({ type: "set_seat", visitId: firstVisitId, seat: 1, occurredAt: at(10) });
+
+    if (s1.type !== "set_seat") throw new Error("Expected set_seat");
+
+    expect(
+      sessionEditFields(recordingVisit(store.getSnapshot().state!, firstVisitId)!, true).find(
+        (item) => item.field === "seat",
+      )?.value,
+    ).toBe("Seat 1 · First base");
+
+    await save({
+      type: "set_seat",
+      visitId: firstVisitId,
+      seat: 5,
+      occurredAt: at(11),
+      replacesSeatingId: s1.seatingId,
+      reason: "Wrong corner",
+    });
+
+    const viewAfterReplace = recordingVisit(store.getSnapshot().state!, firstVisitId)!;
+    expect(viewAfterReplace.currentSeat).toBe(5);
+    expect(viewAfterReplace.seatOutcome).toEqual({ kind: "seat", seat: 5 });
+    expect(sessionEditFields(viewAfterReplace, true).find((f) => f.field === "seat")?.value).toBe(
+      "Seat 5 · Third base",
+    );
+
+    await save({ type: "set_seat", visitId: firstVisitId, seat: 3, occurredAt: at(12) });
+    await save({ type: "finish", visitId: firstVisitId, amount: 30000, finishedAt: at(14) });
+
+    const finishedView = recordingVisit(store.getSnapshot().state!, firstVisitId)!;
+    expect(finishedView.seatOutcome).toEqual({ kind: "multiple", seats: [5, 3] });
+    expect(sessionEditFields(finishedView, true).find((f) => f.field === "seat")?.value).toBe(
+      "Multiple seats",
+    );
+
+    const lines = historyLines(finishedView);
+    const seatingLines = lines.filter((line) => line.type === "seating");
+    expect(seatingLines).toHaveLength(3);
+    expect(seatingLines.map((line) => line.seating.seat)).toEqual([3, 5, 1]);
+    expect(seatingLines[2]!.seating.voidedAt).not.toBeNull();
+
+    const tableView = recordingTable(store.getSnapshot().state!, firstTableId)!;
+    expect(tableView.seatings).toHaveLength(3);
+
+    const poker = await save({
+      type: "start",
+      buyIn: 10000,
+      startedAt: at(15),
+      game: "poker_cash",
+    });
+
+    if (poker.type !== "start") throw new Error("Expected poker start");
+
+    expect(
+      sessionEditFields(recordingVisit(store.getSnapshot().state!, poker.visitId)!, true).some(
+        (item) => item.field === "seat",
+      ),
+    ).toBe(false);
+
+    const tableResizeCmd = store.prepare({
+      type: "set_table_seats",
+      tableId: firstTableId,
+      tableSeats: 7,
+    });
+
+    const seatCmd = store.prepare({
+      type: "set_seat",
+      visitId: firstVisitId,
+      seat: 4,
+      occurredAt: at(13),
+    });
+
+    const voidCmd = store.prepare({
+      type: "void_seating",
+      visitId: firstVisitId,
+      seatingId: s1.seatingId,
+      reason: "Clean",
+    });
+
+    expect(
+      describeRecordingRejection({
+        command: tableResizeCmd,
+        reason: "forbidden",
+        message: "Not starter.",
+      }),
+    ).toBe("The table size didn't sync. Not starter. Your recorded play is saved.");
+
+    expect(
+      describeRecordingRejection({
+        command: seatCmd,
+        reason: "conflict",
+        message: "Seat 4 is already taken.",
+      }),
+    ).toBe("Your seat change didn't sync. Seat 4 is already taken. Your recorded play is saved.");
+
+    expect(
+      describeRecordingRejection({
+        command: voidCmd,
+        reason: "invalid",
+        message: "Already voided.",
+      }),
+    ).toBe("Your seat change didn't sync. Already voided. Your recorded play is saved.");
+
+    const withRejection = {
+      ...store.getSnapshot().state!,
+      sync: {
+        userId: UserId.make("u1"),
+        synced: [],
+        rejected: [
+          {
+            command: tableResizeCmd,
+            reason: "invalid" as const,
+            message: "Move anyone sitting past seat 5.",
+          },
+        ],
+      },
+    };
+
+    expect(
+      recordingSyncView(withRejection, { phase: "idle", error: null }, firstVisitId).rejected,
+    ).toHaveLength(1);
+    expect(
+      recordingSyncView(withRejection, { phase: "idle", error: null }, poker.visitId).rejected,
+    ).toHaveLength(0);
+
+    await store.close();
+  });
 });

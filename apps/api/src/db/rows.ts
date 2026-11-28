@@ -159,6 +159,7 @@ export const TableRow = Schema.Struct({
   starterPlayerId: Schema.NullOr(PlayerId),
   game: Schema.NullOr(Game),
   gameName: Schema.NullOr(Schema.String),
+  tableSeats: Schema.NullOr(Seat),
   venueId: Schema.NullOr(VenueId),
   highLimit: Schema.Boolean,
   shareTokenHash: Schema.NullOr(Schema.String),
@@ -197,6 +198,18 @@ export const PersonalEntryRow = Schema.Struct({
   voidReason: Schema.NullOr(Schema.String),
   replacesEntryId: Schema.NullOr(EntryId),
   counterpartyId: Schema.NullOr(PlayerId),
+});
+
+export const PersonalSeatingRow = Schema.Struct({
+  id: SeatingId,
+  visitId: VisitId,
+  seat: Schema.NullOr(Seat),
+  occurredAt: Timestamp,
+  createdBy: ActorId,
+  createdAt: Timestamp,
+  voidedAt: Schema.NullOr(Timestamp),
+  voidedBy: Schema.NullOr(ActorId),
+  voidReason: Schema.NullOr(Schema.String),
 });
 
 export const PersonalOperationRow = Schema.Struct({

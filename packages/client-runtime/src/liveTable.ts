@@ -1,5 +1,17 @@
-import { MinorUnits, type PlayerId, type TableView, type VisitId } from "@stacks/contracts";
+import {
+  MinorUnits,
+  type PlayerId,
+  type TableView,
+  type VisitId,
+  type VisitSeating,
+} from "@stacks/contracts";
 import { formatMoney } from "@stacks/shared/money";
+import {
+  seatCount,
+  tableLiveSeats,
+  visitSeatOutcome,
+  type VisitSeatOutcome,
+} from "@stacks/shared/seats";
 import * as DateTime from "effect/DateTime";
 
 import { distinctPlayerNames, formatTime } from "./format.ts";
@@ -19,6 +31,8 @@ export type TableSeat = {
   readonly amount: MinorUnits;
   /** Whether this device records their buy-ins and cash-outs from the table. */
   readonly recordable: boolean;
+  readonly seatNumber: number | null;
+  readonly seatOutcome: VisitSeatOutcome;
 };
 
 export type LiveTable = {
@@ -31,6 +45,8 @@ export type LiveTable = {
   readonly playing: number;
   /** Someone played here and everyone has cashed out. */
   readonly closed: boolean;
+  readonly tableSeats: number | null;
+  readonly occupiedSeats: ReadonlyMap<number, VisitId>;
 };
 
 const ms = DateTime.toEpochMillis;
@@ -73,6 +89,31 @@ export const liveTable: (
     name: named.get(item.summary.visit.playerId)!,
   }));
 
+  const localVisitIds = new Set(local.map((item) => item.summary.visit.id));
+
+  const combinedSeatings: ReadonlyArray<VisitSeating> = everyone
+    ? table.seatings
+    : [
+        ...table.seatings,
+        ...(server?.seatings ?? []).filter((seating) => !localVisitIds.has(seating.visitId)),
+      ];
+
+  const totalSeats = seatCount(everyone ? table.table : (server?.table ?? table.table));
+
+  const occupiedSeats =
+    totalSeats === null
+      ? new Map<number, VisitId>()
+      : tableLiveSeats(
+          all.map((item) => item.summary.visit),
+          combinedSeatings,
+        );
+
+  const liveSeatByVisit = new Map<VisitId, number>();
+
+  for (const [seatNumber, visitId] of occupiedSeats) liveSeatByVisit.set(visitId, seatNumber);
+
+  const seatingsByVisit = Map.groupBy(combinedSeatings, (seating) => seating.visitId);
+
   const first = all
     .map((item) => item.summary.visit.startedAt)
     .toSorted((a, b) => ms(a) - ms(b))[0];
@@ -95,6 +136,11 @@ export const liveTable: (
             : "Playing",
         amount: playing ? totals.buyIn : finalResult!,
         recordable: everyone && !isSelf,
+        seatNumber: playing && totalSeats !== null ? (liveSeatByVisit.get(visit.id) ?? null) : null,
+        seatOutcome:
+          totalSeats === null
+            ? ({ kind: "none" } as const)
+            : visitSeatOutcome(seatingsByVisit.get(visit.id) ?? []),
       };
     })
     .toSorted(
@@ -115,6 +161,8 @@ export const liveTable: (
     inPlay: MinorUnits.make(Number(inPlay)),
     playing: live.length,
     closed: seats.length > 0 && live.length === 0,
+    tableSeats: totalSeats,
+    occupiedSeats,
   };
 };
 

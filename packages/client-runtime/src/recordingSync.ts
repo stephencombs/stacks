@@ -47,6 +47,7 @@ import {
   normalizeGameName,
   RecordingError,
 } from "@stacks/shared/recording";
+import { normalizeTableSeats } from "@stacks/shared/seats";
 
 import { newId } from "./ids.ts";
 import { prepareRecordingCommand, type RecordingInput, type RecordingStore } from "./recording.ts";
@@ -365,6 +366,7 @@ export const mergeRecordingHistory: (
     tables: foreignTables(history.tables, self.id, history.commands),
     visits: [],
     entries: [],
+    seatings: [],
     receipts: [],
   };
 
@@ -439,6 +441,13 @@ const settled = (
       receipt.command.operationId !== command.operationId,
   );
 
+  const resized = ledger.receipts.some(
+    (receipt) =>
+      receipt.command.type === "set_table_seats" &&
+      receipt.command.tableId === visit.tableId &&
+      receipt.command.operationId !== command.operationId,
+  );
+
   switch (command.type) {
     case "start":
     case "record_completed": {
@@ -450,6 +459,9 @@ const settled = (
         (edited ||
           (table.game === command.game &&
             (table.gameName ?? null) === normalizeGameName(command.game, command.gameName) &&
+            (resized ||
+              (table.tableSeats ?? null) ===
+                normalizeTableSeats(command.game, command.tableSeats)) &&
             table.venueId === command.venueId &&
             table.highLimit === command.highLimit &&
             ms(visit.startedAt) === ms(command.startedAt))) &&
@@ -491,6 +503,36 @@ const settled = (
             command.replacement.occurredAt,
             command.replacement.note,
           ))
+      );
+    }
+
+    case "set_seat": {
+      const seating = ledger.seatings.find(
+        (item) => item.id === command.seatingId && item.visitId === visit.id,
+      );
+
+      return (
+        seating !== undefined &&
+        seating.seat === command.seat &&
+        ms(seating.occurredAt) === ms(command.occurredAt) &&
+        (command.replacesSeatingId === undefined ||
+          ledger.seatings.some(
+            (item) =>
+              item.id === command.replacesSeatingId &&
+              item.visitId === visit.id &&
+              item.voidedAt !== null &&
+              item.voidReason === command.reason,
+          ))
+      );
+    }
+
+    case "void_seating": {
+      const target = ledger.seatings.find(
+        (item) => item.id === command.seatingId && item.visitId === visit.id,
+      );
+
+      return (
+        target !== undefined && target.voidedAt !== null && target.voidReason === command.reason
       );
     }
 
@@ -588,6 +630,7 @@ const inputOf: (command: RecordingCommand, ids: ReadonlyMap<string, string>) => 
       highLimit: command.highLimit,
       ...optional("game", command.game),
       ...optional("gameName", command.gameName ?? null),
+      ...optional("tableSeats", command.tableSeats ?? null),
       ...optional("venueId", command.venueId),
     };
 
@@ -602,6 +645,13 @@ const inputOf: (command: RecordingCommand, ids: ReadonlyMap<string, string>) => 
       type: command.type,
       tableId: sameId(command.tableId, ids),
       tripId: command.tripId,
+    };
+
+  if (command.type === "set_table_seats")
+    return {
+      type: command.type,
+      tableId: sameId(command.tableId, ids),
+      tableSeats: command.tableSeats,
     };
 
   if (isTableCommand(command))
@@ -621,6 +671,7 @@ const inputOf: (command: RecordingCommand, ids: ReadonlyMap<string, string>) => 
         highLimit: command.highLimit,
         ...optional("game", command.game),
         ...optional("gameName", command.gameName ?? null),
+        ...optional("tableSeats", command.tableSeats ?? null),
         ...optional("venueId", command.venueId),
       };
 
@@ -688,6 +739,28 @@ const inputOf: (command: RecordingCommand, ids: ReadonlyMap<string, string>) => 
         ...optional("startedAt", command.startedAt ?? null),
         ...optional("table", command.table ?? null),
       };
+    case "set_seat":
+      return {
+        type: "set_seat",
+        tableId: sameId(command.tableId, ids),
+        visitId,
+        seat: command.seat,
+        occurredAt: command.occurredAt,
+        ...optional(
+          "replacesSeatingId",
+          command.replacesSeatingId === undefined ? null : sameId(command.replacesSeatingId, ids),
+        ),
+        ...optional("reason", command.reason ?? null),
+      };
+
+    case "void_seating":
+      return {
+        type: "void_seating",
+        tableId: sameId(command.tableId, ids),
+        visitId,
+        seatingId: sameId(command.seatingId, ids),
+        reason: command.reason,
+      };
   }
 };
 
@@ -748,6 +821,9 @@ export const recordRejectedAgain = (state: RecordingState, operationId: Recordin
 
     if ("tableId" in item.command && "tableId" in command)
       ids.set(item.command.tableId, command.tableId);
+
+    if (item.command.type === "set_seat" && command.type === "set_seat")
+      ids.set(item.command.seatingId, command.seatingId);
     const before = createdEntryIds(item.command);
     createdEntryIds(command).forEach((id, index) => ids.set(before[index]!, id));
     next = applyRecordingCommand(next, command);

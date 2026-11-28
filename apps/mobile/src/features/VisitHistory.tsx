@@ -82,6 +82,9 @@ export function History({
                 </View>
               </Row>
             );
+
+          if (line.type === "seating") return null;
+
           const item = line.entry;
           const voided = item.voidedAt !== null;
           const name = historyEntryName(visit, item);

@@ -938,7 +938,11 @@ function EditSessionSheet({
   const [date, setDate] = useState(() => localDateText(new Date(DateTime.toEpochMillis(initial))));
   const [time, setTime] = useState(() => localTimeText(initial));
   const [startError, setStartError] = useState<string | null>(null);
-  const fields = sessionEditFields(visit, canEditTable);
+
+  const fields = sessionEditFields(visit, canEditTable).flatMap((item) =>
+    item.field === "seat" ? [] : [{ ...item, field: item.field }],
+  );
+
   const tripPickable = useTripPickable(visit.table.tripId !== null);
   const tripRow = showTrip && tripPickable;
 

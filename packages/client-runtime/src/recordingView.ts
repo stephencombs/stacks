@@ -9,10 +9,18 @@ import {
   type PlayerIdentity,
   type Table,
   type VisitId,
+  type VisitSeating,
   type VisitSummary,
 } from "@stacks/contracts";
 import { decimalSeparator, formatMoney, minorUnitDigits, parseMoney } from "@stacks/shared/money";
 import { ownPlayers } from "@stacks/shared/recording";
+import {
+  seatCount,
+  sortSeatings,
+  visitSeatNow,
+  visitSeatOutcome,
+  type VisitSeatOutcome,
+} from "@stacks/shared/seats";
 import { buyInPresets } from "@stacks/shared/table";
 import { projectVisit, visitSummary } from "@stacks/shared/visits";
 import * as DateTime from "effect/DateTime";
@@ -56,6 +64,9 @@ export type RecordedVisit = VisitSummary & {
   readonly table: Table;
   /** The table's venue as this device cached it; null when it has none or isn't cached yet. */
   readonly venue: CachedVenue | null;
+  readonly seatings: ReadonlyArray<VisitSeating>;
+  readonly currentSeat: number | null;
+  readonly seatOutcome: VisitSeatOutcome;
 };
 
 /** A table this device records for everyone at, while you aren't playing there. */
@@ -147,6 +158,23 @@ export const venueChoices = (
   return { status: !searching ? "saved" : found === null ? "offline" : "searching", venues };
 };
 
+const visitSeatsView = (state: RecordingState, visitId: VisitId, table: Table) => {
+  const seatings = sortSeatings(state.seatings.filter((seating) => seating.visitId === visitId));
+
+  if (seatCount(table) === null)
+    return {
+      seatings,
+      currentSeat: null,
+      seatOutcome: { kind: "none" } as const,
+    };
+
+  return {
+    seatings,
+    currentSeat: visitSeatNow(seatings),
+    seatOutcome: visitSeatOutcome(seatings),
+  };
+};
+
 export const recordingHome: (state: RecordingState) => RecordingHome = (state) => {
   const mine = new Set(ownPlayers(state));
   const own = state.visits.filter((visit) => mine.has(visit.playerId));
@@ -154,7 +182,12 @@ export const recordingHome: (state: RecordingState) => RecordingHome = (state) =
   const visits = own.map((visit) => {
     const table = tableOf(state, visit.tableId);
 
-    return { ...visitSummary(visit, state.entries), table, venue: venueOf(state, table) };
+    return {
+      ...visitSummary(visit, state.entries),
+      table,
+      venue: venueOf(state, table),
+      ...visitSeatsView(state, visit.id, table),
+    };
   });
 
   const active = visits
@@ -285,6 +318,7 @@ export type RecordingTableView = {
   readonly addable: ReadonlyArray<PlayerIdentity>;
   /** The players the starter appointed to record for everyone here. */
   readonly recorders: ReadonlyArray<PlayerIdentity>;
+  readonly seatings: ReadonlyArray<VisitSeating>;
 };
 
 /** The table a visit is at, with everyone recorded there. */
@@ -335,6 +369,9 @@ export const recordingTable: (
     ...here.map((item) => item.playerId),
   ]);
 
+  const visitIds = new Set(visits.map((item) => item.visit.id));
+  const seatings = sortSeatings(state.seatings.filter((seating) => visitIds.has(seating.visitId)));
+
   return {
     table,
     role,
@@ -345,6 +382,7 @@ export const recordingTable: (
           .id ?? null,
     },
     visits,
+    seatings,
     addable: starter
       ? state.players.filter(
           (player) =>
@@ -433,6 +471,7 @@ export const recordingVisit = (state: RecordingState, visitId: VisitId) => {
     ...summary,
     table,
     venue: venueOf(state, table),
+    ...visitSeatsView(state, visit.id, table),
     entries,
     events,
     replacedBy,
@@ -687,6 +726,12 @@ export const describeRecordingRejection = ({ command, reason, message }: Recordi
   if (command.type === "set_table_trip")
     return `The trip choice didn't sync. ${message} Your recorded play is saved. Choose a trip again from Edit.`;
 
+  if (command.type === "set_table_seats")
+    return `The table size didn't sync. ${message} Your recorded play is saved.`;
+
+  if (command.type === "set_seat" || command.type === "void_seating")
+    return `Your seat change didn't sync. ${message} Your recorded play is saved.`;
+
   const what = Match.value(command).pipe(
     Match.when({ type: "start" }, (command) => `Starting a session with ${money(command.buyIn)}`),
     Match.when(
@@ -784,7 +829,7 @@ export const recordingSyncView: (
     (command) =>
       visitId === undefined ||
       ("visitId" in command && command.visitId === visitId) ||
-      (command.type === "set_table_trip" &&
+      ((command.type === "set_table_trip" || command.type === "set_table_seats") &&
         state?.visits.some((visit) => visit.id === visitId && visit.tableId === command.tableId) ===
           true),
   );
@@ -935,13 +980,37 @@ export const cashOutResultPreview = (visit: RecordingVisitView, text: string) =>
   return Number.isSafeInteger(result) ? result : null;
 };
 
-export type SessionEditField = "buy_in" | "start_time" | "game" | "venue";
+export type SessionEditField = "buy_in" | "seat" | "start_time" | "game" | "venue";
+
+const formatSeatValue = (seat: number, totalSeats: number) =>
+  seat === 1
+    ? "Seat 1 · First base"
+    : seat === totalSeats
+      ? `Seat ${seat} · Third base`
+      : `Seat ${seat}`;
+
+const seatFieldValue = (visit: RecordingVisitView, totalSeats: number) => {
+  if (visit.visit.finishedAt === null)
+    return visit.currentSeat === null ? "Not set" : formatSeatValue(visit.currentSeat, totalSeats);
+
+  return Match.value(visit.seatOutcome).pipe(
+    Match.when({ kind: "seat" }, ({ seat }) => formatSeatValue(seat, totalSeats)),
+    Match.when({ kind: "multiple" }, () => "Multiple seats"),
+    Match.when({ kind: "none" }, () => "Not set"),
+    Match.exhaustive,
+  );
+};
 
 export const sessionEditFields = (visit: RecordingVisitView, canEditTable: boolean) => {
   const fields: Array<{ field: SessionEditField; label: string; value: string }> = [];
 
   if (visit.visit.finishedAt === null)
     fields.push({ field: "buy_in", label: "Buy-in total", value: money(visit.totals.buyIn) });
+
+  const totalSeats = seatCount(visit.table);
+
+  if (totalSeats !== null)
+    fields.push({ field: "seat", label: "Seat", value: seatFieldValue(visit, totalSeats) });
   fields.push({
     field: "start_time",
     label: "Started",
@@ -1020,28 +1089,56 @@ export const tripFieldValue = (
 
 export type HistoryLine =
   | { readonly type: "entry"; readonly at: DateTime.Utc; readonly entry: PlayEntry }
+  | { readonly type: "seating"; readonly at: DateTime.Utc; readonly seating: VisitSeating }
   | { readonly type: "event"; readonly at: DateTime.Utc; readonly event: RecordingEvent };
 
 /**
- * A visit's history, newest first, with the entries that still stand above the voided ones so a
- * correction never sinks under what it replaced. A finish is a line like any other.
+ * A visit's history, newest first, with the entries and seatings that still stand above the
+ * voided ones so a correction never sinks under what it replaced. A finish is a line like any
+ * other.
  */
 export const historyLines: (visit: RecordingVisitView) => ReadonlyArray<HistoryLine> = (visit) => {
   const lines: Array<HistoryLine> = [];
 
   for (const entry of visit.entries) lines.push({ type: "entry", at: entry.occurredAt, entry });
 
+  for (const seating of visit.seatings)
+    lines.push({ type: "seating", at: seating.occurredAt, seating });
+
   for (const event of visit.events) lines.push({ type: "event", at: event.at, event });
 
+  const voided = (line: HistoryLine) =>
+    (line.type === "entry" && line.entry.voidedAt !== null) ||
+    (line.type === "seating" && line.seating.voidedAt !== null)
+      ? 1
+      : 0;
+
+  const createdMs = (line: HistoryLine) => {
+    if (line.type === "entry") return ms(line.entry.createdAt);
+
+    if (line.type === "seating") return ms(line.seating.createdAt);
+
+    return null;
+  };
+
+  const idOf = (line: HistoryLine) => {
+    if (line.type === "entry") return line.entry.id;
+
+    if (line.type === "seating") return line.seating.id;
+
+    return "";
+  };
+
   return lines.toSorted((a, b) => {
-    const voided = (line: HistoryLine) =>
-      line.type === "entry" && line.entry.voidedAt !== null ? 1 : 0;
+    const tieCreated =
+      createdMs(a) !== null && createdMs(b) !== null ? createdMs(b)! - createdMs(a)! : 0;
 
     return (
       voided(a) - voided(b) ||
       ms(b.at) - ms(a.at) ||
       (a.type === "event" ? 0 : 1) - (b.type === "event" ? 0 : 1) ||
-      (a.type === "entry" && b.type === "entry" ? ms(b.entry.createdAt) - ms(a.entry.createdAt) : 0)
+      tieCreated ||
+      (idOf(b) < idOf(a) ? -1 : idOf(b) > idOf(a) ? 1 : 0)
     );
   });
 };

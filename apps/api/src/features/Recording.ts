@@ -20,6 +20,7 @@ import {
   tableScope,
   Unauthorized,
   Visit,
+  VisitSeating,
   type GroupId,
   type PlayerId,
   type TableId,
@@ -50,6 +51,7 @@ import { visitSummary } from "@stacks/shared/visits";
 import {
   PersonalEntryRow,
   PersonalOperationRow,
+  PersonalSeatingRow,
   PersonalVisitRow,
   ParticipantRow,
   PlayerIdentityRow,
@@ -81,6 +83,11 @@ const sessionRecorded = {
 const entryRecorded = {
   reason: "conflict",
   message: "An entry with this ID is already recorded.",
+} as const;
+
+const seatingRecorded = {
+  reason: "conflict",
+  message: "A seating with this ID is already recorded.",
 } as const;
 
 const playerRecorded = {
@@ -201,8 +208,12 @@ export const principal = Effect.fn("Recording.principal")(function* () {
   return principal;
 });
 
+type TableFieldsInit = {
+  -readonly [K in keyof Omit<Table, "starterPlayerId">]: Table[K];
+};
+
 const tableFields = (row: typeof TableRow.Type) => {
-  const base = {
+  const fields: TableFieldsInit = {
     id: row.id,
     tripId: row.tripId,
     game: row.game,
@@ -210,19 +221,19 @@ const tableFields = (row: typeof TableRow.Type) => {
     highLimit: row.highLimit,
   };
 
-  if (row.gameName !== null && row.deletedAt !== null) {
-    return { ...base, gameName: row.gameName, deletedAt: row.deletedAt };
-  }
+  if (row.gameName !== null) fields.gameName = row.gameName;
 
-  if (row.gameName !== null) return { ...base, gameName: row.gameName };
+  if (row.tableSeats !== null) fields.tableSeats = row.tableSeats;
 
-  if (row.deletedAt !== null) return { ...base, deletedAt: row.deletedAt };
+  if (row.deletedAt !== null) fields.deletedAt = row.deletedAt;
 
-  return base;
+  return fields;
 };
 
 const tableOf = (row: typeof TableRow.Type, starterPlayerId: PlayerId) =>
   Table.make({ ...tableFields(row), starterPlayerId });
+
+const seatingOf = (seating: typeof PersonalSeatingRow.Type) => VisitSeating.make(seating);
 
 const visitOf = (visit: typeof PersonalVisitRow.Type) => {
   const base = {
@@ -415,11 +426,43 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
     tables: [],
     visits: [],
     entries: [],
+    seatings: [],
     receipts: [],
   };
 
   if (isTableCommand(command)) {
     const { table, participants, recorders } = yield* lockTable(command.tableId, actorPlayers);
+
+    if (command.type === "set_table_seats") {
+      if (
+        !actorPlayers.includes(table.starterPlayerId) &&
+        !recorders.some((item) => actorPlayers.includes(item.playerId))
+      )
+        return yield* new Rejected({
+          reason: "forbidden",
+          message: "Only whoever records for everyone at this table can change its size.",
+        });
+
+      const [visits, seatings] = yield* Effect.all([
+        sql`select * from personal_visits where table_id = ${table.id}`.pipe(
+          Effect.flatMap(Access.decodeRows(PersonalVisitRow)),
+        ),
+        sql`
+          select s.* from personal_seatings s join personal_visits v on v.id = s.visit_id
+          where v.table_id = ${table.id}
+          order by s.occurred_at, s.created_at, s.id
+        `.pipe(Effect.flatMap(Access.decodeRows(PersonalSeatingRow))),
+      ]);
+
+      return {
+        ...ledger,
+        participants,
+        recorders,
+        tables: [table],
+        visits: visits.map(visitOf),
+        seatings: seatings.map(seatingOf),
+      };
+    }
 
     if (!actorPlayers.includes(table.starterPlayerId))
       return yield* new Rejected({
@@ -565,19 +608,24 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
   const { table, participants, recorders } = yield* lockTable(located.tableId, actorPlayers);
   yield* sql`select 1 from personal_visits where id = ${command.visitId} for update`;
 
-  const visits = yield* sql`select * from personal_visits where table_id = ${table.id}`.pipe(
-    Effect.flatMap(Access.decodeRows(PersonalVisitRow)),
-  );
-
-  const entries = yield* sql`
-    select * from personal_entries where visit_id = ${command.visitId}
-  `.pipe(Effect.flatMap(Access.decodeRows(PersonalEntryRow)));
-
-  const operations = yield* sql`
-    select actor_id, command from personal_operations
-    where visit_id = ${command.visitId} and id <> ${command.operationId}
-    order by seq
-  `.pipe(Effect.flatMap(Access.decodeRows(PersonalOperationRow)));
+  const [visits, entries, seatings, operations] = yield* Effect.all([
+    sql`select * from personal_visits where table_id = ${table.id}`.pipe(
+      Effect.flatMap(Access.decodeRows(PersonalVisitRow)),
+    ),
+    sql`
+      select * from personal_entries where visit_id = ${command.visitId}
+    `.pipe(Effect.flatMap(Access.decodeRows(PersonalEntryRow))),
+    sql`
+      select s.* from personal_seatings s join personal_visits v on v.id = s.visit_id
+      where v.table_id = ${table.id}
+      order by s.occurred_at, s.created_at, s.id
+    `.pipe(Effect.flatMap(Access.decodeRows(PersonalSeatingRow))),
+    sql`
+      select actor_id, command from personal_operations
+      where visit_id = ${command.visitId} and id <> ${command.operationId}
+      order by seq
+    `.pipe(Effect.flatMap(Access.decodeRows(PersonalOperationRow))),
+  ]);
 
   return {
     ...ledger,
@@ -586,6 +634,7 @@ const loadLedger = Effect.fn("Recording.loadLedger")(function* (
     tables: [table],
     visits: visits.map(visitOf),
     entries: entries.map(entryOf),
+    seatings: seatings.map(seatingOf),
     receipts: operations.map((row, index) => ({ command: row.command, revision: index + 2 })),
   };
 });
@@ -601,6 +650,13 @@ const save = Effect.fn("Recording.save")(function* (
   if (isTableCommand(command)) {
     if (command.type === "set_table_trip")
       yield* sql`update tables set trip_id = ${command.tripId} where id = ${command.tableId}`;
+
+    if (command.type === "set_table_seats") {
+      const updated = after.tables.find((table) => table.id === command.tableId)!;
+      yield* sql`
+        update tables set table_seats = ${updated.tableSeats ?? null} where id = ${command.tableId}
+      `;
+    }
 
     if (command.type === "delete_table")
       yield* sql`
@@ -620,9 +676,9 @@ const save = Effect.fn("Recording.save")(function* (
     (table) => !before.tables.some((item) => item.id === table.id),
   )) {
     yield* sql`
-      insert into tables (id, starter_player_id, game, game_name, venue_id, high_limit)
+      insert into tables (id, starter_player_id, game, game_name, table_seats, venue_id, high_limit)
       values (${table.id}, ${table.starterPlayerId}, ${table.game}, ${table.gameName ?? null},
-        ${table.venueId}, ${table.highLimit})
+        ${table.tableSeats ?? null}, ${table.venueId}, ${table.highLimit})
     `;
   }
 
@@ -643,7 +699,8 @@ const save = Effect.fn("Recording.save")(function* (
       yield* sql`
         update tables
         set game = ${table.game}, game_name = ${table.gameName ?? null},
-          venue_id = ${table.venueId}, high_limit = ${table.highLimit}
+          table_seats = ${table.tableSeats ?? null}, venue_id = ${table.venueId},
+          high_limit = ${table.highLimit}
         where id = ${table.id}
       `;
   }
@@ -656,8 +713,9 @@ const save = Effect.fn("Recording.save")(function* (
   }
 
   const visit = after.visits.find((visit) => visit.id === command.visitId)!;
+  const previousVisit = before.visits.find((item) => item.id === visit.id);
 
-  if (!before.visits.some((item) => item.id === visit.id)) {
+  if (!previousVisit) {
     yield* sql`
       insert into personal_visits (id, player_id, table_id, started_at, finished_at, revision)
       values (
@@ -665,7 +723,7 @@ const save = Effect.fn("Recording.save")(function* (
         ${visit.finishedAt ? date(visit.finishedAt) : null}, ${visit.revision}
       )
     `;
-  } else {
+  } else if (previousVisit !== visit) {
     yield* sql`
       update personal_visits
       set started_at = ${date(visit.startedAt)},
@@ -703,6 +761,33 @@ const save = Effect.fn("Recording.save")(function* (
     }
   }
 
+  const knownSeatings = new Map(before.seatings.map((seating) => [seating.id, seating]));
+
+  for (const seating of after.seatings) {
+    const previous = knownSeatings.get(seating.id);
+
+    if (!previous) {
+      yield* sql`
+        insert into personal_seatings (
+          id, visit_id, seat, occurred_at, created_by, created_at,
+          voided_at, voided_by, void_reason
+        ) values (
+          ${seating.id}, ${seating.visitId}, ${seating.seat}, ${date(seating.occurredAt)},
+          ${seating.createdBy}, ${date(seating.createdAt)},
+          ${seating.voidedAt ? date(seating.voidedAt) : null},
+          ${seating.voidedBy}, ${seating.voidReason}
+        )
+      `;
+    } else if (previous !== seating) {
+      yield* sql`
+        update personal_seatings
+        set voided_at = ${seating.voidedAt ? date(seating.voidedAt) : null},
+          voided_by = ${seating.voidedBy}, void_reason = ${seating.voidReason}
+        where id = ${seating.id}
+      `;
+    }
+  }
+
   yield* sql`
     insert into personal_operations (id, player_id, visit_id, table_id, actor_id, command)
     values (${command.operationId}, ${self.playerId}, ${command.visitId}, ${visit.tableId},
@@ -713,11 +798,13 @@ const save = Effect.fn("Recording.save")(function* (
 const uniqueViolation = (constraint: string) =>
   constraint.startsWith("personal_entries")
     ? entryRecorded
-    : constraint.startsWith("players")
-      ? playerRecorded
-      : constraint === "personal_visits_one_open"
-        ? { reason: "invalid" as const, message: "This player is already playing at this table." }
-        : sessionRecorded;
+    : constraint.startsWith("personal_seatings")
+      ? seatingRecorded
+      : constraint.startsWith("players")
+        ? playerRecorded
+        : constraint === "personal_visits_one_open"
+          ? { reason: "invalid" as const, message: "This player is already playing at this table." }
+          : sessionRecorded;
 
 const atTable = (ledger: RecordingLedger, command: RecordingCommand) => {
   const named =
@@ -803,6 +890,12 @@ const applyOne = Effect.fn("Recording.applyOne")(function* (
       const taken = yield* sql`select 1 from personal_entries where id in ${sql.in(created)}`;
 
       if (taken.length > 0) return yield* new Rejected(entryRecorded);
+    }
+
+    if (command.type === "set_seat") {
+      const taken = yield* sql`select 1 from personal_seatings where id = ${command.seatingId}`;
+
+      if (taken.length > 0) return yield* new Rejected(seatingRecorded);
     }
 
     if (!atTable(before, command)) return yield* new Rejected(notAtTable);
@@ -1004,6 +1097,7 @@ export const history = Effect.fn("Recording.history")(function* () {
       players: [],
       visits: [],
       entries: [],
+      seatings: [],
     };
   const mine = sql.in(actorPlayers);
 
@@ -1055,6 +1149,11 @@ export const history = Effect.fn("Recording.history")(function* () {
     select * from personal_entries where visit_id in ${visible} order by created_at, id
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalEntryRow)));
 
+  const seatings = yield* sql`
+    select * from personal_seatings where visit_id in ${visible}
+    order by occurred_at, created_at, id
+  `.pipe(Effect.flatMap(Access.decodeRows(PersonalSeatingRow)));
+
   const operations = yield* sql`
     select actor_id, command from personal_operations
     where table_id in ${whole} or visit_id in ${visible}
@@ -1073,6 +1172,7 @@ export const history = Effect.fn("Recording.history")(function* () {
     players: players.map((player) => PlayerIdentity.make(player)),
     visits: visits.map(visitOf),
     entries: entries.map(entryOf),
+    seatings: seatings.map(seatingOf),
   };
 });
 
@@ -1118,6 +1218,12 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
     where v.table_id = ${row.id}
   `.pipe(Effect.flatMap(Access.decodeRows(PersonalEntryRow)));
 
+  const seatings = yield* sql`
+    select s.* from personal_seatings s join personal_visits v on v.id = s.visit_id
+    where v.table_id = ${row.id} and v.deleted_at is null
+    order by s.occurred_at, s.created_at, s.id
+  `.pipe(Effect.flatMap(Access.decodeRows(PersonalSeatingRow)));
+
   const played = entries.map(entryOf);
 
   const base = {
@@ -1126,6 +1232,7 @@ const viewOf = Effect.fn("Recording.viewOf")(function* (
     visits: visits.flatMap((visit) =>
       visit.deletedAt === null ? [visitSummary(visitOf(visit), played)] : [],
     ),
+    seatings: seatings.map(seatingOf),
     viewerRole,
     viewerPlayerId,
     recorders: recorders.map((item) => item.playerId),

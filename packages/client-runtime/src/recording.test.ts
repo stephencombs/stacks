@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
-import { VenueId, type VisitId } from "@stacks/contracts";
+import { SeatingId, TableId, VenueId, type VisitId } from "@stacks/contracts";
 import { RecordingCommand } from "@stacks/contracts/recordingCommands";
 
 import { makeRecordingStore, type RecordingStore } from "./recording.ts";
@@ -1211,4 +1211,101 @@ describe("recording a table without playing", () => {
     await expect(store.ready).rejects.toMatchObject({ reason: "load" });
     await store.close();
   });
+});
+
+describe("visit seatings and table sizes", () => {
+  it("persists tableSeats, set_table_seats, set_seat replacements, and void_seating across reloads", async () => {
+    const db = memory();
+    let store = await open(db);
+
+    const started = store.prepare({
+      type: "start",
+      buyIn: 20000,
+      startedAt: at(10),
+      game: "blackjack",
+      tableSeats: 7,
+    });
+
+    await store.execute(started);
+    const id = visitId(store);
+    const tableId = store.getSnapshot().state!.tables[0]!.id;
+
+    await save(store, { type: "set_seat", visitId: id, seat: 7, occurredAt: at(11) });
+    const firstSeatingId = store.getSnapshot().state!.seatings[0]!.id;
+
+    await save(store, {
+      type: "set_seat",
+      visitId: id,
+      seat: 2,
+      occurredAt: at(12),
+      replacesSeatingId: firstSeatingId,
+      reason: "Wrong seat",
+    });
+
+    await save(store, { type: "set_table_seats", tableId, tableSeats: 5 });
+    const replacementId = store.getSnapshot().state!.seatings[1]!.id;
+
+    await save(store, {
+      type: "void_seating",
+      visitId: id,
+      seatingId: replacementId,
+      reason: "Cleared",
+    });
+
+    store = await reload(store, db);
+    const loaded = store.getSnapshot().state!;
+    expect(loaded.tables[0]!.tableSeats).toBe(5);
+    expect(loaded.seatings).toHaveLength(2);
+    expect(loaded.seatings.every((row) => row.voidedAt !== null)).toBe(true);
+    expect(recordingVisit(loaded, id)!.currentSeat).toBeNull();
+    await store.close();
+  });
+
+  it("decodes legacy v2 state without seatings or tableSeats", async () => {
+    const db = memory();
+    let store = await open(db);
+    await save(store, { type: "start", buyIn: 20000, startedAt: at(10), game: "blackjack" });
+    await store.close();
+
+    const legacy = JSON.parse(db.document.payload!);
+    delete legacy.seatings;
+    delete legacy.tables[0].tableSeats;
+    db.document = { revision: db.document.revision, payload: JSON.stringify(legacy) };
+
+    store = await open(db);
+    expect(store.getSnapshot().status).toBe("saved");
+    expect(store.getSnapshot().state!.seatings).toEqual([]);
+    expect(recordingVisit(store.getSnapshot().state!, visitId(store))!.currentSeat).toBeNull();
+    await store.close();
+  });
+
+  it.each(["missing receipt", "unexplained void", "mismatched tableSeats"])(
+    "rejects damaged seating state on load: %s",
+    async (damage) => {
+      const db = memory();
+      let store = await open(db);
+      await save(store, { type: "start", buyIn: 20000, startedAt: at(10), game: "blackjack" });
+      const id = visitId(store);
+      await save(store, { type: "set_seat", visitId: id, seat: 3, occurredAt: at(11) });
+      await store.close();
+
+      const saved = JSON.parse(db.document.payload!);
+
+      if (damage === "missing receipt") saved.receipts.pop();
+      else if (damage === "unexplained void") {
+        saved.seatings[0].voidedAt = saved.seatings[0].createdAt;
+        saved.seatings[0].voidedBy = saved.actor.id;
+        saved.seatings[0].voidReason = "Tampered";
+      } else {
+        saved.tables[0].tableSeats = 7;
+      }
+
+      db.document = { revision: db.document.revision, payload: JSON.stringify(saved) };
+      store = makeRecordingStore(db.adapter());
+      await expect(store.ready).rejects.toMatchObject({ reason: "load" });
+      expect(TableId.make(saved.tables[0].id)).toBe(saved.tables[0].id);
+      expect(SeatingId.make(saved.seatings[0].id)).toBe(saved.seatings[0].id);
+      await store.close();
+    },
+  );
 });

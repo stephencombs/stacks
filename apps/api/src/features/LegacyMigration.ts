@@ -36,6 +36,7 @@ interface ImportReport {
   readonly tables: number;
   readonly visits: number;
   readonly entries: number;
+  readonly seatings: number;
 }
 
 class DryRun extends Data.TaggedError("DryRun")<{ readonly report: ImportReport }> {}
@@ -194,6 +195,9 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
             select 1 from entries e
             where (e.created_by = u.id or e.voided_by = u.id) and ${within("e.group_id")}
           )
+          or exists (
+            select 1 from seatings st where st.created_by = u.id and ${within("st.group_id")}
+          )
         )
       on conflict do nothing
       returning id, recording_actor_id
@@ -212,18 +216,22 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       select session_id, player_id from session_players
       union
       select session_id, player_id from entries where session_id is not null
+      union
+      select session_id, player_id from seatings
     )`);
 
     const tables = yield* sql`
-      insert into tables (id, starter_player_id, game, venue_id, high_limit, legacy_session_id, trip_id)
-      select s.id, null, s.game, s.venue_id, s.high_limit, s.id, s.trip_id
+      insert into tables (id, starter_player_id, game, table_seats, venue_id, high_limit,
+        legacy_session_id, trip_id)
+      select s.id, null, s.game, s.table_seats, s.venue_id, s.high_limit, s.id, s.trip_id
       from sessions s
       where ${within("s.group_id")}
       on conflict (id) do update
-        set game = excluded.game, venue_id = excluded.venue_id, high_limit = excluded.high_limit,
-          trip_id = excluded.trip_id
-        where (tables.game, tables.venue_id, tables.high_limit, tables.trip_id) is distinct from
-          (excluded.game, excluded.venue_id, excluded.high_limit, excluded.trip_id)
+        set game = excluded.game, table_seats = excluded.table_seats, venue_id = excluded.venue_id,
+          high_limit = excluded.high_limit, trip_id = excluded.trip_id
+        where (tables.game, tables.table_seats, tables.venue_id, tables.high_limit, tables.trip_id)
+          is distinct from
+          (excluded.game, excluded.table_seats, excluded.venue_id, excluded.high_limit, excluded.trip_id)
       returning id
     `;
 
@@ -265,12 +273,25 @@ export const importLegacy = Effect.fn("LegacyMigration.importLegacy")(function* 
       returning id
     `;
 
+    const seatings = yield* sql`
+      insert into personal_seatings (id, visit_id, seat, occurred_at, created_by, created_at)
+      select st.id, ${sql.literal(participationId("st.session_id", "st.player_id"))},
+        st.seat, st.occurred_at, coalesce(made.recording_actor_id, ${DELETED_ACTOR}::uuid),
+        st.created_at
+      from seatings st
+      ${actor("made", "st.created_by")}
+      where ${within("st.group_id")}
+      on conflict (id) do nothing
+      returning id
+    `;
+
     const report: ImportReport = {
       dryRun: options.dryRun,
       identities: identities.length,
       tables: tables.length,
       visits: visits.length,
       entries: entries.length,
+      seatings: seatings.length,
     };
 
     if (options.dryRun) return yield* new DryRun({ report });
