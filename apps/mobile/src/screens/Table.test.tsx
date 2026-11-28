@@ -1,7 +1,7 @@
 import type { LiveTable as LiveTableModel } from "@stacks/client-runtime/liveTable";
 import { makeRecordingStore } from "@stacks/client-runtime/recording";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
-import { formatSeatLabel, recordingTable } from "@stacks/client-runtime/recordingView";
+import { formatSeatsLabel, recordingTable } from "@stacks/client-runtime/recordingView";
 import { TableId } from "@stacks/contracts";
 import * as Option from "effect/Option";
 import { act, type ReactNode } from "react";
@@ -159,8 +159,8 @@ const setupTableScreen = async ({
           {table.seats.map((seat) => (
             <div key={seat.visitId}>
               {seat.name}
-              {seat.seatNumber !== null && table.tableSeats !== null
-                ? ` · ${formatSeatLabel(seat.seatNumber, table.tableSeats)}`
+              {seat.seatNumbers.length > 0 && table.tableSeats !== null
+                ? ` · ${formatSeatsLabel(seat.seatNumbers, table.tableSeats)}`
                 : ""}
             </div>
           ))}
@@ -284,8 +284,16 @@ it("omits the table map and seat count on live Table and shows each player's sea
 
     const passedTable = screen.getLastTable();
     expect(passedTable?.tableSeats).toBe(5);
-    expect(passedTable?.seats[0]?.seatNumber).toBe(1);
+    expect(passedTable?.seats[0]?.seatNumbers).toEqual([1]);
     await act(async () => screen.root.unmount());
+
+    await store.execute(
+      store.prepare({ type: "set_seat", tableId, visitId: beaVisitId, seats: [1, 2] }),
+    );
+    const multiScreen = await setupTableScreen({ store, tableId });
+    expect(multiScreen.container.textContent).toContain("Bea · Seats 1 & 2");
+    expect(multiScreen.getLastTable()?.seats[0]?.seatNumbers).toEqual([1, 2]);
+    await act(async () => multiScreen.root.unmount());
   } finally {
     await store.close();
   }

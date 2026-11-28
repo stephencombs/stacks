@@ -54,7 +54,7 @@ const setSeat = (
   identity: RecordingIdentity,
   tableId: TableId,
   visitId: VisitId,
-  seat: number | null,
+  spot: number | null | Array<number>,
   minutes: number,
   options: {
     readonly seatingId?: SeatingId;
@@ -62,6 +62,8 @@ const setSeat = (
     readonly reason?: string;
   } = {},
 ) => {
+  const seat = Array.isArray(spot) ? null : spot;
+
   const fields: SetSeatFields = {
     type: "set_seat",
     ...cmdCommon(identity, minutes),
@@ -71,6 +73,8 @@ const setSeat = (
     seat,
     occurredAt: at(minutes),
   };
+
+  if (Array.isArray(spot)) fields.seats = spot;
 
   if (options.replacesSeatingId !== undefined) fields.replacesSeatingId = options.replacesSeatingId;
 
@@ -300,6 +304,74 @@ it.layer(TestApi.layer)("recording seatings and table sizes", (it) => {
         expect(aliceVisit.totals.buyIn).toBe(25000);
         expect(aliceVisit.totals.cashOut).toBe(30000);
         expect((view.seatings ?? []).filter((s) => s.visitId === opened.visitId)).toEqual([]);
+      }),
+  );
+
+  it.effect(
+    "persists simultaneous multi-spot seatings, conflicts against partial overlaps, shrink guards, and void undo",
+    () =>
+      Effect.gen(function* () {
+        const alice = yield* account("alice_multi");
+        const bob = yield* device();
+
+        const opened = start(alice.identity);
+        const started = RecordingCommand.make({ ...opened, tableSeats: 6 });
+        const aliceSeat1 = setSeat(alice.identity, opened.tableId, opened.visitId, 1, 2);
+        const aliceSeat1And6 = setSeat(alice.identity, opened.tableId, opened.visitId, [1, 6], 4);
+        expect(yield* alice.push(started, aliceSeat1, aliceSeat1And6)).toEqual([
+          "accepted",
+          "accepted",
+          "accepted",
+        ]);
+
+        const { token } = yield* alice.client.recording.share({
+          params: { tableId: opened.tableId },
+        });
+
+        const bobJoined = yield* bob.join(token, { id: PlayerId.make(uuid()), displayName: "Bob" });
+        const bobSit = sitDown(bob.identity, opened.tableId, bobJoined.player.id, 5);
+        expect(yield* bob.push(bobSit)).toEqual(["accepted"]);
+
+        const bobMultiConflict = setSeat(bob.identity, opened.tableId, bobSit.visitId, [5, 6], 6);
+        const bobBuyIn = addBuyIn(bob.identity, bobSit.visitId, 0, 5000, 7);
+
+        const pushBob = yield* bob.client.recording.push({
+          payload: { identity: bob.identity, commands: [bobMultiConflict, bobBuyIn] },
+        });
+
+        expect(pushBob.results.map((r) => r.status)).toEqual(["rejected", "accepted"]);
+        expect(pushBob.results[0]).toMatchObject({
+          reason: "conflict",
+          message: "Seat 6 is already taken.",
+        });
+
+        expect(yield* alice.push(setTableSeats(alice.identity, opened.tableId, 5, 8))).toEqual([
+          "invalid",
+        ]);
+
+        const aliceDropTo1 = setSeat(alice.identity, opened.tableId, opened.visitId, 1, 9);
+        expect(yield* alice.push(aliceDropTo1)).toEqual(["accepted"]);
+
+        expect(yield* alice.push(setTableSeats(alice.identity, opened.tableId, 5, 10))).toEqual([
+          "accepted",
+        ]);
+
+        const bobHistory = yield* bob.client.recording.table({
+          params: { tableId: opened.tableId },
+        });
+
+        const multiRow = (bobHistory.seatings ?? []).find((s) => s.id === aliceSeat1And6.seatingId);
+        expect(multiRow).toMatchObject({ seat: null, seats: [1, 6] });
+
+        const history = yield* alice.client.recording.history();
+        const expanded = history.seatings?.find((s) => s.id === aliceSeat1And6.seatingId);
+        expect(expanded).toMatchObject({ seat: null, seats: [1, 6] });
+
+        expect(
+          yield* alice.push(
+            voidSeating(alice.identity, opened.tableId, opened.visitId, aliceDropTo1.seatingId, 11),
+          ),
+        ).toEqual(["invalid"]);
       }),
   );
 });

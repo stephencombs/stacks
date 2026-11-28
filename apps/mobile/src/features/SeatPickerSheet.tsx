@@ -1,8 +1,8 @@
 import type { LiveTable } from "@stacks/client-runtime/liveTable";
 import { useRecordingSubmit } from "@stacks/client-runtime/recordingReact";
-import { formatSeatLabel, type RecordingVisitView } from "@stacks/client-runtime/recordingView";
+import { formatSeatsLabel, type RecordingVisitView } from "@stacks/client-runtime/recordingView";
 import type { SeatingId, TableId, VisitId } from "@stacks/contracts";
-import { sortSeatings, tableSizes } from "@stacks/shared/seats";
+import { sameSeats, seatingSeats, sortSeatings, tableSizes } from "@stacks/shared/seats";
 import { useState } from "react";
 import { View } from "react-native";
 
@@ -22,13 +22,59 @@ const sizeOptions = BJ_SIZES.map((n) => ({
 const maxOccupiedSeat = (occupants: ReadonlyMap<number, ArcOccupant> | undefined) =>
   !occupants || occupants.size === 0 ? 0 : Math.max(...occupants.keys());
 
+const formatDraftConfirm = (picked: ReadonlyArray<number>, tableSeats: number) => {
+  if (picked.length === 0) return "Done";
+
+  if (picked.length === 1) return `Use Seat ${picked[0]}`;
+
+  return `Use ${formatSeatsLabel(picked, tableSeats)}`;
+};
+
+const formatStandingItem = (list: ReadonlyArray<number>) => {
+  if (list.length === 0) return "Left seat";
+
+  if (list.length === 1) return `Seat ${list[0]}`;
+
+  return formatSeatsLabel(list, null) ?? "";
+};
+
+const toggleSeat = (seats: ReadonlyArray<number>, spot: number) =>
+  seats.includes(spot)
+    ? seats.filter((item) => item !== spot)
+    : [...seats, spot].toSorted((a, b) => a - b);
+
+const saveSeatLabel = (
+  picked: ReadonlyArray<number>,
+  initialCount: number,
+  tableSeats: number,
+  live: boolean,
+) => {
+  if (picked.length === 0) {
+    if (initialCount === 0) return "Save seat";
+
+    return live
+      ? initialCount > 1
+        ? "Leave seats"
+        : "Leave seat"
+      : initialCount > 1
+        ? "Remove seats"
+        : "Remove seat";
+  }
+
+  if (picked.length === 1) return `Save Seat ${picked[0]}`;
+
+  return `Save ${formatSeatsLabel(picked, tableSeats)}`;
+};
+
 /** Builds the live seat-number -> occupant map expected by `BlackjackTableArc` and `SeatPickerSheet`. */
 export const liveOccupants = (table: LiveTable) => {
   const map = new Map<number, ArcOccupant>();
 
   for (const item of table.seats) {
-    if (item.playing && item.seatNumber !== null) {
-      map.set(item.seatNumber, {
+    if (!item.playing) continue;
+
+    for (const seatNumber of item.seatNumbers) {
+      map.set(seatNumber, {
         playerId: item.playerId,
         name: item.name,
         isSelf: item.isSelf,
@@ -50,13 +96,13 @@ type SeatPickerSaved = {
 
 type DraftProps = {
   readonly mode: "draft";
-  readonly seat: number | null;
+  readonly seats: ReadonlyArray<number>;
   readonly tableSeats: number;
   readonly canEditTable?: boolean;
   readonly occupants?: ReadonlyMap<number, ArcOccupant> | undefined;
   readonly back?: boolean;
   readonly depth?: number;
-  readonly onSelect: (seat: number | null) => void;
+  readonly onSelect: (seats: ReadonlyArray<number>) => void;
   readonly onTableSeats?: ((tableSeats: number) => void) | undefined;
   readonly onClose: () => void;
 };
@@ -79,8 +125,9 @@ type VisitProps = {
 type SeatPickerProps = DraftProps | VisitProps;
 
 /**
- * Instant seat picker built around `BlackjackTableArc`. Supports both form drafts (`mode="draft"`)
- * and persisted live/finished visits (`mode="visit"`), returning immediately once picked or saved.
+ * Multi-spot blackjack seat picker built around `BlackjackTableArc`. Tapping spots toggles them so
+ * players can sit at one or several hands simultaneously before confirming, while keeping `Leave`
+ * and `Clear` shortcuts one tap away.
  */
 export function SeatPickerSheet(props: SeatPickerProps) {
   if (props.mode === "draft") return <DraftSeatPicker {...props} />;
@@ -89,7 +136,7 @@ export function SeatPickerSheet(props: SeatPickerProps) {
 }
 
 function DraftSeatPicker({
-  seat,
+  seats,
   tableSeats,
   canEditTable = false,
   occupants,
@@ -100,6 +147,10 @@ function DraftSeatPicker({
   onClose,
 }: DraftProps) {
   const [sizeError, setSizeError] = useState<string | null>(null);
+  const resetKey = seats.join(",");
+  const [draft, setDraft] = useState(() => ({ key: resetKey, seats }));
+  const picked = draft.key === resetKey ? draft.seats : seats;
+  const setPicked = (next: ReadonlyArray<number>) => setDraft({ key: resetKey, seats: next });
   const maxLive = maxOccupiedSeat(occupants);
 
   const changeSize = (next: string) => {
@@ -114,20 +165,24 @@ function DraftSeatPicker({
     setSizeError(null);
     onTableSeats?.(count);
 
-    if (seat !== null && seat > count) onSelect(null);
+    const trimmed = picked.filter((seat) => seat <= count);
+
+    if (trimmed.length !== picked.length) setPicked(trimmed);
   };
 
-  const pickSpot = (picked: number) => {
-    if (occupants?.has(picked)) {
-      const taken = occupants.get(picked)!;
-      setSizeError(`Seat ${picked} is already taken by ${taken.name}.`);
+  const toggleSpot = (spot: number) => {
+    if (occupants?.has(spot)) {
+      const taken = occupants.get(spot)!;
+      setSizeError(`Seat ${spot} is already taken by ${taken.name}.`);
 
       return;
     }
 
-    onSelect(picked);
-    onClose();
+    setSizeError(null);
+    setPicked(toggleSeat(picked, spot));
   };
+
+  const confirmLabel = formatDraftConfirm(picked, tableSeats);
 
   return (
     <Sheet
@@ -135,15 +190,15 @@ function DraftSeatPicker({
       back={back}
       depth={depth}
       title="Seat"
-      description="Optional. Tap a spot from dealer's left (Seat 1)."
+      description="Optional. Tap one or more spots from dealer's left (Seat 1)."
       onClose={onClose}
     >
       <BlackjackTableArc
         seats={tableSeats}
         surface="sheet"
-        selectedSeat={seat}
+        selectedSeats={picked}
         occupants={occupants}
-        onSelectSpot={pickSpot}
+        onSelectSpot={toggleSpot}
       />
       {canEditTable && onTableSeats ? (
         <Choice
@@ -154,13 +209,22 @@ function DraftSeatPicker({
         />
       ) : null}
       {sizeError ? <FormError>{sizeError}</FormError> : null}
-      {seat !== null ? (
+      <Button
+        label={confirmLabel}
+        variant="primary"
+        size="lg"
+        onPress={() => {
+          onSelect(picked);
+          onClose();
+        }}
+      />
+      {picked.length > 0 ? (
         <Button
-          label="Clear seat"
+          label={picked.length > 1 ? "Clear seats" : "Clear seat"}
           variant="secondary"
           size="lg"
           onPress={() => {
-            onSelect(null);
+            onSelect([]);
             onClose();
           }}
         />
@@ -187,24 +251,64 @@ function VisitSeatPicker({
   const live = visit.visit.finishedAt === null;
   const standing = sortSeatings(visit.seatings.filter((item) => item.voidedAt === null));
 
-  const path = standing
-    .map((item) => (item.seat === null ? "Left seat" : `Seat ${item.seat}`))
-    .join(" → ");
+  const path = standing.map((item) => formatStandingItem(seatingSeats(item))).join(" → ");
 
   const singleRecord =
-    visit.seatOutcome.kind === "seat" && standing.length === 1 ? standing[0]! : null;
+    standing.length === 1 && seatingSeats(standing[0]!).length > 0 ? standing[0]! : null;
 
   const finishedReadOnly = !live && standing.length > 0 && singleRecord === null;
 
-  const currentSelected = live
-    ? visit.currentSeat
-    : visit.seatOutcome.kind === "seat"
-      ? visit.seatOutcome.seat
-      : null;
+  const otherOccupants = new Map<number, ArcOccupant>();
+  let existingSelfOccupant: ArcOccupant | undefined;
+  const liveOccupantSeats: Array<number> = [];
+
+  if (occupants) {
+    for (const [seatNumber, occ] of occupants) {
+      if (occ.visitId === visit.visit.id) {
+        existingSelfOccupant = occ;
+        liveOccupantSeats.push(seatNumber);
+      } else {
+        otherOccupants.set(seatNumber, occ);
+      }
+    }
+  }
+
+  liveOccupantSeats.sort((a, b) => a - b);
+
+  const initialSeats: ReadonlyArray<number> = live
+    ? occupants
+      ? liveOccupantSeats
+      : visit.currentSeats
+    : singleRecord
+      ? seatingSeats(singleRecord)
+      : [];
+
+  const resetKey = `${visit.visit.id}:${initialSeats.join(",")}:${live ? "live" : "done"}`;
+  const [draft, setDraft] = useState(() => ({ key: resetKey, seats: initialSeats }));
+  const picked = draft.key === resetKey ? draft.seats : initialSeats;
+  const setPicked = (next: ReadonlyArray<number>) => setDraft({ key: resetKey, seats: next });
+
+  const displayOccupants = (() => {
+    if (!live) return otherOccupants;
+
+    const map = new Map(otherOccupants);
+
+    const selfOccupant: ArcOccupant = existingSelfOccupant ?? {
+      playerId: visit.visit.playerId,
+      name: who ?? "You",
+      isSelf: who === undefined,
+      visitId: visit.visit.id,
+    };
+
+    for (const seat of picked) map.set(seat, selfOccupant);
+
+    return map;
+  })();
 
   const submitSize = async (next: string) => {
     const count = Number(next);
-    const maxLive = maxOccupiedSeat(occupants);
+
+    const maxLive = Math.max(maxOccupiedSeat(otherOccupants), ...(live ? initialSeats : []));
 
     if (count < maxLive) {
       setLocalError(`Can't shrink to ${count} seats while Seat ${maxLive} is occupied.`);
@@ -213,6 +317,10 @@ function VisitSeatPicker({
     }
 
     setLocalError(null);
+
+    const trimmed = picked.filter((seat) => seat <= count);
+
+    if (trimmed.length !== picked.length) setPicked(trimmed);
 
     const receipt = await save.submit({
       type: "set_table_seats",
@@ -223,101 +331,19 @@ function VisitSeatPicker({
     if (receipt) onTableSeatsSaved?.(count);
   };
 
-  const selectSpot = async (picked: number) => {
+  const toggleSpot = (spot: number) => {
     if (save.pending || finishedReadOnly) return;
 
-    const occupied = occupants?.get(picked);
+    const occupied = otherOccupants.get(spot);
 
-    if (occupied && occupied.visitId !== visit.visit.id) {
-      setLocalError(
-        `Seat ${picked} is already taken by ${occupied.isSelf ? "you" : occupied.name}.`,
-      );
+    if (occupied) {
+      setLocalError(`Seat ${spot} is already taken by ${occupied.isSelf ? "you" : occupied.name}.`);
 
       return;
     }
 
     setLocalError(null);
-
-    if (live) {
-      if (picked === visit.currentSeat) {
-        onClose();
-
-        return;
-      }
-
-      const receipt = await save.submit({
-        type: "set_seat",
-        tableId: visit.visit.tableId,
-        visitId: visit.visit.id,
-        seat: picked,
-      });
-
-      if (receipt?.command.type === "set_seat") {
-        const label = formatSeatLabel(picked, tableSeats);
-
-        onSaved({
-          visitId: visit.visit.id,
-          tableId: visit.visit.tableId,
-          seatingId: receipt.command.seatingId,
-          text: who ? `${who} sat at ${label}.` : `Sat at ${label}.`,
-          undo: true,
-        });
-      }
-
-      return;
-    }
-
-    if (singleRecord) {
-      if (picked === singleRecord.seat) {
-        onClose();
-
-        return;
-      }
-
-      const receipt = await save.submit({
-        type: "set_seat",
-        tableId: visit.visit.tableId,
-        visitId: visit.visit.id,
-        seat: picked,
-        occurredAt: singleRecord.occurredAt,
-        replacesSeatingId: singleRecord.id,
-        reason: "Seat corrected",
-      });
-
-      if (receipt?.command.type === "set_seat") {
-        const label = formatSeatLabel(picked, tableSeats);
-
-        onSaved({
-          visitId: visit.visit.id,
-          tableId: visit.visit.tableId,
-          seatingId: receipt.command.seatingId,
-          text: `Seat updated to ${label}.`,
-          undo: false,
-        });
-      }
-
-      return;
-    }
-
-    const receipt = await save.submit({
-      type: "set_seat",
-      tableId: visit.visit.tableId,
-      visitId: visit.visit.id,
-      seat: picked,
-      occurredAt: visit.visit.startedAt,
-    });
-
-    if (receipt?.command.type === "set_seat") {
-      const label = formatSeatLabel(picked, tableSeats);
-
-      onSaved({
-        visitId: visit.visit.id,
-        tableId: visit.visit.tableId,
-        seatingId: receipt.command.seatingId,
-        text: `Seat set to ${label}.`,
-        undo: false,
-      });
-    }
+    setPicked(toggleSeat(picked, spot));
   };
 
   const leaveOrRemove = async () => {
@@ -329,15 +355,24 @@ function VisitSeatPicker({
         type: "set_seat",
         tableId: visit.visit.tableId,
         visitId: visit.visit.id,
-        seat: null,
+        seats: [],
       });
 
       if (receipt?.command.type === "set_seat") {
+        const text =
+          initialSeats.length > 1
+            ? who
+              ? `${who} stood up.`
+              : "Left seats."
+            : who
+              ? `${who} stood up from Seat ${initialSeats[0]}.`
+              : "Left seat.";
+
         onSaved({
           visitId: visit.visit.id,
           tableId: visit.visit.tableId,
           seatingId: receipt.command.seatingId,
-          text: who ? `${who} stood up from Seat ${visit.currentSeat}.` : "Left seat.",
+          text,
           undo: true,
         });
       }
@@ -360,13 +395,99 @@ function VisitSeatPicker({
         visitId: visit.visit.id,
         tableId: visit.visit.tableId,
         seatingId: singleRecord.id,
-        text: "Seat removed.",
+        text: initialSeats.length > 1 ? "Seats removed." : "Seat removed.",
+        undo: false,
+      });
+    }
+  };
+
+  const confirmSave = async () => {
+    if (save.pending || finishedReadOnly || sameSeats(picked, initialSeats)) return;
+
+    if (picked.length === 0) {
+      await leaveOrRemove();
+
+      return;
+    }
+
+    setLocalError(null);
+    const label = formatSeatsLabel(picked, tableSeats)!;
+
+    if (live) {
+      const receipt = await save.submit({
+        type: "set_seat",
+        tableId: visit.visit.tableId,
+        visitId: visit.visit.id,
+        seats: picked,
+      });
+
+      if (receipt?.command.type === "set_seat") {
+        const text =
+          picked.length === 1
+            ? who
+              ? `${who} sat at ${label}.`
+              : `Sat at ${label}.`
+            : who
+              ? `${who} is playing ${label}.`
+              : `Playing ${label}.`;
+
+        onSaved({
+          visitId: visit.visit.id,
+          tableId: visit.visit.tableId,
+          seatingId: receipt.command.seatingId,
+          text,
+          undo: true,
+        });
+      }
+
+      return;
+    }
+
+    if (singleRecord) {
+      const receipt = await save.submit({
+        type: "set_seat",
+        tableId: visit.visit.tableId,
+        visitId: visit.visit.id,
+        seats: picked,
+        occurredAt: singleRecord.occurredAt,
+        replacesSeatingId: singleRecord.id,
+        reason: "Seat corrected",
+      });
+
+      if (receipt?.command.type === "set_seat") {
+        onSaved({
+          visitId: visit.visit.id,
+          tableId: visit.visit.tableId,
+          seatingId: receipt.command.seatingId,
+          text: `${picked.length > 1 ? "Seats" : "Seat"} updated to ${label}.`,
+          undo: false,
+        });
+      }
+
+      return;
+    }
+
+    const receipt = await save.submit({
+      type: "set_seat",
+      tableId: visit.visit.tableId,
+      visitId: visit.visit.id,
+      seats: picked,
+      occurredAt: visit.visit.startedAt,
+    });
+
+    if (receipt?.command.type === "set_seat") {
+      onSaved({
+        visitId: visit.visit.id,
+        tableId: visit.visit.tableId,
+        seatingId: receipt.command.seatingId,
+        text: `${picked.length > 1 ? "Seats" : "Seat"} set to ${label}.`,
         undo: false,
       });
     }
   };
 
   const error = localError ?? save.error;
+  const unchanged = sameSeats(picked, initialSeats);
 
   return (
     <Sheet
@@ -376,17 +497,19 @@ function VisitSeatPicker({
       busy={save.pending}
       title={who ? `${who}'s seat` : "Seat"}
       description={
-        finishedReadOnly ? undefined : "Tap a spot to save. Seat 1 starts at the dealer's left."
+        finishedReadOnly
+          ? undefined
+          : "Tap one or more spots from dealer's left (Seat 1), then save."
       }
       onClose={onClose}
     >
       <BlackjackTableArc
         seats={tableSeats}
         surface="sheet"
-        selectedSeat={currentSelected}
-        occupants={occupants}
+        selectedSeats={finishedReadOnly ? [] : picked}
+        occupants={displayOccupants}
         disabled={save.pending}
-        onSelectSpot={finishedReadOnly ? undefined : (picked) => void selectSpot(picked)}
+        onSelectSpot={finishedReadOnly ? undefined : toggleSpot}
       />
       {finishedReadOnly ? (
         <View className="gap-3">
@@ -412,21 +535,31 @@ function VisitSeatPicker({
         />
       ) : null}
       {error ? <FormError>{error}</FormError> : null}
-      {live && visit.currentSeat !== null ? (
+      {!finishedReadOnly ? (
         <Button
-          label="Leave seat"
-          variant="secondary"
+          label={saveSeatLabel(picked, initialSeats.length, tableSeats, live)}
+          variant="primary"
           size="lg"
           pending={save.pending}
+          disabled={unchanged || save.pending}
+          onPress={() => void confirmSave()}
+        />
+      ) : null}
+      {live && initialSeats.length > 0 && picked.length > 0 ? (
+        <Button
+          label={initialSeats.length > 1 ? "Leave seats" : "Leave seat"}
+          variant="secondary"
+          size="lg"
+          disabled={save.pending}
           onPress={() => void leaveOrRemove()}
         />
       ) : null}
-      {!live && singleRecord ? (
+      {!live && singleRecord && picked.length > 0 ? (
         <Button
-          label="Remove seat"
+          label={initialSeats.length > 1 ? "Remove seats" : "Remove seat"}
           variant="danger"
           size="lg"
-          pending={save.pending}
+          disabled={save.pending}
           onPress={() => void leaveOrRemove()}
         />
       ) : null}

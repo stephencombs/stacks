@@ -4,12 +4,15 @@ import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
 import {
+  canonicalSeatFields,
   normalizeTableSeats,
+  sameSeats,
   seatCount,
+  seatingSeats,
   seatsNow,
   sortSeatings,
   tableLiveSeats,
-  visitSeatNow,
+  visitSeatsNow,
   visitSeatOutcome,
 } from "./seats.ts";
 import { ALEX, BEA, CAL } from "./testing/ledgerArbitrary.ts";
@@ -29,9 +32,17 @@ const sit = (playerId: typeof ALEX, seat: number | null, minute: number) => ({
   occurredAt: at(minute),
 });
 
+const normalizeTestSpot = (spot: number | null | Array<number>) => {
+  if (spot === null) return [];
+
+  if (Array.isArray(spot)) return spot;
+
+  return [spot];
+};
+
 const seating = (
   visitId: VisitId,
-  seat: number | null,
+  spot: number | null | Array<number>,
   occurredAt: number,
   options: { readonly createdAt?: number; readonly voidedAt?: number | null } = {},
 ) => {
@@ -40,10 +51,12 @@ const seating = (
   const voidedAt =
     options.voidedAt === undefined || options.voidedAt === null ? null : at(options.voidedAt);
 
+  const fields = canonicalSeatFields(normalizeTestSpot(spot));
+
   return VisitSeating.make({
     id: SeatingId.make(uuid()),
     visitId,
-    seat,
+    ...fields,
     occurredAt: at(occurredAt),
     createdBy: ACTOR,
     createdAt: created,
@@ -92,7 +105,7 @@ describe("table sizes and visit seatings", () => {
     expect(() => normalizeTableSeats("blackjack", 8)).toThrow(RangeError);
   });
 
-  it("orders seatings deterministically and ignores voided rows in visitSeatNow", () => {
+  it("orders seatings deterministically, ignores voided rows in visitSeatsNow, and handles multi-spot rows", () => {
     const first = seating(VISIT_A, 2, 10, { createdAt: 10 });
     const tiedLaterCreated = seating(VISIT_A, 5, 10, { createdAt: 11 });
     const voidedLater = seating(VISIT_A, 4, 20, { voidedAt: 21 });
@@ -102,9 +115,24 @@ describe("table sizes and visit seatings", () => {
       tiedLaterCreated.id,
       voidedLater.id,
     ]);
-    expect(visitSeatNow([voidedLater, tiedLaterCreated, first])).toBe(5);
-    expect(visitSeatNow([seating(VISIT_A, 3, 10), seating(VISIT_A, null, 15)])).toBeNull();
-    expect(visitSeatNow([voidedLater])).toBeNull();
+    expect(visitSeatsNow([voidedLater, tiedLaterCreated, first])).toEqual([5]);
+    expect(visitSeatsNow([seating(VISIT_A, 3, 10), seating(VISIT_A, null, 15)])).toEqual([]);
+    expect(visitSeatsNow([voidedLater])).toEqual([]);
+
+    expect(canonicalSeatFields([])).toEqual({ seat: null });
+    expect(canonicalSeatFields([3])).toEqual({ seat: 3 });
+    expect(canonicalSeatFields([5, 1, 5])).toEqual({ seat: null, seats: [1, 5] });
+    expect(sameSeats([1, 5], [1, 5])).toBe(true);
+    expect(sameSeats([1, 5], [1])).toBe(false);
+
+    const single = seating(VISIT_A, 1, 10);
+    const expanded = seating(VISIT_A, [1, 3], 15);
+    const voidedDrop = seating(VISIT_A, 1, 20, { voidedAt: 21 });
+
+    expect(seatingSeats(single)).toEqual([1]);
+    expect(seatingSeats(expanded)).toEqual([1, 3]);
+    expect(visitSeatsNow([single, expanded, voidedDrop])).toEqual([1, 3]);
+    expect(visitSeatsNow([single, seating(VISIT_A, [1, 3], 15, { voidedAt: 16 })])).toEqual([1]);
   });
 
   it("classifies visitSeatOutcome for stats, excluding trailing stand-ups and voided rows", () => {
@@ -137,9 +165,23 @@ describe("table sizes and visit seatings", () => {
         seating(VISIT_A, 5, 20),
       ]),
     ).toEqual({ kind: "multiple", seats: [2, 5] });
+    expect(visitSeatOutcome([seating(VISIT_A, [1, 2], 10)])).toEqual({
+      kind: "multiple",
+      seats: [1, 2],
+    });
+    expect(
+      visitSeatOutcome([
+        seating(VISIT_A, 1, 10),
+        seating(VISIT_A, [1, 2], 15),
+        seating(VISIT_A, 1, 20),
+      ]),
+    ).toEqual({ kind: "multiple", seats: [1, 2] });
+    expect(
+      visitSeatOutcome([seating(VISIT_A, 1, 10), seating(VISIT_A, [1, 2], 15, { voidedAt: 16 })]),
+    ).toEqual({ kind: "seat", seat: 1 });
   });
 
-  it("tracks live occupied seats only and breaks reopen/restore overlaps by latest seating", () => {
+  it("tracks live occupied seats across single and multi-spot visits and breaks overlaps by latest seating", () => {
     const earlierLive = seating(VISIT_A, 3, 10, { createdAt: 10 });
     const overlappingReopened = seating(VISIT_B, 3, 25, { createdAt: 25 });
     const standingNow = seating(VISIT_C, 4, 15);
@@ -166,6 +208,21 @@ describe("table sizes and visit seatings", () => {
 
     expect([...tableLiveSeats(visits, seatings)]).toEqual([[3, VISIT_B]]);
     expect([...tableLiveSeats(visits, seatings.toReversed())]).toEqual([[3, VISIT_B]]);
+
+    const multiLive = [
+      { id: VISIT_A, finishedAt: null },
+      { id: VISIT_B, finishedAt: null },
+    ];
+
+    const partialOverlap = [
+      seating(VISIT_A, [1, 2], 10, { createdAt: 10 }),
+      seating(VISIT_B, 2, 20, { createdAt: 20 }),
+    ];
+
+    expect([...tableLiveSeats(multiLive, partialOverlap)]).toEqual([
+      [1, VISIT_A],
+      [2, VISIT_B],
+    ]);
   });
 
   it.prop(

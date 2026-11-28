@@ -519,6 +519,7 @@ it("handles solo and shared blackjack seats, undo toast, edit Seat row on iOS/An
 
       await click("+ Pick seat", true);
       await click("Seat 1, first base, open");
+      await click("Save Seat 1", true);
       expect(element.textContent).toContain("Sat at Seat 1 · First base.");
       await click("Undo", true);
       expect(element.textContent).toContain("Seat change undone.");
@@ -547,7 +548,18 @@ it("handles solo and shared blackjack seats, undo toast, edit Seat row on iOS/An
 
       await click("+ Pick seat", true);
       await click("Seat 3, open");
+      await click("Save Seat 3", true);
       expect(element.textContent).toContain("Sat at Seat 3.");
+      await click("Seat 3", true);
+      await click("Seat 4, open");
+      await click("Save Seats 3 & 4", true);
+      expect(element.textContent).toContain("Playing Seats 3 & 4.");
+      expect(element.textContent).toContain("Seats 3 & 4");
+      expect(element.textContent).toContain("BeaSeat 1 · First base · Playing");
+
+      if (os === "ios") expect(element.textContent).toContain("YouSeats 3 & 4 · Playing");
+      await click("Undo", true);
+      expect(element.textContent).toContain("Seat change undone.");
 
       await store.execute(store.prepare({ type: "finish", visitId: visit.id, amount: 25000 }));
       await act(async () => {});

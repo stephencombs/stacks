@@ -28,7 +28,7 @@ import {
   RecordingReceipt,
   visitLiveEntryIds,
 } from "@stacks/shared/recording";
-import { normalizeTableSeats, tableSizes } from "@stacks/shared/seats";
+import { normalizeTableSeats, sameSeats, seatingSeats, tableSizes } from "@stacks/shared/seats";
 import { visitSummary } from "@stacks/shared/visits";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
@@ -516,7 +516,7 @@ const validateRecordingState = (state: RecordingState) => {
         );
         requireValid(
           seating.visitId === command.visitId &&
-            seating.seat === command.seat &&
+            sameSeats(seatingSeats(seating), seatingSeats(command)) &&
             ms(seating.occurredAt) === ms(command.occurredAt) &&
             seating.createdBy === command.actorId &&
             ms(seating.createdAt) === ms(command.preparedAt),

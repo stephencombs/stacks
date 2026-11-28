@@ -15,7 +15,7 @@ import {
   useServerTable,
 } from "@stacks/client-runtime/recordingReact";
 import {
-  formatSeatLabel,
+  formatSeatsLabel,
   LIVE_REBUY_AMOUNTS,
   localDateText,
   localTimeText,
@@ -653,24 +653,35 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           <LiveVisitHero visit={visit} name={own ? undefined : player?.player.displayName} />
           <View className="items-center gap-2">
             <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} felt />
-            {seats && seats.tableSeats !== null ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={
-                  visit.currentSeat === null
-                    ? "Seat: Not set. Pick seat"
-                    : `Seat: ${formatSeatLabel(visit.currentSeat, seats.tableSeats)}. Change seat`
-                }
-                onPress={() => setOpen({ type: "seat" })}
-                className="min-h-11 flex-row items-center gap-1.5 rounded-full border border-felt-ink/25 bg-felt-deep px-4 py-2 active:opacity-80"
-              >
-                <Text className="type-footnote font-semibold text-felt-ink">
-                  {visit.currentSeat === null
-                    ? "+ Pick seat"
-                    : formatSeatLabel(visit.currentSeat, seats.tableSeats)}
-                </Text>
-              </Pressable>
-            ) : null}
+            {seats && seats.tableSeats !== null
+              ? (() => {
+                  const totalSeats = seats.tableSeats;
+
+                  const ownSeats =
+                    seats.seats.find((s) => s.visitId === visitId)?.seatNumbers ??
+                    visit.currentSeats;
+
+                  const seatLabel =
+                    ownSeats.length > 0 ? formatSeatsLabel(ownSeats, totalSeats) : null;
+
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        seatLabel === null
+                          ? "Seat: Not set. Pick seat"
+                          : `Seat: ${seatLabel}. Change seat`
+                      }
+                      onPress={() => setOpen({ type: "seat" })}
+                      className="min-h-11 flex-row items-center gap-1.5 rounded-full border border-felt-ink/25 bg-felt-deep px-4 py-2 active:opacity-80"
+                    >
+                      <Text className="type-footnote font-semibold text-felt-ink">
+                        {seatLabel ?? "+ Pick seat"}
+                      </Text>
+                    </Pressable>
+                  );
+                })()
+              : null}
           </View>
           {seats && shared ? (
             <TableSeats
@@ -691,7 +702,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
                 ? null
                 : visit.seatOutcome.kind === "multiple"
                   ? "Multiple seats"
-                  : formatSeatLabel(visit.seatOutcome.seat, totalSeats);
+                  : formatSeatsLabel([visit.seatOutcome.seat], totalSeats);
 
             if (Platform.OS === "android")
               return (

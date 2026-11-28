@@ -111,7 +111,7 @@ const makeVisit = ({
     },
     venue,
     seatings: [],
-    currentSeat: null,
+    currentSeats: [],
     seatOutcome: { kind: "none" } as const,
   };
 };

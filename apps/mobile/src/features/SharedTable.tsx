@@ -6,15 +6,9 @@ import {
   useServerTable,
   useTableSharing,
 } from "@stacks/client-runtime/recordingReact";
-import { formatSeatLabel, RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
+import { RECORDING_CURRENCY, tableVisitSeatNotes } from "@stacks/client-runtime/recordingView";
 import type { PlayerId, PlayerIdentity, TableId, VisitId } from "@stacks/contracts";
-import {
-  seatCount,
-  sortSeatings,
-  tableLiveSeats,
-  tableSizes,
-  visitSeatOutcome,
-} from "@stacks/shared/seats";
+import { seatCount, tableLiveSeats, tableSizes } from "@stacks/shared/seats";
 import * as Match from "effect/Match";
 import { useState } from "react";
 import { Platform, View } from "react-native";
@@ -63,35 +57,11 @@ export function TableSection({
   const signedOut = account.available && account.isLoaded && !account.isSignedIn;
   const totalSeats = seatCount(table.table);
 
-  const occupied =
-    totalSeats === null
-      ? new Map<number, VisitId>()
-      : tableLiveSeats(
-          table.visits.map((item) => item.visit),
-          table.seatings,
-        );
-
-  const liveSeatByVisit = new Map<VisitId, number>();
-
-  for (const [seatNumber, visitId] of occupied) liveSeatByVisit.set(visitId, seatNumber);
-
-  const rowSeat = (visitId: VisitId, live: boolean) => {
-    if (totalSeats === null) return null;
-
-    if (live) {
-      const seat = liveSeatByVisit.get(visitId);
-
-      return seat === undefined ? null : formatSeatLabel(seat, totalSeats);
-    }
-
-    const outcome = visitSeatOutcome(table.seatings.filter((s) => s.visitId === visitId));
-
-    if (outcome.kind === "seat") return formatSeatLabel(outcome.seat, totalSeats);
-
-    if (outcome.kind === "multiple") return "Multiple seats";
-
-    return null;
-  };
+  const seatNotes = tableVisitSeatNotes(
+    table.visits.map((item) => item.visit),
+    table.seatings,
+    totalSeats,
+  );
 
   return (
     <View className="gap-2">
@@ -105,7 +75,7 @@ export function TableSection({
       </SectionHeading>
       <List>
         {table.visits.map((item) => {
-          const seatLabelText = rowSeat(item.visit.id, item.finalResult === null);
+          const seatLabelText = seatNotes.get(item.visit.id) ?? null;
 
           const baseStatus =
             item.finalResult === null
@@ -298,37 +268,11 @@ function JoinedTableSection({
     ...(server?.seatings ?? []).filter((seating) => !localIds.has(seating.visitId)),
   ];
 
-  const occupied =
-    totalSeats === null
-      ? new Map<number, VisitId>()
-      : tableLiveSeats(
-          rows.map((item) => item.visit),
-          combinedSeatings,
-        );
-
-  const liveSeatByVisit = new Map<VisitId, number>();
-
-  for (const [seatNumber, visitId] of occupied) liveSeatByVisit.set(visitId, seatNumber);
-
-  const rowSeat = (visitId: VisitId, live: boolean) => {
-    if (totalSeats === null) return null;
-
-    if (live) {
-      const seat = liveSeatByVisit.get(visitId);
-
-      return seat === undefined ? null : formatSeatLabel(seat, totalSeats);
-    }
-
-    const outcome = visitSeatOutcome(
-      sortSeatings(combinedSeatings.filter((seating) => seating.visitId === visitId)),
-    );
-
-    if (outcome.kind === "seat") return formatSeatLabel(outcome.seat, totalSeats);
-
-    if (outcome.kind === "multiple") return "Multiple seats";
-
-    return null;
-  };
+  const seatNotes = tableVisitSeatNotes(
+    rows.map((item) => item.visit),
+    combinedSeatings,
+    totalSeats,
+  );
 
   return (
     <View className="gap-2">
@@ -342,7 +286,7 @@ function JoinedTableSection({
       </SectionHeading>
       <List>
         {rows.map((item) => {
-          const seatLabelText = rowSeat(item.visit.id, item.finalResult === null);
+          const seatLabelText = seatNotes.get(item.visit.id) ?? null;
 
           const baseStatus =
             item.finalResult === null

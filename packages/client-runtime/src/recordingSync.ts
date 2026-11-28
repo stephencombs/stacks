@@ -47,7 +47,7 @@ import {
   normalizeGameName,
   RecordingError,
 } from "@stacks/shared/recording";
-import { normalizeTableSeats } from "@stacks/shared/seats";
+import { normalizeTableSeats, sameSeats, seatingSeats } from "@stacks/shared/seats";
 
 import { newId } from "./ids.ts";
 import { prepareRecordingCommand, type RecordingInput, type RecordingStore } from "./recording.ts";
@@ -513,7 +513,7 @@ const settled = (
 
       return (
         seating !== undefined &&
-        seating.seat === command.seat &&
+        sameSeats(seatingSeats(seating), seatingSeats(command)) &&
         ms(seating.occurredAt) === ms(command.occurredAt) &&
         (command.replacesSeatingId === undefined ||
           ledger.seatings.some(
@@ -744,7 +744,7 @@ const inputOf: (command: RecordingCommand, ids: ReadonlyMap<string, string>) => 
         type: "set_seat",
         tableId: sameId(command.tableId, ids),
         visitId,
-        seat: command.seat,
+        ...(command.seats === undefined ? { seat: command.seat } : { seats: command.seats }),
         occurredAt: command.occurredAt,
         ...optional(
           "replacesSeatingId",

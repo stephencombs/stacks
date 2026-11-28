@@ -284,11 +284,11 @@ describe("liveTable seats", () => {
     expect(table.tableSeats).toBe(7);
     expect([...table.occupiedSeats]).toEqual([[7, beaVisit]]);
     expect(table.seats.find((s) => s.visitId === starterVisit)).toMatchObject({
-      seatNumber: null,
+      seatNumbers: [],
       seatOutcome: { kind: "seat", seat: 7 },
     });
     expect(table.seats.find((s) => s.visitId === beaVisit)).toMatchObject({
-      seatNumber: 7,
+      seatNumbers: [7],
       seatOutcome: { kind: "seat", seat: 7 },
     });
 
@@ -361,6 +361,29 @@ describe("liveTable seats", () => {
       [2, carolVisit],
       [6, beaVisit],
     ]);
+
+    await save(participantStore, {
+      type: "set_seat",
+      visitId: carolVisit,
+      seats: [1, 2],
+      occurredAt: at(20, 4),
+    });
+
+    const multiCombined = liveTable(
+      {
+        ...recordingTable(state(participantStore), state(participantStore).tables[0]!.id)!,
+        role: "participant",
+        table: { ...localTable.table, starterPlayerId: carol.id },
+      },
+      server,
+    );
+
+    expect([...multiCombined.occupiedSeats]).toEqual([
+      [1, carolVisit],
+      [2, carolVisit],
+      [6, beaVisit],
+    ]);
+    expect(multiCombined.seats.find((s) => s.visitId === carolVisit)?.seatNumbers).toEqual([1, 2]);
     await participantStore.close();
     await store.close();
   });

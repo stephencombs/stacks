@@ -8,6 +8,7 @@ import {
   type PlayEntry,
   type PlayerIdentity,
   type Table,
+  type Visit,
   type VisitId,
   type VisitSeating,
   type VisitSummary,
@@ -17,7 +18,8 @@ import { ownPlayers } from "@stacks/shared/recording";
 import {
   seatCount,
   sortSeatings,
-  visitSeatNow,
+  tableLiveSeats,
+  visitSeatsNow,
   visitSeatOutcome,
   type VisitSeatOutcome,
 } from "@stacks/shared/seats";
@@ -65,7 +67,7 @@ export type RecordedVisit = VisitSummary & {
   /** The table's venue as this device cached it; null when it has none or isn't cached yet. */
   readonly venue: CachedVenue | null;
   readonly seatings: ReadonlyArray<VisitSeating>;
-  readonly currentSeat: number | null;
+  readonly currentSeats: ReadonlyArray<number>;
   readonly seatOutcome: VisitSeatOutcome;
 };
 
@@ -161,16 +163,19 @@ export const venueChoices = (
 const visitSeatsView = (state: RecordingState, visitId: VisitId, table: Table) => {
   const seatings = sortSeatings(state.seatings.filter((seating) => seating.visitId === visitId));
 
-  if (seatCount(table) === null)
+  if (seatCount(table) === null) {
+    const currentSeats: ReadonlyArray<number> = [];
+
     return {
       seatings,
-      currentSeat: null,
+      currentSeats,
       seatOutcome: { kind: "none" } as const,
     };
+  }
 
   return {
     seatings,
-    currentSeat: visitSeatNow(seatings),
+    currentSeats: visitSeatsNow(seatings),
     seatOutcome: visitSeatOutcome(seatings),
   };
 };
@@ -990,9 +995,68 @@ export const formatSeatLabel = (seat: number, totalSeats: number | null) => {
   return `Seat ${seat}`;
 };
 
+export const formatSeatsLabel = (seats: ReadonlyArray<number>, totalSeats: number | null) => {
+  if (seats.length === 0) return null;
+
+  if (seats.length === 1) return formatSeatLabel(seats[0]!, totalSeats);
+
+  if (seats.length === 2) return `Seats ${seats[0]} & ${seats[1]}`;
+
+  return `Seats ${seats.slice(0, -1).join(", ")} & ${seats.at(-1)}`;
+};
+
+/** Maps each visit at a table to its row seat caption (`"Seat 1 · First base"`, `"Seats 1 & 2"`, `"Multiple seats"`), or null. */
+export const tableVisitSeatNotes = (
+  visits: ReadonlyArray<Pick<Visit, "id" | "finishedAt" | "deletedAt">>,
+  seatings: ReadonlyArray<
+    Pick<
+      VisitSeating,
+      "id" | "visitId" | "seat" | "seats" | "occurredAt" | "createdAt" | "voidedAt"
+    >
+  >,
+  totalSeats: number | null,
+) => {
+  const notes = new Map<VisitId, string | null>();
+
+  if (totalSeats === null) return notes;
+
+  const occupied = tableLiveSeats(visits, seatings);
+  const liveByVisit = new Map<VisitId, Array<number>>();
+
+  for (const [seatNumber, visitId] of occupied) {
+    const list = liveByVisit.get(visitId) ?? [];
+    list.push(seatNumber);
+    liveByVisit.set(visitId, list);
+  }
+
+  for (const visit of visits) {
+    if (visit.finishedAt === null) {
+      const live = liveByVisit.get(visit.id)?.toSorted((a, b) => a - b) ?? [];
+      notes.set(visit.id, formatSeatsLabel(live, totalSeats));
+      continue;
+    }
+
+    const outcome = visitSeatOutcome(
+      sortSeatings(seatings.filter((seating) => seating.visitId === visit.id)),
+    );
+
+    notes.set(visit.id, seatNoteForOutcome(outcome, totalSeats));
+  }
+
+  return notes;
+};
+
+const seatNoteForOutcome = (outcome: VisitSeatOutcome, totalSeats: number) => {
+  if (outcome.kind === "none") return null;
+
+  if (outcome.kind === "multiple") return "Multiple seats";
+
+  return formatSeatLabel(outcome.seat, totalSeats);
+};
+
 const seatFieldValue = (visit: RecordingVisitView, totalSeats: number) => {
   if (visit.visit.finishedAt === null)
-    return visit.currentSeat === null ? "Not set" : formatSeatLabel(visit.currentSeat, totalSeats);
+    return formatSeatsLabel(visit.currentSeats, totalSeats) ?? "Not set";
 
   return Match.value(visit.seatOutcome).pipe(
     Match.when({ kind: "seat" }, ({ seat }) => formatSeatLabel(seat, totalSeats)),

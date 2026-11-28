@@ -27,6 +27,7 @@ import tableGameName from "./0024_table_game_name.ts";
 import accountDeletion from "./0025_account_deletion.ts";
 import accountDeletionHardening from "./0026_account_deletion_hardening.ts";
 import tableSeatsAndVisitSeatings from "./0027_table_seats_and_visit_seatings.ts";
+import multiSpotSeatings from "./0028_multi_spot_seatings.ts";
 
 export const records = {
   "0001_init": init,
@@ -56,6 +57,7 @@ export const records = {
   "0025_account_deletion": accountDeletion,
   "0026_account_deletion_hardening": accountDeletionHardening,
   "0027_table_seats_and_visit_seatings": tableSeatsAndVisitSeatings,
+  "0028_multi_spot_seatings": multiSpotSeatings,
 };
 
 export const migrations = Migrator.fromRecord(records);

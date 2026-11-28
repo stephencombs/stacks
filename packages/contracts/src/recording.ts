@@ -96,13 +96,37 @@ function auditIssue(fact: {
   return undefined;
 }
 
+export function seatsFieldIssue(value: {
+  readonly seat: Seat | null;
+  readonly seats?: ReadonlyArray<Seat> | undefined;
+}) {
+  if (value.seats === undefined) return undefined;
+
+  if (value.seats.length < 2) {
+    return { path: ["seats"], issue: "multi-spot seating requires at least 2 seats" };
+  }
+
+  if (value.seat !== null) {
+    return { path: ["seat"], issue: "must be null when multiple seats are recorded" };
+  }
+
+  for (let index = 1; index < value.seats.length; index += 1) {
+    if (value.seats[index]! <= value.seats[index - 1]!) {
+      return { path: ["seats", index], issue: "must be strictly ascending and unique" };
+    }
+  }
+
+  return undefined;
+}
+
 export const VisitSeating = Schema.Struct({
   id: SeatingId,
   visitId: VisitId,
   seat: Schema.NullOr(Seat),
+  seats: Schema.optionalKey(Schema.Array(Seat)),
   occurredAt: Schema.DateTimeUtc,
   ...seatingAuditFields,
-}).check(Schema.makeFilter(baseAuditIssue));
+}).check(Schema.makeFilter((seating) => baseAuditIssue(seating) ?? seatsFieldIssue(seating)));
 
 export type VisitSeating = typeof VisitSeating.Type;
 

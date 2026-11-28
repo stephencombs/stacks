@@ -28,7 +28,7 @@ import {
   buyInTotalLabel,
   buyInTotalPreview,
   cashOutResultPreview,
-  formatSeatLabel,
+  formatSeatsLabel,
   localDateText,
   localTimeText,
   parsePastSessionTimes,
@@ -40,7 +40,7 @@ import {
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
 import { decimalSeparator, formatMoney } from "@stacks/shared/money";
-import { tableSizes } from "@stacks/shared/seats";
+import { seatingSeats, tableSizes } from "@stacks/shared/seats";
 import * as DateTime from "effect/DateTime";
 import { use, useState, type ReactNode } from "react";
 import { Platform, Pressable, TextInput, View } from "react-native";
@@ -66,8 +66,7 @@ import { ChooseFromContacts } from "./ChooseFromContacts";
 import { CasinoPickerSheet } from "./VenuePicker";
 import { AmountFeedback } from "./AmountFeedback";
 import { applyAmountKey } from "./amountKey";
-import type { ArcOccupant } from "./BlackjackTableArc";
-import { SeatPickerSheet } from "./SeatPickerSheet";
+import { liveOccupants, SeatPickerSheet } from "./SeatPickerSheet";
 import { TripPickerSheet, TripRow, useTripPickable } from "./TableTrip";
 
 const money = (amount: number, showCents = false) =>
@@ -574,10 +573,11 @@ export function StartSheet({
   const [pickingTrip, setPickingTrip] = useState(false);
   const [highLimit, setHighLimit] = useState(false);
   const [recordingOnly, setRecordingOnly] = useState(false);
-  const [seat, setSeat] = useState<number | null>(null);
+  const [seats, setSeats] = useState<ReadonlyArray<number>>([]);
   const [tableSeats, setTableSeats] = useState<number | null>(null);
   const [pickingSeat, setPickingSeat] = useState(false);
   const effectiveSeats = tableSeats ?? USUAL_BJ_SEATS;
+  const seatSummary = formatSeatsLabel(seats, effectiveSeats);
   const tripPickable = useTripPickable(tripId !== null);
   const alreadyPlaying = Boolean(home?.active.length);
   const watching = recordingOnly && !alreadyPlaying;
@@ -586,10 +586,10 @@ export function StartSheet({
     return (
       <SeatPickerSheet
         mode="draft"
-        seat={seat}
+        seats={seats}
         tableSeats={effectiveSeats}
         canEditTable
-        onSelect={setSeat}
+        onSelect={setSeats}
         onTableSeats={setTableSeats}
         onClose={() => setPickingSeat(false)}
       />
@@ -664,12 +664,12 @@ export function StartSheet({
         if (tripId && receipt && "tableId" in receipt.command)
           await save.submit({ type: "set_table_trip", tableId: receipt.command.tableId, tripId });
 
-        if (game === "blackjack" && seat !== null && receipt?.command.type === "start") {
+        if (game === "blackjack" && seats.length > 0 && receipt?.command.type === "start") {
           await save.submit({
             type: "set_seat",
             tableId: receipt.command.tableId,
             visitId: receipt.command.visitId,
-            seat,
+            seats,
             occurredAt: receipt.command.startedAt,
           });
         }
@@ -713,7 +713,7 @@ export function StartSheet({
           setGame(next);
 
           if (next !== "blackjack") {
-            setSeat(null);
+            setSeats([]);
             setTableSeats(null);
           }
         }}
@@ -737,13 +737,13 @@ export function StartSheet({
             ) : (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Seat: ${seat === null ? "Not set" : formatSeatLabel(seat, effectiveSeats)}. Change`}
+                accessibilityLabel={`Seat: ${seatSummary ?? "Not set"}. Change`}
                 onPress={() => setPickingSeat(true)}
                 className="min-h-12 flex-row items-center gap-3 px-4 active:bg-fill"
               >
                 <Text className="type-body text-ink">Seat</Text>
                 <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
-                  {seat === null ? "Not set" : formatSeatLabel(seat, effectiveSeats)}
+                  {seatSummary ?? "Not set"}
                 </Text>
                 <Icon name="chevron-right" color="faint" size={16} />
               </Pressable>
@@ -784,10 +784,11 @@ export function PastSessionSheet({
   const [venue, setVenue] = useState<CachedVenue | null>(() => prefs.defaultVenue);
   const [pickingVenue, setPickingVenue] = useState(false);
   const [highLimit, setHighLimit] = useState(false);
-  const [seat, setSeat] = useState<number | null>(null);
+  const [seats, setSeats] = useState<ReadonlyArray<number>>([]);
   const [tableSeats, setTableSeats] = useState<number | null>(null);
   const [pickingSeat, setPickingSeat] = useState(false);
   const effectiveSeats = tableSeats ?? USUAL_BJ_SEATS;
+  const seatSummary = formatSeatsLabel(seats, effectiveSeats);
   const inParsed = parseRecordingAmount(buyIn.text, 1);
   const outParsed = parseRecordingAmount(cashOut.text, 0);
 
@@ -818,10 +819,10 @@ export function PastSessionSheet({
     return (
       <SeatPickerSheet
         mode="draft"
-        seat={seat}
+        seats={seats}
         tableSeats={effectiveSeats}
         canEditTable
-        onSelect={setSeat}
+        onSelect={setSeats}
         onTableSeats={setTableSeats}
         onClose={() => setPickingSeat(false)}
       />
@@ -867,12 +868,16 @@ export function PastSessionSheet({
           venue ? [venue] : [],
         );
 
-        if (game === "blackjack" && seat !== null && receipt?.command.type === "record_completed") {
+        if (
+          game === "blackjack" &&
+          seats.length > 0 &&
+          receipt?.command.type === "record_completed"
+        ) {
           await save.submit({
             type: "set_seat",
             tableId: receipt.command.tableId,
             visitId: receipt.command.visitId,
-            seat,
+            seats,
             occurredAt: parsed.startedAt,
           });
         }
@@ -933,7 +938,7 @@ export function PastSessionSheet({
           setGame(next);
 
           if (next !== "blackjack") {
-            setSeat(null);
+            setSeats([]);
             setTableSeats(null);
           }
         }}
@@ -944,13 +949,13 @@ export function PastSessionSheet({
           game === "blackjack" ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Seat: ${seat === null ? "Not set" : formatSeatLabel(seat, effectiveSeats)}. Change`}
+              accessibilityLabel={`Seat: ${seatSummary ?? "Not set"}. Change`}
               onPress={() => setPickingSeat(true)}
               className="min-h-12 flex-row items-center gap-3 px-4 active:bg-fill"
             >
               <Text className="type-body text-ink">Seat</Text>
               <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
-                {seat === null ? "Not set" : formatSeatLabel(seat, effectiveSeats)}
+                {seatSummary ?? "Not set"}
               </Text>
               <Icon name="chevron-right" color="faint" size={16} />
             </Pressable>
@@ -1743,8 +1748,7 @@ export function VoidSeatingSheet({
     if (receipt) onVoided();
   };
 
-  const label =
-    seating.seat === null ? "Leaving your seat" : formatSeatLabel(seating.seat, totalSeats);
+  const label = formatSeatsLabel(seatingSeats(seating), totalSeats) ?? "Leaving your seat";
 
   return (
     <RecordingSheet
@@ -1833,48 +1837,36 @@ function useTableDraftSeats(tableId: TableId) {
   const server = useServerTable(tableId);
   const table = state ? recordingTable(state, tableId) : null;
   const live = table ? liveTable(table, server) : null;
-  const totalSeats = live?.tableSeats ?? null;
 
-  const occupants = new Map<number, ArcOccupant>();
-
-  if (live) {
-    for (const item of live.seats) {
-      if (item.playing && item.seatNumber !== null) {
-        occupants.set(item.seatNumber, {
-          playerId: item.playerId,
-          name: item.name,
-          isSelf: item.isSelf,
-          visitId: item.visitId,
-        });
-      }
-    }
-  }
-
-  return { totalSeats, occupants };
+  return {
+    totalSeats: live?.tableSeats ?? null,
+    occupants: live ? liveOccupants(live) : new Map(),
+  };
 }
 
 function TableDraftSeatRow({
-  seat,
+  seats,
   totalSeats,
   onPress,
 }: {
-  seat: number | null;
+  seats: ReadonlyArray<number>;
   totalSeats: number;
   onPress: () => void;
 }) {
   const inSheet = use(InSheet);
+  const label = formatSeatsLabel(seats, totalSeats) ?? "Not set";
 
   return (
     <View className={cn("overflow-hidden rounded-xl", inSheet ? "bg-raised" : "bg-surface")}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Seat: ${seat === null ? "Not set" : formatSeatLabel(seat, totalSeats)}. Change`}
+        accessibilityLabel={`Seat: ${label}. Change`}
         onPress={onPress}
         className="min-h-12 flex-row items-center gap-3 px-4 active:bg-fill"
       >
         <Text className="type-body text-ink">Seat</Text>
         <Text numberOfLines={1} className="flex-1 text-right type-body text-muted">
-          {seat === null ? "Not set" : formatSeatLabel(seat, totalSeats)}
+          {label}
         </Text>
         <Icon name="chevron-right" color="faint" size={16} />
       </Pressable>
@@ -1903,7 +1895,7 @@ export function AddPlayerSheet({
   const [choice, setChoice] = useState<string>(NEW_PLAYER);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
-  const [seat, setSeat] = useState<number | null>(null);
+  const [seats, setSeats] = useState<ReadonlyArray<number>>([]);
   const [pickingSeat, setPickingSeat] = useState(false);
   const draftSeats = useTableDraftSeats(tableId);
   const photo = useContactPhotoDraft();
@@ -1922,13 +1914,13 @@ export function AddPlayerSheet({
   };
 
   const seatIfPicked = async (receipt: RecordingReceipt | null | undefined) => {
-    if (seat === null || receipt?.command.type !== "join_table") return;
+    if (seats.length === 0 || receipt?.command.type !== "join_table") return;
 
     await save.submit({
       type: "set_seat",
       tableId,
       visitId: receipt.command.visitId,
-      seat,
+      seats,
       occurredAt: receipt.command.startedAt,
     });
   };
@@ -1954,10 +1946,10 @@ export function AddPlayerSheet({
     return (
       <SeatPickerSheet
         mode="draft"
-        seat={seat}
+        seats={seats}
         tableSeats={draftSeats.totalSeats}
         occupants={draftSeats.occupants}
-        onSelect={setSeat}
+        onSelect={setSeats}
         onClose={() => setPickingSeat(false)}
       />
     );
@@ -2066,7 +2058,7 @@ export function AddPlayerSheet({
           </View>
           {draftSeats.totalSeats !== null ? (
             <TableDraftSeatRow
-              seat={seat}
+              seats={seats}
               totalSeats={draftSeats.totalSeats}
               onPress={() => setPickingSeat(true)}
             />
@@ -2132,7 +2124,7 @@ export function AddPlayerSheet({
           <TypedAmount label="Buy-in" amount={amount} />
           {draftSeats.totalSeats !== null ? (
             <TableDraftSeatRow
-              seat={seat}
+              seats={seats}
               totalSeats={draftSeats.totalSeats}
               onPress={() => setPickingSeat(true)}
             />
@@ -2164,7 +2156,7 @@ export function SitDownSheet({
 }) {
   const save = useRecordingSubmit();
   const amount = useAmount("", 1);
-  const [seat, setSeat] = useState<number | null>(null);
+  const [seats, setSeats] = useState<ReadonlyArray<number>>([]);
   const [pickingSeat, setPickingSeat] = useState(false);
   const draftSeats = useTableDraftSeats(tableId);
 
@@ -2172,11 +2164,11 @@ export function SitDownSheet({
     return (
       <SeatPickerSheet
         mode="draft"
-        seat={seat}
+        seats={seats}
         tableSeats={draftSeats.totalSeats}
         occupants={draftSeats.occupants}
         back
-        onSelect={setSeat}
+        onSelect={setSeats}
         onClose={() => setPickingSeat(false)}
       />
     );
@@ -2208,12 +2200,12 @@ export function SitDownSheet({
         });
 
         if (receipt?.command.type === "join_table") {
-          if (seat !== null) {
+          if (seats.length > 0) {
             await save.submit({
               type: "set_seat",
               tableId,
               visitId: receipt.command.visitId,
-              seat,
+              seats,
               occurredAt: receipt.command.startedAt,
             });
           }
@@ -2225,7 +2217,7 @@ export function SitDownSheet({
       <KeypadAmount label="Buy-in" amount={amount} />
       {draftSeats.totalSeats !== null ? (
         <TableDraftSeatRow
-          seat={seat}
+          seats={seats}
           totalSeats={draftSeats.totalSeats}
           onPress={() => setPickingSeat(true)}
         />
