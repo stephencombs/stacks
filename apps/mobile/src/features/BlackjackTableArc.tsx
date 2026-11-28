@@ -94,6 +94,8 @@ function BlackjackTableArt({
   disabled: boolean;
 }) {
   const { width, height, cx, cy, railY, positions } = geometry;
+  const bettingLineRadius = geometry.outerRx - 28;
+  const dealerTop = railY + 14;
 
   const outline = (inset: number) => {
     const left = inset + 1;
@@ -116,6 +118,22 @@ function BlackjackTableArt({
       <Svg width={width} height={height}>
         <Path d={outline(0)} fill={colors.rail} />
         <Path d={outline(7)} fill={colors.felt} />
+        <Path
+          d={`M ${cx - bettingLineRadius} ${cy - 4} Q ${cx} ${cy + geometry.outerRy + 10} ${cx + bettingLineRadius} ${cy - 4}`}
+          fill="none"
+          stroke={colors.soft}
+          strokeOpacity={0.46}
+          strokeWidth={1.25}
+          strokeLinecap="round"
+        />
+        <Path
+          d={`M ${cx - 38} ${dealerTop} v 13 q 0 11 11 11 h 54 q 11 0 11 -11 v -13`}
+          fill="none"
+          stroke={colors.soft}
+          strokeOpacity={0.46}
+          strokeWidth={1.25}
+          strokeLinecap="round"
+        />
         <SvgText
           x={cx}
           y={railY + 32}
