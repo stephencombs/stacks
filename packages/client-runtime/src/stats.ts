@@ -1,4 +1,5 @@
 import type { Game, Trip, TripId, VenueId } from "@stacks/contracts";
+import { seatBucketOf, type SeatBucket } from "@stacks/shared/seats";
 import {
   LENGTH_EDGES_HOURS,
   leadingBucket,
@@ -30,6 +31,7 @@ type TripSession = {
   readonly venueId: VenueId | null;
   readonly startedAt: DateTime.Utc;
   readonly endedAt: DateTime.Utc;
+  readonly seatBucket?: SeatBucket | null | undefined;
 };
 
 export type StatsTrip = {
@@ -37,7 +39,7 @@ export type StatsTrip = {
   readonly range: string;
 };
 
-/** Trip counts ignore the period but keep the game and casino filters. */
+/** Trip counts ignore the period but keep the game, casino and seat filters. */
 export function statsTrips(
   sessions: ReadonlyArray<TripSession>,
   trips: ReadonlyArray<Trip>,
@@ -51,7 +53,9 @@ export function statsTrips(
   for (const session of sessions) {
     const matches =
       (filters.game === undefined || filters.game === session.game) &&
-      (filters.venueId === undefined || filters.venueId === session.venueId);
+      (filters.venueId === undefined || filters.venueId === session.venueId) &&
+      (filters.seat === undefined ||
+        (session.game === "blackjack" && (session.seatBucket ?? null) === filters.seat));
 
     if (matches) total++;
     const id = session.tripId;
@@ -161,6 +165,16 @@ const hoursOf = (visits: ReadonlyArray<RecordedVisit>) =>
     0,
   ) / 3_600_000;
 
+export const seatBucketLabel = (seat: SeatBucket | null) => {
+  if (seat === null) return "No seat recorded";
+
+  if (seat === "multiple") return "Multiple seats";
+
+  if (seat === 1) return "Seat 1 · First base";
+
+  return `Seat ${seat}`;
+};
+
 type Choice = {
   readonly value: string;
   readonly label: string;
@@ -169,7 +183,7 @@ type Choice = {
 };
 
 export type StatsChip = {
-  readonly key: "year" | "game" | "venueId" | "tripId";
+  readonly key: "year" | "game" | "seat" | "venueId" | "tripId";
   /** What the chip filters, for a screen reader: "Period". */
   readonly name: string;
   readonly label: string;
@@ -223,39 +237,56 @@ const chip = <K extends StatsChip["key"], V>(
   };
 };
 
+const noMatchSeat = (seat: StatsFilters["seat"]) => {
+  if (seat === undefined || seat === null) return "";
+
+  if (seat === "multiple") return " across multiple seats";
+
+  return ` at Seat ${seat}`;
+};
+
+const noMatchPeriod = (filters: StatsFilters, trip: string) => {
+  if (filters.tripId !== undefined) return ` on ${trip}`;
+
+  if (filters.year !== undefined) return ` in ${filters.year}`;
+
+  return "";
+};
+
 /** Why nothing shows: "No finished Craps sessions at Wynn in 2025." */
 export const noMatch = (filters: StatsFilters, casino: string, trip: string) => {
+  const effectiveGame =
+    filters.seat !== undefined && filters.game === undefined ? "blackjack" : filters.game;
+
   const game =
-    filters.game === undefined ? "" : filters.game === null ? "" : `${gameNames[filters.game]} `;
+    effectiveGame === undefined || effectiveGame === null ? "" : `${gameNames[effectiveGame]} `;
 
   const without = [
     filters.game === null ? "a game" : null,
     filters.venueId === null ? "a casino" : null,
+    filters.seat === null ? "a seat" : null,
   ].filter((part) => part !== null);
 
   return [
-    `No finished ${game}sessions`,
+    `No finished ${game}sessions${noMatchSeat(filters.seat)}`,
     filters.venueId ? ` at ${casino}` : "",
-    filters.tripId !== undefined
-      ? ` on ${trip}`
-      : filters.year === undefined
-        ? ""
-        : ` in ${filters.year}`,
+    noMatchPeriod(filters, trip),
     without.length ? ` without ${without.join(" or ")} set` : "",
     ".",
   ].join("");
 };
 
 /**
- * The filter chips for what's played: period, game, casino, and a trip once there is one. A trip
- * covers its own dates, so picking one takes the period's place. Applied chips lead, so what the
- * page is showing reads first.
+ * The filter chips for what's played: period, game, seat, casino, and a trip once there is one.
+ * A trip covers its own dates, so picking one takes the period's place. Applied chips lead, so
+ * what the page is showing reads first.
  */
 export const filterChips = (
   filters: StatsFilters,
   options: {
     readonly years: ReadonlyArray<number>;
     readonly games: ReadonlyArray<Game | null>;
+    readonly seats?: ReadonlyArray<SeatBucket | null>;
     readonly venueIds: ReadonlyArray<VenueId | null>;
     readonly tripIds: ReadonlyArray<TripId>;
   },
@@ -264,6 +295,31 @@ export const filterChips = (
     readonly tripName: (id: TripId) => string;
   },
 ) => {
+  const gameChip = chip(filters, "game", "Game", "All games", options.games, (game) => ({
+    value: game ?? "none",
+    label: gameName(game),
+  }));
+
+  const game = {
+    ...gameChip,
+    cleared: { ...gameChip.cleared, seat: undefined },
+    options: gameChip.options.map((option) =>
+      option.filters.game === "blackjack"
+        ? option
+        : { ...option, filters: { ...option.filters, seat: undefined } },
+    ),
+  };
+
+  const seatOptions = options.seats ?? [];
+
+  const seat =
+    filters.seat !== undefined || (filters.game === "blackjack" && seatOptions.length > 0)
+      ? chip(filters, "seat", "Seat", "All seats", seatOptions, (value) => ({
+          value: value === null ? "none" : String(value),
+          label: seatBucketLabel(value),
+        }))
+      : null;
+
   const trip =
     options.tripIds.length === 0 && filters.tripId === undefined
       ? null
@@ -281,10 +337,8 @@ export const filterChips = (
           })),
         ]
       : []),
-    chip(filters, "game", "Game", "All games", options.games, (game) => ({
-      value: game ?? "none",
-      label: gameName(game),
-    })),
+    game,
+    ...(seat ? [seat] : []),
     chip(filters, "venueId", "Casino", "All casinos", options.venueIds, (venueId) => ({
       value: venueId ?? "none",
       label: names.venueName(venueId),
@@ -409,10 +463,17 @@ export const personalStatsView = (
   const tripName = (id: TripId) => tripNames.get(id) ?? "Group trip";
   const stats = personalStats(visits, timeZone, filters, now);
 
-  const finished = visits.flatMap(({ visit, table, finalResult }) =>
+  const finished = visits.flatMap(({ visit, table, finalResult, seatOutcome }) =>
     visit.deletedAt !== undefined || visit.finishedAt === null || finalResult === null
       ? []
-      : [{ ...table, startedAt: visit.startedAt, endedAt: visit.finishedAt }],
+      : [
+          {
+            ...table,
+            startedAt: visit.startedAt,
+            endedAt: visit.finishedAt,
+            seatBucket: table.game === "blackjack" ? seatBucketOf(seatOutcome) : null,
+          },
+        ],
   );
 
   const head = {
@@ -572,6 +633,11 @@ export const personalStatsView = (
         ];
   };
 
+  const seatScoped =
+    filters.seat === undefined &&
+    (filters.game === "blackjack" ||
+      (matching.length > 0 && matching.every((item) => item.table.game === "blackjack")));
+
   const patterns = [
     ...leader(
       stats.weekdays,
@@ -583,6 +649,13 @@ export const personalStatsView = (
       (bucket) => `${lengthName(bucket.index)} sessions`,
       (bucket) => `, across ${bucket.sessions}.`,
     ),
+    ...(seatScoped
+      ? leader(
+          stats.seatBuckets,
+          (bucket) => (bucket.index === 1 ? "First base (Seat 1)" : `Seat ${bucket.index}`),
+          (bucket) => ` a session, across ${bucket.sessions}.`,
+        )
+      : []),
   ];
 
   const record = (kind: "win" | "loss", label: string) => {
@@ -655,6 +728,31 @@ export const personalStatsView = (
             result: row.result,
             filters: { ...filters, game: row.game },
           })),
+    bySeat:
+      filters.seat !== undefined || stats.bySeat.length === 0
+        ? null
+        : {
+            count:
+              stats.seatedBlackjackSessions < stats.totalBlackjackSessions
+                ? `${stats.seatedBlackjackSessions} of ${stats.totalBlackjackSessions} blackjack sessions`
+                : undefined,
+            rows: stats.bySeat.map((row) => ({
+              key: String(row.seat),
+              label: seatBucketLabel(row.seat),
+              meta: played(
+                row.sessions,
+                hoursOf(
+                  matching.filter(
+                    (item) =>
+                      item.table.game === "blackjack" &&
+                      seatBucketOf(item.seatOutcome) === row.seat,
+                  ),
+                ),
+              ),
+              result: row.result,
+              filters: { ...filters, game: "blackjack" as const, seat: row.seat },
+            })),
+          },
     byCasino:
       filters.venueId !== undefined
         ? null

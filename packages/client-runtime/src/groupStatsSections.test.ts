@@ -130,12 +130,15 @@ const shown = (
   plays: GroupStats["plays"],
   trips: ReadonlyArray<Trip> = closed,
   filters: StatsFilters = {},
-  options: { clock?: TripClock; privacyMode?: boolean } = {},
+  options: { clock?: TripClock; privacyMode?: boolean; seats?: GroupStats["seats"] } = {},
 ) => {
-  const view = groupStatsView({ plays, venues }, detailWith(trips), filters, {
+  const input =
+    options.seats === undefined ? { plays, venues } : { plays, venues, seats: options.seats };
+
+  const view = groupStatsView(input, detailWith(trips), filters, {
     timeZone: zone,
-    clock,
-    ...options,
+    clock: options.clock ?? clock,
+    privacyMode: options.privacyMode ?? false,
   });
 
   if (view.kind !== "stats") throw new Error(view.kind);
@@ -689,6 +692,80 @@ describe("group stats sections", () => {
       ]);
       expect(view.byCasino!.map((row) => row.meta)).toEqual(["2 tables · 3 appearances"]);
       expect(shown([play(feb, day(14), [[me, 1]])]).byGame).toBeNull();
+    });
+  });
+
+  describe("by seat", () => {
+    it("shows blackjack seats spatially with partial count, hides when seats absent or non-blackjack, and ignores seat filter", () => {
+      const bj1 = play(feb, day(14), [
+        [me, 500, 10000, 60],
+        [sam, -200, 10000, 60],
+      ]);
+
+      const bj2 = play(feb, day(15), [[maya, 300, 10000, 120]]);
+      const craps = play(feb, day(16), [[me, 400, 10000, 60]], "craps");
+
+      const seats: NonNullable<GroupStats["seats"]> = [
+        {
+          playId: bj1.id,
+          playerId: me,
+          seat: "multiple",
+          net: MinorUnits.make(500),
+          milliseconds: 3_600_000,
+        },
+        {
+          playId: bj2.id,
+          playerId: maya,
+          seat: 1,
+          net: MinorUnits.make(300),
+          milliseconds: 7_200_000,
+        },
+      ];
+
+      const view = shown([bj1, bj2, craps], closed, {}, { seats });
+
+      expect(view.bySeat).toEqual({
+        count: "2 of 3 blackjack plays",
+        rows: [
+          {
+            key: "1",
+            label: "Seat 1 · First base",
+            meta: "1 play · 2h",
+            result: MinorUnits.make(300),
+          },
+          {
+            key: "multiple",
+            label: "Multiple seats",
+            meta: "1 play · 1h",
+            result: MinorUnits.make(500),
+          },
+        ],
+      });
+
+      const full = shown(
+        [bj1, bj2],
+        closed,
+        { seat: 1 },
+        {
+          seats: [
+            ...seats,
+            {
+              playId: bj1.id,
+              playerId: sam,
+              seat: 5,
+              net: MinorUnits.make(-200),
+              milliseconds: 3_600_000,
+            },
+          ],
+        },
+      );
+
+      expect(full.bySeat?.count).toBeUndefined();
+      expect(full.bySeat?.rows.map((row) => row.key)).toEqual(["1", "5", "multiple"]);
+      expect(full.chips.some((chip) => chip.key === "seat")).toBe(false);
+
+      expect(shown([bj1, bj2, craps], closed, {}, {}).bySeat).toBeNull();
+      expect(shown([bj1, bj2, craps], closed, { game: "craps" }, { seats }).bySeat).toBeNull();
     });
   });
 

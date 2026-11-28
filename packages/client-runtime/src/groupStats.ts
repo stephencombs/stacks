@@ -23,6 +23,7 @@ import {
   coveredBy,
   groupAwards,
   groupRecords,
+  groupSeatBreakdown,
   groupStats,
   lateNight,
   nightResults,
@@ -54,6 +55,7 @@ import {
   noMatch,
   played,
   returnFigure,
+  seatBucketLabel,
   statsTrips,
   type StatsFilters,
 } from "./stats.ts";
@@ -167,7 +169,8 @@ export const groupStatsView = (
     .filter((player) => player.role !== null || player.claimCode !== null)
     .map((player) => player.id);
 
-  const computed = groupStats(stats.plays, roster, timeZone, filters);
+  const groupFilters: StatsFilters = { ...filters, seat: undefined };
+  const computed = groupStats(stats.plays, roster, timeZone, groupFilters);
 
   const options = {
     ...computed.options,
@@ -175,8 +178,8 @@ export const groupStatsView = (
   };
 
   const head = {
-    ...filterChips(filters, options, { venueName, tripName }),
-    trips: statsTrips(stats.plays, detail.trips, filters, timeZone),
+    ...filterChips(groupFilters, options, { venueName, tripName }),
+    trips: statsTrips(stats.plays, detail.trips, groupFilters, timeZone),
   };
 
   if (stats.plays.length === 0) return { ...head, kind: "empty" as const };
@@ -186,9 +189,9 @@ export const groupStatsView = (
       ...head,
       kind: "no_match" as const,
       sentence: noMatch(
-        filters,
-        venueName(filters.venueId ?? null),
-        filters.tripId === undefined ? "" : tripName(filters.tripId),
+        groupFilters,
+        venueName(groupFilters.venueId ?? null),
+        groupFilters.tripId === undefined ? "" : tripName(groupFilters.tripId),
       ),
     };
 
@@ -751,6 +754,15 @@ export const groupStatsView = (
   const tables = (count: number, appearances: number) =>
     `${plural(count, "table")} · ${plural(appearances, "appearance")}`;
 
+  const seatRows = stats.seats === undefined ? [] : groupSeatBreakdown(plays, stats.seats);
+
+  const blackjackPlays = plays.reduce(
+    (sum, play) => sum + (play.game === "blackjack" ? play.results.length : 0),
+    0,
+  );
+
+  const seatedPlays = seatRows.reduce((sum, row) => sum + row.sessions, 0);
+
   return {
     ...head,
     kind: "stats" as const,
@@ -764,7 +776,7 @@ export const groupStatsView = (
     together: plays.length < TOGETHER_MIN_PLAYS || together.length === 0 ? null : together,
     tripList,
     awards:
-      filters.tripId === undefined || plays.length < AWARDS_MIN_PLAYS
+      groupFilters.tripId === undefined || plays.length < AWARDS_MIN_PLAYS
         ? null
         : groupAwards(plays, clock).map((award) => ({
             key: award.key,
@@ -778,7 +790,7 @@ export const groupStatsView = (
     backing,
     records: recordRows.length === 0 ? null : recordRows,
     byGame:
-      filters.game !== undefined || plays.length < BREAKDOWNS_MIN_PLAYS
+      groupFilters.game !== undefined || plays.length < BREAKDOWNS_MIN_PLAYS
         ? null
         : computed.byGame.map((row) => ({
             key: row.game ?? "none",
@@ -786,10 +798,25 @@ export const groupStatsView = (
             meta: tables(row.sessions, row.appearances),
             chip: gameChip(row.game),
             result: row.result,
-            filters: { ...filters, game: row.game },
+            filters: { ...groupFilters, game: row.game },
           })),
+    bySeat:
+      seatRows.length === 0
+        ? null
+        : {
+            count:
+              seatedPlays < blackjackPlays
+                ? `${seatedPlays} of ${blackjackPlays} blackjack plays`
+                : undefined,
+            rows: seatRows.map((row) => ({
+              key: String(row.seat),
+              label: seatBucketLabel(row.seat),
+              meta: `${plural(row.sessions, "play")} · ${formatHours(row.hours)}`,
+              result: row.result,
+            })),
+          },
     byCasino:
-      filters.venueId !== undefined || plays.length < BREAKDOWNS_MIN_PLAYS
+      groupFilters.venueId !== undefined || plays.length < BREAKDOWNS_MIN_PLAYS
         ? null
         : computed.byCasino
             .toSorted((a, b) => b.sessions - a.sessions)
@@ -798,7 +825,7 @@ export const groupStatsView = (
               label: venueName(row.venueId),
               meta: tables(row.sessions, row.appearances),
               result: row.result,
-              filters: { ...filters, venueId: row.venueId },
+              filters: { ...groupFilters, venueId: row.venueId },
             })),
   };
 };

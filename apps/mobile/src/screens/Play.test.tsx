@@ -64,10 +64,31 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
       </button>
     ),
     Platform: { OS: "ios" },
-    useWindowDimensions: () => ({ fontScale: 1 }),
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
     Animated: { Value, View: Container },
   }));
-  vi.doMock("../components/ui/motion", () => ({ animate: () => {}, duration: {}, ease: {} }));
+  vi.doMock("react-native-svg", () => ({
+    default: Container,
+    Circle: Container,
+    Defs: Container,
+    Ellipse: Container,
+    G: Container,
+    Line: Container,
+    LinearGradient: Container,
+    Path: Container,
+    RadialGradient: Container,
+    Rect: Container,
+    Stop: Container,
+    Text: Container,
+  }));
+  vi.doMock("uniwind", () => ({ useCSSVariable: () => [] }));
+  vi.doMock("../lib/useLargeText", () => ({ useLargeText: () => false }));
+  vi.doMock("../components/ui/motion", () => ({
+    animate: () => {},
+    duration: {},
+    ease: {},
+    useReducedMotion: () => false,
+  }));
   vi.doMock("../components/ui/confirmAction", () => ({
     confirmAction: (_title: string, _message: string, _label: string, confirm: () => void) =>
       confirm(),
@@ -90,7 +111,20 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
   }));
   vi.doMock("../components/ui/Sheet", () => ({
     SheetHost: Container,
-    Sheet: ({ children }: { children: ReactNode }) => <section>{children}</section>,
+    Sheet: ({
+      title,
+      children,
+      footer,
+    }: {
+      title?: string;
+      children?: ReactNode;
+      footer?: ReactNode;
+    }) => (
+      <section aria-label={title}>
+        {children}
+        {footer}
+      </section>
+    ),
   }));
   vi.doMock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
   vi.doMock("../components/ui/HeaderTitle", () => ({ HeaderTitle: () => null }));
@@ -105,7 +139,7 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     ShareCardSheet: ({ title }: { title: string }) => <div>Card preview for {title}</div>,
   }));
   vi.doMock("../components/Money", () => ({ Money: () => null }));
-  vi.doMock("../components/ui/Field", () => ({ FormError: Container }));
+  vi.doMock("../components/ui/Field", () => ({ Choice: () => null, FormError: Container }));
   vi.doMock("../components/ui/Surface", () => ({
     Card: Container,
     EmptyState: Container,
@@ -139,6 +173,9 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     CashOutSheet: () => <div>Cash out sheet</div>,
     VenueSheet: ({ onSaved }: { onSaved: () => void }) => (
       <button onClick={onSaved}>Pick a casino</button>
+    ),
+    VoidSeatingSheet: ({ onVoided }: { onVoided: () => void }) => (
+      <button onClick={onVoided}>Confirm void seat</button>
     ),
   }));
   vi.doMock("../features/TableTrip", () => ({
@@ -252,5 +289,278 @@ it("shows Undo without a ToastHost and keeps guests reachable after deleting the
     await store.close();
     vi.resetModules();
     vi.unstubAllGlobals();
+  }
+});
+
+it("handles solo and shared blackjack seats, undo toast, edit Seat row on iOS/Android, and history inspection", async () => {
+  for (const os of ["ios", "android"] as const) {
+    vi.resetModules();
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    let documentState: RecordingStorageDocument = { revision: 0 };
+
+    const store = makeRecordingStore({
+      load: async () => documentState,
+      commit: async (revision, payload) => {
+        documentState = { revision: revision + 1, payload };
+
+        return documentState.revision;
+      },
+      subscribe: () => () => {},
+      close: async () => {},
+    });
+
+    await store.ready;
+    await store.execute(store.prepare({ type: "start", game: "blackjack", buyIn: 20000 }));
+    const visit = store.getSnapshot().state!.visits[0]!;
+    const navigation = { setOptions: vi.fn(), setParams: vi.fn(), dispatch: vi.fn() };
+
+    vi.doMock("@react-navigation/native", () => ({
+      useIsFocused: () => true,
+      useNavigation: () => navigation,
+      StackActions: {
+        push: (screen: string, params: { readonly visitId: string }) => ({ screen, params }),
+      },
+    }));
+
+    const Container = ({
+      children,
+      accessibilityLabel,
+    }: {
+      children?: ReactNode;
+      accessibilityLabel?: string;
+    }) => <div aria-label={accessibilityLabel}>{children}</div>;
+
+    class Value {
+      interpolate() {
+        return 0;
+      }
+      stopAnimation() {}
+    }
+
+    vi.doMock("react-native", () => ({
+      Text: Container,
+      View: Container,
+      Pressable: ({
+        accessibilityLabel,
+        disabled,
+        onPress,
+        children,
+      }: {
+        accessibilityLabel?: string;
+        disabled?: boolean;
+        onPress?: () => void;
+        children?: ReactNode;
+      }) => (
+        <button aria-label={accessibilityLabel} disabled={disabled} onClick={onPress}>
+          {children}
+        </button>
+      ),
+      Platform: { OS: os },
+      useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+      Animated: { Value, View: Container },
+    }));
+    vi.doMock("react-native-svg", () => ({
+      default: Container,
+      Circle: Container,
+      Defs: Container,
+      Ellipse: Container,
+      G: Container,
+      Line: Container,
+      LinearGradient: Container,
+      Path: Container,
+      RadialGradient: Container,
+      Rect: Container,
+      Stop: Container,
+      Text: Container,
+    }));
+    vi.doMock("uniwind", () => ({ useCSSVariable: () => [] }));
+    vi.doMock("../lib/useLargeText", () => ({ useLargeText: () => false }));
+    vi.doMock("../components/ui/motion", () => ({
+      animate: () => {},
+      duration: {},
+      ease: {},
+      useReducedMotion: () => false,
+    }));
+    vi.doMock("../components/ui/confirmAction", () => ({ confirmAction: () => {} }));
+
+    const Button = ({
+      label,
+      accessibilityLabel,
+      disabled,
+      onPress,
+    }: {
+      label?: string;
+      accessibilityLabel?: string;
+      disabled?: boolean;
+      onPress?: () => void;
+    }) => (
+      <button aria-label={accessibilityLabel} disabled={disabled} onClick={onPress}>
+        {label ?? accessibilityLabel}
+      </button>
+    );
+
+    vi.doMock("../components/ui/Button", () => ({ Button, IconButton: Button }));
+    vi.doMock("../components/ui/ActionMenu", () => ({
+      ActionMenu: ({ actions }: { actions: { label: string; onPress: () => void }[] }) =>
+        actions.map((a) => <Button key={a.label} {...a} />),
+    }));
+    vi.doMock("../components/ui/Sheet", () => ({
+      SheetHost: Container,
+      Sheet: ({
+        title,
+        children,
+        footer,
+      }: {
+        title?: string;
+        children?: ReactNode;
+        footer?: ReactNode;
+      }) => (
+        <section aria-label={title}>
+          {children}
+          {footer}
+        </section>
+      ),
+    }));
+    vi.doMock("../components/ui/GlassSurface", () => ({ GlassSurface: Container }));
+    vi.doMock("../components/ui/HeaderTitle", () => ({ HeaderTitle: () => null }));
+    vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
+    vi.doMock("../components/ui/DateTimeField", () => ({ DateTimeField: () => null }));
+    vi.doMock("../features/PlayerAvatar", () => ({
+      PlayerAvatar: () => null,
+      TABLE_AVATAR_SIZE: 32,
+      PLAYER_SHEET_AVATAR_SIZE: 64,
+    }));
+    vi.doMock("../features/ShareCardSheet", () => ({ ShareCardSheet: () => null }));
+    vi.doMock("../components/Money", () => ({ Money: () => null }));
+    vi.doMock("../components/ui/Field", () => ({ Choice: () => null, FormError: Container }));
+    vi.doMock("../components/ui/Surface", () => ({
+      Card: Container,
+      EmptyState: Container,
+      List: Container,
+      Row: ({
+        children,
+        accessibilityLabel,
+        onPress,
+      }: {
+        children?: ReactNode;
+        accessibilityLabel?: string;
+        onPress?: () => void;
+      }) =>
+        onPress ? (
+          <button aria-label={accessibilityLabel} onClick={onPress}>
+            {children}
+          </button>
+        ) : (
+          <div aria-label={accessibilityLabel}>{children}</div>
+        ),
+      SectionHeading: Container,
+      Skeleton: () => null,
+    }));
+    vi.doMock("../features/Personal", () => ({
+      PersonalScreen: ({
+        children,
+        dock,
+        toast,
+      }: {
+        children: ReactNode;
+        dock?: ReactNode;
+        toast?: ReactNode;
+      }) => (
+        <main>
+          {children}
+          <footer>
+            {toast}
+            {dock}
+          </footer>
+        </main>
+      ),
+      SaveStatus: () => null,
+    }));
+    vi.doMock("../features/RecordingForms", () => ({
+      VoidSeatingSheet: ({ onVoided }: { onVoided: () => void }) => (
+        <button onClick={onVoided}>Confirm void seat</button>
+      ),
+    }));
+    vi.doMock("../features/TableTrip", () => ({
+      TableTripSheet: () => null,
+      TripRow: () => null,
+      useTripPickable: () => false,
+    }));
+    vi.doMock("../features/LiveBar", () => ({ LiveSessionsBar: () => null }));
+    vi.doMock("../lib/recording", () => ({
+      useRecordingState: () => useSyncExternalStore(store.subscribe, store.getSnapshot).state,
+    }));
+    vi.doMock("../features/SharedTable", () => ({ TableSection: () => null }));
+
+    const { RecordingProvider } = await import("@stacks/client-runtime/recordingReact");
+    const { PlayScreen } = await import("./Play");
+    const element = document.createElement("div");
+    const root = createRoot(element);
+
+    const click = async (label: string, exact = false) => {
+      const button = [...element.querySelectorAll("button")].find((b) =>
+        exact
+          ? b.textContent === label || b.getAttribute("aria-label") === label
+          : b.textContent?.includes(label) || b.getAttribute("aria-label")?.startsWith(label),
+      );
+
+      expect(button, label).toBeDefined();
+      await act(async () => button!.click());
+    };
+
+    try {
+      await act(async () =>
+        root.render(
+          <RecordingProvider store={store}>
+            <PlayScreen route={{ params: { visitId: visit.id } }} />
+          </RecordingProvider>,
+        ),
+      );
+
+      await click("+ Pick seat", true);
+      await click("Seat 1, first base, open");
+      expect(element.textContent).toContain("Sat at Seat 1 · First base.");
+      await click("Undo", true);
+      expect(element.textContent).toContain("Seat change undone.");
+
+      await click("Edit my session", true);
+      expect(element.textContent).toContain("SeatNot set");
+      await click("Done", true);
+
+      await store.execute(
+        store.prepare({
+          type: "join_table",
+          tableId: visit.tableId,
+          displayName: "Bea",
+          buyIn: 10000,
+        }),
+      );
+
+      const beaVisitId = store.getSnapshot().state!.visits.find((v) => v.id !== visit.id)!.id;
+
+      await store.execute(
+        store.prepare({ type: "set_seat", tableId: visit.tableId, visitId: beaVisitId, seat: 1 }),
+      );
+      await act(async () => {});
+      expect(element.querySelector('[aria-label="Seat 5, open"]')).toBeNull();
+      expect(element.textContent).toContain("Seat 1 · First base");
+
+      await click("+ Pick seat", true);
+      await click("Seat 3, open");
+      expect(element.textContent).toContain("Sat at Seat 3.");
+
+      await store.execute(store.prepare({ type: "finish", visitId: visit.id, amount: 25000 }));
+      await act(async () => {});
+      expect(element.textContent).toContain("Seat 3");
+      await click("Sat at Seat 3");
+      await click("Void seat record", true);
+      await click("Confirm void seat", true);
+      expect(element.textContent).toContain("Seat record voided. It stays in the history.");
+    } finally {
+      await act(async () => root.unmount());
+      await store.close();
+      vi.resetModules();
+      vi.unstubAllGlobals();
+    }
   }
 });

@@ -35,6 +35,12 @@ Press feedback is built in throughout the native apps: the shared press scale an
 
 A one-tap write, like a rebuy, keeps its button where it was, so a second tap does it again. Taking it back is an Undo somewhere else: a toast on mobile. A button that turns into its own undo makes a double-tap cancel itself. Outside the felt screen, a repeat-amount button reads "Rebuy $300". The felt screen labels the whole row "Rebuy" and uses three equal controls: "+ $100", "+ $200" and "Other". Its undo toast sits above that row.
 
+## Blackjack tabletop arc and seat picker
+
+`BlackjackTableArc` (`apps/mobile/src/features/BlackjackTableArc.tsx`) draws a flat top-down blackjack table with `react-native-svg`, in felt tokens only (a rail, the felt, a curved betting line, an outlined `Dealer` area and numbered spots; no casino props, printed rules, gradients or glow) (`5`, `6`, or `7` spots ordered right-to-left: `Seat 1` / First base on the dealer's left, `Seat N` / Third base on the dealer's right), used exclusively inside seat selection (`SeatPickerSheet`). Each spot keeps a minimum 44pt target and uses `seatLabel(seat, seats)` for accessibility alongside occupant names; live session, table, and shared views show each player's seat directly on their row (`TableSeats`, `SharedTable`) and live felt seat pill without repeating the table map or total seat count.
+
+`SeatPickerSheet` (`apps/mobile/src/features/SeatPickerSheet.tsx`) saves an open spot with one tap (no Save button) on both draft forms and live visits, guards shrinking `5 / 6 / 7` seats below any live occupied spot, atomically replaces single-seat finished records, and routes multi-seat finished sessions to visit History instead of rewriting history.
+
 ## Choice and TextField
 
 Use `Choice` for an exclusive value. SwiftUI and Compose use a segmented control when labels fit and a picker otherwise. Use `presentation="menu"` for compact player or counterparty choices. Narrow a page with `FilterChip`.

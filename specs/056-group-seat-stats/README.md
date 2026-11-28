@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-11-25
 priority: medium
 tags:
@@ -12,10 +12,12 @@ depends_on:
   - "055"
 parent: "052"
 created_at: 2026-11-25T05:46:47.013539700Z
-updated_at: 2026-11-25T05:52:06.962304500Z
+updated_at: 2026-11-26T05:50:58.782517600Z
 transitions:
   - status: planned
     at: 2026-11-25T05:52:06.962304500Z
+  - status: in-progress
+    at: 2026-11-26T05:50:58.782517600Z
 ---
 
 # Seat selection: Group stats blackjack seat breakdown

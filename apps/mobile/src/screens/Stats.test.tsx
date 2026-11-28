@@ -25,10 +25,14 @@ async function load(
     platform = "ios",
     home = null,
     groupState,
+    privacyMode = false,
+    interactiveChips = false,
   }: {
     platform?: "ios" | "android";
     home?: ReturnType<typeof recordingHome> | null;
     groupState?: StatsState;
+    privacyMode?: boolean;
+    interactiveChips?: boolean;
   } = {},
 ) {
   vi.resetModules();
@@ -38,12 +42,14 @@ async function load(
     children,
     className,
     testID,
+    accessibilityLabel,
   }: {
     children?: ReactNode;
     className?: string;
     testID?: string;
+    accessibilityLabel?: string;
   }) => (
-    <div className={className} data-testid={testID}>
+    <div className={className} data-testid={testID} aria-label={accessibilityLabel}>
       {children}
     </div>
   );
@@ -132,16 +138,56 @@ async function load(
   vi.doMock("@react-navigation/elements", () => ({ useHeaderHeight: () => 106 }));
   vi.doMock("../components/ui/Icon", () => ({ Icon: () => null }));
   vi.doMock("../components/Money", () => ({ Money: () => null }));
+  vi.doMock("../lib/preferences", async () => ({
+    ...(await vi.importActual<typeof import("../lib/preferences")>("../lib/preferences")),
+    usePreferences: () => ({ showCents: false, privacyMode }),
+  }));
   vi.doMock("../components/ui/Button", () => ({ Button: Touch }));
-  vi.doMock("../components/ui/FilterChip", () => ({ FilterChip: () => null }));
+  vi.doMock("../components/ui/FilterChip", () => ({
+    FilterChip: interactiveChips
+      ? ({
+          name,
+          value,
+          options,
+          onChange,
+        }: {
+          name: string;
+          value: string;
+          options: ReadonlyArray<{ value: string; label: string }>;
+          onChange: (value: string) => void;
+        }) => {
+          const picked = options.find((o) => o.value === value)?.label ?? name;
+
+          return (
+            <div>
+              <Touch label={`${name}: ${picked}`} onPress={() => {}} />
+              {options.map((option) => (
+                <Touch
+                  key={option.value}
+                  label={`${name}=${option.label}`}
+                  onPress={() => onChange(option.value)}
+                />
+              ))}
+            </div>
+          );
+        }
+      : () => null,
+  }));
   vi.doMock("../components/ui/Surface", () => ({
     EmptyState: Container,
     List: Container,
     SectionHeading: Container,
     Surface: Container,
-    Row: (props: Parameters<typeof Container>[0] & { onPress?: () => void }) =>
+    Row: (
+      props: Parameters<typeof Container>[0] & {
+        onPress?: () => void;
+        accessibilityLabel?: string;
+      },
+    ) =>
       props.onPress ? (
-        <Touch onPress={props.onPress}>{props.children}</Touch>
+        <Touch onPress={props.onPress} accessibilityLabel={props.accessibilityLabel}>
+          {props.children}
+        </Touch>
       ) : (
         <Container {...props} />
       ),
@@ -561,4 +607,224 @@ it("resets every filter from a no-match page", async () => {
   expect(element.textContent).not.toContain("No matching sessions");
   expect(element.textContent).toContain("Result · all time");
   await act(async () => root.unmount());
+});
+
+it("shows By seat for Just me blackjack sessions, filters on tap, hides amounts in privacy mode, and clears seat when leaving Blackjack", async () => {
+  const baseHome = await withFinishedSessions();
+  const bjVisits = baseHome.finished.filter((item) => item.table.game === "blackjack");
+  const otherVisits = baseHome.finished.filter((item) => item.table.game !== "blackjack");
+
+  const seatedHome = {
+    ...baseHome,
+    finished: [
+      { ...bjVisits[0]!, seatOutcome: { kind: "seat" as const, seat: 1 } },
+      { ...bjVisits[1]!, seatOutcome: { kind: "seat" as const, seat: 5 } },
+      { ...bjVisits[2]!, seatOutcome: { kind: "multiple" as const, seats: [1, 5] } },
+      ...bjVisits.slice(3),
+      ...otherVisits,
+    ],
+  };
+
+  for (const platform of ["ios", "android"] as const) {
+    const { StatsScreen, element, errors, root } = await load(signedOut, {
+      platform,
+      home: seatedHome,
+      interactiveChips: platform === "ios",
+    });
+
+    await act(async () => root.render(<StatsScreen route={route} />));
+    expect(errors).toEqual([]);
+    expect(element.textContent).toContain(platform === "android" ? "BY SEAT" : "By seat");
+
+    if (platform === "android") expect(element.textContent).toContain("3 of 4 blackjack sessions");
+    expect(element.textContent).toContain("Seat 1 · First base");
+    expect(element.textContent).toContain("Multiple seats");
+
+    await act(async () => button(element, "Seat 1 · First base").click());
+
+    if (platform === "android") {
+      expect(element.textContent).toContain("Seat 1 · First base");
+      expect(element.textContent).not.toContain("BY SEAT");
+      await act(async () => button(element, "Blackjack").click());
+      await act(async () => button(element.querySelector('[role="menu"]')!, "Baccarat").click());
+      expect(element.textContent).not.toContain("Seat 1 · First base");
+    } else {
+      expect(element.textContent).toContain("Seat: Seat 1 · First base");
+      await act(async () => button(element, "Game=Baccarat").click());
+      expect(element.textContent).not.toContain("Seat: Seat 1 · First base");
+    }
+
+    await act(async () => root.unmount());
+  }
+
+  const secret = await load(signedOut, {
+    platform: "ios",
+    home: seatedHome,
+    privacyMode: true,
+  });
+
+  await act(async () => secret.root.render(<secret.StatsScreen route={route} />));
+
+  const rowLabels = [...secret.element.querySelectorAll("button")].flatMap((node) => {
+    const label = node.getAttribute("aria-label");
+
+    return label?.startsWith("Seat 1 · First base") ? [label] : [];
+  });
+
+  expect(rowLabels).toHaveLength(1);
+  expect(rowLabels[0]).not.toContain("$");
+  expect(rowLabels[0]).toContain("Amount hidden");
+  await act(async () => secret.root.unmount());
+});
+
+it("shows read-only By seat in Group stats with partial count and privacy mode, and hides when seats field is absent", async () => {
+  const startedAt = DateTime.makeUnsafe("2026-11-12T20:00:00.000Z");
+  const endedAt = DateTime.add(startedAt, { hours: 3 });
+  const you = PlayerId.make("0192e7a0-0000-7000-8000-0000000000f1");
+  const friend = PlayerId.make("0192e7a0-0000-7000-8000-0000000000f2");
+  const table1 = TableId.make("0192e7a0-0000-7000-8000-0000000000a1");
+  const table2 = TableId.make("0192e7a0-0000-7000-8000-0000000000a2");
+
+  const detail = {
+    group: {
+      id: GroupId.make(groupId),
+      name: "Thursday crew",
+      currency: CurrencyCode.make("USD"),
+      createdAt: startedAt,
+    },
+    players: [
+      {
+        id: you,
+        displayName: "Maya",
+        role: "owner" as const,
+        userId: UserId.make("user-1"),
+        claimCode: null,
+      },
+      {
+        id: friend,
+        displayName: "Sam",
+        role: "member" as const,
+        userId: UserId.make("user-2"),
+        claimCode: null,
+      },
+    ],
+    myPlayerId: you,
+    role: "owner" as const,
+    trips: [],
+  };
+
+  const plays = [
+    {
+      id: table1,
+      tripId: vegas,
+      game: "blackjack" as const,
+      venueId: null,
+      startedAt,
+      endedAt,
+      results: [
+        {
+          playerId: you,
+          net: MinorUnits.make(1400),
+          buyIn: MinorUnits.make(10000),
+          milliseconds: 10800000,
+        },
+        {
+          playerId: friend,
+          net: MinorUnits.make(-500),
+          buyIn: MinorUnits.make(10000),
+          milliseconds: 10800000,
+        },
+      ],
+    },
+    {
+      id: table2,
+      tripId: vegas,
+      game: "blackjack" as const,
+      venueId: null,
+      startedAt,
+      endedAt,
+      results: [
+        {
+          playerId: you,
+          net: MinorUnits.make(800),
+          buyIn: MinorUnits.make(10000),
+          milliseconds: 10800000,
+        },
+      ],
+    },
+  ];
+
+  const withSeats: StatsState = {
+    kind: "saved",
+    copy: {
+      fetchedAt: endedAt,
+      detail,
+      stats: {
+        venues: [],
+        plays,
+        seats: [
+          {
+            playId: table1,
+            playerId: you,
+            seat: 1,
+            net: MinorUnits.make(1400),
+            milliseconds: 10800000,
+          },
+          {
+            playId: table2,
+            playerId: you,
+            seat: "multiple",
+            net: MinorUnits.make(800),
+            milliseconds: 10800000,
+          },
+        ],
+      },
+    },
+  };
+
+  const { StatsScreen, element, errors, root } = await load(
+    { ...signedOut, isSignedIn: true, userId: "user-1" },
+    { platform: "android", groupState: withSeats },
+  );
+
+  await act(async () => root.render(<StatsScreen route={route} />));
+  expect(errors).toEqual([]);
+  expect(element.textContent).toContain("BY SEAT");
+  expect(element.textContent).toContain("2 of 3 blackjack plays");
+  expect(element.textContent).toContain("Seat 1 · First base");
+  expect(element.textContent).toContain("Multiple seats");
+  expect(element.querySelectorAll('button[aria-label^="Seat 1 · First base"]')).toHaveLength(0);
+  await act(async () => root.unmount());
+
+  const secret = await load(
+    { ...signedOut, isSignedIn: true, userId: "user-1" },
+    { platform: "ios", groupState: withSeats, privacyMode: true },
+  );
+
+  await act(async () => secret.root.render(<secret.StatsScreen route={route} />));
+
+  const rowLabels = [...secret.element.querySelectorAll("[aria-label]")].flatMap((node) => {
+    const label = node.getAttribute("aria-label");
+
+    return label?.startsWith("Seat 1 · First base") ? [label] : [];
+  });
+
+  expect(rowLabels).toHaveLength(1);
+  expect(rowLabels[0]).not.toContain("$");
+  expect(rowLabels[0]).toContain("Amount hidden");
+  await act(async () => secret.root.unmount());
+
+  const legacy: StatsState = {
+    kind: "saved",
+    copy: { fetchedAt: endedAt, detail, stats: { venues: [], plays } },
+  };
+
+  const omitted = await load(
+    { ...signedOut, isSignedIn: true, userId: "user-1" },
+    { platform: "android", groupState: legacy },
+  );
+
+  await act(async () => omitted.root.render(<omitted.StatsScreen route={route} />));
+  expect(omitted.element.textContent).not.toContain("BY SEAT");
+  await act(async () => omitted.root.unmount());
 });

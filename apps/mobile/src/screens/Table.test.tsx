@@ -1,5 +1,7 @@
+import type { LiveTable as LiveTableModel } from "@stacks/client-runtime/liveTable";
 import { makeRecordingStore } from "@stacks/client-runtime/recording";
 import type { RecordingStorageDocument } from "@stacks/client-runtime/recordingStorage";
+import { formatSeatLabel, recordingTable } from "@stacks/client-runtime/recordingView";
 import { TableId } from "@stacks/contracts";
 import * as Option from "effect/Option";
 import { act, type ReactNode } from "react";
@@ -53,16 +55,43 @@ const setupTableScreen = async ({
     useNavigation: () => navigation,
   }));
 
-  const Container = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+  const Container = ({
+    children,
+    accessibilityLabel,
+  }: {
+    children?: ReactNode;
+    accessibilityLabel?: string;
+  }) => <div aria-label={accessibilityLabel}>{children}</div>;
 
   vi.doMock("react-native", () => ({
     Text: Container,
     View: Container,
-    Pressable: ({ children, onPress }: { children?: ReactNode; onPress?: () => void }) => (
-      <button onClick={onPress}>{children}</button>
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+    Pressable: ({
+      children,
+      accessibilityLabel,
+      onPress,
+    }: {
+      children?: ReactNode;
+      accessibilityLabel?: string;
+      onPress?: () => void;
+    }) => (
+      <button aria-label={accessibilityLabel} onClick={onPress}>
+        {children}
+      </button>
     ),
     Platform: { OS: "ios" },
   }));
+  vi.doMock("react-native-svg", () => ({
+    default: Container,
+    Line: Container,
+    Path: Container,
+    Text: Container,
+  }));
+  vi.doMock("uniwind", () => ({ useCSSVariable: () => [] }));
+  vi.doMock("../lib/useLargeText", () => ({ useLargeText: () => false }));
+  vi.doMock("../components/ui/motion", () => ({ useReducedMotion: () => false }));
+  vi.doMock("../features/PlayerAvatar", () => ({ PlayerAvatar: () => null }));
   vi.doMock("../components/Money", () => ({
     Money: ({ amount }: { amount: number }) => <span>{amount}</span>,
   }));
@@ -71,7 +100,31 @@ const setupTableScreen = async ({
       <button onClick={onPress}>{label}</button>
     ),
   }));
-  vi.doMock("../components/ui/Field", () => ({ FormError: Container }));
+  vi.doMock("../components/ui/Field", () => ({
+    FormError: Container,
+    Choice: ({
+      label,
+      options,
+      onChange,
+    }: {
+      label: string;
+      options: ReadonlyArray<{ value: string; label: string }>;
+      onChange: (value: string) => void;
+    }) => (
+      <div role="group" aria-label={label}>
+        {options.map((option) => (
+          <button key={option.value} onClick={() => onChange(option.value)}>
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ),
+  }));
+  vi.doMock("../components/ui/Sheet", () => ({
+    Sheet: ({ title, children }: { title?: string; children?: ReactNode }) => (
+      <section aria-label={title}>{children}</section>
+    ),
+  }));
   vi.doMock("../components/ui/Surface", () => ({
     EmptyState: ({
       title,
@@ -89,6 +142,8 @@ const setupTableScreen = async ({
       </div>
     ),
   }));
+  let lastTableProps: LiveTableModel | null = null;
+
   vi.doMock("../features/LiveBar", () => ({ LiveSessionsBar: () => null }));
   vi.doMock("../features/LiveTable", () => ({
     ActionSlot: () => null,
@@ -96,7 +151,22 @@ const setupTableScreen = async ({
     LiveHero: () => null,
     SeatSheet: () => null,
     TableActionSheet: () => null,
-    TableSeats: () => null,
+    TableSeats: ({ table }: { table: LiveTableModel }) => {
+      lastTableProps = table;
+
+      return (
+        <div>
+          {table.seats.map((seat) => (
+            <div key={seat.visitId}>
+              {seat.name}
+              {seat.seatNumber !== null && table.tableSeats !== null
+                ? ` · ${formatSeatLabel(seat.seatNumber, table.tableSeats)}`
+                : ""}
+            </div>
+          ))}
+        </div>
+      );
+    },
     useDeleteTable: () => ({ error: null, confirm: () => {} }),
   }));
   vi.doMock("../features/Personal", () => ({ PersonalScreen: Container }));
@@ -111,10 +181,13 @@ const setupTableScreen = async ({
   vi.doMock("./Play", () => ({ BackButton: Container, RecordingToast: Container }));
   vi.doMock("./Session", () => ({ ImportedSession: Container }));
 
-  const { recordingTable } = await import("@stacks/client-runtime/recordingView");
-
   vi.doMock("@stacks/client-runtime/recordingReact", () => ({
-    useRecordingSubmit: () => ({ pending: false, error: null, submit: async () => null }),
+    useRecordingSubmit: () => ({
+      pending: false,
+      error: null,
+      submit: async (input: Parameters<typeof store.prepare>[0]) =>
+        store.execute(store.prepare(input)),
+    }),
     useRecordingTable: (id: string) => {
       const current = store.getSnapshot().state;
       const parsed = Option.getOrNull(TableId.makeOption(id));
@@ -135,7 +208,7 @@ const setupTableScreen = async ({
     root.render(<TableScreen route={{ params: { tableId } }} />);
   });
 
-  return { container, root, setOptionsCalls, navigateCalls };
+  return { container, root, setOptionsCalls, navigateCalls, getLastTable: () => lastTableProps };
 };
 
 it("keeps the header and shows a recovery action for invalid and unknown table IDs", async () => {
@@ -182,6 +255,37 @@ it("hides the native header only when a recorded table is loaded and restores it
     expect(loaded.setOptionsCalls).toEqual([{ headerShown: false }]);
     await act(async () => loaded.root.unmount());
     expect(loaded.setOptionsCalls).toEqual([{ headerShown: false }, { headerShown: true }]);
+  } finally {
+    await store.close();
+  }
+});
+
+it("omits the table map and seat count on live Table and shows each player's seat on their row", async () => {
+  const store = await openStore();
+
+  try {
+    await store.execute(store.prepare({ type: "open_table", game: "blackjack", tableSeats: 5 }));
+    const tableId = store.getSnapshot().state!.tables[0]!.id;
+
+    await store.execute(
+      store.prepare({ type: "join_table", tableId, displayName: "Bea", buyIn: 20000 }),
+    );
+
+    const beaVisitId = store.getSnapshot().state!.visits[0]!.id;
+
+    await store.execute(store.prepare({ type: "set_seat", tableId, visitId: beaVisitId, seat: 1 }));
+
+    const screen = await setupTableScreen({ store, tableId });
+    expect(screen.container.textContent).not.toContain("5 seats");
+    expect(
+      screen.container.querySelector('[aria-label="Seat 1, first base, occupied by Bea"]'),
+    ).toBeNull();
+    expect(screen.container.textContent).toContain("Bea · Seat 1 · First base");
+
+    const passedTable = screen.getLastTable();
+    expect(passedTable?.tableSeats).toBe(5);
+    expect(passedTable?.seats[0]?.seatNumber).toBe(1);
+    await act(async () => screen.root.unmount());
   } finally {
     await store.close();
   }

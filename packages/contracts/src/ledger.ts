@@ -29,6 +29,8 @@ export type Game = typeof Game.Type;
 /** A spot at the table, numbered from the dealer's left: seat 1 is first base at blackjack. */
 export const Seat = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 14 }));
 
+export type Seat = typeof Seat.Type;
+
 export const SessionStatus = Schema.Literals(["live", "closed"]);
 
 export type SessionStatus = typeof SessionStatus.Type;

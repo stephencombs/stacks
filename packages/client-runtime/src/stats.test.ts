@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { TripId, VenueId, type Game } from "@stacks/contracts";
+import type { SeatBucket } from "@stacks/shared/seats";
 import * as DateTime from "effect/DateTime";
 
 import { makeRecordingStore, type RecordingInput, type RecordingStore } from "./recording.ts";
@@ -774,6 +775,182 @@ describe("the Just me figures", () => {
       ]);
 
       expect(result.records[0]?.meta).toBe("Craps · Jan 10, 2026");
+    });
+  });
+
+  describe("blackjack seats", () => {
+    const seatedVisits = async (specs: ReadonlyArray<Played & { seat?: SeatBucket | null }>) => {
+      const raw = (await played(specs)).toSorted(
+        (a, b) =>
+          DateTime.toEpochMillis(a.visit.startedAt) - DateTime.toEpochMillis(b.visit.startedAt),
+      );
+
+      return raw.map((item, index) => {
+        const seat = specs[index]?.seat ?? null;
+
+        const seatOutcome = (() => {
+          if (seat === "multiple") return { kind: "multiple", seats: [1, 5] } as const;
+
+          if (seat === null) return { kind: "none" } as const;
+
+          return { kind: "seat", seat } as const;
+        })();
+
+        return { ...item, seatOutcome };
+      });
+    };
+
+    it("orders bySeat spatially, reports partial coverage, and clears seat when leaving Blackjack", async () => {
+      const visits = await seatedVisits([
+        { day: "2026-01-01", hours: 1, buyIn: 10_000, cashOut: 15_000, game: "blackjack", seat: 5 },
+        { day: "2026-01-02", hours: 2, buyIn: 10_000, cashOut: 22_000, game: "blackjack", seat: 1 },
+        {
+          day: "2026-01-03",
+          hours: 1,
+          buyIn: 10_000,
+          cashOut: 4_000,
+          game: "blackjack",
+          seat: "multiple",
+        },
+        { day: "2026-01-04", hours: 1, buyIn: 10_000, cashOut: 11_000, game: "blackjack" },
+        { day: "2026-01-05", hours: 1, buyIn: 10_000, cashOut: 14_000, game: "craps", seat: 2 },
+      ]);
+
+      const all = view(visits);
+
+      if (all.kind !== "stats") throw new Error(all.kind);
+      expect(all.chips.map((c) => c.key)).toEqual(["year", "game", "venueId"]);
+      expect(all.bySeat).toEqual({
+        count: "3 of 4 blackjack sessions",
+        rows: [
+          {
+            key: "1",
+            label: "Seat 1 · First base",
+            meta: "1 session · 2h",
+            result: 12_000,
+            filters: { game: "blackjack", seat: 1 },
+          },
+          {
+            key: "5",
+            label: "Seat 5",
+            meta: "1 session · 1h",
+            result: 5_000,
+            filters: { game: "blackjack", seat: 5 },
+          },
+          {
+            key: "multiple",
+            label: "Multiple seats",
+            meta: "1 session · 1h",
+            result: -6_000,
+            filters: { game: "blackjack", seat: "multiple" },
+          },
+        ],
+      });
+
+      const seatPicked = view(visits, all.bySeat!.rows[0]!.filters);
+
+      if (seatPicked.kind !== "stats") throw new Error(seatPicked.kind);
+      expect(seatPicked.bySeat).toBeNull();
+      expect(seatPicked.chips.map((c) => [c.key, c.applied, c.label])).toEqual([
+        ["game", true, "Blackjack"],
+        ["seat", true, "Seat 1 · First base"],
+        ["year", false, "All time"],
+        ["venueId", false, "All casinos"],
+      ]);
+
+      const gameChip = seatPicked.chips.find((c) => c.key === "game")!;
+      expect(gameChip.cleared.seat).toBeUndefined();
+      expect(gameChip.options.find((o) => o.value === "craps")?.filters.seat).toBeUndefined();
+      expect(gameChip.options.find((o) => o.value === "")?.filters.seat).toBeUndefined();
+
+      const bj = view(visits, { game: "blackjack" });
+      expect(bj.chips.find((c) => c.key === "seat")?.options.map((o) => o.label)).toEqual([
+        "All seats",
+        "Seat 1 · First base",
+        "Seat 5",
+        "Multiple seats",
+        "No seat recorded",
+      ]);
+    });
+
+    it("formats noMatch copy for single seat, multiple seats and unset seat", async () => {
+      const visits = await seatedVisits([
+        { day: "2026-01-01", hours: 1, buyIn: 10_000, cashOut: 15_000, game: "blackjack", seat: 1 },
+      ]);
+
+      const three = view(visits, { year: 2026, game: "blackjack", seat: 3 });
+      expect(three.kind === "no_match" && three.sentence).toBe(
+        "No finished Blackjack sessions at Seat 3 in 2026.",
+      );
+
+      const multi = view(visits, { game: "blackjack", seat: "multiple" });
+      expect(multi.kind === "no_match" && multi.sentence).toBe(
+        "No finished Blackjack sessions across multiple seats.",
+      );
+
+      const none = view(visits, { game: "blackjack", seat: null });
+      expect(none.kind === "no_match" && none.sentence).toBe(
+        "No finished Blackjack sessions without a seat set.",
+      );
+    });
+
+    it("emits a seat Patterns sentence only in blackjack scope, never for Multiple seats or a seat filter", async () => {
+      const batch = (
+        count: number,
+        dayStart: number,
+        cashOut: number,
+        game: Game,
+        seat: SeatBucket,
+      ) =>
+        Array.from({ length: count }, (_, i) => ({
+          day: `2026-03-${String(dayStart + i).padStart(2, "0")}`,
+          hours: 1,
+          buyIn: 10_000,
+          cashOut,
+          game,
+          seat,
+        }));
+
+      const visits = await seatedVisits([
+        ...batch(5, 1, 24_000, "blackjack", 3),
+        ...batch(5, 7, 12_000, "blackjack", 1),
+        ...batch(1, 15, 20_000, "craps", 3),
+      ]);
+
+      const mixedAll = view(visits);
+
+      if (mixedAll.kind !== "stats") throw new Error(mixedAll.kind);
+      expect(mixedAll.patterns.some((p) => p.before.includes("Seat"))).toBe(false);
+
+      const bj = view(visits, { game: "blackjack" });
+
+      if (bj.kind !== "stats") throw new Error(bj.kind);
+      expect(bj.patterns).toContainEqual({
+        key: "Seat 3",
+        before: "Seat 3 averaged",
+        amount: 14_000,
+        after: " a session, across 5.",
+      });
+
+      const filteredSeat = view(visits, { game: "blackjack", seat: 3 });
+
+      if (filteredSeat.kind !== "stats") throw new Error(filteredSeat.kind);
+      expect(filteredSeat.patterns.some((p) => p.before.includes("Seat"))).toBe(false);
+
+      const firstBaseBest = await seatedVisits([
+        ...batch(5, 1, 26_000, "blackjack", 1),
+        ...batch(5, 7, 12_000, "blackjack", 3),
+      ]);
+
+      const bjOnly = view(firstBaseBest);
+
+      if (bjOnly.kind !== "stats") throw new Error(bjOnly.kind);
+      expect(bjOnly.patterns).toContainEqual({
+        key: "First base (Seat 1)",
+        before: "First base (Seat 1) averaged",
+        amount: 16_000,
+        after: " a session, across 5.",
+      });
     });
   });
 });

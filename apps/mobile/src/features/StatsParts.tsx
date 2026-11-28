@@ -230,7 +230,10 @@ export function Filters({
             />
           );
 
-        if (android && (chip.key === "year" || (chip.key === "game" && gameMenu))) {
+        if (
+          android &&
+          (chip.key === "year" || chip.key === "seat" || (chip.key === "game" && gameMenu))
+        ) {
           return (
             <StatsMenu
               key={chip.key}
@@ -411,6 +414,59 @@ export function ByGame({
   );
 }
 
+type SeatRow = {
+  readonly key: string;
+  readonly label: string;
+  readonly meta: string;
+  readonly result: MinorUnits;
+  readonly filters?: StatsFilters;
+};
+
+/** Blackjack results by seat, in spatial order from Seat 1 to Third base, then Multiple seats. */
+export function BySeat({
+  rows,
+  count,
+  currency,
+  onFilter,
+}: {
+  rows: ReadonlyArray<SeatRow>;
+  count?: string | undefined;
+  currency: CurrencyCode;
+  onFilter?: (filters: StatsFilters) => void;
+}) {
+  const prefs = usePreferences();
+  const android = Platform.OS === "android";
+  const track = resultTrack(rows);
+
+  return (
+    <View className="gap-2">
+      <StatsHeading count={count}>By seat</StatsHeading>
+      <List>
+        {rows.map((row) => {
+          const filters = row.filters;
+
+          return (
+            <ResultRow
+              key={row.key}
+              onPress={onFilter && filters ? () => onFilter(filters) : undefined}
+              accessibilityLabel={`${row.label}, ${row.meta}, ${signed(row.result, currency, prefs, true)}`}
+              accessibilityHint={onFilter && filters ? `Shows only ${row.label}` : undefined}
+              className={android ? "gap-2 px-4 py-2.5" : undefined}
+              label={row.label}
+              labelLines={1}
+              meta={row.meta}
+              metaLines={2}
+              result={row.result}
+              currency={currency}
+              track={track}
+            />
+          );
+        })}
+      </List>
+    </View>
+  );
+}
+
 type CasinoRow = {
   readonly key: string;
   readonly label: string;
@@ -548,9 +604,9 @@ function ResultRow({
   currency,
   track,
 }: {
-  onPress: () => void;
+  onPress?: (() => void) | undefined;
   accessibilityLabel: string;
-  accessibilityHint: string;
+  accessibilityHint?: string | undefined;
   className: string | undefined;
   leading?: ReactNode;
   trailing?: ReactNode;

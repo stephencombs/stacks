@@ -15,6 +15,7 @@ import {
   useServerTable,
 } from "@stacks/client-runtime/recordingReact";
 import {
+  formatSeatLabel,
   LIVE_REBUY_AMOUNTS,
   localDateText,
   localTimeText,
@@ -26,9 +27,17 @@ import {
   visitTitle,
   type RecordingVisitView,
 } from "@stacks/client-runtime/recordingView";
-import { MinorUnits, VisitId, type EntryId, type Game } from "@stacks/contracts";
+import {
+  MinorUnits,
+  VisitId,
+  type EntryId,
+  type Game,
+  type SeatingId,
+  type TableId,
+} from "@stacks/contracts";
 import { ownPlayers } from "@stacks/shared/recording";
 import { formatMoney } from "@stacks/shared/money";
+import { seatCount } from "@stacks/shared/seats";
 import * as DateTime from "effect/DateTime";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
@@ -61,10 +70,12 @@ import {
   ReopenSheet,
   StartTimeSheet,
   VenueSheet,
+  VoidSeatingSheet,
   VoidSheet,
 } from "../features/RecordingForms";
 import { LiveSessionsBar } from "../features/LiveBar";
-import { EntryInspector, History } from "../features/VisitHistory";
+import { liveOccupants, SeatPickerSheet } from "../features/SeatPickerSheet";
+import { EntryInspector, History, SeatingInspector } from "../features/VisitHistory";
 import { ShareCardSheet } from "../features/ShareCardSheet";
 import { TableSection } from "../features/SharedTable";
 import { TableTripSheet, TripRow, useTripPickable } from "../features/TableTrip";
@@ -179,7 +190,10 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
   const [sharing, setSharing] = useState(false);
 
   const [saved, setSaved] = useState<{
-    entryId: EntryId;
+    key: string;
+    entryId?: EntryId;
+    seatingId?: SeatingId;
+    tableId?: TableId;
     text: string;
     undo?: boolean;
     visitId?: VisitId;
@@ -247,6 +261,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       formatDisplayMoney(MinorUnits.make(amount), RECORDING_CURRENCY, prefs);
 
     setSaved({
+      key: entryId,
       entryId,
       undo: input.type === "add" && input.kind === "buy_in",
       text:
@@ -281,6 +296,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
     if (receipt?.command.type === "add") {
       setNotice(null);
       setSaved({
+        key: receipt.command.entryId,
         entryId: receipt.command.entryId,
         text: `Rebuy of ${formatDisplayMoney(MinorUnits.make(amount), RECORDING_CURRENCY, prefs)} recorded.`,
         undo: true,
@@ -298,13 +314,36 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
     });
 
     if (receipt)
-      setSaved({ entryId, visitId: of, text: "Rebuy undone. It stays in the history, voided." });
+      setSaved({
+        key: `undone-${entryId}`,
+        entryId,
+        visitId: of,
+        text: "Rebuy undone. It stays in the history, voided.",
+      });
+  };
+
+  const undoSeat = async (seatingId: SeatingId, tableId: TableId, of: VisitId = visitId) => {
+    const receipt = await quick.submit({
+      type: "void_seating",
+      tableId,
+      visitId: of,
+      seatingId,
+      reason: UNDONE_REASON,
+    });
+
+    if (receipt) {
+      setSaved({
+        key: `undone-seat-${seatingId}`,
+        text: "Seat change undone.",
+      });
+    }
   };
 
   const fromTable = ({ entryId, ...rest }: TableRecorded) => {
     close();
 
-    if (entryId) setSaved({ entryId, ...rest });
+    if (entryId || rest.seatingId)
+      setSaved(entryId ? { key: entryId, entryId, ...rest } : { key: rest.seatingId!, ...rest });
     else {
       setSaved(null);
       setNotice(rest.text);
@@ -424,7 +463,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
     );
 
   const toast = saved ? (
-    <RecordingToast key={saved.entryId} felt={live} onDismiss={() => setSaved(null)}>
+    <RecordingToast key={saved.key} felt={live} onDismiss={() => setSaved(null)}>
       <Text
         className={cn(
           "min-w-0 flex-1 text-sm",
@@ -442,7 +481,11 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           <Pressable
             accessibilityRole="button"
             disabled={quick.pending}
-            onPress={() => void undo(saved.entryId, saved.visitId)}
+            onPress={() => {
+              if (saved.seatingId && saved.tableId)
+                void undoSeat(saved.seatingId, saved.tableId, saved.visitId);
+              else if (saved.entryId) void undo(saved.entryId, saved.visitId);
+            }}
             className="px-2 py-1 active:opacity-70"
           >
             <Text className="type-callout font-semibold text-[#6EE7B7]">Undo</Text>
@@ -453,10 +496,14 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
             variant={live ? "felt" : "secondary"}
             pending={quick.pending}
             size="sm"
-            onPress={() => void undo(saved.entryId, saved.visitId)}
+            onPress={() => {
+              if (saved.seatingId && saved.tableId)
+                void undoSeat(saved.seatingId, saved.tableId, saved.visitId);
+              else if (saved.entryId) void undo(saved.entryId, saved.visitId);
+            }}
           />
         )
-      ) : saved.visitId && saved.visitId !== visitId ? (
+      ) : !saved.entryId || (saved.visitId && saved.visitId !== visitId) ? (
         Platform.OS === "android" ? null : (
           <Button
             label="Dismiss"
@@ -468,7 +515,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       ) : Platform.OS === "android" ? (
         <Pressable
           accessibilityRole="button"
-          onPress={() => setOpen({ type: "inspect", entryId: saved.entryId })}
+          onPress={() => setOpen({ type: "inspect", entryId: saved.entryId! })}
           className="px-2 py-1 active:opacity-70"
         >
           <Text className="type-callout font-semibold text-[#6EE7B7]">View entry</Text>
@@ -478,7 +525,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           label="View entry"
           variant={live ? "felt" : "secondary"}
           size="sm"
-          onPress={() => setOpen({ type: "inspect", entryId: saved.entryId })}
+          onPress={() => setOpen({ type: "inspect", entryId: saved.entryId! })}
         />
       )}
     </RecordingToast>
@@ -604,62 +651,97 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
       {live ? (
         <>
           <LiveVisitHero visit={visit} name={own ? undefined : player?.player.displayName} />
-          <View className="items-center">
+          <View className="items-center gap-2">
             <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} felt />
+            {seats && seats.tableSeats !== null ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  visit.currentSeat === null
+                    ? "Seat: Not set. Pick seat"
+                    : `Seat: ${formatSeatLabel(visit.currentSeat, seats.tableSeats)}. Change seat`
+                }
+                onPress={() => setOpen({ type: "seat" })}
+                className="min-h-11 flex-row items-center gap-1.5 rounded-full border border-felt-ink/25 bg-felt-deep px-4 py-2 active:opacity-80"
+              >
+                <Text className="type-footnote font-semibold text-felt-ink">
+                  {visit.currentSeat === null
+                    ? "+ Pick seat"
+                    : formatSeatLabel(visit.currentSeat, seats.tableSeats)}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
           {seats && shared ? (
             <TableSeats
               table={seats}
               current={visitId}
-              onSeat={(seat) => setOpen({ type: "seat", seat })}
+              onSeat={(seat) => setOpen({ type: "player_seat", seat })}
               onSelf={(next) => navigation.dispatch(StackActions.push("Play", { visitId: next }))}
             />
           ) : null}
         </>
       ) : (
         <>
-          {Platform.OS === "android" ? (
-            <View className="flex-row items-center gap-3.5">
-              <GameTile game={visit.table.game} gameName={visit.table.gameName} />
-              <View className="min-w-0 flex-1 gap-0.5">
+          {(() => {
+            const totalSeats = seatCount(visit.table);
+
+            const seatSummary =
+              totalSeats === null || visit.seatOutcome.kind === "none"
+                ? null
+                : visit.seatOutcome.kind === "multiple"
+                  ? "Multiple seats"
+                  : formatSeatLabel(visit.seatOutcome.seat, totalSeats);
+
+            if (Platform.OS === "android")
+              return (
+                <View className="flex-row items-center gap-3.5">
+                  <GameTile game={visit.table.game} gameName={visit.table.gameName} />
+                  <View className="min-w-0 flex-1 gap-0.5">
+                    <Text
+                      accessibilityRole="header"
+                      className="type-title text-[24px] leading-[30px] text-ink"
+                    >
+                      {own
+                        ? visitTitle(visit.table)
+                        : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
+                    </Text>
+                    <Text className="type-footnote text-muted">
+                      {[visit.venue?.name, seatSummary, formatDay(start)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </Text>
+                    <Text className="type-footnote text-muted tabular-nums">
+                      {`${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`}
+                    </Text>
+                  </View>
+                </View>
+              );
+
+            return (
+              <>
                 <Text
                   accessibilityRole="header"
-                  className="type-title text-[24px] leading-[30px] text-ink"
+                  className="type-title text-[28px] leading-[34px] text-ink"
                 >
                   {own
                     ? visitTitle(visit.table)
                     : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
                 </Text>
                 <Text className="type-footnote text-muted">
-                  {[visit.venue?.name, formatDay(start)].filter(Boolean).join(" · ")}
+                  {[
+                    "Finished",
+                    visit.venue?.name,
+                    seatSummary,
+                    formatDay(start),
+                    `${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </Text>
-                <Text className="type-footnote text-muted tabular-nums">
-                  {`${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`}
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <>
-              <Text
-                accessibilityRole="header"
-                className="type-title text-[28px] leading-[34px] text-ink"
-              >
-                {own
-                  ? visitTitle(visit.table)
-                  : `${player!.player.displayName} · ${visitTitle(visit.table)}`}
-              </Text>
-              <Text className="type-footnote text-muted">
-                {[
-                  "Finished",
-                  visit.venue?.name,
-                  formatDay(start),
-                  `${formatTime(start)}–${formatTime(visit.visit.finishedAt!)}`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </Text>
-            </>
-          )}
+              </>
+            );
+          })()}
           <VisitHero visit={visit} own={own} />
           <SaveStatus status={status} error={error} onRetry={retryLoad} visitId={visitId} />
           <TableSection
@@ -676,6 +758,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
             own={own}
             who={name}
             onInspect={(entryId) => setOpen({ type: "inspect", entryId })}
+            onInspectSeating={(seatingId) => setOpen({ type: "inspect_seating", seatingId })}
           />
         </>
       )}
@@ -701,7 +784,7 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           onClose={close}
           onAdded={(name) => edited(`${name} is at the table.`)}
         />
-      ) : open?.type === "seat" && seats ? (
+      ) : open?.type === "player_seat" && seats ? (
         <SeatSheet
           seat={open.seat}
           table={seats}
@@ -709,12 +792,39 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           onRecorded={fromTable}
           onSeated={(_, name) => edited(`${name} is back at the table.`)}
         />
+      ) : open?.type === "seat" ? (
+        <SeatPickerSheet
+          mode="visit"
+          visit={visit}
+          tableSeats={seatCount(visit.table) ?? 5}
+          canEditTable={canEditTable}
+          occupants={seats ? liveOccupants(seats) : undefined}
+          who={own ? undefined : name}
+          back={open.from === "edit"}
+          depth={open.from === "edit" ? 1 : 0}
+          onClose={close}
+          onSaved={(picked) => {
+            close();
+            setNotice(null);
+            setSaved({
+              key: picked.seatingId,
+              seatingId: picked.seatingId,
+              tableId: picked.tableId,
+              visitId: picked.visitId,
+              text: picked.text,
+              undo: picked.undo,
+            });
+          }}
+          onTableSeatsSaved={(count) => edited(`Table set to ${count} seats.`)}
+          onOpenHistory={() => setOpen({ type: "history" })}
+        />
       ) : open?.type === "history" ? (
         <Sheet open back title={own ? "Your history" : `${name}'s history`} onClose={close}>
           <History
             visit={visit}
             heading={false}
             onInspect={(entryId) => setOpen({ type: "inspect", entryId })}
+            onInspectSeating={(seatingId) => setOpen({ type: "inspect_seating", seatingId })}
           />
         </Sheet>
       ) : null}
@@ -819,9 +929,43 @@ function Visit({ visitId, action }: { visitId: VisitId; action?: string }) {
           onClose={close}
           onVoided={() => {
             close();
-            setSaved({ entryId: open.entryId, text: "Entry voided. It stays in the history." });
+            setSaved({
+              key: open.entryId,
+              entryId: open.entryId,
+              text: "Entry voided. It stays in the history.",
+            });
           }}
         />
+      ) : open?.type === "inspect_seating" || open?.type === "void_seating" ? (
+        (() => {
+          const seating = visit.seatings.find((item) => item.id === open.seatingId);
+
+          if (!seating) return null;
+
+          if (open.type === "inspect_seating")
+            return (
+              <SeatingInspector
+                visit={visit}
+                seating={seating}
+                onClose={close}
+                onVoid={() => setOpen({ type: "void_seating", seatingId: open.seatingId })}
+              />
+            );
+
+          return (
+            <VoidSeatingSheet
+              visit={visit}
+              seating={seating}
+              totalSeats={seatCount(visit.table)}
+              onClose={close}
+              onVoided={() => {
+                close();
+                setSaved(null);
+                setNotice("Seat record voided. It stays in the history.");
+              }}
+            />
+          );
+        })()
       ) : null}
     </PersonalScreen>
   );
@@ -939,9 +1083,7 @@ function EditSessionSheet({
   const [time, setTime] = useState(() => localTimeText(initial));
   const [startError, setStartError] = useState<string | null>(null);
 
-  const fields = sessionEditFields(visit, canEditTable).flatMap((item) =>
-    item.field === "seat" ? [] : [{ ...item, field: item.field }],
-  );
+  const fields = sessionEditFields(visit, canEditTable);
 
   const tripPickable = useTripPickable(visit.table.tripId !== null);
   const tripRow = showTrip && tripPickable;
@@ -986,7 +1128,10 @@ function EditSessionSheet({
       >
         <List>
           {fields.map(({ field: type, label, value }) => (
-            <Row key={type} onPress={() => onOpen({ type })}>
+            <Row
+              key={type}
+              onPress={() => onOpen(type === "seat" ? { type: "seat", from: "edit" } : { type })}
+            >
               <Text className="flex-1 type-body text-ink">{label}</Text>
               <Text className="max-w-[60%] shrink type-callout text-muted">{value}</Text>
               <Icon name="chevron-right" color="muted" size={18} />
@@ -1012,7 +1157,8 @@ function EditSessionSheet({
         ) : null}
       </Sheet>
     );
-  const buyInValue = fields.find((f) => f.field === "buy_in")?.value ?? "";
+  const buyInField = fields.find((f) => f.field === "buy_in");
+  const seatField = fields.find((f) => f.field === "seat");
   const gameValue = fields.find((f) => f.field === "game")?.value ?? "Not set";
   const venueValue = fields.find((f) => f.field === "venue")?.value ?? "Not set";
 
@@ -1024,11 +1170,20 @@ function EditSessionSheet({
       footer={<Button label="Done" size="lg" onPress={onClose} />}
     >
       <List>
-        <Row onPress={() => onOpen({ type: "buy_in" })}>
-          <Text className="flex-1 type-body text-ink">Buy-in total</Text>
-          <Text className="max-w-[60%] shrink type-callout text-muted">{buyInValue}</Text>
-          <Icon name="chevron-right" color="muted" size={18} />
-        </Row>
+        {buyInField ? (
+          <Row onPress={() => onOpen({ type: "buy_in" })}>
+            <Text className="flex-1 type-body text-ink">Buy-in total</Text>
+            <Text className="max-w-[60%] shrink type-callout text-muted">{buyInField.value}</Text>
+            <Icon name="chevron-right" color="muted" size={18} />
+          </Row>
+        ) : null}
+        {seatField ? (
+          <Row onPress={() => onOpen({ type: "seat", from: "edit" })}>
+            <Text className="flex-1 type-body text-ink">Seat</Text>
+            <Text className="max-w-[60%] shrink type-callout text-muted">{seatField.value}</Text>
+            <Icon name="chevron-right" color="muted" size={18} />
+          </Row>
+        ) : null}
         <Row>
           <Text className="flex-1 type-body text-ink">Started</Text>
           <View className="flex-row items-center gap-2">

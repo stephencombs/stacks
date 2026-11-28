@@ -16,7 +16,7 @@ import {
   tableTitle,
   UNDONE_REASON,
 } from "@stacks/client-runtime/recordingView";
-import { TableId, type EntryId, type VisitId } from "@stacks/contracts";
+import { TableId, type EntryId, type SeatingId, type VisitId } from "@stacks/contracts";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import { useLayoutEffect, useState } from "react";
@@ -117,7 +117,7 @@ function Table({ tableId }: { tableId: TableId }) {
   const quick = useRecordingSubmit();
   const [open, setOpen] = useState<Open | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [saved, setSaved] = useState<(TableRecorded & { entryId: EntryId }) | null>(null);
+  const [saved, setSaved] = useState<(TableRecorded & { readonly key: string }) | null>(null);
 
   const deletion = useDeleteTable(tableId, () =>
     navigation.navigate("Tabs", { screen: "PlayTab", params: { screen: "Home" } }),
@@ -147,14 +147,44 @@ function Table({ tableId }: { tableId: TableId }) {
   const recorded = ({ entryId, ...rest }: TableRecorded) => {
     close();
 
-    if (entryId) setSaved({ entryId, ...rest });
+    if (entryId || rest.seatingId)
+      setSaved(entryId ? { key: entryId, entryId, ...rest } : { key: rest.seatingId!, ...rest });
     else {
       setSaved(null);
       setNotice(rest.text);
     }
   };
 
-  const undo = async ({ entryId, visitId }: { entryId: EntryId; visitId: VisitId }) => {
+  const undo = async ({
+    entryId,
+    seatingId,
+    tableId: undoTableId,
+    visitId,
+  }: {
+    entryId?: EntryId;
+    seatingId?: SeatingId;
+    tableId?: TableId;
+    visitId: VisitId;
+  }) => {
+    if (seatingId && undoTableId) {
+      const receipt = await quick.submit({
+        type: "void_seating",
+        tableId: undoTableId,
+        visitId,
+        seatingId,
+        reason: UNDONE_REASON,
+      });
+
+      if (receipt) {
+        setSaved(null);
+        setNotice("Seat change undone.");
+      }
+
+      return;
+    }
+
+    if (!entryId) return;
+
     const receipt = await quick.submit({
       type: "correct",
       visitId,
@@ -185,7 +215,7 @@ function Table({ tableId }: { tableId: TableId }) {
       felt={!view.closed}
       toast={
         saved ? (
-          <RecordingToast key={saved.entryId} felt={!view.closed} onDismiss={() => setSaved(null)}>
+          <RecordingToast key={saved.key} felt={!view.closed} onDismiss={() => setSaved(null)}>
             <Text
               className={cn(
                 "min-w-0 flex-1 text-sm",

@@ -79,6 +79,25 @@ vi.mock("react-native", () => ({
 
 vi.mock("uniwind", () => ({ useCSSVariable: () => "#999999" }));
 
+vi.mock("react-native-svg", () => ({
+  default: () => null,
+  Circle: () => null,
+  Defs: () => null,
+  Ellipse: () => null,
+  G: () => null,
+  Line: () => null,
+  LinearGradient: () => null,
+  Path: () => null,
+  RadialGradient: () => null,
+  Rect: () => null,
+  Stop: () => null,
+  Text: () => null,
+}));
+
+vi.mock("../lib/useLargeText", () => ({ useLargeText: () => false }));
+
+vi.mock("../components/ui/motion", () => ({ useReducedMotion: () => false }));
+
 vi.mock("../lib/contactPhotos", () => ({
   linkContactPhoto: (playerId: string, uri: string) => mocks.linked.push([playerId, uri] as const),
   discardContactPick: (uri: string) => mocks.discarded.push(uri),
@@ -95,6 +114,7 @@ vi.mock("../../modules/contact-picker/src", async (original) => ({
 
 vi.mock("@stacks/client-runtime/recordingReact", async (original) => ({
   ...(await original<typeof import("@stacks/client-runtime/recordingReact")>()),
+  useServerTable: () => null,
   useRecordingSubmit: () => ({
     pending: false,
     error: null,

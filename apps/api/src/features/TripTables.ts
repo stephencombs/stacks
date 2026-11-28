@@ -14,7 +14,13 @@ import {
 } from "@stacks/contracts";
 import { groupTable, inGroupAt } from "@stacks/shared/tripTables";
 
-import { PersonalEntryRow, PersonalVisitRow, TableRow, VenueRow } from "../db/rows.ts";
+import {
+  PersonalEntryRow,
+  PersonalSeatingRow,
+  PersonalVisitRow,
+  TableRow,
+  VenueRow,
+} from "../db/rows.ts";
 import { decodeRows } from "./Access.ts";
 import { venueColumns } from "./Views.ts";
 
@@ -59,7 +65,7 @@ export const load = Effect.fn("TripTables.load")(function* (
     new Set(tables.flatMap((table) => (table.venueId === null ? [] : [table.venueId]))),
   );
 
-  const [visits, entries, players, members, absences, venues, pinned] = yield* Effect.all(
+  const [visits, entries, players, members, absences, venues, pinned, seatings] = yield* Effect.all(
     [
       sql`
         select * from personal_visits where table_id in ${sql.in(tableIds)} and deleted_at is null
@@ -134,6 +140,11 @@ export const load = Effect.fn("TripTables.load")(function* (
           where table_id in ${sql.in(tableIds)} and group_player_id is not null
         )
       `.pipe(Effect.flatMap(decodeRows(Schema.Struct({ id: PlayerId, groupId: GroupId })))),
+      sql`
+        select s.* from personal_seatings s join personal_visits v on v.id = s.visit_id
+        where v.table_id in ${sql.in(tableIds)} and v.deleted_at is null and s.voided_at is null
+        order by s.occurred_at, s.created_at, s.id
+      `.pipe(Effect.flatMap(decodeRows(PersonalSeatingRow))),
     ],
     { concurrency: "unbounded" },
   );
@@ -171,6 +182,7 @@ export const load = Effect.fn("TripTables.load")(function* (
         return memberAt(visit.playerId, visit.startedAt);
       },
       (counterpartyId, visit) => memberAt(counterpartyId, visit.startedAt),
+      seatings.filter((seating) => visitIds.has(seating.visitId)),
     );
 
     if (!table) return [];
@@ -208,6 +220,7 @@ export const load = Effect.fn("TripTables.load")(function* (
         myVisitId: mine?.id ?? null,
         memberMilliseconds: table.memberMilliseconds,
         visits: table.visits,
+        seatVisits: table.seatVisits,
       },
     ];
   });

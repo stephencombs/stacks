@@ -6,8 +6,15 @@ import {
   useServerTable,
   useTableSharing,
 } from "@stacks/client-runtime/recordingReact";
-import { RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
+import { formatSeatLabel, RECORDING_CURRENCY } from "@stacks/client-runtime/recordingView";
 import type { PlayerId, PlayerIdentity, TableId, VisitId } from "@stacks/contracts";
+import {
+  seatCount,
+  sortSeatings,
+  tableLiveSeats,
+  tableSizes,
+  visitSeatOutcome,
+} from "@stacks/shared/seats";
 import * as Match from "effect/Match";
 import { useState } from "react";
 import { Platform, View } from "react-native";
@@ -16,7 +23,7 @@ import { Text } from "../components/ui/Text";
 import { Money } from "../components/Money";
 import { confirmAction } from "../components/ui/confirmAction";
 import { Button } from "../components/ui/Button";
-import { FormError } from "../components/ui/Field";
+import { Choice, FormError } from "../components/ui/Field";
 import { Sheet } from "../components/ui/Sheet";
 import { List, Row, SectionHeading, Tag } from "../components/ui/Surface";
 import { useAccount } from "../lib/account";
@@ -54,6 +61,37 @@ export function TableSection({
 
   const others = table.visits.some((item) => !item.isSelf);
   const signedOut = account.available && account.isLoaded && !account.isSignedIn;
+  const totalSeats = seatCount(table.table);
+
+  const occupied =
+    totalSeats === null
+      ? new Map<number, VisitId>()
+      : tableLiveSeats(
+          table.visits.map((item) => item.visit),
+          table.seatings,
+        );
+
+  const liveSeatByVisit = new Map<VisitId, number>();
+
+  for (const [seatNumber, visitId] of occupied) liveSeatByVisit.set(visitId, seatNumber);
+
+  const rowSeat = (visitId: VisitId, live: boolean) => {
+    if (totalSeats === null) return null;
+
+    if (live) {
+      const seat = liveSeatByVisit.get(visitId);
+
+      return seat === undefined ? null : formatSeatLabel(seat, totalSeats);
+    }
+
+    const outcome = visitSeatOutcome(table.seatings.filter((s) => s.visitId === visitId));
+
+    if (outcome.kind === "seat") return formatSeatLabel(outcome.seat, totalSeats);
+
+    if (outcome.kind === "multiple") return "Multiple seats";
+
+    return null;
+  };
 
   return (
     <View className="gap-2">
@@ -66,33 +104,40 @@ export function TableSection({
         At this table
       </SectionHeading>
       <List>
-        {table.visits.map((item) => (
-          <Row
-            key={item.visit.id}
-            onPress={() => onOpen(item.visit.id)}
-            accessibilityHint="Opens their session"
-          >
-            <PlayerAvatar
-              playerId={item.player.id}
-              name={names.get(item.player.id) ?? item.player.displayName}
-              size={TABLE_AVATAR_SIZE}
-              you={item.isSelf}
-            />
-            <View className="min-w-0 flex-1 gap-0.5">
-              <Text className="font-medium text-ink">{names.get(item.player.id)}</Text>
-              <Text className="text-sm text-muted">
-                {item.finalResult === null
-                  ? `Playing since ${formatTime(item.visit.startedAt)}`
-                  : `Finished ${formatTime(item.visit.finishedAt!)}`}
-              </Text>
-            </View>
-            {item.finalResult === null ? (
-              <Tag tone="live">Live</Tag>
-            ) : (
-              <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
-            )}
-          </Row>
-        ))}
+        {table.visits.map((item) => {
+          const seatLabelText = rowSeat(item.visit.id, item.finalResult === null);
+
+          const baseStatus =
+            item.finalResult === null
+              ? `Playing since ${formatTime(item.visit.startedAt)}`
+              : `Finished ${formatTime(item.visit.finishedAt!)}`;
+
+          return (
+            <Row
+              key={item.visit.id}
+              onPress={() => onOpen(item.visit.id)}
+              accessibilityHint="Opens their session"
+            >
+              <PlayerAvatar
+                playerId={item.player.id}
+                name={names.get(item.player.id) ?? item.player.displayName}
+                size={TABLE_AVATAR_SIZE}
+                you={item.isSelf}
+              />
+              <View className="min-w-0 flex-1 gap-0.5">
+                <Text className="font-medium text-ink">{names.get(item.player.id)}</Text>
+                <Text className="text-sm text-muted">
+                  {seatLabelText ? `${seatLabelText} · ${baseStatus}` : baseStatus}
+                </Text>
+              </View>
+              {item.finalResult === null ? (
+                <Tag tone="live">Live</Tag>
+              ) : (
+                <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
+              )}
+            </Row>
+          );
+        })}
       </List>
       {Platform.OS === "android" ? null : (
         <View className="flex-row flex-wrap gap-2">
@@ -245,6 +290,45 @@ function JoinedTableSection({
   ];
 
   const labels = distinctPlayerNames(rows.map((item) => [item.visit.playerId, item.name]));
+  const totalSeats = seatCount(server?.table ?? table.table);
+  const localIds = new Set(table.visits.map((item) => item.visit.id));
+
+  const combinedSeatings = [
+    ...table.seatings,
+    ...(server?.seatings ?? []).filter((seating) => !localIds.has(seating.visitId)),
+  ];
+
+  const occupied =
+    totalSeats === null
+      ? new Map<number, VisitId>()
+      : tableLiveSeats(
+          rows.map((item) => item.visit),
+          combinedSeatings,
+        );
+
+  const liveSeatByVisit = new Map<VisitId, number>();
+
+  for (const [seatNumber, visitId] of occupied) liveSeatByVisit.set(visitId, seatNumber);
+
+  const rowSeat = (visitId: VisitId, live: boolean) => {
+    if (totalSeats === null) return null;
+
+    if (live) {
+      const seat = liveSeatByVisit.get(visitId);
+
+      return seat === undefined ? null : formatSeatLabel(seat, totalSeats);
+    }
+
+    const outcome = visitSeatOutcome(
+      sortSeatings(combinedSeatings.filter((seating) => seating.visitId === visitId)),
+    );
+
+    if (outcome.kind === "seat") return formatSeatLabel(outcome.seat, totalSeats);
+
+    if (outcome.kind === "multiple") return "Multiple seats";
+
+    return null;
+  };
 
   return (
     <View className="gap-2">
@@ -257,34 +341,41 @@ function JoinedTableSection({
         At this table
       </SectionHeading>
       <List>
-        {rows.map((item) => (
-          <Row
-            key={item.visit.id}
-            {...(item.mine
-              ? { onPress: () => onOpen(item.visit.id), accessibilityHint: "Opens your session" }
-              : {})}
-          >
-            <PlayerAvatar
-              playerId={item.visit.playerId}
-              name={labels.get(item.visit.playerId) ?? item.name}
-              size={TABLE_AVATAR_SIZE}
-              you={item.mine}
-            />
-            <View className="min-w-0 flex-1 gap-0.5">
-              <Text className="font-medium text-ink">{labels.get(item.visit.playerId)}</Text>
-              <Text className="text-sm text-muted">
-                {item.finalResult === null
-                  ? `Playing since ${formatTime(item.visit.startedAt)}`
-                  : `Finished ${formatTime(item.visit.finishedAt!)}`}
-              </Text>
-            </View>
-            {item.finalResult === null ? (
-              <Tag tone="live">Live</Tag>
-            ) : (
-              <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
-            )}
-          </Row>
-        ))}
+        {rows.map((item) => {
+          const seatLabelText = rowSeat(item.visit.id, item.finalResult === null);
+
+          const baseStatus =
+            item.finalResult === null
+              ? `Playing since ${formatTime(item.visit.startedAt)}`
+              : `Finished ${formatTime(item.visit.finishedAt!)}`;
+
+          return (
+            <Row
+              key={item.visit.id}
+              {...(item.mine
+                ? { onPress: () => onOpen(item.visit.id), accessibilityHint: "Opens your session" }
+                : {})}
+            >
+              <PlayerAvatar
+                playerId={item.visit.playerId}
+                name={labels.get(item.visit.playerId) ?? item.name}
+                size={TABLE_AVATAR_SIZE}
+                you={item.mine}
+              />
+              <View className="min-w-0 flex-1 gap-0.5">
+                <Text className="font-medium text-ink">{labels.get(item.visit.playerId)}</Text>
+                <Text className="text-sm text-muted">
+                  {seatLabelText ? `${seatLabelText} · ${baseStatus}` : baseStatus}
+                </Text>
+              </View>
+              {item.finalResult === null ? (
+                <Tag tone="live">Live</Tag>
+              ) : (
+                <Money amount={item.finalResult} currency={RECORDING_CURRENCY} tone="result" />
+              )}
+            </Row>
+          );
+        })}
       </List>
       <Text className="text-sm text-muted">
         {server === null
@@ -312,6 +403,36 @@ export function TableSettingsSheet({
   const recording = useRecordingSubmit();
   const [inviting, setInviting] = useState<PlayerIdentity | null>(null);
   const [stopped, setStopped] = useState(false);
+  const [sizeError, setSizeError] = useState<string | null>(null);
+  const totalSeats = seatCount(table.table);
+
+  const occupied =
+    totalSeats === null
+      ? new Map<number, VisitId>()
+      : tableLiveSeats(
+          table.visits.map((item) => item.visit),
+          table.seatings,
+        );
+
+  const maxLive = occupied.size === 0 ? 0 : Math.max(...occupied.keys());
+
+  const bjSizeOptions = (tableSizes.blackjack?.sizes ?? [5, 6, 7]).map((n) => ({
+    value: String(n),
+    label: `${n} seats`,
+  }));
+
+  const changeSize = (next: string) => {
+    const count = Number(next);
+
+    if (count < maxLive) {
+      setSizeError(`Can't shrink to ${count} seats while Seat ${maxLive} is occupied.`);
+
+      return;
+    }
+
+    setSizeError(null);
+    void recording.submit({ type: "set_table_seats", tableId, tableSeats: count });
+  };
 
   const players = [
     ...new Map(
@@ -344,6 +465,18 @@ export function TableSettingsSheet({
       description="Only you see these: you started this table."
     >
       <View className="gap-4">
+        {totalSeats !== null ? (
+          <View className="gap-2">
+            <SectionHeading>Table size</SectionHeading>
+            <Choice
+              label="Table size"
+              options={bjSizeOptions}
+              value={String(totalSeats)}
+              onChange={changeSize}
+            />
+            {sizeError ? <FormError>{sizeError}</FormError> : null}
+          </View>
+        ) : null}
         {!sharing.ready ? (
           <>
             <Text className="text-sm text-muted">
